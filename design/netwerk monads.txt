@@ -127,20 +127,24 @@ bindAndUpdate Node [1,2] (Node <<< map add1) (arrayMapDelta add1)							a = Arra
 bindAndUpdate Node [1,2] (Node <<< bind \x -> [x-1, x+1]) (arrayBindDelta \x -> [x-1, x+1])	a = Array Int, b = Array Int
 bindAndUpdate Node 1 (Node <<< \x -> [x-1, x+1]) (singleValueDelta add1)					a = Int, b = Array Int
 
-singleValueDelta, arrayMapDelta en arrayBindDelta produceren een update functie (Delta a -> b -> b) uit een functie a -> b.
+singleValueDelta, arrayMapDelta en arrayBindDelta produceren een update functie (Delta a -> b -> b) uit een functioneel argument dat varieert.
+Bij de typering hieronder moeten de types per positie afgebeeld kunnen worden op de overeenkomende posities van de typering van de bindAndUpdate functie van de NetworkMonad.
 
-singleValueDelta :: forall a b. (a -> b) -> Delta a -> b -> b
+Hier geldt: a = a, b = b
+singleValueDelta :: forall x y. (x -> y) -> Delta x -> y -> y
 singleValueDelta f (Erbij a) payload = f a
 singleValueDelta f (Eraf a) payload = unit
 
-arrayMapDelta :: forall a b. (ea -> eb) -> Delta Array a -> Array b -> Array b
+Hier geldt: a = Array x, b = Array y
+arrayMapDelta :: forall x y. (x -> y) -> Delta Array x -> Array y -> Array y
 arrayMapDelta f (Erbij [a]) payload = nettoAddTo! payload f a
 arrayMapDelta f (Eraf [a]) payload = removeFrom! payload f a
 
 nettoAddTo! :: Array a -> a -> Array a
 removeFrom! :: Array a -> a -> Array a
 
-arrayBindDelta :: forall a b. ( a -> b) -> Delta a -> b -> b
+Hier geldt: a = Array x, b = Array y
+arrayBindDelta :: forall x y. ( x -> Array y) -> Delta Array x -> Array y -> Array y
 arrayBindDelta f (Erbij [a]) payload = first <<< map (\d -> nettoAddTo! d) (f a)
 arrayBindDelta f (Eraf [a]) payload = first <<< map (\d -> removeFrom! d) (f a)
 
