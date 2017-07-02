@@ -1,0 +1,157 @@
+
+Ik wil op het niveau van NetworkNode een aantal functies kunnen maken zoals addDependent. 
+Deze moeten werken voor alle specialisaties van NetworkNode, d.w.z. het product van de dimensie Singleton - Sequence X het type payload.
+
+Daarnaast wil ik voor Singleton en Sequence specialisaties kunnen schrijven van sommige andere functies, zoals processDeltas.
+
+Edges dragen een update functie die gespecialiseerd is voor de target node. Immers, de functie ontvangt delta's (waar die vandaan komen is niet van belang) en moet die omzetten naar delta's op de target. Overigens kan zo'n functie geschreven zijn in termen van een andere NetworkNode. Denk aan union of plus: een delta leidt tot delta's in combinatie met de payload van het andere argument.
+
+Je zou zeggen dat zo'n deltafunctie dan toch ook getypeerd moet zijn in termen van de netwerknodes waar hij naar kijkt en op werkt?
+
+Delta is natuurlijk een type constructor met een parameter die varieert over het type payload. Update is een functie in termen van Delta a, dus Update a is ook gespecialiseerd voor een type payload.
+
+=========================================================================================================
+
+NetworkNodes met een Maybe value en NetworkNodes met een Array value.
+Edges met een update functie van a -> a en Edges met een update functie van a -> Array a.
+
+Edge = SingleEdge (a -> b) Node | MultipleEdge (a -> Array b) Node
+
+Node a = Singleton (Maybe a) | Sequence (Array a)
+
+Vier combinaties met Int en twee functies add1 en \x -> [x+1, x-1], waarbij Node de source van de edge is!
+
+SingleEdge add1 (Singleton (Maybe Int))
+SingleEdge add1 (Sequence (Array Int))
+MultipleEdge \x -> [x-1, x+1] (Singleton (Maybe Int))
+MultipleEdge \x -> [x-1, x+1] (Sequence (Array Int))
+
+Gecombineerde types:
+
+SingleEdge (a -> b) (Singleton (Maybe a))
+SingleEdge (a -> b) (Sequence (Array a))
+MultipleEdge (a -> Array b) (Singleton (Maybe a))
+MultipleEdge (a -> Array b) (Sequence( Array a))
+
+Al deze types moeten een instantie zijn van Monad:
+
+instance Type1Monad :: Monad SingleEdge (a -> b) (Singleton (Maybe a)) where
+	bind f (Singleton (Just a)) = Singleton (Just (f a))
+	bind f (Singleton Nothing) = Singleton Nothing
+
+instance Type2Monad :: Monad SingleEdge (a -> b) (Sequence (Array a)) where
+	bind f (Sequence ar) = Sequence (map f ar)
+
+Dit is een probleem. Want 
+bind f (Singleton (Just a)) = Sequence [f a]
+bind f (Singleton Nothing) = Sequence []
+
+bind f (Sequence ar) = Sequence (bind f ar)
+
+=========================================================================================================
+
+NetworkNodes met een Maybe value en NetworkNodes met een Array value.
+Edges met een update functie van a -> a en Edges met een update functie van a -> Array a.
+
+Edge = SingleEdge Node | MultipleEdge Node
+
+Node a = Singleton (Maybe a) | Sequence (Array a)
+
+Gecombineerde types:
+
+SingleEdge (Singleton (Maybe a))
+SingleEdge (Sequence (Array a))
+MultipleEdge (Singleton (Maybe a))
+MultipleEdge (Sequence( Array a))
+
+Al deze types moeten een instantie zijn van Monad. Onderstaande definities kloppen niet, want het type resultaat van bind is niet hetzelfde type als het tweede argument!
+
+instance Type1Monad :: Monad SingleEdge (Singleton (Maybe a)) where
+	bind f SingleEdge (Singleton (Just a)) = Singleton (Just (f a))
+	bind f (SingleEdge (Singleton Nothing)) = Singleton Nothing
+
+instance Type2Monad :: Monad SingleEdge (Sequence (Array a)) where
+	bind f (SingleEdge (Sequence ar)) = Sequence (map f ar)
+
+
+bind f (Singleton (Just a)) = Sequence [f a]
+bind f (Singleton Nothing) = Sequence []
+
+bind f (Sequence ar) = Sequence (bind f ar)
+
+
+
+Met deze variant op bind:
+	bind f source@(SingleEdge (Singleton (Just a))) = connect source (Singleton (Just (f a)))
+waarin connect source teruggeeft, klopt het type wel, maar de semantiek toch niet.
+
+=========================================================================================================
+
+Nog eenvoudiger. Je hebt Node en die heeft een payload. Node is een Monad: het zij-effect van bind is dat we destructief de tweede parameter van een bind-applicatie verbinden met het resultaat ervan. Een Node representeert een waarde; een Dependent representeert de applicatie van een unaire functie op die waarde. Zo kunnen we om het even welke waarde en welke unaire functie toepassen. 
+Hebben we Node a en is de functie a->b, dan krijgen we een Node b.
+Hebben we een Node (Array a), dan kan de functie map (a -> b) zijn en krijgen we een Node (Array b)
+Hebben we een Node (array a), dan kan de functie ook bind (a -> Array b) zijn en krijgen we ook een Node (Array b).
+Enzovoort.
+Kortom, we gebruiken bind en de functie moet passen bij a in Node a.
+
+Hoe gaan we om met functies van meer dan één parameter? Dat heb ik opgelost in de Apply class in Perspectives2. We passen currying toe, mappen dan de gecurriede functie over de Node die het eerste argument representeert, en applyen het resultaat op de Node die het tweede argument representeert. Dat is lifting.
+
+
+Maar essentieel is dat we de update functie in bind hebben, want die koppelen we aan de verbinding tussen nodes. De update functie is echter niet hetzelfde als de functie die we toepassen om ineens het nieuwe resultaat te berekenen uit de input.
+
+Als we nu een variant maken van Monad? NetworkedMonad erft van Monad en heeft een aparte functie, 'update'. bind implementeren we dan voor een instance in termen van update van die instance.
+
+Of is update zoals bind, maar krijgt die twéé functies mee? De bind functie en de update functie?
+'bindAndUpdate', zeg maar:
+
+class Apply m <= Bind m where
+  bind :: forall a b. m a -> (a -> m b) -> m b
+
+class (Applicative m, Bind m) <= Monad m
+
+Class Monad m <= NetworkMonad m where
+	bindAndUpdate :: forall a b. m a -> (a -> m b) -> (Delta a -> b -> b) -> m b
+
+Hierin is 
+	Delta a -> b -> b
+de update functie, die een functie is van een delta uitgedrukt als payload a van de source (m a), de payload b van de target (m b) en de nieuwe payload van de target levert, d.w.z. b.
+
+Het resultaat van de update functie wordt destructief gebonden in de resultaat Node.
+
+HEEL BELANGRIJK: a in Delta a op de source die doorgezet wordt naar de target, moet dus hetzelfde type hebben als de payload van de source.
+Oftewel: in Node a en Delta a is 'a' een identiteit: het is hetzelfde type. Dus als de payload een array is, heb je een delta van een array (i.e. de inhoud van de delta is ook een array).
+
+Voorbeelden:
+bindAndUpdate Node 1 (Node <<< add1) (singleValueDelta add1)								a = Int, b = Int
+bindAndUpdate Node [1,2] (Node <<< map add1) (arrayMapDelta add1)							a = Array Int, b = Array Int
+bindAndUpdate Node [1,2] (Node <<< bind \x -> [x-1, x+1]) (arrayBindDelta \x -> [x-1, x+1])	a = Array Int, b = Array Int
+bindAndUpdate Node 1 (Node <<< \x -> [x-1, x+1]) (singleValueDelta add1)					a = Int, b = Array Int
+
+singleValueDelta, arrayMapDelta en arrayBindDelta produceren een update functie (Delta a -> b -> b) uit een functie a -> b.
+
+singleValueDelta :: forall a b. (a -> b) -> Delta a -> b -> b
+singleValueDelta f (Erbij a) payload = f a
+singleValueDelta f (Eraf a) payload = unit
+
+arrayMapDelta :: forall a b. (ea -> eb) -> Delta Array a -> Array b -> Array b
+arrayMapDelta f (Erbij [a]) payload = nettoAddTo! payload f a
+arrayMapDelta f (Eraf [a]) payload = removeFrom! payload f a
+
+nettoAddTo! :: Array a -> a -> Array a
+removeFrom! :: Array a -> a -> Array a
+
+arrayBindDelta :: forall a b. ( a -> b) -> Delta a -> b -> b
+arrayBindDelta f (Erbij [a]) payload = first <<< map (\d -> nettoAddTo! d) (f a)
+arrayBindDelta f (Eraf [a]) payload = first <<< map (\d -> removeFrom! d) (f a)
+
+bindAndUpdate (Node ResourceX) (Node <<< fProp 'owl:FunctionalProperty') singleValueDelta (fProp 'owl:FunctionalProperty')
+
+functionalProperty :: forall a b. String -> Node a -> Node b
+functionalProperty fname n@(Node (Array Resource)) = bindAndUpdate n (Node <<< map (fProp fname)) (arrayMapDelta (fProp fname)
+functionalProperty name n@(Node Resource) = bindAndUpdate n (Node <<< fProp fname) singleValueDelta (fProp fname)
+
+relationalProperty fname = ...
+
+property (Resource {id, isFunctional}) = ...
+
+
