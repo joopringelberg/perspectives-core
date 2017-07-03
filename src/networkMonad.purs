@@ -15,16 +15,16 @@ import Delta (Delta(..))
 -- | Notice, too, that the Delta is in terms of the type that is wrapped in Monad m. E.g., if a is Array x, we have
 -- | Delta Array x and not Delta a!
 class Monad m <= NetworkMonad m where
-	bindAndUpdate :: forall a b. m a -> (a -> m b) -> (Delta a -> b -> b) -> m b
+	bindAndUpdate :: forall a b. m a -> (a -> m b) -> (Delta a -> b -> Array (Delta b)) -> m b
 
-type Update a b = Delta a -> b -> b
+type Update a b = Delta a -> b -> Array (Delta b)
 
-{-}
 -- | Produces an Update function from a function from a to b.
-singleValueDelta :: forall a b. (a -> b) -> Delta a -> b -> Array Delta b
+singleValueDelta :: forall a b. (a -> b) -> Delta a -> b -> Array (Delta b)
 singleValueDelta f (Erbij a) payload = [Erbij (f a)]
 singleValueDelta f (Eraf a) payload = []
 
+{-}
 arrayMapDelta :: forall a b. (a -> b) -> Delta a -> b -> Array Delta b
 arrayMapDelta f (Erbij [a]) payload = [Erbij [(f a)]]
 arrayMapDelta f (Eraf [a]) payload = [Eraf [(f a)]]
