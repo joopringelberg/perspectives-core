@@ -24,11 +24,15 @@ singleValueDelta :: forall a b. (a -> b) -> Delta a -> b -> Array (Delta b)
 singleValueDelta f (Erbij a) payload = [Erbij (f a)]
 singleValueDelta f (Eraf a) payload = []
 
-{-}
-arrayMapDelta :: forall a b. (a -> b) -> Delta a -> b -> Array Delta b
+--| Produce an Update function from a function that maps an array element into another array element.
+--| Notice we only handle Arrays of length one in Deltas.
+arrayMapDelta :: forall a b. (a -> b) -> Delta (Array a) -> Array b -> Array (Delta (Array b))
 arrayMapDelta f (Erbij [a]) payload = [Erbij [(f a)]]
 arrayMapDelta f (Eraf [a]) payload = [Eraf [(f a)]]
+arrayMapDelta f (Erbij _) payload = []
+arrayMapDelta f (Eraf _) payload = []
 
+{-}
 arrayBindDelta :: forall a b. ( a -> b) -> Delta a -> b -> b
 arrayBindDelta f (Erbij [a]) payload = first <<< map (\d -> nettoAddTo d) (f a)
 arrayBindDelta f (Eraf [a]) payload = first <<< map (\d -> removeFrom d) (f a)
