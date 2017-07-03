@@ -9,7 +9,7 @@
 module Perspectives.NetworkMonad where
 
 import Control.Monad
-import Delta (Delta, Erbij, Eraf)
+import Delta (Delta(..))
 
 class Monad m <= NetworkMonad m where
 	bindAndUpdate :: forall a b. m a -> (a -> m b) -> (Delta a -> b -> b) -> m b

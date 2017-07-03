@@ -5,14 +5,12 @@
 -- | **Author** Joop Ringelberg
 
 module Delta
-  ( addDelta,
-    removeDelta,
-    converseDelta,
-    addDeltaTo,
-    Delta,
-    Deltas,
-    Erbij,
-    Eraf
+  (addDelta
+  , removeDelta
+  , converseDelta
+  , addDeltaTo
+  , Delta(..)
+  , Deltas
     )
 where
 import Prelude
