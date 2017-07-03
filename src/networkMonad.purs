@@ -29,5 +29,3 @@ arrayBindDelta f (Eraf [a]) payload = first <<< map (\d -> removeFrom d) (f a)
 
 foreign import nettoAddTo :: Array a -> a -> Array a
 foreign import removeFrom :: Array a -> a -> Array a
-
--- Een commentaar om te stagen.
