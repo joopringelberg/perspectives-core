@@ -32,11 +32,8 @@ arrayMapDelta f (Eraf [a]) payload = [Eraf [(f a)]]
 arrayMapDelta f (Erbij _) payload = []
 arrayMapDelta f (Eraf _) payload = []
 
-{-}
-arrayBindDelta :: forall a b. ( a -> b) -> Delta a -> b -> b
-arrayBindDelta f (Erbij [a]) payload = first <<< map (\d -> nettoAddTo d) (f a)
-arrayBindDelta f (Eraf [a]) payload = first <<< map (\d -> removeFrom d) (f a)
-
-foreign import nettoAddTo :: Array a -> a -> Array a
-foreign import removeFrom :: Array a -> a -> Array a
--}
+arrayBindDelta :: forall a b. ( a -> Array b) -> Delta (Array a) -> Array b -> Array (Delta (Array b))
+arrayBindDelta f (Erbij [a]) payload = map (\d -> Erbij [d]) (f a)
+arrayBindDelta f (Eraf [a]) payload = map (\d -> Eraf [d]) (f a)
+arrayBindDelta f (Erbij _) payload = []
+arrayBindDelta f (Eraf _) payload = []

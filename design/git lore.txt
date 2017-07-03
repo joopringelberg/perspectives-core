@@ -1,0 +1,6 @@
+ATOM/GIT HANDIGHEID
+
+1. Kort overzicht van commits (zie verder: https://git-scm.com/book/en/v2/Git-Basics-Viewing-the-Commit-History):
+
+	git log -5 --pretty=format:"%cr, %s"
+
