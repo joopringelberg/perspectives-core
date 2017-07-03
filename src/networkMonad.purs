@@ -4,7 +4,7 @@
 -- | **Copyright** Perspectives-IT 2017
 -- |
 -- | **Author** Joop Ringelberg
--- | test. en nog eens
+-- | test.
 
 module Perspectives.NetworkMonad where
 
