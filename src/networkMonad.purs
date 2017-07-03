@@ -37,3 +37,11 @@ arrayBindDelta f (Erbij [a]) payload = map (\d -> Erbij [d]) (f a)
 arrayBindDelta f (Eraf [a]) payload = map (\d -> Eraf [d]) (f a)
 arrayBindDelta f (Erbij _) payload = []
 arrayBindDelta f (Eraf _) payload = []
+
+{-
+-- Wat zou bindAndUpdate zijn voor Maybe?
+instance showDelta :: Show a => Show (Delta a) where
+
+instance NetworkMonadMaybe :: NetworkMonad Maybe where
+  bindAndUpdate (Just a) f update = bind (Just a) f
+-}
