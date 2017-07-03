@@ -39,3 +39,6 @@ Vanuit een Node verspreiden we de gecumuleerde deltas (en dat gebeurt pas als al
 Tenslotte hebben we de functie applyDeltas van een Node, die pas toegepast wordt als alle supports van de Node gepropageerd hebben. Deze applyDeltas roept applyUpdate aan op de payload, op elke Delta, en slaat die op in de Node. NB: we hebben de keuze om achtereenvolgens alle deltas toe te passen en het resultaat te assignen, en bij elke stap te assignen.
 
 
+====================================================================================================
+Praktische problemen:
+1. Ik wil een map van Edges, maar elke Edge mag wijzen naar een ander type node. D.w.z. Node is geparameteriseerd, maar ik wil in Edge niets zeggen over de waarde van die Node, behalve dat ie Updatable moet zijn.
