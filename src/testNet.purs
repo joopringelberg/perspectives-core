@@ -3,6 +3,8 @@
 module Test.Network where
 
 import Perspectives.DestructiveArray
+import Control.Bind
+import Control.Apply
 import Perspectives.DestructiveMap (DestructiveMap, setInMap, getFromMap, deleteFromMap)
 
 type Name = String
@@ -41,3 +43,14 @@ removeDependent	source@( Node { dependents }) name
         discard = deleteFromMap dependents name
     in
       deleteFromMap dependents name
+
+data NetworkNode a = NetworkNode a Node
+
+instance functorNetworkNode :: Functor NetworkNode where
+  map fn (NetworkNode x n) = NetworkNode (fn x) n
+
+instance applyNetworkNode :: Apply NetworkNode where
+  apply (NetworkNode fn n) x = fn <$> x
+
+instance bindNetworkNode :: Bind NetworkNode where
+  bind (NetworkNode a n) f = f a

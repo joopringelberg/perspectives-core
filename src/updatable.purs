@@ -1,4 +1,4 @@
--- | The Updatable class encapsulates the idea of updating a value to a new value
+-- | The Updatable class captures the idea of updating a value to a new value
 -- | from a Delta.
 -- |
 -- | **Copyright** Perspectives-IT 2017
