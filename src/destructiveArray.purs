@@ -9,8 +9,11 @@ module Perspectives.DestructiveArray
   , setInDestructiveArrayAt
   , pushInDestructiveArray
   , removeFromDestructiveArrayAt
+  , createDestructiveArray
   )
 where
+
+import Data.Unit
 
 newtype DestructiveArray a = DestructiveArray (Array a)
 
@@ -19,3 +22,5 @@ foreign import setInDestructiveArrayAt :: forall a. DestructiveArray a -> Int ->
 foreign import pushInDestructiveArray :: forall a. DestructiveArray a -> a -> DestructiveArray a
 
 foreign import removeFromDestructiveArrayAt :: forall a. DestructiveArray a -> Int -> DestructiveArray a
+
+foreign import createDestructiveArray :: forall a. Array a -> DestructiveArray a

@@ -29,3 +29,7 @@ exports.removeFromDestructiveArrayAt = function( a )
 		return a;
 	};
 };
+
+exports.createDestructiveArray = function( a ){
+  return a;
+};
