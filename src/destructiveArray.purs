@@ -13,8 +13,6 @@ module Perspectives.DestructiveArray
   )
 where
 
-import Data.Unit
-
 newtype DestructiveArray a = DestructiveArray (Array a)
 
 foreign import setInDestructiveArrayAt :: forall a. DestructiveArray a -> Int -> a -> DestructiveArray a
