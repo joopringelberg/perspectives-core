@@ -10,6 +10,7 @@ module Perspectives.Location where
 import Prelude
 import Data.Maybe
 import Perspectives.Node
+import Data.Unit (unit)
 
 -- | Save the Location in the Node. We need this to be able to retrieve it.
 -- | Return the Location for chaining.
@@ -26,15 +27,6 @@ locate :: forall a. a -> Location a
 locate a = saveLocation l node where
   l@(Location {node}) = Location { value: a, node: createNode unit }
 
-instance showLocation :: Show a => Show (Location a) where
-  show (Location { value, node }) = "Location(" <> show (getIndex node) <> ") "<> show value
-
-instance functorLocation :: Functor Location where
-  map fn (Location {value, node}) =
-    case maybeLocation node fn of
-      Nothing -> createLocation node (fn value) fn node
-      Just l -> l
-
 -- | Create a fresh Location holding the value and linked to the (origin) node through the function.
 createLocation :: forall a b. Node -> b -> (a -> b) -> Node -> Location b
 createLocation node value fn origin = saveLocation location targetNode where
@@ -49,9 +41,19 @@ maybeLocation node fn = handle (retrieveLocation node fn) where
   handle r | isUndefined r = Nothing
           | otherwise = Just (fromUndefined r)
 
-l1 = locate 1
-l2 = map (add 1) l1
-l3 = map (add 1) l1
+instance showLocation :: Show a => Show (Location a) where
+  show (Location { value, node }) = "Location(" <> show (getIndex node) <> ") "<> show value
+
+instance functorLocation :: Functor Location where
+  map fn (Location {value, node}) =
+    case maybeLocation node fn of
+      Nothing -> createLocation node (fn value) fn node
+      Just l -> l
+
+l1 = locate 1 :: Location Int
+l2 = map (add 1) l1 :: Location Int
+l3 = map (add 1) l1 :: Location Int
+
 {-}
 instance applyLocation :: Apply Location where
   apply (Location {value: fn, node: functionNode}) (Location {value, node: valueNode}) =
