@@ -22,6 +22,8 @@ newtype Node = Node
   { location :: AnyLocation
   , dependents :: StrMap( Node)
   , supports :: Array Node
+  , recompute :: (Unit -> Node)
+  , set :: forall a. (a -> Node)
   , index :: Int
   }
 
@@ -40,6 +42,7 @@ type Target = Node
 -- | Connect a Node through a function to another, new Node. This represents, on the level of
 -- | the network, the application of the function to the value of a Location, where the
 -- | application result is contained in another Location.
+-- | The update function is constructed and saved, too.
 foreign import linkNode :: forall a b. Origin -> (a -> b) -> Target -> Target
 
 -- | Create a Node from nothing.

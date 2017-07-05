@@ -17,11 +17,17 @@ exports.getIndex = function( node )
 
 exports.createNode = function()
 {
-	return {
+	var n = {
 		dependents: new Map(),
 		supports: [],
+		set: function( v )
+		{
+			n.location.value0 = v;
+			return n;
+		},
 		index: next()
 	};
+	return n;
 };
 
 exports.linkNode = function( origin )
@@ -31,6 +37,13 @@ exports.linkNode = function( origin )
 		return function( target )
 		{
 			origin.dependents.set( fn.toString(), target );
+			target.supports.push( origin );
+			target.recompute = function()
+			{
+				// value0 represents value in (Location value node)
+				target.location.value0 = fn( origin.location.value0 );
+				return target;
+			};
 			return target;
 		};
 	};

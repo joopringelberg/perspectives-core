@@ -10,6 +10,7 @@ module Perspectives.Location where
 import Prelude
 import Data.Maybe
 import Perspectives.Node
+import Data.Unit (Unit)
 
 -- | Save the Location in the Node. We need this to be able to retrieve it.
 -- | Return the Location for chaining.
@@ -47,6 +48,12 @@ maybeLocation node fn = handle (retrieveLocation node fn) where
   handle r | isUndefined r = Nothing
           | otherwise = Just (fromUndefined r)
 
+recomputeLocation :: forall a. Location a -> Location a
+recomputeLocation (Location v (Node{recompute})) = nodeLocation (recompute unit )
+
+setLocation :: forall a. Location a -> a -> Location a
+setLocation (Location v (Node{set})) a = nodeLocation (set a )
+
 instance showLocation :: Show a => Show (Location a) where
   show (Location value node) = "Location(" <> show (getIndex node) <> ") "<> show value
 
@@ -59,6 +66,8 @@ instance functorLocation :: Functor Location where
 l1 = locate 1 :: Location Int
 l2 = map (add 1) l1 :: Location Int
 l3 = map (add 1) l1 :: Location Int
+l4 = setLocation l1 10 :: Location Int
+l5 = recomputeLocation l2 :: Location Int
 
 {-}
 instance applyLocation :: Apply Location where
