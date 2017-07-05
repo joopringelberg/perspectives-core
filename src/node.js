@@ -14,12 +14,11 @@ exports.getIndex = function( node )
   return node.index;
 }
 
-exports.createNode = function( location )
+exports.createNode = function()
 {
 	return {
-		location: location,
 		dependents: new Map(),
-		origins: [],
+		supports: [],
     index: next()
 	};
 };
@@ -28,7 +27,10 @@ exports.linkNode = function( origin )
 {
   return function( fn )
   {
-    var target = { dependents: new Map(), supports: [ origin ], index: next() };
+    var target = {
+      dependents: new Map(),
+      supports: [ origin ],
+      index: next() };
     origin.dependents.set( fn.toString(), target );
     return target;
   };
