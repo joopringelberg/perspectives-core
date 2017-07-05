@@ -46,7 +46,7 @@ exports.linkNode = function( origins )
 				target.recompute = function()
 				{
 					// value0 represents value in (Location value node)
-					target.location.value0 = fn( origins[ 0 ].location.value );
+					target.location.value0 = fn( origins[ 0 ].location.value0 );
 					return target;
 				};
 			}

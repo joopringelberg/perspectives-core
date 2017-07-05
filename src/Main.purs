@@ -9,5 +9,6 @@ import Perspectives.Location
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
   log (show l3)
-  log (show (setLocation l1 20))
+  log (show (setLocation l0 10))
+  log (show (recomputeLocation l1))
   log (show (recomputeLocation l3))
