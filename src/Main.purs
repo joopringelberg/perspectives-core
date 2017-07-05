@@ -4,7 +4,7 @@ import Prelude
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 
-import Perspectives.LocationInstances
+import Perspectives.Location
 -- test
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
