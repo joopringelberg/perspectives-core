@@ -43,7 +43,7 @@ type Target = Node
 -- | the network, the application of the function to the value of a Location, where the
 -- | application result is contained in another Location.
 -- | The update function is constructed and saved, too.
-foreign import linkNode :: forall a b. Origin -> (a -> b) -> Target -> Target
+foreign import linkNode :: forall a b. Array Origin -> (a -> b) -> Target -> Target
 
 -- | Create a Node from nothing.
 foreign import createNode :: Unit -> Node

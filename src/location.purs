@@ -35,10 +35,10 @@ locate a = let
     in location
 
 -- | From a location, create a fresh dependent location connected to it.
-createDependentLocation :: forall a b. Node -> b -> (a -> b) -> Node -> Location b
-createDependentLocation node value fn origin = let
+createDependentLocation :: forall a b. Node -> b -> (a -> b) -> Array Node -> Location b
+createDependentLocation node value fn origins = let
     location@(Location value target) = locate value
-  in nodeLocation (saveLocation location (linkNode origin fn target))
+  in nodeLocation (saveLocation location (linkNode origins fn target))
 
 -- | Returns a Location holding the result of applying the function to the value of the
 -- | Location of the node, if it exists; Nothing otherwise.
@@ -54,25 +54,33 @@ recomputeLocation (Location v (Node{recompute})) = nodeLocation (recompute unit 
 setLocation :: forall a. Location a -> a -> Location a
 setLocation (Location v (Node{set})) a = nodeLocation (set a )
 
+-- |
+-- | CLASS INSTANCES
+-- |
+-- |
+
 instance showLocation :: Show a => Show (Location a) where
   show (Location value node) = "Location(" <> show (getIndex node) <> ") "<> show value
 
 instance functorLocation :: Functor Location where
   map fn (Location value node) =
     case maybeLocation node fn of
-      Nothing -> createDependentLocation node (fn value) fn node
+      Nothing -> createDependentLocation node (fn value) fn [node]
       Just l -> l
 
-l1 = locate 1 :: Location Int
-l2 = map (add 1) l1 :: Location Int
-l3 = map (add 1) l1 :: Location Int
-l4 = setLocation l1 10 :: Location Int
-l5 = recomputeLocation l2 :: Location Int
+l0 = locate 1 :: Location Int
+l1 = map (add 1) l0 :: Location Int
+--l2 = map (add 1) l1 :: Location Int
+--l3 = setLocation l1 10 :: Location Int
+--l4 = recomputeLocation l2 :: Location Int
 
-{-}
 instance applyLocation :: Apply Location where
-  apply (Location {value: fn, node: functionNode}) (Location {value, node: valueNode}) =
+  apply (Location fn functionNode) (Location value valueNode) =
     case maybeLocation valueNode fn of
-      Nothing -> createDependentLocation
+      Nothing -> createDependentLocation functionNode (fn value) fn [functionNode, valueNode]
       Just l -> l
--}
+
+l3 :: Location Int
+l3 = (+) <$> l0 <*> l1
+--l4 = setLocation l1 20
+--l5 = recomputeLocation l3

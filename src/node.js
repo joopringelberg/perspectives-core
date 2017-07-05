@@ -30,20 +30,36 @@ exports.createNode = function()
 	return n;
 };
 
-exports.linkNode = function( origin )
+exports.linkNode = function( origins )
 {
 	return function( fn )
 	{
 		return function( target )
 		{
-			origin.dependents.set( fn.toString(), target );
-			target.supports.push( origin );
-			target.recompute = function()
+			target.supports = origins;
+			origins.forEach( function( origin )
+							 {
+								 origin.dependents.set( fn.toString(), target );
+							 } );
+			if( origins.length === 1 )
 			{
-				// value0 represents value in (Location value node)
-				target.location.value0 = fn( origin.location.value0 );
-				return target;
-			};
+				target.recompute = function()
+				{
+					// value0 represents value in (Location value node)
+					target.location.value0 = fn( origins[ 0 ].location.value );
+					return target;
+				};
+			}
+			else
+			{
+				target.recompute = function()
+				{
+					var fn = origins[ 0 ].location.value0;
+					var value = origins[ 1 ].location.value0;
+					target.location.value0 = fn( value );
+					return target;
+				};
+			}
 			return target;
 		};
 	};
