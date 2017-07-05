@@ -81,3 +81,9 @@ maybeLocation node fn = handle (retrieveLocation node fn) where
 l1 = locate 1
 l2 = map (add 1) l1
 l3 = map (add 1) l1
+
+instance applyLocation :: Apply Location where
+  apply (Location {value: fn, node: functionNode}) (Location {value, node: valueNode}) =
+    case maybeLocation valueNode fn of
+      Nothing ->
+      Just l -> l
