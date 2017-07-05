@@ -23,20 +23,20 @@ foreign import retrieveLocation :: forall a b. Node -> (a -> b) -> Undefined (Lo
 foreign import nodeLocation :: forall a. Node -> Location a
 
 -- | The primary representation of Location holds a value and a node for side effects.
-newtype Location a = Location { value:: a, node :: Node }
+data Location a = Location a Node
 
 -- | Encapsulate a value in a fresh Location without any dependencies.
 locate :: forall a. a -> Location a
 locate a = let
       node = createNode unit
-      location = Location {value: a, node: node}
+      location = Location a node
       ignore = saveLocation location node
     in location
 
 -- | From a location, create a fresh dependent location connected to it.
 createDependentLocation :: forall a b. Node -> b -> (a -> b) -> Node -> Location b
 createDependentLocation node value fn origin = let
-    location@(Location {value, node: target}) = locate value
+    location@(Location value target) = locate value
   in nodeLocation (saveLocation location (linkNode origin fn target))
 
 -- | Returns a Location holding the result of applying the function to the value of the
@@ -48,10 +48,10 @@ maybeLocation node fn = handle (retrieveLocation node fn) where
           | otherwise = Just (fromUndefined r)
 
 instance showLocation :: Show a => Show (Location a) where
-  show (Location { value, node }) = "Location(" <> show (getIndex node) <> ") "<> show value
+  show (Location value node) = "Location(" <> show (getIndex node) <> ") "<> show value
 
 instance functorLocation :: Functor Location where
-  map fn (Location {value, node}) =
+  map fn (Location value node) =
     case maybeLocation node fn of
       Nothing -> createDependentLocation node (fn value) fn node
       Just l -> l
