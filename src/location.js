@@ -1,9 +1,11 @@
+"use strict";
+
 exports.saveLocation = function(location)
 {
   return function(node)
   {
     node.location = location;
-    return location;
+    return node;
   };
 };
 
@@ -17,4 +19,9 @@ exports.retrieveLocation = function(node)
       return n.location;
     }
   };
-}
+};
+
+exports.nodeLocation = function(node)
+{
+  return node.location;
+};

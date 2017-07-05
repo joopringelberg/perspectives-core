@@ -40,7 +40,7 @@ type Target = Node
 -- | Connect a Node through a function to another, new Node. This represents, on the level of
 -- | the network, the application of the function to the value of a Location, where the
 -- | application result is contained in another Location.
-foreign import linkNode :: forall a b. Origin -> (a -> b) -> Target
+foreign import linkNode :: forall a b. Origin -> (a -> b) -> Target -> Target
 
 -- | Create a Node from nothing.
 foreign import createNode :: Unit -> Node

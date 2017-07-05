@@ -10,28 +10,34 @@ module Perspectives.Location where
 import Prelude
 import Data.Maybe
 import Perspectives.Node
-import Data.Unit (unit)
 
 -- | Save the Location in the Node. We need this to be able to retrieve it.
 -- | Return the Location for chaining.
-foreign import saveLocation :: forall a. Location a -> Node -> Location a
+foreign import saveLocation :: forall a. Location a -> Node -> Node
 
 -- | From a Node holding a Location with value v, follow the link labeled with a
 -- | function a -> b, to the Location that holds the result of applying the function to v.
 foreign import retrieveLocation :: forall a b. Node -> (a -> b) -> Undefined (Location b)
 
+-- | From a Node retrieve its Location.
+foreign import nodeLocation :: forall a. Node -> Location a
+
+-- | The primary representation of Location holds a value and a node for side effects.
 newtype Location a = Location { value:: a, node :: Node }
 
--- | Encapsulate a value in a fresh Location.
+-- | Encapsulate a value in a fresh Location without any dependencies.
 locate :: forall a. a -> Location a
-locate a = saveLocation l node where
-  l@(Location {node}) = Location { value: a, node: createNode unit }
+locate a = let
+      node = createNode unit
+      location = Location {value: a, node: node}
+      ignore = saveLocation location node
+    in location
 
--- | Create a fresh Location holding the value and linked to the (origin) node through the function.
-createLocation :: forall a b. Node -> b -> (a -> b) -> Node -> Location b
-createLocation node value fn origin = saveLocation location targetNode where
-  location = Location { value: value, node: targetNode }
-  targetNode = linkNode origin fn
+-- | From a location, create a fresh dependent location connected to it.
+createDependentLocation :: forall a b. Node -> b -> (a -> b) -> Node -> Location b
+createDependentLocation node value fn origin = let
+    location@(Location {value, node: target}) = locate value
+  in nodeLocation (saveLocation location (linkNode origin fn target))
 
 -- | Returns a Location holding the result of applying the function to the value of the
 -- | Location of the node, if it exists; Nothing otherwise.
@@ -47,7 +53,7 @@ instance showLocation :: Show a => Show (Location a) where
 instance functorLocation :: Functor Location where
   map fn (Location {value, node}) =
     case maybeLocation node fn of
-      Nothing -> createLocation node (fn value) fn node
+      Nothing -> createDependentLocation node (fn value) fn node
       Just l -> l
 
 l1 = locate 1 :: Location Int
@@ -58,6 +64,6 @@ l3 = map (add 1) l1 :: Location Int
 instance applyLocation :: Apply Location where
   apply (Location {value: fn, node: functionNode}) (Location {value, node: valueNode}) =
     case maybeLocation valueNode fn of
-      Nothing -> createLocation
+      Nothing -> createDependentLocation
       Just l -> l
 -}
