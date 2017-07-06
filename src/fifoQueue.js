@@ -17,6 +17,7 @@ Queue.prototype.appendToEnd = function( a )
 		function( x )
 		{
 			this.queue.push( x );
+			return this.queue;
 		}
 	);
 };

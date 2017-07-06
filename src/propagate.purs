@@ -9,22 +9,24 @@
 
 module Perspectives.Propagate where
 
+import Prelude(bind)
+import Perspectives.FifoQueue
+import Data.Identity (Identity(..))
+import Data.StrMap (values)
+import Data.Unit (unit)
 import Perspectives.Location (Location(Location), nodeLocation)
 import Perspectives.Node (Node(Node))
-import Perspectives.FifoQueue
-import Data.Unit (Unit, unit)
-import Data.StrMap (values)
 
-type PropagationQueue = Queue Node
+-- | Propagate update through the network, respecting topological ordering of nodes.
+propagate :: Queue Node -> Queue Node
+propagate q | empty q = q
+propagate q = propagate extendedQueue where
+  (Identity extendedQueue) =
+    do
+      next@(Node {dependents}) <- Identity (popFromFront q)
+      updatedLocation <- Identity (recomputeLocation (nodeLocation next))
+      Identity (appendToEnd q (values dependents))
 
-propagate :: Queue Node -> Unit
-propagate q | empty q = unit
-propagate q =
-      let
-        next@(Node {dependents}) = popFromFront q
-        ignore = appendToEnd q (values dependents)
-        ignore2 = recomputeLocation (nodeLocation next)
-      in propagate q
 
 -- | Recompute the value of a Location based on its changed supports.
 recomputeLocation :: forall a. Location a -> Location a

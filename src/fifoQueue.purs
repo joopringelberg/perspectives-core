@@ -12,7 +12,7 @@ foreign import data Queue :: Type -> Type
 
 foreign import queue :: forall a. Unit -> Queue a
 
-foreign import appendToEnd :: forall a. Queue a -> Array a -> Unit
+foreign import appendToEnd :: forall a. Queue a -> Array a -> Queue a
 
 foreign import popFromFront :: forall a. Queue a -> a
 
