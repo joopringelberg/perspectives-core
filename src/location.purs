@@ -48,12 +48,6 @@ maybeLocation node fn = handle (retrieveLocation node fn) where
   handle r | isUndefined r = Nothing
           | otherwise = Just (fromUndefined r)
 
-recomputeLocation :: forall a. Location a -> Location a
-recomputeLocation (Location v (Node{recompute})) = nodeLocation (recompute unit )
-
-setLocation :: forall a. Location a -> a -> Location a
-setLocation (Location v (Node{set})) a = nodeLocation (set a )
-
 -- |
 -- | CLASS INSTANCES
 -- |
