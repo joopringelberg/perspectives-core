@@ -62,19 +62,8 @@ instance functorLocation :: Functor Location where
       Nothing -> createDependentLocation node (fn value) fn [node]
       Just l -> l
 
-l0 = locate 1 :: Location Int
-l1 = map (add 1) l0 :: Location Int
---l2 = map (add 1) l1 :: Location Int
---l3 = setLocation l1 10 :: Location Int
---l4 = recomputeLocation l2 :: Location Int
-
 instance applyLocation :: Apply Location where
   apply (Location fn functionNode) (Location value valueNode) =
     case maybeLocation valueNode fn of
       Nothing -> createDependentLocation functionNode (fn value) fn [functionNode, valueNode]
       Just l -> l
-
-l3 :: Location Int
-l3 = (+) <$> l0 <*> l1
---l4 = setLocation l1 20
---l5 = recomputeLocation l3

@@ -4,11 +4,6 @@ import Prelude
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 
-import Perspectives.Location
--- test
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
-  log (show l3)
-  log (show (setLocation l0 10))
-  log (show (recomputeLocation l1))
-  log (show (recomputeLocation l3))
+  log (show "Hello world")
