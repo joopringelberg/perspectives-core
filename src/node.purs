@@ -59,8 +59,18 @@ instance eqNode :: Eq Node where
   eq n1 n2 = equalNodes n1 n2
 
 instance ordNode :: Ord Node where
-  compare n1 n2 | n1 == n2 = EQ
-  compare (Node {dependents}) n | elem n (values dependents) = LT
-  compare n (Node {dependents}) | elem n (values dependents) = GT
-  compare n (Node {dependents}) = if lessThenSomeDependent then LT else GT where
-    (Disj lessThenSomeDependent) = foldMap (\dep -> Disj ((compare n dep) == LT)) dependents
+  compare n1 n2 = shallowCompare n1 n2
+
+-- | shallowCompare looks no further than direct dependents.
+shallowCompare :: Node -> Node -> Ordering
+shallowCompare (Node {dependents}) n | elem n (values dependents) = LT
+shallowCompare n (Node {dependents}) | elem n (values dependents) = GT
+shallowCompare _ _ = EQ
+
+-- | Deep compare: what is the relation between two nodes in the entire DAG?
+deepCompare :: Node -> Node -> Ordering
+deepCompare n1 n2 | n1 == n2 = EQ
+deepCompare (Node {dependents}) n | elem n (values dependents) = LT
+deepCompare n (Node {dependents}) | elem n (values dependents) = GT
+deepCompare n (Node {dependents}) = if lessThenSomeDependent then LT else GT where
+  (Disj lessThenSomeDependent) = foldMap (\dep -> Disj ((deepCompare n dep) == LT)) dependents
