@@ -19,12 +19,6 @@ import Perspectives.Node (Node(Node))
 
 
 -- | Propagate update through the network, respecting topological ordering of nodes.
-propagate :: Queue Node -> Queue Node
-propagate q | empty q = q
-propagate q = propagate extendedQueue where
-  (Node {dependents}) = next q
-  extendedQueue = appendToEnd q (values dependents)
-
 propagateChanges :: forall a. Queue Node -> Array (Location a)
 propagateChanges = (map (recomputeLocation <<< nodeLocation)) <<< nodesToRecompute
 
