@@ -74,3 +74,8 @@ exports.fromUndefined = function( v )
 {
 	return v;
 };
+
+exports.equalNodes = function( n1, n2 )
+{
+	return n1 === n2;
+};

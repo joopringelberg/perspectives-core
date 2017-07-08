@@ -3,9 +3,9 @@
  */
 "use strict";
 
-function Queue()
+function Queue(arr)
 {
-	this.queue = [];
+	this.queue = arr;
 	this.index = -1;
 }
 
@@ -22,7 +22,7 @@ Queue.prototype.appendToEnd = function( a )
 	);
 };
 
-Queue.prototype.popFromFront = function()
+Queue.prototype.next = function()
 {
 	if ( this.index < this.queue.length )
 	{
@@ -36,9 +36,9 @@ Queue.prototype.empty = function()
 	this.index >= this.queue.length;
 };
 
-exports.queue = function()
+exports.queue = function(arr)
 {
-	return new Queue();
+	return new Queue(arr);
 };
 
 exports.appendToEnd = function(q)
@@ -49,12 +49,17 @@ exports.appendToEnd = function(q)
 	};
 };
 
-exports.popFromFront = function(q)
+exports.next = function(q)
 {
-	return q.popFromFront();
+	return q.next();
 };
 
 exports.empty = function(q)
 {
 	return q.empty();
+};
+
+exports.cumulator = function(q)
+{
+	return q.queue;
 };

@@ -8,7 +8,10 @@
 module Perspectives.Node where
 
 import Prelude
-import Data.StrMap (StrMap)
+import Data.Foldable (elem, foldMap)
+import Data.Monoid.Disj (Disj(..))
+import Data.Ord (class Ord, Ordering(..))
+import Data.StrMap (StrMap, values)
 
 -- | The node that contains the network information. Its structure and content is invisible
 -- | for the type system.
@@ -49,3 +52,15 @@ foreign import linkNode :: forall a b. Array Origin -> (a -> b) -> Target -> Tar
 foreign import createNode :: Unit -> Node
 
 foreign import getIndex :: Node -> Int
+
+foreign import equalNodes :: Node -> Node -> Boolean
+
+instance eqNode :: Eq Node where
+  eq n1 n2 = equalNodes n1 n2
+
+instance ordNode :: Ord Node where
+  compare n1 n2 | n1 == n2 = EQ
+  compare (Node {dependents}) n | elem n (values dependents) = LT
+  compare n (Node {dependents}) | elem n (values dependents) = GT
+  compare n (Node {dependents}) = if lessThenSomeDependent then LT else GT where
+    (Disj lessThenSomeDependent) = foldMap (\dep -> Disj ((compare n dep) == LT)) dependents
