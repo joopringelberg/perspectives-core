@@ -17,6 +17,8 @@ import Data.Unit (unit)
 import Perspectives.Location (Location(Location), nodeLocation)
 import Perspectives.Node (Node(Node))
 
+currentQueue :: Queue Node
+currentQueue = queue []
 
 -- | Propagate update through the network, respecting topological ordering of nodes.
 propagateChanges :: forall a. Queue Node -> Array (Location a)
@@ -34,5 +36,5 @@ recomputeLocation :: forall a. Location a -> Location a
 recomputeLocation (Location v (Node{recompute})) = nodeLocation (recompute unit )
 
 -- | Set the value of a Location to a new value.
-setLocation :: forall a. Location a -> a -> Location a
-setLocation (Location v (Node{set})) a = nodeLocation (set a )
+setLocation :: forall a. Location a -> a -> Queue Node
+setLocation l@(Location v (Node{set})) a = appendToEnd currentQueue [(set a )]
