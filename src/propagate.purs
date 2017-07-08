@@ -9,23 +9,24 @@
 
 module Perspectives.Propagate where
 
+import Prelude ((<<<), map)
 import Perspectives.FifoQueue
 import Data.Array (elem, filter, sort)
-import Data.Identity (Identity(..))
 import Data.StrMap (values)
 import Data.Unit (unit)
 import Perspectives.Location (Location(Location), nodeLocation)
 import Perspectives.Node (Node(Node))
-import Prelude (bind)
+
 
 -- | Propagate update through the network, respecting topological ordering of nodes.
 propagate :: Queue Node -> Queue Node
 propagate q | empty q = q
 propagate q = propagate extendedQueue where
-  (Identity extendedQueue) =
-    do
-      next@(Node {dependents}) <- Identity (next q)
-      Identity (appendToEnd q (values dependents))
+  (Node {dependents}) = next q
+  extendedQueue = appendToEnd q (values dependents)
+
+propagateChanges :: forall a. Queue Node -> Array (Location a)
+propagateChanges = (map (recomputeLocation <<< nodeLocation)) <<< nodesToRecompute
 
 nodesToRecompute :: Queue Node -> Array Node
 nodesToRecompute q | empty q = cumulator q
