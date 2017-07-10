@@ -20,11 +20,6 @@ exports.createNode = function()
 	var n = {
 		dependents: new Map(),
 		supports: [],
-		set: function( v )
-		{
-			n.location.value0 = v;
-			return n;
-		},
 		index: next()
 	};
 	return n;
@@ -42,6 +37,27 @@ exports.setNode = function(n)
 	}
 }
 
+exports.recomputeNode = function(n)
+{
+	return function()
+	{
+		var fn, value;
+		if ( n.supports.length === 1 )
+		{
+			fn = n.fn;
+			value = n.supports[ 0 ].location.value0
+		}
+		else
+		{
+			fn = supports[ 0 ].location.value0;
+			value = supports[ 1 ].location.value0;
+		}
+		// value0 represents value in (Location value node)
+		n.location.value0 = fn( value );
+		return target;
+	}
+}
+
 exports.linkNode = function( origins )
 {
 	return function( fn )
@@ -49,29 +65,11 @@ exports.linkNode = function( origins )
 		return function( target )
 		{
 			target.supports = origins;
+			target.fn = fn;
 			origins.forEach( function( origin )
 							 {
 								 origin.dependents.set( fn.toString(), target );
 							 } );
-			if( origins.length === 1 )
-			{
-				target.recompute = function()
-				{
-					// value0 represents value in (Location value node)
-					target.location.value0 = fn( origins[ 0 ].location.value0 );
-					return target;
-				};
-			}
-			else
-			{
-				target.recompute = function()
-				{
-					var fn = origins[ 0 ].location.value0;
-					var value = origins[ 1 ].location.value0;
-					target.location.value0 = fn( value );
-					return target;
-				};
-			}
 			return target;
 		};
 	};

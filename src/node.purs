@@ -8,11 +8,11 @@
 module Perspectives.Node where
 
 import Prelude
+import Control.Monad.Eff
 import Data.Foldable (elem, foldMap)
 import Data.Monoid.Disj (Disj(..))
 import Data.Ord (class Ord, Ordering(..))
 import Data.StrMap (StrMap, values)
-import Control.Monad.Eff
 
 -- | The node that contains the network information. Its structure and content is invisible
 -- | for the type system.
@@ -26,7 +26,7 @@ newtype Node = Node
   { location :: AnyLocation
   , dependents :: StrMap( Node)
   , supports :: Array Node
-  , recompute :: (Unit -> Node)
+  , fn :: forall a b. a -> b
   , index :: Int
   }
 
@@ -57,7 +57,11 @@ foreign import equalNodes :: Node -> Node -> Boolean
 
 foreign import data THEORYDELTA :: Effect
 
-foreign import setNode :: forall a eff. Node -> a -> Eff (theoryDelta :: THEORYDELTA | eff) Node
+foreign import setNode :: forall a eff. Node -> a -> Eff (td :: THEORYDELTA | eff) Node
+
+foreign import recomputeNode :: forall eff.
+  Eff (td ::THEORYDELTA | eff) Node
+  -> Eff eff Node
 
 instance eqNode :: Eq Node where
   eq n1 n2 = equalNodes n1 n2
