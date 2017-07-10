@@ -30,6 +30,18 @@ exports.createNode = function()
 	return n;
 };
 
+exports.setNode = function(n)
+{
+	return function(v)
+	{
+		return function()
+		{
+			n.location.value0 = v;
+			return n;
+		}
+	}
+}
+
 exports.linkNode = function( origins )
 {
 	return function( fn )
