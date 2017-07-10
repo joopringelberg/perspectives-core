@@ -10,6 +10,7 @@ module Perspectives.Location where
 import Prelude
 import Data.Maybe
 import Perspectives.Node
+import Control.Alternative (class Applicative)
 import Data.Unit (Unit)
 
 -- | Save the Location in the Node. We need this to be able to retrieve it.
@@ -67,3 +68,6 @@ instance applyLocation :: Apply Location where
     case maybeLocation valueNode fn of
       Nothing -> createDependentLocation functionNode (fn value) fn [functionNode, valueNode]
       Just l -> l
+
+instance applicativeLocation :: Applicative Location where
+  pure = locate
