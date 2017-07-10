@@ -12,6 +12,7 @@ import Data.Foldable (elem, foldMap)
 import Data.Monoid.Disj (Disj(..))
 import Data.Ord (class Ord, Ordering(..))
 import Data.StrMap (StrMap, values)
+import Control.Monad.Eff
 
 -- | The node that contains the network information. Its structure and content is invisible
 -- | for the type system.
@@ -26,7 +27,6 @@ newtype Node = Node
   , dependents :: StrMap( Node)
   , supports :: Array Node
   , recompute :: (Unit -> Node)
-  , set :: forall a. (a -> Node)
   , index :: Int
   }
 
@@ -54,6 +54,10 @@ foreign import createNode :: Unit -> Node
 foreign import getIndex :: Node -> Int
 
 foreign import equalNodes :: Node -> Node -> Boolean
+
+foreign import data THEORYDELTA :: Effect
+
+foreign import setNode :: forall a eff. Node -> a -> Eff (theoryDelta :: THEORYDELTA | eff) Node
 
 instance eqNode :: Eq Node where
   eq n1 n2 = equalNodes n1 n2
