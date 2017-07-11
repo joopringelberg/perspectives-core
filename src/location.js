@@ -146,23 +146,22 @@ exports.mapLoc = function( fun )
 {
 	return function( loc )
 	{
-		// Note: toString does not give a unique value for each function!
 		var linkName = fun.toString();
-		var out = loc.getDependent( linkName );
+		var dependent = loc.getDependent( linkName );
 		var produce = function()
 		{
 			return fun( loc.get() );
 		};
-		if( !out )
+		if( !dependent )
 		{
-			out = new Location( produce );
+			dependent = new Location( produce );
 			/*
 			loc ---dependent--> out
 			loc <--leftSupport--- out
 			 */
-			loc.addLeftLeaningDependent( linkName, out );
+			loc.addLeftLeaningDependent( linkName, dependent );
 		}
-		return out;
+		return dependent;
 	};
 };
 
@@ -170,16 +169,15 @@ exports.applyLoc = function( fun )
 {
 	return function( loc )
 	{
-		// Note: toString does not give a unique value for each function!
 		var linkName = fun.get().toString();
-		var out = fun.getDependent( linkName );
+		var dependent = fun.getDependent( linkName );
 		var produce = function()
 		{
 			return fun.get()( loc.get() );
 		};
-		if( !out )
+		if( !dependent )
 		{
-			out = new Location( produce );
+			dependent = new Location( produce );
 			/*
 			fun ---dependent--> out
 			fun <--leftSupport--- out
@@ -187,9 +185,9 @@ exports.applyLoc = function( fun )
 			loc ---dependent--> out
 			loc <--rightSupport--- out
 			 */
-			fun.addRightLeaningDependent( linkName, out, loc );
+			fun.addRightLeaningDependent( linkName, dependent, loc );
 		}
-		return out;
+		return dependent;
 	};
 };
 
