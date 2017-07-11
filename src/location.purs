@@ -20,11 +20,10 @@ foreign import data Location :: Type -> Type
 -- | Creates a Location with a value.
 foreign import locate :: forall a. a -> Location a
 
--- |Given a Location of effects with no return value, run each effect as it
--- |comes in.
+-- |Given a Location of effects with no return value, run each effect.
 foreign import runLocation :: forall e. Location (Eff e Unit) -> Eff e Unit
 
--- | Type class instances
+-- | TYPE CLASS INSTANCES
 
 -- | The map function of the Functor instance of Location just applies the function to the content of the location.
 instance functorLocation :: Functor Location where
