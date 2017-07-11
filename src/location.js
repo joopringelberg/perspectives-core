@@ -61,6 +61,9 @@ exports.runLocation =
 	{
 		return function()
 		{
+			/*
+			'loc' will contain effectful computations. As soon as a new such computation is set in 'loc', we run it.
+			 */
 			loc.subscribe( function( val )
 						   {
 							   val();
@@ -80,3 +83,7 @@ exports.setLocationValue =
 			};
 		};
 	};
+
+exports.runTHEORYDELTA = function (f) {
+    return f;
+  };
