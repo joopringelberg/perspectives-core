@@ -1,18 +1,17 @@
 module Main where
 
 
+import Prelude
 import Control.Monad.Eff.Console
 import Control.Monad.Eff
-import Prelude
-import Signal
-import Signal.Channel
+import Perspectives.Location (locate, THEORYDELTA, runLocation, setLocationValue)
 
-main :: forall eff. Eff (channel :: CHANNEL, console :: CONSOLE | eff) Unit
+main :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 main = myProgram
 
-myProgram :: forall eff. Eff (channel :: CHANNEL, console :: CONSOLE | eff) Unit
-myProgram = do
-  c <- channel "This content will be ignored."
-  runSignal $ map log (subscribe c)
-  send c "Hello world!"
-  send c "This goes on and on."
+myProgram :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
+myProgram = let c = locate "This content will be ignored." in
+  do
+    runLocation $ map log c
+    setLocationValue c "Hello world!"
+    setLocationValue c "This goes on and on."
