@@ -1,9 +1,18 @@
 module Main where
 
-import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
 
-main :: forall e. Eff (console :: CONSOLE | e) Unit
-main = do
-  log (show "Hello world")
+import Control.Monad.Eff.Console
+import Control.Monad.Eff
+import Prelude
+import Signal
+import Signal.Channel
+
+main :: forall eff. Eff (channel :: CHANNEL, console :: CONSOLE | eff) Unit
+main = myProgram
+
+myProgram :: forall eff. Eff (channel :: CHANNEL, console :: CONSOLE | eff) Unit
+myProgram = do
+  c <- channel "This content will be ignored."
+  runSignal $ map log (subscribe c)
+  send c "Hello world!"
+  send c "This goes on and on."
