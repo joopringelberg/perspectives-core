@@ -4,10 +4,10 @@ module Main where
 import Prelude
 import Control.Monad.Eff.Console
 import Control.Monad.Eff
-import Perspectives.Location (locate, THEORYDELTA, runLocation, setLocationValue, setLocationValue', pureTHEORYDELTA)
+import Perspectives.Location (locate, THEORYDELTA, runLocation, setLocationValue, setLocationValue', pureTHEORYDELTA, runTHEORYDELTA)
 
 main :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
-main = myProgram
+main = myProgram4
 
 myProgram :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram = let
@@ -69,3 +69,36 @@ myProgram3 = let
   in
     do
       runLocation $ map log m
+
+myProgram4 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
+myProgram4 = let
+    m = locate "This content will be ignored."
+    p :: forall e. Eff (td :: THEORYDELTA, console :: CONSOLE | e) Unit
+    p = do
+          runLocation $ map log m
+          (setLocationValue m "Hello world")
+  in runTHEORYDELTA p
+
+myProgram5 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
+myProgram5 = let
+    m = locate "This content will be ignored."
+    in runTHEORYDELTA do
+          runLocation $ map log m
+          (setLocationValue m "Hello world")
+
+myProgram6 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
+myProgram6 = let
+  n = locate 1
+  p = map ((+) 10) n
+  s = (+) <$> n <*> p
+  locationsWithEffectfulComputations = map (map (log <<< show)) [n, p, s]
+  in runTHEORYDELTA do
+      foreachE locationsWithEffectfulComputations runLocation
+      setLocationValue n 10
+{-
+10
+20
+30
+unit
+En dit is een demonstratie van breadth-first!
+-}

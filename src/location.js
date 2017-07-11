@@ -1,8 +1,6 @@
 // module Location
 "use strict";
 
-var queue = [];
-
 /**
  *
  * @param {Iterator} candidates
@@ -23,18 +21,6 @@ function addToQueue( queue, candidates )
 			}
 		);
 }
-
-exports.propagateTheoryDeltas = function()
-{
-	var q = queue, next;
-	queue = [];
-	while( q.length > 0 )
-	{
-		next = q.shift();
-		next.recomputeNode();
-		addToQueue( q, next.dependents );
-	}
-};
 
 function compareLocations( l1, l2 )
 {
@@ -104,17 +90,6 @@ Location.prototype.get = function()
 	return this._value;
 };
 
-Location.prototype.set = function( nv )
-{
-	this._value = nv;
-	addToQueue( queue, this.dependents );
-	this.handlers.forEach(
-		function( h )
-		{
-			h( nv );
-		} );
-};
-
 Location.prototype.updateValue = function( nv )
 {
 	this._value = nv;
@@ -132,6 +107,37 @@ Location.prototype.recomputeNode = function()
 {
 	this.updateValue( this.fun() );
 };
+
+var propagateTheoryDeltas;
+
+(function(queue)
+{
+	propagateTheoryDeltas = function()
+	{
+		var q = queue, next;
+		queue = [];
+		while( q.length > 0 )
+		{
+			next = q.shift();
+			next.recomputeNode();
+			addToQueue( q, next.dependents );
+		}
+	};
+
+	Location.prototype.set = function( nv )
+	{
+		this._value = nv;
+		addToQueue( queue, this.dependents );
+		if ( this.handlers )
+		{
+			this.handlers.forEach(
+				function( h )
+				{
+					h( nv );
+				} );
+		}
+	};
+}([]));
 
 exports.locate = function( v )
 {
@@ -228,5 +234,9 @@ exports.setLocationValue =
 
 exports.runTHEORYDELTA = function( f )
 {
-	return f;
+	return function()
+  {
+    f();
+    propagateTheoryDeltas();
+  };
 };

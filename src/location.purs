@@ -11,6 +11,7 @@ module Perspectives.Location
   , setLocationValue
   , setLocationValue'
   , THEORYDELTA
+  , runTHEORYDELTA
   , pureTHEORYDELTA)
 where
 
@@ -49,6 +50,8 @@ foreign import runTHEORYDELTA :: forall r. Eff (td :: THEORYDELTA | r) Unit -> E
 -- | used when the only required effect is `THEORYDELTA`.
 pureTHEORYDELTA :: Eff (td :: THEORYDELTA) Unit -> Unit
 pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
+
+--foreign import propagateTheoryDeltas :: Unit -> Unit
 
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
