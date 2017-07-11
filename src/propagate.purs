@@ -9,32 +9,54 @@
 
 module Perspectives.Propagate where
 
-import Prelude ((<<<), map)
+import Control.Monad.Eff
 import Perspectives.FifoQueue
 import Data.Array (elem, filter, sort)
 import Data.StrMap (values)
-import Data.Unit (unit)
+import Data.Unit (Unit,unit)
 import Perspectives.Location (Location(Location), nodeLocation)
-import Perspectives.Node (Node(Node))
+import Perspectives.Node (Node(Node), THEORYDELTA, setNode, recomputeNode)
+import Prelude ((<<<), map, bind, pure)
 
-currentQueue :: Queue Node
+type ChangedNode = Eff (td :: THEORYDELTA) Node
+type QueueOfChangedNodes = Queue ChangedNode
+-- | A Queue of Nodes wrapped in the THEORYDELTA effect.
+currentQueue :: QueueOfChangedNodes
 currentQueue = queue []
 
+{-}
 -- | Propagate update through the network, respecting topological ordering of nodes.
-propagateChanges :: forall a. Queue Node -> Array (Location a)
-propagateChanges = (map (recomputeLocation <<< nodeLocation)) <<< nodesToRecompute
+propagateChanges :: forall a eff.
+  Eff (td :: THEORYDELTA | eff) (Queue Node)
+  -> Eff eff (Array Unit)
+--propagateChanges = (map (recomputeLocation <<< nodeLocation)) <<< nodesToRecompute
+propagateChanges queue = do
+  map recomputeLocation (nodesToRecompute queue)
 
-nodesToRecompute :: Queue Node -> Array Node
-nodesToRecompute q | empty q = cumulator q
-nodesToRecompute q = nodesToRecompute (appendToEnd q
-      (sort (filter (\n -> elem n (cumulator q)) (values dependents))))
-    where
-      (Node {dependents}) = next q
+nodesToRecompute :: forall eff.
+  Eff (td :: THEORYDELTA | eff) (Queue Node)
+  -> Eff (td :: THEORYDELTA | eff) (Array Node)
+nodesToRecompute queue = bind queue (\q ->
+  if ( empty q)
+  then pure (cumulator q)
+  else
+    let (Node {dependents}) = next q
+    in
+      nodesToRecompute (pure (appendToEnd q
+            (sort (filter (\n -> elem n (cumulator q)) (values dependents))))))
 
 -- | Recompute the value of a Location based on its changed supports.
-recomputeLocation :: forall a. Location a -> Location a
-recomputeLocation (Location v (Node{recompute})) = nodeLocation (recompute unit )
+recomputeLocation :: forall a eff. Eff (td ::THEORYDELTA | eff) (Location a) -> Eff eff Unit
+recomputeLocation l = do
+    recomputedNode <- recomputeNode (getNode l)
+    pure unit
+  where
+    getNode :: forall b e. Eff (td ::THEORYDELTA | e) (Location b) -> ChangedNode
+    getNode loc = do
+      (Location _ n) <- loc
+      pure n
 
 -- | Set the value of a Location to a new value.
-setLocation :: forall a. Location a -> a -> Queue Node
-setLocation l@(Location v (Node{set})) a = appendToEnd currentQueue [(set a )]
+setLocation :: forall a. Location a -> a -> QueueOfChangedNodes
+setLocation l@(Location _ n) a = appendToEnd currentQueue [setNode n a]
+-}

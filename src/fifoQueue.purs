@@ -6,16 +6,14 @@
 
 module Perspectives.FifoQueue where
 
-import Control.Monad.Eff
-
 foreign import data Queue :: Type -> Type
 
 foreign import queue :: forall a. Array a -> Queue a
 
-foreign import appendToEnd :: forall a eff.
+foreign import appendToEnd :: forall a.
   Queue a ->
-  Array (Eff (eff) a) ->
-  Eff (eff) (Queue a)
+  Array a ->
+  Queue a
 
 foreign import next :: forall a. Queue a -> a
 
