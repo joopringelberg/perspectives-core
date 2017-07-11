@@ -146,6 +146,7 @@ exports.mapLoc = function( fun )
 {
 	return function( loc )
 	{
+		// A function can only be applied once to a location.
 		var linkName = fun.toString();
 		var dependent = loc.getDependent( linkName );
 		var produce = function()
@@ -165,15 +166,16 @@ exports.mapLoc = function( fun )
 	};
 };
 
-exports.applyLoc = function( fun )
+exports.applyLoc = function( funLoc )
 {
 	return function( loc )
 	{
-		var linkName = fun.get().toString();
-		var dependent = fun.getDependent( linkName );
+		// Apply can be executed only once for the combination of funLoc and loc.
+		var linkName = funLoc.fun.toString() + loc.fun.toString();
+		var dependent = funLoc.getDependent( linkName );
 		var produce = function()
 		{
-			return fun.get()( loc.get() );
+			return funLoc.get()( loc.get() );
 		};
 		if( !dependent )
 		{
@@ -185,7 +187,7 @@ exports.applyLoc = function( fun )
 			loc ---dependent--> out
 			loc <--rightSupport--- out
 			 */
-			fun.addRightLeaningDependent( linkName, dependent, loc );
+			funLoc.addRightLeaningDependent( linkName, dependent, loc );
 		}
 		return dependent;
 	};
