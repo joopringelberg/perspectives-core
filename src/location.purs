@@ -51,11 +51,14 @@ foreign import runTHEORYDELTA :: forall r. Eff (td :: THEORYDELTA | r) Unit -> E
 pureTHEORYDELTA :: Eff (td :: THEORYDELTA) Unit -> Unit
 pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
 
---foreign import propagateTheoryDeltas :: Unit -> Unit
+foreign import locationValue :: forall a. Location a -> a
 
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
 -----------------------------------------------------------------------------------------------
+
+instance showLocation :: Show a => Show (Location a) where
+  show l = "loc " <> show (locationValue l)
 
 -- | The map function of the Functor instance of Location just applies the function to the content of the location.
 instance functorLocation :: Functor Location where

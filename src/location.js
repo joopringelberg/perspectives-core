@@ -139,6 +139,7 @@ var propagateTheoryDeltas;
 	};
 }([]));
 
+// TODO: add lookup in some index.
 exports.locate = function( v )
 {
 	function constant()
@@ -199,7 +200,7 @@ exports.applyLoc = function( funLoc )
 	};
 };
 
-exports.getLoc = function( loc )
+exports.locationValue = function( loc )
 {
 	return loc.get();
 };

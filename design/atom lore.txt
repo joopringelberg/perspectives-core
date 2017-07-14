@@ -1,0 +1,4 @@
+cmd-shift-p : show list of commands
+cmd-. : toggle bar that shows command sequences.
+alt-- : jump back to previous cursor position.
+alt-shift-- : jump to next cursor position?
