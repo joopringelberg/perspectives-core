@@ -9,6 +9,7 @@ import Data.StrMap (StrMap, empty, fromFoldable, lookup, runST, keys)
 import Data.StrMap.ST (poke, STStrMap)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
+import Control.Monad.Aff.AVar
 import Perspectives.Location (Location, locate)
 
 {-
@@ -16,6 +17,7 @@ import Perspectives.Location (Location, locate)
 -}
 
 -- | A newtype for the property definitions so we can show them.
+--newtype PropDefs = PropDefs (StrMap (Array Foreign))
 newtype PropDefs = PropDefs (StrMap Foreign)
 
 instance showPropDefs :: Show PropDefs where
@@ -24,6 +26,7 @@ instance showPropDefs :: Show PropDefs where
 -- | Basic representation for Resource, complete with its definition.
 newtype Resource = Resource
   { id :: String
+--  , propDefs :: Maybe (AVar PropDefs)
   , propDefs :: PropDefs
   }
 
