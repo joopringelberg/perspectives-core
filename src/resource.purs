@@ -53,7 +53,7 @@ representResource id pd = case lookup id resourceIndex of
             (Just defs) -> Resource{ id: id, propDefs: defs}
       l = locate r
       m = runPure $ runST do
-        ri <- thawST' resourceIndex -- thawST kopieert.
+        ri <- thawST' resourceIndex -- thawST kopieert, thawST' niet.
         poke ri id (ResourceLocation{ res: r, loc: l})
     in r
   (Just (ResourceLocation {res})) -> res

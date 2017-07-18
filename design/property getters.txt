@@ -1,0 +1,10 @@
+Een property getter wordt een Computation, d.w.z. een effect in de Eff monad - of waarschijnlijker, in de Aff Monad. 
+Dat komt wonderwel uit met de aard van queries. Immers, queries zijn ook functies van een Resource naar een Sequence. Als een property een waarde in de Aff Monad is, kunnen we een query samenstellen uit die bouwstenen en wordt een query óók een waarde in de Aff Monad.
+Kanttekening. Een computation is een Thunk, d.w.z. een parameterloze functie. Een query is niet parameterloos! Maw, de toepassing van een query op een resource, dàt is een computation (thunk).
+Wanneer wordt de query uitgevoerd?
+Als de gebruiker erom vraagt. Dat is dus pas het moment dat we launchAff of runAff inzetten, gevolgd door runPure of de unsafe versie daarvan die de effecten aanneemt (dus feitelijk negeert). Ik ben benieuwd hoe dit gaat integreren met de event handling in het GUI systeem van X.
+Maar we moeten het berekenen van de property/query óók in de Location monad doen, zodat er wordt gecached en de dependencies worden bijgehouden. Waarschijnlijk betekent dat, dat ik Monads moet stapelen. De Aff Monad zal wel een transformer hebben. Anders moet ik een transformer schrijven voor Location.
+Maar misschien ook niet. Eff en Aff hebben **extensible effects**. Misschien moet ik het Location effect toevoegen?
+Zie (de source van) Control.Monad.Aff.Class. Misschien moet ik Location een instance maken van MonadAff.
+
+De allereerste stap is nu echter om de Json enigzins uit te pakken. Ik moet dus de verschillende getters implementeren. Ik heb nu getGetter; dat moet ik integreren met het asynchroon opvragen van de definitie van de resource.
