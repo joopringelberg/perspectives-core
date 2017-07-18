@@ -1,17 +1,18 @@
 module Perspectives.Resource where
 
 import Prelude
-import Data.Maybe (Maybe(..))
-import Partial.Unsafe (unsafePartial)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar, makeVar, putVar, peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, lookup)
 import Data.StrMap.ST (poke, STStrMap)
-import Perspectives.Location (Location, locate)
-import Perspectives.ResourceRetrieval( PropDefs, ResourceId, AsyncResource, fetchDefinition, stringToPropDefs)
+import Network.HTTP.Affjax (AJAX)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
+import Perspectives.ResourceRetrieval (PropDefs, ResourceId, AsyncResource, fetchDefinition, stringToPropDefs)
 
 -- | Basic representation for Resource, complete with its definition.
 newtype Resource = Resource
@@ -64,31 +65,32 @@ newResource id defs = do
 -- | A version of thawST that does not copy.
 foreign import thawST' :: forall a h r. StrMap a -> Eff (st :: ST h | r) (STStrMap h a)
 
+addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, st :: ST ResourceIndex | e) Unit
+addPropertyDefinitions r@(Resource{id}) av =
+  let
+    loc = resourceLocation r
+    newR = Resource{ id: id, propDefs: (Just av)}
+    newResourceLocation = ResourceLocation{ res: r, loc: loc }
+  in do
+    _ <- setLocationValue loc newR
+    ri <- thawST' resourceIndex
+    _ <- poke ri id newResourceLocation
+    pure unit
+
+type AsyncPropDefs e a = Aff (td :: THEORYDELTA, st :: ST ResourceIndex, avar :: AVAR, ajax :: AJAX | e) a
+
 -- | Get the property definitions of a Resource.
-getPropDefs :: Resource -> AsyncResource () PropDefs
-getPropDefs (Resource {id, propDefs}) = case propDefs of
+getPropDefs :: Resource -> AsyncPropDefs () PropDefs
+getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               defstring <- fetchDefinition id
               def <- pure (stringToPropDefs defstring)
               av <- makeVar
               -- set av as the value of propDefs in the resource!
+              _ <- liftEff $ (addPropertyDefinitions r av)
               putVar av def
               pure def
   (Just avar) -> do peekVar avar
-
-{--- | Look up a resource or create a new resource and store it in the index.
-representResource' :: ResourceId -> Maybe PropDefs -> Resource
-representResource' id pd = case lookup id resourceIndex of
-  Nothing -> let
-      r = case pd of
-            Nothing -> Resource{ id: id, propDefs: PropDefs empty }
-            (Just defs) -> Resource{ id: id, propDefs: defs}
-      l = locate r
-      m = runPure $ runST do
-        ri <- thawST' resourceIndex -- thawST kopieert, thawST' niet.
-        poke ri id (ResourceLocation{ res: r, loc: l})
-    in r
-  (Just (ResourceLocation {res})) -> res-}
 
 -----------------------------------------------------------------------------------------------
 -- | EXAMPLES
