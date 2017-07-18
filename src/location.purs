@@ -12,7 +12,8 @@ module Perspectives.Location
   , setLocationValue'
   , THEORYDELTA
   , runTHEORYDELTA
-  , pureTHEORYDELTA)
+  , pureTHEORYDELTA
+  , locationValue)
 where
 
 import Prelude
