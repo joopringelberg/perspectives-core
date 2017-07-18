@@ -1,14 +1,15 @@
 module Perspectives.Property where
 
 import Prelude
-import Control.Monad.Except (runExcept)
+import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Either (Either(..))
-import Data.Foreign (F, Foreign, readArray, readBoolean, readNumber, readString)
+import Data.Foreign (toForeign)
 import Data.JSDate (JSDate, readDate)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Resource (Resource(..), representResource, PropDefs(..))
+import Perspectives.Resource (Resource, getPropDefs, representResource)
+import Perspectives.ResourceRetrieval (PropDefs(..), AsyncResource)
 
 {-
 Property values are represented by Arrays, whatever the cardinality of the property.
@@ -22,26 +23,47 @@ type PropertyName = String
 
 -- | From a Resource's property definitions, that are Foreign - basically unknown types - read an Array of types
 -- | that conform to the return type (in the F monad) of the readf reader function.
-getGetter :: forall a. (Foreign -> F a) -> PropertyName -> Resource -> Array a
+{-getGetter :: forall a. (Foreign -> F a) -> PropertyName -> Resource -> Array a
 getGetter readf pn (Resource{ propDefs: (PropDefs pd)}) = case lookup pn pd of
   Nothing -> []
   (Just f) -> case runExcept $ traverse readf =<< (readArray f) of
     (Left _) -> []
-    (Right n) -> n
+    (Right n) -> n-}
 
--- | Retrieve a string property.
-getString :: PropertyName -> Resource -> Array String
-getString = getGetter readString
+getGetter :: forall a. (Json -> Maybe a) -> PropertyName -> Resource -> AsyncResource () (Either String (Array a))
+getGetter tofn pn r = do
+  (PropDefs pd) <- getPropDefs r
+  case lookup pn pd of
+    Nothing -> pure (Right [])
+    -- Dit moet een array zijn gevuld met types die de tofn kan herkennen.
+    (Just json) -> case toArray json of
+      Nothing -> pure (Left "Not an array!")
+      (Just arr) -> case traverse tofn arr of
+        Nothing -> pure (Left "Not all elements are of the required type")
+        (Just a) -> pure (Right a)
 
--- | Retrieve a numeric property.
-getNumber :: PropertyName -> Resource -> Array Number
-getNumber = getGetter readNumber
+-- | in AsyncResource, retrieve either a String property or an error message.
+getString :: PropertyName -> Resource -> AsyncResource () (Either String (Array String))
+getString = getGetter toString
 
-getBoolean :: PropertyName -> Resource -> Array Boolean
-getBoolean = getGetter readBoolean
 
-getDate :: PropertyName -> Resource -> Array JSDate
-getDate = getGetter readDate
+-- | in AsyncResource, retrieve either a Number property or an error message.
+getNumber :: PropertyName -> Resource -> AsyncResource () (Either String (Array Number))
+getNumber = getGetter toNumber
 
-getResource :: PropertyName -> Resource -> Array Resource
-getResource pn r = map (\rs -> representResource rs Nothing) (getString pn r)
+-- | in AsyncResource, retrieve either a Boolean property or an error message.
+getBoolean :: PropertyName -> Resource -> AsyncResource () (Either String (Array Boolean))
+getBoolean = getGetter toBoolean
+
+-- | in AsyncResource, retrieve either a Date property or an error message.
+--getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))
+--getDate = getGetter (\json -> Just (readDate $ toForeign json ))
+
+-- | in AsyncResource, retrieve either a Resource property or an error message.
+getResource :: PropertyName -> Resource -> AsyncResource () (Either String (Array Resource))
+--getResource pn r = map (\rs -> Just $ representResource rs) (getString pn r)
+getResource pn r = do
+  resIdArray <- getString pn r
+  case resIdArray of
+    (Left err) -> pure $ Left err
+    (Right arr) -> pure $ Right $ map representResource arr

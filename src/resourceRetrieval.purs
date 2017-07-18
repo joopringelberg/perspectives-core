@@ -1,6 +1,7 @@
 module Perspectives.ResourceRetrieval
-( PropDefs
+( PropDefs(..)
 , ResourceId
+, AsyncResource
 , fetchDefinition
 , stringToPropDefs
   )
@@ -9,24 +10,26 @@ where
 import Prelude
 import Control.Monad.Aff (Aff, forkAff)
 import Control.Monad.Aff.AVar (makeVar, putVar, takeVar, AVAR)
+import Data.Argonaut (Json, fromString, jsonParser, toObject)
 import Data.Either (Either(..))
-import Data.Foreign (Foreign)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, empty, keys)
+import Data.StrMap (StrMap, keys, singleton)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
 
 type ResourceId = String
 
 -- | A newtype for the property definitions so we can show them.
 --newtype PropDefs = PropDefs (StrMap (Array Foreign))
-newtype PropDefs = PropDefs (StrMap Foreign)
+newtype PropDefs = PropDefs (StrMap Json)
 
 instance showPropDefs :: Show PropDefs where
   show (PropDefs s) = show $ keys s
 
+type AsyncResource e a = Aff (avar :: AVAR, ajax :: AJAX | e) a
+
 -- | Fetch the definition of a resource asynchronously.
-fetchDefinition :: forall e. ResourceId -> Aff (avar :: AVAR, ajax :: AJAX | e) String
+fetchDefinition :: forall e. ResourceId -> (AsyncResource e String)
 fetchDefinition id = do
   v <- makeVar
   _ <- forkAff do
@@ -48,5 +51,14 @@ userResourceRequest =
   , withCredentials: true
   }
 
+-- | There can be two error scenarios here: either the returned string cannot be parsed
+-- | by JSON.parse, or the resulting json is not an object. Neither is likely.
+-- | What to do in such cases? We could return an empty PropDefs and fail silently.
+-- | The causes of these problems are of no interest to the end user.
 stringToPropDefs :: String -> PropDefs
-stringToPropDefs s = PropDefs empty
+stringToPropDefs s = case jsonParser s of
+    (Left err) -> PropDefs (singleton "error" (fromString err))
+    (Right json) ->
+      case toObject json of
+        Nothing -> PropDefs (singleton "error" (fromString "Definition is not an object!"))
+        (Just obj) -> PropDefs obj

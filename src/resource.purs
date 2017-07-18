@@ -10,9 +10,8 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
 import Data.StrMap (StrMap, empty, lookup)
 import Data.StrMap.ST (poke, STStrMap)
-import Network.HTTP.Affjax (AJAX)
 import Perspectives.Location (Location, locate)
-import Perspectives.ResourceRetrieval( PropDefs, ResourceId, fetchDefinition, stringToPropDefs)
+import Perspectives.ResourceRetrieval( PropDefs, ResourceId, AsyncResource, fetchDefinition, stringToPropDefs)
 
 -- | Basic representation for Resource, complete with its definition.
 newtype Resource = Resource
@@ -66,7 +65,7 @@ newResource id defs = do
 foreign import thawST' :: forall a h r. StrMap a -> Eff (st :: ST h | r) (STStrMap h a)
 
 -- | Get the property definitions of a Resource.
-getPropDefs :: Resource -> Aff (ajax :: AJAX, avar :: AVAR) PropDefs
+getPropDefs :: Resource -> AsyncResource () PropDefs
 getPropDefs (Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               defstring <- fetchDefinition id
