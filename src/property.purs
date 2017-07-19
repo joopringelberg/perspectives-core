@@ -1,7 +1,9 @@
 module Perspectives.Property where
 
 import Prelude
+import Control.Applicative ((*>))
 import Control.Monad.Eff.Class (liftEff)
+import Control.Plus (class Plus, empty)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Array (head)
 import Data.Either (Either(..))
@@ -29,8 +31,13 @@ type PropertyName = String
 -- | the operation may continue.
 -- | NOTE: callers may expect a non-zero Array (based on the model). They will have to handle
 -- | this error situation.
-getPluralGetter :: forall e a. (Json -> Maybe a) -> PropertyName -> Resource -> AsyncPropDefs e (Either String (Array a))
-getPluralGetter tofn pn r = do
+getPluralGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> Maybe Resource
+  -> AsyncPropDefs e (Either String (Array a))
+getPluralGetter tofn pn Nothing = pure (Right [])
+getPluralGetter tofn pn (Just r) = do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     Nothing -> pure (Right [])
@@ -42,8 +49,13 @@ getPluralGetter tofn pn r = do
         (Just a) -> pure (Right a)
 
 -- | Returns either a Maybe value, or an error message if the type could not be recognized as the requested type.
-getSingleGetter :: forall e a. (Json -> Maybe a) -> PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe a))
-getSingleGetter tofn pn r = do
+getSingleGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> Maybe Resource
+  -> AsyncPropDefs e (Either String (Maybe a))
+getSingleGetter tofn pn Nothing = pure (Right Nothing)
+getSingleGetter tofn pn (Just r) = do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     Nothing -> pure (Right Nothing)
@@ -55,29 +67,30 @@ getSingleGetter tofn pn r = do
         (Just a) -> pure (Right $ head a)
 
 -- | in AsyncResource, retrieve either a String or an error message.
-getString :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe String))
+getString :: forall e. PropertyName -> Maybe Resource -> AsyncPropDefs e (Either String (Maybe String))
 getString = getSingleGetter toString
 
 -- | in AsyncResource, retrieve either an Array of Strings or an error message.
-getStrings :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Array String))
+getStrings :: forall e. PropertyName -> Maybe Resource -> AsyncPropDefs e (Either String (Array String))
 getStrings = getPluralGetter toString
 
 -- | in AsyncResource, retrieve either a Number or an error message.
-getNumber :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Maybe Number))
+getNumber :: PropertyName -> Maybe Resource -> AsyncPropDefs () (Either String (Maybe Number))
 getNumber = getSingleGetter toNumber
 
 -- | in AsyncResource, retrieve either an Array of Numbers or an error message.
-getNumbers :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Array Number))
+getNumbers :: PropertyName -> Maybe Resource -> AsyncPropDefs () (Either String (Array Number))
 getNumbers = getPluralGetter toNumber
 
 -- | in AsyncResource, retrieve either a Boolean value or an error message.
-getBoolean :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Maybe Boolean))
+getBoolean :: PropertyName -> Maybe Resource -> AsyncPropDefs () (Either String (Maybe Boolean))
 getBoolean = getSingleGetter toBoolean
 
 -- | in AsyncResource, retrieve either a Resource or an error message.
-getResource :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe Resource))
-getResource pn r = do
-  resIdArray <- getStrings pn r
+getResource :: forall e. PropertyName -> Maybe Resource -> AsyncPropDefs e (Either String (Maybe Resource))
+getResource pn Nothing = pure (Right Nothing)
+getResource pn mr@(Just r) = do
+  resIdArray <- getStrings pn mr
   case resIdArray of
     (Left err) -> pure $ Left err
     (Right arr) -> case head arr of
@@ -85,9 +98,10 @@ getResource pn r = do
       (Just id) -> liftEff $ Right <$> (Just <$> (representResource $ id))
 
 -- | in AsyncResource, retrieve either an Array of Resources or an error message.
-getResources :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Array Resource))
-getResources pn r = do
-  resIdArray <- getStrings pn r
+getResources :: forall e. PropertyName -> Maybe Resource -> AsyncPropDefs e (Either String (Array Resource))
+getResources pn Nothing = pure (Right [])
+getResources pn mr@(Just r) = do
+  resIdArray <- getStrings pn mr
   case resIdArray of
     (Left err) -> pure $ Left err
     (Right arr) -> Right <$> (liftEff $ (traverse representResource arr))
