@@ -29,6 +29,7 @@ instance showPropDefs :: Show PropDefs where
 type AsyncResource e a = Aff (avar :: AVAR, ajax :: AJAX | e) a
 
 -- | Fetch the definition of a resource asynchronously.
+-- | TODO: handle situations without response, or rather, when the response indicates an error.
 fetchDefinition :: forall e. ResourceId -> (AsyncResource e String)
 fetchDefinition id = do
   v <- makeVar
@@ -55,6 +56,9 @@ userResourceRequest =
 -- | by JSON.parse, or the resulting json is not an object. Neither is likely.
 -- | What to do in such cases? We could return an empty PropDefs and fail silently.
 -- | The causes of these problems are of no interest to the end user.
+-- | TODO: construct a PropDefs representing a Resource that failed to load. In this way we
+-- | lift the problem into the Domain that is modelled, leaving it to the application to handle
+-- | this case (e.g. by representing such Resources in a distinghuished way to the user).
 stringToPropDefs :: String -> PropDefs
 stringToPropDefs s = case jsonParser s of
     (Left err) -> PropDefs (singleton "error" (fromString err))

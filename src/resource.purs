@@ -46,10 +46,10 @@ resourceLocation (Resource{id}) = unsafePartial resourceLocation' id where
       (Just (ResourceLocation{ loc })) -> loc
 
 -- | Look up a resource or create a new resource without definition and store it in the index.
-representResource :: ResourceId -> Resource
+representResource :: forall e. ResourceId -> Eff (st :: ST ResourceIndex | e) Resource
 representResource id = case lookup id resourceIndex of
-  Nothing -> Resource{ id: id, propDefs: Nothing}
-  (Just (ResourceLocation {res})) -> res
+  Nothing -> storeResourceInIndex $ Resource{ id: id, propDefs: Nothing}
+  (Just (ResourceLocation {res})) -> pure res
 
 -- | Create a new resource with definitions and store it in the index.
 newResource :: ResourceId -> PropDefs -> Aff ( st :: ST ResourceIndex, avar :: AVAR ) Resource
@@ -57,10 +57,15 @@ newResource id defs = do
     v <- makeVar
     _ <- putVar v defs
     res <- pure (Resource{ id: id, propDefs: Just v})
-    loc <- pure (locate res)
-    ri <- liftEff $ (thawST' resourceIndex)
-    _ <- liftEff $ (poke ri id (ResourceLocation{ res: res, loc: loc}))
+    _ <- liftEff $ storeResourceInIndex res
     pure res
+
+storeResourceInIndex :: forall e. Resource -> Eff (st :: ST ResourceIndex | e) Resource
+storeResourceInIndex res@(Resource{id}) =
+  let loc = locate res
+  in do
+    ri <- thawST' resourceIndex
+    poke ri id (ResourceLocation{ res: res, loc: loc}) *> pure res
 
 -- | A version of thawST that does not copy.
 foreign import thawST' :: forall a h r. StrMap a -> Eff (st :: ST h | r) (STStrMap h a)
@@ -80,7 +85,7 @@ addPropertyDefinitions r@(Resource{id}) av =
 type AsyncPropDefs e a = Aff (td :: THEORYDELTA, st :: ST ResourceIndex, avar :: AVAR, ajax :: AJAX | e) a
 
 -- | Get the property definitions of a Resource.
-getPropDefs :: Resource -> AsyncPropDefs () PropDefs
+getPropDefs :: forall e. Resource -> AsyncPropDefs e PropDefs
 getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               defstring <- fetchDefinition id

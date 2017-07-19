@@ -1,10 +1,10 @@
 module Perspectives.Property where
 
 import Prelude
+import Control.Monad.Eff.Class (liftEff)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
+import Data.Array (head)
 import Data.Either (Either(..))
---import Data.Foreign (toForeign)
---import Data.JSDate (JSDate, readDate)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
@@ -21,48 +21,76 @@ However, a property whose range is Resource, must be represented by an Array of 
 
 type PropertyName = String
 
--- | From a Resource's property definitions, that are Foreign - basically unknown types - read an Array of types
--- | that conform to the return type (in the F monad) of the readf reader function.
-{-getGetter :: forall a. (Foreign -> F a) -> PropertyName -> Resource -> Array a
-getGetter readf pn (Resource{ propDefs: (PropDefs pd)}) = case lookup pn pd of
-  Nothing -> []
-  (Just f) -> case runExcept $ traverse readf =<< (readArray f) of
-    (Left _) -> []
-    (Right n) -> n-}
-
-getGetter :: forall a. (Json -> Maybe a) -> PropertyName -> Resource -> AsyncPropDefs () (Either String (Array a))
-getGetter tofn pn r = do
+-- | Returns either an Array of types, or one of two messages:
+-- | - the value is not an Array;
+-- | - not all elements in the Array are of the required type.
+-- | Wrap this in a function that annotates the Resource with a property holding the message,
+-- | thus lifting the problem into the Domain that is modelled. Then return an empty Array so
+-- | the operation may continue.
+-- | NOTE: callers may expect a non-zero Array (based on the model). They will have to handle
+-- | this error situation.
+getPluralGetter :: forall e a. (Json -> Maybe a) -> PropertyName -> Resource -> AsyncPropDefs e (Either String (Array a))
+getPluralGetter tofn pn r = do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     Nothing -> pure (Right [])
-    -- Dit moet een array zijn gevuld met types die de tofn kan herkennen.
+    -- This must be an array filled with types that the tofn recognizes.
     (Just json) -> case toArray json of
       Nothing -> pure (Left "Not an array!")
       (Just arr) -> case traverse tofn arr of
-        Nothing -> pure (Left "Not all elements are of the required type")
+        Nothing -> pure (Left "Not all elements are of the required type!")
         (Just a) -> pure (Right a)
 
--- | in AsyncResource, retrieve either a String property or an error message.
-getString :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Array String))
-getString = getGetter toString
+-- | Returns either a Maybe value, or an error message if the type could not be recognized as the requested type.
+getSingleGetter :: forall e a. (Json -> Maybe a) -> PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe a))
+getSingleGetter tofn pn r = do
+  (PropDefs pd) <- getPropDefs r
+  case lookup pn pd of
+    Nothing -> pure (Right Nothing)
+    -- This must be an array filled with a single value that the tofn recognizes.
+    (Just json) -> case toArray json of
+      Nothing -> pure (Left "Not an array!")
+      (Just arr) -> case traverse tofn arr of
+        Nothing -> pure (Left "Elements is not of the required type!")
+        (Just a) -> pure (Right $ head a)
 
+-- | in AsyncResource, retrieve either a String or an error message.
+getString :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe String))
+getString = getSingleGetter toString
 
--- | in AsyncResource, retrieve either a Number property or an error message.
-getNumber :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Array Number))
-getNumber = getGetter toNumber
+-- | in AsyncResource, retrieve either an Array of Strings or an error message.
+getStrings :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Array String))
+getStrings = getPluralGetter toString
 
--- | in AsyncResource, retrieve either a Boolean property or an error message.
-getBoolean :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Array Boolean))
-getBoolean = getGetter toBoolean
+-- | in AsyncResource, retrieve either a Number or an error message.
+getNumber :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Maybe Number))
+getNumber = getSingleGetter toNumber
 
--- | in AsyncResource, retrieve either a Resource property or an error message.
-getResource :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Array Resource))
---getResource pn r = map (\rs -> Just $ representResource rs) (getString pn r)
+-- | in AsyncResource, retrieve either an Array of Numbers or an error message.
+getNumbers :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Array Number))
+getNumbers = getPluralGetter toNumber
+
+-- | in AsyncResource, retrieve either a Boolean value or an error message.
+getBoolean :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Maybe Boolean))
+getBoolean = getSingleGetter toBoolean
+
+-- | in AsyncResource, retrieve either a Resource or an error message.
+getResource :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe Resource))
 getResource pn r = do
-  resIdArray <- getString pn r
+  resIdArray <- getStrings pn r
   case resIdArray of
     (Left err) -> pure $ Left err
-    (Right arr) -> pure $ Right $ map representResource arr
+    (Right arr) -> case head arr of
+      Nothing -> pure $ Right Nothing
+      (Just id) -> liftEff $ Right <$> (Just <$> (representResource $ id))
+
+-- | in AsyncResource, retrieve either an Array of Resources or an error message.
+getResources :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Array Resource))
+getResources pn r = do
+  resIdArray <- getStrings pn r
+  case resIdArray of
+    (Left err) -> pure $ Left err
+    (Right arr) -> Right <$> (liftEff $ (traverse representResource arr))
 
 -- | in AsyncResource, retrieve either a Date property or an error message.
 --getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))
