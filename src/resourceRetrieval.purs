@@ -16,6 +16,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, keys)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
+import Perspectives.Identifiers (isDomeinURI, getNamespace, isStandardNamespaceCURIE, getStandardNamespace)
 
 type ResourceId = String
 
@@ -38,10 +39,28 @@ fetchPropDefs id =
                     (Left message) -> Left $ message <> " (" <> id <> ")"
                     Right pd -> Right pd
 
+-- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
+fetchDefinition id = if isDomeinURI id
+  then retrieveDomeinResourceDefinition (getNamespace id) id
+  else if isStandardNamespaceCURIE id
+    then retrieveDomeinResourceDefinition (getStandardNamespace id) id
+    else fetchResourceDefinition id
+
 -- | Fetch the definition of a resource asynchronously.
--- | TODO: handle situations without response, or rather, when the response indicates an error.
-fetchDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
-fetchDefinition id = do
+fetchResourceDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
+fetchResourceDefinition id = do
+  v <- makeVar
+  _ <- forkAff do
+        res <- affjax $ userResourceRequest {url = baseURL <> id}
+        case res.status of
+          StatusCode 200 -> putVar v (Right res.response)
+          otherwise -> putVar v (Left $ "fetchDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+  takeVar v
+
+-- | Fetch the definition of a resource asynchronously.
+-- | TODO dit is de implementatie van fetchResourceDefinition, pas aan voor Domeinen!!
+retrieveDomeinResourceDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
+retrieveDomeinResourceDefinition id = do
   v <- makeVar
   _ <- forkAff do
         res <- affjax $ userResourceRequest {url = baseURL <> id}

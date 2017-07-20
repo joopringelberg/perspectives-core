@@ -1,4 +1,13 @@
-module Perspectives.Identifiers where
+module Perspectives.Identifiers
+( isDomeinURI
+, isStandardNamespaceCURIE
+, isStandardNamespacePrefix
+, getStandardNamespace
+, getPrefix
+, getNamespace
+  )
+
+where
 import Data.Array (unsafeIndex)
 import Data.Foldable (or)
 import Data.Maybe (Maybe(..), maybe)
@@ -8,7 +17,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
-import Prelude (const, (<$>))
+import Prelude (const, flip, (<$>))
 
 standardPrefixes2namespaces :: StrMap String
 standardPrefixes2namespaces = fromFoldable [ (Tuple "user" "model:user#"),
@@ -20,6 +29,10 @@ standardPrefixes2namespaces = fromFoldable [ (Tuple "user" "model:user#"),
   (Tuple "owl" "http://www.w3.org/2002/07/owl#"),
   (Tuple "xml" "http://www.w3.org/XML/1998/namespace")]
 
+type Namespace = String
+
+type Prefix = String
+
 domeinURIRegex :: Regex
 domeinURIRegex = unsafeRegex "^model:(\\w*)#(\\w*)$" noFlags
 
@@ -29,8 +42,6 @@ isDomeinURI s = test domeinURIRegex s
 
 curieRegEx :: Regex
 curieRegEx = unsafeRegex "^(\\w+)\\:(\\w+)" noFlags
-
-type Prefix = String
 
 -- | Returns 'pre' from 'pre:someurl' or Nothing.
 getPrefix :: String -> Maybe Prefix
@@ -45,5 +56,16 @@ isStandardNamespaceCURIE s =
     Nothing -> false
     Just matches -> or (maybe false isStandardNamespacePrefix <$> matches)
 
-isStandardNamespacePrefix :: String -> Boolean
+isStandardNamespacePrefix :: Prefix -> Boolean
 isStandardNamespacePrefix pre = maybe false (const true) (lookup pre standardPrefixes2namespaces)
+
+getStandardNamespace :: String -> Maybe Namespace
+getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (getPrefix s)
+
+namespaceRegex :: Regex
+namespaceRegex = unsafeRegex "^(model:\\w*#)\\w*$" noFlags
+
+getNamespace :: String -> Maybe Namespace
+getNamespace s = case match namespaceRegex s of
+  (Just matches) -> unsafePartial unsafeIndex matches 1
+  _ -> Nothing
