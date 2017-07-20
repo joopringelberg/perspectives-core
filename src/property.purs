@@ -8,7 +8,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Resource (Resource, AsyncPropDefs, getPropDefs, representResource)
+import Perspectives.Resource (Resource(..), AsyncPropDefs, getPropDefs, representResource)
 import Perspectives.ResourceRetrieval (PropDefs(..))
 
 {-
@@ -36,15 +36,18 @@ getPluralGetter :: forall e a.
   -> AsyncPropDefs e (Either String (Array a))
 getPluralGetter tofn pn Nothing = pure (Right [])
 getPluralGetter tofn pn (Just r) = do
-  (PropDefs pd) <- getPropDefs r
-  case lookup pn pd of
-    Nothing -> pure (Right [])
-    -- This must be an array filled with types that the tofn recognizes.
-    (Just json) -> case toArray json of
-      Nothing -> pure (Left "Not an array!")
-      (Just arr) -> case traverse tofn arr of
-        Nothing -> pure (Left "Not all elements are of the required type!")
-        (Just a) -> pure (Right a)
+  pde <- getPropDefs r
+  case pde of
+    (Left err ) -> pure (Left err)
+    (Right (PropDefs pd)) ->
+      case lookup pn pd of
+        Nothing -> pure (Right [])
+        -- This must be an array filled with types that the tofn recognizes.
+        (Just json) -> case toArray json of
+          Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
+          (Just arr) -> case traverse tofn arr of
+            Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" ))
+            (Just a) -> pure (Right a)
 
 -- | Returns either a Maybe value, or an error message if the type could not be recognized as the requested type.
 getSingleGetter :: forall e a.
@@ -54,15 +57,18 @@ getSingleGetter :: forall e a.
   -> AsyncPropDefs e (Either String (Maybe a))
 getSingleGetter tofn pn Nothing = pure (Right Nothing)
 getSingleGetter tofn pn (Just r) = do
-  (PropDefs pd) <- getPropDefs r
-  case lookup pn pd of
-    Nothing -> pure (Right Nothing)
-    -- This must be an array filled with a single value that the tofn recognizes.
-    (Just json) -> case toArray json of
-      Nothing -> pure (Left "Not an array!")
-      (Just arr) -> case traverse tofn arr of
-        Nothing -> pure (Left "Elements is not of the required type!")
-        (Just a) -> pure (Right $ head a)
+  pde <- getPropDefs r
+  case pde of
+    (Left err ) -> pure (Left err)
+    (Right (PropDefs pd)) ->
+      case lookup pn pd of
+        Nothing -> pure (Right Nothing)
+        -- This must be an array filled with a single value that the tofn recognizes.
+        (Just json) -> case toArray json of
+          Nothing -> pure (Left ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
+          (Just arr) -> case traverse tofn arr of
+            Nothing -> pure (Left ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" ))
+            (Just a) -> pure (Right $ head a)
 
 -- | in AsyncResource, retrieve either a String or an error message.
 getString :: forall e. PropertyName -> Maybe Resource -> AsyncPropDefs e (Either String (Maybe String))

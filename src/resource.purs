@@ -6,6 +6,7 @@ import Control.Monad.Aff.AVar (AVar, makeVar, putVar, peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, lookup)
 import Data.StrMap.ST (poke, STStrMap)
@@ -85,16 +86,21 @@ addPropertyDefinitions r@(Resource{id}) av =
 type AsyncPropDefs e a = Aff (td :: THEORYDELTA, st :: ST ResourceIndex, avar :: AVAR, ajax :: AJAX | e) a
 
 -- | Get the property definitions of a Resource.
-getPropDefs :: forall e. Resource -> AsyncPropDefs e PropDefs
+getPropDefs :: forall e. Resource -> AsyncPropDefs e (Either String PropDefs)
 getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               def <- fetchPropDefs id
-              av <- makeVar
-              -- set av as the value of propDefs in the resource!
-              _ <- liftEff $ (addPropertyDefinitions r av)
-              putVar av def
-              pure def
-  (Just avar) -> do peekVar avar
+              case def of
+                (Left err) -> pure (Left err)
+                (Right pd ) -> do
+                    av <- makeVar
+                    -- set av as the value of propDefs in the resource!
+                    _ <- liftEff $ (addPropertyDefinitions r av)
+                    putVar av pd
+                    pure (Right pd)
+  (Just avar) -> do
+                  pd <- peekVar avar
+                  pure (Right pd)
 
 -----------------------------------------------------------------------------------------------
 -- | EXAMPLES
