@@ -2,8 +2,7 @@ module Perspectives.ResourceRetrieval
 ( PropDefs(..)
 , ResourceId
 , AsyncResource
-, fetchDefinition
-, stringToPropDefs
+, fetchPropDefs
   )
 where
 
@@ -11,11 +10,12 @@ import Prelude
 import Control.Monad.Aff (Aff, forkAff)
 import Control.Monad.Aff.AVar (makeVar, putVar, takeVar, AVAR)
 import Data.Argonaut (Json, fromString, jsonParser, toObject)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, keys, singleton)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
+import Network.HTTP.StatusCode (StatusCode(..))
 
 type ResourceId = String
 
@@ -28,14 +28,21 @@ instance showPropDefs :: Show PropDefs where
 
 type AsyncResource e a = Aff (avar :: AVAR, ajax :: AJAX | e) a
 
+fetchPropDefs :: forall e. ResourceId -> AsyncResource e (Either String PropDefs)
+fetchPropDefs id = do
+  defstring <- fetchDefinition id
+  pure (either Left (Right <<< stringToPropDefs) defstring)
+
 -- | Fetch the definition of a resource asynchronously.
 -- | TODO: handle situations without response, or rather, when the response indicates an error.
-fetchDefinition :: forall e. ResourceId -> (AsyncResource e String)
+fetchDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
 fetchDefinition id = do
   v <- makeVar
   _ <- forkAff do
         res <- affjax $ userResourceRequest {url = baseURL <> id}
-        putVar v res.response
+        case res.status of
+          StatusCode 200 -> putVar v (Right res.response)
+          otherwise -> putVar v (Left (show res.status))
   takeVar v
 
 baseURL :: String

@@ -1,9 +1,7 @@
 module Perspectives.Property where
 
 import Prelude
-import Control.Applicative ((*>))
 import Control.Monad.Eff.Class (liftEff)
-import Control.Plus (class Plus, empty)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Array (head)
 import Data.Either (Either(..))

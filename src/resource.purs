@@ -12,7 +12,7 @@ import Data.StrMap.ST (poke, STStrMap)
 import Network.HTTP.Affjax (AJAX)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
-import Perspectives.ResourceRetrieval (PropDefs, ResourceId, AsyncResource, fetchDefinition, stringToPropDefs)
+import Perspectives.ResourceRetrieval (PropDefs, ResourceId, fetchPropDefs)
 
 -- | Basic representation for Resource, complete with its definition.
 newtype Resource = Resource
@@ -88,8 +88,7 @@ type AsyncPropDefs e a = Aff (td :: THEORYDELTA, st :: ST ResourceIndex, avar ::
 getPropDefs :: forall e. Resource -> AsyncPropDefs e PropDefs
 getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
-              defstring <- fetchDefinition id
-              def <- pure (stringToPropDefs defstring)
+              def <- fetchPropDefs id
               av <- makeVar
               -- set av as the value of propDefs in the resource!
               _ <- liftEff $ (addPropertyDefinitions r av)
