@@ -70,6 +70,8 @@ getSingleGetter tofn pn (Just r) = do
             Nothing -> pure (Left ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" ))
             (Just a) -> pure (Right $ head a)
 
+-- | By composing this function with the application of a getSingleGetter or getPluralGetter to a Json toX function,
+-- | we obtain a Kleisli-composable getter that will handle errors.
 applyProperty :: forall a b m. Monad m =>
   (a -> m (Either String b))
   ->( Either String a
