@@ -1,24 +1,38 @@
+-- | A totally unsafe StrMap, tracked by an effect.
+-- |
+
 module Perspectives.GlobalUnsafeStrMap
-( GlobalUnsafeStrMap
-, createGlobalUnsafeStrMap )
+  ( GLStrMap
+  , GLOBALMAP
+  , new
+  , peek
+  , poke
+  , delete
+  ) where
 
-where
-  import Control.Monad.Eff (Eff)
-  import Control.Monad.ST (ST)
-  import Data.StrMap.ST (STStrMap)
-  import Prelude (Unit)
+import Control.Monad.Eff (Eff, kind Effect)
+import Data.Maybe (Maybe(..))
 
-  -- | A permanently thawed STStrMap that is tracked by an ST effect (put otherwise, a computation in Eff tagged by ST
-  -- | that will yield a thawed STStrMap).
-  -- | This is an unsafe index that can be modified everywhere!
-  type GlobalUnsafeStrMap h a= Eff (st :: ST h) (STStrMap h a)
+-- | A reference to a mutable map
+-- |
+-- | The type parameter defines the type of elements of the mutable array.
+-- |
+foreign import data GLStrMap :: Type -> Type
 
-  -- | Create a computation in Eff that holds a permanently thawed STStrMap.
-  foreign import createGlobalUnsafeStrMap :: forall h a. Unit -> GlobalUnsafeStrMap h a
+-- | The GLOBALMAP Effect labels that an unsafe global stringmap is used.
+foreign import data GLOBALMAP :: Effect
 
-  -- myMap :: forall h r. GlobalStrMap String h r
-  -- myMap = createGlobalStrMap unit
-  --
-  -- r = do
-  --   m <- myMap
-  --   poke m "aap" "heeft een staart"
+-- | Create a new, empty mutable map
+foreign import new :: forall a r. Eff (gm :: GLOBALMAP | r) (GLStrMap a)
+
+-- | Get the value for a key in a global map
+peek :: forall a r. GLStrMap a -> String -> Eff (gm :: GLOBALMAP | r) (Maybe a)
+peek = peekImpl Just Nothing
+
+foreign import peekImpl :: forall a b r. (a -> b) -> b -> GLStrMap a -> String -> Eff (gm :: GLOBALMAP | r) b
+
+-- | Update the value for a key in a global map
+foreign import poke :: forall a r. GLStrMap a -> String -> a -> Eff (gm :: GLOBALMAP | r) (GLStrMap a)
+
+-- | Remove a key and the corresponding value from a global map
+foreign import delete :: forall a r. GLStrMap a -> String -> Eff (gm :: GLOBALMAP | r) (GLStrMap a)
