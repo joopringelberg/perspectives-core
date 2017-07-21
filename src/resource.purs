@@ -13,26 +13,8 @@ import Data.StrMap.ST (poke, STStrMap)
 import Network.HTTP.Affjax (AJAX)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
-import Perspectives.ResourceRetrieval (PropDefs, ResourceId, fetchPropDefs)
-
--- | Basic representation for Resource, complete with its definition.
-newtype Resource = Resource
-  { id :: String
-  , propDefs :: Maybe (AVar PropDefs)
-  }
-
--- | The show instance cannot inspect the content of the AVar, because that needs running
--- | the asynchronous computation to yield a result synchronously, which we cannot do.
-instance showResource :: Show Resource where
-    show (Resource{id, propDefs} ) = case propDefs of
-      Nothing -> id <> " (No definition)"
-      (Just avar) -> id <> " (with definition)"
-
--- | We store the combination of Resource and Location in an Index.
-newtype ResourceLocation = ResourceLocation{ res :: Resource, loc :: Location Resource}
-
---instance showResourceLocation :: Show (ResourceLocation e) where
---  show (ResourceLocation{ res }) = show res
+import Perspectives.ResourceRetrieval (fetchPropDefs)
+import Perspectives.ResourceTypes(ResourceLocation(..), Resource(..), PropDefs, ResourceId)
 
 -- | The global index of all Resource-Location pairs, indexed by ResourceId.
 type ResourceIndex = StrMap ResourceLocation

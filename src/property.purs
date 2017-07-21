@@ -8,8 +8,8 @@ import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Resource (Resource, AsyncPropDefs, getPropDefs, representResource)
-import Perspectives.ResourceRetrieval (PropDefs(..))
+import Perspectives.Resource (AsyncPropDefs, getPropDefs, representResource)
+import Perspectives.ResourceTypes (Resource, PropDefs(..))
 
 {-
 Property values are represented by Arrays, whatever the cardinality of the property.

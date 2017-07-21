@@ -1,33 +1,21 @@
 module Perspectives.ResourceRetrieval
-( PropDefs(..)
-, ResourceId
-, AsyncResource
-, fetchPropDefs
+(fetchPropDefs
   )
 where
 
 import Prelude
-import Control.Monad.Aff (Aff, forkAff)
-import Control.Monad.Aff.AVar (makeVar, putVar, takeVar, AVAR)
-import Data.Argonaut (Json, jsonParser, toObject)
+import Control.Monad.Aff (forkAff)
+import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
+import Data.Argonaut (jsonParser, toObject)
 import Data.Either (Either(..), either)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, keys)
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
+import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Identifiers (isDomeinURI, getNamespace, isStandardNamespaceCURIE, getStandardNamespace)
 
-type ResourceId = String
-
--- | A newtype for the property definitions so we can show them.
---newtype PropDefs = PropDefs (StrMap (Array Foreign))
-newtype PropDefs = PropDefs (StrMap Json)
-
-instance showPropDefs :: Show PropDefs where
-  show (PropDefs s) = show $ keys s
-
-type AsyncResource e a = Aff (avar :: AVAR, ajax :: AJAX | e) a
+import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
+import Perspectives.DomeinCache (retrieveDomeinResourceDefinition)
+import Perspectives.ResourceTypes(ResourceId, AsyncResource, PropDefs(..))
 
 fetchPropDefs :: forall e. ResourceId -> AsyncResource e (Either String PropDefs)
 fetchPropDefs id =
@@ -40,6 +28,7 @@ fetchPropDefs id =
                     Right pd -> Right pd
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
+fetchDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
 fetchDefinition id = if isDomeinURI id
   then retrieveDomeinResourceDefinition (getNamespace id) id
   else if isStandardNamespaceCURIE id
@@ -49,18 +38,6 @@ fetchDefinition id = if isDomeinURI id
 -- | Fetch the definition of a resource asynchronously.
 fetchResourceDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
 fetchResourceDefinition id = do
-  v <- makeVar
-  _ <- forkAff do
-        res <- affjax $ userResourceRequest {url = baseURL <> id}
-        case res.status of
-          StatusCode 200 -> putVar v (Right res.response)
-          otherwise -> putVar v (Left $ "fetchDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
-  takeVar v
-
--- | Fetch the definition of a resource asynchronously.
--- | TODO dit is de implementatie van fetchResourceDefinition, pas aan voor Domeinen!!
-retrieveDomeinResourceDefinition :: forall e. ResourceId -> (AsyncResource e (Either String String))
-retrieveDomeinResourceDefinition id = do
   v <- makeVar
   _ <- forkAff do
         res <- affjax $ userResourceRequest {url = baseURL <> id}

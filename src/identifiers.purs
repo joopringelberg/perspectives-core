@@ -5,6 +5,7 @@ module Perspectives.Identifiers
 , getStandardNamespace
 , getPrefix
 , getNamespace
+, Namespace
   )
 
 where
@@ -33,6 +34,11 @@ type Namespace = String
 
 type Prefix = String
 
+getFirstMatch :: Regex -> String -> Maybe String
+getFirstMatch regex s = case match regex s of
+  (Just matches) -> unsafePartial unsafeIndex matches 1
+  _ -> Nothing
+
 domeinURIRegex :: Regex
 domeinURIRegex = unsafeRegex "^model:(\\w*)#(\\w*)$" noFlags
 
@@ -45,9 +51,7 @@ curieRegEx = unsafeRegex "^(\\w+)\\:(\\w+)" noFlags
 
 -- | Returns 'pre' from 'pre:someurl' or Nothing.
 getPrefix :: String -> Maybe Prefix
-getPrefix s = case match curieRegEx s of
-  (Just matches) -> unsafePartial unsafeIndex matches 1
-  _ -> Nothing
+getPrefix = getFirstMatch curieRegEx
 
 -- | True iff the string is a curie with a recognizable prefix that is one of prefixes of the standard namespaces.
 isStandardNamespaceCURIE :: String -> Boolean
@@ -66,6 +70,4 @@ namespaceRegex :: Regex
 namespaceRegex = unsafeRegex "^(model:\\w*#)\\w*$" noFlags
 
 getNamespace :: String -> Maybe Namespace
-getNamespace s = case match namespaceRegex s of
-  (Just matches) -> unsafePartial unsafeIndex matches 1
-  _ -> Nothing
+getNamespace = getFirstMatch namespaceRegex
