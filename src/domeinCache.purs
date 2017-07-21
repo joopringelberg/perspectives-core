@@ -7,32 +7,31 @@ where
 import Control.Monad.Aff (forkAff)
 import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
 import Control.Monad.Eff (Eff)
-import Control.Monad.ST (ST)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, empty, lookup)
 import Data.String.Regex (Regex, replace)
 import Data.String.Regex.Flags (global)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.ResourceTypes (PropDefs, ResourceId, AsyncResource)
-import Prelude (Unit, bind, pure, show, ($), (<>))
+import Prelude (Unit, bind, pure, show, ($), (<>), (*>))
 
 type DomeinFile = Array PropDefs
 -- | The global index of all cached Domein files, indexed by namespace name.
-type DomeinCache = StrMap DomeinFile
+type DomeinCache = GLStrMap DomeinFile
 
-domeinCache :: DomeinCache
-domeinCache = empty
+domeinCache :: forall e. Eff (gm :: GLOBALMAP | e) DomeinCache
+domeinCache = new
 
--- storeDomeinFileInCache :: forall e. Namespace -> DomeinFile -> Eff (st :: ST DomeinCache | e) DomeinFile
--- storeDomeinFileInCache ns df=
---   do
---     dc <- thawST' domeinCache
---     poke dc ns df *> pure df
+storeDomeinFileInCache :: forall e. Namespace -> DomeinFile -> Eff (gm :: GLOBALMAP | e) DomeinFile
+storeDomeinFileInCache ns df=
+  do
+    dc <- domeinCache
+    poke dc ns df *> pure df
 
 domeinFileRegex :: Regex
 domeinFileRegex = unsafeRegex "[:#\\/]" global
