@@ -14,7 +14,7 @@ import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 
 import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
-import Perspectives.DomeinCache (retrieveDomeinResourceDefinition)
+import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
 import Perspectives.ResourceTypes(ResourceId, AsyncResource, PropDefs(..))
 
 fetchPropDefs :: forall e. ResourceId -> AsyncResource e (Either String PropDefs)
@@ -59,14 +59,3 @@ userResourceRequest =
   , password: Just "geheim"
   , withCredentials: true
   }
-
--- | There can be two error scenarios here: either the returned string cannot be parsed
--- | by JSON.parse, or the resulting json is not an object. Neither is likely, because Couchdb
--- | will not store such documents.
-stringToPropDefs :: String -> Either String PropDefs
-stringToPropDefs s = case jsonParser s of
-    (Left err) -> Left $ "stringToPropDefs: cannot parse: " <> s
-    (Right json) ->
-      case toObject json of
-        Nothing -> Left $ "stringToPropDefs: parsed json is not an object!"
-        (Just obj) -> Right $ PropDefs obj
