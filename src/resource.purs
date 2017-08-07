@@ -2,7 +2,7 @@ module Perspectives.Resource where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVar, makeVar, putVar, peekVar, AVAR)
+import Control.Monad.Aff.AVar (AVar, makeVar', makeVar, putVar, peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
@@ -37,11 +37,9 @@ representResource id = case lookup id resourceIndex of
 -- | Create a new resource with definitions and store it in the index.
 newResource :: ResourceId -> PropDefs -> Aff ( st :: ST ResourceIndex, avar :: AVAR ) Resource
 newResource id defs = do
-    v <- makeVar
-    _ <- putVar v defs
+    v <- makeVar' defs
     res <- pure (Resource{ id: id, propDefs: Just v})
-    _ <- liftEff $ storeResourceInIndex res
-    pure res
+    liftEff $ storeResourceInIndex res
 
 storeResourceInIndex :: forall e. Resource -> Eff (st :: ST ResourceIndex | e) Resource
 storeResourceInIndex res@(Resource{id}) =
