@@ -17,6 +17,8 @@ import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI
 import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
 import Perspectives.ResourceTypes(ResourceId, AsyncResource, PropDefs(..))
 
+-- TODO In deze functie moet al onderscheid gemaakt worden tussen domeinresources en user resources.
+-- retrieveDomeinResourceDefinition geeft al een PropDefs terug.
 fetchPropDefs :: forall e. ResourceId -> AsyncResource e (Either String PropDefs)
 fetchPropDefs id =
   do
