@@ -12,23 +12,23 @@ import Perspectives.Resource (AsyncPropDefs, getPropDefs, representResource)
 import Perspectives.ResourceTypes (Resource, PropDefs(..))
 
 {-
-Property values are represented by Arrays, whatever the cardinality of the property.
-We need functions that give us an array of values for a given property for a given resource.
+Property values are represented by Arrays, or Maybes.
+We need functions that give us an array of values or maybe value for a given property for a given resource, depending
+on the property being relational or functional.
 However, we also want to memoize that and track the dependency and provide a method for updating the values.
 Therefore, we lift these functions over Locations. Hence, Resources are put into Locations.
-However, a property whose range is Resource, must be represented by an Array of Resources - not of Locations!
+However, a property whose range is Resource, must be represented by a Maybe Resource value - not by a Location.
 -}
 
 type PropertyName = String
 
--- | Returns either an Array of types, or one of two messages:
--- | - the value is not an Array;
+-- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
+-- | type, e.g. toString.
+-- | Returns a function that takes a property name and returns a plural getter for that property.
+-- | The getter takes a Maybe Resource and returns a computation of either an Array of values, or one of two messages:
+-- | - the value is not an Array (vi);
 -- | - not all elements in the Array are of the required type.
--- | Wrap this in a function that annotates the Resource with a property holding the message,
--- | thus lifting the problem into the Domain that is modelled. Then return an empty Array so
--- | the operation may continue.
--- | NOTE: callers may expect a non-zero Array (based on the model). They will have to handle
--- | this error situation.
+-- | The computation is effectful according to AsyncPropDefs (and extensible).
 getPluralGetter :: forall e a.
   (Json -> Maybe a)
   -> PropertyName
@@ -41,15 +41,22 @@ getPluralGetter tofn pn (Just r) = do
     (Left err ) -> pure (Left err)
     (Right (PropDefs pd)) ->
       case lookup pn pd of
+        -- Property is not available. This is not an error.
         Nothing -> pure (Right [])
-        -- This must be an array filled with types that the tofn recognizes.
+        -- This must be an array filled with values of the type that the tofn recognizes.
         (Just json) -> case toArray json of
           Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
           (Just arr) -> case traverse tofn arr of
             Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" ))
             (Just a) -> pure (Right a)
 
--- | Returns either a Maybe value, or an error message if the type could not be recognized as the requested type.
+-- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
+-- | type, e.g. toString.
+-- | Returns a function that takes a property name and returns a single getter for that property.
+-- | The getter takes a Maybe Resource and returns a computation of either a Maybe value, or one of two messages:
+-- | - the value is not an Array;
+-- | - not all elements in the Array are of the required type.
+-- | The computation is effectful according to AsyncPropDefs (and extensible).
 getSingleGetter :: forall e a.
   (Json -> Maybe a)
   -> PropertyName
@@ -62,6 +69,7 @@ getSingleGetter tofn pn (Just r) = do
     (Left err ) -> pure (Left err)
     (Right (PropDefs pd)) ->
       case lookup pn pd of
+        -- Property is not available. This is not an error.
         Nothing -> pure (Right Nothing)
         -- This must be an array filled with a single value that the tofn recognizes.
         (Just json) -> case toArray json of

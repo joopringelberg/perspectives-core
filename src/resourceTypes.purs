@@ -22,7 +22,6 @@ type ResourceId = String
 type AsyncResource e a = Aff (avar :: AVAR, ajax :: AJAX | e) a
 
 -- | A newtype for the property definitions so we can show them.
---newtype PropDefs = PropDefs (StrMap (Array Foreign))
 newtype PropDefs = PropDefs (StrMap Json)
 
 instance showPropDefs :: Show PropDefs where
