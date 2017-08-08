@@ -2,7 +2,7 @@ module Perspectives.Resource where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVar, makeVar', makeVar, putVar, peekVar, AVAR)
+import Control.Monad.Aff.AVar (AVar, makeVar', peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
@@ -73,10 +73,9 @@ getPropDefs r@(Resource {id, propDefs}) = case propDefs of
               case def of
                 (Left err) -> pure (Left err)
                 (Right pd ) -> do
-                    av <- makeVar
+                    av <- makeVar' pd
                     -- set av as the value of propDefs in the resource!
                     _ <- liftEff $ (addPropertyDefinitions r av)
-                    putVar av pd
                     pure (Right pd)
   (Just avar) -> do
                   pd <- peekVar avar
@@ -92,8 +91,8 @@ r1 = Resource{
 }
 
 j :: Resource
-j = representResource "Joop" Nothing
+j = representResource "Joop"
 
 r1Stored :: Resource
-r1Stored = representResource "r1" (Just propDefs) where (Resource{propDefs}) = r1
+r1Stored = newResource "r1" (Just propDefs) where (Resource{propDefs}) = r1
 -}
