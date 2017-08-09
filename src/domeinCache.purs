@@ -4,29 +4,32 @@ module Perspectives.DomeinCache
 
 where
 
-import Control.Monad.Aff (Aff, forkAff)
-import Control.Monad.Aff.AVar (AVAR, makeVar, putVar, takeVar)
+import Control.Monad.Aff (forkAff)
+import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Argonaut (jsonParser, toArray, toObject)
+import Data.Argonaut (jsonParser, toArray, toObject, toString)
 import Data.Argonaut.Core (JObject)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, fromFoldable, lookup)
 import Data.String.Regex (Regex, replace)
 import Data.String.Regex.Flags (global)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
+import Data.Tuple (Tuple(..))
+import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.ResourceTypes (PropDefs(..), ResourceId, AsyncResource)
-import Prelude (Unit, bind, pure, show, ($), (*>), (<<<), (<>))
+import Perspectives.ResourceTypes (PropDefs(..), ResourceId, AsyncDomeinFile)
+import Prelude (Unit, bind, pure, show, ($), (*>), (<>))
 
+-- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
 type DomeinFile = StrMap PropDefs
--- | The global index of all cached Domein files, indexed by namespace name.
+
+-- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
 type DomeinCache = GLStrMap DomeinFile
 
 domeinCache :: forall e. Eff (gm :: GLOBALMAP | e) DomeinCache
@@ -38,30 +41,31 @@ storeDomeinFileInCache ns df=
     dc <- domeinCache
     poke dc ns df *> pure df
 
+-- | Matches all occurrences of :, # and /.
 domeinFileRegex :: Regex
 domeinFileRegex = unsafeRegex "[:#\\/]" global
 
+-- | Replace all occurrences of :, # and / by _.
 namespaceToDomeinFileName :: String -> String
 namespaceToDomeinFileName s = replace domeinFileRegex "_" s
 
 -- | Fetch the definition of a resource asynchronously from its Domein.
 retrieveDomeinResourceDefinition :: forall e.
-  Maybe Namespace
-  -> ResourceId
+  ResourceId
+  -> Namespace
   -> (AsyncDomeinFile e (Either String PropDefs))
-retrieveDomeinResourceDefinition Nothing id = pure $ Left ("retrieveDomeinResourceDefinition: cannot find namespace for " <> id)
-retrieveDomeinResourceDefinition (Just ns) id = do
-  df <- retrieveDomeinFile ns
+retrieveDomeinResourceDefinition id ns = do
+  -- df :: (Either String DomeinFile)
+  df <- retrieveDomeinFile (namespaceToDomeinFileName ns)
   case df of
-    e@(Left err) -> pure e
+    (Left err) -> pure $ Left err
     (Right f) -> case lookup id f of
       Nothing -> pure $ Left ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
-
-type AsyncDomeinFile e a = Aff (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX | e) a
+      (Just propDefs) -> pure (Right propDefs)
 
 retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e (Either String DomeinFile)
 retrieveDomeinFile ns = do
-  dc <- liftEff $ domeinCache
+  dc <- liftEff domeinCache
   file <- liftEff $ peek dc ns
   case file of
     Nothing -> do
@@ -79,17 +83,30 @@ retrieveDomeinFile ns = do
 stringToDomeinFile :: String -> Either String DomeinFile
 stringToDomeinFile s = case jsonParser s of
   (Left err) -> Left $ "stringToDomeinFile: cannot parse: " <> s
-  (Right json) ->
-    case toArray json of
-      Nothing -> Left $ "stringToDomeinFile: parsed json is not an array!"
-      (Just arr) -> case traverse f arr of
-        Nothing -> Left "stringToDomeinFile: not all array elements are objects!"
-        (Just objArr) -> Right $ objArrayToDomeinFile objArr
-        where f js = maybe Nothing (Just <<< PropDefs) (toObject js)
+  (Right file) ->
+    case toObject file of
+      Nothing -> Left "stringToDomeinFile: received file is not a JSON object!"
+      (Just obj) -> case lookup "resources" obj of
+        Nothing -> Left "stringToDomeinFile: model object does not have a 'resources' property!"
+        (Just json) -> case toArray json of
+          Nothing -> Left "stringToDomeinFile: value of 'resources' property is not an array!"
+          (Just arr) -> case traverse toObject arr of
+            Nothing -> Left "stringToDomeinFile: not all array elements are objects!"
+            (Just objArr) -> case objArrayToDomeinFile objArr of
+              Nothing -> Left "stringToDomeinFile: not all json objects in the array have an appropriate id!"
+              (Just df) -> Right df
 
--- TODO Maak tuples van de id van een resource en de resource zelf, converteer dan naar een StrMap met fromFoldable.
--- objArrayToDomeinFile :: Array JObject -> DomeinFile
-objArrayToDomeinFile arr = fromFoldable []
+objArrayToDomeinFile :: Array JObject -> Maybe DomeinFile
+objArrayToDomeinFile arr = case traverse g arr of
+  Nothing -> Nothing
+  (Just tuples) -> Just $ fromFoldable tuples
+  where
+  g :: JObject -> Maybe (Tuple String PropDefs)
+  g def = case lookup "id" def of
+    Nothing -> Nothing
+    (Just json) -> case toString json of
+      Nothing -> Nothing
+      (Just id ) -> Just (Tuple id (PropDefs def))
 
 -- | There can be two error scenarios here: either the returned string cannot be parsed
 -- | by JSON.parse, or the resulting json is not an object. Neither is likely, because Couchdb

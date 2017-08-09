@@ -14,7 +14,7 @@ import Network.HTTP.Affjax (AJAX)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
-import Perspectives.ResourceTypes(ResourceLocation(..), Resource(..), PropDefs, ResourceId)
+import Perspectives.ResourceTypes (PropDefs, Resource(..), ResourceId, ResourceLocation(..), AsyncDomeinFile)
 
 -- | The global index of all Resource-Location pairs, indexed by ResourceId.
 type ResourceIndex = StrMap ResourceLocation
@@ -63,10 +63,8 @@ addPropertyDefinitions r@(Resource{id}) av =
     _ <- poke ri id newResourceLocation
     pure unit
 
-type AsyncPropDefs e a = Aff (td :: THEORYDELTA, st :: ST ResourceIndex, avar :: AVAR, ajax :: AJAX | e) a
-
 -- | Get the property definitions of a Resource.
-getPropDefs :: forall e. Resource -> AsyncPropDefs e (Either String PropDefs)
+getPropDefs :: forall e. Resource -> AsyncDomeinFile e (Either String PropDefs)
 getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               def <- fetchPropDefs id
@@ -75,7 +73,7 @@ getPropDefs r@(Resource {id, propDefs}) = case propDefs of
                 (Right pd ) -> do
                     av <- makeVar' pd
                     -- set av as the value of propDefs in the resource!
-                    _ <- liftEff $ (addPropertyDefinitions r av)
+                    _ <- pure (addPropertyDefinitions r av)
                     pure (Right pd)
   (Just avar) -> do
                   pd <- peekVar avar

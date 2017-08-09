@@ -1,0 +1,15 @@
+OBSERVATIES NA DE VAKANTIE
+
+1. Het lijkt erop dat er twee soorten location onderscheiden worden:
+	- locations met een computation
+	- locations met een value
+De locations met een computation hebben ook een value. 
+
+2. Location is nog geen instance van Bind of Monad en dat lijkt ook niet nodig. Het is een Functor en een instantie van Apply en Applicative. Dat is genoeg om functies van meerdere argumenten te liften.
+
+3. Een nieuwe location wordt altijd gemaakt met een functie. 'locate' is een hulpfunctie die een waarde verpakt in een constante functie en die in de locatie stopt. De functie die met een location wordt meegegeven, wordt bij aanmaken direct uitgevoerd en het resultaat wordt in de location opgeslagen. Het is met 'get' op te halen.
+
+4. In resource.purs wordt gebruik gemaakt van thawSt'. Beter lijkt het mij om de globalUnsafeStrMap te gaan gebruiken.
+
+TODO
+1. Pas GlobalUnsafeStrMap toe in Perspectives.Resource

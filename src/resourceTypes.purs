@@ -1,6 +1,7 @@
 module Perspectives.ResourceTypes
 ( ResourceId
 , AsyncResource
+, AsyncDomeinFile
 , PropDefs(..)
 , Resource(..)
 , ResourceLocation(..))
@@ -16,10 +17,13 @@ import Data.Argonaut (Json)
 import Network.HTTP.Affjax (AJAX)
 
 import Perspectives.Location(Location)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 
 type ResourceId = String
 
 type AsyncResource e a = Aff (avar :: AVAR, ajax :: AJAX | e) a
+
+type AsyncDomeinFile e a = Aff (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX | e) a
 
 -- | A newtype for the property definitions so we can show them.
 newtype PropDefs = PropDefs (StrMap Json)
