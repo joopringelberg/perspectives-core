@@ -13,3 +13,48 @@ De locations met een computation hebben ook een value.
 
 TODO
 1. Pas GlobalUnsafeStrMap toe in Perspectives.Resource
+
+------------------
+
+s1 :: Resource -> Maybe Resource
+s2 :: Resource -> Maybe Resource
+p1 :: Resource -> Array Resource
+p2 :: Resource -> Array Resource
+
+
+Combinaties voor property paden van links naar rechts, allemaal (mede) gebaseerd op de Bind instances van Maybe en Array.
+s1 s2		bindFlipped s1 >>> bindFlipped s2								>->
+s1 p1		bindFlipped s1 >>> maybe [] singleton >>> bindFlipped p1		>->>
+p1 s1		bindFlipped p1 >>> traverse s1 >>> (maybe [] id) 				>>->
+p1 p2		bindFlipped p1 >>> bindFlipped p2								>>->>
+
+
+Maar dit zijn de echte resultaat types:
+aff (es (Maybe Resource))
+aff (es (Array Resource))
+
+type aff = AsyncPropDefs e
+type es = Either String
+
+getPluralGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> (Maybe Resource -> AsyncPropDefs e (Either String (Array a)))
+
+getSingleGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> (Maybe Resource -> AsyncPropDefs e (Either String (Maybe a)))
+
+Eerste stap: 'Maybe Resource' wordt 'Resource'
+
+getPluralGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> (Resource -> AsyncPropDefs e (Either String (Array a)))
+
+getSingleGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> (Resource -> AsyncPropDefs e (Either String (Maybe a)))
+

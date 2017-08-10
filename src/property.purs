@@ -27,34 +27,6 @@ type AsyncPropDefs e a = AsyncDomeinFile (st :: ST ResourceIndex | e) a
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
--- | Returns a function that takes a property name and returns a plural getter for that property.
--- | The getter takes a Maybe Resource and returns a computation of either an Array of values, or one of two messages:
--- | - the value is not an Array (vi);
--- | - not all elements in the Array are of the required type.
--- | The computation is effectful according to AsyncPropDefs (and extensible).
-getPluralGetter :: forall e a.
-  (Json -> Maybe a)
-  -> PropertyName
-  -> Maybe Resource
-  -> AsyncPropDefs e (Either String (Array a))
-getPluralGetter tofn pn Nothing = pure (Right [])
-getPluralGetter tofn pn (Just r) = do
-  pde <- getPropDefs r
-  case pde of
-    (Left err ) -> pure (Left err)
-    (Right (PropDefs pd)) ->
-      case lookup pn pd of
-        -- Property is not available. This is not an error.
-        Nothing -> pure (Right [])
-        -- This must be an array filled with values of the type that the tofn recognizes.
-        (Just json) -> case toArray json of
-          Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
-          (Just arr) -> case traverse tofn arr of
-            Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" ))
-            (Just a) -> pure (Right a)
-
--- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
--- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a single getter for that property.
 -- | The getter takes a Maybe Resource and returns a computation of either a Maybe value, or one of two messages:
 -- | - the value is not an Array;
@@ -81,7 +53,35 @@ getSingleGetter tofn pn (Just r) = do
             Nothing -> pure (Left ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" ))
             (Just a) -> pure (Right $ head a)
 
--- | By composing this function with the application of a getSingleGetter or getPluralGetter to a Json toX function,
+-- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
+-- | type, e.g. toString.
+-- | Returns a function that takes a property name and returns a plural getter for that property.
+-- | The getter takes a Maybe Resource and returns a computation of either an Array of values, or one of two messages:
+-- | - the value is not an Array (vi);
+-- | - not all elements in the Array are of the required type.
+-- | The computation is effectful according to AsyncPropDefs (and extensible).
+getPluralGetter :: forall e a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> Maybe Resource
+  -> AsyncPropDefs e (Either String (Array a))
+getPluralGetter tofn pn Nothing = pure (Right [])
+getPluralGetter tofn pn (Just r) = do
+  pde <- getPropDefs r
+  case pde of
+    (Left err ) -> pure (Left err)
+    (Right (PropDefs pd)) ->
+      case lookup pn pd of
+        -- Property is not available. This is not an error.
+        Nothing -> pure (Right [])
+        -- This must be an array filled with values of the type that the tofn recognizes.
+        (Just json) -> case toArray json of
+          Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
+          (Just arr) -> case traverse tofn arr of
+            Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" ))
+            (Just a) -> pure (Right a)
+
+-- | By composing this function with the application of a getSingleGetter to a Json toX function,
 -- | we obtain a Kleisli-composable getter that will handle errors.
 applyProperty :: forall a b m. Monad m =>
   (a -> m (Either String b))
