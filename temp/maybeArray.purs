@@ -2,9 +2,10 @@ module MaybeArray where
 
 import Control.Bind (bindFlipped)
 import Data.Array (singleton)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Prelude (map, (<#>), (<$>), (<<<), (=<<), (>>>), id)
+import Prelude (id, map, (+), (<#>), (<$>), (<<<), (=<<), (>>=), (>>>))
 
 f :: forall a. a -> Maybe a
 f x = Just x
@@ -78,3 +79,15 @@ infix 0 pTos as >>->
 testStoS = f >-> g
 testStoP = f >->> p
 testPtoS = p >>-> f
+
+------------------------------------------------------------------------
+----- NESTED MONADS
+------------------------------------------------------------------------
+d1 :: Either String (Maybe Int)
+d1 = Right (Just 1)
+
+add1 :: Int -> Either String (Maybe Int)
+add1 arg = Right (Just (arg + 1))
+
+k :: Either String (Either String Int) -> Either String (Maybe Int)
+k es = es >>= (\mi -> mi >>= (\i -> add1 i))
