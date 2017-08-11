@@ -1,6 +1,7 @@
 module Perspectives.Property where
 
 import Prelude
+import Control.Bind (bindFlipped)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
@@ -35,10 +36,9 @@ type AsyncPropDefs e a = AsyncDomeinFile (st :: ST ResourceIndex | e) a
 getSingleGetter :: forall e a.
   (Json -> Maybe a)
   -> PropertyName
-  -> Maybe Resource
+  -> Resource
   -> AsyncPropDefs e (Either String (Maybe a))
-getSingleGetter tofn pn Nothing = pure (Right Nothing)
-getSingleGetter tofn pn (Just r) = do
+getSingleGetter tofn pn r = do
   pde <- getPropDefs r
   case pde of
     (Left err ) -> pure (Left err)
@@ -90,37 +90,34 @@ applyProperty :: forall a b m. Monad m =>
 applyProperty getter = either (pure <<< Left) getter
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
-getString :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Maybe String))
-getString = applyProperty <<< (getSingleGetter toString)
+getString :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe String))
+getString = getSingleGetter toString
 
 -- | in AsyncDomeinFile, retrieve either an Array of Strings or an error message.
 getStrings :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Array String))
 getStrings = applyProperty <<< (getPluralGetter toString)
 
 -- | in AsyncDomeinFile, retrieve either a Number or an error message.
-getNumber :: PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs () (Either String (Maybe Number))
-getNumber = applyProperty <<< (getSingleGetter toNumber)
+getNumber :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Maybe Number))
+getNumber = getSingleGetter toNumber
 
 -- | in AsyncDomeinFile, retrieve either an Array of Numbers or an error message.
 getNumbers :: PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs () (Either String (Array Number))
 getNumbers = applyProperty <<< (getPluralGetter toNumber)
 
 -- | in AsyncDomeinFile, retrieve either a Boolean value or an error message.
-getBoolean :: PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs () (Either String (Maybe Boolean))
-getBoolean = applyProperty <<< (getSingleGetter toBoolean)
+getBoolean :: PropertyName -> Resource -> AsyncPropDefs () (Either String (Maybe Boolean))
+getBoolean = getSingleGetter toBoolean
 
--- | in AsyncDomeinFile, retrieve either a String or an error message.
-getResource :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Maybe Resource))
-getResource = applyProperty <<< getResource' where
-  -- getResource' :: forall ef. PropertyName -> Maybe Resource -> AsyncDomeinFile ef (Either String (Maybe Resource))
-  getResource' pn Nothing = pure (Right Nothing)
-  getResource' pn mr = do
-    resIdArray <- (getPluralGetter toString) pn mr
-    case resIdArray of
-      (Left err) -> pure $ Left err
-      (Right arr) -> case head arr of
-        Nothing -> pure $ Right Nothing
-        (Just id) -> liftEff $ Right <$> (Just <$> (representResource $ id))
+-- | in AsyncDomeinFile, retrieve either a Resource or an error message.
+getResource :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Either String (Maybe Resource))
+getResource pn mr = do
+  resIdArray <- (getPluralGetter toString) pn (Just mr)
+  case resIdArray of
+    (Left err) -> pure $ Left err
+    (Right arr) -> case head arr of
+      Nothing -> pure $ Right Nothing
+      (Just id) -> liftEff $ Right <$> (Just <$> (representResource $ id))
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
 getResources :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Array Resource))
@@ -136,3 +133,12 @@ getResources = applyProperty <<< getResources' where
 -- | in AsyncDomeinFile, retrieve either a Date property or an error message.
 --getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))
 --getDate = getGetter (\json -> Just (readDate $ toForeign json ))
+
+getBinding :: forall e. Resource -> AsyncPropDefs e (Either String (Maybe Resource))
+getBinding = getResource "model:Systeem#rol_RolBinding"
+
+x :: forall e. AsyncPropDefs e Resource -> AsyncPropDefs e (Either String (Maybe Resource))
+x = bindFlipped getBinding
+
+-- y :: forall e. AsyncPropDefs e (Either String (Maybe Resource)) -> AsyncPropDefs e (Either String (Maybe Resource))
+y getter = bindFlipped (\a -> bindFlipped (\b -> bindFlipped (\c -> getter c) b) a )
