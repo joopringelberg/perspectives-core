@@ -3,7 +3,7 @@ module Temp.MonadTransformers where
 import Prelude
 import Control.Bind ((<=<), (>>=))
 import Control.Monad.Aff (Aff, launchAff, runAff)
-import Control.Monad.Aff.Console (CONSOLE)
+import Control.Monad.Aff.Console (CONSOLE, error)
 import Control.Monad.Eff (runPure)
 import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Eff.Console (log)
@@ -75,7 +75,19 @@ testf = run $ f' 2
 
 testfg = run $ (f' <=< g') 2
 
-test = launchAff do testfg
+test = launchAff do
+  r <- testfg
+  case r of
+    (Left err) -> print err
+    (Right mi) -> print $ show mi
+  s <- run $ (f' <=< g') 0
+  case s of
+    (Left err) -> print err
+    (Right mi) -> print $ show mi
+
+print :: forall e a. MonadEff (console :: CONSOLE | e) a => String -> a Unit
+print = liftEff <<< log
+
 
 {-
 I have functions whose result type is
