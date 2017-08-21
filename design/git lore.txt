@@ -4,6 +4,10 @@ ATOM/GIT HANDIGHEID
 
 	git log -5 --pretty=format:"%cr, %s"
 
+2. Bestand herstellen tot een vorige commit (met hash xxx):
+
+	git checkout xxx filename
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
