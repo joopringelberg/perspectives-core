@@ -19,7 +19,7 @@ import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropD
 import Perspectives.ResourceTypes(ResourceId, AsyncResource, AsyncDomeinFile, PropDefs)
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
-fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e (Either String PropDefs))
+fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e PropDefs)
 --fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e PropDefs)
 fetchPropDefs id = if isDomeinURI id
   then case getNamespace id of
@@ -32,19 +32,18 @@ fetchPropDefs id = if isDomeinURI id
     else fetchResourceDefinition id
 
 -- | Fetch the definition of a resource asynchronously.
-fetchResourceDefinition :: forall e. ResourceId -> (AsyncResource e (Either String PropDefs))
+fetchResourceDefinition :: forall e. ResourceId -> (AsyncResource e PropDefs)
 fetchResourceDefinition id = do
   v <- makeVar
   _ <- forkAff do
         res <- affjax $ userResourceRequest {url = baseURL <> id}
         case res.status of
-          StatusCode 200 -> putVar v (f res.response)
-          otherwise -> putVar v (Left $ "fetchDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+          StatusCode 200 ->
+            case stringToPropDefs res.response of
+              (Left message) -> throwError $ error (message <> " (" <> id <> ")")
+              Right pd -> putVar v pd
+          otherwise -> throwError $ error ("fetchDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   takeVar v
-  where f ds = let x = stringToPropDefs ds
-                in case x of
-                    (Left message) -> Left $ message <> " (" <> id <> ")"
-                    Right pd -> Right pd
 
 baseURL :: String
 baseURL = "http://localhost:5984/user_cor_contexts2/"
