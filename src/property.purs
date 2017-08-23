@@ -7,7 +7,6 @@ import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Array (head)
-import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
@@ -40,19 +39,16 @@ getSingleGetter :: forall e a.
   -> Resource
   -> AsyncPropDefs e (Maybe a)
 getSingleGetter tofn pn r = do
-  pde <- getPropDefs r
-  case pde of
-    (Left err ) -> throwError $ error err
-    (Right (PropDefs pd)) ->
-      case lookup pn pd of
-        -- Property is not available. This is not an error.
-        Nothing -> pure Nothing
-        -- This must be an array filled with a single value that the tofn recognizes.
-        (Just json) -> case toArray json of
-          Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-          (Just arr) -> case traverse tofn arr of
-            Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
-            (Just a) -> pure (head a)
+  (PropDefs pd) <- getPropDefs r
+  case lookup pn pd of
+    -- Property is not available. This is not an error.
+    Nothing -> pure Nothing
+    -- This must be an array filled with a single value that the tofn recognizes.
+    (Just json) -> case toArray json of
+      Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+      (Just arr) -> case traverse tofn arr of
+        Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+        (Just a) -> pure (head a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -67,19 +63,16 @@ getPluralGetter :: forall e a.
   -> Resource
   -> AsyncPropDefs e (Array a)
 getPluralGetter tofn pn r = do
-  pde <- getPropDefs r
-  case pde of
-    (Left err ) -> throwError $ error err
-    (Right (PropDefs pd)) ->
-      case lookup pn pd of
-        -- Property is not available. This is not an error.
-        Nothing -> pure []
-        -- This must be an array filled with values of the type that the tofn recognizes.
-        (Just json) -> case toArray json of
-          Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-          (Just arr) -> case traverse tofn arr of
-            Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
-            (Just a) -> pure a
+  (PropDefs pd) <- getPropDefs r
+  case lookup pn pd of
+    -- Property is not available. This is not an error.
+    Nothing -> pure []
+    -- This must be an array filled with values of the type that the tofn recognizes.
+    (Just json) -> case toArray json of
+      Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+      (Just arr) -> case traverse tofn arr of
+        Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
+        (Just a) -> pure a
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
 getString :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Maybe String)

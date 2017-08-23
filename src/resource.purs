@@ -5,12 +5,13 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar, makeVar', peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, lookup)
 import Data.StrMap.ST (poke, STStrMap)
-import Network.HTTP.Affjax (AJAX)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
@@ -64,20 +65,20 @@ addPropertyDefinitions r@(Resource{id}) av =
     pure unit
 
 -- | Get the property definitions of a Resource.
-getPropDefs :: forall e. Resource -> AsyncDomeinFile e (Either String PropDefs)
+getPropDefs :: forall e. Resource -> AsyncDomeinFile e PropDefs
 getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               def <- fetchPropDefs id
               case def of
-                (Left err) -> pure (Left err)
+                (Left err) -> throwError $ error err
                 (Right pd ) -> do
                     av <- makeVar' pd
                     -- set av as the value of propDefs in the resource!
                     _ <- pure (addPropertyDefinitions r av)
-                    pure (Right pd)
+                    pure pd
   (Just avar) -> do
                   pd <- peekVar avar
-                  pure (Right pd)
+                  pure pd
 
 -----------------------------------------------------------------------------------------------
 -- | EXAMPLES
