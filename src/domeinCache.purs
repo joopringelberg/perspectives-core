@@ -59,14 +59,12 @@ retrieveDomeinResourceDefinition :: forall e.
   -> (AsyncDomeinFile e PropDefs)
 retrieveDomeinResourceDefinition id ns = do
   -- df :: (Either String DomeinFile)
-  df <- retrieveDomeinFile (namespaceToDomeinFileName ns)
-  case df of
-    (Left err) -> throwError $ error err
-    (Right f) -> case lookup id f of
-      Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
-      (Just propDefs) -> pure propDefs
+  f <- retrieveDomeinFile (namespaceToDomeinFileName ns)
+  case lookup id f of
+    Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
+    (Just propDefs) -> pure propDefs
 
-retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e (Either String DomeinFile)
+retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e DomeinFile
 retrieveDomeinFile ns = do
   dc <- liftEff domeinCache
   file <- liftEff $ peek dc ns
@@ -77,11 +75,11 @@ retrieveDomeinFile ns = do
             res <- affjax $ domeinRequest {url = modelsURL <> ns}
             case res.status of
               StatusCode 200 -> case stringToDomeinFile res.response of
-                e@(Left _) -> putVar v e
-                df -> putVar v df
-              otherwise -> putVar v (Left $ "retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+                (Left err) -> throwError $ error err
+                (Right df) -> putVar v df
+              otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
       takeVar v
-    (Just f) -> pure $ Right f
+    (Just f) -> pure f
 
 stringToDomeinFile :: String -> Either String DomeinFile
 stringToDomeinFile s = case jsonParser s of
