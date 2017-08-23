@@ -4,10 +4,13 @@ module Perspectives.DomeinCache
 
 where
 
+import Prelude (Unit, bind, pure, show, ($), (*>), (<>))
 import Control.Monad.Aff (forkAff)
 import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Except (throwError)
 import Data.Argonaut (jsonParser, toArray, toObject, toString)
 import Data.Argonaut.Core (JObject)
 import Data.Either (Either(..))
@@ -21,10 +24,10 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
+
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.ResourceTypes (PropDefs(..), ResourceId, AsyncDomeinFile)
-import Prelude (Unit, bind, pure, show, ($), (*>), (<>))
 
 -- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
 type DomeinFile = StrMap PropDefs
@@ -53,15 +56,15 @@ namespaceToDomeinFileName s = replace domeinFileRegex "_" s
 retrieveDomeinResourceDefinition :: forall e.
   ResourceId
   -> Namespace
-  -> (AsyncDomeinFile e (Either String PropDefs))
+  -> (AsyncDomeinFile e PropDefs)
 retrieveDomeinResourceDefinition id ns = do
   -- df :: (Either String DomeinFile)
   df <- retrieveDomeinFile (namespaceToDomeinFileName ns)
   case df of
-    (Left err) -> pure $ Left err
+    (Left err) -> throwError $ error err
     (Right f) -> case lookup id f of
-      Nothing -> pure $ Left ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
-      (Just propDefs) -> pure (Right propDefs)
+      Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
+      (Just propDefs) -> pure propDefs
 
 retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e (Either String DomeinFile)
 retrieveDomeinFile ns = do
