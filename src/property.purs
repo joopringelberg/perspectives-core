@@ -2,10 +2,12 @@ module Perspectives.Property where
 
 import Prelude
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Array (head)
-import Data.Either (Either(..), either)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
@@ -28,110 +30,90 @@ type AsyncPropDefs e a = AsyncDomeinFile (st :: ST ResourceIndex | e) a
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a single getter for that property.
--- | The getter takes a Maybe Resource and returns a computation of either a Maybe value, or one of two messages:
+-- | The getter takes a Resource and returns a computation of a Maybe value. It can throw one of two errors:
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to AsyncPropDefs (and extensible).
 getSingleGetter :: forall e a.
   (Json -> Maybe a)
   -> PropertyName
-  -> Maybe Resource
-  -> AsyncPropDefs e (Either String (Maybe a))
-getSingleGetter tofn pn Nothing = pure (Right Nothing)
-getSingleGetter tofn pn (Just r) = do
+  -> Resource
+  -> AsyncPropDefs e (Maybe a)
+getSingleGetter tofn pn r = do
   pde <- getPropDefs r
   case pde of
-    (Left err ) -> pure (Left err)
+    (Left err ) -> throwError $ error err
     (Right (PropDefs pd)) ->
       case lookup pn pd of
         -- Property is not available. This is not an error.
-        Nothing -> pure (Right Nothing)
+        Nothing -> pure Nothing
         -- This must be an array filled with a single value that the tofn recognizes.
         (Just json) -> case toArray json of
-          Nothing -> pure (Left ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
+          Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
           (Just arr) -> case traverse tofn arr of
-            Nothing -> pure (Left ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" ))
-            (Just a) -> pure (Right $ head a)
+            Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+            (Just a) -> pure (head a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a plural getter for that property.
--- | The getter takes a Maybe Resource and returns a computation of either an Array of values, or one of two messages:
+-- | The getter takes a Resource and returns a computation of an Array of values. It can throw one of two errors:
 -- | - the value is not an Array (vi);
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to AsyncPropDefs (and extensible).
 getPluralGetter :: forall e a.
   (Json -> Maybe a)
   -> PropertyName
-  -> Maybe Resource
-  -> AsyncPropDefs e (Either String (Array a))
-getPluralGetter tofn pn Nothing = pure (Right [])
-getPluralGetter tofn pn (Just r) = do
+  -> Resource
+  -> AsyncPropDefs e (Array a)
+getPluralGetter tofn pn r = do
   pde <- getPropDefs r
   case pde of
-    (Left err ) -> pure (Left err)
+    (Left err ) -> throwError $ error err
     (Right (PropDefs pd)) ->
       case lookup pn pd of
         -- Property is not available. This is not an error.
-        Nothing -> pure (Right [])
+        Nothing -> pure []
         -- This must be an array filled with values of the type that the tofn recognizes.
         (Just json) -> case toArray json of
-          Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" ))
+          Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
           (Just arr) -> case traverse tofn arr of
-            Nothing ->  pure (Left ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" ))
-            (Just a) -> pure (Right a)
-
--- | By composing this function with the application of a getSingleGetter to a Json toX function,
--- | we obtain a Kleisli-composable getter that will handle errors.
-applyProperty :: forall a b m. Monad m =>
-  (a -> m (Either String b))
-  ->( Either String a
-      -> m (Either String b) )
-applyProperty getter = either (pure <<< Left) getter
+            Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
+            (Just a) -> pure a
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
-getString :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Maybe String))
-getString = applyProperty <<< (getSingleGetter toString)
+getString :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Maybe String)
+getString = getSingleGetter toString
 
 -- | in AsyncDomeinFile, retrieve either an Array of Strings or an error message.
-getStrings :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Array String))
-getStrings = applyProperty <<< (getPluralGetter toString)
+getStrings :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Array String)
+getStrings = getPluralGetter toString
 
 -- | in AsyncDomeinFile, retrieve either a Number or an error message.
-getNumber :: PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs () (Either String (Maybe Number))
-getNumber = applyProperty <<< (getSingleGetter toNumber)
+getNumber :: PropertyName -> Resource -> AsyncPropDefs () (Maybe Number)
+getNumber = getSingleGetter toNumber
 
 -- | in AsyncDomeinFile, retrieve either an Array of Numbers or an error message.
-getNumbers :: PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs () (Either String (Array Number))
-getNumbers = applyProperty <<< (getPluralGetter toNumber)
+getNumbers :: PropertyName -> Resource -> AsyncPropDefs () (Array Number)
+getNumbers = getPluralGetter toNumber
 
 -- | in AsyncDomeinFile, retrieve either a Boolean value or an error message.
-getBoolean :: PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs () (Either String (Maybe Boolean))
-getBoolean = applyProperty <<< (getSingleGetter toBoolean)
+getBoolean :: PropertyName -> Resource -> AsyncPropDefs () (Maybe Boolean)
+getBoolean = getSingleGetter toBoolean
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
-getResource :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Maybe Resource))
-getResource = applyProperty <<< getResource' where
-  -- getResource' :: forall ef. PropertyName -> Maybe Resource -> AsyncDomeinFile ef (Either String (Maybe Resource))
-  getResource' pn Nothing = pure (Right Nothing)
-  getResource' pn mr = do
-    resIdArray <- (getPluralGetter toString) pn mr
-    case resIdArray of
-      (Left err) -> pure $ Left err
-      (Right arr) -> case head arr of
-        Nothing -> pure $ Right Nothing
-        (Just id) -> liftEff $ Right <$> (Just <$> (representResource $ id))
+getResource :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Maybe Resource)
+getResource pn mr = do
+  resIdArray <- (getPluralGetter toString) pn mr
+  case head resIdArray of
+    Nothing -> pure Nothing
+    (Just id) -> liftEff $ (Just <$> (representResource $ id))
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
-getResources :: forall e. PropertyName -> Either String (Maybe Resource) -> AsyncPropDefs e (Either String (Array Resource))
-getResources = applyProperty <<< getResources' where
-  -- getResources' :: forall ef. PropertyName -> Maybe Resource -> AsyncDomeinFile ef (Either String (Array Resource))
-  getResources' pn Nothing = pure (Right [])
-  getResources' pn mr = do
-    resIdArray <- (getPluralGetter toString)  pn mr
-    case resIdArray of
-      (Left err) -> pure $ Left err
-      (Right arr) -> Right <$> (liftEff $ (traverse representResource arr))
+getResources :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Array Resource)
+getResources pn mr = do
+  resIdArray <- (getPluralGetter toString) pn mr
+  (liftEff $ (traverse representResource resIdArray))
 
 -- | in AsyncDomeinFile, retrieve either a Date property or an error message.
 --getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))
