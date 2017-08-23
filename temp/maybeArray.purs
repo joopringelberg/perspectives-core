@@ -1,11 +1,12 @@
 module MaybeArray where
 
-import Control.Bind (bindFlipped)
+import Control.Bind (bindFlipped, composeKleisli)
+import Control.Monad.Aff (Aff)
 import Data.Array (singleton)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Prelude (id, map, (+), (<#>), (<$>), (<<<), (=<<), (>>=), (>>>))
+import Prelude (class Applicative, class Bind, class Monad, bind, id, map, pure, (+), (<#>), (<$>), (<<<), (=<<), (>=>), (>>=), (>>>))
 
 f :: forall a. a -> Maybe a
 f x = Just x
@@ -64,21 +65,131 @@ m''' = bindFlipped p >>> traverse f >>> (maybe [] id)
 ----- THREE INFIX OPERATORS
 ------------------------------------------------------------------------
 
-xTox :: forall a b c. (a -> Maybe b) -> (b -> Maybe c) -> (Maybe a -> Maybe c)
-xTox c d = bindFlipped c >>> bindFlipped d
-infix 0 xTox as >->
+xTox :: forall a b c m. Bind m => (a -> m b) -> (b -> m c) -> a -> m c
+xTox = composeKleisli
+-- xTox f g = f >=> g
 
-sTop :: forall a b c. (a -> Maybe b) -> (b -> Array c) -> (Maybe a -> Array c)
-sTop a b = bindFlipped a >>> maybe [] singleton >>> bindFlipped b
-infix 0 sTop as >->>
+-- xTox' :: forall a b c m ct. Monad m => Applicative ct =>
+--   (a -> m (Either String (ct b))) ->
+--   (b -> m (Either String (ct c))) ->
+--   (a -> m (Either String (ct c)))
+xTox' f g a = f a >>= (either (pure <<< Left) (map g))
 
-pTos :: forall a b c. (a -> Array b) -> (b -> Maybe c) -> (Array a -> Array c)
-pTos h i = bindFlipped h >>> traverse i >>> (maybe [] id)
-infix 0 pTos as >>->
+specialCompose :: forall a b c e m. Bind m =>
+  (a -> Aff e (Either String (Maybe b)))
+  -> (b -> Aff e (Either String (Maybe c)))
+  -> (a -> Aff e (Either String (Maybe c)))
+specialCompose f g a = do
+  r <- f a
+  case r of
+    (Left err) -> pure (Left err)
+    (Right ft) -> case ft of
+      Nothing -> pure (Right Nothing)
+      (Just c) -> g c
 
-testStoS = f >-> g
-testStoP = f >->> p
-testPtoS = p >>-> f
+xTox''' f g a = do
+  r <- f a
+  case r of
+    (Left err) -> pure (Left err)
+    (Right ft) -> traverse g ft
+
+{-
+I have a function f:
+  f :: forall e a b. a -> Aff e (Either String (Array b))
+Now I would like to apply that functon to a value of type Array a and produce, again, the same return type. In other words, I need a function of type:
+  forall e a b. Array a -> Aff e (Either Error (Array b))
+I break my head over how to construct the latter function out of f.
+
+I actually want to compose functions like f. This puzzle derives from that.
+
+I could solve a similar puzzle, that is composing functions like g:
+  g :: forall e a b. a -> Aff e (Either String (Maybe b))
+The following function will compose g with itself:
+  specialCompose :: forall a b c e m. Bind m =>
+    (a -> Aff e (Either String (Maybe b)))
+    -> (b -> Aff e (Either String (Maybe c)))
+    -> (a -> Aff e (Either String (Maybe c)))
+  specialCompose f g a = do
+    r <- f a
+    case r of
+      (Left err) -> pure (Left err)
+      (Right ft) -> case ft of
+        Nothing -> pure (Right Nothing)
+        (Just c) -> g c
+-}
+
+{-
+f heeft als type:
+  a -> m (Either String (ct b))
+composeKleisli past f toe en past de tweede functie toe op de inner value van het resultaat daarvan.
+Deze tweede functie, die ik construeer, moet dus dit type hebben:
+  (Either String (ct b)) -> m (Either String (ct c))
+Maar g heeft dit type:
+  b -> m (Either String (ct c))
+In:
+  either (pure <<< Left) x
+moet x als type hebben:
+  ct b -> m (Either String (ct c))
+De functie
+  map g
+heeft als type:
+  ct b -> ct (m (Either String (ct c)))
+dus dat is niet OK.
+-}
+
+sTop :: forall a b c. (a -> Maybe b) -> (b -> Array c) -> (a -> Array c)
+sTop a b = a >>> maybe [] singleton >>> bindFlipped b
+infix 0 sTop as >=>>
+
+pTos :: forall a b c. (a -> Array b) -> (b -> Maybe c) -> (a -> Array c)
+pTos h i = h >>> traverse i >>> (maybe [] id)
+infix 0 pTos as >>=>
+
+testXtoX = f >=> g
+testStoP = f >=>> p
+testPtoS = p >>=> f
+testAll = f >=> f >=>> p >=> p >>=> f
+
+------------------------------------------------------------------------
+----- A MISTAKEN EXPERIMENT
+------------------------------------------------------------------------
+-- xTox' :: forall a b c m. Monad m =>
+--   (a -> m (Either String b))
+--   -> (b -> m (Either String c))
+--   -> (m (Either String a) -> m (Either String c))
+-- xTox' c d = bindFlipped (applyProperty c) >>> bindFlipped (applyProperty d)
+--
+-- sTop' a b = bindFlipped (applyProperty a) >>> maybe [] singleton >>> bindFlipped (applyProperty b)
+
+------------------------------------------------------------------------
+----- GETTERS
+------------------------------------------------------------------------
+-- type Getter e a m. Monad m = Resource -> AsyncPropDefs e (Either String (m a))
+--
+-- applyProperty :: forall a b m. Monad m =>
+--   (a -> m (Either String b))
+--   ->( Either String a
+--       -> m (Either String b) )
+-- applyProperty getter = either (pure <<< Left) getter
+--
+-- bindFlipped :: forall m a b. Bind m => (a -> m b) -> m a -> m b
+-- bindFlipped = flip bind
+
+-- composeKleisli :: forall a b c m. Bind m => (a -> m b) -> (b -> m c) -> a -> m c
+-- composeKleisli f g a = f a >>= g
+-- infixr 1 composeKleisli as >=>
+
+myCompose :: forall a b c m. Monad m =>
+  (a -> m (Either String b))
+  -> (b -> m (Either String c))
+  -> (a -> m (Either String c))
+myCompose a b = a >=> (either (pure <<< Left) b)
+
+applyProperty :: forall a b m. Monad m =>
+  (a -> m (Either String b))
+  ->( Either String a
+      -> m (Either String b) )
+applyProperty a = either (pure <<< Left) a
 
 ------------------------------------------------------------------------
 ----- NESTED MONADS
