@@ -6,9 +6,11 @@ where
 import Prelude
 import Control.Monad.Aff (forkAff)
 import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 
@@ -18,14 +20,15 @@ import Perspectives.ResourceTypes(ResourceId, AsyncResource, AsyncDomeinFile, Pr
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
 fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e (Either String PropDefs))
+--fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e PropDefs)
 fetchPropDefs id = if isDomeinURI id
-  then maybe (pure (Left ("Cannot construct namespace out of id " <> id)))
-        (retrieveDomeinResourceDefinition id)
-        (getNamespace id)
+  then case getNamespace id of
+    Nothing -> throwError $ error ("Cannot construct namespace out of id " <> id)
+    (Just ns) -> retrieveDomeinResourceDefinition id ns
   else if isStandardNamespaceCURIE id
-    then maybe (pure (Left ("Cannot construct standard namespace out of id " <> id)))
-          (retrieveDomeinResourceDefinition id)
-          (getStandardNamespace id)
+    then case getStandardNamespace id of
+      Nothing -> throwError $ error ("Cannot construct standard namespace out of id " <> id)
+      (Just ns) -> retrieveDomeinResourceDefinition id ns
     else fetchResourceDefinition id
 
 -- | Fetch the definition of a resource asynchronously.
