@@ -1,11 +1,13 @@
 module Perspectives.PropertyComposition where
 
 import Control.Monad.Aff (Aff)
-import Data.Array (cons, foldr)
+import Data.Array (cons, foldr, nub)
+import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (class Traversable, traverse)
-import Prelude (class Bind, bind, id, join, pure, ($), (>=>))
+import Prelude (class Bind, bind, id, join, pure, ($))
 
+-- | Duplicates must be removed.
 xTox :: forall a b c trav e. Traversable trav => Bind trav =>
   (a -> Aff e (trav b))
   -> (b -> Aff e (trav c))
@@ -34,7 +36,8 @@ sTop f g a = do
 
 infix 0 sTop as >->>
 
-pTos :: forall a b c e.
+-- | Duplicates must be removed.
+pTos :: forall a b c e. Eq c =>
   (a -> Aff e (Array b))
   -> (b -> Aff e (Maybe c))
   -> a
@@ -44,7 +47,7 @@ pTos f g a = do
   -- x :: Array b
   y <- traverse g x
   -- y :: Array (Maybe c)
-  pure $ foldr (maybe id cons) [] y
+  pure $ nub $ foldr (maybe id cons) [] y
 
 infix 0 pTos as >>->
 

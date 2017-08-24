@@ -2,7 +2,7 @@ module MaybeArray where
 
 import Control.Bind (bindFlipped, composeKleisli)
 import Control.Monad.Aff (Aff)
-import Data.Array (singleton)
+import Data.Array (cons, foldr, singleton)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
@@ -138,11 +138,12 @@ dus dat is niet OK.
 -}
 
 sTop :: forall a b c. (a -> Maybe b) -> (b -> Array c) -> (a -> Array c)
-sTop a b = a >>> maybe [] singleton >>> bindFlipped b
+-- sTop a b = a >>> maybe [] singleton >>> bindFlipped b
+sTop a b = a >>> (maybe [] b)
 infix 0 sTop as >=>>
 
 pTos :: forall a b c. (a -> Array b) -> (b -> Maybe c) -> (a -> Array c)
-pTos h i = h >>> traverse i >>> (maybe [] id)
+pTos h i = h >>> map i >>> (foldr (maybe id cons) [])
 infix 0 pTos as >>=>
 
 testXtoX = f >=> g
