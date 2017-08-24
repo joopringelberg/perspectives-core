@@ -4,7 +4,7 @@ import Control.Monad.Aff (Aff)
 import Data.Array (cons, foldr)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (class Traversable, traverse)
-import Prelude (class Bind, bind, id, join, pure, ($))
+import Prelude (class Bind, bind, id, join, pure, ($), (>=>))
 
 xTox :: forall a b c trav e. Traversable trav => Bind trav =>
   (a -> Aff e (trav b))
@@ -30,6 +30,7 @@ sTop f g a = do
   case x of
     Nothing -> pure []
     (Just b) -> g b
+-- sTop f g = f >=> (maybe (pure []) g)
 
 infix 0 sTop as >->>
 
@@ -53,9 +54,3 @@ infix 0 pTos as >>->
 -- b = Maybe c
 -- t = Array
 -- traverse :: (b -> Aff e (Maybe c)) -> Array b -> Aff e (Array (Maybe c))
---
--- t = Array
--- a = Maybe c
--- m = Maybe
--- b = c
--- traverse :: (Maybe c -> Maybe c) -> Array (Maybe c) -> Maybe (Array c)
