@@ -1,8 +1,8 @@
 module Perspectives.PropertyComposition where
 
 import Control.Monad.Aff (Aff)
-import Data.Array (cons, foldr, singleton)
-import Data.Maybe (Maybe, maybe)
+import Data.Array (cons, foldr)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (class Traversable, traverse)
 import Prelude (class Bind, bind, id, join, pure, ($))
 
@@ -26,11 +26,10 @@ sTop :: forall a b c e.
   -> Aff e (Array c)
 sTop f g a = do
   x <- f a
-  y <- traverse g (maybeToArray x)
-  pure (join y)
-  where
-    maybeToArray :: forall d. Maybe d -> Array d
-    maybeToArray = maybe [] singleton
+  -- x :: Maybe b
+  case x of
+    Nothing -> pure []
+    (Just b) -> g b
 
 infix 0 sTop as >->>
 
