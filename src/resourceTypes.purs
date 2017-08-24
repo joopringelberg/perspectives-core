@@ -8,16 +8,16 @@ module Perspectives.ResourceTypes
 
 where
 
-import Prelude (class Show, show, ($), (<>))
-import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, keys)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR, AVar)
 import Data.Argonaut (Json)
+import Data.Eq (class Eq)
+import Data.Maybe (Maybe(..))
+import Data.StrMap (StrMap, keys)
 import Network.HTTP.Affjax (AJAX)
-
-import Perspectives.Location(Location)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.Location (Location)
+import Prelude (class Show, eq, show, ($), (<>))
 
 type ResourceId = String
 
@@ -43,6 +43,9 @@ instance showResource :: Show Resource where
     show (Resource{id, propDefs} ) = case propDefs of
       Nothing -> id <> " (No definition)"
       (Just avar) -> id <> " (with definition)"
+
+instance eqResource :: Eq Resource where
+  eq (Resource{id : id1}) (Resource{id : id2}) = eq id1 id2
 
 -- | We store the combination of Resource and Location in an Index.
 newtype ResourceLocation = ResourceLocation{ res :: Resource, loc :: Location Resource}
