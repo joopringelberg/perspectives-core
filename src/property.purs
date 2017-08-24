@@ -26,6 +26,9 @@ type PropertyName = String
 
 type AsyncPropDefs e a = AsyncDomeinFile (st :: ST ResourceIndex | e) a
 
+type PluralGetter a = forall e. Resource -> AsyncPropDefs e (Array a)
+type SingleGetter a = forall e. Resource -> AsyncPropDefs e (Maybe a)
+
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a single getter for that property.
