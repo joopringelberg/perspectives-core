@@ -77,3 +77,8 @@ foreign import applyLoc :: forall a b. Location (a -> b) -> Location a -> Locati
 -- | For the Applicative instance of Location we have pure wrap a value in a Location.
 instance applicativeLocation :: Applicative Location where
   pure = locate
+
+instance bindLocation :: Bind Location where
+  bind c f = f (locationValue c)
+
+instance monadLocation :: Monad Location
