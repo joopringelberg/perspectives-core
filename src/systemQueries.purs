@@ -10,9 +10,6 @@ import Perspectives.PropertyComposition
 identifier :: SingleGetter String
 identifier (Resource{id})= pure $ Just id
 
-rol_RolBinding :: SingleGetter Resource
-rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"
-
 label :: SingleGetter String
 label = getString "rdfs:label"
 
@@ -31,3 +28,6 @@ superClasses = QC.aclosure subClassOf
 typeSuperClasses :: PluralGetter Resource
 typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
 -- typeSuperClasses = rdfType >->> QC.cons QC.identity superClasses
+
+rol_RolBinding :: SingleGetter Resource
+rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"

@@ -1,9 +1,10 @@
 module Perspectives.QueryCombinators where
 
 import Prelude
-import Data.Array (cons, elemIndex, nub, union) as Arr
-import Data.Maybe (Maybe(..))
+import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
+import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Perspectives.Property (AsyncPropDefs, PluralGetter, SingleGetter)
 import Perspectives.ResourceTypes (Resource)
 
@@ -47,6 +48,26 @@ cons f g r = do
         Nothing -> pure $ Arr.cons el b
         _ -> pure b
 
--- | Identity function: from a Resource a, compute Aff e (Just a) 
+-- | Identity function: from a Resource a, compute Aff e (Just a)
 identity :: SingleGetter Resource
 identity = pure <<< Just
+
+filter :: SingleGetter Boolean -> PluralGetter Resource -> PluralGetter Resource
+filter c rs r = do
+  (candidates :: Array Resource) <- rs r
+  (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
+  pure (Arr.foldr takeOrDrop [] judgedCandidates)
+  where
+    judge :: forall e. Resource -> AsyncPropDefs e (Tuple Resource (Maybe Boolean))
+    judge candidate = do
+      (judgement :: Maybe Boolean) <- c candidate
+      pure (Tuple candidate judgement)
+    takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
+    takeOrDrop (Tuple res b) cumulator = case b of
+      (Just true) -> Arr.cons res cumulator
+      _ -> cumulator
+
+hasValue :: forall a. SingleGetter a -> SingleGetter Boolean
+hasValue f r = do
+  (v :: Maybe a) <- f r
+  pure $ Just $ (maybe false (const true)) v
