@@ -24,7 +24,6 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
-
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.ResourceTypes (PropDefs(..), ResourceId, AsyncDomeinFile)
@@ -58,7 +57,6 @@ retrieveDomeinResourceDefinition :: forall e.
   -> Namespace
   -> (AsyncDomeinFile e PropDefs)
 retrieveDomeinResourceDefinition id ns = do
-  -- df :: (Either String DomeinFile)
   f <- retrieveDomeinFile (namespaceToDomeinFileName ns)
   case lookup id f of
     Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
@@ -76,7 +74,9 @@ retrieveDomeinFile ns = do
             case res.status of
               StatusCode 200 -> case stringToDomeinFile res.response of
                 (Left err) -> throwError $ error err
-                (Right df) -> putVar v df
+                (Right (df :: DomeinFile)) -> do
+                  _ <- putVar v df
+                  liftEff $ storeDomeinFileInCache ns df
               otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
       takeVar v
     (Just f) -> pure f

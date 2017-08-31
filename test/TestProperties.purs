@@ -15,7 +15,7 @@ import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource)
 
 test = launchAff do
-  log "========================================================="
+  log "=========================Test.Properties================================"
   (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
   (l :: (Maybe String)) <-  (rol_RolBinding >-> label) gb
   log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show l))
