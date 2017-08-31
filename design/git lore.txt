@@ -10,6 +10,18 @@ ATOM/GIT HANDIGHEID
 
 3. The Alt+Cmd+Z keybinding checks out the HEAD revision of the file in the editor.
 
+4. Het verschil van een file in de ene en de andere branch:
+
+	git diff WorkingQueries:src/domeinCache.purs master:src/domeinCache.purs
+
+5. OpenDiff gebruiken:
+
+	git difftool --tool=opendiff
+
+6. De veranderingen in een file vergeleken over twee branches, in opendiff:
+
+	git difftool --tool=opendiff  WorkingQueries:src/domeinCache.purs master:src/domeinCache.purs
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
