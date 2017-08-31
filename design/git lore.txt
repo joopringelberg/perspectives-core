@@ -26,6 +26,10 @@ ATOM/GIT HANDIGHEID
 
 	git checkout otherbranch myfile.txt
 
+8. List files in andere branch:
+
+	git ls-tree -rt --name-only master
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
