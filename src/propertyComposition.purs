@@ -1,27 +1,27 @@
 module Perspectives.PropertyComposition where
 
 import Control.Bind ((>=>))
-import Control.Monad.Aff (Aff)
+import Control.Monad (class Monad)
 import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Prelude (bind, id, join, pure, ($))
 
-sTos :: forall a b c e.
-  (a -> Aff e (Maybe b))
-  -> (b -> Aff e (Maybe c))
+sTos :: forall a b c m. Monad m =>
+  (a -> m (Maybe b))
+  -> (b -> m (Maybe c))
   -> a
-  -> Aff e (Maybe c)
+  -> m (Maybe c)
 sTos f g = f >=> (maybe (pure Nothing) g)
 
 infix 0 sTos as >->
 
-sTop :: forall a b c e.
-  (a -> Aff e (Maybe b))
-  -> (b -> Aff e (Array c))
+sTop :: forall a b c m. Monad m =>
+  (a -> m (Maybe b))
+  -> (b -> m (Array c))
   -> a
-  -> Aff e (Array c)
+  -> m (Array c)
 sTop f g a = do
   x <- f a
   case (x :: Maybe b) of
@@ -31,11 +31,11 @@ sTop f g a = do
 
 infix 0 sTop as >->>
 
-pTos :: forall a b c e. Eq c =>
-  (a -> Aff e (Array b))
-  -> (b -> Aff e (Maybe c))
+pTos :: forall a b c m.  Monad m => Eq c =>
+  (a -> m (Array b))
+  -> (b -> m (Maybe c))
   -> a
-  -> Aff e (Array c)
+  -> m (Array c)
 pTos f g a = do
   x <- f a
   y <- traverse g (x :: Array b)
@@ -43,11 +43,11 @@ pTos f g a = do
 
 infix 0 pTos as >>->
 
-pTop :: forall a b c e. Eq c =>
-  (a -> Aff e (Array b))
-  -> (b -> Aff e (Array c))
+pTop :: forall a b c m.  Monad m => Eq c =>
+  (a -> m (Array b))
+  -> (b -> m (Array c))
   -> a
-  -> Aff e (Array c)
+  -> m (Array c)
 pTop f g a = do
   x <- f a
   y <- traverse g (x :: Array b)

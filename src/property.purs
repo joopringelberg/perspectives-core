@@ -10,8 +10,10 @@ import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
+import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (getPropDefs, representResource, ResourceIndex)
-import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFile)
+import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
+import Control.Monad.Trans.Class (lift)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -24,10 +26,17 @@ However, a property whose range is Resource, must be represented by a Maybe Reso
 
 type PropertyName = String
 
-type AsyncPropDefs e a = AsyncDomeinFile (st :: ST ResourceIndex | e) a
+type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex | e)
 
+type AsyncPropDefs e a = AsyncPropDefsM e a
+
+-- type AsyncPropDefs e a = LocationT (AsyncPropDefsM e) a
+
+-- type PluralGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Array a)
 type PluralGetter a = forall e. Resource -> AsyncPropDefs e (Array a)
+
 type SingleGetter a = forall e. Resource -> AsyncPropDefs e (Maybe a)
+type SingleGetterL a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Maybe a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -39,8 +48,7 @@ type SingleGetter a = forall e. Resource -> AsyncPropDefs e (Maybe a)
 getSingleGetter :: forall e a.
   (Json -> Maybe a)
   -> PropertyName
-  -> Resource
-  -> AsyncPropDefs e (Maybe a)
+  -> (Resource -> AsyncPropDefs e (Maybe a))
 getSingleGetter tofn pn r = do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
@@ -77,36 +85,45 @@ getPluralGetter tofn pn r = do
         Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
         (Just a) -> pure a
 
+liftGetter :: forall a. SingleGetter a -> SingleGetterL a
+liftGetter g = lift <<< g
+
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
-getString :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Maybe String)
+getString :: PropertyName -> SingleGetter String
 getString = getSingleGetter toString
 
+getStringL :: PropertyName -> SingleGetterL String
+getStringL p = liftGetter (getString p)
+
 -- | in AsyncDomeinFile, retrieve either an Array of Strings or an error message.
-getStrings :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Array String)
+getStrings :: PropertyName -> PluralGetter String
 getStrings = getPluralGetter toString
 
 -- | in AsyncDomeinFile, retrieve either a Number or an error message.
-getNumber :: PropertyName -> Resource -> AsyncPropDefs () (Maybe Number)
+getNumber :: PropertyName -> SingleGetter Number
 getNumber = getSingleGetter toNumber
 
 -- | in AsyncDomeinFile, retrieve either an Array of Numbers or an error message.
-getNumbers :: PropertyName -> Resource -> AsyncPropDefs () (Array Number)
+getNumbers :: PropertyName -> PluralGetter Number
 getNumbers = getPluralGetter toNumber
 
 -- | in AsyncDomeinFile, retrieve either a Boolean value or an error message.
-getBoolean :: PropertyName -> Resource -> AsyncPropDefs () (Maybe Boolean)
+getBoolean :: PropertyName -> SingleGetter Boolean
 getBoolean = getSingleGetter toBoolean
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
-getResource :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Maybe Resource)
+getResource :: PropertyName -> SingleGetter Resource
 getResource pn mr = do
   resIdArray <- (getPluralGetter toString) pn mr
   case head resIdArray of
     Nothing -> pure Nothing
     (Just id) -> liftEff $ (Just <$> (representResource $ id))
 
+getResourceL :: PropertyName -> SingleGetterL Resource
+getResourceL p = liftGetter (getResource p)
+
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
-getResources :: forall e. PropertyName -> Resource -> AsyncPropDefs e (Array Resource)
+getResources :: PropertyName -> PluralGetter Resource
 getResources pn mr = do
   resIdArray <- (getPluralGetter toString) pn mr
   (liftEff $ (traverse representResource resIdArray))
