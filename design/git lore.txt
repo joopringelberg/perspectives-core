@@ -22,6 +22,10 @@ ATOM/GIT HANDIGHEID
 
 	git difftool --tool=opendiff  WorkingQueries:src/domeinCache.purs master:src/domeinCache.purs
 
+7. Kopieer een file uit een andere branch naar de huidige:
+
+	git checkout otherbranch myfile.txt
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
