@@ -26,5 +26,3 @@ import Perspectives.ResourceTypes (PropDefs)
 test = do
   (pd :: PropDefs) <- retrieveDomeinResourceDefinition "model:ExecutieKetenDomein#" "model:ExecutieKetenDomein#"
   log (show pd)
-
-c = retrieveDomeinResourceDefinition "model:ExecutieKetenDomein#" "model:ExecutieKetenDomein#"

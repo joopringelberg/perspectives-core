@@ -4,7 +4,6 @@ module Perspectives.DomeinCache
 
 where
 
-import Prelude (Unit, bind, pure, show, ($), (*>), (<>))
 import Control.Monad.Aff (forkAff)
 import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
 import Control.Monad.Eff (Eff)
@@ -27,6 +26,7 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.ResourceTypes (PropDefs(..), ResourceId, AsyncDomeinFile)
+import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<>))
 
 -- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
 type DomeinFile = StrMap PropDefs
@@ -34,13 +34,13 @@ type DomeinFile = StrMap PropDefs
 -- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
 type DomeinCache = GLStrMap DomeinFile
 
-domeinCache :: forall e. Eff (gm :: GLOBALMAP | e) DomeinCache
-domeinCache = new
+domeinCache :: DomeinCache
+domeinCache = new unit
 
 storeDomeinFileInCache :: forall e. Namespace -> DomeinFile -> Eff (gm :: GLOBALMAP | e) DomeinFile
 storeDomeinFileInCache ns df=
   do
-    dc <- domeinCache
+    dc <- pure domeinCache
     poke dc ns df *> pure df
 
 -- | Matches all occurrences of :, # and /.
@@ -64,9 +64,7 @@ retrieveDomeinResourceDefinition id ns = do
 
 retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e DomeinFile
 retrieveDomeinFile ns = do
-  dc <- liftEff domeinCache
-  file <- liftEff $ peek dc ns
-  case file of
+  case peek domeinCache ns of
     Nothing -> do
       v <- makeVar
       _ <- forkAff do

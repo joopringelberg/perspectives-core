@@ -19,6 +19,4 @@ import Network.HTTP.Affjax.Response (ResponseType(..))
 
 import Test.Properties
 
-
--- main :: forall r. Eff (ref :: REF, console :: CONSOLE | r ) Unit
 main = test

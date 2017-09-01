@@ -36,18 +36,18 @@ test :: forall t106.
        )
     )
 test = launchAff do
-  sInA <- stringInAff
-  log sInA
-  locString <- stringInLocation "String in Location in Aff"
-  log $ locationValue locString
+  -- sInA <- stringInAff
+  -- log sInA
+  -- locString <- stringInLocation "String in Location in Aff"
+  -- log $ locationValue locString
 
   gebruiker <- getGebruiker
   log gebruiker
-  locGebruiker <- runLocationT getGebruikerInLocation
-  log $ locationValue locGebruiker
-
-  locPropDefs <- getPropDefsInLocation1
-  log $ locPropDefs
+  -- locGebruiker <- runLocationT getGebruikerInLocation
+  -- log $ locationValue locGebruiker
+  --
+  -- locPropDefs <- getPropDefsInLocation1
+  -- log $ locPropDefs
 
 f :: forall e. String -> LocationT (Aff e) String
 f s = lift $ pure s
