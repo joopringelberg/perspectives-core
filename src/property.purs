@@ -28,15 +28,18 @@ type PropertyName = String
 
 type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex | e)
 
-type AsyncPropDefs e a = AsyncPropDefsM e a
+-- | PluralGetter defined in the monad stack of LocationT (Aff e) (through AsyncPropDefsM, an alias giving specific
+-- | effects). Accordingly, getPluralGetter lifts its final result (the Array of a in Aff) into Location.
+type PluralGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Array a)
 
--- type AsyncPropDefs e a = LocationT (AsyncPropDefsM e) a
+-- | PluralGetter defined in the monad stack of LocationT (Aff e) (through AsyncPropDefsM, an alias giving specific
+-- | effects). Accordingly, getPluralGetter lifts its final result (the Array of a in Aff) into Location.
+type SingleGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Maybe a)
 
--- type PluralGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Array a)
-type PluralGetter a = forall e. Resource -> AsyncPropDefs e (Array a)
-
-type SingleGetter a = forall e. Resource -> AsyncPropDefs e (Maybe a)
-type SingleGetterL a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Maybe a)
+-- Below are the types without LocationT.
+-- type AsyncPropDefs e a = AsyncPropDefsM e a
+-- type PluralGetter a = forall e. Resource -> AsyncPropDefs e (Array a)
+-- type SingleGetter a = forall e. Resource -> AsyncPropDefs e (Maybe a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -44,12 +47,12 @@ type SingleGetterL a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Maybe
 -- | The getter takes a Resource and returns a computation of a Maybe value. It can throw one of two errors:
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
--- | The computation is effectful according to AsyncPropDefs (and extensible).
-getSingleGetter :: forall e a.
+-- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
+getSingleGetter :: forall a.
   (Json -> Maybe a)
   -> PropertyName
-  -> (Resource -> AsyncPropDefs e (Maybe a))
-getSingleGetter tofn pn r = do
+  -> SingleGetter a
+getSingleGetter tofn pn r = lift $ do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     -- Property is not available. This is not an error.
@@ -67,13 +70,12 @@ getSingleGetter tofn pn r = do
 -- | The getter takes a Resource and returns a computation of an Array of values. It can throw one of two errors:
 -- | - the value is not an Array (vi);
 -- | - not all elements in the Array are of the required type.
--- | The computation is effectful according to AsyncPropDefs (and extensible).
-getPluralGetter :: forall e a.
+-- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
+getPluralGetter :: forall a.
   (Json -> Maybe a)
   -> PropertyName
-  -> Resource
-  -> AsyncPropDefs e (Array a)
-getPluralGetter tofn pn r = do
+  -> PluralGetter a
+getPluralGetter tofn pn r = lift $ do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     -- Property is not available. This is not an error.
@@ -85,15 +87,9 @@ getPluralGetter tofn pn r = do
         Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
         (Just a) -> pure a
 
-liftGetter :: forall a. SingleGetter a -> SingleGetterL a
-liftGetter g = lift <<< g
-
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
 getString :: PropertyName -> SingleGetter String
 getString = getSingleGetter toString
-
-getStringL :: PropertyName -> SingleGetterL String
-getStringL p = liftGetter (getString p)
 
 -- | in AsyncDomeinFile, retrieve either an Array of Strings or an error message.
 getStrings :: PropertyName -> PluralGetter String
@@ -118,9 +114,6 @@ getResource pn mr = do
   case head resIdArray of
     Nothing -> pure Nothing
     (Just id) -> liftEff $ (Just <$> (representResource $ id))
-
-getResourceL :: PropertyName -> SingleGetterL Resource
-getResourceL p = liftGetter (getResource p)
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
 getResources :: PropertyName -> PluralGetter Resource

@@ -4,17 +4,18 @@ import Prelude
 import Perspectives.PropertyComposition
 import Perspectives.SystemQueries
 import Control.Monad.Aff (launchAff)
-import Control.Monad.Aff.Console (log)
+import Control.Monad.Aff.Console (log) as Aff
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Perspectives.Location (Location)
--- import Perspectives.LocationT (runLocationT)
+import Perspectives.LocationT (runLocationT)
 import Perspectives.Property (SingleGetter)
 import Perspectives.QueryCombinators (filter, hasValue) as QC
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource)
 
-test = launchAff do
+test = launchAff $ runLocationT do
   log "=========================Test.Properties================================"
   (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
   (l :: (Maybe String)) <-  (rol_RolBinding >-> label) gb
@@ -53,4 +54,4 @@ test = launchAff do
 hasLabel :: SingleGetter Boolean
 hasLabel = QC.hasValue label
 
--- log = lift <<< Aff.log
+log = lift <<< Aff.log

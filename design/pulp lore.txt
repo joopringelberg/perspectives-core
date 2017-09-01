@@ -1,0 +1,6 @@
+
+pulp test -- --censor-lib --censor-warnings
+
+pulp build -- --censor-lib --censor-warnings
+
+pulp browserify --optimise --to output.js

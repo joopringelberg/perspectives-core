@@ -5,13 +5,14 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Property (AsyncPropDefs, PluralGetter, SingleGetter)
+import Perspectives.LocationT (LocationT)
+import Perspectives.Property (PluralGetter, SingleGetter, AsyncPropDefsM)
 import Perspectives.ResourceTypes (Resource)
 
 -- | Compute the transitive closure of the SingleGetter to obtain a PluralGetter. NB: only for Resource results!
 mclosure :: SingleGetter Resource -> PluralGetter Resource
 mclosure f rs = closure' rs [] where
-  closure' :: forall e. Resource -> Array Resource -> AsyncPropDefs e (Array Resource)
+  -- closure' :: forall e. Resource -> Array Resource -> PluralGetter Resource
   closure' r ts = do
     (t :: Maybe Resource) <- f r
     case t of
@@ -58,7 +59,7 @@ filter c rs r = do
   (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
   pure (Arr.foldr takeOrDrop [] judgedCandidates)
   where
-    judge :: forall e. Resource -> AsyncPropDefs e (Tuple Resource (Maybe Boolean))
+    judge :: forall e. Resource -> LocationT (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
     judge candidate = do
       (judgement :: Maybe Boolean) <- c candidate
       pure (Tuple candidate judgement)

@@ -1,11 +1,11 @@
 module Perspectives.SystemQueries where
 
-import Prelude (($), pure)
-import Data.Maybe(Maybe(..))
-import Perspectives.Property (SingleGetter, PluralGetter, getResource, getResources, getString)
-import Perspectives.ResourceTypes (Resource(..))
-import Perspectives.QueryCombinators as QC
 import Perspectives.PropertyComposition
+import Perspectives.QueryCombinators as QC
+import Data.Maybe (Maybe(..))
+import Perspectives.Property (PluralGetter, SingleGetter, getResource, getResources, getString)
+import Perspectives.ResourceTypes (Resource(..))
+import Prelude (($), pure)
 
 identifier :: SingleGetter String
 identifier (Resource{id})= pure $ Just id

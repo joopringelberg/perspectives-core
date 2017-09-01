@@ -17,29 +17,8 @@ import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax, defaultRequest)
 import Network.HTTP.Affjax.Response (ResponseType(..))
 
+import Test.Properties
 
-main :: forall r. Eff (ref :: REF, console :: CONSOLE | r ) Unit
-main = do
-  log "hello world"
-{-
-main = launchAff $ do
-  res <- affjax $ userResourceRequest
-  json <- case jsonParser res.response of
-    Left e -> pure e
-    Right r -> foldJsonObject jsonEmptyObject r
-  liftEff $ log $ "GET /api response: " <> getField json
 
-userResourceRequest :: AffjaxRequest Unit
-userResourceRequest =
-  { method: Left GET
-  , url: "http://localhost:5984/user_cor_contexts2/user:xGebruiker"
-  , headers: []
-  , content: Nothing
-  , username: Just "cor"
-  , password: Just "geheim"
-  , withCredentials: true
-  }
-
-baseURL :: String
-baseURL = "http://localhost:5984/user_cor_contexts2/"
--}
+-- main :: forall r. Eff (ref :: REF, console :: CONSOLE | r ) Unit
+main = test

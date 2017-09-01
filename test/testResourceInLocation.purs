@@ -3,18 +3,19 @@ module Test.ResourceInLocation where
 import Prelude
 import Control.Monad.Aff (Aff, Canceler(..), launchAff)
 import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Aff.Console (CONSOLE, log)
+import Control.Monad.Aff.Console (CONSOLE, log) as Aff
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.ST (ST)
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap)
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Location (Location, locationValue)
--- import Perspectives.LocationT (runLocationT)
+import Perspectives.LocationT (runLocationT)
 import Perspectives.Property (getString)
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource(..), ResourceLocation(..))
@@ -23,7 +24,7 @@ import Perspectives.SystemQueries (label)
 test :: forall t36.
   Eff
     ( exception :: EXCEPTION
-    , console :: CONSOLE
+    , console :: Aff.CONSOLE
     , ajax :: AJAX
     , avar :: AVAR
     , gm :: GLOBALMAP
@@ -31,7 +32,7 @@ test :: forall t36.
     | t36
     )
     (Canceler
-       ( console :: CONSOLE
+       ( console :: Aff.CONSOLE
        , ajax :: AJAX
        , avar :: AVAR
        , gm :: GLOBALMAP
@@ -39,7 +40,7 @@ test :: forall t36.
        | t36
        )
     )
-test = launchAff do
+test = launchAff $ runLocationT $do
   log "========================================================="
   (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
   log $ show gb
@@ -50,14 +51,4 @@ test = launchAff do
     Nothing -> log "Niets gevonden"
     _ -> log "Wel iets gevonden"
 
-x :: forall e.
-  Resource
-  -> Aff
-       ( gm :: GLOBALMAP
-       , avar :: AVAR
-       , ajax :: AJAX
-       , st :: ST (StrMap ResourceLocation)
-       | e
-       )
-       (Maybe String)
-x = getString "rdfs:label"
+log = lift <<< Aff.log
