@@ -13,7 +13,8 @@ module Perspectives.Location
   , THEORYDELTA
   , runTHEORYDELTA
   , pureTHEORYDELTA
-  , locationValue)
+  , locationValue,
+  bindLoc)
 where
 
 import Prelude
@@ -78,7 +79,9 @@ foreign import applyLoc :: forall a b. Location (a -> b) -> Location a -> Locati
 instance applicativeLocation :: Applicative Location where
   pure = locate
 
+foreign import bindLoc :: forall a b. Location a -> (a -> Location b) -> Location b
+
 instance bindLocation :: Bind Location where
-  bind c f = f (locationValue c)
+  bind = bindLoc
 
 instance monadLocation :: Monad Location

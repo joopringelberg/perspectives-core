@@ -200,6 +200,27 @@ exports.applyLoc = function( funLoc )
 	};
 };
 
+exports.bindLoc = function( loc )
+{
+	return function( fun )
+	{
+		// A function can only be applied once to a location.
+		var linkName = fun.toString();
+		var dependent = loc.getDependent( linkName );
+		if( !dependent )
+		{
+			// Dependent will be produced by fun:
+			dependent = fun( loc.get() );
+			/*
+			loc ---dependent--> out
+			loc <--leftSupport--- out
+			 */
+			loc.addLeftLeaningDependent( linkName, dependent );
+		}
+		return dependent;
+	};
+};
+
 exports.locationValue = function( loc )
 {
 	return loc.get();
