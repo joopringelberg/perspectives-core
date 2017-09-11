@@ -45,9 +45,6 @@ storeResourceInIndex res@(Resource{id}) =
   in do
     poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure res
 
--- | A version of thawST that does not copy.
--- foreign import thawST' :: forall a h r. StrMap a -> Eff (st :: ST h | r) (STStrMap h a)
-
 addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
 addPropertyDefinitions r@(Resource{id}) av =
   let
