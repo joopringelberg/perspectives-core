@@ -149,6 +149,17 @@ exports.locate = function( v )
 	return new Location( constant );
 };
 
+exports.connectLocations = function( l1 )
+{
+	return function( f )
+	{
+		return function( l2 )
+		{
+			l1.addLeftLeaningDependent( f.toString(), l2)
+		};
+	};
+};
+
 exports.mapLoc = function( fun )
 {
 	return function( loc )

@@ -7,6 +7,7 @@
 module Perspectives.Location
   ( Location
   , locate
+  , connectLocations
   , runLocation
   , setLocationValue
   , setLocationValue'
@@ -41,6 +42,8 @@ foreign import setLocationValue :: forall a e. (Location a) -> a -> Eff (td :: T
 
 setLocationValue' :: forall a. (Location a) -> a -> Eff (td :: THEORYDELTA) Unit
 setLocationValue' l a = setLocationValue l a
+
+foreign import connectLocations :: forall a b f. Location a -> f -> Location b -> Unit
 
 -- | This is a handler.
 -- | Consumes a computation that has the THEORYDELTA effect. Returns a computation without
