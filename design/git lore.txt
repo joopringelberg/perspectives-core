@@ -30,6 +30,11 @@ ATOM/GIT HANDIGHEID
 
 	git ls-tree -rt --name-only master
 
+9. Maak een nieuwe branche en laat HEAD naar die branch wijzen:
+
+	git branch myBranchName
+	git checkout myBranchName
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
