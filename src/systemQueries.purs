@@ -31,3 +31,5 @@ typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
 
 rol_RolBinding :: SingleGetter Resource
 rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"
+
+test = query rol_RolBinding >-> rdfType

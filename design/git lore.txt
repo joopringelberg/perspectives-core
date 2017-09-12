@@ -39,6 +39,19 @@ ATOM/GIT HANDIGHEID
 
 	git log --oneline --decorate --graph --all
 
+11. Toon veranderde files met status in een bepaalde commit:
+
+	git show --name-status 10f479c
+
+12. Toon lijst van tags/met de eerste vijf regels van de aantekening:
+
+	git tag
+	git tag -n5
+
+13. Maak tag met aantekening:
+
+	git tag -a v1.4 -m "my version 1.4"
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.

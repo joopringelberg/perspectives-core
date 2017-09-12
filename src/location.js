@@ -158,6 +158,7 @@ exports.connectLocations = function( l1 )
 			// console.log( "In connectLocations met:", f.toString())
 			// console.log( "In connectLocations.")
 			l1.addLeftLeaningDependent( f.toString(), l2)
+			return l2;
 		};
 	};
 };
@@ -238,6 +239,14 @@ exports.locationValue = function( loc )
 {
 	return loc.get();
 };
+
+exports.locationDependentAux = function( f )
+{
+	return function( loc )
+	{
+		return loc.getDependent( f.toString() );
+	}
+}
 
 exports.runLocation =
 	function runLocation( loc )

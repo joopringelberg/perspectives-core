@@ -39,7 +39,7 @@ test :: forall t36.
        | t36
        )
     )
-test = launchAff $ runLocationT $do
+test = launchAff $ do
   log "========================================================="
   (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
   log $ show gb
@@ -50,4 +50,4 @@ test = launchAff $ runLocationT $do
     Nothing -> log "Niets gevonden"
     _ -> log "Wel iets gevonden"
 
-log = lift <<< Aff.log
+log = Aff.log

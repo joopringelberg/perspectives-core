@@ -5,7 +5,6 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.LocationT (LocationT)
 import Perspectives.Property (PluralGetter, SingleGetter, AsyncPropDefsM)
 import Perspectives.ResourceTypes (Resource)
 
@@ -59,7 +58,7 @@ filter c rs r = do
   (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
   pure (Arr.foldr takeOrDrop [] judgedCandidates)
   where
-    judge :: forall e. Resource -> LocationT (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
+    judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
     judge candidate = do
       (judgement :: Maybe Boolean) <- c candidate
       pure (Tuple candidate judgement)

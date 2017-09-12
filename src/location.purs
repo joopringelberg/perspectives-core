@@ -14,12 +14,15 @@ module Perspectives.Location
   , THEORYDELTA
   , runTHEORYDELTA
   , pureTHEORYDELTA
-  , locationValue,
-  bindLoc)
+  , locationValue
+  , bindLoc
+  , traverseLoc)
 where
 
 import Prelude
 import Control.Monad.Eff (Eff, kind Effect, runPure)
+import Data.Foreign (Foreign, isUndefined, unsafeFromForeign)
+import Data.Maybe (Maybe(..))
 
 foreign import data Location :: Type -> Type
 
@@ -58,6 +61,18 @@ pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
 
 foreign import locationValue :: forall a. Location a -> a
 
+-- foreign import data Undefined :: Type -> Type
+--
+-- foreign import isUndefined :: forall a. Undefined a -> Boolean
+
+foreign import locationDependentAux :: forall a c. (a -> c) -> Location a -> Foreign
+
+locationDependent :: forall a b c. (a -> c) -> Location a -> Maybe (Location b)
+locationDependent f loc =
+  let d = locationDependentAux f loc
+  in
+    if isUndefined d then Nothing else Just (unsafeFromForeign d)
+
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
 -----------------------------------------------------------------------------------------------
@@ -88,3 +103,15 @@ instance bindLocation :: Bind Location where
   bind = bindLoc
 
 instance monadLocation :: Monad Location
+
+-- instance traverseLocation :: Traversable Location where
+--   traverse = traverseLoc
+--   sequence = traverse1 id
+
+traverseLoc :: forall a b m. Applicative m => Monad m => (a -> m b) -> Location a -> m (Location b)
+traverseLoc f loc = case locationDependent f loc of
+  Nothing ->
+    do
+      b <- f (locationValue loc)
+      pure (connectLocations loc f (locate b))
+  (Just bLoc) -> pure bLoc

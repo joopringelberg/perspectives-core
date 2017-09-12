@@ -5,14 +5,11 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
-import Control.Monad.Trans.Class (lift)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, connectLocations, locate, locationValue)
-import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (getPropDefs, representResource, ResourceIndex)
 import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
 
@@ -29,18 +26,13 @@ type PropertyName = String
 
 type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex | e)
 
--- | PluralGetter defined in the monad stack of LocationT (Aff e) (through AsyncPropDefsM, an alias giving specific
--- | effects). Accordingly, getPluralGetter lifts its final result (the Array of a in Aff) into Location.
-type PluralGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Array a)
+-- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
+-- | effects).
+type PluralGetter a = forall e. Resource -> (AsyncPropDefsM e) (Array a)
 
--- | PluralGetter defined in the monad stack of LocationT (Aff e) (through AsyncPropDefsM, an alias giving specific
--- | effects). Accordingly, getPluralGetter lifts its final result (the Array of a in Aff) into Location.
-type SingleGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Maybe a)
-
--- Below are the types without LocationT.
--- type AsyncPropDefs e a = AsyncPropDefsM e a
--- type PluralGetter a = forall e. Resource -> AsyncPropDefs e (Array a)
--- type SingleGetter a = forall e. Resource -> AsyncPropDefs e (Maybe a)
+-- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
+-- | effects).
+type SingleGetter a = forall e. Resource -> (AsyncPropDefsM e) (Maybe a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -53,7 +45,7 @@ getSingleGetter :: forall a.
   (Json -> Maybe a)
   -> PropertyName
   -> SingleGetter a
-getSingleGetter tofn pn r = lift $ do
+getSingleGetter tofn pn r = do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     -- Property is not available. This is not an error.
@@ -64,36 +56,6 @@ getSingleGetter tofn pn r = lift $ do
       (Just arr) -> case traverse tofn arr of
         Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
         (Just a) -> pure (head a)
-
-getSingleGetter' :: forall a.
-  (Json -> Maybe a)
-  -> PropertyName
-  -> SingleGetter' a
-getSingleGetter' tofn pn r = do
-  (PropDefs pd) <- getPropDefs r
-  case lookup pn pd of
-    -- Property is not available. This is not an error.
-    Nothing -> pure Nothing
-    -- This must be an array filled with a single value that the tofn recognizes.
-    (Just json) -> case toArray json of
-      Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-      (Just arr) -> case traverse tofn arr of
-        Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
-        (Just a) -> pure (head a)
-
-type SingleGetter' a = forall e. Resource -> AsyncPropDefsM e (Maybe a)
-
--- Deze functie is Kleisli-composable.
-liftGetter :: forall a e.
-  (Resource -> AsyncPropDefsM e (Maybe a))
-  -> (Location (Maybe Resource) -> AsyncPropDefsM e (Location (Maybe a)))
-liftGetter g aLoc = case locationValue aLoc of
-  Nothing -> pure $ locate Nothing
-  (Just a) -> do
-    maybeB <- g a
-    case maybeB of
-      Nothing -> pure (locate Nothing)
-      justB -> pure (connectLocations aLoc g (locate justB))
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -106,7 +68,7 @@ getPluralGetter :: forall a.
   (Json -> Maybe a)
   -> PropertyName
   -> PluralGetter a
-getPluralGetter tofn pn r = lift $ do
+getPluralGetter tofn pn r = do
   (PropDefs pd) <- getPropDefs r
   case lookup pn pd of
     -- Property is not available. This is not an error.
