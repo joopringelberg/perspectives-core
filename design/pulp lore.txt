@@ -4,3 +4,5 @@ pulp test -- --censor-lib --censor-warnings
 pulp build -- --censor-lib --censor-warnings
 
 pulp browserify --optimise --to output.js
+
+pulp browserify --optimise -I test --to output.js

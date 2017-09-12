@@ -155,6 +155,8 @@ exports.connectLocations = function( l1 )
 	{
 		return function( l2 )
 		{
+			// console.log( "In connectLocations met:", f.toString())
+			// console.log( "In connectLocations.")
 			l1.addLeftLeaningDependent( f.toString(), l2)
 		};
 	};

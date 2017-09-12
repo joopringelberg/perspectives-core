@@ -11,9 +11,8 @@ import Control.Monad.ST (ST)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap)
 import Network.HTTP.Affjax (AJAX)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap)
 import Perspectives.Location (Location, locationValue)
 import Perspectives.LocationT (runLocationT)
 import Perspectives.Property (getString)
@@ -28,7 +27,7 @@ test :: forall t36.
     , ajax :: AJAX
     , avar :: AVAR
     , gm :: GLOBALMAP
-    , st :: ST (StrMap ResourceLocation)
+    , st :: ST (GLStrMap ResourceLocation)
     | t36
     )
     (Canceler
@@ -36,7 +35,7 @@ test :: forall t36.
        , ajax :: AJAX
        , avar :: AVAR
        , gm :: GLOBALMAP
-       , st :: ST (StrMap ResourceLocation)
+       , st :: ST (GLStrMap ResourceLocation)
        | t36
        )
     )

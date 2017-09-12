@@ -5,15 +5,16 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
+import Control.Monad.Trans.Class (lift)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
+import Perspectives.Location (Location, connectLocations, locate, locationValue)
 import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (getPropDefs, representResource, ResourceIndex)
 import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
-import Control.Monad.Trans.Class (lift)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -44,7 +45,7 @@ type SingleGetter a = forall e. Resource -> LocationT (AsyncPropDefsM e) (Maybe 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a single getter for that property.
--- | The getter takes a Resource and returns a computation of a Maybe value. It can throw one of two errors:
+-- | The getter takes a Resource and returns a computation of a Maybe value in a Location. It can throw one of two errors:
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
@@ -64,11 +65,41 @@ getSingleGetter tofn pn r = lift $ do
         Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
         (Just a) -> pure (head a)
 
+getSingleGetter' :: forall a.
+  (Json -> Maybe a)
+  -> PropertyName
+  -> SingleGetter' a
+getSingleGetter' tofn pn r = do
+  (PropDefs pd) <- getPropDefs r
+  case lookup pn pd of
+    -- Property is not available. This is not an error.
+    Nothing -> pure Nothing
+    -- This must be an array filled with a single value that the tofn recognizes.
+    (Just json) -> case toArray json of
+      Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+      (Just arr) -> case traverse tofn arr of
+        Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+        (Just a) -> pure (head a)
+
+type SingleGetter' a = forall e. Resource -> AsyncPropDefsM e (Maybe a)
+
+-- Deze functie is Kleisli-composable.
+liftGetter :: forall a e.
+  (Resource -> AsyncPropDefsM e (Maybe a))
+  -> (Location (Maybe Resource) -> AsyncPropDefsM e (Location (Maybe a)))
+liftGetter g aLoc = case locationValue aLoc of
+  Nothing -> pure $ locate Nothing
+  (Just a) -> do
+    maybeB <- g a
+    case maybeB of
+      Nothing -> pure (locate Nothing)
+      justB -> pure (connectLocations aLoc g (locate justB))
+
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a plural getter for that property.
--- | The getter takes a Resource and returns a computation of an Array of values. It can throw one of two errors:
--- | - the value is not an Array (vi);
+-- | The getter takes a Resource and returns a computation of an Array of values in a Location. It can throw one of two errors:
+-- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
 getPluralGetter :: forall a.
