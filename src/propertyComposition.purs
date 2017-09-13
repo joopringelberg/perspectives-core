@@ -6,7 +6,7 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, connectLocations, locate, locationValue, traverseLoc)
+import Perspectives.Location (Location, traverseLoc)
 import Prelude (bind, id, join, pure, ($))
 
 -- | Start a query with this function
@@ -14,6 +14,8 @@ query :: forall k l n. Monad n =>
   (k -> n (Maybe l))
   -> (Location (Maybe k) -> n (Location (Maybe l)))
 query g aloc = traverseLoc (maybe (pure Nothing) g) aloc
+
+infix 0 query as |->
 
 -- sTos :: forall a b c m. Monad m =>
 --   (a -> m (Maybe b))
@@ -34,40 +36,16 @@ sTos p q =
       -> (Location (Maybe k) -> n (Location (Maybe l)))
     lift g aloc = traverseLoc (maybe (pure Nothing) g) aloc
 
-    lift' :: forall k l n. Monad n =>
-      (k -> n (Maybe l))
-      -> (Location (Maybe k) -> n (Location (Maybe l)))
-    lift' g aLoc = case locationValue aLoc of
-      Nothing -> pure $ locate Nothing
-      (Just a) -> do
-        maybeB <- g a
-        case maybeB of
-          Nothing -> pure (locate Nothing)
-          justB -> pure (connectLocations aLoc g (locate justB))
-
--- traverse :: forall a b m. Applicative m => (a -> m b) -> t a -> m (t b)
--- m = n
--- t = Location
--- a = k
--- b = Maybe l
--- traverse :: forall k l n. Applicative n =>
---  (k -> n (Maybe l))
---    -> Location k -> n (Location (Maybe l))
-
--- m = n
--- t = Location
--- a = Maybe k
--- b = Maybe l
--- traverse :: forall k l n. Applicative n =>
---  (Maybe k -> n (Maybe l))
---    -> Location (Maybe k) -> n (Location (Maybe l))
---
--- Now transform:
--- k -> n (Maybe l)
--- into:
--- Maybe k -> n (Maybe l)
--- with:
--- maybe (pure Nothing) g
+    -- lift' :: forall k l n. Monad n =>
+    --   (k -> n (Maybe l))
+    --   -> (Location (Maybe k) -> n (Location (Maybe l)))
+    -- lift' g aLoc = case locationValue aLoc of
+    --   Nothing -> pure $ locate Nothing
+    --   (Just a) -> do
+    --     maybeB <- g a
+    --     case maybeB of
+    --       Nothing -> pure (locate Nothing)
+    --       justB -> pure (connectLocations aLoc g (locate justB))
 
 infix 0 sTos as >->
 

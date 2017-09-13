@@ -19,9 +19,9 @@ test = launchAff do
   log "=========================Test.Properties================================"
   (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
   gbLoc <- pure (locate (Just gb))
-  (l :: Location (Maybe String)) <-  (query rol_RolBinding >-> label) gbLoc
+  (l :: Location (Maybe String)) <-  ((|->) rol_RolBinding >-> label) gbLoc
   log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue l)))
-  (m :: Location (Maybe String)) <-  (query rol_RolBinding >-> label) gbLoc
+  (m :: Location (Maybe String)) <-  ((|->) rol_RolBinding >-> label) gbLoc
   log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue m)))
 
   -- log "========================================================="
