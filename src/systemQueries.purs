@@ -3,12 +3,13 @@ module Perspectives.SystemQueries where
 import Perspectives.PropertyComposition
 import Perspectives.QueryCombinators as QC
 import Data.Maybe (Maybe(..))
+import Perspectives.Location (nameFunction)
 import Perspectives.Property (PluralGetter, SingleGetter, getResource, getResources, getString)
 import Perspectives.ResourceTypes (Resource(..))
-import Prelude (($), pure)
+import Prelude (pure, (<<<))
 
 identifier :: SingleGetter String
-identifier (Resource{id})= pure $ Just id
+identifier (Resource{id})= nameFunction "identifier" (pure <<< Just) id
 
 label :: SingleGetter String
 label = getString "rdfs:label"
@@ -20,10 +21,10 @@ rdfType :: SingleGetter Resource
 rdfType = getResource "rdf:type"
 
 types :: PluralGetter Resource
-types = QC.mclosure rdfType
+types = nameFunction "types" (QC.mclosure rdfType)
 
 superClasses :: PluralGetter Resource
-superClasses = QC.aclosure subClassOf
+superClasses = nameFunction "superClasses" (QC.aclosure subClassOf)
 
 -- typeSuperClasses :: PluralGetter Resource
 -- typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)

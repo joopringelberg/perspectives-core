@@ -30,24 +30,24 @@ test = launchAff do
   h' <-  ((|->>) types) gbLoc
   log ( "((|->>) types) user:xGebruiker = " <> (show h'))
 
-  -- log "========================================================="
-  -- ekd <- liftEff $ representResource "model:ExecutieKetenDomein#ExecutieKetenDomein"
-  -- m <-  label ekd
-  -- log ( "label model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show m))
-  --
-  --
-  -- log "========================================================="
-  -- n <-  (subClassOf >>-> label) ekd
-  -- log ( "(subClassOf >-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
-  --
-  -- log "========================================================="
-  -- o <-  (rdfType >-> label) gb
-  -- log ( "(rdfType >-> label) user:xGebruiker = " <> (show o))
-  --
-  -- log "========================================================="
-  -- p <-  (types >>-> label) gb
-  -- log ( "(types >>-> label user:xGebruiker) = " <> (show p))
-  --
+  log "========================================================="
+  ekd <- liftEff $ representResource "model:ExecutieKetenDomein#ExecutieKetenDomein"
+  m <-  label ekd
+  log ( "label model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show m))
+
+
+  log "========================================================="
+  n <-  (subClassOf >>-> label) ekd
+  log ( "(subClassOf >-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
+
+  log "========================================================="
+  o <-  ((|->) rdfType >-> label) gbLoc
+  log ( "((|->) rdfType >-> label) user:xGebruiker = " <> (show o))
+
+  log "========================================================="
+  p <-  ((|->) types >>-> label) gbLoc
+  log ( "((|->) types >>-> label user:xGebruiker) = " <> (show p))
+
   -- log "========================================================="
   -- q <-  (typeSuperClasses >>-> identifier) gb
   -- log ( "(typeSuperClasses >>-> identifier) user:xGebruiker = " <> (show q))

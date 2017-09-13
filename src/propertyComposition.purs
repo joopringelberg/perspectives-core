@@ -13,7 +13,6 @@ import Prelude (bind, id, join, pure, ($))
 liftSingleGetter :: forall k l n. Monad n =>
   (k -> n (Maybe l))
   -> (Location (Maybe k) -> n (Location (Maybe l)))
--- liftSingleGetter g aloc = nameFunction (functionName g) (traverseLoc (maybe (pure Nothing) g)) aloc
 liftSingleGetter g aloc = traverseLoc (nameFunction (functionName g) (maybe (pure Nothing) g)) aloc
 
 infix 0 liftSingleGetter as |->
@@ -23,7 +22,6 @@ liftPluralGetter :: forall k l n. Monad n =>
   (k -> n (Array l))
   -> (Location (Maybe k) -> n (Location (Array l)))
 liftPluralGetter g aloc = traverseLoc (nameFunction (functionName g) (maybe (pure []) g)) aloc
--- liftPluralGetter g aloc = nameFunction (functionName g) (traverseLoc (maybe (pure []) g)) aloc
 
 infix 0 liftPluralGetter as |->>
 
