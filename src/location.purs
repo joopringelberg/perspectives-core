@@ -18,7 +18,7 @@ module Perspectives.Location
   , bindLoc
   , traverseLoc
   , nameFunction
-  , functionName) 
+  , functionName)
 where
 
 import Prelude

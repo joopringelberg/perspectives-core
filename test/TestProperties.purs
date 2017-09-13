@@ -37,7 +37,8 @@ test = launchAff do
 
 
   log "========================================================="
-  n <-  (subClassOf >>-> label) ekd
+  ekdLoc <- pure (locate (Just ekd))
+  n <-  ((|->>) subClassOf >>-> label) ekdLoc
   log ( "(subClassOf >-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
 
   log "========================================================="
@@ -45,7 +46,7 @@ test = launchAff do
   log ( "((|->) rdfType >-> label) user:xGebruiker = " <> (show o))
 
   log "========================================================="
-  p <-  ((|->) types >>-> label) gbLoc
+  p <-  ((|->>) types >>-> label) gbLoc
   log ( "((|->) types >>-> label user:xGebruiker) = " <> (show p))
 
   -- log "========================================================="

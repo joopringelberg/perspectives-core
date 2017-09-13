@@ -6,8 +6,8 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, nameFunction, traverseLoc, functionName)
-import Prelude (bind, id, join, pure, ($))
+import Perspectives.Location (Location, functionName, locationValue, nameFunction, setLocationValue, traverseLoc)
+import Prelude (bind, id, join, pure, ($), (*>), (>>>))
 
 -- | prefix a query that starts with a SingleGetter with this function
 liftSingleGetter :: forall k l n. Monad n =>
@@ -56,14 +56,20 @@ infix 0 sTop as >->>
 -- sTop f g = f >=> (maybe (pure []) g)
 
 pTos :: forall a b c m.  Monad m => Eq c =>
-  (a -> m (Array b))
+  (Location (Maybe a) -> m (Location (Array b)))
   -> (b -> m (Maybe c))
-  -> a
-  -> m (Array c)
-pTos f g a = do
-  x <- f a
-  y <- traverse g (x :: Array b)
-  pure $ nub $ foldr (maybe id cons) [] (y :: Array (Maybe c))
+  -> (Location (Maybe a) -> m (Location (Array c)))
+pTos f g a =
+  let
+    h :: Array b -> m (Array c)
+    h arrayB = do
+                (p :: Array (Maybe c)) <- traverse g arrayB
+                pure $ nub $ foldr (maybe id cons) [] p
+  in
+    do
+      (x :: Location (Array b)) <- f (a :: Location (Maybe a))
+      traverseLoc (nameFunction (functionName g) h) x
+
 
 infix 0 pTos as >>->
 
