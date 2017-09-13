@@ -6,16 +6,26 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, traverseLoc)
+import Perspectives.Location (Location, nameFunction, traverseLoc, functionName)
 import Prelude (bind, id, join, pure, ($))
 
--- | Start a query with this function
-query :: forall k l n. Monad n =>
+-- | prefix a query that starts with a SingleGetter with this function
+liftSingleGetter :: forall k l n. Monad n =>
   (k -> n (Maybe l))
   -> (Location (Maybe k) -> n (Location (Maybe l)))
-query g aloc = traverseLoc (maybe (pure Nothing) g) aloc
+-- liftSingleGetter g aloc = nameFunction (functionName g) (traverseLoc (maybe (pure Nothing) g)) aloc
+liftSingleGetter g aloc = traverseLoc (nameFunction (functionName g) (maybe (pure Nothing) g)) aloc
 
-infix 0 query as |->
+infix 0 liftSingleGetter as |->
+
+-- | prefix a query that starts with a PluralGetter with this function
+liftPluralGetter :: forall k l n. Monad n =>
+  (k -> n (Array l))
+  -> (Location (Maybe k) -> n (Location (Array l)))
+liftPluralGetter g aloc = traverseLoc (nameFunction (functionName g) (maybe (pure []) g)) aloc
+-- liftPluralGetter g aloc = nameFunction (functionName g) (traverseLoc (maybe (pure []) g)) aloc
+
+infix 0 liftPluralGetter as |->>
 
 -- sTos :: forall a b c m. Monad m =>
 --   (a -> m (Maybe b))
@@ -28,40 +38,24 @@ sTos :: forall a b c m. Monad m =>
   (Location (Maybe a) -> m (Location (Maybe b)))
   -> (b -> m (Maybe c))
   -> (Location (Maybe a) -> m (Location (Maybe c)))
-sTos p q =
-  p >=> (lift q)
-  where
-    lift :: forall k l n. Monad n =>
-      (k -> n (Maybe l))
-      -> (Location (Maybe k) -> n (Location (Maybe l)))
-    lift g aloc = traverseLoc (maybe (pure Nothing) g) aloc
-
-    -- lift' :: forall k l n. Monad n =>
-    --   (k -> n (Maybe l))
-    --   -> (Location (Maybe k) -> n (Location (Maybe l)))
-    -- lift' g aLoc = case locationValue aLoc of
-    --   Nothing -> pure $ locate Nothing
-    --   (Just a) -> do
-    --     maybeB <- g a
-    --     case maybeB of
-    --       Nothing -> pure (locate Nothing)
-    --       justB -> pure (connectLocations aLoc g (locate justB))
+sTos p q = p >=> (liftSingleGetter q)
 
 infix 0 sTos as >->
 
 sTop :: forall a b c m. Monad m =>
-  (a -> m (Maybe b))
+  (Location (Maybe a) -> m (Location (Maybe b)))
   -> (b -> m (Array c))
-  -> a
-  -> m (Array c)
-sTop f g a = do
-  x <- f a
-  case (x :: Maybe b) of
-    Nothing -> pure []
-    (Just b) -> g b
--- sTop f g = f >=> (maybe (pure []) g)
+  -> (Location (Maybe a) -> m (Location (Array c)))
+sTop p q = p >=> (liftPluralGetter q)
 
 infix 0 sTop as >->>
+
+-- sTop f g a = do
+--   x <- f a
+--   case (x :: Maybe b) of
+--     Nothing -> pure []
+--     (Just b) -> g b
+-- sTop f g = f >=> (maybe (pure []) g)
 
 pTos :: forall a b c m.  Monad m => Eq c =>
   (a -> m (Array b))

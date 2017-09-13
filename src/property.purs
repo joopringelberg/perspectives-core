@@ -12,6 +12,7 @@ import Data.StrMap (lookup)
 import Data.Traversable (traverse)
 import Perspectives.Resource (getPropDefs, representResource, ResourceIndex)
 import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
+import Perspectives.Location (nameFunction)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -81,38 +82,44 @@ getPluralGetter tofn pn r = do
         (Just a) -> pure a
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
+-- getString :: PropertyName -> SingleGetter String
+-- getString = getSingleGetter toString
+
 getString :: PropertyName -> SingleGetter String
-getString = getSingleGetter toString
+getString name = nameFunction name (getSingleGetter toString name)
 
 -- | in AsyncDomeinFile, retrieve either an Array of Strings or an error message.
 getStrings :: PropertyName -> PluralGetter String
-getStrings = getPluralGetter toString
+getStrings name = nameFunction name (getPluralGetter toString name)
 
 -- | in AsyncDomeinFile, retrieve either a Number or an error message.
 getNumber :: PropertyName -> SingleGetter Number
-getNumber = getSingleGetter toNumber
+getNumber name = nameFunction name (getSingleGetter toNumber name)
 
 -- | in AsyncDomeinFile, retrieve either an Array of Numbers or an error message.
 getNumbers :: PropertyName -> PluralGetter Number
-getNumbers = getPluralGetter toNumber
+getNumbers name = nameFunction name (getPluralGetter toNumber name)
 
 -- | in AsyncDomeinFile, retrieve either a Boolean value or an error message.
 getBoolean :: PropertyName -> SingleGetter Boolean
-getBoolean = getSingleGetter toBoolean
+getBoolean name = nameFunction name (getSingleGetter toBoolean name)
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
 getResource :: PropertyName -> SingleGetter Resource
-getResource pn mr = do
-  resIdArray <- (getPluralGetter toString) pn mr
-  case head resIdArray of
-    Nothing -> pure Nothing
-    (Just id) -> liftEff $ (Just <$> (representResource $ id))
+getResource pn' = nameFunction pn' (f pn') where
+  f :: PropertyName -> SingleGetter Resource
+  f pn mr = do
+    resIdArray <- (getPluralGetter toString) pn mr
+    case head resIdArray of
+      Nothing -> pure Nothing
+      (Just id) -> liftEff $ (Just <$> (representResource $ id))
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
 getResources :: PropertyName -> PluralGetter Resource
-getResources pn mr = do
-  resIdArray <- (getPluralGetter toString) pn mr
-  (liftEff $ (traverse representResource resIdArray))
+getResources pn' = (nameFunction pn' (f pn')) where
+  f pn mr = do
+    resIdArray <- (getPluralGetter toString) pn mr
+    (liftEff $ (traverse representResource resIdArray))
 
 -- | in AsyncDomeinFile, retrieve either a Date property or an error message.
 --getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))

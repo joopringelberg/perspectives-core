@@ -25,11 +25,9 @@ types = QC.mclosure rdfType
 superClasses :: PluralGetter Resource
 superClasses = QC.aclosure subClassOf
 
-typeSuperClasses :: PluralGetter Resource
-typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
+-- typeSuperClasses :: PluralGetter Resource
+-- typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
 -- typeSuperClasses = rdfType >->> QC.cons QC.identity superClasses
 
 rol_RolBinding :: SingleGetter Resource
 rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"
-
-test = query rol_RolBinding >-> rdfType

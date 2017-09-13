@@ -21,8 +21,14 @@ test = launchAff do
   gbLoc <- pure (locate (Just gb))
   (l :: Location (Maybe String)) <-  ((|->) rol_RolBinding >-> label) gbLoc
   log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue l)))
-  (m :: Location (Maybe String)) <-  ((|->) rol_RolBinding >-> label) gbLoc
-  log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue m)))
+
+  log "========================================================="
+  h <-  ((|->) rdfType) gbLoc
+  log ( "((|->) rdfType) user:xGebruiker = " <> (show h))
+
+  log "========================================================="
+  h' <-  ((|->>) types) gbLoc
+  log ( "((|->>) types) user:xGebruiker = " <> (show h'))
 
   -- log "========================================================="
   -- ekd <- liftEff $ representResource "model:ExecutieKetenDomein#ExecutieKetenDomein"

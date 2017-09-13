@@ -155,9 +155,9 @@ exports.connectLocations = function( l1 )
 	{
 		return function( l2 )
 		{
-			// console.log( "In connectLocations met:", f.toString())
+			// console.log( "In connectLocations met:", f.name)
 			// console.log( "In connectLocations.")
-			l1.addLeftLeaningDependent( f.toString(), l2)
+			l1.addLeftLeaningDependent( f.name, l2)
 			return l2;
 		};
 	};
@@ -168,7 +168,7 @@ exports.mapLoc = function( fun )
 	return function( loc )
 	{
 		// A function can only be applied once to a location.
-		var linkName = fun.toString();
+		var linkName = fun.name;
 		var dependent = loc.getDependent( linkName );
 		var produce = function()
 		{
@@ -192,7 +192,7 @@ exports.applyLoc = function( funLoc )
 	return function( loc )
 	{
 		// Apply can be executed only once for the combination of funLoc and loc.
-		var linkName = funLoc.fun.toString() + loc.fun.toString();
+		var linkName = funLoc.fun.name + loc.fun.name;
 		var dependent = funLoc.getDependent( linkName );
 		var produce = function()
 		{
@@ -219,7 +219,7 @@ exports.bindLoc = function( loc )
 	return function( fun )
 	{
 		// A function can only be applied once to a location.
-		var linkName = fun.toString();
+		var linkName = fun.name;
 		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
@@ -244,8 +244,22 @@ exports.locationDependentAux = function( f )
 {
 	return function( loc )
 	{
-		return loc.getDependent( f.toString() );
+		return loc.getDependent( f.name );
 	}
+};
+
+exports.nameFunction = function( name )
+{
+	return function( f )
+	{
+		Object.defineProperty(f, 'name', {value: name})
+		return f;
+	}
+}
+
+exports.functionName = function( f )
+{
+	return f.name;
 }
 
 exports.runLocation =

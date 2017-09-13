@@ -16,7 +16,9 @@ module Perspectives.Location
   , pureTHEORYDELTA
   , locationValue
   , bindLoc
-  , traverseLoc)
+  , traverseLoc
+  , nameFunction
+  , functionName) 
 where
 
 import Prelude
@@ -72,6 +74,10 @@ locationDependent f loc =
   let d = locationDependentAux f loc
   in
     if isUndefined d then Nothing else Just (unsafeFromForeign d)
+
+foreign import nameFunction :: forall a b. String -> (a -> b) -> (a -> b)
+
+foreign import functionName :: forall a b. (a -> b) -> String
 
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
