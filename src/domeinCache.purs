@@ -4,8 +4,8 @@ module Perspectives.DomeinCache
 
 where
 
-import Control.Monad.Aff (forkAff)
-import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
+import Control.Monad.Aff (Aff, forkAff)
+import Control.Monad.Aff.AVar (AVar, makeVar, putVar, peekVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
@@ -32,16 +32,13 @@ import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<>))
 type DomeinFile = StrMap PropDefs
 
 -- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
-type DomeinCache = GLStrMap DomeinFile
+type DomeinCache = GLStrMap (AVar DomeinFile)
 
 domeinCache :: DomeinCache
 domeinCache = new unit
 
-storeDomeinFileInCache :: forall e. Namespace -> DomeinFile -> Eff (gm :: GLOBALMAP | e) DomeinFile
-storeDomeinFileInCache ns df=
-  do
-    dc <- pure domeinCache
-    poke dc ns df *> pure df
+storeDomeinFileInCache :: forall e. Namespace -> AVar DomeinFile -> Aff (gm :: GLOBALMAP | e) (AVar DomeinFile)
+storeDomeinFileInCache ns df= liftEff $ poke domeinCache ns df *> pure df
 
 -- | Matches all occurrences of :, # and /.
 domeinFileRegex :: Regex
@@ -67,17 +64,16 @@ retrieveDomeinFile ns = do
   case peek domeinCache ns of
     Nothing -> do
       v <- makeVar
+      _ <- storeDomeinFileInCache ns v
       _ <- forkAff do
             res <- affjax $ domeinRequest {url = modelsURL <> ns}
             case res.status of
               StatusCode 200 -> case stringToDomeinFile res.response of
                 (Left err) -> throwError $ error err
-                (Right (df :: DomeinFile)) -> do
-                  _ <- putVar v df
-                  liftEff $ storeDomeinFileInCache ns df
+                (Right (df :: DomeinFile)) -> putVar v df
               otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
-      takeVar v
-    (Just f) -> pure f
+      peekVar v
+    (Just v) -> peekVar v
 
 stringToDomeinFile :: String -> Either String DomeinFile
 stringToDomeinFile s = case jsonParser s of
