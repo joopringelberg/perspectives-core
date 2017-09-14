@@ -16,6 +16,6 @@ test = do
   log "========================================================="
   log "poke myMap \"een\" 1'"
   _ <- poke myMap "een" 1
-  v <- pure $ peek myMap "een"
+  v <- peek myMap "een"
   log ("lookup myMap \"een\"'= " <> show v)
   log "========================================================="

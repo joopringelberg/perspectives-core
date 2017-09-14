@@ -4,13 +4,12 @@ exports["new"] = function () {
   return {};
 };
 
-exports.peekImpl = function (just) {
-  return function (nothing) {
-    return function (m) {
-      return function (k) {
-          return {}.hasOwnProperty.call(m, k) ? just(m[k]) : nothing;
+exports.peekImpl = function (m) {
+  return function (k) {
+    return function()
+      {
+        return m[k];
       };
-    };
   };
 };
 

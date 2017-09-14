@@ -61,7 +61,8 @@ retrieveDomeinResourceDefinition id ns = do
 
 retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e DomeinFile
 retrieveDomeinFile ns = do
-  case peek domeinCache ns of
+  x <- liftEff $ peek domeinCache ns
+  case x of
     Nothing -> do
       v <- makeVar
       _ <- storeDomeinFileInCache ns v

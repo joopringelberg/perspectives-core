@@ -20,17 +20,21 @@ resourceIndex :: ResourceIndex
 resourceIndex = new unit
 
 -- | From a Resource, find its Location.
-resourceLocation :: Resource -> Location Resource
+resourceLocation :: forall e. Resource -> Eff (gm :: GLOBALMAP | e ) (Location Resource)
 resourceLocation (Resource{id}) = unsafePartial resourceLocation' id where
-    resourceLocation' :: Partial => String -> Location Resource
-    resourceLocation' rid = case peek resourceIndex id of
-      (Just (ResourceLocation{ loc })) -> loc
+    resourceLocation' :: Partial => String -> Eff (gm :: GLOBALMAP | e) (Location Resource)
+    resourceLocation' rid = do
+      x <- peek resourceIndex id
+      case x of
+        (Just (ResourceLocation{ loc })) -> pure loc
 
 -- | Look up a resource or create a new resource without definition and store it in the index.
 representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) Resource
-representResource id = case peek resourceIndex id of
-  Nothing -> storeResourceInIndex $ Resource{ id: id, propDefs: Nothing}
-  (Just (ResourceLocation {res})) -> pure res
+representResource id = do
+  x <- peek resourceIndex id
+  case x of
+    Nothing -> storeResourceInIndex $ Resource{ id: id, propDefs: Nothing}
+    (Just (ResourceLocation {res})) -> pure res
 
 -- | Create a new resource with definitions and store it in the index.
 newResource :: ResourceId -> PropDefs -> Aff ( gm :: GLOBALMAP, avar :: AVAR ) Resource
@@ -47,13 +51,10 @@ storeResourceInIndex res@(Resource{id}) =
 
 addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
 addPropertyDefinitions r@(Resource{id}) av =
-  let
-    loc = resourceLocation r
-    newR = Resource{ id: id, propDefs: (Just av)}
-    newResourceLocation = ResourceLocation{ res: r, loc: loc }
-  in do
-    _ <- setLocationValue loc newR
-    _ <- poke resourceIndex id newResourceLocation
+  do
+    loc <- resourceLocation r
+    _ <- setLocationValue loc (Resource{ id: id, propDefs: (Just av)})
+    _ <- poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
     pure unit
 
 -- | Get the property definitions of a Resource.
