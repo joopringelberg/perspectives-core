@@ -6,9 +6,7 @@ import Control.Monad.Aff.AVar (AVar, makeVar', peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
--- import Data.StrMap.ST (poke, STStrMap)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
 import Perspectives.ResourceTypes (PropDefs, Resource(..), ResourceId, ResourceLocation(..), AsyncDomeinFile)
@@ -20,20 +18,19 @@ resourceIndex :: ResourceIndex
 resourceIndex = new unit
 
 -- | From a Resource, find its Location.
-resourceLocation :: forall e. Resource -> Eff (gm :: GLOBALMAP | e ) (Location Resource)
-resourceLocation (Resource{id}) = unsafePartial resourceLocation' id where
-    resourceLocation' :: Partial => String -> Eff (gm :: GLOBALMAP | e) (Location Resource)
-    resourceLocation' rid = do
-      x <- peek resourceIndex id
-      case x of
-        (Just (ResourceLocation{ loc })) -> pure loc
+resourceLocation :: forall e. Resource -> Eff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
+resourceLocation (Resource{id}) = do
+  x <- peek resourceIndex id
+  case x of
+    (Just (ResourceLocation{ loc })) -> pure loc
+    Nothing -> pure (locate Nothing)
 
 -- | Look up a resource or create a new resource without definition and store it in the index.
 representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) Resource
 representResource id = do
   x <- peek resourceIndex id
   case x of
-    Nothing -> storeResourceInIndex $ Resource{ id: id, propDefs: Nothing}
+    Nothing -> storeResourceInIndex (Resource{ id: id, propDefs: Nothing})
     (Just (ResourceLocation {res})) -> pure res
 
 -- | Create a new resource with definitions and store it in the index.
@@ -45,7 +42,7 @@ newResource id defs = do
 
 storeResourceInIndex :: forall e. Resource -> Eff (gm :: GLOBALMAP | e) Resource
 storeResourceInIndex res@(Resource{id}) =
-  let loc = locate res
+  let loc = locate (Just res)
   in do
     poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure res
 
@@ -53,7 +50,7 @@ addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEO
 addPropertyDefinitions r@(Resource{id}) av =
   do
     loc <- resourceLocation r
-    _ <- setLocationValue loc (Resource{ id: id, propDefs: (Just av)})
+    _ <- setLocationValue loc (Just (Resource{ id: id, propDefs: (Just av)}))
     _ <- poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
     pure unit
 

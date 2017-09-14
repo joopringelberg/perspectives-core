@@ -56,7 +56,7 @@ instance eqResource :: Eq Resource where
   eq (Resource{id : id1}) (Resource{id : id2}) = eq id1 id2
 
 -- | We store the combination of Resource and Location in an Index.
-newtype ResourceLocation = ResourceLocation{ res :: Resource, loc :: Location Resource}
+newtype ResourceLocation = ResourceLocation{ res :: Resource, loc :: Location (Maybe Resource)}
 
 --instance showResourceLocation :: Show (ResourceLocation e) where
 --  show (ResourceLocation{ res }) = show res
