@@ -16,6 +16,7 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap)
 import Perspectives.Location (Location, locationValue)
 import Perspectives.LocationT (runLocationT)
 import Perspectives.Property (getString)
+import Perspectives.PropertyComposition ((|->))
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource(..), ResourceLocation(..))
 import Perspectives.SystemQueries (label)
@@ -41,12 +42,12 @@ test :: forall t36.
     )
 test = launchAff $ do
   log "========================================================="
-  (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
+  (gb :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
   log $ show gb
 
   log "========================================================="
-  (l :: (Maybe String)) <- (getString "rdfs:label" gb)
-  case l of
+  (l :: Location (Maybe String)) <- ((getString "rdfs:label") |-> gb)
+  case locationValue l of
     Nothing -> log "Niets gevonden"
     _ -> log "Wel iets gevonden"
 

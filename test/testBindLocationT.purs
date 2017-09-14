@@ -26,7 +26,7 @@ log = lift <<< Aff.log
 -}
 
 test = launchAff $ runLocationT do
-  (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
+  (gb :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
   log (show gb)
   log (show gb)
 

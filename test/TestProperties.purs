@@ -17,8 +17,7 @@ import Perspectives.ResourceTypes (Resource)
 
 test = launchAff do
   log "=========================Test.Properties================================"
-  (gb :: Resource) <- liftEff $ representResource "user:xGebruiker"
-  gbLoc <- pure (locate (Just gb))
+  (gbLoc :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
   (l :: Location (Maybe String)) <-  ((|->) rol_RolBinding >-> label) gbLoc
   log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue l)))
 
@@ -31,15 +30,14 @@ test = launchAff do
   log ( "((|->>) types) user:xGebruiker = " <> (show h'))
 
   log "========================================================="
-  ekd <- liftEff $ representResource "model:ExecutieKetenDomein#ExecutieKetenDomein"
-  m <-  label ekd
+  ekdLoc <- liftEff $ representResource "model:ExecutieKetenDomein#ExecutieKetenDomein"
+  m <-  ((|->) label) ekdLoc
   log ( "label model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show m))
 
 
   log "========================================================="
-  ekdLoc <- pure (locate (Just ekd))
   n <-  ((|->>) subClassOf >>-> label) ekdLoc
-  log ( "(subClassOf >-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
+  log ( "((|->>) subClassOf >-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
 
   log "========================================================="
   o <-  ((|->) rdfType >-> label) gbLoc

@@ -10,8 +10,8 @@ import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, nameFunction)
-import Perspectives.Resource (getPropDefs, representResource, ResourceIndex)
+import Perspectives.Location (Location, locate, nameFunction)
+import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, resourceFromLocation)
 import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
 
 {-
@@ -113,17 +113,21 @@ getResource :: PropertyName -> SingleGetter Resource
 getResource pn' = nameFunction pn' (f pn') where
   f :: PropertyName -> SingleGetter Resource
   f pn mr = do
-    resIdArray <- (getPluralGetter toString) pn mr
-    case head resIdArray of
-      Nothing -> pure Nothing
-      (Just id) -> liftEff $ (Just <$> (representResource $ id))
+    (maybeId :: Maybe String) <- getSingleGetter toString pn mr
+    (loc :: Location (Maybe Resource)) <- case maybeId of
+      Nothing -> pure $ locate Nothing
+      (Just id) -> liftEff (representResource id)
+    pure $ Just $ resourceFromLocation loc
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
 getResources :: PropertyName -> PluralGetter Resource
 getResources pn' = (nameFunction pn' (f pn')) where
   f pn mr = do
     resIdArray <- (getPluralGetter toString) pn mr
-    (liftEff $ (traverse representResource resIdArray))
+    (liftEff $ (traverse h resIdArray))
+    where h id = do
+                  loc <- representResource id
+                  pure $ resourceFromLocation loc
 
 -- | in AsyncDomeinFile, retrieve either a Date property or an error message.
 --getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))

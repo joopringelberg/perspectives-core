@@ -6,8 +6,9 @@ import Control.Monad.Aff.AVar (AVar, makeVar', peekVar, AVAR)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
+import Partial.Unsafe (unsafePartial)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
-import Perspectives.Location (Location, THEORYDELTA, locate, setLocationValue)
+import Perspectives.Location (Location, THEORYDELTA, locate, locationValue, setLocationValue)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
 import Perspectives.ResourceTypes (PropDefs, Resource(..), ResourceId, ResourceLocation(..), AsyncDomeinFile)
 
@@ -25,26 +26,34 @@ resourceLocation (Resource{id}) = do
     (Just (ResourceLocation{ loc })) -> pure loc
     Nothing -> pure (locate Nothing)
 
+-- | From a Location, return the resource
+resourceFromLocation :: Location (Maybe Resource) -> Resource
+resourceFromLocation loc = unsafePartial resourceFromLocation' loc where
+    resourceFromLocation' :: Partial => Location (Maybe Resource) -> Resource
+    resourceFromLocation' locR =
+      case locationValue locR of
+        (Just r) -> r
+
 -- | Look up a resource or create a new resource without definition and store it in the index.
-representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) Resource
+representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) (Location (Maybe Resource))
 representResource id = do
   x <- peek resourceIndex id
   case x of
     Nothing -> storeResourceInIndex (Resource{ id: id, propDefs: Nothing})
-    (Just (ResourceLocation {res})) -> pure res
+    (Just (ResourceLocation {loc})) -> pure loc
 
 -- | Create a new resource with definitions and store it in the index.
-newResource :: ResourceId -> PropDefs -> Aff ( gm :: GLOBALMAP, avar :: AVAR ) Resource
+newResource :: ResourceId -> PropDefs -> Aff ( gm :: GLOBALMAP, avar :: AVAR ) (Location (Maybe Resource))
 newResource id defs = do
     v <- makeVar' defs
     res <- pure (Resource{ id: id, propDefs: Just v})
     liftEff $ storeResourceInIndex res
 
-storeResourceInIndex :: forall e. Resource -> Eff (gm :: GLOBALMAP | e) Resource
+storeResourceInIndex :: forall e. Resource -> Eff (gm :: GLOBALMAP | e) (Location (Maybe Resource))
 storeResourceInIndex res@(Resource{id}) =
   let loc = locate (Just res)
   in do
-    poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure res
+    poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure loc
 
 addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
 addPropertyDefinitions r@(Resource{id}) av =
