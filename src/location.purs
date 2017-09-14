@@ -63,10 +63,6 @@ pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
 
 foreign import locationValue :: forall a. Location a -> a
 
--- foreign import data Undefined :: Type -> Type
---
--- foreign import isUndefined :: forall a. Undefined a -> Boolean
-
 foreign import locationDependentAux :: forall a c. (a -> c) -> Location a -> Foreign
 
 locationDependent :: forall a b c. (a -> c) -> Location a -> Maybe (Location b)

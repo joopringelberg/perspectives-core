@@ -28,7 +28,7 @@ superClasses = nameFunction "superClasses" (QC.aclosure subClassOf)
 
 -- typeSuperClasses :: PluralGetter Resource
 -- typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
--- typeSuperClasses = rdfType >->> QC.cons QC.identity superClasses
+-- typeSuperClasses = (|->) rdfType >->> QC.cons QC.identity superClasses
 
 rol_RolBinding :: SingleGetter Resource
 rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"

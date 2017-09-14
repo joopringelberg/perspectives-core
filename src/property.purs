@@ -10,9 +10,9 @@ import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
+import Perspectives.Location (Location, nameFunction)
 import Perspectives.Resource (getPropDefs, representResource, ResourceIndex)
 import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
-import Perspectives.Location (nameFunction)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -27,13 +27,17 @@ type PropertyName = String
 
 type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex | e)
 
+-- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
+-- | effects).
+type SingleGetter a = forall e. Resource -> (AsyncPropDefsM e) (Maybe a)
+
+type MemoizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
+
 -- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
 type PluralGetter a = forall e. Resource -> (AsyncPropDefsM e) (Array a)
 
--- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
--- | effects).
-type SingleGetter a = forall e. Resource -> (AsyncPropDefsM e) (Maybe a)
+type MemoizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.

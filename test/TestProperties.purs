@@ -49,10 +49,14 @@ test = launchAff do
   p <-  ((|->>) types >>-> label) gbLoc
   log ( "((|->) types >>-> label user:xGebruiker) = " <> (show p))
 
-  -- log "========================================================="
+  log "========================================================="
+  p' <-  ((|->) rol_RolBinding >-> rdfType >->> types >>->> subClassOf >>-> label) gbLoc
+  log ( "(((|->) rol_RolBinding >-> rdfType >->> types >>->> subClassOf >>-> label) user:xGebruiker) = " <> (show p'))
+
+-- log "========================================================="
   -- q <-  (typeSuperClasses >>-> identifier) gb
   -- log ( "(typeSuperClasses >>-> identifier) user:xGebruiker = " <> (show q))
-  --
+
   -- log "========================================================="
   -- r <-  (typeSuperClasses >>-> hasLabel) gb
   -- log ( "(typeSuperClasses >>-> hasLabel) user:xGebruiker = " <> (show r))
