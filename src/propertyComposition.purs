@@ -1,14 +1,16 @@
 module Perspectives.PropertyComposition where
 
 import Control.Bind ((>=>))
+import Control.Monad.Eff.Class (liftEff)
 import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (functionName, nameFunction, traverseLoc)
+import Perspectives.Location (Location, functionName, locationValue, nameFunction, traverseLoc)
 import Perspectives.Property (MemoizingPluralGetter, MemoizingSingleGetter, PluralGetter, SingleGetter, AsyncPropDefsM)
+import Perspectives.Resource (resourceLocation)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($))
+import Prelude (bind, id, join, pure, ($), (<<<), (>>>))
 
 -- | Prefix a query that starts with a SingleGetter with this function
 -- liftSingleGetter :: forall k l n. Monad n =>
@@ -32,8 +34,8 @@ infixl 0 liftPluralGetter as |->>
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Maybe c)))
-sTos :: forall a. MemoizingSingleGetter Resource -> SingleGetter a -> MemoizingSingleGetter a
-sTos p q = p >=> (liftSingleGetter q)
+sTos :: forall a. MemoizingSingleGetter Resource -> MemoizingSingleGetter a -> MemoizingSingleGetter a
+sTos p q = p >=> q
 
 infixl 0 sTos as >->
 
@@ -41,8 +43,8 @@ infixl 0 sTos as >->
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
-sTop :: forall a. MemoizingSingleGetter Resource -> PluralGetter a -> MemoizingPluralGetter a
-sTop p q = p >=> (liftPluralGetter q)
+sTop :: forall a. MemoizingSingleGetter Resource -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+sTop p q = p >=> q
 
 infixl 0 sTop as >->>
 
@@ -50,15 +52,15 @@ infixl 0 sTop as >->>
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
-pTos :: forall a. Eq a => MemoizingPluralGetter Resource -> SingleGetter a -> MemoizingPluralGetter a
+pTos :: forall a. Eq a => MemoizingPluralGetter Resource -> MemoizingSingleGetter a -> MemoizingPluralGetter a
 pTos f g =
   let
     h :: forall e. Array Resource -> AsyncPropDefsM e (Array a)
     h arrayB = do
-                (p :: Array (Maybe a)) <- traverse g arrayB
-                pure $ nub $ foldr (maybe id cons) [] p
+                (p :: Array (Location (Maybe a))) <- traverse ((liftEff <<< resourceLocation) >=> g) arrayB
+                pure $ nub $ foldr (locationValue >>> (maybe id cons)) [] p
     in f >=> (traverseLoc (nameFunction (functionName g) h))
-  -- f >=> (traverseLoc (nameFunction (functionName g) (traverse g >=> (pure <<< nub <<< (foldr (maybe id cons) [])))))
+  -- f >=> (traverseLoc (nameFunction (functionName g) (traverse ((liftEff <<< resourceLocation) >=> g) >=> (pure <<< nub <<< (foldr (locationValue >>> (maybe id cons)) [])))))
 
 infixl 0 pTos as >>->
 

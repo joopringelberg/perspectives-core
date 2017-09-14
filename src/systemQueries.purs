@@ -4,31 +4,31 @@ import Perspectives.PropertyComposition
 import Perspectives.QueryCombinators as QC
 import Data.Maybe (Maybe(..))
 import Perspectives.Location (nameFunction)
-import Perspectives.Property (PluralGetter, SingleGetter, getResource, getResources, getString)
+import Perspectives.Property (MemoizingSingleGetter, PluralGetter, SingleGetter, MemoizingPluralGetter, getResource, getResources, getString)
 import Perspectives.ResourceTypes (Resource(..))
-import Prelude (pure, (<<<))
+import Prelude (pure, (<<<), ($))
 
 identifier :: SingleGetter String
 identifier (Resource{id})= nameFunction "identifier" (pure <<< Just) id
 
-label :: SingleGetter String
-label = getString "rdfs:label"
+label :: MemoizingSingleGetter String
+label = liftSingleGetter (getString "rdfs:label")
 
-subClassOf :: PluralGetter Resource
-subClassOf = getResources "rdfs:subClassOf"
+subClassOf :: MemoizingPluralGetter Resource
+subClassOf = liftPluralGetter (getResources "rdfs:subClassOf")
 
-rdfType :: SingleGetter Resource
-rdfType = getResource "rdf:type"
+rdfType :: MemoizingSingleGetter Resource
+rdfType = liftSingleGetter (getResource "rdf:type")
 
-types :: PluralGetter Resource
-types = nameFunction "types" (QC.mclosure rdfType)
+-- types :: PluralGetter Resource
+-- types = nameFunction "types" (QC.mclosure rdfType)
 
-superClasses :: PluralGetter Resource
-superClasses = nameFunction "superClasses" (QC.aclosure subClassOf)
+-- superClasses :: PluralGetter Resource
+-- superClasses = nameFunction "superClasses" (QC.aclosure subClassOf)
 
 -- typeSuperClasses :: PluralGetter Resource
 -- typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
 -- typeSuperClasses = (|->) rdfType >->> QC.cons QC.identity superClasses
 
-rol_RolBinding :: SingleGetter Resource
-rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"
+rol_RolBinding :: MemoizingSingleGetter Resource
+rol_RolBinding = liftSingleGetter (getResource "model:SysteemDomein#rol_RolBinding")

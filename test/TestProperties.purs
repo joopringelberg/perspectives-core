@@ -18,38 +18,38 @@ import Perspectives.ResourceTypes (Resource)
 test = launchAff do
   log "=========================Test.Properties================================"
   (gbLoc :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
-  (l :: Location (Maybe String)) <-  ((|->) rol_RolBinding >-> label) gbLoc
+  (l :: Location (Maybe String)) <-  (rol_RolBinding >-> label) gbLoc
   log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue l)))
 
   log "========================================================="
-  h <-  ((|->) rdfType) gbLoc
-  log ( "((|->) rdfType) user:xGebruiker = " <> (show h))
+  h <-  (rdfType) gbLoc
+  log ( "(rdfType) user:xGebruiker = " <> (show h))
 
-  log "========================================================="
-  h' <-  ((|->>) types) gbLoc
-  log ( "((|->>) types) user:xGebruiker = " <> (show h'))
+  -- log "========================================================="
+  -- h' <-  ((|->>) types) gbLoc
+  -- log ( "((|->>) types) user:xGebruiker = " <> (show h'))
 
   log "========================================================="
   ekdLoc <- liftEff $ representResource "model:ExecutieKetenDomein#ExecutieKetenDomein"
-  m <-  ((|->) label) ekdLoc
+  m <-  (label) ekdLoc
   log ( "label model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show m))
 
 
   log "========================================================="
-  n <-  ((|->>) subClassOf >>-> label) ekdLoc
-  log ( "((|->>) subClassOf >-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
+  n <-  (subClassOf >>-> label) ekdLoc
+  log ( "(subClassOf >>-> label) model:ExecutieKetenDomein#ExecutieKetenDomein = " <> (show n))
 
   log "========================================================="
-  o <-  ((|->) rdfType >-> label) gbLoc
-  log ( "((|->) rdfType >-> label) user:xGebruiker = " <> (show o))
+  o <-  (rdfType >-> label) gbLoc
+  log ( "(rdfType >-> label) user:xGebruiker = " <> (show o))
 
-  log "========================================================="
-  p <-  ((|->>) types >>-> label) gbLoc
-  log ( "((|->) types >>-> label user:xGebruiker) = " <> (show p))
+  -- log "========================================================="
+  -- p <-  ((|->>) types >>-> label) gbLoc
+  -- log ( "((|->) types >>-> label user:xGebruiker) = " <> (show p))
 
-  log "========================================================="
-  p' <-  ((|->) rol_RolBinding >-> rdfType >->> types >>->> subClassOf >>-> label) gbLoc
-  log ( "(((|->) rol_RolBinding >-> rdfType >->> types >>->> subClassOf >>-> label) user:xGebruiker) = " <> (show p'))
+  -- log "========================================================="
+  -- p' <-  ((|->) rol_RolBinding >-> rdfType >->> types >>->> subClassOf >>-> label) gbLoc
+  -- log ( "(((|->) rol_RolBinding >-> rdfType >->> types >>->> subClassOf >>-> label) user:xGebruiker) = " <> (show p'))
 
 -- log "========================================================="
   -- q <-  (typeSuperClasses >>-> identifier) gb
@@ -63,7 +63,7 @@ test = launchAff do
   -- s <-  (QC.filter hasLabel typeSuperClasses  >>-> identifier) gb
   -- log ( "(filter hasLabel typeSuperClasses) user:xGebruiker = " <> (show s))
 
-hasLabel :: SingleGetter Boolean
-hasLabel = QC.hasValue label
+-- hasLabel :: SingleGetter Boolean
+-- hasLabel = QC.hasValue label
 
 log = Aff.log

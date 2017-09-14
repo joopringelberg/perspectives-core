@@ -20,7 +20,7 @@ import Perspectives.ResourceTypes (Resource, ResourceLocation(..))
 test = launchAff do
   log "=========================Test.Properties================================"
   (gb :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
-  (l :: Location (Maybe String)) <- ((|->) rol_RolBinding >-> label) gb
+  (l :: Location (Maybe String)) <- (rol_RolBinding >-> label) gb
   log ( "label user:xGebruiker = " <> (show (locationValue l)))
 
 
