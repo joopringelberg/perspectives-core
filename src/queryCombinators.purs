@@ -86,8 +86,8 @@ identity' = pure <<< Just
 identity :: MemoizingSingleGetter Resource
 identity = pure
 
-filter :: SingleGetter Boolean -> PluralGetter Resource -> PluralGetter Resource
-filter c rs r = do
+filter' :: SingleGetter Boolean -> PluralGetter Resource -> PluralGetter Resource
+filter' c rs r = do
   (candidates :: Array Resource) <- rs r
   (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
   pure (Arr.foldr takeOrDrop [] judgedCandidates)
@@ -98,6 +98,21 @@ filter c rs r = do
       pure (Tuple candidate judgement)
     takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
     takeOrDrop (Tuple res b) cumulator = case b of
+      (Just true) -> Arr.cons res cumulator
+      _ -> cumulator
+
+filter :: MemoizingSingleGetter Boolean -> MemoizingPluralGetter Resource -> MemoizingPluralGetter Resource
+filter c rs r = do
+  (candidates :: Location (Array Resource)) <- rs (r :: Location (Maybe Resource))
+  (judgedCandidates :: Array (Tuple Resource (Location (Maybe Boolean)))) <- traverse judge (locationValue candidates)
+  pure $ locate (Arr.foldr takeOrDrop [] judgedCandidates)
+  where
+    judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Location (Maybe Boolean)))
+    judge candidate = do
+      (judgement :: Location (Maybe Boolean)) <- ((liftEff <<< locationFromResource) >=> c) candidate
+      pure (Tuple candidate judgement)
+    takeOrDrop :: Tuple Resource (Location (Maybe Boolean)) -> Array Resource -> Array Resource
+    takeOrDrop (Tuple res b) cumulator = case locationValue b of
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 

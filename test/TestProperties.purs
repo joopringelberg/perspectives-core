@@ -63,8 +63,8 @@ test = launchAff do
   r <-  (typeSuperClasses >>-> hasLabel) gbLoc
   log ( "(typeSuperClasses >>-> hasLabel) user:xGebruiker = " <> (show r))
   --
-  -- log "========================================================="
-  -- s <-  (QC.filter hasLabel typeSuperClasses  >>-> identifier) gb
-  -- log ( "(filter hasLabel typeSuperClasses) user:xGebruiker = " <> (show s))
+  log "========================================================="
+  s <-  (QC.filter hasLabel typeSuperClasses  >>-> identifier) gbLoc
+  log ( "(filter hasLabel typeSuperClasses) user:xGebruiker = " <> (show s))
 
 log = Aff.log
