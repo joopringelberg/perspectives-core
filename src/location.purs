@@ -18,7 +18,8 @@ module Perspectives.Location
   , bindLoc
   , traverseLoc
   , nameFunction
-  , functionName)
+  , functionName
+  , memoizeMonadicFunction)
 where
 
 import Prelude
@@ -63,9 +64,10 @@ pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
 
 foreign import locationValue :: forall a. Location a -> a
 
-foreign import locationDependentAux :: forall a c. (a -> c) -> Location a -> Foreign
+foreign import locationDependentAux :: forall a b c. (a -> b) -> Location c -> Foreign
 
-locationDependent :: forall a b c. (a -> c) -> Location a -> Maybe (Location b)
+-- | Do not assume anything about the content of the locations and the function.
+locationDependent :: forall a b c d. (a -> b) -> Location c -> Maybe (Location d)
 locationDependent f loc =
   let d = locationDependentAux f loc
   in
@@ -75,12 +77,23 @@ foreign import nameFunction :: forall a b. String -> (a -> b) -> (a -> b)
 
 foreign import functionName :: forall a b. (a -> b) -> String
 
+memoizeMonadicFunction :: forall a b m. Monad m => (Location a -> m (Location b)) -> (Location a -> m (Location b))
+memoizeMonadicFunction g aloc =
+  case locationDependent g aloc of
+    Nothing ->
+      do
+        resultLoc <- g aloc
+        pure $ connectLocations aloc g resultLoc
+    (Just rloc) -> pure rloc
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
 -----------------------------------------------------------------------------------------------
 
 instance showLocation :: Show a => Show (Location a) where
   show l = "loc " <> show (locationValue l)
+
+instance eqLocation :: Eq a => Eq (Location a) where
+  eq l1 l2 = eq (locationValue l1) (locationValue l2)
 
 -- | The map function of the Functor instance of Location just applies the function to the content of the location.
 instance functorLocation :: Functor Location where
