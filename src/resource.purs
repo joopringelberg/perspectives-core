@@ -19,8 +19,8 @@ resourceIndex :: ResourceIndex
 resourceIndex = new unit
 
 -- | From a Resource, find its Location.
-resourceLocation :: forall e. Resource -> Eff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
-resourceLocation (Resource{id}) = do
+locationFromResource :: forall e. Resource -> Eff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
+locationFromResource (Resource{id}) = do
   x <- peek resourceIndex id
   case x of
     (Just (ResourceLocation{ loc })) -> pure loc
@@ -58,7 +58,7 @@ storeResourceInIndex res@(Resource{id}) =
 addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
 addPropertyDefinitions r@(Resource{id}) av =
   do
-    loc <- resourceLocation r
+    loc <- locationFromResource r
     _ <- setLocationValue loc (Just (Resource{ id: id, propDefs: (Just av)}))
     _ <- poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
     pure unit
