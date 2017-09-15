@@ -8,9 +8,9 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Location (Location, functionName, locationValue, nameFunction, traverseLoc)
 import Perspectives.Property (MemoizingPluralGetter, MemoizingSingleGetter, PluralGetter, SingleGetter, AsyncPropDefsM)
-import Perspectives.Resource (resourceLocation)
+import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($), (<<<), (>>>))
+import Prelude (bind, id, join, pure, ($), map, (<<<), (>>>))
 
 -- | Prefix a query that starts with a SingleGetter with this function
 -- liftSingleGetter :: forall k l n. Monad n =>
@@ -57,10 +57,10 @@ pTos f g =
   let
     h :: forall e. Array Resource -> AsyncPropDefsM e (Array a)
     h arrayB = do
-                (p :: Array (Location (Maybe a))) <- traverse ((liftEff <<< resourceLocation) >=> g) arrayB
+                (p :: Array (Location (Maybe a))) <- traverse ((liftEff <<< locationFromResource) >=> g) arrayB
                 pure $ nub $ foldr (locationValue >>> (maybe id cons)) [] p
     in f >=> (traverseLoc (nameFunction (functionName g) h))
-  -- f >=> (traverseLoc (nameFunction (functionName g) (traverse ((liftEff <<< resourceLocation) >=> g) >=> (pure <<< nub <<< (foldr (locationValue >>> (maybe id cons)) [])))))
+  -- f >=> (traverseLoc (nameFunction (functionName g) (traverse ((liftEff <<< locationFromResource) >=> g) >=> (pure <<< nub <<< (foldr (locationValue >>> (maybe id cons)) [])))))
 
 infixl 0 pTos as >>->
 
@@ -68,14 +68,14 @@ infixl 0 pTos as >>->
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
-pTop :: forall a. Eq a => MemoizingPluralGetter Resource -> PluralGetter a -> MemoizingPluralGetter a
+pTop :: forall a. Eq a => MemoizingPluralGetter Resource -> MemoizingPluralGetter a -> MemoizingPluralGetter a
 pTop f g =
   let
     h :: forall e. Array Resource -> AsyncPropDefsM e (Array a)
     h arrayB = do
-                  y <- traverse g (arrayB :: Array Resource)
-                  pure $ nub (join (y :: Array (Array a)))
+                  (y :: Array (Location (Array a))) <- traverse ((liftEff <<< locationFromResource) >=> g) arrayB
+                  pure $ nub (join (map locationValue y))
   in f >=> (traverseLoc (nameFunction (functionName g) h))
-  -- f >=> (traverseLoc (nameFunction (functionName g) (traverse g >=> (pure <<< nub <<< join))))
+  -- f >=> (traverseLoc (nameFunction (functionName g) (traverse ((liftEff <<< locationFromResource) >=> g) >=> (pure <<< nub <<< join <<< map locationValue))))
 
 infixl 0 pTop as >>->>
