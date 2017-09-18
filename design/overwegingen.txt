@@ -1,0 +1,71 @@
+WAT ER SPEELT
+
+1. Het type van de getters.
+Het type is nu:
+
+	Location (Maybe Resource) -> AsyncPropDefs e (Location (Maybe Resource))
+	of
+	Location (Maybe Resource) -> AsyncPropDefs e (Location (Array Resource))
+
+Maar eerder gebruikte ik LocationT (AsyncPropdefs e), dus de monad stapeling van (AsyncPropdefs e) en Location. Het type van de getters was dan (waarschijnlijk):
+
+	(Maybe Resource) -> LocationT (AsyncPropdefs e) (Maybe Resource)
+	of
+	(Maybe Resource) -> LocationT (AsyncPropdefs e) (Array Resource)
+
+Beiden hebben de vorm:
+
+	forall a b m. Monad m => a -> m b
+
+Ik ben overgestapt naar de huidige vorm. Maar waarom ook alweer?
+
+
+2. Waarom zou ik het type van de PluralGetter niet veranderen? Naar:
+
+	Location (Maybe Resource) -> AsyncPropDefs e (Location (Array (Location (Maybe Resource))))
+
+Dat maakt het toepassen van een SingleGetter op het resultaat van een PluralGetter veel eenvoudiger. Nu moet ik telkens vanuit de Resource zijn Locatie vinden.
+
+
+3. Je kunt van elkaar onderscheiden:
+	- dependency tracking. Is die compleet?
+	- memoriseren.
+	- updaten en dat kun je onderverdelen in:
+		- herberekenen (value propagation)
+		- actualiseren (delta propagation)
+In de huidige implementatie is de dependency tracking nog onvoldoende bij de PluralToPlural en PluralToSingle compositie operatoren. Misschien nog op meer plekken.
+
+
+4. Voor de Resource getters heb ik compositie operatoren geschreven met speciale semantiek:
+	- PluralToSingle is zo geschreven dat het beeld van een Resource die afgebeeld wordt op Nothing, niet opgenomen wordt in het resultaat;
+	- PluralToSingle èn PluralToPlural zijn zo geschreven dat elke waarde maar één keer voorkomt in het resultaat.
+
+Bijvoorbeeld: 
+PluralGetter Resource >>-> SingleGetter Number
+Deze functie verwijdert duplicate getallen! Dat is niet de bedoeling.
+
+Dat willen we dus niet (vanzelfsprekend) voor getters van String, Bool, Number en Date. Hoe gaan we daarmee om
+	- als we in purescript een query samenstellen? Wat voor compositie operator gebruiken we dan?
+	- kunnen we bij query parsing automatisch de juiste compositie operator kiezen?
+
+
+5. Wat voor soort functies kunnen we ons voorstellen die als Domein Maybe of Array String, Bool, Number en Date hebben?
+	- op de functies van Maybe waarden kunnen dat gewone string-, number-, bool- en date functies zijn.
+	- op de Arrays: fold, filter.
+
+
+7. Ordening. In Perspectives1 gebruiken we de ordening die ontstaat bij het verzamelen van superclasses. Er was ook expliciete topologische ordening. Nu willen we in Perspectives2 eigenlijk geen overerving, dus misschien dat dat niet meer nodig is. 
+Het lijkt mij prettig om ordening alleen op uiteindelijke queryresultaten toe te passen, dus geen rekening te houden met ordening van query-argumenten.
+
+
+8. Waar en wanneer memoriseren? Wat zijn de linknamen waarmee je memoriseert?
+	- in elk geval wil ik de basisfeiten memoriseren.
+	- calculated properties hebben een eigen naam en worden dus als basisfeit gememoriseerd.
+	- waarom memoriseren we de tussenstappen van een querypad, van links naar rechts?
+		- als het basisfeit dat onder één van de tussenstappen ligt, verandert, hoeven we alleen maar het pad vanaf die stap opnieuw te berekenen (efficiente update)
+		- twee queries kunnen het begin van hun paden delen (hergebruik van eerdere berekeningen)
+		- we hoeven niet het resultaat van de rest van de query bij een tussenstap te memoriseren (dat is de betekenis van calculated properties met een naam). Alleen de volgende stap is voldoende.
+		OPMERKING De propertynaam van zo'n tussenstap is voldoende als linknaam, omdat de input verzameling maar éénmaal met die propertynaam gebruikt kan worden.
+
+
+9. Memoriseren is dus niet hetzelfde als dependency tracking. PluralToSingle is nu geïmplementeerd als de compositie van de PluralGetter met een functie die met traverseLoc wordt getracked, die de SingleGetters toepast. Als de PluralGetter opnieuw berekend wordt (b.v. omdat er een Resource bijkomt), wordt ook de tweede functie opnieuw berekend. Maar als de waarde van één der SingleGetters verandert, gebeurt er niets. Er is geen tracking van die afhankelijkheid!
