@@ -7,7 +7,7 @@ import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Location (Location, functionName, locationValue, nameFunction, traverseLoc)
-import Perspectives.Property (AsyncPropDefsM, MemoizingPluralGetter, MemoizingSingleGetter, PluralGetter, SingleGetter, PropertyName)
+import Perspectives.Property (MemoizingPluralGetter, MemoizingSingleGetter, PluralGetter, SingleGetter, AsyncPropDefsM)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
 import Prelude (bind, id, join, pure, ($), map, (<<<), (>>>))
@@ -26,8 +26,8 @@ infixl 0 liftSingleGetter as |->
 --   (k -> n (Array l))
 --   -> (Location (Maybe k) -> n (Location (Array l)))
 liftPluralGetter :: forall a. PluralGetter a -> MemoizingPluralGetter a
-liftPluralGetter g = nameFunction (functionName g) (traverseLoc (maybe (pure []) g))
--- liftPluralGetter g = traverseLoc (nameFunction (functionName g) (maybe (pure []) g))
+-- liftPluralGetter g = nameFunction (functionName g) (traverseLoc (maybe (pure []) g)) -- DIT IS FOUT
+liftPluralGetter g = traverseLoc (nameFunction (functionName g) (maybe (pure []) g))
 
 infixl 0 liftPluralGetter as |->>
 
@@ -53,7 +53,6 @@ infixl 0 sTop as >->>
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
--- TODO: de dependency tracking is niet voldoende. Verandering in de SingleGetter g leidt niet tot herberekening.
 pTos :: forall a. Eq a => MemoizingPluralGetter Resource -> MemoizingSingleGetter a -> MemoizingPluralGetter a
 pTos f g =
   let
@@ -70,7 +69,6 @@ infixl 0 pTos as >>->
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
--- TODO: de dependency tracking is niet voldoende. Verandering in de PluralGetter g leidt niet tot herberekening.
 pTop :: forall a. Eq a => MemoizingPluralGetter Resource -> MemoizingPluralGetter a -> MemoizingPluralGetter a
 pTop f g =
   let
