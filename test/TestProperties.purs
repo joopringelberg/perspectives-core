@@ -55,16 +55,16 @@ test = launchAff do
   q <-  (rdfType >->> superClasses) gbLoc
   log ( "(rdfType >->> superClasses) user:xGebruiker = " <> (show q))
 
-  log "========================================================="
-  q <-  (typeSuperClasses >>-> identifier) gbLoc
-  log ( "(typeSuperClasses >>-> identifier) user:xGebruiker = " <> (show q))
+  -- log "========================================================="
+  -- q <-  (typeSuperClasses >>-> identifier) gbLoc
+  -- log ( "(typeSuperClasses >>-> identifier) user:xGebruiker = " <> (show q))
 
-  log "========================================================="
-  r <-  (typeSuperClasses >>-> hasLabel) gbLoc
-  log ( "(typeSuperClasses >>-> hasLabel) user:xGebruiker = " <> (show r))
+  -- log "========================================================="
+  -- r <-  (typeSuperClasses >>-> hasLabel) gbLoc
+  -- log ( "(typeSuperClasses >>-> hasLabel) user:xGebruiker = " <> (show r))
   --
-  log "========================================================="
-  s <-  (QC.filter hasLabel typeSuperClasses  >>-> identifier) gbLoc
-  log ( "(filter hasLabel typeSuperClasses) user:xGebruiker = " <> (show s))
+  -- log "========================================================="
+  -- s <-  (QC.filter hasLabel typeSuperClasses  >>-> identifier) gbLoc
+  -- log ( "(filter hasLabel typeSuperClasses) user:xGebruiker = " <> (show s))
 
 log = Aff.log

@@ -6,7 +6,7 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, locate, locationValue, memoizeMonadicFunction, nameFunction)
+import Perspectives.Location (Location, functionName, locate, locationValue, memoizeMonadicFunction, nameFunction)
 import Perspectives.Property (AsyncPropDefsM, MemoizingSingleGetter, PluralGetter, SingleGetter, MemoizingPluralGetter)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
@@ -68,16 +68,30 @@ cons' f g r = do
         Nothing -> pure $ Arr.cons el b
         _ -> pure b
 
+-- cons :: forall a. Eq a => MemoizingSingleGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+-- cons f g r = do
+--   (a :: Location (Maybe a)) <- f r
+--   (b :: Location (Array a)) <- g r
+--   case locationValue a of
+--     Nothing -> pure b
+--     (Just el) ->
+--       case Arr.elemIndex el (locationValue b) of
+--         Nothing -> pure $ (maybe id Arr.cons) <$> a <*> b
+--         _ -> pure b
+
 cons :: forall a. Eq a => MemoizingSingleGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
-cons f g r = do
-  (a :: Location (Maybe a)) <- f r
-  (b :: Location (Array a)) <- g r
-  case locationValue a of
-    Nothing -> pure b
-    (Just el) ->
-      case Arr.elemIndex el (locationValue b) of
-        Nothing -> pure $ (maybe id Arr.cons) <$> a <*> b
-        _ -> pure b
+cons f' g' = nameFunction ("cons_" <> functionName f' <> "_" <> functionName g') aux f' g'
+  where
+    aux :: MemoizingSingleGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+    aux f g r = do
+      (a :: Location (Maybe a)) <- f r
+      (b :: Location (Array a)) <- g r
+      case locationValue a of
+        Nothing -> pure b
+        (Just el) ->
+          case Arr.elemIndex el (locationValue b) of
+            Nothing -> pure $ (maybe id Arr.cons) <$> a <*> b
+            _ -> pure b
 
 -- | Identity function: from a Resource a, compute Aff e (Just a)
 identity' :: SingleGetter Resource
@@ -101,20 +115,18 @@ filter' c rs r = do
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 
+-- | TODO: filter memoiseert nog niet!
 filter :: MemoizingSingleGetter Boolean -> MemoizingPluralGetter Resource -> MemoizingPluralGetter Resource
 filter c rs r = do
   (candidates :: Location (Array Resource)) <- rs (r :: Location (Maybe Resource))
-  (judgedCandidates :: Array (Tuple Resource (Location (Maybe Boolean)))) <- traverse judge (locationValue candidates)
-  pure $ locate (Arr.foldr takeOrDrop [] judgedCandidates)
+  (judgedCandidates :: Array (Maybe Resource)) <- traverse judge (locationValue candidates)
+  pure $ locate (Arr.foldr (maybe id Arr.cons) [] judgedCandidates)
   where
-    judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Location (Maybe Boolean)))
+    judge :: forall e. Resource -> (AsyncPropDefsM e) (Maybe Resource)
     judge candidate = do
-      (judgement :: Location (Maybe Boolean)) <- ((liftEff <<< locationFromResource) >=> c) candidate
-      pure (Tuple candidate judgement)
-    takeOrDrop :: Tuple Resource (Location (Maybe Boolean)) -> Array Resource -> Array Resource
-    takeOrDrop (Tuple res b) cumulator = case locationValue b of
-      (Just true) -> Arr.cons res cumulator
-      _ -> cumulator
+      res <- liftEff $ locationFromResource candidate
+      (judgement :: Location (Maybe Boolean)) <- c res
+      pure $ (maybe Nothing (const (Just candidate))) (locationValue judgement)
 
 hasValue' :: forall a. SingleGetter a -> SingleGetter Boolean
 hasValue' f r = do

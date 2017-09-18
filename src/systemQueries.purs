@@ -22,19 +22,20 @@ subClassOf = liftPluralGetter (getResources "rdfs:subClassOf")
 rdfType :: MemoizingSingleGetter Resource
 rdfType = liftSingleGetter (getResource "rdf:type")
 
+rol_RolBinding :: MemoizingSingleGetter Resource
+rol_RolBinding = liftSingleGetter (getResource "model:SysteemDomein#rol_RolBinding")
+
+-- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
 types :: MemoizingPluralGetter Resource
 types = memoizeMonadicFunction $ nameFunction "types" (QC.mclosure rdfType)
 
 -- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
 superClasses :: MemoizingPluralGetter Resource
-superClasses = memoizeMonadicFunction $ nameFunction "superClasses" (QC.aclosure subClassOf)
+superClasses = QC.aclosure subClassOf
 
 typeSuperClasses :: MemoizingPluralGetter Resource
-typeSuperClasses = QC.cons rdfType (rdfType >->> superClasses)
+typeSuperClasses = nameFunction "typeSuperClasses" (QC.cons rdfType (rdfType >->> superClasses))
 -- typeSuperClasses = (|->) rdfType >->> QC.cons QC.identity superClasses
 
-rol_RolBinding :: MemoizingSingleGetter Resource
-rol_RolBinding = liftSingleGetter (getResource "model:SysteemDomein#rol_RolBinding")
-
 hasLabel :: MemoizingSingleGetter Boolean
-hasLabel = QC.hasValue label
+hasLabel = nameFunction "hasLabel" (QC.hasValue label)

@@ -73,18 +73,20 @@ locationDependent f loc =
   in
     if isUndefined d then Nothing else Just (unsafeFromForeign d)
 
-foreign import nameFunction :: forall a b. String -> (a -> b) -> (a -> b)
+foreign import nameFunction :: forall a. String -> a -> a
 
 foreign import functionName :: forall a b. (a -> b) -> String
 
 memoizeMonadicFunction :: forall a b m. Monad m => (Location a -> m (Location b)) -> (Location a -> m (Location b))
-memoizeMonadicFunction g aloc =
-  case locationDependent g aloc of
-    Nothing ->
-      do
-        resultLoc <- g aloc
-        pure $ connectLocations aloc g resultLoc
-    (Just rloc) -> pure rloc
+memoizeMonadicFunction g' = nameFunction (functionName g') aux g'
+  where
+    aux g aloc =
+      case locationDependent g aloc of
+        Nothing ->
+          do
+            resultLoc <- g aloc
+            pure $ connectLocations aloc g resultLoc
+        (Just rloc) -> pure rloc
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
 -----------------------------------------------------------------------------------------------
