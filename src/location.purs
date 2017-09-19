@@ -19,7 +19,7 @@ module Perspectives.Location
   , traverseLoc
   , nameFunction
   , functionName
-  , memoizeMonadicFunction)
+  , memorizeMonadicFunction)
 where
 
 import Prelude
@@ -77,8 +77,8 @@ foreign import nameFunction :: forall a. String -> a -> a
 
 foreign import functionName :: forall a b. (a -> b) -> String
 
-memoizeMonadicFunction :: forall a b m. Monad m => (Location a -> m (Location b)) -> (Location a -> m (Location b))
-memoizeMonadicFunction g' = nameFunction (functionName g') aux g'
+memorizeMonadicFunction :: forall a b m. Monad m => (Location a -> m (Location b)) -> (Location a -> m (Location b))
+memorizeMonadicFunction g' = nameFunction (functionName g') aux g'
   where
     aux g aloc =
       case locationDependent g aloc of
@@ -97,14 +97,14 @@ instance showLocation :: Show a => Show (Location a) where
 instance eqLocation :: Eq a => Eq (Location a) where
   eq l1 l2 = eq (locationValue l1) (locationValue l2)
 
--- | The map function of the Functor instance of Location just applies the function to the content of the location.
+-- | The map function of the Functor instance of Location just applies the function to the content of the location. NOTE: the function must have a name!
 instance functorLocation :: Functor Location where
   map = mapLoc
 
 foreign import mapLoc :: forall a b. (a -> b) -> Location a -> Location b
 
 -- | The apply function of the Apply instance of Location takes the function out of the first location and
--- | applies it to the content of the second location.
+-- | applies it to the content of the second location.  NOTE: the function must have a name!
 instance applyLocation :: Apply Location where
   apply = applyLoc
 
@@ -116,6 +116,7 @@ instance applicativeLocation :: Applicative Location where
 
 foreign import bindLoc :: forall a b. Location a -> (a -> Location b) -> Location b
 
+-- |  NOTE: the function must have a name!
 instance bindLocation :: Bind Location where
   bind = bindLoc
 

@@ -6,16 +6,16 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, functionName, locate, locationValue, memoizeMonadicFunction, nameFunction)
-import Perspectives.Property (AsyncPropDefsM, MemoizingSingleGetter, PluralGetter, SingleGetter, MemoizingPluralGetter)
+import Perspectives.Location (Location, functionName, locate, locationValue, memorizeMonadicFunction, nameFunction)
+import Perspectives.Property (AsyncPropDefsM, MemorizingSingleGetter, PluralGetter, SingleGetter, MemorizingPluralGetter)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
 
--- | Compute the transitive closure of the MemoizingSingleGetter to obtain a MemoizingPluralGetter. NB: only for Resource results!
+-- | Compute the transitive closure of the MemorizingSingleGetter to obtain a MemorizingPluralGetter. NB: only for Resource results!
 -- | TODO: memoiseert nog niet de recursieve stappen!
-mclosure :: MemoizingSingleGetter Resource -> MemoizingPluralGetter Resource
+mclosure :: MemorizingSingleGetter Resource -> MemorizingPluralGetter Resource
 mclosure fun res = closure fun (locate []) res where
-  closure :: MemoizingSingleGetter Resource -> Location (Array Resource) -> MemoizingPluralGetter Resource
+  closure :: MemorizingSingleGetter Resource -> Location (Array Resource) -> MemorizingPluralGetter Resource
   closure f acc rs =
     do
       (x :: Location (Maybe Resource)) <- f rs
@@ -31,9 +31,9 @@ aclosure' f r = do
   (childClosures :: Array (Array Resource)) <- traverse (aclosure' f) t
   pure $ Arr.nub (join (Arr.cons t childClosures))
 
--- | Compute the transitive closure of the MemoizingPluralGetter to obtain a PluralGetter. NB: only for Resource results!
+-- | Compute the transitive closure of the MemorizingPluralGetter to obtain a PluralGetter. NB: only for Resource results!
 -- | TODO: memoiseert nog niet de recursieve stappen!
-aclosure :: MemoizingPluralGetter Resource -> MemoizingPluralGetter Resource
+aclosure :: MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
 aclosure f (r :: Location (Maybe Resource)) =
     do
       (t :: Location (Array Resource)) <- f r
@@ -50,7 +50,7 @@ concat' f g r = do
   b <- g r
   pure $ Arr.union a b
 
-concat :: forall a. Eq a => MemoizingPluralGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
 concat f g r = do
   a <- f r
   b <- g r
@@ -68,37 +68,23 @@ cons' f g r = do
         Nothing -> pure $ Arr.cons el b
         _ -> pure b
 
--- cons :: forall a. Eq a => MemoizingSingleGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
--- cons f g r = do
---   (a :: Location (Maybe a)) <- f r
---   (b :: Location (Array a)) <- g r
---   case locationValue a of
---     Nothing -> pure b
---     (Just el) ->
---       case Arr.elemIndex el (locationValue b) of
---         Nothing -> pure $ (maybe id Arr.cons) <$> a <*> b
---         _ -> pure b
-
-cons :: forall a. Eq a => MemoizingSingleGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+cons :: forall a. Eq a => MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
 cons f' g' = nameFunction ("cons_" <> functionName f' <> "_" <> functionName g') aux f' g'
   where
-    aux :: MemoizingSingleGetter a -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+    fname :: String
+    fname = ("cons_" <> functionName f' <> "_" <> functionName g')
+    aux :: MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
     aux f g r = do
       (a :: Location (Maybe a)) <- f r
       (b :: Location (Array a)) <- g r
-      case locationValue a of
-        Nothing -> pure b
-        (Just el) ->
-          case Arr.elemIndex el (locationValue b) of
-            Nothing -> pure $ (maybe id Arr.cons) <$> a <*> b
-            _ -> pure b
+      pure $ (nameFunction fname (maybe id Arr.cons)) <$> a <*> b
 
 -- | Identity function: from a Resource a, compute Aff e (Just a)
 identity' :: SingleGetter Resource
 identity' = pure <<< Just
 
-identity :: MemoizingSingleGetter Resource
-identity = pure
+identity :: MemorizingSingleGetter Resource
+identity = nameFunction "identity" pure
 
 filter' :: SingleGetter Boolean -> PluralGetter Resource -> PluralGetter Resource
 filter' c rs r = do
@@ -116,7 +102,7 @@ filter' c rs r = do
       _ -> cumulator
 
 -- | TODO: filter memoiseert nog niet!
-filter :: MemoizingSingleGetter Boolean -> MemoizingPluralGetter Resource -> MemoizingPluralGetter Resource
+filter :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
 filter c rs r = do
   (candidates :: Location (Array Resource)) <- rs (r :: Location (Maybe Resource))
   (judgedCandidates :: Array (Maybe Resource)) <- traverse judge (locationValue candidates)
@@ -133,8 +119,7 @@ hasValue' f r = do
   (v :: Maybe a) <- f r
   pure $ Just $ (maybe false (const true)) v
 
-hasValue :: forall a. MemoizingSingleGetter a -> MemoizingSingleGetter Boolean
-hasValue f = memoizeMonadicFunction $ nameFunction "hasValue" g where
-  g r = do
-    (v :: Location (Maybe a)) <- f r
-    pure $ locate (Just $ (maybe false (const true)) (locationValue v))
+-- | The generated function will have the specialized name "has_<name of f>".
+hasValue :: forall a. MemorizingSingleGetter a -> MemorizingSingleGetter Boolean
+hasValue f = nameFunction name (f >=> (pure <<< map (nameFunction name (Just <<< (maybe false (const true)))) ))
+  where name = "has_" <> functionName f

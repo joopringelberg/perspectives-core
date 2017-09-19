@@ -17,6 +17,6 @@ import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax, defaultRequest)
 import Network.HTTP.Affjax.Response (ResponseType(..))
 
-import Test.Properties
+import Test.Memoization
 
 main = test

@@ -10,7 +10,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
 import Perspectives.Location (Location, locate, locationValue)
 import Perspectives.LocationT (runLocationT)
-import Perspectives.Property (SingleGetter, MemoizingSingleGetter)
+import Perspectives.Property (SingleGetter, MemorizingSingleGetter)
 import Perspectives.QueryCombinators (filter, hasValue) as QC
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource)

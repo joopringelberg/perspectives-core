@@ -18,7 +18,7 @@ import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
 Property values are represented by Arrays, or Maybes.
 We need functions that give us an array of values or maybe value for a given property for a given resource, depending
 on the property being relational or functional.
-However, we also want to memoize that and track the dependency and provide a method for updating the values.
+However, we also want to memorize that and track the dependency and provide a method for updating the values.
 Therefore, we lift these functions over Locations. Hence, Resources are put into Locations.
 However, a property whose range is Resource, must be represented by a Maybe Resource value - not by a Location.
 -}
@@ -31,13 +31,13 @@ type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex | e)
 -- | effects).
 type SingleGetter a = forall e. Resource -> (AsyncPropDefsM e) (Maybe a)
 
-type MemoizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
+type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
 
 -- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
 type PluralGetter a = forall e. Resource -> (AsyncPropDefsM e) (Array a)
 
-type MemoizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
+type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.

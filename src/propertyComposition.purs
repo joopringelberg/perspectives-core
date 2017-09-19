@@ -7,35 +7,36 @@ import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Location (Location, functionName, locationValue, nameFunction, traverseLoc)
-import Perspectives.Property (MemoizingPluralGetter, MemoizingSingleGetter, PluralGetter, SingleGetter, AsyncPropDefsM)
+import Perspectives.Property (MemorizingPluralGetter, MemorizingSingleGetter, PluralGetter, SingleGetter, AsyncPropDefsM)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
 import Prelude (bind, id, join, pure, ($), map, (<<<), (>>>))
 
 -- | Prefix a query that starts with a SingleGetter with this function
--- liftSingleGetter :: forall k l n. Monad n =>
+-- memorizeSingleGetter :: forall k l n. Monad n =>
 --   (k -> n (Maybe l))
 --   -> (Location (Maybe k) -> n (Location (Maybe l)))
-liftSingleGetter :: forall a. SingleGetter a -> MemoizingSingleGetter a
-liftSingleGetter g = traverseLoc (nameFunction (functionName g) (maybe (pure Nothing) g))
+memorizeSingleGetter :: forall a. SingleGetter a -> MemorizingSingleGetter a
+memorizeSingleGetter g = nameFunction name (traverseLoc (nameFunction name (maybe (pure Nothing) g)))
+  where name = (functionName g)
 
-infixl 0 liftSingleGetter as |->
+infixl 0 memorizeSingleGetter as |->
 
 -- | prefix a query that starts with a PluralGetter with this function
--- liftPluralGetter :: forall k l n. Monad n =>
+-- memorizePluralGetter :: forall k l n. Monad n =>
 --   (k -> n (Array l))
 --   -> (Location (Maybe k) -> n (Location (Array l)))
-liftPluralGetter :: forall a. PluralGetter a -> MemoizingPluralGetter a
--- liftPluralGetter g = nameFunction (functionName g) (traverseLoc (maybe (pure []) g)) -- DIT IS FOUT
-liftPluralGetter g = traverseLoc (nameFunction (functionName g) (maybe (pure []) g))
+memorizePluralGetter :: forall a. PluralGetter a -> MemorizingPluralGetter a
+-- memorizePluralGetter g = nameFunction (functionName g) (traverseLoc (maybe (pure []) g)) -- DIT IS FOUT
+memorizePluralGetter g = traverseLoc (nameFunction (functionName g) (maybe (pure []) g))
 
-infixl 0 liftPluralGetter as |->>
+infixl 0 memorizePluralGetter as |->>
 
 -- sTos :: forall a b c m. Monad m =>
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Maybe c)))
-sTos :: forall a. MemoizingSingleGetter Resource -> MemoizingSingleGetter a -> MemoizingSingleGetter a
+sTos :: forall a. MemorizingSingleGetter Resource -> MemorizingSingleGetter a -> MemorizingSingleGetter a
 sTos p q = p >=> q
 
 infixl 0 sTos as >->
@@ -44,7 +45,7 @@ infixl 0 sTos as >->
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
-sTop :: forall a. MemoizingSingleGetter Resource -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+sTop :: forall a. MemorizingSingleGetter Resource -> MemorizingPluralGetter a -> MemorizingPluralGetter a
 sTop p q = p >=> q
 
 infixl 0 sTop as >->>
@@ -53,7 +54,7 @@ infixl 0 sTop as >->>
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
-pTos :: forall a. Eq a => MemoizingPluralGetter Resource -> MemoizingSingleGetter a -> MemoizingPluralGetter a
+pTos :: forall a. Eq a => MemorizingPluralGetter Resource -> MemorizingSingleGetter a -> MemorizingPluralGetter a
 pTos f g =
   let
     h :: forall e. Array Resource -> AsyncPropDefsM e (Array a)
@@ -69,7 +70,7 @@ infixl 0 pTos as >>->
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
-pTop :: forall a. Eq a => MemoizingPluralGetter Resource -> MemoizingPluralGetter a -> MemoizingPluralGetter a
+pTop :: forall a. Eq a => MemorizingPluralGetter Resource -> MemorizingPluralGetter a -> MemorizingPluralGetter a
 pTop f g =
   let
     h :: forall e. Array Resource -> AsyncPropDefsM e (Array a)
