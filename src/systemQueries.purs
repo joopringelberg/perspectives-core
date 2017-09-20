@@ -2,16 +2,14 @@ module Perspectives.SystemQueries where
 
 import Perspectives.PropertyComposition
 import Perspectives.QueryCombinators as QC
-import Data.Maybe (Maybe(..))
-import Perspectives.Location (locate, memorizeMonadicFunction, nameFunction)
+import Data.Maybe (Maybe(..), maybe)
+import Perspectives.Location (locate, locationValue, memorizeMonadicFunction, nameFunction)
 import Perspectives.Property (MemorizingPluralGetter, MemorizingSingleGetter, getResource, getResources, getString)
-import Perspectives.Resource (resourceFromLocation)
 import Perspectives.ResourceTypes (Resource(..))
 import Prelude (pure, (<<<), ($))
 
 identifier :: MemorizingSingleGetter String
-identifier = memorizeMonadicFunction $ nameFunction "identifier"
-  (pure <<< locate <<< Just <<< (\(Resource {id}) -> id ) <<< resourceFromLocation)
+identifier = pure <<< (maybe (locate Nothing) (locate <<< Just <<< (\(Resource {id}) -> id ))) <<< locationValue
 
 label :: MemorizingSingleGetter String
 label = memorizeSingleGetter (getString "rdfs:label")
