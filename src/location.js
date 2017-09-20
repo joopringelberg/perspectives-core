@@ -41,7 +41,7 @@ function Location( fun, name )
 	this._value = fun();
 	this.fun = fun;
 	this.locName = name;
-	this._dependents = new Map();
+	this._dependents = {};
 	this._supports = [];
 }
 
@@ -50,27 +50,35 @@ Location.prototype = Object.create(
 	{
 		dependents: {
 			get: function() {
-				return Array.from( this._dependents.values() );
+				var r = [];
+				var dependents = this._dependents;
+				dependents.keys().forEach(
+					function(key)
+					{
+						r.push( dependents[ key ]);
+					}
+				);
+				return r;
 			}
 		}
 	} );
 
 Location.prototype.getDependent = function( linkName ) {
-	return this._dependents.get( linkName );
+	return this._dependents[linkName];
 };
 
 Location.prototype.addDependent = function( linkName, dep ) {
-	this._dependents.set( linkName, dep );
+	this._dependents[linkName] = dep;
 	dep._supports.push( this );
 };
 
 // NOTE: add dependents first, then remove. On removing all dependents, the location will self-destruct!
 Location.prototype.removeDependent = function( linkName ) {
-	const self = this;
-	const dep = this.getDependent( linkName );
-	this._dependents.delete( linkName );
+	var self = this;
+	var dep = this.getDependent( linkName );
+	delete this._dependents[linkName];
 	dep.removeSupport( this );
-	if( this._dependents.size === 0 )
+	if( this._dependents.keys().length === 0 )
 	{
 		// This location has no further use. Disconnect from supports.
 		this._supports.forEach( function( s ) {
@@ -110,13 +118,13 @@ Location.prototype.recomputeNode = function() {
 	this.updateValue( this.fun() );
 };
 
-let propagateTheoryDeltas;
+var propagateTheoryDeltas;
 
 (
 	function( queue ) {
 		propagateTheoryDeltas = function() {
-			const q = queue;
-			let next;
+			var q = queue;
+			var next;
 			queue = [];
 			while( q.length > 0 )
 			{
@@ -170,7 +178,7 @@ function valueName( v )
 exports.connectLocations = function( loc ) {
 	return function( fun ) {
 		return function( dependent ) {
-			const linkName = fun.name + "_" + loc.locName;
+			var linkName = fun.name + "_" + loc.locName;
 			loc.addDependent( linkName, dependent );
 			return dependent;
 		};
@@ -180,8 +188,8 @@ exports.connectLocations = function( loc ) {
 exports.mapLoc = function( fun ) {
 	return function( loc ) {
 		// A function can only be applied once to a location.
-		const linkName = fun.name + "_" + loc.locName;
-		let dependent = loc.getDependent( linkName );
+		var linkName = fun.name + "_" + loc.locName;
+		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
 			dependent = new Location(
@@ -198,8 +206,8 @@ exports.mapLoc = function( fun ) {
 exports.applyLoc = function( funLoc ) {
 	return function( loc ) {
 		// Apply can be executed only once for the combination of funLoc and loc.
-		const linkName = funLoc.locName + loc.locName;
-		let dependent = funLoc.getDependent( linkName );
+		var linkName = funLoc.locName + loc.locName;
+		var dependent = funLoc.getDependent( linkName );
 		if( !dependent )
 		{
 			dependent = new Location(
@@ -216,21 +224,23 @@ exports.applyLoc = function( funLoc ) {
 
 exports.bindLoc = function( loc ) {
 	return function( fun ) {
-		const linkName = fun.name + "_" + loc.locName;
-		let dependent = loc.getDependent( linkName );
+		var linkName = fun.name + "_" + loc.locName;
+		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
 			// Dependent will be produced by fun:
 			dependent = fun( loc.get() );
 			// The function set in dependent will perform the update necessary for bind.
 			dependent.fun = function() {
-				const newLocWithValue = fun( loc.get() );
+				var newLocWithValue = fun( loc.get() );
 				// Move the dependents of dependent to newLocWithValue.
-				for( let [ linkName, dep ] of dependent.entries )
-				{
-					newLocWithValue.addDependent( linkName, dep );
-					dependent.removeDependent( linkName );
-				}
+				dependent._dependents.keys().forEach(
+					function( linkName )
+					{
+						newLocWithValue.addDependent( linkName, dependent.getDependent(linkName));
+						dependent.removeDependent( linkName );
+					}
+				);
 				// Return the content of the new location; it will be inserted into dependent by the recomputeNode function.
 				return newLocWithValue.get();
 			};
