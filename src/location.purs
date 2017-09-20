@@ -116,7 +116,7 @@ instance applicativeLocation :: Applicative Location where
 
 foreign import bindLoc :: forall a b. Location a -> (a -> Location b) -> Location b
 
--- |  NOTE: the function must have a name!
+-- |  NOTE: the function must have a name! Bind will make the location returned by f dependent on la, in: bind la f.
 instance bindLocation :: Bind Location where
   bind = bindLoc
 
