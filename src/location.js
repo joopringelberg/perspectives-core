@@ -53,9 +53,8 @@ Location.prototype = Object.create(
 				var r = [];
 				var dependents = this._dependents;
 				dependents.keys().forEach(
-					function(key)
-					{
-						r.push( dependents[ key ]);
+					function( key ) {
+						r.push( dependents[ key ] );
 					}
 				);
 				return r;
@@ -64,11 +63,11 @@ Location.prototype = Object.create(
 	} );
 
 Location.prototype.getDependent = function( linkName ) {
-	return this._dependents[linkName];
+	return this._dependents[ linkName ];
 };
 
 Location.prototype.addDependent = function( linkName, dep ) {
-	this._dependents[linkName] = dep;
+	this._dependents[ linkName ] = dep;
 	dep._supports.push( this );
 };
 
@@ -76,7 +75,7 @@ Location.prototype.addDependent = function( linkName, dep ) {
 Location.prototype.removeDependent = function( linkName ) {
 	var self = this;
 	var dep = this.getDependent( linkName );
-	delete this._dependents[linkName];
+	delete this._dependents[ linkName ];
 	dep.removeSupport( this );
 	if( this._dependents.keys().length === 0 )
 	{
@@ -118,6 +117,10 @@ Location.prototype.recomputeNode = function() {
 	this.updateValue( this.fun() );
 };
 
+Location.prototype.toJSON = function(){
+	return this.id;
+};
+
 var propagateTheoryDeltas;
 
 (
@@ -148,13 +151,15 @@ var propagateTheoryDeltas;
 	}( [] )
 );
 
-// TODO: add lookup in some index.
 exports.locate = function( v ) {
 	return new Location( function() {
 		return v;
 	}, valueName( v ) );
 };
 
+/*
+ * Note that this function depends on the representation of ADT's by the purescript compiler.
+ */
 function valueName( v )
 {
 	if( Array.isArray( v ) )
@@ -166,7 +171,7 @@ function valueName( v )
 		switch( typeof v )
 		{
 			case "object":
-				return v.id;
+				return JSON.stringify(v, ["value0", "value1", "value2", "value3", "id"]);
 			case "function":
 				return v.name;
 			default:
@@ -193,9 +198,9 @@ exports.mapLoc = function( fun ) {
 		if( !dependent )
 		{
 			dependent = new Location(
-				function() {
+				nameFunction( fun.name, function() {
 					return fun( loc.get() );
-				},
+				}),
 				linkName );
 			loc.addDependent( linkName, dependent );
 		}
@@ -211,9 +216,9 @@ exports.applyLoc = function( funLoc ) {
 		if( !dependent )
 		{
 			dependent = new Location(
-				function() {
+				nameFunction( funLoc.locName, function() {
 					return funLoc.get()( loc.get() );
-				},
+				}),
 				linkName );
 			funLoc.addDependent( linkName, dependent );
 			loc.addDependent( linkName, dependent );
@@ -231,19 +236,18 @@ exports.bindLoc = function( loc ) {
 			// Dependent will be produced by fun:
 			dependent = fun( loc.get() );
 			// The function set in dependent will perform the update necessary for bind.
-			dependent.fun = function() {
+			dependent.fun = nameFunction( fun.name, function() {
 				var newLocWithValue = fun( loc.get() );
 				// Move the dependents of dependent to newLocWithValue.
 				dependent._dependents.keys().forEach(
-					function( linkName )
-					{
-						newLocWithValue.addDependent( linkName, dependent.getDependent(linkName));
+					function( linkName ) {
+						newLocWithValue.addDependent( linkName, dependent.getDependent( linkName ) );
 						dependent.removeDependent( linkName );
 					}
 				);
 				// Return the content of the new location; it will be inserted into dependent by the recomputeNode function.
 				return newLocWithValue.get();
-			};
+			} );
 			loc.addDependent( linkName, dependent );
 		}
 		return dependent;
@@ -256,19 +260,18 @@ exports.connectLocationsAsInBind = function( loc ) {
 			var linkName = loc.locName + ">>=" + fun.name;
 			loc.addDependent( linkName, dependent );
 			// The function set in dependent will perform the update necessary for bind.
-			dependent.fun = function() {
+			dependent.fun = nameFunction( fun.name, function() {
 				var newLocWithValue = fun( loc.get() );
 				// Move the dependents of dependent to newLocWithValue.
 				dependent._dependents.keys().forEach(
-					function( linkName )
-					{
-						newLocWithValue.addDependent( linkName, dependent.getDependent(linkName));
+					function( linkName ) {
+						newLocWithValue.addDependent( linkName, dependent.getDependent( linkName ) );
 						dependent.removeDependent( linkName );
 					}
 				);
 				// Return the content of the new location; it will be inserted into dependent by the recomputeNode function.
 				return newLocWithValue.get();
-			};
+			} );
 			return dependent;
 		};
 	};
@@ -286,10 +289,15 @@ exports.locationDependentAux = function( f ) {
 
 exports.nameFunction = function( name ) {
 	return function( f ) {
-		Object.defineProperty( f, 'name', { value: name } );
-		return f;
+		return nameFunction( name, f );
 	};
 };
+
+function nameFunction( name, f )
+{
+	Object.defineProperty( f, 'name', { value: name } );
+	return f;
+}
 
 exports.functionName = function( f ) {
 	return f.name;

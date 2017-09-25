@@ -10,7 +10,7 @@ import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, StackedLocation)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($), (<$>), (<<<), (>=>), (>>>))
+import Prelude (bind, id, join, pure, ($), (<$>), (<<<), (<>), (>=>), (>>>))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ locate a))
@@ -49,7 +49,9 @@ liftToLocationT f = nestedToStackedLocation <<< f
 --   -> (Location (Maybe a) -> m (Location (Maybe c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
 sTos :: forall a. MemorizingSingleGetter Resource -> MemorizingSingleGetter a -> MemorizingSingleGetter a
-sTos p q = p >=> q
+sTos p q = nameFunction name (p >=> q) where
+  name :: String
+  name = functionName p <> ">->" <> functionName q
 
 infixl 0 sTos as >->
 
@@ -59,7 +61,9 @@ infixl 0 sTos as >->
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
 sTop :: forall a. MemorizingSingleGetter Resource -> MemorizingPluralGetter a -> MemorizingPluralGetter a
-sTop p q = p >=> q
+sTop p q = nameFunction name (p >=> q) where
+  name :: String
+  name = functionName p <> ">->" <> functionName q
 
 infixl 0 sTop as >->>
 
@@ -78,9 +82,11 @@ pTos f g =
         -- Here we connect the result F of applying f with the result of applying g to F.
         pure $ connectLocations arrayB h (locate $ nub $ foldr (locationValue >>> (maybe id cons)) [] p)
       (Just loc) -> pure loc
+    name :: String
+    name = functionName f <> ">>->" <> functionName g
 
     -- Note that the function h is named only once, when the composition operator is applied.
-    in f >=> nameFunction (functionName g) h
+    in nameFunction name (f >=> nameFunction (functionName g) h)
 
 infixl 0 pTos as >>->
 
@@ -98,6 +104,10 @@ pTop f g =
                   (p :: Array (Location (Array a))) <- traverse (locationFromResource >=> g) (locationValue arrayB)
                   pure $ connectLocations arrayB h (locate $ nub (join (locationValue <$> p)))
       (Just loc) -> pure loc
-  in f >=> (nameFunction (functionName g) h)
+    name :: String
+    name = functionName f <> ">>->" <> functionName g
+
+    -- Note that the function h is named only once, when the composition operator is applied.
+    in nameFunction name (f >=> nameFunction (functionName g) h)
 
 infixl 0 pTop as >>->>

@@ -38,6 +38,7 @@ type SingleGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Maybe a)
 
 -- type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
 type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Maybe a))
+type StackedMemorizingSingleGetter a = forall e. Location (Maybe Resource) -> StackedLocation e (Maybe a)
 
 -- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
@@ -45,6 +46,7 @@ type PluralGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Array a)
 
 -- type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
 type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Array a))
+type StackedMemorizingPluralGetter a = forall e. Location (Maybe Resource) -> StackedLocation e (Array a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.

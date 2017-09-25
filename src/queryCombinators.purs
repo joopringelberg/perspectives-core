@@ -5,26 +5,12 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, functionName, locate, locationValue, nameFunction, nestLocationInMonad)
+import Perspectives.Location (Location, connectLocations, functionName, locate, locationValue, nameFunction, nestLocationInMonad)
 import Perspectives.LocationT (LocationT(..))
-import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation)
+import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource, LocationWithResource)
-
--- | Compute the transitive closure of the MemorizingSingleGetter to obtain a MemorizingPluralGetter. NB: only for Resource results!
--- | TODO: memoiseert nog niet de recursieve stappen!
--- mclosure :: MemorizingSingleGetter Resource -> MemorizingPluralGetter Resource
--- mclosure fun res = closure fun (locate []) res where
---   closure :: MemorizingSingleGetter Resource -> Location (Array Resource) -> MemorizingPluralGetter Resource
---   closure f acc (rs :: Location (Maybe Resource)) =
---     do
---       (x :: Location (Maybe Resource)) <- f rs
---       case locationValue x of
---         Nothing -> pure acc
---         (Just r) -> case Arr.elemIndex r (locationValue acc) of
---           Nothing -> closure f ((maybe id Arr.cons) <$> x <*> acc) x
---           otherwise -> pure acc
 
 close :: forall a.
   (Location (Maybe a) -> Location (Maybe a))
@@ -77,11 +63,12 @@ closeWithAcc f acc loca = (maybe id Arr.cons) <$> loca <*> (bind loca h)
             otherwise -> locate []
     h Nothing = locate []
 
--- This is the combination of close' and closeWithAcc.
+-- | This function memorizes.
 mclosure :: MemorizingSingleGetter Resource -> MemorizingPluralGetter Resource
-mclosure fun loc = mclosure' fun [] loc where
+mclosure fun = nameFunction ("mclosure_" <> functionName fun) (mclosure' fun []) where
   mclosure' :: MemorizingSingleGetter Resource -> Array Resource -> MemorizingPluralGetter Resource
   mclosure' f acc (loca :: LocationWithResource) =
+  -- TODO. (h >>> nestedToStackedLocation) is anoniem.
     stackedToNestedLocation ((nameFunction "cons" (maybe id Arr.cons)) <$> stackedResource <*> (bind stackedResource (h >>> nestedToStackedLocation)))
     where
 
@@ -125,15 +112,17 @@ concat' f g r = do
   b <- g r
   pure $ Arr.union a b
 
+-- | This function memorizes due to LocationT apply.
 concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
-concat f g r = do
-  a <- f r
-  b <- g r
-  pure $ Arr.union <$> a <*> b
+-- concat f g r = stackedToNestedLocation $ concatAux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r
+concat f g = nameFunction ("concat_" <> functionName f <> "_" <> functionName g) (\r -> stackedToNestedLocation $ concatAux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r)
+
+concatAux :: forall a. Eq a => Array a -> Array a -> Array a
+concatAux = nameFunction "concat" (\a b -> Arr.union a b)
 
 -- | Add the result of a SingleGetter to that of a PluralGetter.
-cons' :: forall a. Eq a => SingleGetter a -> PluralGetter a -> PluralGetter a
-cons' f g r = do
+addTo' :: forall a. Eq a => SingleGetter a -> PluralGetter a -> PluralGetter a
+addTo' f g r = do
   (a :: Maybe a) <- f r
   (b :: Array a) <- g r
   case a of
@@ -143,23 +132,22 @@ cons' f g r = do
         Nothing -> pure $ Arr.cons el b
         _ -> pure b
 
+-- | This function memorizes due to LocationT apply.
 addTo :: forall a. Eq a => MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
-addTo f' g' = nameFunction ("cons_" <> functionName f' <> "_" <> functionName g') aux f' g'
+addTo f' g' = nameFunction ("addTo_" <> functionName f' <> "_" <> functionName g' ) (aux f' g')
   where
-    fname :: String
-    fname = ("cons_" <> functionName f' <> "_" <> functionName g')
+    h :: (Maybe a) -> (Array a) -> (Array a)
+    h = nameFunction ("addTo_" <> functionName f' <> "_" <> functionName g') (maybe id Arr.cons)
+
     aux :: MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
-    aux f g r = do
-      (a :: Location (Maybe a)) <- f r
-      (b :: Location (Array a)) <- g r
-      pure $ (nameFunction fname (maybe id Arr.cons)) <$> a <*> b
+    aux f g r = stackedToNestedLocation (h <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r)
 
 -- | Identity function: from a Resource a, compute Aff e (Just a)
 identity' :: SingleGetter Resource
 identity' = pure
 
 identity :: MemorizingSingleGetter Resource
-identity = nestLocationInMonad (nameFunction "identity" identity')
+identity = nameFunction "identity" (nestLocationInMonad (nameFunction "identity" identity'))
 -- identity = nameFunction "identity" pure
 
 filter' :: SingleGetter Boolean -> PluralGetter Resource -> PluralGetter Resource
@@ -177,27 +165,29 @@ filter' c rs (r :: Maybe Resource) = do
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 
--- | TODO: filter memoiseert nog niet!
+-- TODO: wel verbonden locaties, nog geen hergebruik!
 filter :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
-filter c rs r = do
-  (candidates :: Location (Array Resource)) <- rs (r :: LocationWithResource)
-  (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge (locationValue candidates)
-  pure $ locate (Arr.foldr takeOrDrop [] judgedCandidates)
+filter c' rs'=
+  nameFunction name aux c' rs'
   where
+    name :: String
+    name = "filter_" <> (functionName c')
+    aux :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
+    aux c rs r = do
+      (candidates :: Location (Array Resource)) <- rs (r :: LocationWithResource)
+      (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge (locationValue candidates)
+      pure $ connectLocations candidates aux (locate (Arr.foldr takeOrDrop [] judgedCandidates))
+
     judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
     judge candidate = do
       (res :: Location (Maybe Resource)) <- locationFromResource candidate
-      (judgement :: Location (Maybe Boolean)) <- c res
+      (judgement :: Location (Maybe Boolean)) <- c' res
       pure (Tuple candidate (locationValue judgement))
+
     takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
     takeOrDrop (Tuple res b) cumulator = case b of
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
-
-consIfSomething :: forall a. Location (Maybe a) -> Array (Location (Maybe a)) -> Array (Location (Maybe a))
-consIfSomething lwr acc = case locationValue lwr of
-  Nothing -> acc
-  otherwise -> Arr.cons lwr acc
 
 hasValue' :: forall a. SingleGetter a -> SingleGetter Boolean
 hasValue' f r = do
