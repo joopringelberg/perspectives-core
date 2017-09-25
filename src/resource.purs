@@ -10,7 +10,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Location (Location, THEORYDELTA, locate, locationValue, setLocationValue)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
-import Perspectives.ResourceTypes (PropDefs, Resource(..), ResourceId, ResourceLocation(..), AsyncDomeinFile)
+import Perspectives.ResourceTypes (AsyncDomeinFile, LocationWithResource, PropDefs, Resource(..), ResourceId, ResourceLocation(..))
 
 -- | The global index of all Resource-Location pairs, indexed by ResourceId.
 type ResourceIndex = GLStrMap ResourceLocation
@@ -18,15 +18,16 @@ type ResourceIndex = GLStrMap ResourceLocation
 resourceIndex :: ResourceIndex
 resourceIndex = new unit
 
--- | From a Resource, find its Location.
-locationFromResource :: forall e. Resource -> Eff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
+-- | From a Resource, find its Location. Note how this may return a location with Nothing!
+-- | Prefer representResource in most situations.
+locationFromResource :: forall e. Resource -> Aff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
 locationFromResource (Resource{id}) = do
-  x <- peek resourceIndex id
+  x <- liftEff $ peek resourceIndex id
   case x of
     (Just (ResourceLocation{ loc })) -> pure loc
     Nothing -> pure (locate Nothing)
 
--- | From a Location, return the resource
+-- | From a Location, return the resource.
 resourceFromLocation :: Location (Maybe Resource) -> Resource
 resourceFromLocation loc = unsafePartial resourceFromLocation' loc where
     resourceFromLocation' :: Partial => Location (Maybe Resource) -> Resource
@@ -35,7 +36,7 @@ resourceFromLocation loc = unsafePartial resourceFromLocation' loc where
         (Just r) -> r
 
 -- | Look up a resource or create a new resource without definition and store it in the index.
-representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) (Location (Maybe Resource))
+representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) LocationWithResource
 representResource id = do
   x <- peek resourceIndex id
   case x of
@@ -58,7 +59,7 @@ storeResourceInIndex res@(Resource{id}) =
 addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
 addPropertyDefinitions r@(Resource{id}) av =
   do
-    loc <- locationFromResource r
+    loc <- representResource id
     _ <- setLocationValue loc (Just (Resource{ id: id, propDefs: (Just av)}))
     _ <- poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
     pure unit

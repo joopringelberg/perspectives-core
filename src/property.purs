@@ -11,8 +11,9 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
 import Perspectives.Location (Location, locate, nameFunction)
+import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, resourceFromLocation)
-import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFileM)
+import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -27,17 +28,23 @@ type PropertyName = String
 
 type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex | e)
 
+type StackedLocation e a = LocationT (AsyncPropDefsM e) a
+
+type NestedLocation e a = AsyncPropDefsM e (Location a)
+
 -- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
-type SingleGetter a = forall e. Resource -> (AsyncPropDefsM e) (Maybe a)
+type SingleGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Maybe a)
 
-type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
+-- type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
+type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Maybe a))
 
 -- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
-type PluralGetter a = forall e. Resource -> (AsyncPropDefsM e) (Array a)
+type PluralGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Array a)
 
-type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
+-- type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
+type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Array a))
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -50,17 +57,19 @@ getSingleGetter :: forall a.
   (Json -> Maybe a)
   -> PropertyName
   -> SingleGetter a
-getSingleGetter tofn pn r = do
-  (PropDefs pd) <- getPropDefs r
-  case lookup pn pd of
-    -- Property is not available. This is not an error.
-    Nothing -> pure Nothing
-    -- This must be an array filled with a single value that the tofn recognizes.
-    (Just json) -> case toArray json of
-      Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-      (Just arr) -> case traverse tofn arr of
-        Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
-        (Just a) -> pure (head a)
+getSingleGetter tofn pn res = case res of
+  Nothing -> pure Nothing
+  (Just r) -> do
+    (PropDefs pd) <- getPropDefs r
+    case lookup pn pd of
+      -- Property is not available. This is not an error.
+      Nothing -> pure Nothing
+      -- This must be an array filled with a single value that the tofn recognizes.
+      (Just json) -> case toArray json of
+        Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+        (Just arr) -> case traverse tofn arr of
+          Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+          (Just a) -> pure (head a)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -73,17 +82,19 @@ getPluralGetter :: forall a.
   (Json -> Maybe a)
   -> PropertyName
   -> PluralGetter a
-getPluralGetter tofn pn r = do
-  (PropDefs pd) <- getPropDefs r
-  case lookup pn pd of
-    -- Property is not available. This is not an error.
-    Nothing -> pure []
-    -- This must be an array filled with values of the type that the tofn recognizes.
-    (Just json) -> case toArray json of
-      Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-      (Just arr) -> case traverse tofn arr of
-        Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
-        (Just a) -> pure a
+getPluralGetter tofn pn res = case res of
+  Nothing -> pure []
+  (Just r) -> do
+    (PropDefs pd) <- getPropDefs r
+    case lookup pn pd of
+      -- Property is not available. This is not an error.
+      Nothing -> pure []
+      -- This must be an array filled with values of the type that the tofn recognizes.
+      (Just json) -> case toArray json of
+        Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+        (Just arr) -> case traverse tofn arr of
+          Nothing ->  throwError $ error ("getPluralGetter: property " <> pn <> " of resource " <> show r <> " does not have all elements of the required type!" )
+          (Just a) -> pure a
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
 -- getString :: PropertyName -> SingleGetter String

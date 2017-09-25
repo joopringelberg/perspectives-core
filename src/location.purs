@@ -8,6 +8,7 @@ module Perspectives.Location
   ( Location
   , locate
   , connectLocations
+  , connectLocationsAsInBind
   , runLocation
   , setLocationValue
   , setLocationValue'
@@ -19,7 +20,8 @@ module Perspectives.Location
   , traverseLoc
   , nameFunction
   , functionName
-  , memorizeMonadicFunction)
+  , nestLocationInMonad
+  , locationDependent)
 where
 
 import Prelude
@@ -51,6 +53,9 @@ setLocationValue' l a = setLocationValue l a
 
 foreign import connectLocations :: forall a b f. Location a -> f -> Location b -> Location b
 
+foreign import connectLocationsAsInBind :: forall a b f. Location a -> f -> Location b -> Location b
+
+
 -- | This is a handler.
 -- | Consumes a computation that has the THEORYDELTA effect. Returns a computation without
 -- | that effect.
@@ -77,16 +82,14 @@ foreign import nameFunction :: forall a. String -> a -> a
 
 foreign import functionName :: forall a b. (a -> b) -> String
 
-memorizeMonadicFunction :: forall a b m. Monad m => (Location a -> m (Location b)) -> (Location a -> m (Location b))
-memorizeMonadicFunction g' = nameFunction (functionName g') aux g'
-  where
-    aux g aloc =
-      case locationDependent g aloc of
-        Nothing ->
-          do
-            resultLoc <- g aloc
-            pure $ connectLocations aloc g resultLoc
-        (Just rloc) -> pure rloc
+nestLocationInMonad :: forall a b m. Monad m => (a -> m b) -> (Location a -> m (Location b))
+nestLocationInMonad f r =
+  case locationDependent f r of
+    Nothing -> do
+      x <- f (locationValue r)
+      pure $ connectLocations r f (locate x)
+    (Just result) -> pure result
+
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
 -----------------------------------------------------------------------------------------------

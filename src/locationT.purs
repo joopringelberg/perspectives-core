@@ -49,9 +49,8 @@ bind1 (LocationT af) f = LocationT
       let (LocationT af') = f (locationValue l)
       in
         do
-        (l' :: Location b) <- af'
-        _ <- pure (connectLocations l f l')
-        pure l'
+          (l' :: Location b) <- af'
+          pure (connectLocationsAsInBind l f l')
         ))
 
 instance monadLocationT :: Monad m => Monad (LocationT m)

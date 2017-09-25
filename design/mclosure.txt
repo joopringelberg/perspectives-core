@@ -46,3 +46,27 @@ Hier wordt het besluit tot recursie mede genomen op basis van de test of de volg
 De volgende stap is om uit deze functie er één af te leiden die een SingleGetter accepteert, d.w.z. een functie die Location (Maybe Resource) in een monad oplevert.
 
 Alternatief: maak eerst een versie van close die een SingleGetter accepteert. Die is minder bruikbaar maar omdat close simpeler is, is het misschien een goede tussenstap naar het inwerken van de monad.
+
+ONDERZOEK:
+wat is de relatie tussen een SingleGetter en een zelfde functie die in LocationT is geschreven?
+
+type SingleGetter a = forall e. Resource -> (AsyncPropDefsM e) (Maybe a)
+
+type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
+
+newtype LocationT m a = LocationT (m (Location a))
+
+m = (AsyncPropDefsM e)
+a = (Maybe a)
+
+LocationT (AsyncPropDefsM e) (Maybe a) = LocationT (AsyncPropDefsM e) (Location (Maybe a))
+
+
+Wat ik gedaan heb:
+- in property.purs het type van MemorizingSingleGetter en MemorizingPluralGetter omgeschreven naar LocationT.
+- in propertyComposition.purs pTos en pTop omgeschreven zodat ze met deze nieuwe types werken.
+	MERK OP dat in deze functies niet langer traverseLoc gebruikt wordt. Er ontbreekt dus een verbinding, tenzij die in LocationT gezet wordt?
+- in queryCombinators mclosure' uitgetcommentarieerd.
+- close hergedefinieerd in termen van LocationT en dat werkt!
+Nu moet de bind1 van LocationT nog de juiste location semantiek geven.
+HELAAS, FOUTJE.

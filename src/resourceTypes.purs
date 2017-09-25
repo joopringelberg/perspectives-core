@@ -6,7 +6,8 @@ module Perspectives.ResourceTypes
 , AsyncDomeinFile
 , PropDefs(..)
 , Resource(..)
-, ResourceLocation(..))
+, ResourceLocation(..)
+, LocationWithResource)
 
 where
 
@@ -60,3 +61,5 @@ newtype ResourceLocation = ResourceLocation{ res :: Resource, loc :: Location (M
 
 --instance showResourceLocation :: Show (ResourceLocation e) where
 --  show (ResourceLocation{ res }) = show res
+
+type LocationWithResource = Location (Maybe Resource)

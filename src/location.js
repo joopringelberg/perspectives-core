@@ -188,7 +188,7 @@ exports.connectLocations = function( loc ) {
 exports.mapLoc = function( fun ) {
 	return function( loc ) {
 		// A function can only be applied once to a location.
-		var linkName = fun.name + "_" + loc.locName;
+		var linkName = fun.name + "<$>" + loc.locName;
 		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
@@ -206,7 +206,7 @@ exports.mapLoc = function( fun ) {
 exports.applyLoc = function( funLoc ) {
 	return function( loc ) {
 		// Apply can be executed only once for the combination of funLoc and loc.
-		var linkName = funLoc.locName + loc.locName;
+		var linkName = funLoc.locName + "<*>" + loc.locName;
 		var dependent = funLoc.getDependent( linkName );
 		if( !dependent )
 		{
@@ -224,7 +224,7 @@ exports.applyLoc = function( funLoc ) {
 
 exports.bindLoc = function( loc ) {
 	return function( fun ) {
-		var linkName = fun.name + "_" + loc.locName;
+		var linkName = loc.locName + ">>=" + fun.name;
 		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
@@ -247,6 +247,30 @@ exports.bindLoc = function( loc ) {
 			loc.addDependent( linkName, dependent );
 		}
 		return dependent;
+	};
+};
+
+exports.connectLocationsAsInBind = function( loc ) {
+	return function( fun ) {
+		return function( dependent ) {
+			var linkName = loc.locName + ">>=" + fun.name;
+			loc.addDependent( linkName, dependent );
+			// The function set in dependent will perform the update necessary for bind.
+			dependent.fun = function() {
+				var newLocWithValue = fun( loc.get() );
+				// Move the dependents of dependent to newLocWithValue.
+				dependent._dependents.keys().forEach(
+					function( linkName )
+					{
+						newLocWithValue.addDependent( linkName, dependent.getDependent(linkName));
+						dependent.removeDependent( linkName );
+					}
+				);
+				// Return the content of the new location; it will be inserted into dependent by the recomputeNode function.
+				return newLocWithValue.get();
+			};
+			return dependent;
+		};
 	};
 };
 
