@@ -117,7 +117,7 @@ Location.prototype.recomputeNode = function() {
 	this.updateValue( this.fun() );
 };
 
-Location.prototype.toJSON = function(){
+Location.prototype.toJSON = function() {
 	return this.id;
 };
 
@@ -151,11 +151,26 @@ var propagateTheoryDeltas;
 	}( [] )
 );
 
-exports.locate = function( v ) {
+exports.saveInLocation = function( v ) {
 	return new Location( function() {
 		return v;
 	}, valueName( v ) );
 };
+
+exports.saveInNamedLocation = function( name ) {
+	{
+		return function( v ) {
+			return new Location( function() {
+				return v;
+			}, name );
+		};
+	}
+};
+
+exports.locationName = function( l )
+{
+	return l.locName;
+}
 
 /*
  * Note that this function depends on the representation of ADT's by the purescript compiler.
@@ -171,7 +186,13 @@ function valueName( v )
 		switch( typeof v )
 		{
 			case "object":
-				return JSON.stringify(v, ["value0", "value1", "value2", "value3", "id"]);
+				return JSON.stringify( v, [
+					"value0",
+					"value1",
+					"value2",
+					"value3",
+					"id"
+				] );
 			case "function":
 				return v.name;
 			default:
@@ -181,9 +202,8 @@ function valueName( v )
 }
 
 exports.connectLocations = function( loc ) {
-	return function( fun ) {
+	return function( linkName ) {
 		return function( dependent ) {
-			var linkName = fun.name + "_" + loc.locName;
 			loc.addDependent( linkName, dependent );
 			return dependent;
 		};
@@ -193,15 +213,15 @@ exports.connectLocations = function( loc ) {
 exports.mapLoc = function( fun ) {
 	return function( loc ) {
 		// A function can only be applied once to a location.
-		var linkName = fun.name + "<$>" + loc.locName;
+		var linkName = fun.name + "<$>";
 		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
 			dependent = new Location(
 				nameFunction( fun.name, function() {
 					return fun( loc.get() );
-				}),
-				linkName );
+				} ),
+				linkName  + loc.locName);
 			loc.addDependent( linkName, dependent );
 		}
 		return dependent;
@@ -211,15 +231,15 @@ exports.mapLoc = function( fun ) {
 exports.applyLoc = function( funLoc ) {
 	return function( loc ) {
 		// Apply can be executed only once for the combination of funLoc and loc.
-		var linkName = funLoc.locName + "<*>" + loc.locName;
+		var linkName = funLoc.locName + "<*>";
 		var dependent = funLoc.getDependent( linkName );
 		if( !dependent )
 		{
 			dependent = new Location(
 				nameFunction( funLoc.locName, function() {
 					return funLoc.get()( loc.get() );
-				}),
-				linkName );
+				} ),
+				linkName + loc.locName );
 			funLoc.addDependent( linkName, dependent );
 			loc.addDependent( linkName, dependent );
 		}

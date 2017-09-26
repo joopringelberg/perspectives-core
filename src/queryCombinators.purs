@@ -5,10 +5,10 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, connectLocations, functionName, locate, locationValue, nameFunction, nestLocationInMonad)
+import Perspectives.Location (Location, connectLocations, functionName, saveInLocation, locationValue, nameFunction, nestLocationInMonad)
 import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
-import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
+import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation, (>->))
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource, LocationWithResource)
 
@@ -21,7 +21,7 @@ close f loca = (maybe id Arr.cons) <$> loca <*> (bind loca h)
     h :: Maybe a -> Location (Array a)
     h mr = case mr of
       (Just _) -> close f (f loca)
-      Nothing -> locate []
+      Nothing -> saveInLocation []
 
 -- This is the same closure, but now typed as LocationT (AsyncPropDefsM e) (Maybe a). This means the Aff and
 -- Location monads have been stacked.
@@ -39,7 +39,7 @@ close' f (loca :: Location (Maybe Resource)) = stackedToNestedLocation ((maybe i
         -- close expects a Location (because f does so).
         (x :: Location (Maybe Resource)) <- (f loca)
         close' f x
-      Nothing -> pure $ locate []
+      Nothing -> pure $ saveInLocation []
 
 -- Here we add an accumulator to the pure recursive function, in order to detect a value of a that has been seen before.
 -- In this way we prevent endless recursion when f is idempotent.
@@ -60,12 +60,13 @@ closeWithAcc f acc loca = (maybe id Arr.cons) <$> loca <*> (bind loca h)
         (Just next) ->
           case Arr.elemIndex next acc' of
             Nothing -> closeWithAcc f acc' nextLoc
-            otherwise -> locate []
-    h Nothing = locate []
+            otherwise -> saveInLocation []
+    h Nothing = saveInLocation []
 
 -- | This function memorizes.
 mclosure :: MemorizingSingleGetter Resource -> MemorizingPluralGetter Resource
 mclosure fun = nameFunction ("mclosure_" <> functionName fun) (mclosure' fun []) where
+
   mclosure' :: MemorizingSingleGetter Resource -> Array Resource -> MemorizingPluralGetter Resource
   mclosure' f acc (loca :: LocationWithResource) =
   -- TODO. (h >>> nestedToStackedLocation) is anoniem.
@@ -84,8 +85,8 @@ mclosure fun = nameFunction ("mclosure_" <> functionName fun) (mclosure' fun [])
               (Just nexta) -> let acc' = (maybe id Arr.cons) (locationValue loca) acc
                               in case Arr.elemIndex nexta acc' of
                                   Nothing -> mclosure' f acc' nextLoc
-                                  otherwise -> pure $locate []
-          Nothing -> pure $ locate []
+                                  otherwise -> pure $saveInLocation []
+          Nothing -> pure $ saveInLocation []
 
 aclosure' :: PluralGetter Resource -> PluralGetter Resource
 aclosure' f r = do
@@ -100,7 +101,7 @@ aclosure f (r :: Location (Maybe Resource)) =
     do
       (t :: Location (Array Resource)) <- f r
       (childClosures :: Array (Location (Array Resource))) <- (traverse (locationFromResource >=> g) (locationValue t))
-      pure (locate (Arr.nub (join (Arr.cons (locationValue t) (map locationValue childClosures)))))
+      pure (saveInLocation (Arr.nub (join (Arr.cons (locationValue t) (map locationValue childClosures)))))
       where
         g :: forall e. LocationWithResource -> AsyncPropDefsM e (Location (Array Resource))
         g = (aclosure f)
@@ -114,11 +115,14 @@ concat' f g r = do
 
 -- | This function memorizes due to LocationT apply.
 concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
--- concat f g r = stackedToNestedLocation $ concatAux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r
-concat f g = nameFunction ("concat_" <> functionName f <> "_" <> functionName g) (\r -> stackedToNestedLocation $ concatAux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r)
+concat f g = nameFunction queryName query
+  where
+    queryName = ("concat " <> functionName f <> " " <> functionName g)
 
-concatAux :: forall a. Eq a => Array a -> Array a -> Array a
-concatAux = nameFunction "concat" (\a b -> Arr.union a b)
+    -- NOTE we do not want to rename Arr.union itself.
+    aux = nameFunction "union" (\a b -> Arr.union a b)
+
+    query r = stackedToNestedLocation $ aux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r
 
 -- | Add the result of a SingleGetter to that of a PluralGetter.
 addTo' :: forall a. Eq a => SingleGetter a -> PluralGetter a -> PluralGetter a
@@ -134,21 +138,22 @@ addTo' f g r = do
 
 -- | This function memorizes due to LocationT apply.
 addTo :: forall a. Eq a => MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
-addTo f' g' = nameFunction ("addTo_" <> functionName f' <> "_" <> functionName g' ) (aux f' g')
+addTo f' g' = nameFunction queryName (query f' g')
   where
-    h :: (Maybe a) -> (Array a) -> (Array a)
-    h = nameFunction ("addTo_" <> functionName f' <> "_" <> functionName g') (maybe id Arr.cons)
+    queryName = ("addTo " <> functionName f' <> " " <> functionName g' )
 
-    aux :: MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
-    aux f g r = stackedToNestedLocation (h <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r)
+    aux :: (Maybe a) -> (Array a) -> (Array a)
+    aux = nameFunction "cons" (maybe id Arr.cons)
+
+    query :: MemorizingSingleGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
+    query f g r = stackedToNestedLocation (aux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r)
 
 -- | Identity function: from a Resource a, compute Aff e (Just a)
 identity' :: SingleGetter Resource
 identity' = pure
 
 identity :: MemorizingSingleGetter Resource
-identity = nameFunction "identity" (nestLocationInMonad (nameFunction "identity" identity'))
--- identity = nameFunction "identity" pure
+identity = nestLocationInMonad (nameFunction "identity" (\x -> pure x))
 
 filter' :: SingleGetter Boolean -> PluralGetter Resource -> PluralGetter Resource
 filter' c rs (r :: Maybe Resource) = do
@@ -165,18 +170,18 @@ filter' c rs (r :: Maybe Resource) = do
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 
--- TODO: wel verbonden locaties, nog geen hergebruik!
 filter :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
 filter c' rs'=
   nameFunction name aux c' rs'
   where
     name :: String
-    name = "filter_" <> (functionName c')
+    name = "filter " <> (functionName c')
+
     aux :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
     aux c rs r = do
       (candidates :: Location (Array Resource)) <- rs (r :: LocationWithResource)
       (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge (locationValue candidates)
-      pure $ connectLocations candidates aux (locate (Arr.foldr takeOrDrop [] judgedCandidates))
+      pure $ connectLocations candidates name (saveInLocation (Arr.foldr takeOrDrop [] judgedCandidates))
 
     judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
     judge candidate = do
@@ -189,12 +194,20 @@ filter c' rs'=
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 
+-- | In this definition, the purescript compiler replaces a local isNothing with
+-- | "isNothing1". That is no problem. Both the local function and the function that
+-- | is generated for isNothing have a name. Explicit naming is therefore not necessary.
+isNothing :: forall e a. Location (Maybe a) -> NestedLocation e (Maybe Boolean)
+isNothing locr = pure $ map isNothing_ locr
+    where
+      isNothing_ :: (Maybe a) -> Maybe Boolean
+      isNothing_ = Just <<< (maybe false (const true))
+
 hasValue' :: forall a. SingleGetter a -> SingleGetter Boolean
 hasValue' f r = do
   (v :: Maybe a) <- f r
   pure $ Just $ (maybe false (const true)) v
 
--- | The generated function will have the specialized name "has_<name of f>".
+-- | The generated function will have the specialized name "hasValue <name of f>".
 hasValue :: forall a. MemorizingSingleGetter a -> MemorizingSingleGetter Boolean
-hasValue f = nameFunction name (f >=> (pure <<< map (nameFunction name (Just <<< (maybe false (const true)))) ))
-  where name = "has_" <> functionName f
+hasValue f = nameFunction ("hasValue " <> functionName f) (f >=> isNothing)

@@ -36,7 +36,7 @@ apply1 (LocationT floc) (LocationT ma) = LocationT do
   pure (f <*> a)
 
 instance applicativeLocationT :: Monad m => Applicative (LocationT m) where
-  pure = LocationT <<< pure <<< locate
+  pure = LocationT <<< pure <<< saveInLocation
 
 instance bindLocationT :: Monad m => Bind (LocationT m) where
   bind = bind1
@@ -56,7 +56,7 @@ bind1 (LocationT af) f = LocationT
 instance monadLocationT :: Monad m => Monad (LocationT m)
 
 instance monadTransLocationT :: MonadTrans LocationT where
-  lift = LocationT <<< liftM1 locate
+  lift = LocationT <<< liftM1 saveInLocation
 
 instance monadEffLocation :: MonadEff eff m => MonadEff eff (LocationT m) where
   liftEff = lift <<< liftEff

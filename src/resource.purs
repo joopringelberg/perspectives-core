@@ -8,7 +8,7 @@ import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
-import Perspectives.Location (Location, THEORYDELTA, locate, locationValue, setLocationValue)
+import Perspectives.Location (Location, THEORYDELTA, saveInLocation, saveInNamedLocation, locationValue, setLocationValue)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
 import Perspectives.ResourceTypes (AsyncDomeinFile, LocationWithResource, PropDefs, Resource(..), ResourceId, ResourceLocation(..))
 
@@ -25,7 +25,7 @@ locationFromResource (Resource{id}) = do
   x <- liftEff $ peek resourceIndex id
   case x of
     (Just (ResourceLocation{ loc })) -> pure loc
-    Nothing -> pure (locate Nothing)
+    Nothing -> pure (saveInLocation Nothing)
 
 -- | From a Location, return the resource.
 resourceFromLocation :: Location (Maybe Resource) -> Resource
@@ -52,7 +52,7 @@ newResource id defs = do
 
 storeResourceInIndex :: forall e. Resource -> Eff (gm :: GLOBALMAP | e) (Location (Maybe Resource))
 storeResourceInIndex res@(Resource{id}) =
-  let loc = locate (Just res)
+  let loc = saveInNamedLocation id (Just res)
   in do
     poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure loc
 

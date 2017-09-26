@@ -3,15 +3,15 @@ module Test.Location where
 import Prelude
 import Control.Monad.Eff.Console
 import Control.Monad.Eff
-import Perspectives.Location (locate, THEORYDELTA, runLocation, setLocationValue, setLocationValue', pureTHEORYDELTA, runTHEORYDELTA)
+import Perspectives.Location (saveInLocation, THEORYDELTA, runLocation, setLocationValue, setLocationValue', pureTHEORYDELTA, runTHEORYDELTA)
 
 test :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 test = myProgram6
 
 myProgram :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram = let
-  m = locate "This content will be ignored."
-  n = locate 1
+  m = saveInLocation "This content will be ignored."
+  n = saveInLocation 1
   p = map ((+) 10) n
   s = (+) <$> n <*> p
   in
@@ -48,8 +48,8 @@ Main executeert elk van deze computations.
 
 myProgram2 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram2 = let
-  m = locate "This content will be ignored."
-  n = locate 1
+  m = saveInLocation "This content will be ignored."
+  n = saveInLocation 1
   p = map ((+) 10) n
   s = (+) <$> n <*> p
   locationsWithEffectfulComputations = map (map (log <<< show)) [n, p, s]
@@ -63,7 +63,7 @@ myProgram2 = let
 
 myProgram3 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram3 = let
-  m = locate "This content will be ignored."
+  m = saveInLocation "This content will be ignored."
   ignore = pureTHEORYDELTA (setLocationValue' m "Hello world")
   in
     do
@@ -71,7 +71,7 @@ myProgram3 = let
 
 myProgram4 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram4 = let
-    m = locate "This content will be ignored."
+    m = saveInLocation "This content will be ignored."
     p :: forall e. Eff (td :: THEORYDELTA, console :: CONSOLE | e) Unit
     p = do
           runLocation $ map log m
@@ -80,14 +80,14 @@ myProgram4 = let
 
 myProgram5 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram5 = let
-    m = locate "This content will be ignored."
+    m = saveInLocation "This content will be ignored."
     in runTHEORYDELTA do
           runLocation $ map log m
           (setLocationValue m "Hello world")
 
 myProgram6 :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram6 = let
-  n = locate 1
+  n = saveInLocation 1
   p = map ((+) 10) n
   s = (+) <$> n <*> p
   locationsWithEffectfulComputations = map (map (log <<< show)) [n, p, s]

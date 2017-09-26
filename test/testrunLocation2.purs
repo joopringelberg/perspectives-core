@@ -2,12 +2,12 @@ module Test.Location2 where
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log, logShow)
-import Perspectives.Location (locate, setLocationValue, runLocation, runTHEORYDELTA, locationValue)
+import Perspectives.Location (saveInLocation, setLocationValue, runLocation, runTHEORYDELTA, locationValue)
 import Prelude (Unit, discard, map, show, ($), (+), (<$>), (<*>), (<<<), (<>))
 
 test :: forall e. Eff (console :: CONSOLE |e) Unit
 test = let
-  n = locate 1
+  n = saveInLocation 1
   p = map ((+) 10) n
   s = (+) <$> n <*> p
   -- locWithEffect mimics a GUI element that shows a system value that can change.

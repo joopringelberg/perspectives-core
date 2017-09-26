@@ -10,7 +10,7 @@ function showLoc(l, n)
 	console.log( "Location " + n + " has value " + location.getLoc( l ) );
 }
 
-var l1 = location.locate( 1 );
+var l1 = location.saveInLocation( 1 );
 showLoc( l1, 'l1');
 
 l1.onChange(

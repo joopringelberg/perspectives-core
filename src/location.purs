@@ -6,7 +6,8 @@
 
 module Perspectives.Location
   ( Location
-  , locate
+  , saveInLocation
+  , saveInNamedLocation
   , connectLocations
   , connectLocationsAsInBind
   , runLocation
@@ -32,7 +33,12 @@ import Data.Maybe (Maybe(..))
 foreign import data Location :: Type -> Type
 
 -- | Creates a Location with a value.
-foreign import locate :: forall a. a -> Location a
+foreign import saveInLocation :: forall a. a -> Location a
+
+-- | Creates a Location with the given name, containing the value.
+foreign import saveInNamedLocation :: forall a. String -> a -> Location a
+
+foreign import locationName :: forall a. Location a -> String
 
 -- | The location holds a computation with effects (and yields unit).
 -- | Returns a computation (yielding value unit in the Eff Monad) that, when run, runs the computation in
@@ -82,13 +88,17 @@ foreign import nameFunction :: forall a. String -> a -> a
 
 foreign import functionName :: forall a b. (a -> b) -> String
 
+-- | The resulting query function has the same name as f.
 nestLocationInMonad :: forall a b m. Monad m => (a -> m b) -> (Location a -> m (Location b))
-nestLocationInMonad f r =
-  case locationDependent f r of
-    Nothing -> do
-      x <- f (locationValue r)
-      pure $ connectLocations r f (locate x)
-    (Just result) -> pure result
+nestLocationInMonad f = nameFunction (functionName f) query
+  where
+    query r = case locationDependent f r of
+      Nothing -> do
+        x <- f (locationValue r)
+        pure $ connectLocations r (functionName f) (saveInNamedLocation name x)
+      (Just result) -> pure result
+      where name = functionName f <> " " <> locationName r
+
 
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
@@ -115,7 +125,7 @@ foreign import applyLoc :: forall a b. Location (a -> b) -> Location a -> Locati
 
 -- | For the Applicative instance of Location we have pure wrap a value in a Location.
 instance applicativeLocation :: Applicative Location where
-  pure = locate
+  pure = saveInLocation
 
 foreign import bindLoc :: forall a b. Location a -> (a -> Location b) -> Location b
 
@@ -134,5 +144,5 @@ traverseLoc f loc = case locationDependent f loc of
   Nothing ->
     do
       b <- f (locationValue loc)
-      pure (connectLocations loc f (locate b))
+      pure (connectLocations loc (functionName f) (saveInLocation b))
   (Just bLoc) -> pure bLoc

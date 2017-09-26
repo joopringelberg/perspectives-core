@@ -8,7 +8,7 @@ import Control.Monad.Aff.Console (log) as Aff
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
-import Perspectives.Location (Location, locate, locationValue)
+import Perspectives.Location (Location, saveInLocation, locationValue)
 import Perspectives.LocationT (runLocationT)
 import Perspectives.Property (MemorizingSingleGetter, SingleGetter)
 import Perspectives.QueryCombinators (filter) as QC

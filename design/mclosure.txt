@@ -61,6 +61,7 @@ a = (Maybe a)
 
 LocationT (AsyncPropDefsM e) (Maybe a) = LocationT (AsyncPropDefsM e) (Location (Maybe a))
 
+xxx :: (AsyncPropDefsM e) (Location (Maybe a)) -> LocationT (AsyncPropDefsM e) (Location (Maybe a))
 
 Wat ik gedaan heb:
 - in property.purs het type van MemorizingSingleGetter en MemorizingPluralGetter omgeschreven naar LocationT.

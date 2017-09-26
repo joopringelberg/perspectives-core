@@ -47,7 +47,6 @@ Deze functies moeten dus een naam moeten hebben. Bijvoorbeeld:
 Dit is voor alle operatoren en combinatoren geregeld.
 
 IS HET ZINVOL?
-1. In nestLocationInMonad zeker wel.
 2. In de get(Type>)(s) functies niet in directe zin. Er wordt niet in gememoriseerd.
 3. In nestLocationInMonad wel. Daar wordt gememoriseerd dmv connectLocations en locationDependent.
 4. In pToS en pToP wel. Daar wordt gememoriseerd dmv connectLocations en locationDependent.
@@ -62,12 +61,16 @@ IS HET ZINVOL?
 	- aclosure (naamgeving, memoriseren en hergebruik)
 	- filter (hergebruik)
 	
-6. In SystemQueries:
+6. In SystemQueries: NALOPEN!!
 	- identifier is een MemorizingSingleGetter en moet een naam hebben. NB QUERYSTAP?
 	- types gebruikt memorizeMonadicFunction. De gegenereerde functie (QC.mclosure rdfType) moet dus een naam hebben. mclosure genereert een anonieme functie.
 	- superClasses wordt gegenereerd door (QC.aclosure subClassOf). aclosure genereert een anonieme functie.
 	- typeSuperClasses is een functie gegenereerd door >->> en die geeft geen naam.
 
-
-OPEN VRAAG: moet een met een combinator gegenereerde functie een naam hebben?
-
+NAAMGEVING
+Combinatoren en compositie operatoren vat ik samen onder de naam 'combinatoren.
+Elke combinator moet een functie opleveren die een naam heeft. Deze namen zijn samengesteld uit de namen van de componenten waar de combinator op is toegepast.
+De componenten zijn immers functies waar hetzelfde voor geldt: ze moeten een naam hebben.
+Een combinator kan een structuur van afhankelijke locaties opzetten bovenop de structuur die zijn componenten aanmaken. De combinator moet de verbindingen in die structuur een naam geven. Voorbeelden:
+	- de sTos combinator legt geen extra structuur aan bovenop de verbindingen die de participerende singlegetters aanleggen;
+	- de pTos combinator construeert twee arrays, waarvan de tweede in een locatie opgeslagen wordt en het eindresultaat van de combinatie vormt. Deze locatie is afhankelijk van het resultaat van de eerste component en de gebruikte naam is die van de tweede component.

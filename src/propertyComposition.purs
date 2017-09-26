@@ -5,7 +5,7 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, connectLocations, functionName, locate, locationDependent, locationValue, nameFunction, nestLocationInMonad)
+import Perspectives.Location (Location, connectLocations, functionName, saveInLocation, locationDependent, locationValue, nameFunction, nestLocationInMonad)
 import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, StackedLocation)
 import Perspectives.Resource (locationFromResource)
@@ -13,7 +13,7 @@ import Perspectives.ResourceTypes (Resource)
 import Prelude (bind, id, join, pure, ($), (<$>), (<<<), (<>), (>=>), (>>>))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
-affToStackedLocation ma = LocationT (bind ma (\a -> pure $ locate a))
+affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
 
 locationToStackedLocation :: forall e a. Location a -> StackedLocation e a
 locationToStackedLocation la = LocationT (pure la)
@@ -80,13 +80,13 @@ pTos f g =
       Nothing -> do
         (p :: Array (Location (Maybe a))) <- traverse (locationFromResource >=> g) (locationValue arrayB)
         -- Here we connect the result F of applying f with the result of applying g to F.
-        pure $ connectLocations arrayB h (locate $ nub $ foldr (locationValue >>> (maybe id cons)) [] p)
+        pure $ connectLocations arrayB (functionName g) (saveInLocation $ nub $ foldr (locationValue >>> (maybe id cons)) [] p)
       (Just loc) -> pure loc
     name :: String
     name = functionName f <> ">>->" <> functionName g
 
     -- Note that the function h is named only once, when the composition operator is applied.
-    in nameFunction name (f >=> nameFunction (functionName g) h)
+    in nameFunction name (f >=> h)
 
 infixl 0 pTos as >>->
 
@@ -102,12 +102,12 @@ pTop f g =
     h arrayB = case locationDependent h arrayB of
       Nothing -> do
                   (p :: Array (Location (Array a))) <- traverse (locationFromResource >=> g) (locationValue arrayB)
-                  pure $ connectLocations arrayB h (locate $ nub (join (locationValue <$> p)))
+                  pure $ connectLocations arrayB (functionName g) (saveInLocation $ nub (join (locationValue <$> p)))
       (Just loc) -> pure loc
     name :: String
     name = functionName f <> ">>->" <> functionName g
 
     -- Note that the function h is named only once, when the composition operator is applied.
-    in nameFunction name (f >=> nameFunction (functionName g) h)
+    in nameFunction name (f >=> h)
 
 infixl 0 pTop as >>->>

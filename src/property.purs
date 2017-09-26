@@ -10,7 +10,7 @@ import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, locate, nameFunction)
+import Perspectives.Location (Location, saveInLocation, nameFunction)
 import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, resourceFromLocation)
 import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
@@ -128,7 +128,7 @@ getResource pn' = nameFunction pn' (f pn') where
   f pn mr = do
     (maybeId :: Maybe String) <- getSingleGetter toString pn mr
     (loc :: Location (Maybe Resource)) <- case maybeId of
-      Nothing -> pure $ locate Nothing
+      Nothing -> pure $ saveInLocation Nothing
       (Just id) -> liftEff (representResource id)
     pure $ Just $ resourceFromLocation loc
 
