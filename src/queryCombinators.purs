@@ -5,10 +5,10 @@ import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, connectLocations, functionName, saveInLocation, locationValue, nameFunction, nestLocationInMonad)
+import Perspectives.Location (Location, functionName, saveInLocation, locationValue, nameFunction, nestLocationInMonad)
 import Perspectives.LocationT (LocationT(..))
-import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
-import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation, (>->))
+import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation)
+import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource, LocationWithResource)
 
@@ -170,23 +170,23 @@ filter' c rs (r :: Maybe Resource) = do
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 
+-- | This function memorizes due to nestLocationInMonad.
 filter :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
-filter c' rs'=
-  nameFunction name aux c' rs'
+filter c rs=
+  nameFunction name (rs >=> (nestLocationInMonad (nameFunction name filterWithCriterium)))
   where
     name :: String
-    name = "filter " <> (functionName c')
+    name = "filter " <> (functionName c)
 
-    aux :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
-    aux c rs r = do
-      (candidates :: Location (Array Resource)) <- rs (r :: LocationWithResource)
-      (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge (locationValue candidates)
-      pure $ connectLocations candidates name (saveInLocation (Arr.foldr takeOrDrop [] judgedCandidates))
+    filterWithCriterium :: forall e. Array Resource -> AsyncPropDefsM e (Array Resource)
+    filterWithCriterium candidates = do
+      (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
+      pure $ (Arr.foldr takeOrDrop [] judgedCandidates)
 
     judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
     judge candidate = do
       (res :: Location (Maybe Resource)) <- locationFromResource candidate
-      (judgement :: Location (Maybe Boolean)) <- c' res
+      (judgement :: Location (Maybe Boolean)) <- c res
       pure (Tuple candidate (locationValue judgement))
 
     takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
