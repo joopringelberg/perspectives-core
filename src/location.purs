@@ -57,7 +57,7 @@ foreign import setLocationValue :: forall a e. (Location a) -> a -> Eff (td :: T
 setLocationValue' :: forall a. (Location a) -> a -> Eff (td :: THEORYDELTA) Unit
 setLocationValue' l a = setLocationValue l a
 
-foreign import connectLocations :: forall a b f. Location a -> f -> Location b -> Location b
+foreign import connectLocations :: forall a b. Location a -> String -> Location b -> Location b
 
 foreign import connectLocationsAsInBind :: forall a b f. Location a -> f -> Location b -> Location b
 

@@ -95,6 +95,8 @@ infixl 0 pTos as >>->
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does memorize the result of applying the second argument to the result of the first.
+-- TODO: Zodra dit in StackedMemorizingPluralGetter is geschreven, is connectLocations niet nodig.
+-- composekleisli verbindt f x met (f >=>g) x.
 pTop :: forall a. Eq a => MemorizingPluralGetter Resource -> MemorizingPluralGetter a -> MemorizingPluralGetter a
 pTop f g =
   let

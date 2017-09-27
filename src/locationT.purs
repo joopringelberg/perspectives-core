@@ -56,7 +56,7 @@ bind1 (LocationT af) f = LocationT
 instance monadLocationT :: Monad m => Monad (LocationT m)
 
 instance monadTransLocationT :: MonadTrans LocationT where
-  lift = LocationT <<< liftM1 saveInLocation
+  lift = LocationT <<< map saveInLocation
 
 instance monadEffLocation :: MonadEff eff m => MonadEff eff (LocationT m) where
   liftEff = lift <<< liftEff

@@ -7,8 +7,8 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.Location (Location, functionName, saveInLocation, locationValue, nameFunction, nestLocationInMonad)
 import Perspectives.LocationT (LocationT(..))
-import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation)
-import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
+import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, PluralGetter, SingleGetter, StackedLocation, StackedMemorizingSingleGetter, StackedMemorizingPluralGetter)
+import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation, (>>->>))
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource, LocationWithResource)
 
@@ -63,11 +63,40 @@ closeWithAcc f acc loca = (maybe id Arr.cons) <$> loca <*> (bind loca h)
             otherwise -> saveInLocation []
     h Nothing = saveInLocation []
 
+-- This version works with StackedLocation and needs no low level Location functions!
+mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
+mclosure fun = nameFunction queryName (mclosure' fun []) where
+  queryName :: String
+  queryName = "mclosure_" <> functionName fun
+
+  -- TODO. (h >>> nestedToStackedLocation) is anoniem.
+
+  mclosure' :: StackedMemorizingSingleGetter Resource -> Array Resource -> StackedMemorizingPluralGetter Resource
+  mclosure' f acc (loca :: Maybe Resource) =
+    (nameFunction "cons" (maybe id Arr.cons)) <$> pure loca <*> (bind (pure loca) h)
+    where
+      h :: forall e. Maybe Resource -> StackedLocation e (Array Resource)
+      h mr = case mr of
+          (Just _) -> do
+            (nextLoc :: Maybe Resource) <- f loca
+            case nextLoc of
+              Nothing -> mclosure' f acc nextLoc
+              (Just nexta) -> let acc' = (maybe id Arr.cons) loca acc
+                              in case Arr.elemIndex nexta acc' of
+                                  Nothing -> mclosure' f acc' nextLoc
+                                  otherwise -> pure []
+          Nothing -> pure []
+
 aclosure' :: PluralGetter Resource -> PluralGetter Resource
 aclosure' f r = do
   (t :: Array Resource) <- f r
   (childClosures :: Array (Array Resource)) <- traverse (aclosure' f) (map Just t)
   pure $ Arr.nub (join (Arr.cons t childClosures))
+
+-- This version will work as soon as >>->> works for StackedMemorizingPluralGetter's!
+-- aclosure :: StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
+-- aclosure f = (f >>->> (aclosure f))
+
 
 -- | Concatenate the results of two PluralGetters.
 concat' :: forall a. Eq a => PluralGetter a -> PluralGetter a -> PluralGetter a
@@ -102,6 +131,28 @@ filter' c rs (r :: Maybe Resource) = do
     judge candidate = do
       (judgement :: Maybe Boolean) <- c (Just candidate)
       pure (Tuple candidate judgement)
+    takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
+    takeOrDrop (Tuple res b) cumulator = case b of
+      (Just true) -> Arr.cons res cumulator
+      _ -> cumulator
+
+filter :: StackedMemorizingSingleGetter Boolean -> StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
+filter c rs =
+  nameFunction name (rs >=> (nameFunction name filterWithCriterium))
+  where
+    name :: String
+    name = "filter " <> (functionName c)
+
+    filterWithCriterium :: forall e. Array Resource -> StackedLocation e (Array Resource)
+    filterWithCriterium candidates = do
+      (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
+      pure $ (Arr.foldr takeOrDrop [] judgedCandidates)
+
+    judge :: forall e. Resource -> (StackedLocation e) (Tuple Resource (Maybe Boolean))
+    judge candidate = do
+      (judgement :: Maybe Boolean) <- c (Just candidate)
+      pure (Tuple candidate judgement)
+
     takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
     takeOrDrop (Tuple res b) cumulator = case b of
       (Just true) -> Arr.cons res cumulator
