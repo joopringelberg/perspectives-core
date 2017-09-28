@@ -1,13 +1,13 @@
 module Perspectives.QueryCombinators where
 
 import Prelude
-import Data.Array (foldr, cons, elemIndex, union) as Arr
+import Data.Array (foldr, cons, elemIndex, union, nub) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.Location (Location, functionName, nameFunction)
 import Perspectives.Property (MemorizingPluralGetter, NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
-import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation, (>>->>))
+import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
 import Perspectives.ResourceTypes (Resource)
 
 mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
@@ -26,7 +26,10 @@ mclosure fun = nameFunction queryName (mclosure' fun []) where
 
 -- | Compute the transitive closure of the MemorizingPluralGetter to obtain a PluralGetter. NB: only for Resource results!
 aclosure :: StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
-aclosure f = (f >>->> (aclosure f))
+aclosure f r = do
+  (t :: Array Resource) <- f r
+  (childClosures :: Array (Array Resource)) <- traverse (aclosure f) (map Just t)
+  pure $ Arr.nub (join (Arr.cons t childClosures))
 
 -- | This function memorizes due to LocationT apply.
 concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
