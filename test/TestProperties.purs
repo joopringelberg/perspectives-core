@@ -15,11 +15,11 @@ import Perspectives.QueryCombinators (filter) as QC
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource)
 
-test = launchAff do
+test = launchAff $ runLocationT do
   log "=========================Test.Properties================================"
-  (gbLoc :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
-  (l :: Location (Maybe String)) <-  (rol_RolBinding >-> label) gbLoc
-  log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show (locationValue l)))
+  (gbLoc :: Maybe Resource) <- liftEff $ representResource "user:xGebruiker"
+  (l :: Maybe String) <-  (rol_RolBinding >-> label) gbLoc
+  log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show l))
 
   log "========================================================="
   h <-  (rdfType) gbLoc
@@ -67,4 +67,4 @@ test = launchAff do
   s <-  (QC.filter hasLabel typeSuperClasses  >>-> identifier) gbLoc
   log ( "(filter hasLabel typeSuperClasses) user:xGebruiker = " <> (show s))
 
-log = Aff.log
+log = lift <<< Aff.log

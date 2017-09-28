@@ -43,12 +43,14 @@ resourceFromLocation loc = unsafePartial resourceFromLocation' loc where
         (Just r) -> r
 
 -- | Look up a resource or create a new resource without definition and store it in the index.
-representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) LocationWithResource
+representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) (Maybe Resource)
 representResource id = do
   x <- peek resourceIndex id
   case x of
-    Nothing -> storeResourceInIndex (Resource{ id: id, propDefs: Nothing})
-    (Just (ResourceLocation {loc})) -> pure loc
+    Nothing -> do
+      loc <- storeResourceInIndex (Resource{ id: id, propDefs: Nothing})
+      pure $ locationValue loc
+    (Just (ResourceLocation {loc})) -> pure $ locationValue loc
 
 -- | Create a new resource with definitions and store it in the index.
 newResource :: ResourceId -> PropDefs -> Aff ( gm :: GLOBALMAP, avar :: AVAR ) (Location (Maybe Resource))
@@ -63,12 +65,12 @@ storeResourceInIndex res@(Resource{id}) =
   in do
     poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure loc
 
-addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Eff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
+addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Aff (td :: THEORYDELTA, gm :: GLOBALMAP | e) Unit
 addPropertyDefinitions r@(Resource{id}) av =
   do
-    loc <- representResource id
-    _ <- setLocationValue loc (Just (Resource{ id: id, propDefs: (Just av)}))
-    _ <- poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
+    loc <- locationFromResource r
+    _ <- liftEff $ setLocationValue loc (Just (Resource{ id: id, propDefs: (Just av)}))
+    _ <- liftEff $ poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
     pure unit
 
 -- | Get the property definitions of a Resource.
@@ -83,19 +85,3 @@ getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   (Just avar) -> do
                   pd <- peekVar avar
                   pure pd
-
------------------------------------------------------------------------------------------------
--- | EXAMPLES
------------------------------------------------------------------------------------------------
-{-r1 :: Resource
-r1 = Resource{
-  id : "r1",
-  propDefs : PropDefs $ fromFoldable [ (Tuple "maten" (toForeign [ 1, 2])), (Tuple "naam" (toForeign ["Joop", "Johannes"]))]
-}
-
-j :: Resource
-j = representResource "Joop"
-
-r1Stored :: Resource
-r1Stored = newResource "r1" (Just propDefs) where (Resource{propDefs}) = r1
--}

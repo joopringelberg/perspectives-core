@@ -20,32 +20,32 @@ import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource(..), ResourceLocation(..))
 import Perspectives.SystemQueries (label)
 
-test :: forall t36.
-  Eff
-    ( exception :: EXCEPTION
-    , console :: Aff.CONSOLE
-    , ajax :: AJAX
-    , avar :: AVAR
-    , gm :: GLOBALMAP
-    , st :: ST (GLStrMap ResourceLocation)
-    | t36
-    )
-    (Canceler
-       ( console :: Aff.CONSOLE
-       , ajax :: AJAX
-       , avar :: AVAR
-       , gm :: GLOBALMAP
-       , st :: ST (GLStrMap ResourceLocation)
-       | t36
-       )
-    )
-test = launchAff $ do
+-- test :: forall t36.
+--   Eff
+--     ( exception :: EXCEPTION
+--     , console :: Aff.CONSOLE
+--     , ajax :: AJAX
+--     , avar :: AVAR
+--     , gm :: GLOBALMAP
+--     , st :: ST (GLStrMap ResourceLocation)
+--     | t36
+--     )
+--     (Canceler
+--        ( console :: Aff.CONSOLE
+--        , ajax :: AJAX
+--        , avar :: AVAR
+--        , gm :: GLOBALMAP
+--        , st :: ST (GLStrMap ResourceLocation)
+--        | t36
+--        )
+--     )
+test = launchAff do
   log "========================================================="
-  (gb :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
+  (gb :: Maybe Resource) <- liftEff $ representResource "user:xGebruiker"
   log $ show gb
 
   log "========================================================="
-  (l :: Maybe String) <- ((getString "rdfs:label") (locationValue gb))
+  (l :: Maybe String) <- ((getString "rdfs:label") gb)
   case l of
     Nothing -> log "Niets gevonden"
     _ -> log "Wel iets gevonden"

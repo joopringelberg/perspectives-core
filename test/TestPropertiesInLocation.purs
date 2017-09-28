@@ -4,7 +4,7 @@ import Prelude
 import Perspectives.PropertyComposition
 import Perspectives.SystemQueries
 import Control.Monad.Aff (Aff, launchAff)
-import Control.Monad.Aff.Console (log)
+import Control.Monad.Aff.Console (log) as Aff
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.ST (ST)
 import Control.Monad.Trans.Class (lift)
@@ -17,12 +17,13 @@ import Perspectives.QueryCombinators (filter, hasValue) as QC
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource, ResourceLocation(..))
 
-test = launchAff do
+test = launchAff $ runLocationT do
   log "=========================Test.Properties================================"
-  (gb :: Location (Maybe Resource)) <- liftEff $ representResource "user:xGebruiker"
-  (l :: Location (Maybe String)) <- (rol_RolBinding >-> label) gb
-  log ( "label user:xGebruiker = " <> (show (locationValue l)))
+  (gb :: Maybe Resource) <- liftEff $ representResource "user:xGebruiker"
+  (l :: Maybe String) <- (rol_RolBinding >-> label) gb
+  log ( "label user:xGebruiker = " <> (show l))
 
+log = lift <<< Aff.log
 
 -- label :: SingleGetterL String
 -- label = getStringL "rdfs:label"

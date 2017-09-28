@@ -6,11 +6,11 @@ import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
 import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
-import Data.Array (head)
-import Data.Maybe (Maybe(..))
+import Data.Array (cons, foldr, head)
+import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, saveInLocation, nameFunction)
+import Perspectives.Location (Location, locationValue, nameFunction, saveInLocation)
 import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, resourceFromLocation)
 import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
@@ -127,20 +127,17 @@ getResource pn' = nameFunction pn' (f pn') where
   f :: PropertyName -> SingleGetter Resource
   f pn mr = do
     (maybeId :: Maybe String) <- getSingleGetter toString pn mr
-    (loc :: Location (Maybe Resource)) <- case maybeId of
-      Nothing -> pure $ saveInLocation Nothing
-      (Just id) -> liftEff (representResource id)
-    pure $ Just $ resourceFromLocation loc
+    case maybeId of
+      Nothing -> pure Nothing
+      (Just id) -> liftEff $ representResource id
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
 getResources :: PropertyName -> PluralGetter Resource
 getResources pn' = (nameFunction pn' (f pn')) where
   f pn mr = do
     resIdArray <- (getPluralGetter toString) pn mr
-    (liftEff $ (traverse h resIdArray))
-    where h id = do
-                  loc <- representResource id
-                  pure $ resourceFromLocation loc
+    (x :: Array (Maybe Resource)) <- liftEff $ (traverse representResource resIdArray)
+    pure $ foldr (maybe id cons) [] x
 
 -- | in AsyncDomeinFile, retrieve either a Date property or an error message.
 --getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))
