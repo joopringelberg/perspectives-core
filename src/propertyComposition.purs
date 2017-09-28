@@ -78,10 +78,10 @@ pTos f g =
     name = functionName f <> ">>->" <> functionName g
 
     applyg :: forall e. Array Resource -> StackedLocation e (Array (Maybe a))
-    applyg = nameFunction "applyg" traverse (g <<< Just)
+    applyg = traverse (g <<< Just)
 
     collectResults :: forall e. Array (Maybe a) -> StackedLocation e (Array a)
-    collectResults = nameFunction "collectResults" pure <<< nub <<< (foldr (maybe id cons) [])
+    collectResults = pure <<< nub <<< (foldr (maybe id cons) [])
 
   in nameFunction name (f >=> applyg >=> collectResults)
 
@@ -96,13 +96,13 @@ pTop :: forall a. Eq a => StackedMemorizingPluralGetter Resource -> StackedMemor
 pTop f g =
   let
     name :: String
-    name = functionName f <> ">>->" <> functionName g
+    name = functionName f <> ">>->>" <> functionName g
 
     applyg :: forall e. Array Resource -> StackedLocation e (Array (Array a))
-    applyg = nameFunction "applyg" traverse (g <<< Just)
+    applyg = traverse (g <<< Just)
 
     collectResults :: forall e. Array (Array a) -> StackedLocation e (Array a)
-    collectResults = nameFunction "collectResults" pure <<< nub <<< join
+    collectResults = pure <<< nub <<< join
 
   in nameFunction name (f >=> applyg >=> collectResults)
 
