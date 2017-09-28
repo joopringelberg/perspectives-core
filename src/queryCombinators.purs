@@ -1,14 +1,13 @@
 module Perspectives.QueryCombinators where
 
 import Prelude
-import Data.Array (foldr, cons, elemIndex, nub, union) as Arr
+import Data.Array (foldr, cons, elemIndex, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, functionName, locationValue, nameFunction, nestLocationInMonad)
-import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, StackedMemorizingSingleGetter, StackedMemorizingPluralGetter)
+import Perspectives.Location (Location, functionName, nameFunction)
+import Perspectives.Property (MemorizingPluralGetter, NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
 import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation, (>>->>))
-import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
 
 mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
@@ -55,30 +54,31 @@ addTo f g = nameFunction queryName (query f g)
 identity :: StackedMemorizingSingleGetter Resource
 identity = memorizeInStackedLocation (nameFunction "identity" (\x -> pure x))
 
--- | This function memorizes due to nestLocationInMonad.
-filter :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
-filter c rs=
-  nameFunction name (rs >=> (nestLocationInMonad (nameFunction name filterWithCriterium)))
+filter :: StackedMemorizingSingleGetter Boolean -> StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
+filter c rs =
+  nameFunction name (rs >=> (nameFunction name filterWithCriterium))
   where
     name :: String
     name = "filter " <> (functionName c)
 
-    filterWithCriterium :: forall e. Array Resource -> AsyncPropDefsM e (Array Resource)
+    filterWithCriterium :: forall e. Array Resource -> StackedLocation e (Array Resource)
     filterWithCriterium candidates = do
       (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
       pure $ (Arr.foldr takeOrDrop [] judgedCandidates)
 
-    judge :: forall e. Resource -> (AsyncPropDefsM e) (Tuple Resource (Maybe Boolean))
+    judge :: forall e. Resource -> (StackedLocation e) (Tuple Resource (Maybe Boolean))
     judge candidate = do
-      (res :: Location (Maybe Resource)) <- locationFromResource candidate
-      (judgement :: Location (Maybe Boolean)) <- c res
-      pure (Tuple candidate (locationValue judgement))
+      (judgement :: Maybe Boolean) <- c (Just candidate)
+      pure (Tuple candidate judgement)
 
     takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
     takeOrDrop (Tuple res b) cumulator = case b of
       (Just true) -> Arr.cons res cumulator
       _ -> cumulator
 
+-- | This function is more general than a SingleGetter Boolean, because it will work on other arguments
+-- | than just Maybe Resource.
+-- |
 -- | In this definition, the purescript compiler replaces a local isNothing with
 -- | "isNothing1". That is no problem. Both the local function and the function that
 -- | is generated for isNothing have a name. Explicit naming is therefore not necessary.
@@ -89,5 +89,5 @@ isNothing locr = pure $ map isNothing_ locr
       isNothing_ = Just <<< (maybe false (const true))
 
 -- | The generated function will have the specialized name "hasValue <name of f>".
-hasValue :: forall a. MemorizingSingleGetter a -> MemorizingSingleGetter Boolean
-hasValue f = nameFunction ("hasValue " <> functionName f) (f >=> isNothing)
+hasValue :: forall a. StackedMemorizingSingleGetter a -> StackedMemorizingSingleGetter Boolean
+hasValue f = nameFunction ("hasValue " <> functionName f) (((f >>> stackedToNestedLocation) >=> isNothing) >>> nestedToStackedLocation)

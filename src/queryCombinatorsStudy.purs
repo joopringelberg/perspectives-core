@@ -162,3 +162,9 @@ hasValue' :: forall a. SingleGetter a -> SingleGetter Boolean
 hasValue' f r = do
   (v :: Maybe a) <- f r
   pure $ Just $ (maybe false (const true)) v
+
+isNothing :: forall e a. Location (Maybe a) -> NestedLocation e (Maybe Boolean)
+isNothing locr = pure $ map isNothing_ locr
+    where
+      isNothing_ :: (Maybe a) -> Maybe Boolean
+      isNothing_ = Just <<< (maybe false (const true))
