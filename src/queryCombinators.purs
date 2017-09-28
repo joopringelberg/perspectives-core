@@ -6,35 +6,24 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.Location (Location, functionName, saveInLocation, locationValue, nameFunction, nestLocationInMonad)
-import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, StackedLocation)
-import Perspectives.PropertyComposition (locationToStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
+import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, StackedMemorizingSingleGetter, StackedMemorizingPluralGetter)
+import Perspectives.PropertyComposition (nestedToStackedLocation, stackedToNestedLocation)
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource, LocationWithResource)
 
--- | This function memorizes.
-mclosure :: MemorizingSingleGetter Resource -> MemorizingPluralGetter Resource
-mclosure fun = nameFunction ("mclosure_" <> functionName fun) (mclosure' fun []) where
+mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
+mclosure fun = nameFunction queryName (mclosure' fun []) where
+  queryName :: String
+  queryName = "mclosure_" <> functionName fun
 
-  mclosure' :: MemorizingSingleGetter Resource -> Array Resource -> MemorizingPluralGetter Resource
-  mclosure' f acc (loca :: LocationWithResource) =
-  -- TODO. (h >>> nestedToStackedLocation) is anoniem.
-    stackedToNestedLocation ((nameFunction "cons" (maybe id Arr.cons)) <$> stackedResource <*> (bind stackedResource (h >>> nestedToStackedLocation)))
-    where
-
-      stackedResource :: forall e. StackedLocation e (Maybe Resource)
-      stackedResource = locationToStackedLocation loca
-
-      h :: forall e. Maybe Resource -> NestedLocation e (Array Resource)
-      h mr = case mr of
-          (Just _) -> do
-            (nextLoc :: Location (Maybe Resource)) <- (f loca)
-            case locationValue nextLoc of
-              Nothing -> mclosure' f acc nextLoc
-              (Just nexta) -> let acc' = (maybe id Arr.cons) (locationValue loca) acc
-                              in case Arr.elemIndex nexta acc' of
-                                  Nothing -> mclosure' f acc' nextLoc
-                                  otherwise -> pure $saveInLocation []
-          Nothing -> pure $ saveInLocation []
+  mclosure' :: StackedMemorizingSingleGetter Resource -> Array Resource -> StackedMemorizingPluralGetter Resource
+  mclosure' f acc Nothing = pure []
+  mclosure' f acc (Just r) | (maybe false (const true)) (Arr.elemIndex r acc) = pure []
+  mclosure' f acc mr@(Just r) =
+      do
+        next <- f mr
+        rest <- mclosure' f (Arr.cons r acc) next
+        pure $ (maybe id Arr.cons) next rest
 
 -- | Compute the transitive closure of the MemorizingPluralGetter to obtain a PluralGetter. NB: only for Resource results!
 -- | TODO: memoiseert nog niet de recursieve stappen!
