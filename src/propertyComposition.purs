@@ -5,9 +5,10 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, functionName, saveInLocation, nameFunction)
+import Perspectives.Location (Location, functionName, nameFunction, nestLocationInMonad, saveInLocation)
 import Perspectives.LocationT (LocationT(..))
-import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingSingleGetter, StackedMemorizingPluralGetter)
+import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
+import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
 import Prelude (bind, id, join, pure, ($), (<<<), (<>), (>=>))
 
@@ -41,6 +42,19 @@ liftToLocationT :: forall a e.
   ->
   (Location (Maybe Resource) -> LocationT (AsyncPropDefsM e) a)
 liftToLocationT f = nestedToStackedLocation <<< f
+
+-- | Use this function to lift a SingleGetter or PluralGetter to a StackedMemorizingSingleGetter or a
+-- | StackedMemorizingPluralGetter.
+memorizeInStackedLocation :: forall b e.
+  (Maybe Resource -> (AsyncPropDefsM e) b)
+  -> (Maybe Resource -> StackedLocation e b)
+memorizeInStackedLocation f mr = LocationT do
+    loc <- locationFromMaybeResource mr
+    g loc
+  where
+  g = nestLocationInMonad f
+
+-- magic f mr = nestedToStackedLocation $ bind (locationFromMaybeResource mr) (nestLocationInMonad f)
 
 -- sTos :: forall a b c m. Monad m =>
 --   (Location (Maybe a) -> m (Location (Maybe b)))

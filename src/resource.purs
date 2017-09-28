@@ -18,14 +18,21 @@ type ResourceIndex = GLStrMap ResourceLocation
 resourceIndex :: ResourceIndex
 resourceIndex = new unit
 
--- | From a Resource, find its Location. Note how this may return a location with Nothing!
--- | Prefer representResource in most situations.
+-- | From a Resource, find its Location.
 locationFromResource :: forall e. Resource -> Aff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
-locationFromResource (Resource{id}) = do
+locationFromResource res@(Resource{id}) = do
   x <- liftEff $ peek resourceIndex id
   case x of
     (Just (ResourceLocation{ loc })) -> pure loc
-    Nothing -> pure (saveInLocation Nothing)
+    Nothing -> liftEff $ storeResourceInIndex res
+
+locationFromMaybeResource :: forall e. Maybe Resource -> Aff (gm :: GLOBALMAP | e ) (Location (Maybe Resource))
+locationFromMaybeResource Nothing = pure $ saveInLocation Nothing
+locationFromMaybeResource (Just res@(Resource{id})) = do
+  x <- liftEff $ peek resourceIndex id
+  case x of
+    (Just (ResourceLocation{ loc })) -> pure loc
+    Nothing -> liftEff $ storeResourceInIndex res
 
 -- | From a Location, return the resource.
 resourceFromLocation :: Location (Maybe Resource) -> Resource

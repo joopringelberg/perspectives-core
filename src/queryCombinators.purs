@@ -7,7 +7,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.Location (Location, functionName, locationValue, nameFunction, nestLocationInMonad)
 import Perspectives.Property (AsyncPropDefsM, MemorizingPluralGetter, MemorizingSingleGetter, NestedLocation, StackedMemorizingSingleGetter, StackedMemorizingPluralGetter)
-import Perspectives.PropertyComposition (nestedToStackedLocation, stackedToNestedLocation, (>>->>))
+import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation, (>>->>))
 import Perspectives.Resource (locationFromResource)
 import Perspectives.ResourceTypes (Resource)
 
@@ -52,8 +52,8 @@ addTo f g = nameFunction queryName (query f g)
     query :: StackedMemorizingSingleGetter a -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
     query f' g' r = mcons <$> f' r <*> g' r
 
-identity :: MemorizingSingleGetter Resource
-identity = nestLocationInMonad (nameFunction "identity" (\x -> pure x))
+identity :: StackedMemorizingSingleGetter Resource
+identity = memorizeInStackedLocation (nameFunction "identity" (\x -> pure x))
 
 -- | This function memorizes due to nestLocationInMonad.
 filter :: MemorizingSingleGetter Boolean -> MemorizingPluralGetter Resource -> MemorizingPluralGetter Resource
