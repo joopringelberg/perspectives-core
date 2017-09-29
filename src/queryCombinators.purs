@@ -2,6 +2,7 @@ module Perspectives.QueryCombinators where
 
 import Prelude
 import Data.Array (foldr, cons, elemIndex, union, nub) as Arr
+import Data.Eq ((==))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -22,8 +23,9 @@ mclosure fun = nameFunction queryName (mclosure' fun []) where
   mclosure' f acc mr@(Just r) =
       do
         next <- f mr
-        rest <- mclosure' f (Arr.cons r acc) next
-        pure $ mcons next rest
+        if next == mr then pure [] else do
+          rest <- mclosure' f (Arr.cons r acc) next
+          pure $ mcons next rest
 
 mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
 mcons = nameFunction "mcons" (maybe id Arr.cons)
