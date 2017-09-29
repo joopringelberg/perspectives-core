@@ -5,12 +5,12 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, functionName, nameFunction, nestLocationInMonad, saveInLocation)
+import Perspectives.Location (Location, functionName, memorize, nameFunction, nestLocationInMonad, saveInLocation)
 import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($), (<<<), (<>), (>=>))
+import Prelude (bind, id, join, pure, ($), (<<<), (<=<), (<>), (>=>))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
@@ -53,6 +53,15 @@ memorizeInStackedLocation f mr = LocationT do
     g loc
   where
   g = nestLocationInMonad f
+
+memorizeSingleResourceGetter :: forall e.
+  (Maybe Resource -> (AsyncPropDefsM e) (Location (Maybe Resource)))
+  -> (Maybe Resource -> StackedLocation e (Maybe Resource))
+memorizeSingleResourceGetter f mr = LocationT do
+    loc <- locationFromMaybeResource mr
+    g loc
+  where
+  g = memorize f
 
 -- magic f mr = nestedToStackedLocation $ bind (locationFromMaybeResource mr) (nestLocationInMonad f)
 

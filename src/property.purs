@@ -12,8 +12,8 @@ import Data.StrMap (lookup)
 import Data.Traversable (traverse)
 import Perspectives.Location (Location, locationValue, nameFunction, saveInLocation)
 import Perspectives.LocationT (LocationT)
-import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, resourceFromLocation)
-import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
+import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, representResourceInLocation, resourceFromLocation)
+import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource, LocationWithResource)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -122,14 +122,14 @@ getBoolean :: PropertyName -> SingleGetter Boolean
 getBoolean name = nameFunction name (getSingleGetter toBoolean name)
 
 -- | in AsyncDomeinFile, retrieve either a String or an error message.
-getResource :: PropertyName -> SingleGetter Resource
+getResource :: forall e. PropertyName -> (Maybe Resource) -> AsyncPropDefsM e LocationWithResource
 getResource pn' = nameFunction pn' (f pn') where
-  f :: PropertyName -> SingleGetter Resource
+  f :: PropertyName -> (Maybe Resource) -> AsyncPropDefsM e LocationWithResource
   f pn mr = do
     (maybeId :: Maybe String) <- getSingleGetter toString pn mr
     case maybeId of
-      Nothing -> pure Nothing
-      (Just id) -> liftEff $ representResource id
+      Nothing -> pure $ saveInLocation Nothing
+      (Just id) -> liftEff $ representResourceInLocation id
 
 -- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
 getResources :: PropertyName -> PluralGetter Resource

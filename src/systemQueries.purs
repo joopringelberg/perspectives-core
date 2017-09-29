@@ -22,10 +22,10 @@ subClassOf :: StackedMemorizingPluralGetter Resource
 subClassOf = memorizeInStackedLocation (getResources "rdfs:subClassOf")
 
 rdfType :: StackedMemorizingSingleGetter Resource
-rdfType = memorizeInStackedLocation (getResource "rdf:type")
+rdfType = memorizeSingleResourceGetter (getResource "rdf:type")
 
 rol_RolBinding :: StackedMemorizingSingleGetter Resource
-rol_RolBinding = memorizeInStackedLocation (getResource "model:SysteemDomein#rol_RolBinding")
+rol_RolBinding = memorizeSingleResourceGetter (getResource "model:SysteemDomein#rol_RolBinding")
 
 -- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
 types :: StackedMemorizingPluralGetter Resource

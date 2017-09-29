@@ -8,6 +8,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Location (Location, functionName, nameFunction)
 import Perspectives.Property (MemorizingPluralGetter, NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
 import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
+import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
 
 mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
@@ -60,7 +61,7 @@ addTo f g = nameFunction queryName (query f g)
     query f' g' r = mcons <$> f' r <*> g' r
 
 identity :: StackedMemorizingSingleGetter Resource
-identity = memorizeInStackedLocation (nameFunction "identity" (\x -> pure x))
+identity = nameFunction "identity" (\x -> nestedToStackedLocation (locationFromMaybeResource x))
 
 filter :: StackedMemorizingSingleGetter Boolean -> StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
 filter c rs =

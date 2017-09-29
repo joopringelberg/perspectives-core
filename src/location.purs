@@ -23,6 +23,7 @@ module Perspectives.Location
   , nameFunction
   , functionName
   , nestLocationInMonad
+  , memorize
   , locationDependent)
 where
 
@@ -102,6 +103,15 @@ nestLocationInMonad f = nameFunction (functionName f) query
         pure $ connectLocations r (functionName f) (saveInNamedLocation name x)
       (Just result) -> pure result
       where name = functionName f <> " " <> locationName r
+
+memorize :: forall a b m. Monad m => (a -> m (Location b)) -> (Location a -> m (Location b))
+memorize f = nameFunction (functionName f) query
+  where
+    query r = case locationDependent f r of
+      Nothing -> do
+        (x :: Location b) <- f (locationValue r)
+        pure $ connectLocations r (functionName f) x
+      (Just result) -> pure result
 
 
 -----------------------------------------------------------------------------------------------

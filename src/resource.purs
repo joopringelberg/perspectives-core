@@ -42,15 +42,18 @@ resourceFromLocation loc = unsafePartial resourceFromLocation' loc where
       case locationValue locR of
         (Just r) -> r
 
--- | Look up a resource or create a new resource without definition and store it in the index.
 representResource :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) (Maybe Resource)
-representResource id = do
+representResource id = representResourceInLocation id >>= (pure <<< locationValue)
+
+-- | Look up a resource or create a new resource without definition and store it in the index.
+representResourceInLocation :: forall e. ResourceId -> Eff (gm :: GLOBALMAP | e) (Location (Maybe Resource))
+representResourceInLocation id = do
   x <- peek resourceIndex id
   case x of
     Nothing -> do
       loc <- storeResourceInIndex (Resource{ id: id, propDefs: Nothing})
-      pure $ locationValue loc
-    (Just (ResourceLocation {loc})) -> pure $ locationValue loc
+      pure loc
+    (Just (ResourceLocation {loc})) -> pure loc
 
 -- | Create a new resource with definitions and store it in the index.
 newResource :: ResourceId -> PropDefs -> Aff ( gm :: GLOBALMAP, avar :: AVAR ) (Location (Maybe Resource))
