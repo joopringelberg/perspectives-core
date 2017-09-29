@@ -167,10 +167,21 @@ exports.saveInNamedLocation = function( name ) {
 	}
 };
 
-exports.locationName = function( l )
-{
+exports.saveResource = function( name ) {
+	{
+		return function( v ) {
+			var loc = new Location( function() {
+				return v;
+			}, name );
+			v.value0.location = loc;
+			return loc;
+		};
+	}
+};
+
+exports.locationName = function( l ) {
 	return l.locName;
-}
+};
 
 /*
  * Note that this function depends on the representation of ADT's by the purescript compiler.
@@ -218,10 +229,10 @@ exports.mapLoc = function( fun ) {
 		if( !dependent )
 		{
 			dependent = new Location(
-				nameFunction( fun.name, function() {
+				function() {
 					return fun( loc.get() );
-				} ),
-				linkName  + loc.locName);
+				},
+				linkName + loc.locName );
 			loc.addDependent( linkName, dependent );
 		}
 		return dependent;
@@ -236,9 +247,9 @@ exports.applyLoc = function( funLoc ) {
 		if( !dependent )
 		{
 			dependent = new Location(
-				nameFunction( funLoc.locName, function() {
+				function() {
 					return funLoc.get()( loc.get() );
-				} ),
+				},
 				linkName + loc.locName );
 			funLoc.addDependent( linkName, dependent );
 			loc.addDependent( linkName, dependent );
@@ -256,7 +267,7 @@ exports.bindLoc = function( loc ) {
 			// Dependent will be produced by fun:
 			dependent = fun( loc.get() );
 			// The function set in dependent will perform the update necessary for bind.
-			dependent.fun = nameFunction( fun.name, function() {
+			dependent.fun = function() {
 				var newLocWithValue = fun( loc.get() );
 				// Move the dependents of dependent to newLocWithValue.
 				dependent._dependents.keys().forEach(
@@ -267,7 +278,7 @@ exports.bindLoc = function( loc ) {
 				);
 				// Return the content of the new location; it will be inserted into dependent by the recomputeNode function.
 				return newLocWithValue.get();
-			} );
+			};
 			loc.addDependent( linkName, dependent );
 		}
 		return dependent;
@@ -280,7 +291,7 @@ exports.connectLocationsAsInBind = function( loc ) {
 			var linkName = loc.locName + ">>=" + fun.name;
 			loc.addDependent( linkName, dependent );
 			// The function set in dependent will perform the update necessary for bind.
-			dependent.fun = nameFunction( fun.name, function() {
+			dependent.fun = function() {
 				var newLocWithValue = fun( loc.get() );
 				// Move the dependents of dependent to newLocWithValue.
 				dependent._dependents.keys().forEach(
@@ -291,7 +302,7 @@ exports.connectLocationsAsInBind = function( loc ) {
 				);
 				// Return the content of the new location; it will be inserted into dependent by the recomputeNode function.
 				return newLocWithValue.get();
-			} );
+			};
 			return dependent;
 		};
 	};

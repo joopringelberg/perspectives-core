@@ -8,6 +8,7 @@ module Perspectives.Location
   ( Location
   , saveInLocation
   , saveInNamedLocation
+  , saveResource
   , connectLocations
   , connectLocationsAsInBind
   , runLocation
@@ -37,6 +38,9 @@ foreign import saveInLocation :: forall a. a -> Location a
 
 -- | Creates a Location with the given name, containing the value.
 foreign import saveInNamedLocation :: forall a. String -> a -> Location a
+
+-- | Creates a Location with the given name, containing the Maybe Resource. Connects the location to the Resource.
+foreign import saveResource :: forall a. String -> a -> Location a
 
 foreign import locationName :: forall a. Location a -> String
 
