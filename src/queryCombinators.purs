@@ -13,7 +13,7 @@ import Perspectives.ResourceTypes (Resource)
 mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
 mclosure fun = nameFunction queryName (mclosure' fun []) where
   queryName :: String
-  queryName = "mclosure_" <> functionName fun
+  queryName = "mclosure " <> functionName fun
 
   mclosure' :: StackedMemorizingSingleGetter Resource -> Array Resource -> StackedMemorizingPluralGetter Resource
   mclosure' f acc Nothing = pure []
@@ -22,14 +22,22 @@ mclosure fun = nameFunction queryName (mclosure' fun []) where
       do
         next <- f mr
         rest <- mclosure' f (Arr.cons r acc) next
-        pure $ (maybe id Arr.cons) next rest
+        pure $ mcons next rest
+
+mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
+mcons = nameFunction "mcons" (maybe id Arr.cons)
 
 -- | Compute the transitive closure of the MemorizingPluralGetter to obtain a PluralGetter. NB: only for Resource results!
 aclosure :: StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
-aclosure f r = do
-  (t :: Array Resource) <- f r
-  (childClosures :: Array (Array Resource)) <- traverse (aclosure f) (map Just t)
-  pure $ Arr.nub (join (Arr.cons t childClosures))
+aclosure f' = nameFunction queryName (aclosure' f') where
+  queryName :: String
+  queryName = "aclosure " <> functionName f'
+
+  aclosure' :: StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
+  aclosure' f r = do
+    (t :: Array Resource) <- f r
+    (childClosures :: Array (Array Resource)) <- traverse (aclosure f) (map Just t)
+    pure $ Arr.nub (join (Arr.cons t childClosures))
 
 -- | This function memorizes due to LocationT apply.
 concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
@@ -47,9 +55,6 @@ addTo :: forall a. Eq a => StackedMemorizingSingleGetter a -> StackedMemorizingP
 addTo f g = nameFunction queryName (query f g)
   where
     queryName = ("addTo " <> functionName f <> " " <> functionName g)
-
-    mcons :: (Maybe a) -> (Array a) -> (Array a)
-    mcons = maybe id Arr.cons
 
     query :: StackedMemorizingSingleGetter a -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
     query f' g' r = mcons <$> f' r <*> g' r
