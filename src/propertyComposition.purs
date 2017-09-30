@@ -57,9 +57,9 @@ memorizeInStackedLocation f = nameFunction (functionName f)(\mr -> LocationT do
 memorizeSingleResourceGetter :: forall e.
   (Maybe Resource -> (AsyncPropDefsM e) (Location (Maybe Resource)))
   -> (Maybe Resource -> StackedLocation e (Maybe Resource))
-memorizeSingleResourceGetter f mr = LocationT do
+memorizeSingleResourceGetter f = nameFunction (functionName f)(\mr -> LocationT do
     loc <- locationFromMaybeResource mr
-    g loc
+    g loc)
   where
   g = memorize f
 
