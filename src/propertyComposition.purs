@@ -10,7 +10,7 @@ import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($), (<<<), (<=<), (<>), (>=>), (>>=))
+import Prelude (bind, id, join, pure, ($), (<<<), (<>), (>=>))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))

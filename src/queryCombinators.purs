@@ -12,23 +12,15 @@ import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStac
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
 
-mclosure :: StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter Resource
-mclosure fun = nameFunction queryName (mclosure' fun []) where
-  queryName :: String
-  queryName = "mclosure " <> functionName fun
-
+mclosure :: StackedMemorizingSingleGetter Resource -> String -> StackedMemorizingPluralGetter Resource
+mclosure fun queryName = nameFunction queryName (mclosure' fun []) where
   mclosure' :: StackedMemorizingSingleGetter Resource -> Array Resource -> StackedMemorizingPluralGetter Resource
   mclosure' f acc Nothing = pure []
   mclosure' f acc (Just r) | (maybe false (const true)) (Arr.elemIndex r acc) = pure []
-  -- mclosure' f acc mr@(Just r) =
-  --     do
-  --       next <- f mr
-  --       if next == mr then pure [] else do
-  --         rest <- mclosure' f (Arr.cons r acc) next
-  --         pure $ mcons next rest
-
   mclosure' f acc mr@(Just r) =
-    (f >=> nameFunction ("mclosure " <> functionName f)
+    -- If we do not name the recursive step (with f), an application of (mclosure g) on
+    -- the same mr will erroneously return the same result.
+    (f >=> nameFunction queryName
       (\next -> if next == mr then pure [] else do
         rest <- mclosure' f (Arr.cons r acc) next
         pure $ mcons next rest)) mr
@@ -49,6 +41,7 @@ aclosure f' = nameFunction queryName (aclosure' f') where
     pure $ Arr.nub (join (Arr.cons t childClosures))
 
 -- | This function memorizes due to LocationT apply.
+-- TODO: moet dit niet in StackedLocation zijn?
 concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
 concat f g = nameFunction queryName query
   where
