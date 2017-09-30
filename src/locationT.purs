@@ -47,7 +47,7 @@ bind1 :: forall a b m. Monad m => LocationT m a
   -> LocationT m b
 bind1 (LocationT af) f = LocationT
   (af >>= (\(l :: Location a) ->
-    case locationDependent (locationName l <> ">>=" <> functionName f) l of
+    case locationDependent (functionName f) l of
       Nothing ->
         let (LocationT af') = f (locationValue l)
         in

@@ -256,7 +256,7 @@ exports.applyLoc = function( funLoc ) {
 
 exports.bindLoc = function( loc ) {
 	return function( fun ) {
-		var linkName = loc.locName + ">>=" + fun.name;
+		var linkName = fun.name;
 		var dependent = loc.getDependent( linkName );
 		if( !dependent )
 		{
@@ -284,7 +284,7 @@ exports.bindLoc = function( loc ) {
 exports.connectLocationsAsInBind = function( loc ) {
 	return function( fun ) {
 		return function( dependent ) {
-			var linkName = loc.locName + ">>=" + fun.name;
+			var linkName = fun.name;
 			loc.addDependent( linkName, dependent );
 			// The function set in dependent will perform the update necessary for bind.
 			dependent.fun = function() {
