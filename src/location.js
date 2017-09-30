@@ -179,10 +179,6 @@ exports.saveResource = function( name ) {
 	}
 };
 
-exports.locationName = function( l ) {
-	return l.locName;
-};
-
 /*
  * Note that this function depends on the representation of ADT's by the purescript compiler.
  */
@@ -312,9 +308,13 @@ exports.locationValue = function( loc ) {
 	return loc.get();
 };
 
-exports.locationDependentAux = function( f ) {
+exports.locationName = function( loc ){
+	return loc.locName;
+}
+
+exports.locationDependentAux = function( name ) {
 	return function( loc ) {
-		return loc.getDependent( f.name );
+		return loc.getDependent( name );
 	};
 };
 

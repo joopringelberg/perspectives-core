@@ -18,13 +18,16 @@ module Perspectives.Location
   , runTHEORYDELTA
   , pureTHEORYDELTA
   , locationValue
+  , locationName
   , bindLoc
   , traverseLoc
   , nameFunction
   , functionName
   , nestLocationInMonad
   , memorize
-  , locationDependent)
+  , locationDependent
+  , namepreseveringComposeKleisli
+  , (>==>))
 where
 
 import Prelude
@@ -80,10 +83,10 @@ pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
 
 foreign import locationValue :: forall a. Location a -> a
 
-foreign import locationDependentAux :: forall a b c. (a -> b) -> Location c -> Foreign
+foreign import locationDependentAux :: forall a. String -> Location a -> Foreign
 
 -- | Do not assume anything about the content of the locations and the function.
-locationDependent :: forall a b c d. (a -> b) -> Location c -> Maybe (Location d)
+locationDependent :: forall a b. String -> Location a -> Maybe (Location b)
 locationDependent f loc =
   let d = locationDependentAux f loc
   in
@@ -97,7 +100,7 @@ foreign import functionName :: forall a b. (a -> b) -> String
 nestLocationInMonad :: forall a b m. Monad m => (a -> m b) -> (Location a -> m (Location b))
 nestLocationInMonad f = nameFunction (functionName f) query
   where
-    query r = case locationDependent f r of
+    query r = case locationDependent (functionName f) r of
       Nothing -> do
         x <- f (locationValue r)
         pure $ connectLocations r (functionName f) (saveInNamedLocation name x)
@@ -107,12 +110,16 @@ nestLocationInMonad f = nameFunction (functionName f) query
 memorize :: forall a b m. Monad m => (a -> m (Location b)) -> (Location a -> m (Location b))
 memorize f = nameFunction (functionName f) query
   where
-    query r = case locationDependent f r of
+    query r = case locationDependent (functionName f) r of
       Nothing -> do
         (x :: Location b) <- f (locationValue r)
         pure $ connectLocations r (functionName f) x
       (Just result) -> pure result
 
+namepreseveringComposeKleisli :: forall a b c m. Bind m => (a -> m b) -> (b -> m c) -> a -> m c
+namepreseveringComposeKleisli f g = nameFunction (functionName f) (\a -> f a >>= g)
+
+infixr 1 namepreseveringComposeKleisli as >==>
 
 -----------------------------------------------------------------------------------------------
 -- | TYPE CLASS INSTANCES
@@ -154,7 +161,7 @@ instance monadLocation :: Monad Location
 --   sequence = traverse1 id
 
 traverseLoc :: forall a b m. Applicative m => Monad m => (a -> m b) -> Location a -> m (Location b)
-traverseLoc f loc = case locationDependent f loc of
+traverseLoc f loc = case locationDependent (functionName f) loc of
   Nothing ->
     do
       b <- f (locationValue loc)

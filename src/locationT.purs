@@ -11,7 +11,7 @@ import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Prelude (bind, map, pure, (<$>), (<*>), (<<<))
+import Prelude (bind, map, pure, (<$>), (<*>), (<<<), (<>))
 
 newtype LocationT m a = LocationT (m (Location a))
 
@@ -47,7 +47,7 @@ bind1 :: forall a b m. Monad m => LocationT m a
   -> LocationT m b
 bind1 (LocationT af) f = LocationT
   (af >>= (\(l :: Location a) ->
-    case locationDependent f l of
+    case locationDependent (locationName l <> ">>=" <> functionName f) l of
       Nothing ->
         let (LocationT af') = f (locationValue l)
         in

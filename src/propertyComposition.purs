@@ -5,12 +5,12 @@ import Data.Array (cons, foldr, nub)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, functionName, memorize, nameFunction, nestLocationInMonad, saveInLocation)
+import Perspectives.Location (Location, functionName, memorize, nameFunction, nestLocationInMonad, saveInLocation, (>==>))
 import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($), (<<<), (<=<), (<>), (>=>))
+import Prelude (bind, id, join, pure, ($), (<<<), (<=<), (<>), (>=>), (>>=))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
@@ -48,9 +48,9 @@ liftToLocationT f = nestedToStackedLocation <<< f
 memorizeInStackedLocation :: forall b e.
   (Maybe Resource -> (AsyncPropDefsM e) b)
   -> (Maybe Resource -> StackedLocation e b)
-memorizeInStackedLocation f mr = LocationT do
+memorizeInStackedLocation f = nameFunction (functionName f)(\mr -> LocationT do
     loc <- locationFromMaybeResource mr
-    g loc
+    g loc)
   where
   g = nestLocationInMonad f
 
@@ -101,12 +101,23 @@ pTos f g =
     name = functionName f <> ">>->" <> functionName g
 
     applyg :: forall e. Array Resource -> StackedLocation e (Array (Maybe a))
-    applyg = traverse (g <<< Just)
+    applyg = nameFunction (functionName g )(traverse (g <<< Just))
 
     collectResults :: forall e. Array (Maybe a) -> StackedLocation e (Array a)
     collectResults = pure <<< nub <<< (foldr (maybe id cons) [])
 
-  in nameFunction name (f >=> applyg >=> collectResults)
+  -- Important: the association is to the right, i.e. the expression below equals:
+  -- (f >=> (applyg >==> collectResults))
+  -- The name preserving composeKleisli application means the subexpression
+  -- (applyg >==> collectResults)
+  -- bears the name of applyg, casu quo the name of g. As f has a name, too, here we will
+  -- see three locations connected by names relating to f and g, respectively.
+  in nameFunction name (f >=> applyg >==> collectResults)
+
+  -- in nameFunction name (f >=> applyg >=> collectResults)
+  -- in (\r -> f r >>= nameFunction ("applyg" <> functionName g)
+  --     (\x -> applyg x >>= nameFunction ("collectResults" <> functionName g)
+  --       (\y -> collectResults y)))
 
 infixl 0 pTos as >>->
 
@@ -122,11 +133,11 @@ pTop f g =
     name = functionName f <> ">>->>" <> functionName g
 
     applyg :: forall e. Array Resource -> StackedLocation e (Array (Array a))
-    applyg = traverse (g <<< Just)
+    applyg = nameFunction (functionName g) (traverse (g <<< Just))
 
     collectResults :: forall e. Array (Array a) -> StackedLocation e (Array a)
     collectResults = pure <<< nub <<< join
 
-  in nameFunction name (f >=> applyg >=> collectResults)
+  in nameFunction name (f >=> applyg >==> collectResults)
 
 infixl 0 pTop as >>->>
