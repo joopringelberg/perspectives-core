@@ -6,7 +6,7 @@ import Data.Eq ((==))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, functionName, nameFunction)
+import Perspectives.Location (Location, functionName, nameFunction, (>==>))
 import Perspectives.Property (MemorizingPluralGetter, NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
 import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
 import Perspectives.Resource (locationFromMaybeResource)
@@ -20,12 +20,18 @@ mclosure fun = nameFunction queryName (mclosure' fun []) where
   mclosure' :: StackedMemorizingSingleGetter Resource -> Array Resource -> StackedMemorizingPluralGetter Resource
   mclosure' f acc Nothing = pure []
   mclosure' f acc (Just r) | (maybe false (const true)) (Arr.elemIndex r acc) = pure []
+  -- mclosure' f acc mr@(Just r) =
+  --     do
+  --       next <- f mr
+  --       if next == mr then pure [] else do
+  --         rest <- mclosure' f (Arr.cons r acc) next
+  --         pure $ mcons next rest
+
   mclosure' f acc mr@(Just r) =
-      do
-        next <- f mr
-        if next == mr then pure [] else do
-          rest <- mclosure' f (Arr.cons r acc) next
-          pure $ mcons next rest
+    (f >=> nameFunction ("mclosure " <> functionName f)
+      (\next -> if next == mr then pure [] else do
+        rest <- mclosure' f (Arr.cons r acc) next
+        pure $ mcons next rest)) mr
 
 mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
 mcons = nameFunction "mcons" (maybe id Arr.cons)
