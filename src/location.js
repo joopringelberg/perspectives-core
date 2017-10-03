@@ -238,6 +238,10 @@ exports.mapLoc = function( fun ) {
 exports.applyLoc = function( funLoc ) {
 	return function( loc ) {
 		// Apply can be executed only once for the combination of funLoc and loc.
+		// If we use funLoc.locName as linkName and look up in loc, we will find the right dependent.
+		// However, we cannot use that name to connect funLoc to loc. It is entirely plausible that
+		// we will apply fun multiple times to its first argument, but with different second arguments
+		// (remember, fun has arity 2). We would then overwrite the link from funLoc.
 		var linkName = funLoc.locName + "<*>" + loc.locName;
 		var dependent = funLoc.getDependent( linkName );
 		if( !dependent )

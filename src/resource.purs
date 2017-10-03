@@ -11,7 +11,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Location (Location, THEORYDELTA, saveInLocation, locationValue, setLocationValue, saveResource)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
-import Perspectives.ResourceTypes (AsyncDomeinFile, PropDefs, Resource(..), ResourceId, ResourceLocation(..))
+import Perspectives.ResourceTypes (PropDefs, Resource(..), ResourceId, ResourceLocation(..))
 
 -- | The global index of all Resource-Location pairs, indexed by ResourceId.
 type ResourceIndex = GLStrMap ResourceLocation
