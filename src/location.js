@@ -186,7 +186,7 @@ function valueName( v )
 {
 	if( Array.isArray( v ) )
 	{
-		return v.map( valueName ).toString();
+		return "[" + v.map( valueName ).toString() + "]";
 	}
 	else
 	{
@@ -238,7 +238,7 @@ exports.mapLoc = function( fun ) {
 exports.applyLoc = function( funLoc ) {
 	return function( loc ) {
 		// Apply can be executed only once for the combination of funLoc and loc.
-		var linkName = funLoc.locName + "<*>";
+		var linkName = funLoc.locName + "<*>" + loc.locName;
 		var dependent = funLoc.getDependent( linkName );
 		if( !dependent )
 		{
@@ -246,7 +246,7 @@ exports.applyLoc = function( funLoc ) {
 				function() {
 					return funLoc.get()( loc.get() );
 				},
-				linkName + loc.locName );
+				linkName );
 			funLoc.addDependent( linkName, dependent );
 			loc.addDependent( linkName, dependent );
 		}
