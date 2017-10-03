@@ -1,7 +1,7 @@
 module Perspectives.PropertyComposition where
 
 
-import Data.Array (cons, foldr, nub)
+import Data.Array (cons, elemIndex, foldr, head, nub, tail, union)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
@@ -10,7 +10,7 @@ import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, id, join, pure, ($), (<<<), (<>), (>=>))
+import Prelude (bind, const, id, join, otherwise, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
@@ -71,7 +71,7 @@ memorizeSingleResourceGetter f = nameFunction (functionName f)(\mr -> LocationT 
 --   -> (Location (Maybe a) -> m (Location (Maybe c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
 sTos :: forall a. StackedMemorizingSingleGetter Resource -> StackedMemorizingSingleGetter a -> StackedMemorizingSingleGetter a
-sTos p q = nameFunction name (p >=> q) where
+sTos p q = nameFunction name (p >==> q) where
   name :: String
   name = functionName p <> ">->" <> functionName q
 
@@ -83,7 +83,7 @@ infixl 0 sTos as >->
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
 sTop :: forall a. StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
-sTop p q = nameFunction name (p >=> q) where
+sTop p q = nameFunction name (p >==> q) where
   name :: String
   name = functionName p <> ">->" <> functionName q
 
@@ -95,31 +95,20 @@ infixl 0 sTop as >->>
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does memorize the result of applying the second argument to the result of the first.
 pTos :: forall a. Eq a => StackedMemorizingPluralGetter Resource -> StackedMemorizingSingleGetter a -> StackedMemorizingPluralGetter a
-pTos f g =
-  let
-    name :: String
-    name = functionName f <> ">>->" <> functionName g
-
-    applyg :: forall e. Array Resource -> StackedLocation e (Array (Maybe a))
-    applyg = nameFunction (functionName g )(traverse (g <<< Just))
-
-    collectResults :: forall e. Array (Maybe a) -> StackedLocation e (Array a)
-    collectResults = pure <<< nub <<< (foldr (maybe id cons) [])
-
-  -- Important: the association is to the right, i.e. the expression below equals:
-  -- (f >=> (applyg >==> collectResults))
-  -- The name preserving composeKleisli application means the subexpression
-  -- (applyg >==> collectResults)
-  -- bears the name of applyg, casu quo the name of g. As f has a name, too, here we will
-  -- see three locations connected by names relating to f and g, respectively.
-  in nameFunction name (f >=> applyg >==> collectResults)
-
-  -- in nameFunction name (f >=> applyg >=> collectResults)
-  -- in (\r -> f r >>= nameFunction ("applyg" <> functionName g)
-  --     (\x -> applyg x >>= nameFunction ("collectResults" <> functionName g)
-  --       (\y -> collectResults y)))
+pTos f g r = f r >>= nameFunction (functionName g) (\arr -> pTos' (Just arr)) where
+  pTos' :: forall e. Maybe (Array Resource) -> StackedLocation e (Array a)
+  pTos' Nothing = pure []
+  pTos' (Just fs) = mconsUniques <$> (g $ head fs) <*> (pTos' $ tail fs)
 
 infixl 0 pTos as >>->
+
+-- NOTE: if we make mcons point free, it will effectively not have a name when applied.
+mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
+mcons e a = (maybe id cons) e a
+
+mconsUniques :: forall a. Eq a => Maybe a -> Array a -> Array a
+mconsUniques (Just el) arr | (maybe true (const false)) $ elemIndex el arr = cons el arr
+mconsUniques otherwise arr = arr
 
 -- pTop :: forall a b c m.  Monad m => Eq c =>
 --   (Location (Maybe a) -> m (Location (Array b)))
@@ -127,17 +116,9 @@ infixl 0 pTos as >>->
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does memorize the result of applying the second argument to the result of the first.
 pTop :: forall a. Eq a => StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
-pTop f g =
-  let
-    name :: String
-    name = functionName f <> ">>->>" <> functionName g
-
-    applyg :: forall e. Array Resource -> StackedLocation e (Array (Array a))
-    applyg = nameFunction (functionName g) (traverse (g <<< Just))
-
-    collectResults :: forall e. Array (Array a) -> StackedLocation e (Array a)
-    collectResults = pure <<< nub <<< join
-
-  in nameFunction name (f >=> applyg >==> collectResults)
+pTop f g r = f r >>= nameFunction (functionName g) (\arr -> pTop' (Just arr)) where
+  pTop' :: forall e. Maybe (Array Resource) -> StackedLocation e (Array a)
+  pTop' Nothing = pure []
+  pTop' (Just (fs :: Array Resource)) = union <$> (g $ head fs) <*> (pTop' $ tail fs)
 
 infixl 0 pTop as >>->>

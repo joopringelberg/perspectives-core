@@ -1,56 +1,41 @@
 module Perspectives.QueryCombinators where
 
 import Prelude
-import Data.Array (foldr, cons, elemIndex, union, nub) as Arr
-import Data.Eq ((==))
+import Data.Array (head, null, tail)
+import Data.Array (cons, elemIndex, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
-import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..))
-import Perspectives.Location (Location, functionName, nameFunction, (>==>))
-import Perspectives.Property (MemorizingPluralGetter, NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
-import Perspectives.PropertyComposition (memorizeInStackedLocation, nestedToStackedLocation, stackedToNestedLocation)
+import Perspectives.Location (Location, functionName, nameFunction)
+import Perspectives.Property (NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
+import Perspectives.PropertyComposition (nestedToStackedLocation, stackedToNestedLocation, mcons)
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
 
 mclosure :: StackedMemorizingSingleGetter Resource -> String -> StackedMemorizingPluralGetter Resource
 mclosure fun queryName = nameFunction queryName (mclosure' fun []) where
   mclosure' :: StackedMemorizingSingleGetter Resource -> Array Resource -> StackedMemorizingPluralGetter Resource
-  mclosure' f acc Nothing = pure []
-  mclosure' f acc (Just r) | (maybe false (const true)) (Arr.elemIndex r acc) = pure []
-  mclosure' f acc mr@(Just r) =
-    -- If we do not name the recursive step (with f), an application of (mclosure g) on
-    -- the same mr will erroneously return the same result.
-    (f >=> nameFunction queryName
-      (\next -> if next == mr then pure [] else do
-        rest <- mclosure' f (Arr.cons r acc) next
-        pure $ mcons next rest)) mr
+  mclosure' f acc mr@(Just r) | (maybe true (const false)) (Arr.elemIndex r acc) =
+    mcons
+      <$> nestedToStackedLocation (locationFromMaybeResource mr)
+      <*> (f mr >>= (\next -> mclosure' f (Arr.cons r acc) next))
+  mclosure' f acc otherwise = pure []
 
-mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
-mcons = nameFunction "mcons" (maybe id Arr.cons)
-
--- | Compute the transitive closure of the MemorizingPluralGetter to obtain a PluralGetter. NB: only for Resource results!
-aclosure :: StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
-aclosure f' = nameFunction queryName (aclosure' f') where
-  queryName :: String
-  queryName = "aclosure " <> functionName f'
-
-  aclosure' :: StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
-  aclosure' f r = do
-    (t :: Array Resource) <- f r
-    (childClosures :: Array (Array Resource)) <- traverse (aclosure f) (map Just t)
-    pure $ Arr.nub (join (Arr.cons t childClosures))
+aclosure :: StackedMemorizingPluralGetter Resource -> String -> StackedMemorizingPluralGetter Resource
+aclosure f queryName r = nameFunction queryName $ (f r) >>= ((pure <<< Just) >=> aclosure') where
+  aclosure' :: forall e. Maybe (Array Resource) -> StackedLocation e (Array Resource)
+  aclosure' (Just rs) | not $ null rs =
+    union
+      <$> aclosure f queryName (head rs)
+      <*> (mcons <$> nestedToStackedLocation (locationFromMaybeResource (head rs)) <*> aclosure' (tail rs))
+    where union a b = Arr.union a b
+  aclosure' rs | otherwise = pure []
 
 -- | This function memorizes due to LocationT apply.
--- TODO: moet dit niet in StackedLocation zijn?
-concat :: forall a. Eq a => MemorizingPluralGetter a -> MemorizingPluralGetter a -> MemorizingPluralGetter a
+concat :: forall a. Eq a => StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
 concat f g = nameFunction queryName query
   where
     queryName = ("concat " <> functionName f <> " " <> functionName g)
 
-    -- NOTE we do not want to rename Arr.union itself.
-    aux = nameFunction "union" (\a b -> Arr.union a b)
-
-    query r = stackedToNestedLocation $ aux <$> (nestedToStackedLocation <<< f) r <*> (nestedToStackedLocation <<< g) r
+    query r = Arr.union <$> f r <*> g r
 
 -- | This function memorizes due to LocationT apply.
 addTo :: forall a. Eq a => StackedMemorizingSingleGetter a -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
@@ -64,27 +49,19 @@ addTo f g = nameFunction queryName (query f g)
 identity :: StackedMemorizingSingleGetter Resource
 identity = nameFunction "identity" (\x -> nestedToStackedLocation (locationFromMaybeResource x))
 
-filter :: StackedMemorizingSingleGetter Boolean -> StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
-filter c rs =
-  nameFunction name (rs >=> (nameFunction name filterWithCriterium))
+filter :: StackedMemorizingSingleGetter Boolean -> String -> StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter Resource
+filter c queryName rs =
+  nameFunction queryName (rs >=> (nameFunction queryName ((pure <<< Just) >=> nameFunction queryName filterWithCriterium)))
   where
-    name :: String
-    name = "filter " <> (functionName c)
+    filterWithCriterium :: forall e. Maybe (Array Resource) -> StackedLocation e (Array Resource)
+    filterWithCriterium (Just candidates) | not $ null candidates =
+      mcons <$> ((c $ head candidates) >>= addOrNot) <*> (filterWithCriterium $ tail candidates)
+        where
+        addOrNot mb = case mb of
+          (Just true) -> pure $ head candidates
+          otherwise -> pure Nothing
+    filterWithCriterium otherwise = pure []
 
-    filterWithCriterium :: forall e. Array Resource -> StackedLocation e (Array Resource)
-    filterWithCriterium candidates = do
-      (judgedCandidates :: Array (Tuple Resource (Maybe Boolean))) <- traverse judge candidates
-      pure $ (Arr.foldr takeOrDrop [] judgedCandidates)
-
-    judge :: forall e. Resource -> (StackedLocation e) (Tuple Resource (Maybe Boolean))
-    judge candidate = do
-      (judgement :: Maybe Boolean) <- c (Just candidate)
-      pure (Tuple candidate judgement)
-
-    takeOrDrop :: Tuple Resource (Maybe Boolean) -> Array Resource -> Array Resource
-    takeOrDrop (Tuple res b) cumulator = case b of
-      (Just true) -> Arr.cons res cumulator
-      _ -> cumulator
 
 -- | This function is more general than a SingleGetter Boolean, because it will work on other arguments
 -- | than just Maybe Resource.

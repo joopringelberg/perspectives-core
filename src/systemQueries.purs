@@ -33,7 +33,7 @@ types = (QC.mclosure rdfType "types")
 
 -- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
 superClasses :: StackedMemorizingPluralGetter Resource
-superClasses = nameFunction "superClasses" (QC.aclosure subClassOf)
+superClasses = nameFunction "superClasses" (QC.aclosure subClassOf "superClasses")
 
 typeSuperClasses :: StackedMemorizingPluralGetter Resource
 typeSuperClasses = nameFunction "typeSuperClasses" (QC.addTo rdfType (rdfType >->> superClasses))
