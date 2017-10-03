@@ -52,7 +52,7 @@ Location.prototype = Object.create(
 			get: function() {
 				var r = [];
 				var dependents = this._dependents;
-				dependents.keys().forEach(
+				Object.keys( dependents ).forEach(
 					function( key ) {
 						r.push( dependents[ key ] );
 					}
