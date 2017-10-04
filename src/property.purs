@@ -10,9 +10,9 @@ import Data.Array (cons, foldr, head)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, THEORYDELTA, locationValue, nameFunction, saveInLocation)
+import Perspectives.Location (Location, nameFunction, saveInLocation)
 import Perspectives.LocationT (LocationT)
-import Perspectives.Resource (ResourceIndex, getPropDefs, representResource, representResourceInLocation, resourceFromLocation)
+import Perspectives.Resource (PROPDEFS, ResourceIndex, getPropDefs, representResource, representResourceInLocation)
 import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource, LocationWithResource)
 
 {-
@@ -26,7 +26,7 @@ However, a property whose range is Resource, must be represented by a Maybe Reso
 
 type PropertyName = String
 
-type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex, td :: THEORYDELTA | e)
+type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex, prd :: PROPDEFS | e)
 
 type StackedLocation e a = LocationT (AsyncPropDefsM e) a
 

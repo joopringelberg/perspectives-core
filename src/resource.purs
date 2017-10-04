@@ -3,13 +3,13 @@ module Perspectives.Resource where
 import Prelude
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar, makeVar', peekVar, AVAR)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
-import Perspectives.Location (Location, THEORYDELTA, saveInLocation, locationValue, setLocationValue, saveResource)
+import Perspectives.Location (Location, saveInLocation, locationValue, setLocationValue, saveResource)
 import Perspectives.ResourceRetrieval (fetchPropDefs)
 import Perspectives.ResourceTypes (PropDefs, Resource(..), ResourceId, ResourceLocation(..))
 
@@ -69,22 +69,19 @@ storeResourceInIndex res@(Resource{id}) =
   in do
     poke resourceIndex id (ResourceLocation{ res: res, loc: loc}) *> pure loc
 
-addPropertyDefinitions :: forall e. Resource -> AVar PropDefs -> Aff (td :: THEORYDELTA, gm :: GLOBALMAP, avar :: AVAR | e) Unit
-addPropertyDefinitions r@(Resource{id}) av =
-  do
-    loc <- locationFromResource r
-    _ <- liftEff $ setLocationValue loc (Just (Resource{ id: id, propDefs: (Just av)}))
-    _ <- liftEff $ poke resourceIndex id (ResourceLocation{ res: r, loc: loc })
-    pure unit
+foreign import data PROPDEFS :: Effect
+
+-- | Modify the structure of the Resource, tracking this effect with PROPDEFS
+foreign import setPropertyDefinitions :: forall e. Resource -> Maybe (AVar PropDefs) -> Eff (prd :: PROPDEFS | e) Unit
 
 -- | Get the property definitions of a Resource.
-getPropDefs :: forall e. Resource -> Aff (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX, td :: THEORYDELTA | e) PropDefs
+getPropDefs :: forall e. Resource -> Aff (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX, prd :: PROPDEFS | e) PropDefs
 getPropDefs r@(Resource {id, propDefs}) = case propDefs of
   Nothing -> do
               pd <- fetchPropDefs id
               av <- makeVar' pd
               -- set av as the value of propDefs in the resource!
-              _ <- addPropertyDefinitions r av
+              _ <- liftEff $ setPropertyDefinitions r (Just av)
               pure pd
   (Just avar) -> do
                   pd <- peekVar avar
