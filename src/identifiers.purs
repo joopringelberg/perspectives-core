@@ -4,7 +4,11 @@ module Perspectives.Identifiers
 , isStandardNamespacePrefix
 , getStandardNamespace
 , getPrefix
+, getLocalNameFromCurie
+, getLocalNameFromURI
 , getNamespace
+, getFirstMatch
+, getSecondMatch
 , Namespace
   )
 
@@ -39,6 +43,11 @@ getFirstMatch regex s = case match regex s of
   (Just matches) -> unsafePartial unsafeIndex matches 1
   _ -> Nothing
 
+getSecondMatch :: Regex -> String -> Maybe String
+getSecondMatch regex s = case match regex s of
+  (Just matches) -> unsafePartial unsafeIndex matches 2
+  _ -> Nothing
+
 domeinURIRegex :: Regex
 domeinURIRegex = unsafeRegex "^model:(\\w*)#(\\w*)$" noFlags
 
@@ -53,7 +62,11 @@ curieRegEx = unsafeRegex "^(\\w+)\\:(\\w+)" noFlags
 getPrefix :: String -> Maybe Prefix
 getPrefix = getFirstMatch curieRegEx
 
--- | True iff the string is a curie with a recognizable prefix that is one of prefixes of the standard namespaces.
+-- | Returns "someurl" from "pre:someurl" or Nothing
+getLocalNameFromCurie :: String -> Maybe String
+getLocalNameFromCurie = getSecondMatch curieRegEx
+
+-- | True iff the string is a curie with a recognizable prefix that is one of prefixes of the standard namespaces: "owl:whatever" returns true.
 isStandardNamespaceCURIE :: String -> Boolean
 isStandardNamespaceCURIE s =
   case match curieRegEx s of
@@ -63,6 +76,7 @@ isStandardNamespaceCURIE s =
 isStandardNamespacePrefix :: Prefix -> Boolean
 isStandardNamespacePrefix pre = maybe false (const true) (lookup pre standardPrefixes2namespaces)
 
+-- | From "owl:Thing", get "http://www.w3.org/2002/07/owl#"
 getStandardNamespace :: String -> Maybe Namespace
 getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (getPrefix s)
 
@@ -71,3 +85,7 @@ namespaceRegex = unsafeRegex "^(model:\\w*#)\\w*$" noFlags
 
 getNamespace :: String -> Maybe Namespace
 getNamespace = getFirstMatch namespaceRegex
+
+-- | Returns "someurl" from "pre:someurl" or Nothing
+getLocalNameFromURI :: String -> Maybe String
+getLocalNameFromURI = getSecondMatch domeinURIRegex
