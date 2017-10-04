@@ -4,7 +4,7 @@ import Perspectives.PropertyComposition
 import Perspectives.QueryCombinators as QC
 import Data.Maybe (Maybe(..))
 import Perspectives.Location (nameFunction)
-import Perspectives.Property (SingleGetter, StackedMemorizingSingleGetter, StackedMemorizingPluralGetter, getResource, getResources, getString)
+import Perspectives.Property (SingleGetter, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, getBoolean, getResource, getResources, getString)
 import Perspectives.ResourceTypes (Resource(..))
 import Prelude (pure)
 
@@ -44,3 +44,9 @@ hasLabel = QC.hasValue label
 
 hasBinding :: StackedMemorizingSingleGetter Boolean
 hasBinding = QC.hasValue rol_RolBinding
+
+isFunctional :: StackedMemorizingSingleGetter Boolean
+isFunctional = memorizeInStackedLocation (getBoolean "owl:FunctionalProperty")
+
+rdfsRange :: StackedMemorizingSingleGetter String
+rdfsRange = memorizeInStackedLocation (getString "rdfs:range")
