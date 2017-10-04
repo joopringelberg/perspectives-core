@@ -98,7 +98,7 @@ pTos :: forall a. Eq a => StackedMemorizingPluralGetter Resource -> StackedMemor
 pTos f g r = f r >>= nameFunction (functionName g) (\arr -> pTos' (Just arr)) where
   pTos' :: forall e. Maybe (Array Resource) -> StackedLocation e (Array a)
   pTos' Nothing = pure []
-  pTos' (Just fs) = mconsUniques <$> (g $ head fs) <*> (pTos' $ tail fs)
+  pTos' (Just fs) = (nameFunction "mconsUniques" mconsUniques) <$> (g $ head fs) <*> (pTos' $ tail fs)
 
 infixl 0 pTos as >>->
 
@@ -106,6 +106,8 @@ infixl 0 pTos as >>->
 mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
 mcons e a = (maybe id cons) e a
 
+-- NOTE: because of the class constraint, mconsUniques compiles to a function that returns a function.
+-- This latter function will NOT have a name. Hence it is necessary to name the function on each application...
 mconsUniques :: forall a. Eq a => Maybe a -> Array a -> Array a
 mconsUniques (Just el) arr | (maybe true (const false)) $ elemIndex el arr = cons el arr
 mconsUniques otherwise arr = arr
