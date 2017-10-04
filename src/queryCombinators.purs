@@ -20,7 +20,7 @@ mclosure fun queryName = nameFunction queryName (mclosure' fun []) where
   mclosure' f acc otherwise = pure []
 
 aclosure :: StackedMemorizingPluralGetter Resource -> String -> StackedMemorizingPluralGetter Resource
-aclosure f queryName r = nameFunction queryName $ (f r) >>= ((pure <<< Just) >=> aclosure') where
+aclosure f queryName r = nameFunction queryName $ (f r) >>= (nameFunction queryName $ ((pure <<< Just) >=> aclosure')) where
   aclosure' :: forall e. Maybe (Array Resource) -> StackedLocation e (Array Resource)
   aclosure' (Just rs) | not $ null rs =
     union
