@@ -1,16 +1,15 @@
 module Perspectives.PropertyComposition where
 
 
-import Data.Array (cons, elemIndex, foldr, head, nub, tail, union)
+import Data.Array (cons, elemIndex, head, tail, union)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Traversable (traverse)
 import Perspectives.Location (Location, functionName, memorize, nameFunction, nestLocationInMonad, saveInLocation, (>==>))
 import Perspectives.LocationT (LocationT(..))
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, const, id, join, otherwise, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
+import Prelude (bind, const, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
@@ -54,6 +53,9 @@ memorizeInStackedLocation f = nameFunction (functionName f)(\mr -> LocationT do
   where
   g = nestLocationInMonad f
 
+-- | From a function that takes a Resource and returns a Resource, create a function that
+-- | connects the locations that these Resources are saved in. The resulting function bears
+-- | the same name as its argument function.
 memorizeSingleResourceGetter :: forall e.
   (Maybe Resource -> (AsyncPropDefsM e) (Location (Maybe Resource)))
   -> (Maybe Resource -> StackedLocation e (Maybe Resource))

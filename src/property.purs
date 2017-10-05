@@ -48,6 +48,8 @@ type PluralGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Array a)
 type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Array a))
 type StackedMemorizingPluralGetter a = forall e. Maybe Resource -> StackedLocation e (Array a)
 
+type StackedMemorizingGetter a = forall e. Maybe Resource -> StackedLocation e a
+
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
 -- | Returns a function that takes a property name and returns a single getter for that property.

@@ -34,6 +34,7 @@ import Prelude
 import Control.Monad.Eff (Eff, kind Effect, runPure)
 import Data.Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Data.Maybe (Maybe(..))
+import Perspectives.PropertyNames (getInversePropertyName)
 
 foreign import data Location :: Type -> Type
 
@@ -113,6 +114,7 @@ memorize f = nameFunction (functionName f) query
     query r = case locationDependent (functionName f) r of
       Nothing -> do
         (x :: Location b) <- f (locationValue r)
+        _ <- pure $ connectLocations x (getInversePropertyName (functionName f)) r
         pure $ connectLocations r (functionName f) x
       (Just result) -> pure result
 

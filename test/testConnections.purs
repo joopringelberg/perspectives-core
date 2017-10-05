@@ -66,8 +66,8 @@ test = launchAff $ runLocationT do
   -- log $ show z
   -- log "Klaar"
 
-  (gebruiker :: Maybe Resource) <- liftEff $ representResource "model:SysteemDomein#Gebruiker"
-  x <- identity >->> superClasses >>-> label $ gebruiker
+  (gebruiker :: Maybe Resource) <- liftEff $ representResource "owl:Thing"
+  x <- identity >-> rdfType >-> identifier $ gebruiker
   log $ show x
   _ <- pure $ catchit gebruiker
   log "Klaar"

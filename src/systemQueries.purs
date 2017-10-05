@@ -50,3 +50,6 @@ isFunctional = memorizeInStackedLocation (getBoolean "owl:FunctionalProperty")
 
 rdfsRange :: StackedMemorizingSingleGetter String
 rdfsRange = memorizeInStackedLocation (getString "rdfs:range")
+
+owlInverseOf :: StackedMemorizingSingleGetter Resource
+owlInverseOf = memorizeSingleResourceGetter (getResource "owl:inverseOf")

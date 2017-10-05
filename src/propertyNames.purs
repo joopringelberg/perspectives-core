@@ -6,7 +6,6 @@ import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.Identifiers (getFirstMatch, getLocalNameFromCurie, getLocalNameFromURI, getNamespace, getPrefix, getSecondMatch, isStandardNamespaceCURIE)
-import Perspectives.Property (PropertyName)
 import Prelude (id, ($), (<>))
 
 {-
@@ -19,7 +18,7 @@ c. If the above two cases did not succeed, just prefix the name with "inverse_"
 
 -}
 
-getInversePropertyName :: PropertyName -> PropertyName
+getInversePropertyName :: String -> String
 getInversePropertyName pn =
   case invertIdentifierFromStandardNamespace pn of
     (Just n) -> n
@@ -33,17 +32,17 @@ capitalizeWord word = (toUpper $ take 1 word) <> drop 1 word
 decapitalizeWord :: String -> String
 decapitalizeWord = toLower
 
-invertIdentifierFromStandardNamespace :: PropertyName -> Maybe PropertyName
+invertIdentifierFromStandardNamespace :: String -> Maybe String
 invertIdentifierFromStandardNamespace s = if isStandardNamespaceCURIE s then Just (((maybe "" id) (getPrefix s)) <> ":inverse_" <> (maybe "" id)  (getLocalNameFromCurie s)) else Nothing
 
 domainRangeRuleRegex :: Regex
 domainRangeRuleRegex = unsafeRegex "(.+?)\\_(.+)" noFlags
 
-conformsToDomainRangeRule :: PropertyName -> Boolean
+conformsToDomainRangeRule :: String -> Boolean
 conformsToDomainRangeRule s = test domainRangeRuleRegex s
 
--- | Note that PropertyName cannot be a curie!
-invertDomainAndRange :: PropertyName -> Maybe PropertyName
+-- | Note that String cannot be a curie!
+invertDomainAndRange :: String -> Maybe String
 invertDomainAndRange pn =
     let
       namespace = getNamespace pn
