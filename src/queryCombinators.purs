@@ -4,7 +4,7 @@ import Prelude
 import Data.Array (head, null, tail)
 import Data.Array (cons, elemIndex, union) as Arr
 import Data.Maybe (Maybe(..), maybe)
-import Perspectives.Location (Location, functionName, nameFunction)
+import Perspectives.Location (Location, THEORYDELTA, functionName, nameFunction)
 import Perspectives.Property (NestedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, StackedLocation)
 import Perspectives.PropertyComposition (nestedToStackedLocation, stackedToNestedLocation, mcons)
 import Perspectives.Resource (locationFromMaybeResource)
@@ -21,7 +21,7 @@ mclosure fun queryName = nameFunction queryName (mclosure' fun []) where
 
 aclosure :: StackedMemorizingPluralGetter Resource -> String -> StackedMemorizingPluralGetter Resource
 aclosure f queryName r = nameFunction queryName $ (f r) >>= (nameFunction queryName $ ((pure <<< Just) >=> aclosure')) where
-  aclosure' :: forall e. Maybe (Array Resource) -> StackedLocation e (Array Resource)
+  aclosure' :: forall e. Maybe (Array Resource) -> StackedLocation (td :: THEORYDELTA | e) (Array Resource)
   aclosure' (Just rs) | not $ null rs =
     union
       <$> aclosure f queryName (head rs)
@@ -33,7 +33,7 @@ filter :: StackedMemorizingSingleGetter Boolean -> String -> StackedMemorizingPl
 filter c queryName rs =
   nameFunction queryName (rs >=> (nameFunction queryName ((pure <<< Just) >=> nameFunction queryName filterWithCriterium)))
   where
-    filterWithCriterium :: forall e. Maybe (Array Resource) -> StackedLocation e (Array Resource)
+    filterWithCriterium :: forall e. Maybe (Array Resource) -> StackedLocation (td :: THEORYDELTA | e) (Array Resource)
     filterWithCriterium (Just candidates) | not $ null candidates =
       mcons <$> ((c $ head candidates) >>= addOrNot) <*> (filterWithCriterium $ tail candidates)
         where

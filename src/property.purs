@@ -10,7 +10,7 @@ import Data.Array (cons, foldr, head)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.Location (Location, nameFunction, saveInLocation)
+import Perspectives.Location (Location, THEORYDELTA, nameFunction, saveInLocation)
 import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (PROPDEFS, ResourceIndex, getPropDefs, representResource, representResourceInLocation)
 import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource, LocationWithResource)
@@ -38,7 +38,7 @@ type SingleGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Maybe a)
 
 -- type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
 type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Maybe a))
-type StackedMemorizingSingleGetter a = forall e. Maybe Resource -> StackedLocation e (Maybe a)
+type StackedMemorizingSingleGetter a = forall e. Maybe Resource -> StackedLocation (td :: THEORYDELTA | e) (Maybe a)
 
 -- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
@@ -46,7 +46,7 @@ type PluralGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Array a)
 
 -- type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
 type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Array a))
-type StackedMemorizingPluralGetter a = forall e. Maybe Resource -> StackedLocation e (Array a)
+type StackedMemorizingPluralGetter a = forall e. Maybe Resource -> StackedLocation (td :: THEORYDELTA | e) (Array a)
 
 type StackedMemorizingGetter a = forall e. Maybe Resource -> StackedLocation e a
 

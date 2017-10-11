@@ -28,6 +28,8 @@ import Test.Connections
 
 main = test
 
+-- test = log "Hello world!"
+
 -- test = launchAff do
 --   log "=========================Test.Properties================================"
 --   (gbLoc :: Location (Maybe Resource)) <- (liftEff $ representResource "user:xGebruiker")

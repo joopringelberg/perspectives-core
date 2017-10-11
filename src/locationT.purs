@@ -66,3 +66,5 @@ instance monadEffLocation :: MonadEff eff m => MonadEff eff (LocationT m) where
 
 instance monadAffLocation :: MonadAff eff m => MonadAff eff (LocationT m) where
   liftAff = lift <<< liftAff
+
+foreign import copyToLocation :: forall a b e. LocationT e b -> LocationT e a -> LocationT e b

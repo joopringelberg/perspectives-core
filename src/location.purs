@@ -10,6 +10,8 @@ module Perspectives.Location
   , saveInNamedLocation
   , saveResource
   , connectLocations
+  , addDependent
+  , setUpdateFunction
   , connectLocationsAsInBind
   , runLocation
   , setLocationValue
@@ -31,6 +33,7 @@ module Perspectives.Location
 where
 
 import Prelude
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff, kind Effect, runPure)
 import Data.Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Data.Maybe (Maybe(..))
@@ -85,6 +88,10 @@ pureTHEORYDELTA c = runPure (runTHEORYDELTA c)
 foreign import locationValue :: forall a. Location a -> a
 
 foreign import locationDependentAux :: forall a. String -> Location a -> Foreign
+
+foreign import addDependent :: forall a b e. Location a -> String -> Location b -> Eff e Unit
+
+foreign import setUpdateFunction :: forall a b e. Location a -> Eff e b -> Eff e Unit
 
 -- | Do not assume anything about the content of the locations and the function.
 locationDependent :: forall a b. String -> Location a -> Maybe (Location b)

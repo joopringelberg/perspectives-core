@@ -71,6 +71,31 @@ Location.prototype.addDependent = function( linkName, dep ) {
 	dep._supports.push( this );
 };
 
+exports.addDependent = function(support)
+{
+	return function(linkName)
+	{
+		return function(dependent)
+		{
+			return function()
+			{
+				support.addDependent( linkName, dependent );
+			};
+		};
+	};
+};
+
+exports.setUpdateFunction = function(loc)
+{
+	return function(fun)
+	{
+		return function()
+		{
+			loc.fun = fun;
+		}
+	}
+};
+
 // NOTE: add dependents first, then remove. On removing all dependents, the location will self-destruct!
 Location.prototype.removeDependent = function( linkName ) {
 	var self = this;
@@ -312,9 +337,9 @@ exports.locationValue = function( loc ) {
 	return loc.get();
 };
 
-exports.locationName = function( loc ){
+exports.locationName = function( loc ) {
 	return loc.locName;
-}
+};
 
 exports.locationDependentAux = function( name ) {
 	return function( loc ) {

@@ -66,10 +66,10 @@ test = launchAff $ runLocationT do
   -- log $ show z
   -- log "Klaar"
 
-  (gebruiker :: Maybe Resource) <- liftEff $ representResource "owl:Thing"
-  x <- identity >-> rdfType >-> identifier $ gebruiker
+  (gebruiker :: Maybe Resource) <- liftEff $ representResource "user:xGebruiker"
+  (x :: Maybe Resource) <- rdfType >-> rdfType $ gebruiker
   log $ show x
-  _ <- pure $ catchit gebruiker
+  _ <- pure $ catchit x
   log "Klaar"
 
 log = lift <<< Aff.log
