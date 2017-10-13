@@ -1,5 +1,5 @@
 module Test.Main where
 
-import Test.Properties
+import Test.Location
 
 main = test

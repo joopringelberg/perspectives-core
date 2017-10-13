@@ -6,7 +6,7 @@ import Control.Monad.Eff
 import Perspectives.Location (saveInLocation, THEORYDELTA, runLocation, setLocationValue, setLocationValue', pureTHEORYDELTA, runTHEORYDELTA)
 
 test :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
-test = myProgram6
+test = myProgram
 
 myProgram :: forall eff. Eff (td :: THEORYDELTA, console :: CONSOLE | eff) Unit
 myProgram = let
