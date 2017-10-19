@@ -24,7 +24,7 @@ import Perspectives.PropertyComposition (lowerFromLocationT, (>->))
 import Perspectives.Resource (representResource)
 import Perspectives.ResourceTypes (Resource(..))
 
-import Test.Location
+import Test.Properties
 
 main = test
 
