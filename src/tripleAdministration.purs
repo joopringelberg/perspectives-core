@@ -96,6 +96,8 @@ ensureResource index rid = do
         pure m
     (Just m) -> pure m
 
+foreign import addDependency :: forall e a. Triple (Maybe a) -> TripleRef -> Eff (gm :: GLOBALMAP | e) TripleRef
+
 -- The global index of triples with a single Int value.
 intIndex :: ResourceIndex (Maybe Int)
 intIndex = new unit

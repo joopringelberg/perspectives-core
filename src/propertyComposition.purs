@@ -16,8 +16,10 @@ import Perspectives.Location (Location, THEORYDELTA, functionName, locationValue
 import Perspectives.LocationT (LocationT(..), copyToLocation)
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (PROPDEFS, ResourceIndex, locationFromMaybeResource)
-import Perspectives.ResourceTypes (Resource)
-import Prelude (Unit, bind, const, eq, id, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Perspectives.ResourceTypes (Resource(..))
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency)
+import Perspectives.Triples (NamedFunction(..), NamedSingleTripleGetter, TripleGetter)
+import Prelude (Unit, bind, const, eq, id, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
@@ -80,38 +82,36 @@ memorizeSingleResourceGetter f = nameFunction (functionName f)(\mr -> LocationT 
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Maybe c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
-sTos :: forall a. Eq a => StackedMemorizingSingleGetter Resource -> StackedMemorizingSingleGetter a -> StackedMemorizingSingleGetter a
--- sTos p q = nameFunction name (p >==> q) where
---   name :: String
---   name = functionName p <> ">->" <> functionName q
-sTos p q a = nestedToStackedLocation $ do
-  (b :: Location (Maybe Resource)) <- stackedToNestedLocation $ p a
-  (c :: Location (Maybe a)) <- stackedToNestedLocation $ q (locationValue b)
-  -- Now copy c to a fresh location, making it depend on c.
-  (r :: Location (Maybe a)) <- pure ((nameFunction "id" id) <$> c)
-  -- Now make it a dependent of b, too.
-  _ <- liftEff $ addDependent b "some name" r
-  -- Finally, install an appropriate update function in r.
-  _ <- liftEff $ setUpdateFunction r (update b c r)
-  pure r
-  where
-    -- update :: forall e. Location (Maybe Resource) -> Location (Maybe a) -> Location (Maybe a) -> Eff (Magic e) (Canceler (Magic e))
-    update b c r = (runAff (\e-> pure unit) (\z-> pure unit)) $ do
-      case locationValue c == locationValue r of
-        true -> do
-          c' <- stackedToNestedLocation $ q (locationValue b)
-          _ <- liftEff $ setLocationValue r (locationValue c')
-          pure unit
-        false -> liftEff $ setLocationValue r (locationValue c)
+sTos' :: forall a. Eq a => NamedSingleTripleGetter Resource -> NamedSingleTripleGetter a -> NamedSingleTripleGetter a
+sTos' (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name (p >=> (\(Triple{object}) -> q object)) where
+  name :: String
+  name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
+
+sTos :: forall a. Eq a => NamedSingleTripleGetter Resource -> NamedSingleTripleGetter a -> NamedSingleTripleGetter a
+sTos (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name combination where
+
+  combination :: forall e. TripleGetter e (Maybe a)
+  combination mr@(Just (Resource{id})) = do
+    first@(Triple{object: mo, supports: psupports, dependencies: pdependencies}) <- p mr
+    second@(Triple{object : ma, supports: qsupports, dependencies: qdependencies}) <- q mo
+    _ <- liftEff (addDependency first (TripleRef{subject: id, predicate: name }))
+    _ <- liftEff (addDependency second (TripleRef{subject: id, predicate: name }))
+    pure (Triple{ subject: id,
+      predicate: name
+      , object: ma
+      , supports: []
+      , dependencies: []})
+  combination Nothing = pure (Triple{ subject: ""
+          , predicate: name
+          , object: Nothing
+          , supports: []
+          , dependencies: []
+          })
+
+  name :: String
+  name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 type Magic e =  (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX, prd :: PROPDEFS, st :: (ST ResourceIndex), td :: THEORYDELTA | e)
-
-copyResult :: forall b e.
-  Maybe Resource
-  -> StackedLocation e b
-  -> StackedLocation e b
-copyResult mr computationOfb =
-  copyToLocation computationOfb (nestedToStackedLocation $ locationFromMaybeResource mr)
 
 infixl 0 sTos as >->
 
