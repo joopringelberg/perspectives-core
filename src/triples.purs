@@ -11,23 +11,25 @@ import Perspectives.ResourceTypes (Resource(..))
 import Perspectives.TripleAdministration (class PossiblyEmptyFunctor, ResourceIndex, Triple(..), addTriple, booleanIndex, empty, isEmpty, lookup, numberIndex, numbersIndex, resourceIndex, resourcesIndex, stringIndex, stringsIndex)
 import Prelude (bind, id, pure, ($))
 
-data NamedFunction f = NamedFunction String f
+data NamedFunction' f = NamedFunction' String f
+
+data NamedFunction e ef a = NamedFunction String (TripleGetter e (ef a)) (ResourceIndex (ef a))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
 
-runTripleGetter :: forall a e. NamedFunction (TripleGetter e a) -> Maybe Resource -> AsyncPropDefsM e a
-runTripleGetter (NamedFunction _ tg) mr = bind (tg mr) (\(Triple{object}) -> pure object)
+runTripleGetter :: forall a e ef. NamedFunction e ef a -> Maybe Resource -> AsyncPropDefsM e (ef a)
+runTripleGetter (NamedFunction _ tg s) mr = bind (tg mr) (\(Triple{object}) -> pure object)
 
 type TripleGetter e a = Maybe Resource -> AsyncPropDefsM e (Triple a)
 
-type NamedSingleTripleGetter a = forall e. NamedFunction (TripleGetter e (Maybe a))
+type NamedSingleTripleGetter a = forall e. NamedFunction e Maybe a
 
-type NamedPluralTripleGetter a = forall e. NamedFunction (TripleGetter e (Array a))
+type NamedPluralTripleGetter a = forall e. NamedFunction e Array a
 
 -- | Use this function to construct property getters that memorize in the triple administration.
-constructTripleGetter :: forall a e ef. PossiblyEmptyFunctor ef => (Json -> Maybe a) -> ResourceIndex (ef a) -> PropertyName -> NamedFunction (TripleGetter e (ef a))
-constructTripleGetter tofn tripleStore pn = NamedFunction pn tripleGetter where
+constructTripleGetter :: forall a e ef. PossiblyEmptyFunctor ef => (Json -> Maybe a) -> ResourceIndex (ef a) -> PropertyName -> NamedFunction e ef a
+constructTripleGetter tofn tripleStore pn = NamedFunction pn tripleGetter tripleStore where
   -- Here we interpret the empty string as the identification of Nothing??
   tripleGetter ::  TripleGetter e (ef a)
   tripleGetter res@(Just (Resource{id})) = do
@@ -65,7 +67,7 @@ getBoolean name = constructTripleGetter toBoolean booleanIndex name
 
 -- | in AsyncDomeinFile, retrieve either a Resource or an error message. This sets up the property definitions.
 getResource :: PropertyName -> NamedSingleTripleGetter Resource
-getResource pn = NamedFunction pn tripleGetter where
+getResource pn = NamedFunction pn tripleGetter resourceIndex where
   tripleGetter :: forall e. TripleGetter e (Maybe Resource)
   tripleGetter res@(Just (Resource{id})) = do
     t@(Triple{object}) <- liftEff (lookup resourceIndex id pn)
@@ -87,7 +89,7 @@ getResource pn = NamedFunction pn tripleGetter where
 
 -- | in AsyncDomeinFile, retrieve either a Resource or an error message. This sets up the property definitions.
 getResources :: PropertyName -> NamedPluralTripleGetter Resource
-getResources pn = NamedFunction pn tripleGetter where
+getResources pn = NamedFunction pn tripleGetter resourcesIndex where
   tripleGetter :: forall e. TripleGetter e (Array Resource)
   tripleGetter res@(Just (Resource{id : rid})) = do
     t@(Triple{object}) <- liftEff (lookup resourcesIndex rid pn)
