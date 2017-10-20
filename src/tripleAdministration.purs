@@ -1,27 +1,16 @@
 module Perspectives.TripleAdministration where
 
+import Perspectives.PossiblyEmptyFunctor
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
+import Data.Argonaut (Json, toBoolean, toNumber, toString)
 import Data.Array (head, null)
+import Data.Lazy (Lazy, defer, force)
 import Data.Maybe (Maybe(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
+import Perspectives.Property (AsyncPropDefsM, PropertyName, getGetter)
 import Perspectives.ResourceTypes (Resource(..), ResourceId)
 import Prelude (class Functor, bind, id, pure, unit)
-
-class Functor ef <= PossiblyEmptyFunctor ef where
-  empty :: forall a. ef a
-  isEmpty :: forall a. ef a -> Boolean
-  fromArray :: forall a. Array a -> ef a
-
-instance possiblyEmptyMaybe :: PossiblyEmptyFunctor Maybe where
-  empty = Nothing
-  isEmpty Nothing = true
-  isEmpty otherwise = false
-  fromArray = head
-
-instance possiblyEmptyArray :: PossiblyEmptyFunctor Array where
-  empty = []
-  isEmpty = null
-  fromArray = id
 
 type PredicateId = String
 
@@ -31,6 +20,45 @@ newtype Triple a = Triple
   , object :: a
   , supports :: Array TripleRef
   , dependencies :: Array TripleRef}
+
+class MemorizedTriple t ef a where
+  tripleStore :: PossiblyEmptyFunctor ef => Lazy (GLStrMap (GLStrMap (t (ef a))))
+  lookup1 :: forall e. PossiblyEmptyFunctor ef =>
+    ResourceId ->
+    PredicateId ->
+    Eff (gm :: GLOBALMAP | e) (t (ef a))
+  addTriple1 :: forall e. PossiblyEmptyFunctor ef =>
+    ResourceId ->
+    PredicateId ->
+    (ef a) ->
+    Array TripleRef ->
+    Array TripleRef ->
+    Eff (gm :: GLOBALMAP | e) (t (ef a))
+  constructTripleGetter1 :: forall e. PossiblyEmptyFunctor ef =>
+    (Json -> Maybe a) ->
+    ResourceIndex (ef a) ->
+    PropertyName ->
+    NamedFunction (Maybe Resource -> AsyncPropDefsM e (t (ef a)))
+
+instance singleIntTriple :: MemorizedTriple Triple Maybe Int where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance multipleStringTriple :: MemorizedTriple Triple Array String where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+-- test1 :: forall e. ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (Maybe Int))
+-- test1 rid pid = test rid pid where
+--   test :: forall a. ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (Maybe a))
+--   test rid pid = lookup1 rid pid
+--
+-- test2 :: forall e. ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (Maybe Int))
+-- test2 rid pid = lookup1 rid pid
 
 newtype TripleRef = TripleRef { subject :: ResourceId, predicate :: PredicateId}
 
@@ -97,6 +125,36 @@ ensureResource index rid = do
     (Just m) -> pure m
 
 foreign import addDependency :: forall e a. Triple (Maybe a) -> TripleRef -> Eff (gm :: GLOBALMAP | e) TripleRef
+
+data NamedFunction f = NamedFunction String f
+
+applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
+applyNamedFunction (NamedFunction _ f) a = f a
+
+type TripleGetter e a = Maybe Resource -> AsyncPropDefsM e (Triple a)
+
+type NamedSingleTripleGetter a = forall e. NamedFunction (TripleGetter e (Maybe a))
+
+type NamedPluralTripleGetter a = forall e. NamedFunction (TripleGetter e (Array a))
+
+-- | Use this function to construct property getters that memorize in the triple administration.
+constructTripleGetter :: forall a e t ef. PossiblyEmptyFunctor ef => (Json -> Maybe a) -> ResourceIndex (ef a) -> PropertyName -> NamedFunction (Maybe Resource -> AsyncPropDefsM e (t (ef a)))
+constructTripleGetter tofn tripleStore pn = NamedFunction pn tripleGetter where
+  tripleGetter ::  (Maybe Resource -> AsyncPropDefsM e (t (ef a)))
+  tripleGetter res@(Just (Resource{id})) = do
+    t@(Triple{object} :: t (ef a)) <- liftEff (lookup1 id pn)
+    case isEmpty object of
+      true -> do
+        (object' :: ef a) <- getGetter tofn pn res
+        liftEff (addTriple tripleStore id pn object' [] [])
+      false -> pure t
+  tripleGetter Nothing = pure (Triple{ subject: ""
+          , predicate: pn
+          , object: empty
+          , supports: []
+          , dependencies: []
+          })
+
 
 -- The global index of triples with a single Int value.
 intIndex :: ResourceIndex (Maybe Int)
