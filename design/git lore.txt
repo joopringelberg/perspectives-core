@@ -10,7 +10,7 @@ ATOM/GIT HANDIGHEID
 
 3. The Alt+Cmd+Z keybinding checks out the HEAD revision of the file in the editor.
 
-4. Het verschil van een file in de ene en de andere branch:
+4. Het verschil van een file in de ene en de andere branch (door branchnamen te vervangen door revision numbers kun je ook daarover vergelijken):
 
 	git diff WorkingQueries:src/domeinCache.purs master:src/domeinCache.purs
 
