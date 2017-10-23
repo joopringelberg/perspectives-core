@@ -15,7 +15,7 @@ import Perspectives.Location (Location, THEORYDELTA, nameFunction, saveInLocatio
 import Perspectives.LocationT (LocationT)
 import Perspectives.Resource (PROPDEFS, ResourceIndex, getPropDefs, representResource, representResourceInLocation)
 import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource, LocationWithResource)
-import Perspectives.TripleAdministration (class PossiblyEmptyFunctor, empty, fromArray)
+import Perspectives.ObjectCollection (class ObjectCollection, empty, fromArray)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -34,7 +34,7 @@ type StackedLocation e a = LocationT (AsyncPropDefsM e) a
 
 type NestedLocation e a = AsyncPropDefsM e (Location a)
 
-type Getter ef a = forall e. PossiblyEmptyFunctor ef => Maybe Resource -> (AsyncPropDefsM e) (ef a)
+type Getter ef a = forall e. ObjectCollection ef => Maybe Resource -> (AsyncPropDefsM e) (ef a)
 
 -- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
@@ -61,7 +61,7 @@ type StackedMemorizingGetter a = forall e. Maybe Resource -> StackedLocation e a
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
-getGetter :: forall a ef. PossiblyEmptyFunctor ef =>
+getGetter :: forall a ef. ObjectCollection ef =>
   (Json -> Maybe a)
   -> PropertyName
   -> Getter ef a

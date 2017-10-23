@@ -14,12 +14,13 @@ import Network.HTTP.Affjax (AJAX)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Location (Location, THEORYDELTA, functionName, locationValue, memorize, nameFunction, nestLocationInMonad, saveInLocation, setLocationValue, (>==>), addDependent, setUpdateFunction)
 import Perspectives.LocationT (LocationT(..), copyToLocation)
+import Perspectives.ObjectCollection (class ObjectCollection)
 import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
 import Perspectives.Resource (PROPDEFS, ResourceIndex, locationFromMaybeResource)
 import Perspectives.ResourceTypes (Resource(..))
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency)
-import Perspectives.Triples (NamedFunction(..), NamedSingleTripleGetter, TripleGetter)
-import Prelude (Unit, bind, const, eq, id, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple1)
+import Perspectives.Triples (NamedSingleTripleGetter)
+import Prelude (Unit, bind, const, eq, id, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=), discard)
 
 affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
 affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
@@ -77,6 +78,18 @@ memorizeSingleResourceGetter f = nameFunction (functionName f)(\mr -> LocationT 
 
 -- magic f mr = nestedToStackedLocation $ bind (locationFromMaybeResource mr) (nestLocationInMonad f)
 
+class (ObjectCollection ef1, ObjectCollection ef2, ObjectCollection ef3) <= ObjectCollectionCombination ef1 ef2 ef3 where
+  compose :: forall e a. ObjectCollection ef3 => Eq a =>
+    NamedFunction (TripleGetter e (ef1 Resource)) ->
+    NamedFunction (TripleGetter e (ef2 a)) ->
+    NamedFunction (TripleGetter e (ef3 a))
+
+instance singleToSingle :: ObjectCollectionCombination Maybe Maybe Maybe where
+  compose = sTos
+
+-- instance singleToPlural :: TypedObjectCollection Maybe Array Array where
+--   compose = sTop
+
 -- sTos :: forall a b c m. Monad m =>
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Maybe c))
@@ -87,15 +100,20 @@ sTos' (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name (
   name :: String
   name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
-sTos :: forall a. Eq a => NamedSingleTripleGetter Resource -> NamedSingleTripleGetter a -> NamedSingleTripleGetter a
+sTos :: forall e a. Eq a =>
+  NamedFunction (TripleGetter e (Maybe Resource)) ->
+  NamedFunction (TripleGetter e (Maybe a)) ->
+  NamedFunction (TripleGetter e (Maybe a))
+-- sTos :: forall a. Eq a => NamedSingleTripleGetter Resource -> NamedSingleTripleGetter a -> NamedSingleTripleGetter a
 sTos (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name combination where
 
-  combination :: forall e. TripleGetter e (Maybe a)
+  combination :: TripleGetter e (Maybe a)
   combination mr@(Just (Resource{id})) = do
     first@(Triple{object: mo, supports: psupports, dependencies: pdependencies}) <- p mr
     second@(Triple{object : ma, supports: qsupports, dependencies: qdependencies}) <- q mo
     _ <- liftEff (addDependency first (TripleRef{subject: id, predicate: name }))
     _ <- liftEff (addDependency second (TripleRef{subject: id, predicate: name }))
+    -- _ <- liftEff (addTriple1 id name ma [] [])
     pure (Triple{ subject: id,
       predicate: name
       , object: ma

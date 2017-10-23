@@ -1,10 +1,11 @@
 module Perspectives.TripleAdministration where
 
-import Perspectives.PossiblyEmptyFunctor
+import Perspectives.ObjectCollection
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Argonaut (Json, toBoolean, toNumber, toString)
 import Data.Array (head, null)
+import Data.Eq (class Eq)
 import Data.Lazy (Lazy, defer, force)
 import Data.Maybe (Maybe(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
@@ -21,44 +22,27 @@ newtype Triple a = Triple
   , supports :: Array TripleRef
   , dependencies :: Array TripleRef}
 
-class MemorizedTriple t ef a where
-  tripleStore :: PossiblyEmptyFunctor ef => Lazy (GLStrMap (GLStrMap (t (ef a))))
-  lookup1 :: forall e. PossiblyEmptyFunctor ef =>
+class TypedObjectCollection ef a where
+  tripleStore :: ObjectCollection ef => Lazy (GLStrMap (GLStrMap (Triple (ef a))))
+  lookup1 :: forall e. ObjectCollection ef =>
     ResourceId ->
     PredicateId ->
-    Eff (gm :: GLOBALMAP | e) (t (ef a))
-  addTriple1 :: forall e. PossiblyEmptyFunctor ef =>
+    Eff (gm :: GLOBALMAP | e) (Triple (ef a))
+  addTriple1 :: forall e. ObjectCollection ef =>
     ResourceId ->
     PredicateId ->
     (ef a) ->
     Array TripleRef ->
     Array TripleRef ->
-    Eff (gm :: GLOBALMAP | e) (t (ef a))
-  constructTripleGetter1 :: forall e. PossiblyEmptyFunctor ef =>
+    Eff (gm :: GLOBALMAP | e) (Triple (ef a))
+  constructTripleGetter1 :: forall e. ObjectCollection ef =>
     (Json -> Maybe a) ->
-    ResourceIndex (ef a) ->
     PropertyName ->
-    NamedFunction (Maybe Resource -> AsyncPropDefsM e (t (ef a)))
-
-instance singleIntTriple :: MemorizedTriple Triple Maybe Int where
-  tripleStore = defer (\_ -> new unit)
-  lookup1 = lookup (force tripleStore)
-  addTriple1 = addTriple (force tripleStore)
-  constructTripleGetter1 = constructTripleGetter (force tripleStore)
-
-instance multipleStringTriple :: MemorizedTriple Triple Array String where
-  tripleStore = defer (\_ -> new unit)
-  lookup1 = lookup (force tripleStore)
-  addTriple1 = addTriple (force tripleStore)
-  constructTripleGetter1 = constructTripleGetter (force tripleStore)
-
--- test1 :: forall e. ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (Maybe Int))
--- test1 rid pid = test rid pid where
---   test :: forall a. ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (Maybe a))
---   test rid pid = lookup1 rid pid
---
--- test2 :: forall e. ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (Maybe Int))
--- test2 rid pid = lookup1 rid pid
+    NamedFunction (Maybe Resource -> AsyncPropDefsM e (Triple (ef a)))
+  -- sTos1 :: forall e. Eq a => NamedFunction (TripleGetter e (Maybe Resource)) -> NamedFunction (TripleGetter e (Maybe a)) -> NamedFunction (TripleGetter e (Maybe a))
+  -- sTop1 :: forall e. Eq a => NamedFunction (TripleGetter e (Maybe Resource)) -> NamedFunction (TripleGetter e (Array a)) -> NamedFunction (TripleGetter e (Array a))
+  -- pTop1 :: forall e. Eq a => NamedFunction (TripleGetter e (Array Resource)) -> NamedFunction (TripleGetter e (Array a)) -> NamedFunction (TripleGetter e (Array a))
+  -- pTos1 :: forall e. Eq a => NamedFunction (TripleGetter e (Array Resource)) -> NamedFunction (TripleGetter e (Maybe a)) -> NamedFunction (TripleGetter e (Array a))
 
 newtype TripleRef = TripleRef { subject :: ResourceId, predicate :: PredicateId}
 
@@ -68,7 +52,7 @@ type ResourceIndex a = GLStrMap (PredicateIndex a)
 -- A store of objects indexed by PredicateId.
 type PredicateIndex a = GLStrMap (Triple a)
 
-lookup :: forall e a ef. PossiblyEmptyFunctor ef => ResourceIndex (ef a) -> ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (ef a))
+lookup :: forall e a ef. ObjectCollection ef => ResourceIndex (ef a) -> ResourceId -> PredicateId -> Eff (gm :: GLOBALMAP | e) (Triple (ef a))
 lookup index rid pid = do
   preds <- peek index rid
   case preds of
@@ -93,7 +77,7 @@ lookup index rid pid = do
 
 -- | Add a triple to the index. The object value of the triple should comply to the type of the ResourceIndex!
 -- | Will add an entry for the resourceId if it is not yet present.
-addTriple :: forall e a ef. PossiblyEmptyFunctor ef =>
+addTriple :: forall e a ef. ObjectCollection ef =>
   ResourceIndex (ef a) ->
   ResourceId ->
   PredicateId ->
@@ -114,7 +98,7 @@ addTriple index rid pid val sups deps =
       _ <- poke index rid predIndex
       pure triple
 
-ensureResource :: forall e a ef. PossiblyEmptyFunctor ef => ResourceIndex (ef a) -> ResourceId -> Eff (gm :: GLOBALMAP | e) (PredicateIndex (ef a))
+ensureResource :: forall e a ef. ObjectCollection ef => ResourceIndex (ef a) -> ResourceId -> Eff (gm :: GLOBALMAP | e) (PredicateIndex (ef a))
 ensureResource index rid = do
   pid <- peek index rid
   case pid of
@@ -133,16 +117,19 @@ applyNamedFunction (NamedFunction _ f) a = f a
 
 type TripleGetter e a = Maybe Resource -> AsyncPropDefsM e (Triple a)
 
-type NamedSingleTripleGetter a = forall e. NamedFunction (TripleGetter e (Maybe a))
-
-type NamedPluralTripleGetter a = forall e. NamedFunction (TripleGetter e (Array a))
+runTripleGetter :: forall a e. NamedFunction (TripleGetter e a) -> Maybe Resource -> AsyncPropDefsM e a
+runTripleGetter (NamedFunction _ tg) mr = bind (tg mr) (\(Triple{object}) -> pure object)
 
 -- | Use this function to construct property getters that memorize in the triple administration.
-constructTripleGetter :: forall a e t ef. PossiblyEmptyFunctor ef => (Json -> Maybe a) -> ResourceIndex (ef a) -> PropertyName -> NamedFunction (Maybe Resource -> AsyncPropDefsM e (t (ef a)))
-constructTripleGetter tofn tripleStore pn = NamedFunction pn tripleGetter where
-  tripleGetter ::  (Maybe Resource -> AsyncPropDefsM e (t (ef a)))
+constructTripleGetter :: forall a e ef. ObjectCollection ef =>
+  ResourceIndex (ef a) ->
+  (Json -> Maybe a) ->
+  PropertyName ->
+  NamedFunction (Maybe Resource -> AsyncPropDefsM e (Triple (ef a)))
+constructTripleGetter tripleStore tofn pn = NamedFunction pn tripleGetter where
+  tripleGetter ::  (Maybe Resource -> AsyncPropDefsM e (Triple (ef a)))
   tripleGetter res@(Just (Resource{id})) = do
-    t@(Triple{object} :: t (ef a)) <- liftEff (lookup1 id pn)
+    t@(Triple{object} :: Triple (ef a)) <- liftEff (lookup tripleStore id pn)
     case isEmpty object of
       true -> do
         (object' :: ef a) <- getGetter tofn pn res
@@ -155,6 +142,47 @@ constructTripleGetter tofn tripleStore pn = NamedFunction pn tripleGetter where
           , dependencies: []
           })
 
+instance singleIntCollection :: TypedObjectCollection Maybe Int where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance pluralIntCollection :: TypedObjectCollection Array Int where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance singleStringCollection :: TypedObjectCollection Maybe String where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance pluralStringCollection :: TypedObjectCollection Array String where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance singleNumberCollection :: TypedObjectCollection Maybe Number where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance pluralNumberCollection :: TypedObjectCollection Array Number where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
+
+instance singleBooleanCollection :: TypedObjectCollection Maybe Boolean where
+  tripleStore = defer (\_ -> new unit)
+  lookup1 = lookup (force tripleStore)
+  addTriple1 = addTriple (force tripleStore)
+  constructTripleGetter1 = constructTripleGetter (force tripleStore)
 
 -- The global index of triples with a single Int value.
 intIndex :: ResourceIndex (Maybe Int)
