@@ -25,7 +25,7 @@ import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.ResourceTypes (PropDefs(..), ResourceId, AsyncDomeinFile)
+import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFile)
 import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<>))
 
 -- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
@@ -50,7 +50,7 @@ namespaceToDomeinFileName s = replace domeinFileRegex "_" s
 
 -- | Fetch the definition of a resource asynchronously from its Domein.
 retrieveDomeinResourceDefinition :: forall e.
-  ResourceId
+  Resource
   -> Namespace
   -> (AsyncDomeinFile e PropDefs)
 retrieveDomeinResourceDefinition id ns = do

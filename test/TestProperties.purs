@@ -18,17 +18,18 @@ import Perspectives.Property (MemorizingSingleGetter, SingleGetter)
 import Perspectives.QueryCombinators (filter) as QC
 import Perspectives.Resource (representResource, representResource')
 import Perspectives.ResourceTypes (Resource)
-import Perspectives.Triples (runTripleGetter)
+import Perspectives.TripleAdministration (runTripleGetter)
+
 
 test = runAff handleError handleSuccess do
   log "=========================Test.Properties================================"
   (gbLoc :: Maybe Resource) <- liftEff $ representResource' "user:xGebruiker"
   (l :: Maybe String) <-  runTripleGetter label gbLoc
   log ( "label user:xGebruiker = " <> (show l))
-  --
-  -- log "========================================================="
-  -- (l :: Maybe String) <-  (rol_RolBinding >-> label) gbLoc
-  -- log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show l))
+
+  log "========================================================="
+  (l :: Maybe String) <-  runTripleGetter (rol_RolBinding >-> label) gbLoc
+  log ( "(rol_RolBinding >-> label) user:xGebruiker = " <> (show l))
   --
   -- log "========================================================="
   -- h <-  rdfType gbLoc

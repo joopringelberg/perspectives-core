@@ -16,11 +16,11 @@ import Network.HTTP.StatusCode (StatusCode(..))
 
 import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
 import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
-import Perspectives.ResourceTypes(ResourceId, AsyncResource, AsyncDomeinFile, PropDefs)
+import Perspectives.ResourceTypes(Resource, AsyncResource, AsyncDomeinFile, PropDefs)
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
-fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e PropDefs)
---fetchPropDefs :: forall e. ResourceId -> (AsyncDomeinFile e PropDefs)
+fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
+--fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
 fetchPropDefs id = if isDomeinURI id
   then case getNamespace id of
     Nothing -> throwError $ error ("Cannot construct namespace out of id " <> id)
@@ -32,7 +32,7 @@ fetchPropDefs id = if isDomeinURI id
     else fetchResourceDefinition id
 
 -- | Fetch the definition of a resource asynchronously.
-fetchResourceDefinition :: forall e. ResourceId -> (AsyncResource e PropDefs)
+fetchResourceDefinition :: forall e. Resource -> (AsyncResource e PropDefs)
 fetchResourceDefinition id = do
   v <- makeVar
   _ <- forkAff do

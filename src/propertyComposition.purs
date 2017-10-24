@@ -1,147 +1,88 @@
 module Perspectives.PropertyComposition where
 
 
-import Control.Monad.Aff (Canceler(..), launchAff, runAff)
-import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (EXCEPTION)
-import Control.Monad.ST (ST)
-import Data.Array (cons, elemIndex, head, tail, union)
+import Control.Monad.Writer (Writer, WriterT(..), runWriter, runWriterT)
+import Data.Array (cons, elemIndex, head, tail)
 import Data.Eq (class Eq)
 import Data.Maybe (Maybe(..), maybe)
-import Network.HTTP.Affjax (AJAX)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.Location (Location, THEORYDELTA, functionName, locationValue, memorize, nameFunction, nestLocationInMonad, saveInLocation, setLocationValue, (>==>), addDependent, setUpdateFunction)
-import Perspectives.LocationT (LocationT(..), copyToLocation)
-import Perspectives.ObjectCollection (class ObjectCollection)
-import Perspectives.Property (AsyncPropDefsM, NestedLocation, StackedLocation, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter)
-import Perspectives.Resource (PROPDEFS, ResourceIndex, locationFromMaybeResource)
-import Perspectives.ResourceTypes (Resource(..))
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple1)
+import Perspectives.ObjectCollection (empty)
+import Perspectives.Property (AsyncPropDefsM)
+import Perspectives.ResourceTypes (Resource)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple)
 import Perspectives.Triples (NamedSingleTripleGetter)
-import Prelude (Unit, bind, const, eq, id, pure, unit, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=), discard)
-
-affToStackedLocation :: forall e a. AsyncPropDefsM e a -> StackedLocation e a
-affToStackedLocation ma = LocationT (bind ma (\a -> pure $ saveInLocation a))
-
-locationToStackedLocation :: forall e a. Location a -> StackedLocation e a
-locationToStackedLocation la = LocationT (pure la)
-
-locationToNestedLocation :: forall a e. Location a -> NestedLocation e a
-locationToNestedLocation la = pure la
-
-nestedToStackedLocation :: forall e a. NestedLocation e a -> StackedLocation e a
-nestedToStackedLocation ma = LocationT ma
-
-stackedToNestedLocation :: forall e a. StackedLocation e a -> NestedLocation e a
-stackedToNestedLocation (LocationT ma) = ma
-
--- infixl 0 nestLocationInMonad as |->
-
--- infixl 0 nestLocationInMonad as |->>
-
-lowerFromLocationT :: forall a x e.
-  (x -> LocationT (AsyncPropDefsM e) a)
-  ->
-  (x -> AsyncPropDefsM e (Location a))
-lowerFromLocationT f = stackedToNestedLocation <<< f
-
-liftToLocationT :: forall a e.
-  (Location (Maybe Resource) -> AsyncPropDefsM e (Location a))
-  ->
-  (Location (Maybe Resource) -> LocationT (AsyncPropDefsM e) a)
-liftToLocationT f = nestedToStackedLocation <<< f
-
--- | Use this function to lift a SingleGetter or PluralGetter to a StackedMemorizingSingleGetter or a
--- | StackedMemorizingPluralGetter.
-memorizeInStackedLocation :: forall b e.
-  (Maybe Resource -> (AsyncPropDefsM e) b)
-  -> (Maybe Resource -> StackedLocation e b)
-memorizeInStackedLocation f = nameFunction (functionName f)(\mr -> LocationT do
-    loc <- locationFromMaybeResource mr
-    g loc)
-  where
-  g = nestLocationInMonad f
-
--- | From a function that takes a Resource and returns a Resource, create a function that
--- | connects the locations that these Resources are saved in. The resulting function bears
--- | the same name as its argument function.
-memorizeSingleResourceGetter :: forall e.
-  (Maybe Resource -> (AsyncPropDefsM e) (Location (Maybe Resource)))
-  -> (Maybe Resource -> StackedLocation e (Maybe Resource))
-memorizeSingleResourceGetter f = nameFunction (functionName f)(\mr -> LocationT do
-    loc <- locationFromMaybeResource mr
-    g loc)
-  where
-  g = memorize f
-
--- magic f mr = nestedToStackedLocation $ bind (locationFromMaybeResource mr) (nestLocationInMonad f)
-
-class (ObjectCollection ef1, ObjectCollection ef2, ObjectCollection ef3) <= ObjectCollectionCombination ef1 ef2 ef3 where
-  compose :: forall e a. ObjectCollection ef3 => Eq a =>
-    NamedFunction (TripleGetter e (ef1 Resource)) ->
-    NamedFunction (TripleGetter e (ef2 a)) ->
-    NamedFunction (TripleGetter e (ef3 a))
-
-instance singleToSingle :: ObjectCollectionCombination Maybe Maybe Maybe where
-  compose = sTos
-
--- instance singleToPlural :: TypedObjectCollection Maybe Array Array where
---   compose = sTop
+import Prelude (bind, const, id, pure, ($), (<$>), (<*>), (<>), (>=>), (>>=))
 
 -- sTos :: forall a b c m. Monad m =>
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Maybe c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
-sTos' :: forall a. Eq a => NamedSingleTripleGetter Resource -> NamedSingleTripleGetter a -> NamedSingleTripleGetter a
+sTos' :: forall e. NamedSingleTripleGetter e -> NamedSingleTripleGetter e -> NamedSingleTripleGetter e
 sTos' (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name (p >=> (\(Triple{object}) -> q object)) where
   name :: String
   name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
-sTos :: forall e a. Eq a =>
-  NamedFunction (TripleGetter e (Maybe Resource)) ->
-  NamedFunction (TripleGetter e (Maybe a)) ->
-  NamedFunction (TripleGetter e (Maybe a))
--- sTos :: forall a. Eq a => NamedSingleTripleGetter Resource -> NamedSingleTripleGetter a -> NamedSingleTripleGetter a
+-- sTos :: forall e.
+--   NamedFunction (TripleGetter e Maybe) ->
+--   NamedFunction (TripleGetter e Maybe) ->
+--   NamedFunction (TripleGetter e Maybe)
+sTos :: forall e. NamedSingleTripleGetter e -> NamedSingleTripleGetter e -> NamedSingleTripleGetter e
 sTos (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name combination where
 
-  combination :: TripleGetter e (Maybe a)
-  combination mr@(Just (Resource{id})) = do
-    first@(Triple{object: mo, supports: psupports, dependencies: pdependencies}) <- p mr
-    second@(Triple{object : ma, supports: qsupports, dependencies: qdependencies}) <- q mo
+  combination mr@(Just id) = do
+    first@(Triple{object: mo}) <- p mr
+    second@(Triple{object : ma}) <- q mo
     _ <- liftEff (addDependency first (TripleRef{subject: id, predicate: name }))
     _ <- liftEff (addDependency second (TripleRef{subject: id, predicate: name }))
-    -- _ <- liftEff (addTriple1 id name ma [] [])
+    _ <- liftEff (addTriple id name ma [] [])
     pure (Triple{ subject: id,
       predicate: name
       , object: ma
-      , supports: []
       , dependencies: []})
   combination Nothing = pure (Triple{ subject: ""
           , predicate: name
-          , object: Nothing
-          , supports: []
+          , object: empty
           , dependencies: []
           })
 
   name :: String
   name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
-type Magic e =  (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX, prd :: PROPDEFS, st :: (ST ResourceIndex), td :: THEORYDELTA | e)
-
 infixl 0 sTos as >->
-
 -- sTop :: forall a b c m. Monad m =>
 --   (Location (Maybe a) -> m (Location (Maybe b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does not memorize. The memorizing is done entirely by its arguments.
-sTop :: forall a. StackedMemorizingSingleGetter Resource -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
-sTop p q = nameFunction name (p >==> q) where
+sTop :: forall e.
+  NamedFunction (TripleGetter e Maybe) ->
+  NamedFunction (TripleGetter e Array) ->
+  NamedFunction (TripleGetter e Array)
+sTop (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name combination where
+
+  combination mr@(Just id) = do
+    first@(Triple{object: mo}) <- p mr
+    second@(Triple{object : ma}) <- q mo
+    _ <- liftEff (addDependency first (TripleRef{subject: id, predicate: name }))
+    _ <- liftEff (addDependency second (TripleRef{subject: id, predicate: name }))
+    _ <- liftEff (addTriple id name ma [] [])
+    pure (Triple{ subject: id,
+      predicate: name
+      , object: ma
+      , dependencies: []})
+  combination Nothing = pure (Triple{ subject: ""
+          , predicate: name
+          , object: empty
+          , dependencies: []
+          })
+
   name :: String
-  name = functionName p <> ">->" <> functionName q
+  name = "(" <>  nameOfp <> " >->> " <> nameOfq <> ")"
+
+-- sTop p q = nameFunction name (p >=> q) where
+--   name :: String
+--   name = functionName p <> ">->" <> functionName q
 
 infixl 0 sTop as >->>
 
@@ -150,13 +91,60 @@ infixl 0 sTop as >->>
 --   -> (b -> m (Maybe c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does memorize the result of applying the second argument to the result of the first.
-pTos :: forall a. Eq a => StackedMemorizingPluralGetter Resource -> StackedMemorizingSingleGetter a -> StackedMemorizingPluralGetter a
-pTos f g r = f r >>= nameFunction (functionName g) (\arr -> pTos' (Just arr)) where
-  pTos' :: forall e. Maybe (Array Resource) -> StackedLocation (td :: THEORYDELTA | e) (Array a)
+-- pTos :: forall e.
+--   NamedFunction (TripleGetter e Array) ->
+--   NamedFunction (TripleGetter e Maybe) ->
+--   NamedFunction (TripleGetter e Array)
+-- pTos f g r = f r >>= (\arr -> pTos' (Just arr)) where
+--   pTos' :: forall e. Maybe (Array String) -> AsyncPropDefsM e (Triple Array)
+--   pTos' Nothing = pure []
+--   pTos' (Just fs) = mconsUniques <$> (g $ head fs) <*> (pTos' $ tail fs)
+
+pTos :: forall e.
+  NamedFunction (TripleGetter e Array) ->
+  NamedFunction (TripleGetter e Maybe) ->
+  NamedFunction (TripleGetter e Array)
+pTos (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name
+  (\r -> do
+    case r of
+      Nothing ->
+        pure  (Triple{ subject: ""
+              , predicate: name
+              , object: []
+              , dependencies: []
+              })
+      (Just id) -> do
+        (Triple{object : arr}) <- p r
+        x <- pTos' (Just arr)
+        triple <-
+          pure (Triple{ subject: id
+                , predicate: name
+                , object: arr
+                , dependencies: []
+                })
+        _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
+        pure triple)
+  where
+
+  -- pTos' :: Maybe (Array String) -> AsyncPropDefsM e (Array String)
+  pTos' :: Maybe (Array String) -> WriterT Dependencies (AsyncPropDefsM e) (Array String)
   pTos' Nothing = pure []
-  pTos' (Just fs) = (nameFunction "mconsUniques" mconsUniques) <$> (g $ head fs) <*> (pTos' $ tail fs)
+  pTos' (Just fs) = do
+    (Triple{object: mnext}) <- q $ head fs
+    rest <- runWriterT $ pTos' $ tail fs
+    pure $ (maybe id cons) mnext rest
+
+  pTos'' :: Maybe (Array String) -> WriterT Dependencies (AsyncPropDefsM e) (Array String)
+  pTos'' Nothing = pure []
+  pTos'' (Just fs) =
+    mconsUniques <*> (q >=> (\(Triple{object: mnext}) -> pure mnext)) $ head fs <$> pTos'' $ tail fs
+
+  name :: String
+  name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 infixl 0 pTos as >>->
+
+type Dependencies = Array TripleRef
 
 -- NOTE: if we make mcons point free, it will effectively not have a name when applied.
 mcons :: forall a. (Maybe a) -> (Array a) -> (Array a)
@@ -168,15 +156,20 @@ mconsUniques :: forall a. Eq a => Maybe a -> Array a -> Array a
 mconsUniques (Just el) arr | (maybe true (const false)) $ elemIndex el arr = cons el arr
 mconsUniques otherwise arr = arr
 
+{-
 -- pTop :: forall a b c m.  Monad m => Eq c =>
 --   (Location (Maybe a) -> m (Location (Array b)))
 --   -> (b -> m (Array c))
 --   -> (Location (Maybe a) -> m (Location (Array c)))
 -- | This composition operator does memorize the result of applying the second argument to the result of the first.
-pTop :: forall a. Eq a => StackedMemorizingPluralGetter Resource -> StackedMemorizingPluralGetter a -> StackedMemorizingPluralGetter a
-pTop f g r = f r >>= nameFunction (functionName g) (\arr -> pTop' (Just arr)) where
-  pTop' :: forall e. Maybe (Array Resource) -> StackedLocation (td :: THEORYDELTA | e) (Array a)
+pTop :: forall e a. Eq a =>
+  NamedFunction (TripleGetter e Array) ->
+  NamedFunction (TripleGetter e Array) ->
+  NamedFunction (TripleGetter e Array)
+pTop f g r = f r >>= (\arr -> pTop' (Just arr)) where
+  pTop' :: forall e. Maybe (Array Resource) -> AsyncPropDefsM e (Triple Array)
   pTop' Nothing = pure []
   pTop' (Just (fs :: Array Resource)) = union <$> (g $ head fs) <*> (pTop' $ tail fs)
 
 infixl 0 pTop as >>->>
+-}

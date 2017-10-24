@@ -1,20 +1,16 @@
 module Perspectives.Property where
 
 import Prelude
-import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
-import Data.Argonaut (Json, toArray, toBoolean, toNumber, toString)
-import Data.Array (cons, foldr)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Argonaut (toArray, toString)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.Location (Location, THEORYDELTA, nameFunction, saveInLocation)
-import Perspectives.LocationT (LocationT)
-import Perspectives.Resource (PROPDEFS, ResourceIndex, getPropDefs, representResource, representResourceInLocation)
-import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource, LocationWithResource)
+import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPropDefs)
+import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
 import Perspectives.ObjectCollection (class ObjectCollection, empty, fromArray)
 
 {-
@@ -28,31 +24,17 @@ However, a property whose range is Resource, must be represented by a Maybe Reso
 
 type PropertyName = String
 
-type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceIndex, prd :: PROPDEFS, gm :: GLOBALMAP | e)
+type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceDefinitions, prd :: PROPDEFS, gm :: GLOBALMAP | e)
 
-type StackedLocation e a = LocationT (AsyncPropDefsM e) a
-
-type NestedLocation e a = AsyncPropDefsM e (Location a)
-
-type Getter ef a = forall e. ObjectCollection ef => Maybe Resource -> (AsyncPropDefsM e) (ef a)
+type Getter ef = forall e. ObjectCollection ef => Maybe Resource -> (AsyncPropDefsM e) (ef String)
 
 -- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
-type SingleGetter a = Getter Maybe a
-
--- type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Maybe a))
-type MemorizingSingleGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Maybe a))
-type StackedMemorizingSingleGetter a = forall e. Maybe Resource -> StackedLocation (td :: THEORYDELTA | e) (Maybe a)
+type SingleGetter = Getter Maybe
 
 -- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
 -- | effects).
-type PluralGetter a = forall e. Maybe Resource -> (AsyncPropDefsM e) (Array a)
-
--- type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> (AsyncPropDefsM e) (Location (Array a))
-type MemorizingPluralGetter a = forall e. Location (Maybe Resource) -> AsyncPropDefsM e (Location (Array a))
-type StackedMemorizingPluralGetter a = forall e. Maybe Resource -> StackedLocation (td :: THEORYDELTA | e) (Array a)
-
-type StackedMemorizingGetter a = forall e. Maybe Resource -> StackedLocation e a
+type PluralGetter = Getter Array
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -61,65 +43,17 @@ type StackedMemorizingGetter a = forall e. Maybe Resource -> StackedLocation e a
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
-getGetter :: forall a ef. ObjectCollection ef =>
-  (Json -> Maybe a)
-  -> PropertyName
-  -> Getter ef a
-getGetter tofn pn res = case res of
+getGetter :: forall ef. ObjectCollection ef => PropertyName -> Getter ef
+getGetter pn res = case res of
   Nothing -> pure empty
   (Just r) -> do
     (PropDefs pd) <- getPropDefs r
     case lookup pn pd of
       -- Property is not available. This is not an error.
       Nothing -> pure empty
-      -- This must be an array filled with a single value that the tofn recognizes.
+      -- This must be an array filled with zero or more values that toString recognizes.
       (Just json) -> case toArray json of
         Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-        (Just arr) -> case traverse tofn arr of
-          Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+        (Just arr) -> case traverse toString arr of
+          Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
           (Just a) -> pure (fromArray a)
-
--- | in AsyncDomeinFile, retrieve either a String or an error message.
--- getString :: PropertyName -> SingleGetter String
--- getString = getSingleGetter toString
-
-getString :: PropertyName -> SingleGetter String
-getString name = nameFunction name (getGetter toString name)
-
--- | in AsyncDomeinFile, retrieve either an Array of Strings or an error message.
-getStrings :: PropertyName -> Getter Array String
-getStrings name = nameFunction name (getGetter toString name)
-
--- | in AsyncDomeinFile, retrieve either a Number or an error message.
-getNumber :: PropertyName -> SingleGetter Number
-getNumber name = nameFunction name (getGetter toNumber name)
-
--- | in AsyncDomeinFile, retrieve either an Array of Numbers or an error message.
-getNumbers :: PropertyName -> PluralGetter Number
-getNumbers name = nameFunction name (getGetter toNumber name)
-
--- | in AsyncDomeinFile, retrieve either a Boolean value or an error message.
-getBoolean :: PropertyName -> SingleGetter Boolean
-getBoolean name = nameFunction name (getGetter toBoolean name)
-
--- | in AsyncDomeinFile, retrieve either a String or an error message.
-getResource :: forall e. PropertyName -> (Maybe Resource) -> AsyncPropDefsM e LocationWithResource
-getResource pn' = nameFunction pn' (f pn') where
-  f :: PropertyName -> (Maybe Resource) -> AsyncPropDefsM e LocationWithResource
-  f pn mr = do
-    (maybeId :: Maybe String) <- getGetter toString pn mr
-    case maybeId of
-      Nothing -> pure $ saveInLocation Nothing
-      (Just id) -> liftEff $ representResourceInLocation id
-
--- | in AsyncDomeinFile, retrieve either an Array of Resources or an error message.
-getResources :: PropertyName -> PluralGetter Resource
-getResources pn' = (nameFunction pn' (f pn')) where
-  f pn mr = do
-    resIdArray <- (getGetter toString) pn mr
-    (x :: Array (Maybe Resource)) <- liftEff $ (traverse representResource resIdArray)
-    pure $ foldr (maybe id cons) [] x
-
--- | in AsyncDomeinFile, retrieve either a Date property or an error message.
---getDate :: PropertyName -> Resource -> AsyncResource () (Either String (Array JSDate))
---getDate = getGetter (\json -> Just (readDate $ toForeign json ))

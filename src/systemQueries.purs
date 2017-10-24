@@ -4,9 +4,9 @@ import Perspectives.PropertyComposition
 import Perspectives.QueryCombinators as QC
 import Data.Maybe (Maybe(..))
 import Perspectives.Location (nameFunction)
-import Perspectives.Property (SingleGetter, StackedMemorizingPluralGetter, StackedMemorizingSingleGetter, getBoolean)
-import Perspectives.ResourceTypes (Resource(..))
-import Perspectives.Triples (NamedSingleTripleGetter, NamedPluralTripleGetter, getResources, getString, getResource)
+import Perspectives.Property (SingleGetter)
+import Perspectives.ResourceTypes (Resource)
+import Perspectives.Triples (NamedSingleTripleGetter, NamedPluralTripleGetter)
 import Prelude (pure)
 
 identifier' :: SingleGetter String
