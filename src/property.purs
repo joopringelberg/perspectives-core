@@ -11,7 +11,6 @@ import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPropDefs)
 import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
-import Perspectives.ObjectCollection (class ObjectCollection, empty, fromArray)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -26,15 +25,7 @@ type PropertyName = String
 
 type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceDefinitions, prd :: PROPDEFS, gm :: GLOBALMAP | e)
 
-type Getter ef = forall e. ObjectCollection ef => Maybe Resource -> (AsyncPropDefsM e) (ef String)
-
--- | SingleGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
--- | effects).
-type SingleGetter = Getter Maybe
-
--- | PluralGetter defined in the monad (Aff e) (through AsyncPropDefsM, an alias giving specific
--- | effects).
-type PluralGetter = Getter Array
+type Getter = forall e. Resource -> (AsyncPropDefsM e) (Array String)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -43,17 +34,15 @@ type PluralGetter = Getter Array
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
-getGetter :: forall ef. ObjectCollection ef => PropertyName -> Getter ef
-getGetter pn res = case res of
-  Nothing -> pure empty
-  (Just r) -> do
-    (PropDefs pd) <- getPropDefs r
-    case lookup pn pd of
-      -- Property is not available. This is not an error.
-      Nothing -> pure empty
-      -- This must be an array filled with zero or more values that toString recognizes.
-      (Just json) -> case toArray json of
-        Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-        (Just arr) -> case traverse toString arr of
-          Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
-          (Just a) -> pure (fromArray a)
+getGetter :: PropertyName -> Getter
+getGetter pn r = do
+  (PropDefs pd) <- getPropDefs r
+  case lookup pn pd of
+    -- Property is not available. This is not an error.
+    Nothing -> pure []
+    -- This must be an array filled with zero or more values that toString recognizes.
+    (Just json) -> case toArray json of
+      Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+      (Just arr) -> case traverse toString arr of
+        Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+        (Just a) -> pure a

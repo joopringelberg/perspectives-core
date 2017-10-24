@@ -1,69 +1,71 @@
 module Perspectives.TripleAdministration where
 
-import Perspectives.ObjectCollection
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Data.Array (null)
 import Data.Maybe (Maybe(..))
+import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Property (AsyncPropDefsM, PropertyName, getGetter)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (class Functor, bind, pure, unit)
+import Prelude (bind, pure, unit, (<>))
 
 type Predicate = String
 
-newtype Triple ef = Triple
+newtype Triple = Triple
   { subject :: Resource
   , predicate :: Predicate
-  , object :: ef String
+  , object :: Array String
   , dependencies :: Array TripleRef}
+
+instance showTriple :: Show Triple where
+  show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
 
 newtype TripleRef = TripleRef { subject :: Resource, predicate :: Predicate}
 
--- | A global index of Triples, indexed by Resource.
-type ResourceIndex ef = GLStrMap (PredicateIndex ef)
+instance showTripleRef :: Show TripleRef where
+  show (TripleRef {subject, predicate}) = "{" <> show subject <> ", " <> show predicate <> "}"
 
-tripleIndex :: forall ef. ObjectCollection ef => ResourceIndex ef
+-- | A global index of Triples, indexed by Resource.
+type ResourceIndex = GLStrMap PredicateIndex
+
+tripleIndex :: ResourceIndex
 tripleIndex = new unit
 
 -- | The global store of triples, indexed by Resource and Predicate.
 
 -- A store of objects indexed by Predicate.
-type PredicateIndex ef = GLStrMap (Triple ef)
+type PredicateIndex = GLStrMap Triple
 
 data NamedFunction f = NamedFunction String f
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
 
-type TripleGetter e ef = Maybe Resource -> AsyncPropDefsM e (Triple ef)
+type TripleGetter e = Resource -> AsyncPropDefsM e Triple
 
 -- | Use this function to construct property getters that memorize in the triple administration.
-constructTripleGetter :: forall e ef. ObjectCollection ef =>
+constructTripleGetter :: forall e.
   PropertyName ->
-  NamedFunction (TripleGetter e ef)
+  NamedFunction (TripleGetter e)
 constructTripleGetter pn = NamedFunction pn tripleGetter where
-  tripleGetter :: TripleGetter e ef
-  tripleGetter res@(Just id) = do
-    t@(Triple{object} :: Triple ef) <- liftEff (lookup tripleIndex id pn)
-    case isEmpty object of
+  tripleGetter :: TripleGetter e
+  tripleGetter id = do
+    t@(Triple{object} :: Triple) <- liftEff (lookup tripleIndex id pn)
+    case null object of
       true -> do
-        (object' :: ef String) <- getGetter pn res
-        liftEff (addTriple id pn object' [] [])
+        (object' :: Array String) <- getGetter pn id
+        liftEff (addTriple id pn object' [])
       false -> pure t
-  tripleGetter Nothing = pure (Triple{ subject: ""
-          , predicate: pn
-          , object: empty
-          , dependencies: []
-          })
 
-lookup :: forall e ef. ObjectCollection ef => ResourceIndex ef -> Resource -> Predicate -> Eff (gm :: GLOBALMAP | e) (Triple ef)
+lookup :: forall e. ResourceIndex -> Resource -> Predicate -> Eff (gm :: GLOBALMAP | e) Triple
 lookup index rid pid = do
   preds <- peek index rid
   case preds of
     Nothing ->
       pure (Triple{ subject: rid
               , predicate: pid
-              , object: empty
+              , object: []
               , dependencies: []
               })
     (Just p) -> do
@@ -72,23 +74,22 @@ lookup index rid pid = do
         Nothing ->
           pure (Triple{ subject: rid
                   , predicate: pid
-                  , object: empty
+                  , object: []
                   , dependencies: []
                   })
         (Just o) -> pure o
 
 -- | Add a triple to the index. The object value of the triple should comply to the type of the ResourceIndex!
 -- | Will add an entry for the Resource if it is not yet present.
-addTriple :: forall e ef. ObjectCollection ef =>
+addTriple :: forall e.
   Resource ->
   Predicate ->
-  (ef String) ->
+  (Array String) ->
   Array TripleRef ->
-  Array TripleRef ->
-  Eff (gm :: GLOBALMAP | e) (Triple ef)
-addTriple rid pid val sups deps =
+  Eff (gm :: GLOBALMAP | e) Triple
+addTriple rid pid val deps =
     do
-      (m :: PredicateIndex ef) <- ensureResource rid
+      (m :: PredicateIndex) <- ensureResource rid
       triple <- pure (Triple{ subject: rid
                 , predicate: pid
                 , object: val
@@ -98,17 +99,17 @@ addTriple rid pid val sups deps =
       _ <- poke tripleIndex rid predIndex
       pure triple
 
-ensureResource :: forall e ef. ObjectCollection ef => Resource -> Eff (gm :: GLOBALMAP | e) (PredicateIndex ef)
+ensureResource :: forall e. Resource -> Eff (gm :: GLOBALMAP | e) PredicateIndex
 ensureResource rid = do
   pid <- peek tripleIndex rid
   case pid of
     Nothing -> do
-        (m :: PredicateIndex ef) <- pure (new unit)
+        (m :: PredicateIndex) <- pure (new unit)
         _ <- poke tripleIndex rid m
         pure m
     (Just m) -> pure m
 
-foreign import addDependency :: forall e ef. Triple ef -> TripleRef -> Eff (gm :: GLOBALMAP | e) TripleRef
+foreign import addDependency :: forall e. Triple -> TripleRef -> Eff (gm :: GLOBALMAP | e) TripleRef
 
 -- runTripleGetter :: forall e ef.
 --   NamedFunction (TripleGetter ef) ->
