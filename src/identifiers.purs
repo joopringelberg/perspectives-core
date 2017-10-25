@@ -10,6 +10,7 @@ module Perspectives.Identifiers
 , getFirstMatch
 , getSecondMatch
 , Namespace
+, isWellFormedIdentifier
   )
 
 where
@@ -25,7 +26,8 @@ import Partial.Unsafe (unsafePartial)
 import Prelude (const, flip, (<$>))
 
 standardPrefixes2namespaces :: StrMap String
-standardPrefixes2namespaces = fromFoldable [ (Tuple "user" "model:user#"),
+standardPrefixes2namespaces = fromFoldable [
+  (Tuple "user" "model:user#"),
   (Tuple "blank" "model:blank#"),
   (Tuple "_" "model:blank#"),
   (Tuple "xsd" "http://www.w3.org/2001/XMLSchema#"),
@@ -89,3 +91,8 @@ getNamespace = getFirstMatch namespaceRegex
 -- | Returns "someurl" from "pre:someurl" or Nothing
 getLocalNameFromURI :: String -> Maybe String
 getLocalNameFromURI = getSecondMatch domeinURIRegex
+
+isWellFormedIdentifier :: String -> Boolean
+isWellFormedIdentifier s = case isDomeinURI s of
+  true -> true
+  false -> isStandardNamespaceCURIE s

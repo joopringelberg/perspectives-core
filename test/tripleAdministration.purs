@@ -2,19 +2,17 @@ module Test.TripleAdministration where
 
 
 import Prelude
-import Control.Monad.Aff (Canceler, launchAff)
-import Control.Monad.Aff.Console (log)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Class (liftEff)
-
 import Perspectives.SystemQueries
 import Perspectives.PropertyComposition
 import Perspectives.TripleAdministration
 import Test.TestEffects
+import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.Console (log)
+import Control.Monad.Eff.Class (liftEff)
 
 
-test :: forall e. Eff (TestEffects e) (Canceler (CancelerEffects e))
-test = launchAff do
+test :: forall e. Aff (CancelerEffects e) Unit
+test = do
   log "=========================Test.Properties================================"
   ((Triple{object : r0}) :: Triple) <- applyNamedFunction (constructTripleGetter "rdfs:label") "user:xGebruiker"
   log $ show r0
@@ -27,4 +25,6 @@ test = launchAff do
   ((Triple{object: r2}) :: Triple) <-  "user:xGebruiker" ## rdfType >-> subClassOf >-> label
   log $ show r2
 
-  liftEff $ lookup tripleIndex "user:xGebruiker" "rdfs:label"
+  _ <- liftEff $ lookup tripleIndex "user:xGebruiker" "rdfs:label"
+
+  pure unit

@@ -9,6 +9,7 @@ import Data.Argonaut (toArray, toString)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
+import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPropDefs)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
 
@@ -35,14 +36,18 @@ type Getter = forall e. Resource -> Aff (PropDefsEffects e) (Array String)
 -- | - not all elements in the Array are of the required type.
 -- | The computation has the PropDefsEffects in Aff.
 getGetter :: PropertyName -> Getter
-getGetter pn r = do
-  (PropDefs pd) <- getPropDefs r
-  case lookup pn pd of
-    -- Property is not available. This is not an error.
-    Nothing -> pure []
-    -- This must be an array filled with zero or more values that toString recognizes.
-    (Just json) -> case toArray json of
-      Nothing -> throwError $ error ("getSingleGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
-      (Just arr) -> case traverse toString arr of
-        Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
-        (Just a) -> pure a
+getGetter pn r =
+  -- Is the propertyname well formed?
+  case isWellFormedIdentifier pn of
+    false -> throwError $ error ("getGetter: property '" <> pn <> "' is not a wellformed standard CURIE or DomeinURI!" )
+    true -> do
+      (PropDefs pd) <- getPropDefs r
+      case lookup pn pd of
+        -- Property is not available. This is not an error.
+        Nothing -> pure []
+        -- This must be an array filled with zero or more values that toString recognizes.
+        (Just json) -> case toArray json of
+          Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+          (Just arr) -> case traverse toString arr of
+            Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+            (Just a) -> pure a
