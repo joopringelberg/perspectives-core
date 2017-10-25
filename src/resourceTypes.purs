@@ -1,7 +1,7 @@
 module Perspectives.ResourceTypes
-( AsyncResourceM
-, AsyncResource
-, AsyncDomeinFileM
+( AsyncResource
+, ResourceEffects
+, DomeinFileEffects
 , AsyncDomeinFile
 , PropDefs(..)
 , Resource
@@ -19,15 +19,14 @@ import Prelude (class Show, show, ($), (<>))
 
 type Resource = String
 
-type AsyncResourceM e = Aff (avar :: AVAR, ajax :: AJAX | e)
-type AsyncResource e a = AsyncResourceM e a
+type ResourceEffects e = (avar :: AVAR, ajax :: AJAX | e)
 
--- | AsyncDomeinFileM is a type synonym for a monad with extensible effects including at least GLOBALMAP,
--- | AVAR and AJAX.
-type AsyncDomeinFileM e =  Aff (gm :: GLOBALMAP, avar :: AVAR, ajax :: AJAX | e)
+type AsyncResource e a = Aff (ResourceEffects e) a
+
+type DomeinFileEffects e = ResourceEffects (gm :: GLOBALMAP | e)
 
 -- | Type synonym AsyncDomeinFile is some type a in the extensible AsyncDomeinFileM monad.
-type AsyncDomeinFile e a = AsyncDomeinFileM e a
+type AsyncDomeinFile e a = Aff (DomeinFileEffects e) a
 
 -- | A newtype for the property definitions so we can show them.
 newtype PropDefs = PropDefs (StrMap Json)

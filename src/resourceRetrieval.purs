@@ -19,8 +19,8 @@ import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropD
 import Perspectives.ResourceTypes(Resource, AsyncResource, AsyncDomeinFile, PropDefs)
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
+-- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
 fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
---fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
 fetchPropDefs id = if isDomeinURI id
   then case getNamespace id of
     Nothing -> throwError $ error ("Cannot construct namespace out of id " <> id)

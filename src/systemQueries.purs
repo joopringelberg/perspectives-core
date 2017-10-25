@@ -1,32 +1,27 @@
 module Perspectives.SystemQueries where
 
 import Perspectives.PropertyComposition
-import Perspectives.QueryCombinators as QC
-import Data.Maybe (Maybe(..))
-import Perspectives.Location (nameFunction)
-import Perspectives.Property (SingleGetter)
-import Perspectives.ResourceTypes (Resource)
-import Perspectives.Triples (NamedSingleTripleGetter, NamedPluralTripleGetter)
+import Perspectives.Property (Getter)
+import Perspectives.TripleAdministration (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
-identifier' :: SingleGetter String
-identifier' Nothing = pure Nothing
-identifier' (Just (Resource {id})) = pure (Just id)
+identifier' :: Getter
+identifier' id = pure [id]
 
-identifier :: StackedMemorizingSingleGetter String
-identifier = memorizeInStackedLocation (nameFunction "identifier" identifier')
+identifier :: NamedTripleGetter
+identifier = constructTripleGetterFromArbitraryFunction "identifier" identifier'
 
-label :: NamedSingleTripleGetter String
-label = getString "rdfs:label"
+label :: NamedTripleGetter
+label = constructTripleGetter "rdfs:label"
 
-subClassOf :: NamedPluralTripleGetter Resource
-subClassOf = getResources "rdfs:subClassOf"
+subClassOf :: NamedTripleGetter
+subClassOf = constructTripleGetter "rdfs:subClassOf"
 
-rdfType :: NamedSingleTripleGetter Resource
-rdfType = getResource "rdf:type"
+rdfType :: NamedTripleGetter
+rdfType = constructTripleGetter "rdf:type"
 
-rol_RolBinding :: NamedSingleTripleGetter Resource
-rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"
+rol_RolBinding :: NamedTripleGetter
+rol_RolBinding = constructTripleGetter "model:SysteemDomein#rol_RolBinding"
 
 -- -- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
 -- types :: StackedMemorizingPluralGetter Resource
@@ -46,11 +41,11 @@ rol_RolBinding = getResource "model:SysteemDomein#rol_RolBinding"
 -- hasBinding :: StackedMemorizingSingleGetter Boolean
 -- hasBinding = QC.hasValue rol_RolBinding
 
-isFunctional :: StackedMemorizingSingleGetter Boolean
-isFunctional = memorizeInStackedLocation (getBoolean "owl:FunctionalProperty")
+isFunctional :: NamedTripleGetter
+isFunctional = constructTripleGetter "owl:FunctionalProperty"
 
-rdfsRange :: NamedSingleTripleGetter String
-rdfsRange = getString "rdfs:range"
+rdfsRange :: NamedTripleGetter
+rdfsRange = constructTripleGetter "rdfs:range"
 
-owlInverseOf :: NamedSingleTripleGetter Resource
-owlInverseOf = getResource "owl:inverseOf"
+owlInverseOf :: NamedTripleGetter
+owlInverseOf = constructTripleGetter "owl:inverseOf"

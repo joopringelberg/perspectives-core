@@ -1,6 +1,7 @@
 module Perspectives.Property where
 
 import Prelude
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
@@ -8,9 +9,8 @@ import Data.Argonaut (toArray, toString)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPropDefs)
-import Perspectives.ResourceTypes (AsyncDomeinFileM, PropDefs(..), Resource)
+import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
 
 {-
 Property values are represented by Arrays, or Maybes.
@@ -23,9 +23,9 @@ However, a property whose range is Resource, must be represented by a Maybe Reso
 
 type PropertyName = String
 
-type AsyncPropDefsM e = AsyncDomeinFileM (st :: ST ResourceDefinitions, prd :: PROPDEFS, gm :: GLOBALMAP | e)
+type PropDefsEffects e = DomeinFileEffects (st :: ST ResourceDefinitions, prd :: PROPDEFS | e)
 
-type Getter = forall e. Resource -> (AsyncPropDefsM e) (Array String)
+type Getter = forall e. Resource -> Aff (PropDefsEffects e) (Array String)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -33,7 +33,7 @@ type Getter = forall e. Resource -> (AsyncPropDefsM e) (Array String)
 -- | The getter takes a Resource and returns a computation of a Maybe value in a Location. It can throw one of two errors:
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
--- | The computation is effectful according to LocationT (AsyncPropDefsM e) (and extensible).
+-- | The computation has the PropDefsEffects in Aff.
 getGetter :: PropertyName -> Getter
 getGetter pn r = do
   (PropDefs pd) <- getPropDefs r

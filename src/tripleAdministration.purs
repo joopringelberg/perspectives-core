@@ -1,12 +1,13 @@
 module Perspectives.TripleAdministration where
 
+import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (null)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
-import Perspectives.Property (AsyncPropDefsM, PropertyName, getGetter)
+import Perspectives.Property (Getter, PropertyName, PropDefsEffects, getGetter)
 import Perspectives.ResourceTypes (Resource)
 import Prelude (bind, pure, unit, (<>))
 
@@ -42,14 +43,35 @@ data NamedFunction f = NamedFunction String f
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
 
-type TripleGetter e = Resource -> AsyncPropDefsM e Triple
+applyToNamedFunction :: forall a b. a -> NamedFunction (a -> b) -> b
+applyToNamedFunction a (NamedFunction _ f)= f a
+
+infix 0 applyToNamedFunction as ##
+
+type TripleGetter e = Resource -> Aff (PropDefsEffects e) Triple
+
+type NamedTripleGetter = forall e. NamedFunction (TripleGetter e)
+
+constructTripleGetterFromArbitraryFunction :: forall e.
+  PropertyName ->
+  Getter ->
+  NamedFunction (TripleGetter e)
+constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGetter where
+  tripleGetter :: TripleGetter e
+  tripleGetter id = do
+    t@(Triple{object} :: Triple) <- liftEff (lookup tripleIndex id pn)
+    case null object of
+      true -> do
+        (object' :: Array String) <- getter id
+        liftEff (addTriple id pn object' [])
+      false -> pure t
 
 -- | Use this function to construct property getters that memorize in the triple administration.
 constructTripleGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
 constructTripleGetter pn = NamedFunction pn tripleGetter where
-  tripleGetter :: TripleGetter e
+  -- tripleGetter :: TripleGetter e
   tripleGetter id = do
     t@(Triple{object} :: Triple) <- liftEff (lookup tripleIndex id pn)
     case null object of
@@ -114,5 +136,5 @@ foreign import addDependency :: forall e. Triple -> TripleRef -> Eff (gm :: GLOB
 -- runTripleGetter :: forall e ef.
 --   NamedFunction (TripleGetter ef) ->
 --   Maybe Resource ->
---   AsyncPropDefsM e (ef String)
+--   Aff (PropDefsEffects e) (ef String)
 -- runTripleGetter (NamedFunction _ tg) mr = bind (tg mr) (\(Triple{object}) -> pure object)
