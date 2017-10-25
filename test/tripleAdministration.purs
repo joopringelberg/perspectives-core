@@ -9,6 +9,7 @@ import Test.TestEffects
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff.Class (liftEff)
+import Perspectives.QueryCombinators (closure, filter, hasValue)
 
 
 test :: forall e. Aff (CancelerEffects e) Unit
@@ -25,6 +26,22 @@ test = do
   ((Triple{object: r2}) :: Triple) <-  "user:xGebruiker" ## rdfType >-> subClassOf >-> label
   log $ show r2
 
-  _ <- liftEff $ lookup tripleIndex "user:xGebruiker" "rdfs:label"
+  log "=========================================================================="
+  ((Triple{object: r3}) :: Triple) <-  "user:xGebruiker" ## rdfType >-> closure subClassOf
+  log $ show r3
+
+  log "=========================================================================="
+  ((Triple{object: r4}) :: Triple) <-  "user:xGebruiker" ## closure rdfType
+  log $ show r4
+
+  log "=========================================================================="
+  ((Triple{object: r5}) :: Triple) <-  "user:xGebruiker" ## hasValue rdfType
+  log $ show r5
+
+  log "=========================================================================="
+  ((Triple{object: r5}) :: Triple) <-  "user:xGebruiker" ## filter (hasValue label) (rdfType >-> closure subClassOf)
+  log $ show r5
+
+  _ <- liftEff $ lookupTriple "user:xGebruiker" "rdfs:label"
 
   pure unit

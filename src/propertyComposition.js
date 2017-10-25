@@ -1,6 +1,6 @@
 "use strict";
 
-exports.head = function(array)
+exports.unsafeHead = function(array)
 {
   return array[0];
 }

@@ -1,7 +1,7 @@
 module Main where
 
 import Test.TestEffects
-import Test.TripleAdministration
+import Test.Properties
 import Control.Monad.Eff (Eff)
 import Control.Monad.Aff (Canceler, runAff)
 

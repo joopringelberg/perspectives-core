@@ -59,7 +59,7 @@ constructTripleGetterFromArbitraryFunction :: forall e.
 constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGetter where
   tripleGetter :: TripleGetter e
   tripleGetter id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookup tripleIndex id pn)
+    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id pn)
     case null object of
       true -> do
         (object' :: Array String) <- getter id
@@ -73,16 +73,16 @@ constructTripleGetter :: forall e.
 constructTripleGetter pn = NamedFunction pn tripleGetter where
   -- tripleGetter :: TripleGetter e
   tripleGetter id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookup tripleIndex id pn)
+    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id pn)
     case null object of
       true -> do
         (object' :: Array String) <- getGetter pn id
         liftEff (addTriple id pn object' [])
       false -> pure t
 
-lookup :: forall e. ResourceIndex -> Resource -> Predicate -> Eff (gm :: GLOBALMAP | e) Triple
-lookup index rid pid = do
-  preds <- peek index rid
+lookupTriple :: forall e. Resource -> Predicate -> Eff (gm :: GLOBALMAP | e) Triple
+lookupTriple rid pid = do
+  preds <- peek tripleIndex rid
   case preds of
     Nothing ->
       pure (Triple{ subject: rid
@@ -120,6 +120,9 @@ addTriple rid pid val deps =
       predIndex <- poke m pid triple
       _ <- poke tripleIndex rid predIndex
       pure triple
+
+registerTriple :: forall e. Triple -> Eff (gm :: GLOBALMAP | e) Triple
+registerTriple (Triple{subject, predicate, object, dependencies}) = addTriple subject predicate object dependencies
 
 ensureResource :: forall e. Resource -> Eff (gm :: GLOBALMAP | e) PredicateIndex
 ensureResource rid = do

@@ -2,14 +2,15 @@ module Perspectives.SystemQueries where
 
 import Perspectives.PropertyComposition
 import Perspectives.Property (Getter)
+import Perspectives.QueryCombinators (closure, concat, hasValue) as QC
 import Perspectives.TripleAdministration (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
-identifier' :: Getter
-identifier' id = pure [id]
+identity' :: Getter
+identity' id = pure [id]
 
-identifier :: NamedTripleGetter
-identifier = constructTripleGetterFromArbitraryFunction "identifier" identifier'
+identity :: NamedTripleGetter
+identity = constructTripleGetterFromArbitraryFunction "identity" identity'
 
 label :: NamedTripleGetter
 label = constructTripleGetter "rdfs:label"
@@ -23,23 +24,21 @@ rdfType = constructTripleGetter "rdf:type"
 rol_RolBinding :: NamedTripleGetter
 rol_RolBinding = constructTripleGetter "model:SysteemDomein#rol_RolBinding"
 
--- -- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
--- types :: StackedMemorizingPluralGetter Resource
--- types = (QC.mclosure rdfType "types")
---
--- -- | NB. Dit is onvoldoende. Alleen de 'buitenste' aanroep wordt gememoiseerd; niet de recursieve.
--- superClasses :: StackedMemorizingPluralGetter Resource
--- superClasses = nameFunction "superClasses" (QC.aclosure subClassOf "superClasses")
---
--- typeSuperClasses :: StackedMemorizingPluralGetter Resource
--- typeSuperClasses = nameFunction "typeSuperClasses" (QC.addTo rdfType (rdfType >->> superClasses))
--- -- -- typeSuperClasses = nameFunction "typeSuperClasses" (rdfType >->> QC.addTo QC.identity superClasses)
---
--- hasLabel :: StackedMemorizingSingleGetter Boolean
--- hasLabel = QC.hasValue label
---
--- hasBinding :: StackedMemorizingSingleGetter Boolean
--- hasBinding = QC.hasValue rol_RolBinding
+types :: NamedTripleGetter
+types = QC.closure rdfType
+
+superClasses :: NamedTripleGetter
+superClasses = QC.closure subClassOf
+
+typeSuperClasses :: NamedTripleGetter
+typeSuperClasses = QC.concat rdfType (rdfType >-> superClasses)
+-- typeSuperClasses = rdfType >->> QC.concat identity superClasses
+
+hasLabel :: NamedTripleGetter
+hasLabel = QC.hasValue label
+
+hasBinding :: NamedTripleGetter
+hasBinding = QC.hasValue rol_RolBinding
 
 isFunctional :: NamedTripleGetter
 isFunctional = constructTripleGetter "owl:FunctionalProperty"

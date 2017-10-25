@@ -6,7 +6,7 @@ import Control.Monad.Eff.Class (liftEff)
 import Data.Array (null, tail, union)
 import Data.Maybe (Maybe(..))
 import Perspectives.Property (PropDefsEffects)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple, lookup, tripleIndex)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple, lookupTriple)
 import Prelude (bind, not, pure, ($), (<>))
 
 
@@ -16,7 +16,7 @@ compose :: forall e.
   NamedFunction (TripleGetter e)
 compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name compose' where
   compose' id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookup tripleIndex id name)
+    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id name)
     case null object of
       true -> do
         resultOfP@(Triple{object : arr}) <- p id
@@ -29,7 +29,7 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name
     where
       collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
       collect (Just fs) | not (null fs) = do
-        t@(Triple{object}) <- q $ head fs
+        t@(Triple{object}) <- q $ unsafeHead fs
         _ <- liftEff $ addDependency t (TripleRef{subject: id, predicate: name})
         rest <- collect $ tail fs
         pure $ union object rest
@@ -40,4 +40,4 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name
 
 infixl 9 compose as >->
 
-foreign import head :: forall a. Array a -> a
+foreign import unsafeHead :: forall a. Array a -> a
