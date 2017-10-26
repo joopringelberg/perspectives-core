@@ -5,7 +5,7 @@ where
 
 import Prelude
 import Control.Monad.Aff (forkAff)
-import Control.Monad.Aff.AVar (makeVar, putVar, takeVar)
+import Control.Monad.Aff.AVar (makeEmptyVar, makeVar, putVar, takeVar)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
@@ -13,10 +13,9 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
-
-import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
 import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
-import Perspectives.ResourceTypes(Resource, AsyncResource, AsyncDomeinFile, PropDefs)
+import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
+import Perspectives.ResourceTypes (Resource, AsyncResource, AsyncDomeinFile, PropDefs)
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
 -- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
@@ -34,14 +33,14 @@ fetchPropDefs id = if isDomeinURI id
 -- | Fetch the definition of a resource asynchronously.
 fetchResourceDefinition :: forall e. Resource -> (AsyncResource e PropDefs)
 fetchResourceDefinition id = do
-  v <- makeVar
+  v <- makeEmptyVar
   _ <- forkAff do
         res <- affjax $ userResourceRequest {url = baseURL <> id}
         case res.status of
           StatusCode 200 ->
             case stringToPropDefs res.response of
               (Left message) -> throwError $ error (message <> " (" <> id <> ")")
-              Right pd -> putVar v pd
+              Right pd -> putVar pd v
           otherwise -> throwError $ error ("fetchDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   takeVar v
 

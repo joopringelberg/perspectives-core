@@ -2,7 +2,7 @@ module Perspectives.Resource where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVar, makeVar', peekVar)
+import Control.Monad.Aff.AVar (AVar, makeVar, readVar)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
@@ -24,10 +24,10 @@ getPropDefs id = do
   case propDefs of
     Nothing -> do
                 pd <- fetchPropDefs id
-                av <- makeVar' pd
+                av <- makeVar pd
                 -- set av as the value of propDefs in the resource!
                 _ <- liftEff $ poke resourceDefinitions id av
                 pure pd
     (Just avar) -> do
-                    pd <- peekVar avar
+                    pd <- readVar avar
                     pure pd
