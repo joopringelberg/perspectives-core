@@ -14,15 +14,15 @@ closure :: forall e.
   NamedFunction (TripleGetter e)
 closure getter@(NamedFunction nameOfp p) = NamedFunction name closure' where
   closure' id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id name)
-    case null object of
-      true -> do
+    mt <- liftEff (lookupTriple id name)
+    case mt of
+      Nothing -> do
         resultOfP@(Triple{object : arr}) <- p id
         -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
         _ <- liftEff $ addDependency resultOfP (TripleRef{subject: id, predicate: name})
         x <- collect (Just (difference arr [id]))
         liftEff (addTriple id name x [])
-      false -> pure t
+      (Just t) -> pure t
 
     where
       collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
@@ -42,15 +42,15 @@ filter :: forall e.
   NamedFunction (TripleGetter e)
 filter criterium@(NamedFunction nameOfc c) getter@(NamedFunction nameOfp p) = NamedFunction name filter' where
   filter' id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id name)
-    case null object of
-      true -> do
+    mt <- liftEff (lookupTriple id name)
+    case mt of
+      Nothing -> do
         resultOfP@(Triple{object : arr}) <- p id
         -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
         _ <- liftEff $ addDependency resultOfP (TripleRef{subject: id, predicate: name})
         x <- collect (Just (difference arr [id]))
         liftEff (addTriple id name x [])
-      false -> pure t
+      (Just t) -> pure t
 
     where
       collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
@@ -78,16 +78,16 @@ concat :: forall e.
 concat criterium@(NamedFunction nameOfp p) getter@(NamedFunction nameOfq q) = NamedFunction name concat'
   where
     concat' id = do
-      t@(Triple{object} :: Triple) <- liftEff (lookupTriple id name)
-      case null object of
-        true -> do
+      mt <- liftEff (lookupTriple id name)
+      case mt of
+        Nothing -> do
           pt@(Triple{object : ps}) <- p id
           qt@(Triple{object : qs}) <- q id
           triple <- liftEff (addTriple id name (union ps qs) [])
           _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
           _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
           pure triple
-        false -> pure t
+        (Just t) -> pure t
 
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
 
@@ -102,8 +102,8 @@ isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null objec
 hasValue :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
 hasValue (NamedFunction nameOfp p) = NamedFunction name hasValue' where
   hasValue' id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id name)
-    case null object of
-      true -> (p >=> isNothing >=> liftEff <<< registerTriple) id
-      false -> pure t
+    mt <- liftEff (lookupTriple id name)
+    case mt of
+      Nothing -> (p >=> isNothing >=> liftEff <<< registerTriple) id
+      (Just t) -> pure t
   name = "(hasValue " <> nameOfp <> ")"

@@ -16,15 +16,15 @@ compose :: forall e.
   NamedFunction (TripleGetter e)
 compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name compose' where
   compose' id = do
-    t@(Triple{object} :: Triple) <- liftEff (lookupTriple id name)
-    case null object of
-      true -> do
+    mt <- liftEff (lookupTriple id name)
+    case mt of
+      Nothing -> do
         resultOfP@(Triple{object : arr}) <- p id
         -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
         _ <- liftEff $ addDependency resultOfP (TripleRef{subject: id, predicate: name})
         x <- collect (Just arr)
         liftEff (addTriple id name x [])
-      false -> pure t
+      (Just t) -> pure t
 
     where
       collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
