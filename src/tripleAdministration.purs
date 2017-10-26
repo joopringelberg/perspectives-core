@@ -9,7 +9,7 @@ import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Property (Getter, PropertyName, PropDefsEffects, getGetter)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (bind, pure, unit, (<>))
+import Prelude (class Eq, Ordering(..), bind, conj, eq, pure, unit, (&&), (<>), (==))
 
 type Predicate = String
 
@@ -21,6 +21,9 @@ newtype Triple = Triple
 
 instance showTriple :: Show Triple where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
+
+instance eqTriple :: Eq Triple where
+  eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
 newtype TripleRef = TripleRef { subject :: Resource, predicate :: Predicate}
 
