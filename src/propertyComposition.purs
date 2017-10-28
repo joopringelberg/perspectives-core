@@ -5,8 +5,9 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (null, tail, union)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (PropDefsEffects)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple, lookupTriple)
+import Perspectives.Property (Getter, PropDefsEffects, addToGetterIndex)
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex, lookupInTripleIndex)
+import Perspectives.TripleGetter (NamedFunction(..), TripleGetter)
 import Prelude (bind, not, pure, ($), (<>))
 
 
@@ -15,24 +16,35 @@ compose :: forall e.
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e)
 compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name compose' where
+  compose' :: TripleGetter e
   compose' id = do
-    mt <- liftEff (lookupTriple id name)
+    mt <- liftEff (lookupInTripleIndex id name)
     case mt of
       Nothing -> do
-        resultOfP@(Triple{object : arr}) <- p id
-        -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
-        _ <- liftEff $ addDependency resultOfP (TripleRef{subject: id, predicate: name})
-        x <- collect (Just arr)
-        liftEff (addTriple id name x [])
+        x <- getter id
+        _ <- liftEff (addToGetterIndex name getter)
+        liftEff (addToTripleIndex id name x [])
       (Just t) -> pure t
 
     where
+      endResult :: TripleRef
+      endResult = TripleRef{subject: id, predicate: name}
+
+      getter :: Getter e
+      getter id' = do
+        t@(Triple{object : objectsOfP}) <- p id'
+        -- The end result depends on the result of the first predicate.
+        _ <- liftEff $ addDependency t endResult
+        collect (Just objectsOfP)
+
       collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
       collect (Just fs) | not (null fs) = do
-        t@(Triple{object}) <- q $ unsafeHead fs
-        _ <- liftEff $ addDependency t (TripleRef{subject: id, predicate: name})
-        rest <- collect $ tail fs
-        pure $ union object rest
+        let nextP = unsafeHead fs
+        t@(Triple{object: objectsOfQ}) <- q nextP
+        -- The end result depends, too, on the result of q applied to the next object of p.
+        _ <- liftEff $ addDependency t endResult
+        restOfObjects <- collect $ tail fs
+        pure $ union objectsOfQ restOfObjects
       collect otherwise = pure []
 
   name :: String

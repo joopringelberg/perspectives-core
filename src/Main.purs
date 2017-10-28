@@ -1,10 +1,11 @@
 module Main where
 
-import Test.TestEffects
-import Test.Properties
+-- import Test.TestEffects
+-- import Test.TheoryChange
 import Control.Monad.Aff (Fiber, runAff)
 import Control.Monad.Eff (Eff)
 import Prelude (Unit)
 
-main :: forall e. Eff (CancelerEffects e) (Fiber (CancelerEffects e) Unit)
-main = runAff handleError test
+-- main :: forall e. Eff (CancelerEffects e) (Fiber (CancelerEffects e) Unit)
+-- main = runAff handleError test
+main = "hello"

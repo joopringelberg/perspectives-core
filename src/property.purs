@@ -2,6 +2,7 @@ module Perspectives.Property where
 
 import Prelude
 import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
@@ -9,6 +10,7 @@ import Data.Argonaut (toArray, toString)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPropDefs)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
@@ -26,7 +28,7 @@ type PropertyName = String
 
 type PropDefsEffects e = DomeinFileEffects (st :: ST ResourceDefinitions, prd :: PROPDEFS | e)
 
-type Getter = forall e. Resource -> Aff (PropDefsEffects e) (Array String)
+type Getter e = Resource -> Aff (PropDefsEffects e) (Array String)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -35,7 +37,7 @@ type Getter = forall e. Resource -> Aff (PropDefsEffects e) (Array String)
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation has the PropDefsEffects in Aff.
-getGetter :: PropertyName -> Getter
+getGetter :: forall e. PropertyName -> Getter e
 getGetter pn r =
   -- Is the propertyname well formed?
   case isWellFormedIdentifier pn of
@@ -51,3 +53,14 @@ getGetter pn r =
           (Just arr) -> case traverse toString arr of
             Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
             (Just a) -> pure a
+
+type GetterIndex e = GLStrMap (Getter e)
+
+getterIndex :: forall e. GetterIndex e
+getterIndex = new unit
+
+addToGetterIndex :: forall e. PropertyName -> Getter e -> Eff (PropDefsEffects e) (GetterIndex e)
+addToGetterIndex qname q = poke getterIndex qname q
+
+lookupInGetterIndex :: forall e1 e2. PropertyName -> Eff (gm :: GLOBALMAP | e1) (Maybe (Getter e2))
+lookupInGetterIndex = peek getterIndex

@@ -6,7 +6,8 @@ import Data.Array (cons, difference, head, null, tail, union)
 import Data.Maybe (Maybe(..), maybe)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition (unsafeHead)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addTriple, applyNamedFunction, lookupTriple, registerTriple)
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex, lookupInTripleIndex, registerTriple)
+import Perspectives.TripleGetter (NamedFunction(..), TripleGetter, applyNamedFunction)
 import Prelude (bind, id, not, pure, show, ($), (<$>), (<*>), (<<<), (<>), (>=>))
 
 closure :: forall e.
@@ -14,14 +15,14 @@ closure :: forall e.
   NamedFunction (TripleGetter e)
 closure getter@(NamedFunction nameOfp p) = NamedFunction name closure' where
   closure' id = do
-    mt <- liftEff (lookupTriple id name)
+    mt <- liftEff (lookupInTripleIndex id name)
     case mt of
       Nothing -> do
         resultOfP@(Triple{object : arr}) <- p id
         -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
         _ <- liftEff $ addDependency resultOfP (TripleRef{subject: id, predicate: name})
         x <- collect (Just (difference arr [id]))
-        liftEff (addTriple id name x [])
+        liftEff (addToTripleIndex id name x [])
       (Just t) -> pure t
 
     where
@@ -42,14 +43,14 @@ filter :: forall e.
   NamedFunction (TripleGetter e)
 filter criterium@(NamedFunction nameOfc c) getter@(NamedFunction nameOfp p) = NamedFunction name filter' where
   filter' id = do
-    mt <- liftEff (lookupTriple id name)
+    mt <- liftEff (lookupInTripleIndex id name)
     case mt of
       Nothing -> do
         resultOfP@(Triple{object : arr}) <- p id
         -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
         _ <- liftEff $ addDependency resultOfP (TripleRef{subject: id, predicate: name})
         x <- collect (Just (difference arr [id]))
-        liftEff (addTriple id name x [])
+        liftEff (addToTripleIndex id name x [])
       (Just t) -> pure t
 
     where
@@ -78,12 +79,12 @@ concat :: forall e.
 concat criterium@(NamedFunction nameOfp p) getter@(NamedFunction nameOfq q) = NamedFunction name concat'
   where
     concat' id = do
-      mt <- liftEff (lookupTriple id name)
+      mt <- liftEff (lookupInTripleIndex id name)
       case mt of
         Nothing -> do
           pt@(Triple{object : ps}) <- p id
           qt@(Triple{object : qs}) <- q id
-          triple <- liftEff (addTriple id name (union ps qs) [])
+          triple <- liftEff (addToTripleIndex id name (union ps qs) [])
           _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
           _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
           pure triple
@@ -102,7 +103,7 @@ isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null objec
 hasValue :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
 hasValue (NamedFunction nameOfp p) = NamedFunction name hasValue' where
   hasValue' id = do
-    mt <- liftEff (lookupTriple id name)
+    mt <- liftEff (lookupInTripleIndex id name)
     case mt of
       Nothing -> (p >=> isNothing >=> liftEff <<< registerTriple) id
       (Just t) -> pure t

@@ -1,9 +1,15 @@
 module Perspectives.TheoryChange where
 
-import Data.Array (difference, elemIndex, head, snoc, sortBy, uncons, union)
-import Data.Maybe (Maybe(..))
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..))
-import Prelude (Ordering(..), Unit, unit)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
+import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Traversable (traverse)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.Property (PropDefsEffects, lookupInGetterIndex)
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), lookupInTripleIndex)
+import Prelude (Ordering(..), Unit, bind, id, pure, (+))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -25,9 +31,32 @@ type TripleQueue = Array Triple
 addToQueue :: TripleQueue -> Array Triple -> TripleQueue
 addToQueue q triples = union q (sortBy dependsOn (difference triples q))
 
--- propagateTheoryDeltas :: TripleQueue -> Unit
--- propagateTheoryDeltas q = case popFromQueue q of
---   Nothing -> unit
---   (Just {head, tail}) -> do
---     triple <- recompute head
---     pure propagateTheoryDeltas tail
+propagateTheoryDeltas :: forall e. TripleQueue -> Aff (PropDefsEffects e) (Array String)
+propagateTheoryDeltas q = case popFromQueue q of
+  Nothing -> pure []
+  (Just {head, tail}) -> do
+    (obj :: Array String) <- recompute head
+    _ <- saveChangedObject head obj
+    (deps :: Array Triple) <- liftEff (getDependencies head)
+    propagateTheoryDeltas (addToQueue tail deps)
+  where
+
+    getDependencies :: Triple ->  Eff (PropDefsEffects e) (Array Triple)
+    getDependencies (Triple{dependencies}) = do
+      x <- traverse lookupRef dependencies
+      pure (foldr (maybe id cons) [] x)
+
+    lookupRef :: forall eff. TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe Triple)
+    lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
+
+recompute :: forall e. Triple -> Aff (PropDefsEffects e) (Array String)
+recompute (Triple{subject, predicate}) = do
+  mp <- liftEff (lookupInGetterIndex predicate)
+  case mp of
+    Nothing -> pure []
+    (Just p) -> p subject
+
+saveChangedObject :: forall e. Triple -> Array String -> Aff e Unit
+saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
+
+foreign import saveChangedObject_ :: forall e. Triple -> Array String -> Eff e Unit

@@ -3,10 +3,10 @@ module Perspectives.SystemQueries where
 import Perspectives.PropertyComposition
 import Perspectives.Property (Getter)
 import Perspectives.QueryCombinators (closure, concat, hasValue) as QC
-import Perspectives.TripleAdministration (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
-identity' :: Getter
+identity' :: forall e. Getter e
 identity' id = pure [id]
 
 identity :: NamedTripleGetter
