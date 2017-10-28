@@ -5,7 +5,7 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (null, tail, union)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (ObjectsGetter, PropDefsEffects, addToObjectsGetterIndex)
+import Perspectives.Property (ObjectsGetter, PropDefsEffects)
 import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex, lookupInTripleIndex)
 import Perspectives.TripleGetter (NamedFunction(..), TripleGetter)
 import Prelude (bind, not, pure, ($), (<>))
@@ -23,7 +23,6 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
       case mt of
         Nothing -> do
           x <- getter id
-          _ <- liftEff (addToObjectsGetterIndex name getter)
           liftEff (addToTripleIndex id name x [] getter)
         (Just t) -> pure t
 

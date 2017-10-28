@@ -2,7 +2,6 @@ module Perspectives.Property where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
@@ -10,7 +9,6 @@ import Data.Argonaut (toArray, toString)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Data.Traversable (traverse)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPropDefs)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
@@ -53,14 +51,3 @@ getObjectsGetter pn r =
           (Just arr) -> case traverse toString arr of
             Nothing -> throwError $ error ("getObjectsGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
             (Just a) -> pure a
-
-type ObjectsGetterIndex e = GLStrMap (ObjectsGetter e)
-
-objectsGetterIndex :: forall e. ObjectsGetterIndex e
-objectsGetterIndex = new unit
-
-addToObjectsGetterIndex :: forall e. PropertyName -> ObjectsGetter e -> Eff (PropDefsEffects e) (ObjectsGetterIndex e)
-addToObjectsGetterIndex qname q = poke objectsGetterIndex qname q
-
-lookupInObjectsGetterIndex :: forall e1 e2. PropertyName -> Eff (gm :: GLOBALMAP | e1) (Maybe (ObjectsGetter e2))
-lookupInObjectsGetterIndex = peek objectsGetterIndex

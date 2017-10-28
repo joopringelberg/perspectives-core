@@ -7,7 +7,7 @@ import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, uni
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.Property (PropDefsEffects, lookupInObjectsGetterIndex)
+import Perspectives.Property (PropDefsEffects)
 import Perspectives.TripleAdministration (Triple(..), TripleRef(..), lookupInTripleIndex)
 import Prelude (Ordering(..), Unit, bind, id, pure)
 
@@ -49,12 +49,8 @@ propagateTheoryDeltas q = case popFromQueue q of
     lookupRef :: forall eff. TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple e))
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
-recompute :: forall e1 e2. Triple e2 -> Aff (PropDefsEffects e1) (Array String)
-recompute (Triple{subject, predicate}) = do
-  mp <- liftEff (lookupInObjectsGetterIndex predicate)
-  case mp of
-    Nothing -> pure []
-    (Just p) -> p subject
+recompute :: forall e. Triple e -> Aff (PropDefsEffects e) (Array String)
+recompute (Triple{subject, objectsGetter}) = objectsGetter subject
 
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 Unit
 saveChangedObject t obj = liftEff (saveChangedObject_ t obj)

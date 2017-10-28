@@ -3,7 +3,7 @@ module Perspectives.TripleGetter where
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (ObjectsGetter, PropDefsEffects, PropertyName, addToObjectsGetterIndex, getObjectsGetter)
+import Perspectives.Property (ObjectsGetter, PropDefsEffects, PropertyName, getObjectsGetter)
 import Perspectives.ResourceTypes (Resource)
 import Perspectives.TripleAdministration (Triple, addToTripleIndex, lookupInTripleIndex)
 import Prelude (bind, pure)
@@ -33,7 +33,6 @@ constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGe
     case mt of
       Nothing -> do
         (object' :: Array String) <- getter id
-        _ <- liftEff (addToObjectsGetterIndex pn getter)
         liftEff (addToTripleIndex id pn object' [] getter)
       (Just t) -> pure t
 
@@ -48,6 +47,5 @@ constructTripleGetter pn = NamedFunction pn tripleGetter where
     case mt of
       Nothing -> do
         (object' :: Array String) <- getObjectsGetter pn id
-        _ <- liftEff (addToObjectsGetterIndex pn (getObjectsGetter pn))
         liftEff (addToTripleIndex id pn object' [] (getObjectsGetter pn))
       (Just t) -> pure t
