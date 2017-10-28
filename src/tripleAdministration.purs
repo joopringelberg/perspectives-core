@@ -89,4 +89,5 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
+-- TODO: dit moet eigenlijk een apart effect zijn, b.v.: DEPENDENCY.
 foreign import addDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
