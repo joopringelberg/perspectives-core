@@ -7,7 +7,7 @@ import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, uni
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.Property (PropDefsEffects, lookupInGetterIndex)
+import Perspectives.Property (PropDefsEffects, lookupInObjectsGetterIndex)
 import Perspectives.TripleAdministration (Triple(..), TripleRef(..), lookupInTripleIndex)
 import Prelude (Ordering(..), Unit, bind, id, pure, (+))
 
@@ -51,7 +51,7 @@ propagateTheoryDeltas q = case popFromQueue q of
 
 recompute :: forall e. Triple -> Aff (PropDefsEffects e) (Array String)
 recompute (Triple{subject, predicate}) = do
-  mp <- liftEff (lookupInGetterIndex predicate)
+  mp <- liftEff (lookupInObjectsGetterIndex predicate)
   case mp of
     Nothing -> pure []
     (Just p) -> p subject

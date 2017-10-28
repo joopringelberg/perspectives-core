@@ -5,7 +5,7 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (null, tail, union)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (Getter, PropDefsEffects, addToGetterIndex)
+import Perspectives.Property (ObjectsGetter, PropDefsEffects, addToObjectsGetterIndex)
 import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex, lookupInTripleIndex)
 import Perspectives.TripleGetter (NamedFunction(..), TripleGetter)
 import Prelude (bind, not, pure, ($), (<>))
@@ -22,7 +22,7 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name
     case mt of
       Nothing -> do
         x <- getter id
-        _ <- liftEff (addToGetterIndex name getter)
+        _ <- liftEff (addToObjectsGetterIndex name getter)
         liftEff (addToTripleIndex id name x [])
       (Just t) -> pure t
 
@@ -30,7 +30,7 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name
       endResult :: TripleRef
       endResult = TripleRef{subject: id, predicate: name}
 
-      getter :: Getter e
+      getter :: ObjectsGetter e
       getter id' = do
         t@(Triple{object : objectsOfP}) <- p id'
         -- The end result depends on the result of the first predicate.

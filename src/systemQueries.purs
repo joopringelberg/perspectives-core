@@ -1,12 +1,12 @@
 module Perspectives.SystemQueries where
 
 import Perspectives.PropertyComposition
-import Perspectives.Property (Getter)
+import Perspectives.Property (ObjectsGetter)
 import Perspectives.QueryCombinators (closure, concat, hasValue) as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
-identity' :: forall e. Getter e
+identity' :: forall e. ObjectsGetter e
 identity' id = pure [id]
 
 identity :: NamedTripleGetter

@@ -3,7 +3,7 @@ module Perspectives.TripleGetter where
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (Getter, PropDefsEffects, PropertyName, addToGetterIndex, getGetter)
+import Perspectives.Property (ObjectsGetter, PropDefsEffects, PropertyName, addToObjectsGetterIndex, getObjectsGetter)
 import Perspectives.ResourceTypes (Resource)
 import Perspectives.TripleAdministration (Triple, addToTripleIndex, lookupInTripleIndex)
 import Prelude (bind, pure)
@@ -24,7 +24,7 @@ type NamedTripleGetter = forall e. NamedFunction (TripleGetter e)
 
 constructTripleGetterFromArbitraryFunction :: forall e.
   PropertyName ->
-  Getter e ->
+  ObjectsGetter e ->
   NamedFunction (TripleGetter e)
 constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGetter where
   tripleGetter :: TripleGetter e
@@ -33,7 +33,7 @@ constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGe
     case mt of
       Nothing -> do
         (object' :: Array String) <- getter id
-        _ <- liftEff (addToGetterIndex pn getter)
+        _ <- liftEff (addToObjectsGetterIndex pn getter)
         liftEff (addToTripleIndex id pn object' [])
       (Just t) -> pure t
 
@@ -47,7 +47,7 @@ constructTripleGetter pn = NamedFunction pn tripleGetter where
     mt <- liftEff (lookupInTripleIndex id pn)
     case mt of
       Nothing -> do
-        (object' :: Array String) <- getGetter pn id
-        _ <- liftEff (addToGetterIndex pn (getGetter pn))
+        (object' :: Array String) <- getObjectsGetter pn id
+        _ <- liftEff (addToObjectsGetterIndex pn (getObjectsGetter pn))
         liftEff (addToTripleIndex id pn object' [])
       (Just t) -> pure t

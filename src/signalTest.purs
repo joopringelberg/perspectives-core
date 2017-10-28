@@ -12,13 +12,13 @@ type Subject = String
 type Predicate = String
 type Object = String
 
-type Getter e = Subject -> Eff e Object
+type ObjectsGetter e = Subject -> Eff e Object
 
 type Triple = Channel Object
 type QueryResult = Signal Object
 
-getGetter :: forall e. Predicate -> Getter e
-getGetter p s = case s of
+getObjectsGetter :: forall e. Predicate -> ObjectsGetter e
+getObjectsGetter p s = case s of
   "a" -> case p of
     "p" -> pure "b"
     otherwise -> pure "bottom"
@@ -50,7 +50,7 @@ updateTriple = send
 
 lookupInTripleIndex :: forall e. Subject -> Predicate -> Eff (channel :: CHANNEL | e) Triple
 lookupInTripleIndex s p = do
-  o <- getGetter p s
+  o <- getObjectsGetter p s
   channel o
 
 type TripleGetter e = Subject -> Eff (channel :: CHANNEL | e) Triple

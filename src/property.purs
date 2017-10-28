@@ -28,7 +28,7 @@ type PropertyName = String
 
 type PropDefsEffects e = DomeinFileEffects (st :: ST ResourceDefinitions, prd :: PROPDEFS | e)
 
-type Getter e = Resource -> Aff (PropDefsEffects e) (Array String)
+type ObjectsGetter e = Resource -> Aff (PropDefsEffects e) (Array String)
 
 -- | Used as a higher order function of a single argument: a function that maps a specific json type to a value
 -- | type, e.g. toString.
@@ -37,11 +37,11 @@ type Getter e = Resource -> Aff (PropDefsEffects e) (Array String)
 -- | - the value is not an Array;
 -- | - not all elements in the Array are of the required type.
 -- | The computation has the PropDefsEffects in Aff.
-getGetter :: forall e. PropertyName -> Getter e
-getGetter pn r =
+getObjectsGetter :: forall e. PropertyName -> ObjectsGetter e
+getObjectsGetter pn r =
   -- Is the propertyname well formed?
   case isWellFormedIdentifier pn of
-    false -> throwError $ error ("getGetter: property '" <> pn <> "' is not a wellformed standard CURIE or DomeinURI!" )
+    false -> throwError $ error ("getObjectsGetter: property '" <> pn <> "' is not a wellformed standard CURIE or DomeinURI!" )
     true -> do
       (PropDefs pd) <- getPropDefs r
       case lookup pn pd of
@@ -49,18 +49,18 @@ getGetter pn r =
         Nothing -> pure []
         -- This must be an array filled with zero or more values that toString recognizes.
         (Just json) -> case toArray json of
-          Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
+          Nothing -> throwError $ error ("getObjectsGetter: property " <> pn <> " of resource " <> show r <> " is not an array!" )
           (Just arr) -> case traverse toString arr of
-            Nothing -> throwError $ error ("getGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
+            Nothing -> throwError $ error ("getObjectsGetter: property " <> pn <> " of resource " <> show r <> " has an element that is not of the required type" )
             (Just a) -> pure a
 
-type GetterIndex e = GLStrMap (Getter e)
+type ObjectsGetterIndex e = GLStrMap (ObjectsGetter e)
 
-getterIndex :: forall e. GetterIndex e
-getterIndex = new unit
+objectsGetterIndex :: forall e. ObjectsGetterIndex e
+objectsGetterIndex = new unit
 
-addToGetterIndex :: forall e. PropertyName -> Getter e -> Eff (PropDefsEffects e) (GetterIndex e)
-addToGetterIndex qname q = poke getterIndex qname q
+addToObjectsGetterIndex :: forall e. PropertyName -> ObjectsGetter e -> Eff (PropDefsEffects e) (ObjectsGetterIndex e)
+addToObjectsGetterIndex qname q = poke objectsGetterIndex qname q
 
-lookupInGetterIndex :: forall e1 e2. PropertyName -> Eff (gm :: GLOBALMAP | e1) (Maybe (Getter e2))
-lookupInGetterIndex = peek getterIndex
+lookupInObjectsGetterIndex :: forall e1 e2. PropertyName -> Eff (gm :: GLOBALMAP | e1) (Maybe (ObjectsGetter e2))
+lookupInObjectsGetterIndex = peek objectsGetterIndex
