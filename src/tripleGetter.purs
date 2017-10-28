@@ -18,7 +18,7 @@ applyToNamedFunction a (NamedFunction _ f)= f a
 
 infix 0 applyToNamedFunction as ##
 
-type TripleGetter e = Resource -> Aff (PropDefsEffects e) Triple
+type TripleGetter e = Resource -> Aff (PropDefsEffects e) (Triple e)
 
 type NamedTripleGetter = forall e. NamedFunction (TripleGetter e)
 
@@ -34,7 +34,7 @@ constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGe
       Nothing -> do
         (object' :: Array String) <- getter id
         _ <- liftEff (addToObjectsGetterIndex pn getter)
-        liftEff (addToTripleIndex id pn object' [])
+        liftEff (addToTripleIndex id pn object' [] getter)
       (Just t) -> pure t
 
 -- | Use this function to construct property getters that memorize in the triple administration.
@@ -49,5 +49,5 @@ constructTripleGetter pn = NamedFunction pn tripleGetter where
       Nothing -> do
         (object' :: Array String) <- getObjectsGetter pn id
         _ <- liftEff (addToObjectsGetterIndex pn (getObjectsGetter pn))
-        liftEff (addToTripleIndex id pn object' [])
+        liftEff (addToTripleIndex id pn object' [] (getObjectsGetter pn))
       (Just t) -> pure t

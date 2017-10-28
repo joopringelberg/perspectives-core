@@ -6,7 +6,7 @@ import Perspectives.SystemQueries
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Perspectives.QueryCombinators (filter) as QC
-import Perspectives.TripleAdministration ((##))
+import Perspectives.TripleGetter ((##))
 import Test.TestEffects (CancelerEffects)
 
 gebruiker :: String

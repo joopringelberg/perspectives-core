@@ -10,38 +10,39 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff.Class (liftEff)
 import Perspectives.QueryCombinators (closure, filter, hasValue)
+import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter, (##))
 
 
-test :: forall e. Aff (CancelerEffects e) Unit
+test :: forall eff. Aff (CancelerEffects eff) Unit
 test = do
   log "=========================Test.Properties================================"
-  ((Triple{object : r0}) :: Triple) <- applyNamedFunction (constructTripleGetter "rdfs:label") "user:xGebruiker"
+  ((Triple{object : r0})) <- applyNamedFunction (constructTripleGetter "rdfs:label") "user:xGebruiker"
   log $ show r0
 
   log "=========================================================================="
-  ((Triple{object: r1}) :: Triple) <- applyNamedFunction (rdfType >-> subClassOf) "user:xGebruiker"
+  ((Triple{object: r1})) <- applyNamedFunction (rdfType >-> subClassOf) "user:xGebruiker"
   log $ show r1
 
   log "=========================================================================="
-  ((Triple{object: r2}) :: Triple) <-  "user:xGebruiker" ## rdfType >-> subClassOf >-> label
+  ((Triple{object: r2})) <-  "user:xGebruiker" ## rdfType >-> subClassOf >-> label
   log $ show r2
 
   log "=========================================================================="
-  ((Triple{object: r3}) :: Triple) <-  "user:xGebruiker" ## rdfType >-> closure subClassOf
+  ((Triple{object: r3})) <-  "user:xGebruiker" ## rdfType >-> closure subClassOf
   log $ show r3
 
   log "=========================================================================="
-  ((Triple{object: r4}) :: Triple) <-  "user:xGebruiker" ## closure rdfType
+  ((Triple{object: r4})) <-  "user:xGebruiker" ## closure rdfType
   log $ show r4
 
   log "=========================================================================="
-  ((Triple{object: r5}) :: Triple) <-  "user:xGebruiker" ## hasValue rdfType
+  ((Triple{object: r5})) <-  "user:xGebruiker" ## hasValue rdfType
   log $ show r5
 
   log "=========================================================================="
-  ((Triple{object: r5}) :: Triple) <-  "user:xGebruiker" ## filter (hasValue label) (rdfType >-> closure subClassOf)
-  log $ show r5
+  ((Triple{object: r6})) <-  "user:xGebruiker" ## filter (hasValue label) (rdfType >-> closure subClassOf)
+  log $ show r6
 
-  _ <- liftEff $ lookupTriple "user:xGebruiker" "rdfs:label"
+  _ <- liftEff $ lookupInTripleIndex "user:xGebruiker" "rdfs:label"
 
   pure unit

@@ -9,19 +9,19 @@ import Test.TestEffects
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff.Class (liftEff)
-import Perspectives.QueryCombinators (closure, filter, hasValue)
 import Perspectives.TheoryChange (propagateTheoryDeltas)
+import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
 
 
 test :: forall e. Aff (CancelerEffects e) Unit
 test = do
   log "=========================Test.Properties================================"
-  (t@(Triple{object : r0}) :: Triple) <- applyNamedFunction (constructTripleGetter "rdfs:label") "user:xGebruiker"
+  (t@(Triple{object : r0})) <- applyNamedFunction (constructTripleGetter "rdfs:label") "user:xGebruiker"
   log $ show r0
 
   r1 <- propagateTheoryDeltas [t]
   log $ show r1
 
-  _ <- liftEff $ lookupTriple "user:xGebruiker" "rdfs:label"
+  _ <- liftEff $ lookupInTripleIndex "user:xGebruiker" "rdfs:label"
 
   pure unit

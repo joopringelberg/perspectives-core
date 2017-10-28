@@ -15,40 +15,41 @@ compose :: forall e.
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e)
-compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name compose' where
-  compose' :: TripleGetter e
-  compose' id = do
-    mt <- liftEff (lookupInTripleIndex id name)
-    case mt of
-      Nothing -> do
-        x <- getter id
-        _ <- liftEff (addToObjectsGetterIndex name getter)
-        liftEff (addToTripleIndex id name x [])
-      (Just t) -> pure t
+compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
+  NamedFunction name compose' where
+    compose' :: TripleGetter e
+    compose' id = do
+      mt <- liftEff (lookupInTripleIndex id name)
+      case mt of
+        Nothing -> do
+          x <- getter id
+          _ <- liftEff (addToObjectsGetterIndex name getter)
+          liftEff (addToTripleIndex id name x [] getter)
+        (Just t) -> pure t
 
-    where
-      endResult :: TripleRef
-      endResult = TripleRef{subject: id, predicate: name}
+      where
+        endResult :: TripleRef
+        endResult = TripleRef{subject: id, predicate: name}
 
-      getter :: ObjectsGetter e
-      getter id' = do
-        t@(Triple{object : objectsOfP}) <- p id'
-        -- The end result depends on the result of the first predicate.
-        _ <- liftEff $ addDependency t endResult
-        collect (Just objectsOfP)
+        getter :: ObjectsGetter e
+        getter id' = do
+          t@(Triple{object : objectsOfP}) <- p id'
+          -- The end result depends on the result of the first predicate.
+          _ <- liftEff $ addDependency t endResult
+          collect (Just objectsOfP)
 
-      collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
-      collect (Just fs) | not (null fs) = do
-        let nextP = unsafeHead fs
-        t@(Triple{object: objectsOfQ}) <- q nextP
-        -- The end result depends, too, on the result of q applied to the next object of p.
-        _ <- liftEff $ addDependency t endResult
-        restOfObjects <- collect $ tail fs
-        pure $ union objectsOfQ restOfObjects
-      collect otherwise = pure []
+        collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
+        collect (Just fs) | not (null fs) = do
+          let nextP = unsafeHead fs
+          t@(Triple{object: objectsOfQ}) <- q nextP
+          -- The end result depends, too, on the result of q applied to the next object of p.
+          _ <- liftEff $ addDependency t endResult
+          restOfObjects <- collect $ tail fs
+          pure $ union objectsOfQ restOfObjects
+        collect otherwise = pure []
 
-  name :: String
-  name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
+    name :: String
+    name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 infixl 9 compose as >->
 

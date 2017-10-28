@@ -4,7 +4,6 @@ import Prelude
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 import Control.Monad.Eff.Unsafe (unsafePerformEff)
-import Prelude (pure)
 import Signal (Signal, constant, map2, unwrap)
 import Signal.Channel (CHANNEL, Channel, channel, send, subscribe)
 
