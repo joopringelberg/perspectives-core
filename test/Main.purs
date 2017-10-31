@@ -1,6 +1,6 @@
 module Test.Main where
 
-import Test.Properties
+import Test.QueryEffects
 import Test.TestEffects
 import Control.Monad.Aff (Fiber, runAff)
 import Control.Monad.Eff (Eff)

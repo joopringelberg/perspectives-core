@@ -20,7 +20,7 @@ infix 0 applyToNamedFunction as ##
 
 type TripleGetter e = Resource -> Aff (PropDefsEffects e) (Triple e)
 
-type NamedTripleGetter = forall e. NamedFunction (TripleGetter e)
+type NamedTripleGetter e = NamedFunction (TripleGetter e)
 
 constructTripleGetterFromArbitraryFunction :: forall e.
   PropertyName ->

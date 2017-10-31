@@ -8,8 +8,10 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Property (PropDefsEffects)
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), lookupInTripleIndex)
-import Prelude (Ordering(..), Unit, bind, id, pure)
+import Perspectives.ResourceTypes (Resource)
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), Predicate, lookupInTripleIndex)
+import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
+import Prelude (Ordering(..), Unit, bind, id, join, pure, ($))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -31,6 +33,11 @@ type TripleQueue e = Array (Triple e)
 addToQueue :: forall e. TripleQueue e -> Array (Triple e) -> TripleQueue e
 addToQueue q triples = union q (sortBy dependsOn (difference triples q))
 
+updateFromSeeds :: forall e. Array (Triple e) -> Aff (PropDefsEffects e) (Array String)
+updateFromSeeds ts = do
+  x <- liftEff (traverse getDependencies ts)
+  propagateTheoryDeltas (join x)
+
 propagateTheoryDeltas :: forall e. TripleQueue e -> Aff (PropDefsEffects e) (Array String)
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
@@ -39,20 +46,30 @@ propagateTheoryDeltas q = case popFromQueue q of
     _ <- saveChangedObject head obj
     (deps :: Array (Triple e)) <- liftEff (getDependencies head)
     propagateTheoryDeltas (addToQueue tail deps)
+
+getDependencies :: forall e eff. Triple e ->  Eff (gm :: GLOBALMAP | eff) (Array (Triple e))
+getDependencies (Triple{dependencies}) = do
+  x <- traverse lookupRef dependencies
+  pure (foldr (maybe id cons) [] x)
   where
-
-    getDependencies :: forall eff. Triple e ->  Eff (PropDefsEffects eff) (Array (Triple e))
-    getDependencies (Triple{dependencies}) = do
-      x <- traverse lookupRef dependencies
-      pure (foldr (maybe id cons) [] x)
-
-    lookupRef :: forall eff. TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple e))
+    -- lookupRef :: TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple e))
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 recompute :: forall e. Triple e -> Aff (PropDefsEffects e) (Array String)
 recompute (Triple{subject, objectsGetter}) = objectsGetter subject
 
-saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 Unit
+saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)
 saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
 
-foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 Unit
+foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 (Triple e2)
+
+setProperty :: forall e. Resource -> Predicate -> Array String -> Aff (PropDefsEffects e) (Triple e)
+setProperty rid pid object =
+  do
+    mt <- liftEff $ lookupInTripleIndex rid pid
+    case mt of
+      -- Case Nothing will not happen when we have contexts.
+      Nothing -> do
+        t <- applyNamedFunction (constructTripleGetter pid) rid
+        saveChangedObject t object
+      (Just t) -> saveChangedObject t object

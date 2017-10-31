@@ -5,8 +5,11 @@ import Perspectives.PropertyComposition
 import Perspectives.SystemQueries
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
+import Control.Monad.Eff.Console (logShow)
+import Control.Monad.Eff.Class (liftEff)
 import Perspectives.QueryCombinators (filter) as QC
-import Perspectives.TripleGetter ((##))
+import Perspectives.QueryEffect ((~>))
+import Perspectives.TripleGetter (NamedFunction(..), (##))
 import Test.TestEffects (CancelerEffects)
 
 gebruiker :: String
@@ -17,6 +20,7 @@ test = do
   log "=========================Test.Properties================================"
   l <-  gebruiker ## label
   log ( "gebruiker ## label = " <> (show l))
+
 
   log "========================================================="
   l1 <-  gebruiker ## (rol_RolBinding >-> label)

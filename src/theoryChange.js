@@ -7,7 +7,7 @@ exports.saveChangedObject_ = function(triple)
     return function()
     {
       triple.object = obj;
-      return {};
+      return triple;
     };
   };
 };

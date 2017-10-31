@@ -5,30 +5,35 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Perspectives.Property (PropDefsEffects, ObjectsGetter)
 import Perspectives.ResourceTypes (Resource)
-import Perspectives.TripleAdministration (Triple(..), addToTripleIndex)
-import Perspectives.TripleGetter (NamedFunction(..))
-import Prelude (Unit, bind, pure, ($))
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex)
+import Perspectives.TripleGetter (NamedFunction(..), NamedTripleGetter)
+import Prelude (Unit, bind, pure, ($), (<>))
 
-type QueryEffect e = NamedFunction (Array String -> Eff e Unit)
+type QueryEffect e1 e2= NamedFunction (Triple e2 -> Eff e1 Unit)
 
-addEffectToQuery :: forall e1 e2 e3.
-  NamedFunction (Resource -> Aff (PropDefsEffects e3) (Triple e2))
-    -> QueryEffect (PropDefsEffects e1)
-      -> NamedFunction (Resource -> Aff (PropDefsEffects e3) (Triple e1))
+-- addEffectToQuery :: forall e1 e2.
+--   NamedFunction (Resource -> Aff (PropDefsEffects e2) (Triple e1))
+--     -> QueryEffect (PropDefsEffects e2)
+--       -> NamedTripleGetter e2
 addEffectToQuery (NamedFunction tgName tg) (NamedFunction effectName effect) =
   NamedFunction effectName addEffectToQuery' where
 
-    addEffectToQuery' :: Resource -> Aff (PropDefsEffects e3) (Triple e1)
+    -- addEffectToQuery' :: Resource -> Aff (PropDefsEffects e2) (Triple e2)
     addEffectToQuery' id = do
       t@(Triple{subject, predicate, object}) <- tg id
-      liftEff $ addToTripleIndex id effectName [] [] (effectFun object)
+      _ <- liftEff $ effect object
+      _ <- liftEff $ addDependency t endResult
+      liftEff $ addToTripleIndex id name [] [] (effectFun t)
+      where
+        endResult :: TripleRef
+        endResult = TripleRef{subject: id, predicate: name}
 
-    -- endResult :: TripleRef
-    -- endResult = TripleRef{subject: id, predicate: effectName}
+    -- effectFun :: Triple e2 -> ObjectsGetter e2
+    effectFun (Triple{object}) id = do
+      _ <- liftEff $ effect object
+      pure object
 
-    effectFun :: Array String -> ObjectsGetter e1
-    effectFun objs id = do
-      _ <- liftEff $ effect objs
-      pure objs
+    name :: String
+    name = "(" <>  tgName <> " ~> " <> effectName <> ")"
 
 infixl 9 addEffectToQuery as ~>

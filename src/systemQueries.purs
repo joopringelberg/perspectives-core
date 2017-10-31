@@ -9,42 +9,42 @@ import Prelude (pure)
 identity' :: forall e. ObjectsGetter e
 identity' id = pure [id]
 
-identity :: NamedTripleGetter
+identity :: forall e. NamedTripleGetter e
 identity = constructTripleGetterFromArbitraryFunction "identity" identity'
 
-label :: NamedTripleGetter
+label :: forall e. NamedTripleGetter e
 label = constructTripleGetter "rdfs:label"
 
-subClassOf :: NamedTripleGetter
+subClassOf :: forall e. NamedTripleGetter e
 subClassOf = constructTripleGetter "rdfs:subClassOf"
 
-rdfType :: NamedTripleGetter
+rdfType :: forall e. NamedTripleGetter e
 rdfType = constructTripleGetter "rdf:type"
 
-rol_RolBinding :: NamedTripleGetter
+rol_RolBinding :: forall e. NamedTripleGetter e
 rol_RolBinding = constructTripleGetter "model:SysteemDomein#rol_RolBinding"
 
-types :: NamedTripleGetter
+types :: forall e. NamedTripleGetter e
 types = QC.closure rdfType
 
-superClasses :: NamedTripleGetter
+superClasses :: forall e. NamedTripleGetter e
 superClasses = QC.closure subClassOf
 
-typeSuperClasses :: NamedTripleGetter
+typeSuperClasses :: forall e. NamedTripleGetter e
 typeSuperClasses = QC.concat rdfType (rdfType >-> superClasses)
 -- typeSuperClasses = rdfType >->> QC.concat identity superClasses
 
-hasLabel :: NamedTripleGetter
+hasLabel :: forall e. NamedTripleGetter e
 hasLabel = QC.hasValue label
 
-hasBinding :: NamedTripleGetter
+hasBinding :: forall e. NamedTripleGetter e
 hasBinding = QC.hasValue rol_RolBinding
 
-isFunctional :: NamedTripleGetter
+isFunctional :: forall e. NamedTripleGetter e
 isFunctional = constructTripleGetter "owl:FunctionalProperty"
 
-rdfsRange :: NamedTripleGetter
+rdfsRange :: forall e. NamedTripleGetter e
 rdfsRange = constructTripleGetter "rdfs:range"
 
-owlInverseOf :: NamedTripleGetter
+owlInverseOf :: forall e. NamedTripleGetter e
 owlInverseOf = constructTripleGetter "owl:inverseOf"
