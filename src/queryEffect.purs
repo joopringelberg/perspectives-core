@@ -5,8 +5,7 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Perspectives.Property (PropDefsEffects, ObjectsGetter)
 import Perspectives.ResourceTypes (Resource)
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex)
-import Perspectives.TripleGetter (NamedFunction(..), NamedTripleGetter)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleRef(..), addDependency, addToTripleIndex)
 import Prelude (Unit, bind, pure, ($), (<>))
 
 type QueryEffect e1 e2= NamedFunction (Triple e2 -> Eff e1 Unit)
@@ -23,7 +22,7 @@ addEffectToQuery (NamedFunction tgName tg) (NamedFunction effectName effect) =
       t@(Triple{subject, predicate, object}) <- tg id
       _ <- liftEff $ effect object
       _ <- liftEff $ addDependency t endResult
-      liftEff $ addToTripleIndex id name [] [] (effectFun t)
+      liftEff $ addToTripleIndex id name [] [] [] (effectFun t)
       where
         endResult :: TripleRef
         endResult = TripleRef{subject: id, predicate: name}

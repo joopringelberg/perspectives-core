@@ -4,45 +4,70 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (cons, difference, head, null, tail, union)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Traversable (traverse)
 import Perspectives.Property (PropDefsEffects, ObjectsGetter)
-import Perspectives.PropertyComposition (unsafeHead)
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex, lookupInTripleIndex, registerTriple)
-import Perspectives.TripleGetter (NamedFunction(..), TripleGetter, applyNamedFunction)
-import Prelude (bind, id, not, pure, show, ($), (<$>), (<*>), (<<<), (<>), (>=>))
+import Perspectives.PropertyComposition (compose, unsafeHead)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), addDependency, addToTripleIndex, getRef, lookupInTripleIndex, memorize, registerTriple)
+import Perspectives.TripleGetter (applyNamedFunction)
+import Prelude (bind, id, join, map, not, pure, show, ($), (<$>), (<*>), (<<<), (<>), (>=>))
+
+-- closure :: forall e.
+--   NamedFunction (TripleGetter e) ->
+--   NamedFunction (TripleGetter e)
+-- closure tgetter@(NamedFunction nameOfp p) =
+  -- NamedFunction name closure' where
+  -- closure' id = do
+  --   mt <- liftEff (lookupInTripleIndex id name)
+  --   case mt of
+  --     Nothing -> do
+  --       x <- getter id
+  --       liftEff (addToTripleIndex id name x [] [] getter)
+  --     (Just t) -> pure t
+  --
+  --   where
+  --     endResult :: TripleRef
+  --     endResult = TripleRef{subject: id, predicate: name}
+  --
+  --     getter :: ObjectsGetter e
+  --     getter id' = do
+  --       resultOfP@(Triple{object}) <- p id'
+  --       -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
+  --       _ <- liftEff $ addDependency resultOfP endResult
+  --       collect (Just (difference object [id]))
+  --
+  --     collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
+  --     collect (Just fs) | not (null fs) = do
+  --       t@(Triple{object}) <- applyNamedFunction (closure tgetter) (unsafeHead fs)
+  --       _ <- liftEff $ addDependency t (TripleRef{subject: id, predicate: name})
+  --       rest <- collect $ tail fs
+  --       pure $ union (cons (unsafeHead fs) object) rest
+  --     collect otherwise = pure []
 
 closure :: forall e.
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e)
-closure tgetter@(NamedFunction nameOfp p) = NamedFunction name closure' where
-  closure' id = do
-    mt <- liftEff (lookupInTripleIndex id name)
-    case mt of
-      Nothing -> do
-        x <- getter id
-        liftEff (addToTripleIndex id name x [] getter)
-      (Just t) -> pure t
+closure (NamedFunction nameOfp p) =
+  memorize getter name
+  where
+    getter :: TripleGetter e
+    getter id' = do
+      t@(Triple{object : objectsOfP}) <- p id'
+      (triples :: Array (Triple e)) <- traverse getter (difference objectsOfP [id'])
+      objects <- pure $ join $ map (\(Triple{object}) -> object) triples
+      pure $ Triple { subject: id'
+                    , predicate : name
+                    , object : objects
+                    , dependencies : []
+                    , supports : map getRef (cons t triples)
+                    , tripleGetter : getter}
 
-    where
-      endResult :: TripleRef
-      endResult = TripleRef{subject: id, predicate: name}
+    name :: String
+    name = "(closure " <>  nameOfp <> ")"
 
-      getter :: ObjectsGetter e
-      getter id' = do
-        resultOfP@(Triple{object : arr}) <- p id'
-        -- The end result (represented by: TripleRef{subject: id, predicate: name}) depends partly on the result of the first predicate:
-        _ <- liftEff $ addDependency resultOfP endResult
-        collect (Just (difference arr [id]))
-
-      collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
-      collect (Just fs) | not (null fs) = do
-        t@(Triple{object}) <- applyNamedFunction (closure tgetter) (unsafeHead fs)
-        _ <- liftEff $ addDependency t (TripleRef{subject: id, predicate: name})
-        rest <- collect $ tail fs
-        pure $ union (cons (unsafeHead fs) object) rest
-      collect otherwise = pure []
-
-  name :: String
-  name = "(closure " <>  nameOfp <> ")"
+closure' :: forall e.
+  NamedFunction (TripleGetter e) ->
+  NamedFunction (TripleGetter e)
+closure' p = compose p (closure' p)
 
 filter :: forall e.
   NamedFunction (TripleGetter e) ->
@@ -55,7 +80,7 @@ filter (NamedFunction nameOfc c) (NamedFunction nameOfp p) = NamedFunction name 
     case mt of
       Nothing -> do
         x <- getter' id
-        liftEff (addToTripleIndex id name x [] getter')
+        liftEff (addToTripleIndex id name x [] [] getter')
       (Just t) -> pure t
 
     where
@@ -84,6 +109,7 @@ filter (NamedFunction nameOfc c) (NamedFunction nameOfp p) = NamedFunction name 
 mcons :: forall a. Maybe a -> Array a -> Array a
 mcons = maybe id cons
 
+{-
 concat :: forall e.
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e) ->
@@ -96,7 +122,7 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = NamedFunction name 
       case mt of
         Nothing -> do
           objects <- getter id
-          triple <- liftEff (addToTripleIndex id name objects [] getter)
+          triple <- liftEff (addToTripleIndex id name objects [] [] getter)
           _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
           _ <- liftEff $ addDependency triple (TripleRef{subject: id, predicate: name})
           pure triple
@@ -126,3 +152,4 @@ hasValue (NamedFunction nameOfp p) = NamedFunction name hasValue' where
       Nothing -> (p >=> isNothing >=> liftEff <<< registerTriple) id
       (Just t) -> pure t
   name = "(hasValue " <> nameOfp <> ")"
+-}

@@ -1,21 +1,28 @@
 module Perspectives.TripleAdministration where
 
-import Control.Monad.Eff (Eff)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
-import Perspectives.Property (ObjectsGetter)
+import Perspectives.Property (PropDefsEffects)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (class Eq, bind, pure, unit, (&&), (<>), (==))
+import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==), (>>=))
 
 type Predicate = String
+
+type TripleGetter e = Resource -> Aff (PropDefsEffects e) (Triple e)
+
+data NamedFunction f = NamedFunction String f
 
 newtype Triple e = Triple
   { subject :: Resource
   , predicate :: Predicate
   , object :: Array String
   , dependencies :: Array TripleRef
-  , objectsGetter :: ObjectsGetter e}
+  , supports :: Array TripleRef
+  , tripleGetter :: TripleGetter e}
 
 instance showTriple :: Show (Triple e) where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
@@ -30,6 +37,9 @@ instance eqTripleRef :: Eq TripleRef where
 
 instance showTripleRef :: Show TripleRef where
   show (TripleRef {subject, predicate}) = "{" <> show subject <> ", " <> show predicate <> "}"
+
+getRef :: forall e. Triple e -> TripleRef
+getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}
 
 -- | An index of Predicate-Object combinations, indexed by Resource.
 type TripleIndex e = GLStrMap (PredicateIndex e)
@@ -61,23 +71,26 @@ addToTripleIndex :: forall e1 e2.
   Predicate ->
   (Array String) ->
   Array TripleRef ->
-  ObjectsGetter e2 ->
+  Array TripleRef ->
+  TripleGetter e2 ->
   Eff (gm :: GLOBALMAP | e1) (Triple e2)
-addToTripleIndex rid pid val deps objsGetter =
+addToTripleIndex rid pid val deps sups tripleGetter =
     do
       (m :: PredicateIndex e2) <- ensureResource rid
       triple <- pure (Triple{ subject: rid
                 , predicate: pid
                 , object: val
                 , dependencies: deps
-                , objectsGetter: objsGetter
+                , supports : sups
+                , tripleGetter: tripleGetter
                 })
       predIndex <- poke m pid triple
       _ <- poke tripleIndex rid predIndex
+      _ <- foreachE sups (addDependency_ triple)
       pure triple
 
 registerTriple :: forall e1 e2. Triple e2 -> Eff (gm :: GLOBALMAP | e1) (Triple e2)
-registerTriple (Triple{subject, predicate, object, dependencies, objectsGetter}) = addToTripleIndex subject predicate object dependencies objectsGetter
+registerTriple (Triple{subject, predicate, object, dependencies, supports, tripleGetter}) = addToTripleIndex subject predicate object dependencies supports tripleGetter
 
 ensureResource :: forall e1 e2. Resource -> Eff (gm :: GLOBALMAP | e1) (PredicateIndex e2)
 ensureResource rid = do
@@ -89,5 +102,17 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
+memorize :: forall e. TripleGetter e -> String -> NamedFunction (TripleGetter e)
+memorize getter name = NamedFunction name \id -> do
+  mt <- liftEff (lookupInTripleIndex id name)
+  case mt of
+    Nothing -> do
+      t <- getter id
+      liftEff $ registerTriple t
+    (Just t) -> pure t
+
 -- TODO: dit moet eigenlijk een apart effect zijn, b.v.: DEPENDENCY.
 foreign import addDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+
+addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+addDependency_ t tr = void (addDependency t tr)

@@ -1,14 +1,10 @@
 module Perspectives.PropertyComposition where
 
 
-import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Class (liftEff)
-import Data.Array (null, tail, union)
-import Data.Maybe (Maybe(..))
-import Perspectives.Property (ObjectsGetter, PropDefsEffects)
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), addDependency, addToTripleIndex, lookupInTripleIndex)
-import Perspectives.TripleGetter (NamedFunction(..), TripleGetter)
-import Prelude (bind, not, pure, ($), (<>))
+import Data.Array (cons, difference)
+import Data.Traversable (traverse)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
+import Prelude (bind, join, pure, ($), (<>), map)
 
 
 compose :: forall e.
@@ -16,40 +12,25 @@ compose :: forall e.
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e)
 compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
-  NamedFunction name compose' where
-    compose' :: TripleGetter e
-    compose' id = do
-      mt <- liftEff (lookupInTripleIndex id name)
-      case mt of
-        Nothing -> do
-          x <- getter id
-          liftEff (addToTripleIndex id name x [] getter)
-        (Just t) -> pure t
-
-      where
-        endResult :: TripleRef
-        endResult = TripleRef{subject: id, predicate: name}
-
-        getter :: ObjectsGetter e
-        getter id' = do
-          t@(Triple{object : objectsOfP}) <- p id'
-          -- The end result depends on the result of the first predicate.
-          _ <- liftEff $ addDependency t endResult
-          collect (Just objectsOfP)
-
-        collect :: Maybe (Array String) -> Aff (PropDefsEffects e) (Array String)
-        collect (Just fs) | not (null fs) = do
-          let nextP = unsafeHead fs
-          t@(Triple{object: objectsOfQ}) <- q nextP
-          -- The end result depends, too, on the result of q applied to the next object of p.
-          _ <- liftEff $ addDependency t endResult
-          restOfObjects <- collect $ tail fs
-          pure $ union objectsOfQ restOfObjects
-        collect otherwise = pure []
+  memorize getter name
+    where
+    getter :: TripleGetter e
+    getter id = do
+      t@(Triple{object : objectsOfP}) <- p id
+      -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
+      (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
+      objects <- pure $ join $ map (\(Triple{object}) -> object) triples
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : objects
+                    , dependencies : []
+                    , supports : map getRef (cons t triples)
+                    , tripleGetter : getter}
 
     name :: String
     name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 infixl 9 compose as >->
 
+-- TODO: weggooien zodra de combinators veranderd zijn.
 foreign import unsafeHead :: forall a. Array a -> a

@@ -11,7 +11,7 @@ import Perspectives.Property (PropDefsEffects)
 import Perspectives.ResourceTypes (Resource)
 import Perspectives.TripleAdministration (Triple(..), TripleRef(..), Predicate, lookupInTripleIndex)
 import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
-import Prelude (Ordering(..), Unit, bind, id, join, pure, ($))
+import Prelude (Ordering(..), bind, id, join, pure, ($))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -56,7 +56,7 @@ getDependencies (Triple{dependencies}) = do
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 recompute :: forall e. Triple e -> Aff (PropDefsEffects e) (Array String)
-recompute (Triple{subject, objectsGetter}) = objectsGetter subject
+recompute (Triple{subject, tripleGetter}) = tripleGetter subject
 
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)
 saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
