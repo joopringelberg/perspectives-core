@@ -11,7 +11,7 @@ import Perspectives.Property (PropDefsEffects)
 import Perspectives.ResourceTypes (Resource)
 import Perspectives.TripleAdministration (Predicate, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
-import Prelude (Ordering(..), Unit, bind, flip, id, join, pure, void, ($), (>>=))
+import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -72,9 +72,6 @@ recompute (Triple{subject, tripleGetter}) = tripleGetter subject
 
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)
 saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
-
-setObject :: forall e1 e2. Aff e1 (Triple e2) -> Array String -> Aff e1 (Triple e2)
-setObject t o = t >>= (flip saveChangedObject o)
 
 foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 (Triple e2)
 

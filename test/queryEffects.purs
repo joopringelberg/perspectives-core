@@ -26,6 +26,7 @@ test = do
   y <- ("user:xGebruiker" ## rol_RolBinding >-> label) >>= (flip saveChangedObject ["Hello Pirate!"])
   y' <- setObject ("user:xGebruiker" ## rol_RolBinding >-> label) ["Hello Pirate!"]
   void (updateFromSeeds [y])
+  void ("model:SysteemDomein#Gebruiker" ## label ~> showOnConsole)
 
   void (liftEff (lookupInTripleIndex "user:xGebruiker" "rdfs:label"))
 
