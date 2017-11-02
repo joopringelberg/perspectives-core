@@ -2,9 +2,9 @@ module Perspectives.TripleGetter where
 
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (PropertyName, getObjectsGetter)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex)
-import Prelude (bind, pure)
+import Perspectives.Property (PropertyName, ObjectsGetter, getObjectsGetter)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
+import Prelude (bind, pure, ($))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
@@ -18,17 +18,19 @@ type NamedTripleGetter e = NamedFunction (TripleGetter e)
 
 constructTripleGetterFromArbitraryFunction :: forall e.
   PropertyName ->
-  TripleGetter e ->
+  ObjectsGetter e ->
   NamedFunction (TripleGetter e)
-constructTripleGetterFromArbitraryFunction pn getter = NamedFunction pn tripleGetter where
-  tripleGetter :: TripleGetter e
-  tripleGetter id = do
-    mt <- liftEff (lookupInTripleIndex id pn)
-    case mt of
-      Nothing -> do
-        (Triple{object}) <- getter id
-        liftEff (addToTripleIndex id pn object [] [] getter)
-      (Just t) -> pure t
+constructTripleGetterFromArbitraryFunction pn objGetter = memorize getter pn
+  where
+  getter :: TripleGetter e
+  getter id = do
+    (object :: Array String) <- objGetter id
+    pure $ Triple { subject: id
+                  , predicate : pn
+                  , object : object
+                  , dependencies : []
+                  , supports : []
+                  , tripleGetter : getter}
 
 -- | Use this function to construct property getters that memorize in the triple administration.
 constructTripleGetter :: forall e.

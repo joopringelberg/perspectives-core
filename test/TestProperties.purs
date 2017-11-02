@@ -9,7 +9,7 @@ import Control.Monad.Eff.Console (logShow)
 import Control.Monad.Eff.Class (liftEff)
 import Perspectives.QueryCombinators (filter) as QC
 import Perspectives.QueryEffect ((~>))
-import Perspectives.TripleGetter (NamedFunction(..), (##))
+import Perspectives.TripleGetter ((##))
 import Test.TestEffects (CancelerEffects)
 
 gebruiker :: String

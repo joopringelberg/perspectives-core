@@ -1,0 +1,153 @@
+WAT WE MOETEN KUNNEN DOEN
+
+LATER TOEGEVOEGD:
+Dit is een abstractie die helpt om een goede representatie van de basisfeiten te vinden. Maar daarin ligt het probleem niet. Wat vooral lastig is, is de logische inferentie onder condities van theorie-verandering. Een tweede lastig onderwerp is de functionele compositie van queries in combinatie met effect.
+
+Creëren:
+1. Een Context maken.
+2. Een Rol maken in een Context (met een naam, die het type van de Rol bepaalt).
+3. Een Rol een waarde voor een property geven.
+4. Een Rol aan een Rol binden.
+
+Bevragen:
+1. Een property waarde van een Rol opvragen (per naam).
+2. Een Rol van een Context opvragen (per naam).
+3. De Context van een Rol opvragen.
+4. De binding van een Rol opvragen.
+5. De rollen die een Rol vult opvragen.
+
+Non-functionals:
+1. Aannemend dat we rollen en contexten separaat blijven opslaan:
+	a. Als we de Rol van een Context opvragen, moet die Rol zonodig asynchroon geladen worden.
+	b. Als we de Context van een Rol opvragen, moet die Context zonodig asynchroon geladen worden.
+2. Als we iets gemaakt of veranderd hebben, moet het worden opgeslagen en verstuurd naar betrokkenen.
+	- een gebruiker is betrokken bij een Context als hij er (indirect) een rol van vult;
+	- een gebruiker is betrokken bij een Rol als hij die rol (indirect) vult;
+	- een gebruiker is betrokken bij een Rol als hij een Perspectief op die Rol heeft.
+
+OVER BIDIRECTIONALITEIT
+De datastructuren zijn gericht. Traverseren in de omgekeerde richting doen we met een Zipper of met een functionele index (een lens-beschrijving, d.w.z. een lijst van operaties die gecomponeerd kunnen worden).
+
+Types en instanties
+1. Een type is een Context.
+2. Een instantie is een Context of een Rol.
+3. Een context hoeft geen type te hebben. Zo kunnen we een type hiërarchie altijd eindigen.
+
+SCENARIO'S
+Een Context van een bepaald type maken
+1. Maak een lege context.
+2. Maak daarin een lege rol met de naam "zelf"
+3. Geef de zelfrol de eigenschap "type" met als waarde het betreffende type.
+4. Bepaal uit het type van de context welke rol de creator bij deze rol moet spelen.
+5. Geef de context deze rol.
+6. Vul deze rol met de onderwerp rol van de Actie waarin de Context wordt gemaakt.
+Non functionals: context en rol worden bewaard.
+
+Een Type Context maken (dus: een Context die een type Context beschrijft)
+1. Maak een lege Context van het type ContextType. De gebruiker/modelleur speelt de rol 'contextType_Ontwerper' bij dit ContextType (we laten in het midden waar het type ContextType vandaan komt!).
+	CONVENTIE: de rolnaam construeren we uit de naam van het type en de naam van de rol.
+2. Voeg RolTypen toe aan deze Context. Een RolType is een Context. Elk RolType vult de rol "context_Rol". Deze rol is beschreven in het type ContextType.
+
+Een Type Rol maken (dus: een Context die een type Rol beschrijft)
+1. Maak een lege Context van het type RolType. De gebruiker/modelleur speelt de rol 'contextType_Ontwerper' bij dit ContextType (we laten in het midden waar het type RolType vandaan komt!).
+2. Vul de rol rol_MogelijkeBinding met een RolType.
+3. Voeg PropertyTypen toe aan deze Context. Een PropertyType is een Context. Elk PropertyType vult de rol "rol_Property". Deze rol is beschreven in het RolType.
+4. Voeg PropertyPerspectieven toe aan deze Rol. Een PropertyPerspectief is een Context. Elk PropertyPerspectief vult de rol "rol_PropertyPerspectief". Deze rol is beschreven in het RolType.
+
+Een Type Property maken (dus: een Context die een type Property beschrijft).
+1. Maak een lege Context met het type PropertyType. De gebruiker/modelleur speelt de rol 'contextType_Ontwerper' bij dit ContextType (we laten in het midden waar het type PropertyType vandaan komt!).
+2. Geef de zelfrol van deze Context voor de property 'range' één van de basistypen als waarde. Basistype is een enumeratie van strings.
+3. Geef de zelfrol van deze Context voor de property 'functional' een boolean waarde.
+4. Geef de zelfrol van deze Context voor de property 'inverseFunctional' een boolean waarde.
+
+Een PropertyPerspectief maken (dus: een Context die een PropertyPerspectief beschrijft).
+1. Maak een lege Context met het type PropertyPerspectief.  De gebruiker/modelleur speelt de rol 'ontwerper' bij dit ContextType (we laten in het midden waar het type PropertyPerspectief vandaan komt!).
+2. Voeg PropertyTypen toe aan deze Context. Een PropertyType is een Context. Elk PropertyType vult de rol "propertyPerspectief_Property". Deze rol is beschreven in het PropertyPerspectiefType.
+
+
+VOORBEELDEN
+
+Context Aangifte
+	type: ContextType
+
+Dit kunnen we verkort schrijven:
+
+ContextType Aangifte.
+
+Zo hebben we ook RolType en PropertyType.
+
+Geven we Aangifte twee rollen:
+ContextType Aangifte
+	context_Rol: Aangever
+	context_Rol: Verbalisant
+
+Nu willen we Aangifte ook de numerieke property Prioriteit geven:
+ContextType Aangifte
+	context_Rol: Aangever
+	context_Rol: Verbalisant
+	context_Rol: 
+		RolType Zelf
+			rol_Property: Prioriteit
+
+Daar hebben we ook een verkorte syntax voor:
+ContextType Aangifte
+	context_Rol: Aangever
+	context_Rol: Verbalisant
+	Properties:
+		Prioriteit
+
+We kunnen in-place definiëren:
+
+ContextType Aangifte
+	context_Rol: Aangever
+	context_Rol: Verbalisant
+	Properties:
+		PropertyType Prioriteit
+			Properties:
+				range: Integer
+				functional: true
+				inverseFunctional: false
+
+Hiermee geven we Aangifte dus de Integer-valued property Prioriteit.
+
+Nog een verkorting: PropertyType is een Context zonder rollen, afgezien van de ontwerper. We kunnen een PropertyType daarom zo beschrijven:
+
+PropertyType Prioriteit
+	range: Integer
+	functional: true
+	inverseFunctional: false
+
+Dus aangifte wordt dan:
+
+ContextType Aangifte
+	context_Rol: Aangever
+	context_Rol: Verbalisant
+	Properties:
+		PropertyType Prioriteit
+			range: Integer
+			functional: true
+			inverseFunctional: false
+
+DE HOOFDTYPEN
+
+Context ContextType
+	context_Rol: Ontwerper		-- Merk op: dit geeft dus bij instanties de rol 'contextType_Ontwerper'.
+	type: ContextType
+
+ContextType is een Context met twee gevulde rollen, namelijk context_Rol en type. Deze rollen vullen we respectievelijk met Ontwerper en ContextType. Zo geven we aan dat het type van ContextType recursief ContextType is (misschien is het beter om het type van ContextType weg te laten). En we geven aan dat Contexten van het type ContextType de Rol 'contextType_Ontwerper' hebben (
+
+Context Ontwerper
+	type: RolType
+	context_Rol: Ontwerper
+	rolType_MogelijkeBinding: Gebruiker
+
+Context RolType
+	type: RolType
+	context_Rol: Ontwerper
+	context_Rol: MogelijkeBinding
+
+Context MogelijkeBinding
+	type: RolType
+	rolType_MogelijkeBinding: RolType
+
+

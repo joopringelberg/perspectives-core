@@ -1,7 +1,7 @@
 module Perspectives.TheoryChange where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), maybe)
@@ -9,9 +9,9 @@ import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.ResourceTypes (Resource)
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), Predicate, lookupInTripleIndex)
+import Perspectives.TripleAdministration (Predicate, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
-import Prelude (Ordering(..), bind, id, join, pure, ($))
+import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -42,10 +42,22 @@ propagateTheoryDeltas :: forall e. TripleQueue e -> Aff (PropDefsEffects e) (Arr
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do
-    (obj :: Array String) <- recompute head
-    _ <- saveChangedObject head obj
+    t@(Triple{object, supports} :: Triple e) <- recompute head
+    _ <- saveChangedObject head object
+    _ <- liftEff $ updateDependencies head t
+    _ <- liftEff $ setSupports head supports
     (deps :: Array (Triple e)) <- liftEff (getDependencies head)
     propagateTheoryDeltas (addToQueue tail deps)
+
+updateDependencies :: forall e e1. Triple e -> Triple e -> Eff (gm :: GLOBALMAP | e1) Unit
+updateDependencies t@(Triple{supports: old}) (Triple{supports: new}) =
+  foreachE (difference old new) remove where
+    remove :: TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+    remove ref = void do
+      mt <- getTriple ref
+      case mt of
+        (Just supportingTriple) -> removeDependency supportingTriple (getRef t)
+        Nothing -> pure ref
 
 getDependencies :: forall e eff. Triple e ->  Eff (gm :: GLOBALMAP | eff) (Array (Triple e))
 getDependencies (Triple{dependencies}) = do
@@ -55,7 +67,7 @@ getDependencies (Triple{dependencies}) = do
     -- lookupRef :: TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple e))
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
-recompute :: forall e. Triple e -> Aff (PropDefsEffects e) (Array String)
+recompute :: forall e. Triple e -> Aff (PropDefsEffects e) (Triple e)
 recompute (Triple{subject, tripleGetter}) = tripleGetter subject
 
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)

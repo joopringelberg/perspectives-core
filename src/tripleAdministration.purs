@@ -8,7 +8,7 @@ import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.ResourceTypes (Resource)
-import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==), (>>=))
+import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==))
 
 type Predicate = String
 
@@ -64,6 +64,9 @@ lookupInTripleIndex rid pid = do
           pure Nothing
         (Just o) -> pure (Just o)
 
+getTriple :: forall e1 e2. TripleRef -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
+getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
+
 -- | Add a triple to the index. The object value of the triple should comply to the type of the TripleIndex!
 -- | Will add an entry for the Resource if it is not yet present.
 addToTripleIndex :: forall e1 e2.
@@ -86,7 +89,7 @@ addToTripleIndex rid pid val deps sups tripleGetter =
                 })
       predIndex <- poke m pid triple
       _ <- poke tripleIndex rid predIndex
-      _ <- foreachE sups (addDependency_ triple)
+      _ <- foreachE sups (addDependency_ (getRef triple))
       pure triple
 
 registerTriple :: forall e1 e2. Triple e2 -> Eff (gm :: GLOBALMAP | e1) (Triple e2)
@@ -113,6 +116,12 @@ memorize getter name = NamedFunction name \id -> do
 
 -- TODO: dit moet eigenlijk een apart effect zijn, b.v.: DEPENDENCY.
 foreign import addDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+foreign import removeDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+foreign import setSupports ::  forall e1 e2. Triple e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
 
-addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
-addDependency_ t tr = void (addDependency t tr)
+addDependency_ :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+addDependency_ dependentRef supportingRef = do
+  ms <- getTriple supportingRef
+  case ms of
+    (Just support) -> void (addDependency support dependentRef)
+    Nothing -> pure unit
