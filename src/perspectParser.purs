@@ -5,7 +5,7 @@ import Control.Alt ((<|>))
 import Data.Foldable (elem)
 import Data.List (List(..), many)
 import Data.Maybe (Maybe(..))
-import Perspectives.Syntax (Context(..), ContextDefinition(..), PrivatePropertyAssignments(..), PropertyAssignment(..), PropertyDefinition(..), PublicPropertyAssignments(..), RolAssignmentWithPropertyAssignments(..), SimpleValue(..))
+import Perspectives.Syntax (Context(..), ContextDefinition(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignmentWithPropertyAssignments(..), SimpleValue(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
@@ -94,15 +94,6 @@ propertyDefinition = withPos do
   name <- sameLine *> identifier
   props <- indented *> withPos (block (try propertyAssignment))
   pure $ PropertyDefinition {scope: scope, name: name, properties: props}
-
-
--- privatePropertyDefinition = 'private' BLOCK propertyAssignment*
-privatePropertyAssignments :: IP PrivatePropertyAssignments
-privatePropertyAssignments = PrivatePropertyAssignments <$> propertyAssignmentList "private"
-
--- publicPropertyAssignments = 'public' BLOCK propertyAssignment*
-publicPropertyAssignments :: IP PublicPropertyAssignments
-publicPropertyAssignments = PublicPropertyAssignments <$> propertyAssignmentList "public"
 
 -----------------------------------------------------------
 -- Context

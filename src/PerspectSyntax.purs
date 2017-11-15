@@ -56,10 +56,6 @@ instance showPropertyAssignment :: Show PropertyAssignment where
 -- rolAssignment = type '=>' identifier
 newtype RolAssignment = RolAssignment {name :: String, value :: String}
 
-newtype PublicPropertyAssignments = PublicPropertyAssignments (List PropertyAssignment)
-
-newtype PrivatePropertyAssignments = PrivatePropertyAssignments (List PropertyAssignment)
-
 -- rolAssignment = type '=>' identifier BLOCK propertyAssignment*
 newtype RolAssignmentWithPropertyAssignments = RolAssignmentWithPropertyAssignments
   {name :: String, binding :: String, properties :: List PropertyAssignment}
@@ -79,12 +75,6 @@ instance showRolAssignment :: Show RolAssignment where
 
 instance showRolAssignmentWithPropertyAssignments :: Show RolAssignmentWithPropertyAssignments where
   show (RolAssignmentWithPropertyAssignments{name, binding, properties}) = name <> " => " <> binding <> "\n" <> show properties
-
-instance showPublicPropertyAssignments :: Show PublicPropertyAssignments where
-  show (PublicPropertyAssignments la) = "public properties: " <> show la
-
-instance showPrivatePropertyAssignments :: Show PrivatePropertyAssignments where
-  show (PrivatePropertyAssignments la) = "private properties: " <> show la
 
 instance showContextDefinition :: Show ContextDefinition where
   show (ContextDefinition{id, contextType, privateProperties, publicProperties, roles }) =
