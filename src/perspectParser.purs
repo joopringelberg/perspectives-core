@@ -5,9 +5,9 @@ import Control.Alt ((<|>))
 import Data.Foldable (elem)
 import Data.List (List(..), filter, many)
 import Data.Maybe (Maybe(..))
-import Perspectives.Syntax (Context(..), ContextDefinition(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolAssignmentWithPropertyAssignments(..), RolDefinition(..), SimpleValue(..))
+import Perspectives.Syntax (Context(..), ContextDefinition(..), Expr(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolAssignmentWithPropertyAssignments(..), RolDefinition(..), SimpleValue(..))
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (==), (>>=))
+import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (optionMaybe, try)
@@ -122,7 +122,7 @@ rolDefinition = withPos do
   pure $ RolDefinition {id: definedTypeName, rolType: typeName, binding: binding, properties: propDefs}
 
 -----------------------------------------------------------
--- Context
+-- Context and ContextDefinition
 -----------------------------------------------------------
 
 -- context = type identifier BLOCK propertyAssignment* rolAssignmentWithPropertyAssignments*
@@ -131,19 +131,20 @@ context = withPos do
   typeName <- sameOrIndented *> identifier
   instanceName <- sameOrIndented *> identifier
   indented *> withPos do
-    props <- (block (try propertyAssignment))
-    roles <- (block (try rolAssignmentWithPropertyAssignments))
+    props <- (block propertyAssignment)
+    roles <- (block rolAssignmentWithPropertyAssignments)
     pure $ Context {id: instanceName
                   ,contextType: typeName
                   , properties: props
                   , roles: roles }
 
--- contextDefinition = type identifier BLOCK
+-- contextDefinition = DEF type identifier BLOCK
 -- 	privatePropertyDefinition*
 -- 	publicPropertyDefinition*
 -- 	rolDefinition*
 contextDefinition :: IP ContextDefinition
 contextDefinition = withPos do
+  _ <- reserved "DEF"
   typeName <- sameOrIndented *> identifier
   definedTypeName <- sameOrIndented *> identifier
   indented *> withPos do
@@ -154,6 +155,16 @@ contextDefinition = withPos do
                   , privateProperties: filter (\(PropertyDefinition{scope}) -> scope == "private") propDefs
                   , publicProperties: filter (\(PropertyDefinition{scope}) -> scope == "public") propDefs
                   , roles: roles }
+
+-----------------------------------------------------------
+-- File and expr
+-----------------------------------------------------------
+expr :: IP Expr
+expr = CtxtDef <$> contextDefinition <|> Ctxt <$> context
+
+file :: IP (List Expr)
+file = many expr
+
 -----------------------------------------------------------
 -- Tests
 -----------------------------------------------------------
@@ -234,7 +245,7 @@ etc
 -- runIndentParser test12 rolDefinition
 
 test13 :: String
-test13 = """:ContextType :Aangifte
+test13 = """DEF :ContextType :Aangifte
 	private :status
 		:isFunctional = true
 		:isVerplicht = true
@@ -255,5 +266,10 @@ test13 = """:ContextType :Aangifte
       :isFunctional = true
       :isVerplicht = true
       :range = Number
+
 """
 -- runIndentParser test13 contextDefinition
+
+test14 :: String
+test14 = test13 <> test8
+-- runIndentParser test14 file

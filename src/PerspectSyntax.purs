@@ -7,7 +7,7 @@ import Data.List (List)
 import Data.StrMap (StrMap)
 
 data Expr = Ctxt Context
-          | Rol Rol
+          | CtxtDef ContextDefinition
 
 newtype ContextDefinition = ContextDefinition
   { id :: String
@@ -107,3 +107,7 @@ instance showRolDefinition :: Show RolDefinition where
     "\nID: " <> id <>
     "\nBinding: " <> show bnd <>
     "\nProperties " <> show properties
+
+instance showExpr :: Show Expr where
+  show (Ctxt c) = show c
+  show (CtxtDef d) = show d
