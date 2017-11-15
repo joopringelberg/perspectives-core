@@ -3,6 +3,18 @@ WAT WE MOETEN KUNNEN DOEN
 LATER TOEGEVOEGD:
 Dit is een abstractie die helpt om een goede representatie van de basisfeiten te vinden. Maar daarin ligt het probleem niet. Wat vooral lastig is, is de logische inferentie onder condities van theorie-verandering. Een tweede lastig onderwerp is de functionele compositie van queries in combinatie met effect.
 
+Basisonderdelen:
+1. Context.
+2. RolInContext.
+3. Inner ZelfRol.
+4. Outer ZelfRol.
+5. Property van Rol.
+
+Basisverbindingen:
+1. Tussen Rol en Context (driemaal).
+2. Tussen Rol en Rol.
+3. De 'verbinding' tussen Rol en Propertywaarde (dit is de property zelf).
+
 Creëren:
 1. Een Context maken.
 2. Een Rol maken in een Context (met een naam, die het type van de Rol bepaalt).
@@ -10,11 +22,15 @@ Creëren:
 4. Een Rol aan een Rol binden.
 
 Bevragen:
-1. Een property waarde van een Rol opvragen (per naam).
-2. Een Rol van een Context opvragen (per naam).
-3. De Context van een Rol opvragen.
-4. De binding van een Rol opvragen.
-5. De rollen die een Rol vult opvragen.
+1. Een RolInContext van een Context opvragen (per naam), en terug.
+2. De Inner ZelfRol van een Context opvragen, en terug.
+3. De Outer ZelfRol van een Context opvragen, en terug.
+4. De binding van een Rol opvragen, en terug.
+5. Een property waarde van een Rol opvragen (per naam).
+
+Systematisch: er is een verschil tussen:
+a. een rol bij naam opvragen van een Context of een property waarde bij naam opvragen bij een Rol, en
+b. alle Rollen opvragen bij een Context of alle property waarden bij een Rol (hoewel dat laatste nauwelijks nuttig is).
 
 Non-functionals:
 1. Aannemend dat we rollen en contexten separaat blijven opslaan:
@@ -37,7 +53,7 @@ SCENARIO'S
 Een Context van een bepaald type maken
 1. Maak een lege context.
 2. Maak daarin een lege rol met de naam "zelf"
-3. Geef de zelfrol de eigenschap "type" met als waarde het betreffende type.
+3. Geef de zelfrol de eigenschap "type" met als waarde het betreffende type. Neen, fout: dit moet een rol zijn.
 4. Bepaal uit het type van de context welke rol de creator bij deze rol moet spelen.
 5. Geef de context deze rol.
 6. Vul deze rol met de onderwerp rol van de Actie waarin de Context wordt gemaakt.
@@ -96,11 +112,20 @@ ContextType Aangifte
 	Properties:
 		Prioriteit
 
+Dan is het ook wel makkelijk om de Rollen te groeperen:
+ContextType Aangifte
+	Rollen:
+		Aangever
+		Verbalisant
+	Properties:
+		Prioriteit
+
 We kunnen in-place definiëren:
 
 ContextType Aangifte
-	context_Rol: Aangever
-	context_Rol: Verbalisant
+	Rollen:
+		Aangever
+		Verbalisant
 	Properties:
 		PropertyType Prioriteit
 			Properties:
@@ -120,8 +145,9 @@ PropertyType Prioriteit
 Dus aangifte wordt dan:
 
 ContextType Aangifte
-	context_Rol: Aangever
-	context_Rol: Verbalisant
+	Rollen:
+		Aangever
+		Verbalisant
 	Properties:
 		PropertyType Prioriteit
 			range: Integer
@@ -142,12 +168,203 @@ Context Ontwerper
 	rolType_MogelijkeBinding: Gebruiker
 
 Context RolType
-	type: RolType
 	context_Rol: Ontwerper
+	type: RolType
 	context_Rol: MogelijkeBinding
 
 Context MogelijkeBinding
+	context_Rol: Ontwerper
 	type: RolType
 	rolType_MogelijkeBinding: RolType
+
+
+BASIS-SYNTAX
+We hebben een syntax nodig om de hoofdtypen te kunnen beschrijven. Daarbij mag je dus geen gebruik maken van de hoofdtypen zelf.
+
+Basisonderdelen:
+1. Context.
+2. RolInContext.
+3. Inner ZelfRol.
+4. Outer ZelfRol.
+5. Property van Rol.
+
+Basisverbindingen:
+1. Tussen Rol en Context (driemaal).
+2. Tussen Rol en Rol.
+3. De 'verbinding' tussen Rol en Propertywaarde (dit is de property zelf).
+
+Uit de basisonderdelen en basisverbindingen daartussen volgen de onderstaande noodzakelijke bevragingsmogelijkheden:
+1. Een RolInContext van een Context opvragen (per naam), en terug.
+2. De Inner ZelfRol van een Context opvragen, en terug.
+3. De Outer ZelfRol van een Context opvragen, en terug.
+4. De binding van een Rol opvragen, en terug.
+5. Een property waarde van een Rol opvragen (per naam).
+
+We kiezen nu een representatie van de basisonderdelen en basisverbindingen in RDF. Het enige dat we van RDF gebruiken is rdf:type (en natuurlijk de syntax waarmee we basisfeiten representeren).
+
+De basisonderdelen Context en Rol (alledrie de rollen) representeren we met een Resource. De Properties van Rol representeren we met een RDF property (zie hieronder).
+
+1. Omdat een Context alleen Rollen heeft, is een RDF property van een Context automatisch een rol.
+2. De property id is bij afspraak: <contextnaam>_<Rolnaam>.
+3. Deze property kan altijd twee kanten op genavigeerd worden, door de naam om te draaien.
+4. Een Context heeft twee vaste RDF properties, namelijk context_BinnenRol en context_BuitenRol.
+4. Een Rol heeft een vaste property binding.
+5. Alle RDF properties van een Rol zijn automatisch properties van een Rol (één op één mapping tussen Perspect Property van Rol en RDF property).
+
+Nu kunnen we een syntax opstellen om basisonderdelen en verbindingen mee te beschrijven.
+Indentering groepeert.
+
+	Context <cnaam>					
+	
+	RDF:
+	<cnaam> rdf:type :Context
+
+Dit introduceert een Context (ik gebruik een default namespace).
+
+	Context <cnaam>
+		<rolnaam1>
+	
+	RDF: 
+	<cnaam> rdf:type :Context
+	<rolnaam1> rdf:type :RolInContext
+	<cnaam> <cnaam1>_<Rolnaam1> <rolnaam1>
+	<rolnaam1> rol_Context <cnaam>			// Dit hebben we nodig om met een generieke property van rol naar context te kunnen navigeren. En om alle rollen van een Context te kunnen pakken.
+
+Nu heeft de context één rol, die via een property verbonden is met de context. NB. We hoeven deze property niet verder te beschrijven, dus geen range of domain aan te geven.
+
+	Context <cnaam>
+		<rolnaam1> = <rolnaam2>
+	
+	RDF:
+	<cnaam> rdf:type :Context
+	<rolnaam1> rdf:type :RolInContext
+	<cnaam> <cnaam1>_<Rolnaam1> <rolnaam1>
+	<rolnaam1> binding <rolnaam2>
+	
+Merk op dat we niet weten wat voor type Rol rolnaam2 is. Merk ook op dat de syntax '=' gebruikt in plaats van binding.
+
+	Context <cnaam>
+		<rolnaam1> = <cnaam2>
+
+	Context <cnaam2>
+
+	RDF:
+	<cnaam> rdf:type :Context
+	<rolnaam1> rdf:type :RolInContext
+	<cnaam> <cnaam1>_<Rolnaam1> <rolnaam1>
+	<rolnaam1> binding <cnaam2>OuterZelfRol
+	<cnaam2> rdf:type :Context
+	<cnaam2>OuterZelfRol rdf:type :OuterZelfRol
+	<cnaam2> context_BuitenRol <cnaam2>OuterZelfRol
+
+Merk op dat, omdat we een RolInContext van de ene context gevuld hebben met een andere context, die andere context een OuterZelfRol moet hebben. De naam van die rol(instantie) wordt gegenereerd.
+
+	Context <cnaam>
+		<rolnaam1> = <cnaam2>
+
+	Context <cnaam2>
+		BuitenRol = Rol
+						label = "Dit is de tweede context"
+
+	RDF:
+	<cnaam> rdf:type :Context
+	<rolnaam1> rdf:type :RolInContext
+	<cnaam> <cnaam1>_<Rolnaam1> <rolnaam1>
+	<rolnaam1> binding <cnaam2>BuitenRol
+	<cnaam2> rdf:type :Context
+	<cnaam2>OuterZelfRol rdf:type :BuitenRol
+	<cnaam2> context_BuitenRol <cnaam2>OuterZelfRol
+	<cnaam2>OuterZelfRol :label "Dit is de tweede context"
+
+Opmerkingen:
+	1. De binding van de OuterZelfRol van cnaam2 heeft een definitie in situ.
+	2. Alle onderdelen van een Rol zijn properties. Daarom kunnen we de syntax waarmee we contexten rollen geven, overloaden om Rollen properties te geven.
+	3. Wat voorheen het rdfs:label van een Concept was, kan nu eenvoudigweg de label property van de OuterZelfRol zijn.
+
+VOORLOPIGE CONCLUSIES
+Zo beschrijven we instanties van Contexten en Rollen:
+1. Een Context heeft de standaard properties context_BinnenRol en context_BuitenRol.
+2. Elke andere Rol r in Context c wordt gerepresenteerd met een property c_R.
+3. Context, RolInContext, BinnenRol en BuitenRol zijn de enige basisblokken die in de object positie van rdf:type voorkomen. Het zijn dus de enige basistypen.
+4. Een property van een Rol wordt direct gerepresenteerd met een RDF triple met de propertynaam in predicaat positie.
+5. Elk van de drie soorten rollen heeft de standaard property rol_Context met als waarde de Context waar de Rol bij hoort.
+6. Een BinnenRol heeft de standaard property 'binding' met als waarde de BuitenRol van dezelfde Context.
+7. Constraint: een BuitenRol heeft geen property 'binding'.
+8. Een RolInContext heeft de standaard property 'binding'. Dit is een functionele property.
+
+Toelichting op rol_Context. Zonder deze property kunnen we niet van een Rol naar een Context zonder de naam van beiden te weten. Dat is beperkend. Denk aan een BuitenRol van C1 die een ContextInRol van C2 vult. We kunnen van C1 naar zijn BuitenRol, naar zijn Binding; maar dan, als we naar C2 willen, moeten we de naam van C2 weten om de query te kunnen schrijven. Dat is te beperkend. 
+Ander aspect van deze beperking: zonder rol_Context kunnen we geen query schrijven die alle Rollen van een Context oplevert.
+Althans, als we modelreflectie gebruiken, dan kan het wel, met een omweg en filteren. Maar het kan dan dus niet op het basisniveau zoals hier beschreven. Daarom wil ik een dubbele verbinding tussen een Rol en zijn Context: één specifiek, één generiek.
+
+Zoiets is volgens mij niet nodig voor properties van rollen. Redeneren over alle properties van een Rol komt veel minder voor dan navigeren over rollen en contexten.
+
+Kortom, 
+vijf RDF properties: context_BinnenRol, context_BuitenRol, rdf:type, rol_Context en binding; NB: 'binnenRol', 'buitenRol' kunnen ook.
+vier Resources die als subject van rdf:type voorkomen: Context, RolInContext, BinnenRol, BuitenRol.
+een ongelimiteerd aantal properties die een Rol aan een Context binden;
+een ongelimiteerd aantal properties van Rollen.
+Alle andere concepten zijn afgeleid. We zullen types moeten beschrijven met behulp van de bovenstaande mogelijkheden. Dat geldt, op een bepaalde manier recursief, voor Context, RolInContext, BinnenRol en BuitenRol zelf. Het geldt ook voor Property en PropertyPerspectief. En dan volgen de andere concepten.
+
+DE VOLGENDE OPGAVEN:
+1. Hoe beschrijven we de typen ContextType, RolType, PropertyPerspectiefType, enzovoort?
+2. Hoe realiseren we de semantiek van deze typen ten opzichte van hun instanties, dat wil zeggen concrete, instantieerbare typen?
+3. Waar bestaat die semantiek uit?
+4. Hoe realiseren we de semantiek van instantieerbare typen ten opzichte van hun instanties?
+5. Waar bestaat die semantiek uit?
+
+Uitwerking
+We onderscheiden drie niveaus:
+1. De beschrijving van contexten die het type "Context" beschrijven, of "Rol", of "Property", of "PropertyPerspectief", enz.: Cor's pak 'm beet 20 typen. Laten we dit Perspect Artefact Typen (PAT) noemen. Of MetaTypen.
+2. De beschrijving van instanties van die typen. Dat zijn dus de typen die een model vormen, zoals Aangifte. Laten we ze ModelTypen noemen (MT).
+3. De instanties. 
+Merk op dat (1), (2) en (3) dezelfde vorm zullen hebben (zoals hierboven beschreven). Er zijn alleen maar contexten en rollen en hun verbindende properties. Hun /betekenis/ is anders: sommige contexten begrijpen we als ModelTypen, andere als instanties daarvan, weer andere als 'Class types' - categorieën van ModelTypen.
+
+Wat is de gewenste semantiek van ModelTypen?
+1. Een Context ModelType geeft de mogelijke rollen en dus ook rolproperties van zijn instanties.
+2. Een Rol ModelType geeft het type van de mogelijke binding van instanties van die Rol.
+3. Een Rol ModelType geeft de mogelijke properties van zijn instanties.
+4. Een Property ModelType beperkt de mogelijke waarden van die Property bij instanties van Rollen tot een type. Hij geeft ook aan of de Property functioneel of inverseFunctioneel is, en of de Property verplicht is of niet.
+5. Een PropertyPerspectief ModelType geeft de geordende opsomming van Properties van de Rol waar het Perspectief op geldt.
+
+Welke operationele betekenis heeft deze semantiek?
+1. Als de gebruiker een instantie van een Context of Rol maakt, 
+	- wordt hij geleid in zijn keuze voor onderdelen, d.w.z. respectievelijk Rollen bij de Context, Binding van de Rol of Properties en waarden van de Rol
+	- krijgt hij een melding als hij een keuze heeft gemaakt die strijdig is met de gewenste semantiek van het type van de instantie (een geschonden-constraint melding).
+2. Hetzelfde geldt voor als hij een query maakt:
+	- hij wordt geleid in zijn keuze voor de volgende stap van de query (welke Rol van de context, welke Property van de Rol).
+	- hij krijgt een geschonden constraint melding als een keuze strijdig is met de gewenste semantiek.
+3. Als een Model Type verandert wordt, krijgt de gebruiker melding over instanties en queries die nu ten opzichte van het veranderde type ongeldige keuzes bevatten.
+4. In de uitwerking van een Actie (b.v. in een scherm) worden de Properties in het Perspectief op het lvw ingezet.
+
+Welke vragen moet het systeem kunnen beantwoorden om de bovenstaande semantiek te kunnen realiseren? M.a.w., welke modelreflectie is noodzakelijk?
+1. Welke RolTypen horen bij een bepaald ContextType?
+2. Welk type Binding hoort bij een bepaald RolType?
+3. Welke Property(namen) horen bij een bepaald RolType?
+4. Welk type waarde hoort bij een bepaalde Property?
+5. Welke Property typen horen bij een PropertyPerspectief?
+
+Wat is de gewenste semantiek van MetaTypen?
+1. De modelleur wordt geleid bij het opstellen van ModelTypen, of gewezen op keuzes die hij heeft gemaakt die de gewenste semantiek van MetaTypen schenden.
+2. Merk op dat de modelleur alléén Contexten maakt om typen te beschrijven. Deze contexten kunnen wel Rollen hebben, maar die kunnen alléén gebonden zijn aan MetaTypen!
+	Bijvoorbeeld: een ContextType wordt beschreven met een Context waarvan de Rollen uitsluitend gebonden kunnen worden aan RolTypen.
+3. Merk op dat ModelTypen gewoon Contexten zijn...
+4. Een RolType wordt beschreven met een Context waarvan de Rollen gebonden worden aan PropertyTypen, met uitzondering van:
+	- de Rol Binding, die gebonden wordt aan een RolType
+5. Hoe representeren we (representeren we uberhaupt) dat een Rol altijd de property rol_Context heeft? Leggen we vast dat RolType een Rol heeft die die property representeert en heeft die Rol als Binding ContextType?
+
+STELLING: de properties van de basisrepresentatie (de vijf RDF properties) hoeven niet in de MetaTypen beschreven te worden. Dat betekent dat we geen reflectie kunnen gebruiken om hun eigenschappen vast te stellen. Oftewel, hun eigenschappen mogen in code verankerd zijn.
+
+STELLING: behalve rdf:type hebben we ook psp:type. Het object van psp:type moet een MetaType zijn, dus: psp:Context, psp:Rol, psp:Property, psp:PropertyPerspectief, psp:Actie, enz.
+De objecten van rdf:type zijn alleen psp:Context psp:BinnenRol, psp:BuitenRol en psp:RolInContext.
+
+VRAAG: hebben we psp:Rol, naast psp:BinnenRol, psp:BuitenRol en psp:RolInContext? En zo ja, hoe modelleren we zijn verhouding tot de andere twee?
+Allevier kunnen we alleen beschrijven als Contexten. 
+- psp:BinnenRol kan niet gebruikt worden om rollen te vullen. IS DIT ZO? Indien toch wel, alleen rollen van dezelfde context.
+- psp:BinnenRol is nooit gevuld.
+- waar heb je psp:Rol voor nodig? Waarschijnlijk alleen als meest generieke restrictie op de mogelijke bindingen van een rol. psp:Rol zou dan staan voor ofwel psp:RolInContext, ofwel psp:BuitenRol.
+
+STELLING: de Rol Binding van een RolType kan meerdere keren voorkomen. Dit hebben we nodig om aan te geven dat een Rol gebonden kan worden door meerdere soorten Rollen. We hebben immers geen inheritance om een generieker type mee te maken dat die meerdere soorten verenigt.
+
+COROLLARY: we hebben psp:Rol niet nodig.
 
 

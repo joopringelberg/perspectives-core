@@ -1,0 +1,286 @@
+DE GOUDEN REGEL:
+
+Voor
+
+	<type> <ident>
+
+moeten we hebben:
+
+	<type> psp:type ?c
+	?c psp:type psp:MetaType
+	?c :describes ?x
+
+De RDF voor <type> <ident> is dan:
+
+	<ident> psp:type <type>
+	<ident> rdf:type ?x
+
+Cruciaal is de property :describes. Deze property bestaat voor alle instanties van :MetaType. Het object is in alle triples :Context, behalve deze uitzonderingen:
+
+	:RolInContextType :describes :RolInContext
+	:BuitenRolType :describes :BuitenRol
+	:BinnenRolType :describes :BinnenRol
+	
+	:PropertyType :describes :RolInContext
+
+Deze property wordt dus niet in een modelfile vastgelegd maar is onderdeel van de code.
+
+Waarom beschrijft een PropertyType een RolInContext in plaats van een Context? We hoeven voor een PropertyType alleen maar eigenschappen met simpele waarden (bool, number, date, etc.) vast te leggen. Dat kan met de properties van een rol, dus is het voldoende als we PropertyType een RolInContext laten beschrijven.
+
+========================================================================
+DE BASISREPRESENTATIE:
+
+	:MetaType :MetaType
+
+Daarvoor hebben we:
+
+	:MetaType psp:type :MetaType
+	:MetaType :describes :Context
+	:MetaType rdf:type :Context
+
+En dan:
+
+	:MetaType :ContextType
+	
+		:RolInContextType :RolInContextType
+		:RolInContextType :BinnenRolType
+		:RolInContextType :BuitenRolType
+
+Dus
+
+	:ContextType psp:type :MetaType
+	:ContextType :describes :Context
+	:ContextType rdf:type :Context
+	
+	:ContextType :context_Rol :RolInContextType
+	:ContextType :context_Rol :BinnenRolType
+	:ContextType :context_Rol :BuitenRolType
+
+
+En dan:
+
+	:MetaType :RolInContextType
+		:RolInContextType :PropertyType
+
+Dus
+
+	:RolInContextType psp:type :MetaType
+	:RolInContextType :describes :RolInContext
+	:RolInContextType rdf:type :Context
+	:RolInContextType :context_Rol :PropertyType
+
+En ook zo:
+
+	:MetaType :BuitenRolType
+
+Met:
+
+	:BuitenRolType psp:type :MetaType
+	:BuitenRolType :describes :BuitenRol
+	:BuitenRolType rdf:type :Context
+	
+
+Maar let op:
+
+	:MetaType :PropertyType 
+
+Waarin:
+
+	:PropertyType psp:type :MetaType
+	:PropertyType :describes RolInContext 	!!
+	:PropertyType rdf:type :Context
+
+Immers, :PropertyType beschrijft een RolInContext van een RolInContext.
+
+========================================================================
+CHECK: ModelType
+
+	ContextType Aangifte
+	
+type = :ContextType
+ident = :Aangifte
+?c = :MetaType
+?x = :Context
+
+	:ContextType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :Aangifte is dan:
+
+	:Aangifte psp:type :ContextType
+	:Aangifte rdf:type :Context
+
+Klopt!
+
+
+CHECK: Instantie van ModelType
+
+	:Aangifte :aangifte1
+
+type = :Aangifte
+ident = :aangifte1
+?c = :MetaType
+?x = :Context
+
+	:Aangifte psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :aangifte1 is dan:
+
+	:aangifte1 psp:type :Aangifte
+	:aangifte1 rdf:type :Context
+
+Klopt!
+
+CHECK: RolInContext van Instantie van ModelType
+
+	:Aangifte :aangifte1
+		:Aangever => :Jansen
+
+Dit is suikersyntax voor:
+
+	:Aangifte :aangifte1
+		:Aangever :aangifte1Aangever
+			:binding = :Jansen
+
+Focussen we eerst op ":Aangever :aangifte1Aangever":
+
+type = :Aangever
+ident = :aangifte1Aangever
+?c = :RolInContextType
+?x = :RolInContext
+
+	:Aangever psp:type :RolInContextType
+	:RolInContextType psp:type psp:MetaType
+	:RolInContextType :describes :RolInContext
+
+De RDF voor ":Aangifte :aangifte1Aangever" is dan:
+
+	:aangifte1Aangever psp:type :Aangever
+	:aangifte1Aangever rdf:type :RolInContext
+
+De RDF voor ":Aangever = :Jansen" in de context van ":Aangifte :aangifte1" wordt nu:
+
+	:aangifte1 :Aangever :aangifte1Aangever
+	
+	:aangifte1Aangever psp:type :Aangever
+	:aangifte1Aangever rdf:type :RolInContext
+	
+Tenslotte de property ":binding = :Jansen":
+
+	:aangifte1Aangever psp:binding :Jansen
+
+
+CHECK: MetaType (ContextType)
+
+	:MetaType :ContextType
+
+type = :MetaType
+ident = :ContextType
+?c = :MetaType
+?x = :Context
+
+	:MetaType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :ContextType is dan:
+
+	:ContextType psp:type :MetaType
+	:ContextType rdf:type :Context
+
+Klopt!
+
+CHECK: MetaType (RolInContextType)
+
+	:MetaType :RolInContextType
+
+type = :MetaType
+ident = :RolInContextType
+?c = :MetaType
+?x = :Context
+
+	:MetaType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :RolInContextType is dan:
+
+	:RolInContextType psp:type :MetaType
+	:RolInContextType rdf:type :Context
+
+
+CHECK: RolInContextType bij ModelType
+
+	:ContextType :Aangifte
+		:RolInContextType :Aangever
+
+type = :RolInContextType
+ident = :Aangever
+?c = :MetaType
+?x = :Context
+
+	:RolInContextType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :Aangever is dan:
+
+	:Aangever psp:type :RolInContextType
+	:Aangever rdf:type :Context
+
+Klopt!
+
+
+CHECK: definitie van een Property van een RolInContextType
+
+	ContextType :Aangifte
+		:RolInContextType :Aangever
+			:PropertyType :Betrouwbaarheid
+
+type = :PropertyType
+ident = :Betrouwbaarheid
+?c = :MetaType
+?x = :RolInContext
+
+	:PropertyType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :RolInContext
+
+De RDF is voor :Betrouwbaarheid is dan:
+
+	:Betrouwbaarheid psp:type :PropertyType
+	:Betrouwbaarheid rdf:type :RolInContext
+
+CHECK: definitie van een Property van een ContextType
+
+	ContextType :Aangifte
+		:BuitenRol :buitenRolVanAangifte
+			:PropertyType :urgentie
+				:isFunctional = true
+				:isVerplicht = true
+				:range = Int
+
+
+CHECK: MogelijkeBinding
+
+	:ContextType :Aangifte
+		:RolInContextType :Aangever
+			:MogelijkeBinding => :Gebruiker
+
+en dat wordt:
+
+	:ContextType :Aangifte
+		:RolInContextType :Aangever
+			:MogelijkeBinding :MogelijkeBindingVanAangever
+				:binding = :Gebruiker
+
+
+
+
+
+
+
+

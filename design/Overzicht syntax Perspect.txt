@@ -1,0 +1,433 @@
+OVERZICHT VAN DE SYNTAX VOOR PERSPECT
+
+:Aangifte :aangifte1
+	:Aangever => :Jansen
+		:betrouwbaarheid = 10
+	:status = "voltooid"
+	:urgentie = 5
+
+Dit fragment beschrijft een concrete aangifte (dus een instantie van een type :Aangifte) met de identifier ":aangifte1". De dubbele punt staat voor de default namespace van Perspect (wat het dan ook moge zijn). Soms gebruiken we ook het prefix "psp".
+
+Identifiers mogen met een hoofd- en kleine letter beginnen.
+
+:aangifte1 heeft een rol :Aangever, die gebonden is aan een rol met de identifier :Jansen. We hoeven niet na te denken over het verschil tussen property-van-de-context en rol-van-de-context en evenmin over de naam van de rol. De naam van (het type van de) rol - :Aangever - bepaalt hier dat er een rol èn een property zijn. In een query kan ook deze naam gebruikt worden.
+
+De instantie van de rol :Aangever (die in dit fragment niet expliciet genoemd wordt!) heeft een property :betrouwbaarheid waarvan de waarde gelijk is aan het getal 10. Let op: het is dus niet :Jansen die een :betrouwbaarheid heeft!
+
+Eigenlijk is ":Aangever => :Jansen" suiker-syntax voor:
+
+	:Aangever :aangifte1Aangever
+		:binding = :Jansen
+
+In deze expliciete vorm zie je wel de naam van de instantie van het rol-type :Aangever. Je ziet ook dat rol-binding gewone property lijkt. Toch is hij dat niet, omdat we niet aan een simpele waarde binden (zoals 'string' of 'boolean') maar aan een rol-instantie met de naam :Jansen.
+
+De aangifte zelf (:aangifte1) heeft ook properties: een property :status, die gelijk is aan de string "voltooid", en een property :urgentie, die als waarde het getal 5 heeft. We kunnen aan dit fragment niet zien of deze properties privaat of publiek zijn.
+
+Dat kan wel in de onderstaande definitie van :Aangifte:
+
+	:ContextType :Aangifte
+		:RolInContextType :Aangever
+			:MogelijkeBinding => :Gebruiker
+			:PropertyType :betrouwbaarheid
+				:isFunctional = true
+				:isVerplicht = true
+				:range = "Int"
+		private :status
+			:isFunctional = true
+			:isVerplicht = true
+			:range = "String"
+		public :urgentie
+			:isFunctional = true
+			:isVerplicht = true
+			:range = "Int"
+
+We zien hier de sleutelwoorden 'private' en 'public'. Sleutelwoorden zijn syntactische elementen zonder directe referentie in termen van contexten, rollen of properties. Sleutelwoorden kunnen in een editor die de Perspect syntax ondersteunt, een onderscheidend visueel kenmerk hebben, zoals een afwijkende kleur.
+
+Zij worden gevolgd door een propertynaam (in een namespace, de default namespace in dit geval). Per property kunnen we een aantal eigenschappen vastleggen: :isFunctional, :isVerplicht en :range. 
+
+	(ontwerpkwestie: We kunnen overwegen om deze eigenschappen ook met sleutelwoorden aan te duiden. De karakteristieken van een property liggen vast en hun aantal is beperkt.)
+
+In de definitie van :Aangifte is ook de definitie van een rol in context opgenomen. Deze begint met de term :RolInContextType. Dit is geen sleutelwoord. Later meer over de betekenis van deze term. Na deze term volgt de naam van het roltype en dat is hier :Aangever. 
+
+In de body van de definitie komen we allereerst een rol tegen: :MogelijkeBinding. Die rol is gebonden aan :Gebruiker en dat is het type van de bindingen van de rol :Aangever.
+
+Verder zien we dat in de body van deze rol-definitie ook een property is beschreven. Die begint met de term :PropertyType. De identifier van deze property - de *naam* van de property - is :betrouwbaarheid. Ook hier zien we weer de termen :isFunctional, :isVerplicht en :range.
+
+Merk op dat de context van deze termen nu :PropertyType is, terwijl we voor de private en public properties die we hebben gezien, :ContextType als contextgever begrepen (status en urgentie zijn properties van :Aangifte). Eigenlijk is de private-public syntax een suikersyntax voor:
+
+	ContextType :Aangifte
+		:BinnenRolType :AangifteBinnenRol
+			:PropertyType :status
+				:isFunctional = true
+				:isVerplicht = true
+				:range = "String"
+		:BuitenRolType :AangifteBuitenRol
+			:PropertyType :urgentie
+				:isFunctional = true
+				:isVerplicht = true
+				:range = "Int"
+
+Nu zien we de structurele overeenkomst tussen properties van :Aangever en de properties van de binnen- en buitenrol van :Aangifte. :BinnenRolType (en :BuitenRolType) heeft dezelfde functie als :RolInContextType. De 'basis-syntax' is dus dat in de definitie van een context de definitie van zijn rollen opgenomen kunnen worden. En vervolgens kunnen we in de definitie van een rol de definitie van een property opnemen.
+
+Voor de :RolInContext van :Aangifte kozen we een naam, namelijk :Aangever. Ook voor de binnen- en buitenrol moeten we een naam kiezen. Hier is dat respectievelijk :AangifteBinnenRol en :AangifteBuitenRol. Zolang we de verkorte syntax gebruiken, zijn deze namen onzichtbaar (en worden ze gegenereerd door het systeem). We kunnen ze vervangen door een willekeurige identifier.
+
+Is 'kanBindenAan' óók suikersyntax? Neen. We kunnen geen herschrijving geven die voldoet aan alle regels.
+
+Over :range. Properties van rollen variëren over simpele typen, zoals Int en String. Er is slechts een gering aantal van deze typen en modelleurs kunnen ze niet bijmaken. Deze typen hebben verder geen beschrijving in Perspect modellen. We kunnen overwegen om voor deze typen sleutelwoorden te maken. In dat geval hoeven ze niet in quotes te worden geschreven (later meer hierover).
+
+Overigens: deze simpele typen komen niet voor als subjecten van basisfeiten (triples), alleen als objecten. Daarom hoeven we niet te bepalen of properties omgekeerd functioneel zijn: dat zijn ze nooit.
+
+Dit is de volledige basisyntax van Perspect. Verdere variatie wordt vooral bepaald door meer soorten types die de modelleur kan maken, zoals bijvoorbeeld een :ActieType.
+
+TYPEN VAN TYPEN
+:Aangifte is een type. Immers, :aangifte1 is een instantie van dat type. Het type van :Aangifte is :ContextType. Zo hebben we ook :RolInContextType gezien en :PropertyType (en :BinnenRolType en :BuitenRolType, maar in de praktijk zal de modelleur die niet gebruiken, maar de sleutelwoorden private en public).
+
+Wat kunnen we zeggen over :ContextType, :RolInContextType en :PropertyType? Het zijn typen van typen, oftewel meta-typen, of type classes, en we kunnen ze ook Perspect-typen noemen. Ik houd het op meta-typen. 
+
+Een context-type geeft de typen rollen die in instanties van die context mogen voorkomen. Een property-type daarentegen geeft alleen aan of die property functioneel is, verplicht is en wat zijn range is. En dat doen we met properties (van het property-type zelf), niet met rollen. Nog een keer:
+- een context-type is een beschrijving die bestaat uit rollen;
+- een property-type is een beschrijving die bestaat uit properties.
+Het verschil is syntactisch ook heel duidelijk:
+
+	ContextType :Aangifte
+		:RolInContextType :Aangever
+
+maar:
+
+			:PropertyType :betrouwbaarheid
+				:isFunctional = true
+
+De '=' syntax wordt alléén gebruikt voor properties, zowel in types als instanties.
+
+Kortom, er is een groot structureel verschil tussen een instantie van een :ContextType ("een context-type") en van een :PropertyType ("een property-type"). De één heeft rollen, de ander properties. Daar zien we onmiddelijk aan dat de eerste een context is, en de tweede een rol. Met andere woorden, een :ContextType beschrijft een context, een :PropertyType beschrijft een rol.
+
+(let op: "een context-type" en "een :ContextType" gebruik ik als synoniemen. :Aangifte is een context-type. Dus ":ContextType" is het *type*, "een :ContextType" is een instantie van :ContextType).
+
+Dit is misschien het moeilijkste onderdeel van de Perspect representatie en zeker het meest verwarrende. We hebben nu:
+	- :ContextType *beschrijft* een context, en:
+	- :ContextType is het *type* van het type van contexten;
+Maar:
+	- :PropertyType *beschrijft* een rol;
+	- :PropertyType is het *type* van een property van een rol-type
+
+De verwarring is gebaseerd op het feit dat we contexten en rollen gebruiken om contexten en rollen te beschrijven en óók nog eens hun typen te beschrijven.
+
+We hebben nu :ContextType en :PropertyType behandeld. Dan hebben we nog :RolInContextType. Die is rechttoe-rechtaan, want met zo'n type beschrijven we een rol in context:
+	- :RolInContextType *beschrijft* een rol in context, en:
+	- :RolInContextType is het type van het type van een rol in context.
+
+:ContextType, :RolInContextType en :PropertyType zijn instanties van :MetaType.
+
+
+
+HET NUT VAN METATYPEN
+MetaTypen (d.w.z. instanties van :MetaType) zoals :ContextType en :RolInContextType hebben een praktisch nut in Perspect. Als de modelleur een beschrijving van een type context opstelt (d.w.z. als hij een context-type maakt, een instantie van :ContextType), dan willen we hem ondersteunen in zijn mogelijke keuzes en zo nodig attenderen op foute composities.
+
+Welke keuzes heeft de modelleur als hij een instantie van :ContextType schrijft? Oftewel, als hij heeft ingetikt:
+
+	:ContextType :Aangifte
+
+wat zijn dan de vervolgmogelijkheden op de volgende regel? Wel, hij kan kiezen uit:
+
+	- :RolInContextType
+	- private (zonder suikersyntax zou dat zijn: :BinnenRolType)
+	- public (zonder suikersyntax zou dat zijn: :BuitenRolType).
+
+Het Perspect systeem bepaalt dat deze keuzes mogelijk zijn uit de *beschrijving* van :ContextType, die luidt:
+
+
+	:MetaType :ContextType
+		:RolInContextType :RolInContextType
+		:RolInContextType :BinnenRolType
+		:RolInContextType :BuitenRolType
+
+Het systeem evalueert de query:
+
+	:ContextType ## :RolInContextType
+	
+en krijgt dan drie alternatieven. Die schotelt het systeem voor aan de modelleur. Merk op, dat het meta-type :ContextType drie rollen heeft (afgezien van zijn binnen- en buitenrol)! Elk van die rollen wordt gevuld door een ander meta-type.
+
+Vervolgens, als de modelleur heeft staan:
+
+	:ContextType :Aangifte
+		:RolInContextType :Aangifte
+		
+dan kijkt het systeem na in de definitie van :RolInContextType wat de mogelijkheden voor verdere detaillering door compositie zijn:
+
+	:MetaType :RolInContextType
+		:RolInContextType :PropertyType
+
+Het evalueert dezelfde query: 
+
+	:ContextType ## :RolInContextType
+	
+en komt tot de conclusie dat het enige mogelijke soort onderdeel van een typebeschrijving van een RolInContext een :PropertyType is. En dat klopt (als we even afzien van PropertyPerspectieven, die we natuurlijk ook op kunnen nemen in de beschrijving van :RolInContextType).
+
+Als de modelleur daarentegen gekozen had voor 'private' of 'public':
+
+	:ContextType :Aangifte
+		public
+
+Dan zou het deze query evalueren:
+
+	:ContextType ## :BuitenRol ## :PropertyType 
+
+Het resultaat zou in dit geval leeg zijn (want een :ContextType heeft geen specifieke publieke properties). Maar veronderstel dat we hadden gemodelleerd dat er een 'label' hoort bij een :ContextType, dan zou de query die property hebben opgeleverd en de curie van die property zou door het systeem als mogelijk vervolg zijn voorgedragen.
+
+Kortom, door de meta-typen te beschrijven, tuigen we de ondersteuningsmogelijkheden van het Perspect systeem op.
+
+
+
+VAN PERSPECT SYNTAX NAAR RDF
+Contexten, de drie soorten rollen en hun verbindingen kunnen eenvoudig in RDF worden gerepresenteerd.
+
+We hebben:
+
+	- de properties
+		- rdf:type
+		- psp:binnenRol
+		- psp:buitenRol
+		- psp:context_Rol
+		- psp:binding
+	- rdf:type heeft slechts vier objecten:
+		- :Context, 
+		- :RolInContext, 
+		- :BinnenRol en 
+		- :BuitenRol
+	- deze vier objecten hebben geen type (of we moeten rdfs:Resource gaan gebruiken, wat ik liever niet doe). 
+
+Deze properties en types onttrekken zich aan Perspect-modellering (ze liggen er juist aan ten grondslag). We noemen dit de *basisrepresentatie*
+
+We hebben een GOUDEN REGEL voor vertaling van Perspect syntax naar RDF. De Perspect expressie:
+
+	<type> <identifier>
+
+vertalen we naar RDF met behulp van de meta-type definities, waarin we moeten kunnen vinden:
+
+	<type> psp:type ?c
+	?c psp:type psp:MetaType
+	?c :describes ?x
+
+De RDF voor <identifier> is dan:
+
+	<identifier> psp:type <type>
+	<identifier> rdf:type ?x
+
+TOELICHTING. In dit schema komen twee nog niet besproken properties voor, namelijk psp:type en psp:describes.
+
+Omdat we rdf:type willen beperken tot de vier basistypen (context en de rollen), hebben we een andere property nodig om uit te drukken dat een resource een bepaald Perspect-type heeft. Daar gebruiken we psp:type voor. Bovendien is het heel handig om zowel rdf:type als psp:type van een resource te kunnen gebruiken. Zo kunnen we verschil maken tussen betekenis op RDF niveau en betekenis op Perspect niveau. 
+
+Immers, op RDF-niveau is alles een Context of een Rol. Dat komt omdat we Perspect hebben teruggebracht tot precies die begrippen en die, en alléén die, moeten we helemaal in RDF uitdrukken.
+
+Maar op Perspect-niveau hebben we ook PropertyPerspectief, Actie, Case, enzovoort. Dat leggen we vast met psp:type.
+
+De property psp:describes vult de beschrijving van de meta-types aan. Deze property bestaat voor alle instanties van :MetaType. Het object is in alle triples :Context, behalve deze uitzonderingen:
+
+	:RolInContextType :describes :RolInContext
+	:BuitenRolType :describes :BuitenRol
+	:BinnenRolType :describes :BinnenRol
+	:PropertyType :describes :RolInContext
+
+Deze property wordt dus niet in een modelfile vastgelegd maar is onderdeel van de code, net zoals de vijf basisproperties die hierboven opgesomd werden.
+
+Waarom ':describes'? Een alternatief zou zijn: 'wordt gerepresenteerd door'. Voorlopig houd ik het op :describes 
+
+Kortom: vertaling van Perspect syntax naar RDF berust op:
+1. de basisrepresentatie
+2. de :describes triples/tabel
+3. de meta-types
+4. de gouden regel.
+5. de twee vormen van suikersyntax, te weten:
+	- private en public voor properties van de zelfrollen van contexten;
+	- => voor rolbinding.
+
+
+
+VOORBEELDEN
+Laten we een paar voorbeelden uitwerken. 
+
+1. Eerst een context-type:
+
+	:ContextType :Aangifte
+
+In het schema moeten we <type> en <ident> substitueren en dan ?c en ?x vinden.
+type = :ContextType
+ident = :Aangifte
+?c = :MetaType
+?x = :Context
+
+	:ContextType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :Aangifte is dan:
+
+	:Aangifte psp:type :ContextType
+	:Aangifte rdf:type :Context
+
+En dat klopt! Op beide niveaus van betekenis staat de juiste waarde.
+
+2. Dan de instantie van een context-type:
+
+	:Aangifte :aangifte1
+
+Substitutie enzovoort:
+type = :Aangifte
+ident = :aangifte1
+?c = :MetaType
+?x = :Context
+
+	:Aangifte psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :aangifte1 is dan:
+
+	:aangifte1 psp:type :Aangifte
+	:aangifte1 rdf:type :Context
+
+En dat klopt ook. 
+
+3. De definitie van een Property van een RolInContextType
+
+	ContextType :Aangifte
+		:RolInContextType :Aangever
+			:PropertyType :Betrouwbaarheid
+
+type = :PropertyType
+ident = :Betrouwbaarheid
+?c = :MetaType
+?x = :RolInContext
+
+	:PropertyType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :RolInContext
+
+De RDF is voor :Betrouwbaarheid is dan:
+
+	:Betrouwbaarheid psp:type :PropertyType
+	:Betrouwbaarheid rdf:type :RolInContext
+
+Dit klopt. Verwarrend kan zijn dat het rdf:type van :Betrouwbaarheid :RolInContext is. Maar bedenk dan dat een :RolInContext beschreven wordt met een :Context en dat die natuurlijk alleen rollen heeft.
+
+4. Tenslotte een meta-type:
+
+
+	:MetaType :ContextType
+
+type = :MetaType
+ident = :ContextType
+?c = :MetaType
+?x = :Context
+
+	:MetaType psp:type :MetaType
+	:MetaType psp:type psp:MetaType
+	:MetaType :describes :Context
+
+De RDF is voor :ContextType is dan:
+
+	:ContextType psp:type :MetaType
+	:ContextType rdf:type :Context
+
+Klopt!
+
+
+
+DE META-TYPES
+Voor elk meta-type hebben we een definitie nodig. De meta-types zijn:
+	:MetaType
+	:ContextType (hoewel deze misschien niet nodig is)
+	:RolInContextType
+	:BinnenRolType
+	:BuitenRolType
+	:PropertyType
+	:PropertyPerspectief
+	
+En dan semantisch betekenisvollere begrippen:
+	Domain
+	Party
+	Case
+	Activity
+	State
+	Action
+	Function
+
+En dan voor de integratie nog:
+
+	Template
+	Dialog
+	Message
+	Screen Item
+	Information product
+
+:ContextType is misschien te abstract en wordt volledig overschaduwd door de anderen.
+
+Hieronder volgen de definities van een paar van hen:
+
+:MetaType :MetaType
+
+	In RDF:
+	:MetaType psp:type :MetaType
+	:MetaType :describes :Context
+	:MetaType rdf:type :Context
+
+Eigenlijk is :MetaType onvolledig beschreven want de rollen ontbreken. Het pakt zo uit, dat :MetaType dezelfde definitie zou hebben als :ContextType. Desondanks vind ik het verhelderend om de term te handhaven. Beschouw hem maar als een alias voor :ContextType.
+
+:MetaType :ContextType
+	:RolInContextType :RolInContextType
+	:RolInContextType :BinnenRolType
+	:RolInContextType :BuitenRolType
+
+	In RDF:	
+	:ContextType psp:type :MetaType
+	:ContextType :describes :Context
+	:ContextType rdf:type :Context	
+	:ContextType :context_Rol :RolInContextType
+	:ContextType :context_Rol :BinnenRolType
+	:ContextType :context_Rol :BuitenRolType
+
+:MetaType :RolInContextType
+	:RolInContextType :PropertyType
+	:RolInContextType :PropertyPerspectief
+	:RolInContextType :MogelijkeBinding
+
+	In RDF:
+	:RolInContextType psp:type :MetaType
+	:RolInContextType :describes :RolInContext
+	:RolInContextType rdf:type :Context
+	:RolInContextType :context_Rol :PropertyType
+	:RolInContextType :context_Rol :PropertyPerspectief
+
+Zo ook:
+:MetaType :BuitenRolType
+:MetaType :BinnenRolType
+
+Merk op dat de binding van een rol niet beschreven wordt. Dat is omdat :binding een property van de basisrepresentatie van Perspect is. Als we :binding wel zouden willen opnemen, stuiten we op een probleem: voor iedere instantie van :RolInContextType geldt namelijk dat hij de property :binding moet ondersteunen (d.w.z. dat instanties van die instanties een waarde voor :binding moeten kunnen hebben). Maar dat kunnen we niet uitdrukken bij de definitie van :RolInContextType zelf. We zouden dan bij elke individuele instantie van :RolInContextType moeten aangeven dat hij een property :binding mogelijk maakt. Het enige effect daarvan is dat de systeem-modelleur een fout kan maken door het weg te laten.
+
+Hetzelfde geldt voor :binnenRol en :buitenRol. De property psp:type beschrijven we evenmin (elk :MetaType heeft een psp:type). :describes zouden we kunnen opnemen als properties van de contexten die instanties van :MetatType uiteindelijk zijn (d.w.z. als properties van hun :BuitenRol). Maar ik zie het nut daarvan niet in. Er wordt geen waarde toegevoegd door deze aspecten van de basisrepresentatie in de meta-typen op te nemen. De semantiek van deze properties ligt vast in de werking van de code. Door ze op te nemen in de meta-typen suggereren we een vrijheid voor de systeem-modelleur die er niet is.
+
+Nog een instantie van :MetaType:
+
+:MetaType :PropertyType
+	:BuitenRol :buitenRolVanPropertyType
+		:PropertyType :isFunctional
+			:isFunctional = true
+			:range = "boolean"
+			:isVerplicht = true
+		:PropertyType :range
+			:isFunctional = true
+			:range = "string"
+			:isVerplicht = true
+		:PropertyType :isVerplicht
+			:isFunctional = true
+			:range = "boolean"
+			:isVerplicht = true
+	
+	In RDF:
+	:PropertyType psp:type :MetaType
+	:PropertyType :describes RolInContext
+	:PropertyType rdf:type :Context
+
+Als we een :PropertyType maken, moeten we die nu de public properties :isFunctional, :isVerplicht en :range geven. Merk op dat er geen suiker-syntax is voor het definiëren van een property van een (zelfrol van een) context (er is wel suiker-syntax voor het vastleggen van een property-waarde van een context).
+
+Omdat deze drie properties verplicht zijn en omdat dit de volledige opsomming van properties van een PropertyType is, kunnen we overwegen om voor deze properties sleutelwoorden te introduceren.
