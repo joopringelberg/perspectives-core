@@ -9,17 +9,19 @@ import Data.StrMap (StrMap)
 data Expr = Ctxt Context
           | Rol Rol
 
-data Context1 = Context1 { id :: String
-                    , context_BinnenRol :: Rol
-                    , context_BuitenRol :: Rol
-                    , rollen :: StrMap Rol }
-
 newtype ContextDefinition = ContextDefinition
   { id :: String
   , contextType :: String
-  , privateProperties :: List PropertyAssignment
-  , publicProperties :: List PropertyAssignment
-  , roles :: List RolAssignmentWithPropertyAssignments
+  , privateProperties :: List PropertyDefinition
+  , publicProperties :: List PropertyDefinition
+  , roles :: List RolDefinition
+  }
+
+newtype RolDefinition = RolDefinition
+  { id :: String
+  , rolType :: String
+  , binding :: RolAssignment
+  , properties :: List PropertyDefinition
   }
 
 newtype Context = Context
@@ -50,11 +52,8 @@ data SimpleValue =
 -- propertyAssignment = type '=' simpleValue
 newtype PropertyAssignment = PropertyAssignment {name :: String, op :: Unit, value :: SimpleValue}
 
-instance showPropertyAssignment :: Show PropertyAssignment where
-  show (PropertyAssignment{name, value}) = show name <> " = " <> show value
-
 -- rolAssignment = type '=>' identifier
-newtype RolAssignment = RolAssignment {name :: String, value :: String}
+newtype RolAssignment = RolAssignment {name :: String, binding :: String}
 
 -- rolAssignment = type '=>' identifier BLOCK propertyAssignment*
 newtype RolAssignmentWithPropertyAssignments = RolAssignmentWithPropertyAssignments
@@ -65,13 +64,17 @@ newtype PropertyDefinition = PropertyDefinition
   , name :: String
   , properties :: List PropertyAssignment}
 
+-----------------------------------------------------------
+-- Show instances
+-----------------------------------------------------------
+
 instance showSimpleValue :: Show SimpleValue where
   show (String s) = show s
   show (Int i) = show i
   show (Bool b) = show b
 
 instance showRolAssignment :: Show RolAssignment where
-  show (RolAssignment{name, value}) = show name <> " = " <> show value
+  show (RolAssignment{name, binding}) = show name <> " = " <> show binding
 
 instance showRolAssignmentWithPropertyAssignments :: Show RolAssignmentWithPropertyAssignments where
   show (RolAssignmentWithPropertyAssignments{name, binding, properties}) = name <> " => " <> binding <> "\n" <> show properties
@@ -92,6 +95,15 @@ instance showContext :: Show Context where
 
 instance showPropertyDefinition :: Show PropertyDefinition where
   show (PropertyDefinition {scope, name, properties}) =
-    "\nScope: " <> scope <>
-    "\nID: " <> name <>
+    "\n" <> scope <> " " <> name <>
     "\nProperties:\n" <> show properties
+
+instance showPropertyAssignment :: Show PropertyAssignment where
+  show (PropertyAssignment{name, value}) = show name <> " = " <> show value
+
+instance showRolDefinition :: Show RolDefinition where
+  show (RolDefinition{id, rolType, binding: (RolAssignment{binding: bnd}), properties}) =
+    "\nType: " <> rolType <>
+    "\nID: " <> id <>
+    "\nBinding: " <> show bnd <>
+    "\nProperties " <> show properties
