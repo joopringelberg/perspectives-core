@@ -90,6 +90,7 @@ instance showContextDefinition :: Show ContextDefinition where
 
 instance showContext :: Show Context where
   show (Context{id, contextType, properties, roles }) =
-    contextType <> " " <> id <>
-      "\nproperties:\n" <> show properties <>
-      "\nroles:\n" <> show roles
+    "\nType: " <> contextType <>
+    "\nID: " <> id <>
+    "\nproperties:\n" <> show properties <>
+    "\nroles:\n" <> show roles

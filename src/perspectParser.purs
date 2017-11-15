@@ -7,7 +7,7 @@ import Perspectives.Syntax (Context(..), ContextDefinition(..), PrivatePropertyA
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
-import Text.Parsing.Parser.Combinators (option)
+import Text.Parsing.Parser.Combinators (option, try)
 
 -----------------------------------------------------------
 -- Lexemes
@@ -85,8 +85,8 @@ context = withPos do
   typeName <- sameLine *> identifier
   definedTypeName <- sameLine *> identifier
   indented *> withPos do
-    props <- (block (checkIndent *> propertyAssignment))
-    roles <- (checkIndent *> (many rolAssignment))
+    props <- (block (try propertyAssignment))
+    roles <- (block (try rolAssignment))
     pure $ Context {id: definedTypeName
                   ,contextType: typeName
                   , properties: props
@@ -134,19 +134,19 @@ c = 3"""
 test6 :: String
 test6 = """:Aangifte :aangifte1
   :status = "voltooid"
-	:Aangever => :Jansen
+  :Aangever => :Jansen
 """
 
 test7 :: String
 test7 = """:Aangifte :aangifte1
   :status = "voltooid"
-	:Aangever => :Jansen
-		:betrouwbaarheid = 10
+  :Aangever => :Jansen
+    :betrouwbaarheid = 10
 """
 test8 :: String
 test8 = """:Aangifte :aangifte1
   :status = "voltooid"
-	:urgentie = 5
-	:Aangever => :Jansen
-		:betrouwbaarheid = 10
+  :urgentie = 5
+  :Aangever => :Jansen
+    :betrouwbaarheid = 10
 """
