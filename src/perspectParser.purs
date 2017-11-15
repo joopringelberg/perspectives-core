@@ -2,12 +2,15 @@ module Perspectives.Parser where
 
 import Perspectives.IndentParser
 import Control.Alt ((<|>))
+import Data.Foldable (elem)
 import Data.List (List(..), many)
-import Perspectives.Syntax (Context(..), ContextDefinition(..), PrivatePropertyAssignments(..), PropertyAssignment(..), PublicPropertyAssignments(..), RolAssignmentWithPropertyAssignments(..), SimpleValue(..))
+import Data.Maybe (Maybe(..))
+import Perspectives.Syntax (Context(..), ContextDefinition(..), PrivatePropertyAssignments(..), PropertyAssignment(..), PropertyDefinition(..), PublicPropertyAssignments(..), RolAssignmentWithPropertyAssignments(..), SimpleValue(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
-import Text.Parsing.Parser.Combinators (option, try)
+import Text.Parsing.Parser (fail)
+import Text.Parsing.Parser.Combinators (option, optionMaybe, try)
 
 -----------------------------------------------------------
 -- Lexemes
@@ -38,6 +41,16 @@ simpleValue :: IP SimpleValue
 simpleValue = string <|> int <|> bool
 
 -----------------------------------------------------------
+-- Datatypes
+-----------------------------------------------------------
+dataTypes :: Array String
+dataTypes = ["Number", "String", "Bool", "Date"]
+
+dataType :: IP SimpleValue
+dataType = do
+  s <- try identifier
+  if elem s dataTypes then pure $ String s else fail "Expected one of 'Number', 'String', 'Bool' or 'Date'."
+-----------------------------------------------------------
 -- Assignment
 -----------------------------------------------------------
 
@@ -47,7 +60,7 @@ propertyAssignment = withPos $
   {name: _, op: _, value: _}
     <$> (sameLine *> identifier)
     <*> (sameLine *> reservedOp "=")
-    <*> (sameLine *> simpleValue)
+    <*> (sameLine *> (simpleValue <|> dataType))
   >>= (pure <<< PropertyAssignment)
 
 -- rolAssignment = type '=>' identifier BLOCK propertyAssignment*
@@ -67,11 +80,27 @@ propertyAssignmentList keyword = withPos do
   rest <- option Nil (indented *> (withPos $ block (checkIndent *> propertyAssignment)))
   pure (Cons first rest)
 
+-- propertyDefinition = ('public' | 'private') identifier BLOCK propertyAssignment*
+propertyDefinition :: IP PropertyDefinition
+propertyDefinition = withPos do
+  private <- optionMaybe (reserved "private")
+  scope <- case private of
+    Nothing -> do
+      public <- optionMaybe (reserved "public")
+      case public of
+        Nothing -> fail "Expected 'private' or 'public'"
+        otherwise -> pure "public"
+    otherwise -> pure "private"
+  name <- sameLine *> identifier
+  props <- indented *> withPos (block (try propertyAssignment))
+  pure $ PropertyDefinition {scope: scope, name: name, properties: props}
+
+
 -- privatePropertyDefinition = 'private' BLOCK propertyAssignment*
 privatePropertyAssignments :: IP PrivatePropertyAssignments
 privatePropertyAssignments = PrivatePropertyAssignments <$> propertyAssignmentList "private"
 
--- publicPropertyDefinition = 'public' BLOCK propertyAssignment*
+-- publicPropertyAssignments = 'public' BLOCK propertyAssignment*
 publicPropertyAssignments :: IP PublicPropertyAssignments
 publicPropertyAssignments = PublicPropertyAssignments <$> propertyAssignmentList "public"
 
@@ -79,20 +108,25 @@ publicPropertyAssignments = PublicPropertyAssignments <$> propertyAssignmentList
 -- Context
 -----------------------------------------------------------
 
--- context = type identifier BLOCK (rolAssignment | propertyAssignment)*
+-- context = type identifier BLOCK propertyAssignment* rolAssignment*
 context :: IP Context
 context = withPos do
   typeName <- sameLine *> identifier
-  definedTypeName <- sameLine *> identifier
+  instanceName <- sameLine *> identifier
   indented *> withPos do
     props <- (block (try propertyAssignment))
     roles <- (block (try rolAssignment))
-    pure $ Context {id: definedTypeName
+    pure $ Context {id: instanceName
                   ,contextType: typeName
                   , properties: props
                   , roles: roles }
 
--- context = type identifier BLOCK (rolAssignment | propertyAssignment)*
+-- contextDefinition = type identifier BLOCK
+-- 	| privatePropertyDefinition
+-- 	| publicPropertyDefinition
+-- 	( rolDefinition
+-- 	| RolAssignment
+-- 	)*
 contextDefinition :: IP ContextDefinition
 contextDefinition = withPos do
   typeName <- sameLine *> identifier
@@ -149,4 +183,17 @@ test8 = """:Aangifte :aangifte1
   :urgentie = 5
   :Aangever => :Jansen
     :betrouwbaarheid = 10
+"""
+
+test9 :: String
+test9 = """private :betrouwbaarheid
+  :isFunctional = true
+  :isVerplicht = false
+"""
+
+test10 :: String
+test10 = """public :urgentie
+  :isFunctional = true
+  :isVerplicht = true
+  :range = Number
 """

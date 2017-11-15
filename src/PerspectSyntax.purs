@@ -64,6 +64,11 @@ newtype PrivatePropertyAssignments = PrivatePropertyAssignments (List PropertyAs
 newtype RolAssignmentWithPropertyAssignments = RolAssignmentWithPropertyAssignments
   {name :: String, binding :: String, properties :: List PropertyAssignment}
 
+newtype PropertyDefinition = PropertyDefinition
+  { scope :: String
+  , name :: String
+  , properties :: List PropertyAssignment}
+
 instance showSimpleValue :: Show SimpleValue where
   show (String s) = show s
   show (Int i) = show i
@@ -92,5 +97,11 @@ instance showContext :: Show Context where
   show (Context{id, contextType, properties, roles }) =
     "\nType: " <> contextType <>
     "\nID: " <> id <>
-    "\nproperties:\n" <> show properties <>
-    "\nroles:\n" <> show roles
+    "\nProperties:\n" <> show properties <>
+    "\nRoles:\n" <> show roles
+
+instance showPropertyDefinition :: Show PropertyDefinition where
+  show (PropertyDefinition {scope, name, properties}) =
+    "\nScope: " <> scope <>
+    "\nID: " <> name <>
+    "\nProperties:\n" <> show properties
