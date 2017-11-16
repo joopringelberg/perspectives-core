@@ -5,20 +5,21 @@ import Control.Lazy (fix)
 import Control.Monad (class Monad)
 import Control.Monad.State (gets)
 import Data.Array (cons, many, null, replicate, union)
-import Data.Char.Unicode (isSpace)
+import Data.Char (toCharCode)
+import Data.Char.Unicode.Internal (uIswspace)
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable)
 import Data.List (foldr, foldl)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, insert, lookup, singleton, empty, mapWithKey, union) as SM
 import Data.String (Pattern(..), contains, fromCharArray, singleton)
-import Text.Parsing.Indent (block, checkIndent, sameLine, withPos)
+import Perspectives.IndentParser (IP)
+import Prelude (class Show, Unit, bind, otherwise, pure, show, ($), (*>), (-), (<$>), (<*), (<*>), (<<<), (<=), (<>), (==), (>>=), (||))
+import Text.Parsing.Indent (checkIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), ParserT, fail)
-import Text.Parsing.Parser.Combinators (lookAhead, many1Till, optionMaybe, skipMany, skipMany1, try, (<?>))
+import Text.Parsing.Parser.Combinators (lookAhead, many1Till, manyTill, optionMaybe, skipMany, skipMany1, try, (<?>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, string, char, satisfy) as SP
-import Perspectives.IndentParser (IP)
-import Prelude (class Show, Unit, bind, otherwise, pure, show, ($), (*>), (-), (<$>), (<*), (<*>), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- TODO
@@ -141,51 +142,78 @@ getLine :: IP Int
 getLine = getPosition >>= (\pos -> pure $ sourceLine pos)
 
 -----------------------------------------------------------
--- Parsers that parse a single line
+-- Parsers that parse a single line. They consume the newline and all following inlineSpace,
+-- leaving the parser at the start of the next expression or the end of the next line.
 -----------------------------------------------------------
 
 type Code = String
 type Comment = String
 
--- Consumes any character up to and including the newline and produces a newline terminated string.
+-- Consumes any character up to and including the newline. Produces a newline terminated string.
 untilNewline :: IP String
-untilNewline = withPos (many1Till (sameLine *> SP.anyChar) (SP.char '\n')) >>= pure <<< charsToLine
+untilNewline = withPos (many1Till (sameLine *> SP.anyChar) (SP.char '\n')) <* inlineSpace >>= pure <<< charsToLine
 
 -- Concatenate all characters.
 charsToLine :: forall f. Foldable f => f Char -> String
-charsToLine lc = foldr (\c s -> singleton c <> s) "" lc
+charsToLine lc = foldr (\c s -> singleton c <> s) "\n" lc
 
-whiteSpace :: IP Unit
-whiteSpace = skipMany (simpleSpace <?> "") where
+-- An empty line starts in the leftmost column, contains just whiteSpace characters and is terminated by a newline.
+-- The result is a newline terminated string.
+emptyLine :: IP String
+emptyLine = try $ manyTill (SP.satisfy isInlineSpace) (SP.char '\n') <* inlineSpace >>= pure <<< charsToLine
+
+-- whiteSpace :: IP Unit
+-- whiteSpace = skipMany (simpleSpace <?> "") where
+--   simpleSpace :: forall m . Monad m => ParserT String m Unit
+--   simpleSpace = skipMany1 (SP.satisfy isSpace)
+
+-- | This is a variant of isSpace.
+-- | Returns `True` for any Unicode space character, and the control
+-- | characters `\t`, `\n`, `\r`, `\f`, `\v`.
+-- |
+-- | `isInlineSpace` includes non-breaking space.
+isInlineSpace :: Char -> Boolean
+-- The magic 0x377 used in the code below isn't really that magical. As of
+-- 2014, all the codepoints at or below 0x377 have been assigned, so we
+-- shouldn't have to worry about any new spaces appearing below there.
+isInlineSpace c = if uc <= 0x337
+               then uc == 32 || uc == 0xa0
+               else uIswspace $ toCharCode c
+  where
+    uc :: Int
+    uc = toCharCode c
+
+inlineSpace :: IP Unit
+inlineSpace = skipMany (simpleSpace <?> "") where
   simpleSpace :: forall m . Monad m => ParserT String m Unit
-  simpleSpace = skipMany1 (SP.satisfy isSpace)
+  simpleSpace = skipMany1 (SP.satisfy isInlineSpace)
 
--- returns a comment and leaves the parser at the start of the next expression (having eaten all whiteSpace).
 comment :: IP Comment
-comment = (<>) <$> (SP.string "--") <*> (untilNewline <* whiteSpace)
+comment = ((<>) <$> (SP.string "--") <*> untilNewline)
 
--- Only matches code that is by itself on a single line and leaves the parser at the start of the next expression (having eaten all whiteSpace).
+commentOrEmptyLine :: IP Comment
+commentOrEmptyLine = comment <|> emptyLine
+
+-- Matches code that is by itself on a single line.
 codeLine :: IP CommentAdmin
-codeLine = try do
+codeLine = do
   (col :: Int) <- getColumn
-  expr <- untilNewline <* whiteSpace
+  expr <- untilNewline
   case contains (Pattern "--") expr of
       true -> fail "Comment found in code"
-      false -> pure $ CommentAdmin commentIndex expr (fromCharArray (replicate (col - 1) ' ') <> expr <> "\n")
+      false -> pure $ CommentAdmin commentIndex expr (fromCharArray (replicate (col - 1) ' ') <> expr)
 
--- Only matches code that is followed by a comment on the same line, leaving the parser at the start of that comment.
+-- Only matches code that is followed by a comment on the same line. Matches up to the "--", leaving the parser just
+-- before them.
 codeLineUpToComment :: IP String
-codeLineUpToComment = withPos $ many1Till (sameLine *> SP.anyChar) (lookAhead (SP.string "--")) >>= (pure <<< charsToLine)
+codeLineUpToComment = (withPos $ many1Till (sameLine *> SP.anyChar) (lookAhead (SP.string "--")) >>= (pure <<< charsToLine))
 -- codeLineUpToComment = withPos do
 --   (col :: Int) <- getColumn
 --   chars <- many1Till (sameLine *> SP.anyChar) (lookAhead (SP.string "--"))
---   pure (fromCharArray (replicate (col - 1) ' ') <> charsToLine chars <> "\n")
+--   pure (fromCharArray (replicate (col - 1) ' ') <> charsToLine chars)
 
--- Only matches some code followed by a comment on the same line, leaving the parser at the start of the next expression.
+-- Only matches some code followed by a comment on the same line.
 codeLineWithInlineComment :: IP CommentAdmin
--- codeLineWithInlineComment = try (f <$> codeLineUpToComment <*> comment) where
-  -- f code com = CommentAdmin (afterLine commentIndex code com) code code
-
 codeLineWithInlineComment = try do
   (col :: Int) <- getColumn
   (code :: String) <- codeLineUpToComment
@@ -193,6 +221,8 @@ codeLineWithInlineComment = try do
   pure $ CommentAdmin (afterLine commentIndex code comnt)
           code
           (fromCharArray(replicate (col - 1) ' ') <> code)
+-- codeLineWithInlineComment = try (f <$> codeLineUpToComment <*> comment) where
+  -- f code com = CommentAdmin (afterLine commentIndex code com) code code
 
 anyCodeLine :: IP CommentAdmin
 anyCodeLine = codeLineWithInlineComment <|> codeLine
@@ -209,18 +239,21 @@ allTheRest' = allTheRest >>= (\s -> pure $ CommentAdmin commentIndex "" s)
 -----------------------------------------------------------
 
 -- | Parses any number of commentlines followed by a single line of code (with or without commment).
+-- | Like the parsers in the previous section consumes preceding whiteSpace and the terminating newline.
 lines :: IP CommentAdmin
-lines = try $ withPos $ f <$> (many (checkIndent *> comment)) <*> (checkIndent *> anyCodeLine) where
+lines = try $ withPos $ f <$> (many (checkIndent *> commentOrEmptyLine)) <*> (checkIndent *> anyCodeLine) where
   f comments ca | null comments = ca
   f comments ca@(CommentAdmin i c all) | otherwise = CommentAdmin (SM.insert "beforeLine" (SM.singleton c comments) i) c all
 
 -- | Parses lines and a blok of content.
+-- TODO: lege regel onderin blok.
 blok :: IP CommentAdmin -> IP CommentAdmin
 blok blokContent = do
   commentAndCode <- lines
   withPos do
-    content <- (block blokContent)
-    optionalComment <- optionMaybe (try (checkIndent *> comment))
+    -- content <- (block blokContent)
+    content <- many (checkIndent *> blokContent)
+    optionalComment <- optionMaybe (try (checkIndent *> commentOrEmptyLine))
     let cadmin@(CommentAdmin i last allcode) = foldl mergeCommentAdmins commentAndCode content
     case optionalComment of
       Nothing -> pure cadmin
@@ -264,13 +297,17 @@ test6 = """-- Commentaar vooraf-- Nog een keer commentaar vooraf\n:Aangifte :aan
 
 test7 :: String
 test7 = """-- Eerste commentaar
+
 Eerste codeRegel.
     -- Geïndenteerd commentaar
-    Geïndenteerde code -- Commentaar achter geïndenteerde code
+
+    Geïndenteerde code -- Commentaar achter geïndenteerde code.
+    
     Laatste code
     -- Laatste commentaar
 allerlaatste code
 """
+-- runIndentParser test7 blokOrLines
 
 t1 :: String
 t1 = """-- Eerste commentaar
@@ -325,4 +362,8 @@ Eerste codeRegel.
     Laatste code
     -- Laatste commentaar
 allerlaatste code
+"""
+
+test12 :: String
+test12 = """
 """
