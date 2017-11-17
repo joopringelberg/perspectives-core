@@ -154,7 +154,7 @@ contextDefinition = withPos do
                   ,contextType: typeName
                   , privateProperties: filter (\(PropertyDefinition{scope}) -> scope == "private") propDefs
                   , publicProperties: filter (\(PropertyDefinition{scope}) -> scope == "public") propDefs
-                  , roles: roles }
+                  , rolDefinitions: roles }
 
 -----------------------------------------------------------
 -- File and expr

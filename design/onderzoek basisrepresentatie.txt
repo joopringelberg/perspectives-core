@@ -1,0 +1,73 @@
+WAT IS DE CENTRALE REPRESENTATIE?
+
+Need to have:
+1. Het moet als Json te zijn serialiseren, met behoud van structuur.
+2. Mutaties van basisfeiten moeten er op kunnen worden uitgevoerd.
+3. We moeten er tekst uit kunnen genereren.
+4. We moeten het uit tekst kunnen genereren.
+
+In schema:
+
+text	->		REPRESENTATIE		-> text
+				/\			/\
+				|			|
+				|			|
+				\/			\/
+				json		mutaties basisfeiten
+
+Nice to have:
+1. Enige flexibiliteit tussen text en representatie.
+2. Buitenrollen kunnen worden geladen zonder de context.
+
+KWESTIES
+1. Bij assignment van context properties: bepaal of het gaat om een property van de binnen- of buitenrol.
+Uit de representatie kun je slechts afleiden wat de propertynaam en (nieuwe) propertywaarde is. Modelreflectie moet duidelijk maken of het om een private of publieke property gaat.
+Merk op dat het type van de context nog niet beschikbaar of volledig hoeft te zijn! In dat geval kun je de tekst dus wel parseren, maar niet verder interpreteren (naar json of mutaties).
+Eventueel zou je privaat en publiek in instanties syntactisch van elkaar kunnen onderscheiden. Bijvoorbeeld zo:
+
+	:Aangifte :aangifte1
+		:Aangever => :Jansen
+			:betrouwbaarheid = 10
+		(:status = "voltooid")
+		:urgentie = 5
+
+Hier is :status een private property, :urgentie een publieke.
+
+2. Als in de representatie de binnen- en buitenrol niet expliciet gemodelleerd worden, dan is het niet mogelijk om de buitenrol op te halen zonder de context op te halen. Terwijl dat wel een mooie manier is om zuinig grote aantallen contexten in te laden.
+
+Stel dat we een context parseren als een pair van context en buitenrol? De binnenrol kan een structureel onderdeel zijn van de context. Dus zoiets:
+
+	{
+		context: 
+			{
+				id: "xxx"
+				,binnenRol: { binding: ["xxx-buitenRol"] ...}
+				,buitenRol: "xxx-buitenRol"
+				...
+			}
+		buitenRol:
+			{
+				id: "xxx-buitenRol"
+				...
+			}
+	}
+
+Andere rollen komen ook in deze structuur (zie hieronder). Het wordt een StrMap van Context en Rol. Om dat voor elkaar te krijgen, moeten beiden onderdeel zijn van dezelfde ADT. We noemen de structuur een ContextCollection.
+
+In couch breken we deze delen los en slaan ze apart op. Als je een context gaat editen, haal je ook zijn buitenRol op. Als je een BuitenRol gaat editen, hoef je niet zijn Context op te halen.
+
+3. Hoe representeren we property- en rolassignments? Momenteel zijn ze als Lists gerepresenteerd. Dat is onhandig voor het ophalen van een property tbv een query. Een StrMap zou beter zijn. Kan een StrMap de target zijn van de parser?
+Ja, natuurlijk. In de parser 'context' kan ik b.v. de lijst van properties omzetten in een StrMap en dan onderdeel maken van Context.
+
+In combinatie met het idee bij (2) betekent dat, dat de private properties in de binnenRol terechtkomen - die dus een StrMap wordt van Array String. De public properties komen in de buitenRol van de collectie zijn.
+
+4. Rollen met properties in een context.
+De huidige representatie slaat een lijst van RolAssignmentWithPropertyAssignments op bij de context. Maar dit zijn natuurlijk zelfstandige rollen. Die zouden we dus óók op kunnen nemen in de compiler target op hetzelfde niveau als context en buitenRol. De target wordt daarmee een strMap van items die geïndexeerd zijn met hun id en apart in Couch opgeslagen worden. 
+Bij een nieuwe parsering wordt altijd een hele context opnieuw ontleed. Je kunt dan per onderdeel van de gegenereerde StrMap kijken of er wijzigingen zijn. 
+
+5. Wild idee: we zouden contexten met hun rollen als een enkel document kunnen opslaan in couch. Het ophalen van een Rol wordt daarmee iets anders dan het ophalen van een context. Nadeel: je moet met een context alle rollen ophalen. Voordeel: minder netwerk overhead om alle rollen van een context op te halen.
+
+6. Overigens: als je b.v. een Domein edit, hoef je helemaal niet direct alle contexten en rollen op te halen. Je zou de contexten 'ingeklapt' kunnen tonen. Pas als je een context expandeert, worden de rollen opgehaald. Of als je een rol expandeert...
+Je kunt zelfs de naam van een context intikken en die vervolgens laten expanderen!
+Merk op dat de ContextCollection niet volledig hoeft te zijn als je hem bewerkt in de editor. 
+Een onderdeel verwijderen kan dus alleen met een delta: twee opeenvolgende versies van de ContextCollection waarin dat onderdeel eerst wel, vervolgens niet voorkomt.

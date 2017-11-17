@@ -4,17 +4,20 @@ module Perspectives.Syntax where
 
 import Prelude
 import Data.List (List)
-import Data.StrMap (StrMap)
 
 data Expr = Ctxt Context
           | CtxtDef ContextDefinition
+
+-----------------------------------------------------------
+-- Definitions
+-----------------------------------------------------------
 
 newtype ContextDefinition = ContextDefinition
   { id :: String
   , contextType :: String
   , privateProperties :: List PropertyDefinition
   , publicProperties :: List PropertyDefinition
-  , roles :: List RolDefinition
+  , rolDefinitions :: List RolDefinition
   }
 
 newtype RolDefinition = RolDefinition
@@ -24,24 +27,21 @@ newtype RolDefinition = RolDefinition
   , properties :: List PropertyDefinition
   }
 
+newtype PropertyDefinition = PropertyDefinition
+  { scope :: String
+  , name :: String
+  , properties :: List PropertyAssignment}
+
+-----------------------------------------------------------
+-- Instances
+-----------------------------------------------------------
+
 newtype Context = Context
   { id :: String
   , contextType :: String
   , properties :: List PropertyAssignment
   , roles :: List RolAssignmentWithPropertyAssignments
   }
-
-type CommonRolMembers m =
-  { id :: String
-  , rol_Context :: Context
-  , properties :: StrMap (Array Object)
-  | m}
-
-data Rol =  BinnenRol (CommonRolMembers (binding :: Rol))
-          | BuitenRol (CommonRolMembers ())
-          | RolInContext (CommonRolMembers (binding :: Rol))
-
-type Object = String
 
 data SimpleValue =
     String String
@@ -59,11 +59,6 @@ newtype RolAssignment = RolAssignment {name :: String, binding :: String}
 newtype RolAssignmentWithPropertyAssignments = RolAssignmentWithPropertyAssignments
   {name :: String, binding :: String, properties :: List PropertyAssignment}
 
-newtype PropertyDefinition = PropertyDefinition
-  { scope :: String
-  , name :: String
-  , properties :: List PropertyAssignment}
-
 -----------------------------------------------------------
 -- Show instances
 -----------------------------------------------------------
@@ -80,11 +75,11 @@ instance showRolAssignmentWithPropertyAssignments :: Show RolAssignmentWithPrope
   show (RolAssignmentWithPropertyAssignments{name, binding, properties}) = name <> " => " <> binding <> "\n" <> show properties
 
 instance showContextDefinition :: Show ContextDefinition where
-  show (ContextDefinition{id, contextType, privateProperties, publicProperties, roles }) =
+  show (ContextDefinition{id, contextType, privateProperties, publicProperties, rolDefinitions }) =
     contextType <> " " <> id <>
       "\nprivate:\n" <> show privateProperties <>
       "\npublic:\n" <> show publicProperties <>
-      "\nroles:\n" <> show roles
+      "\nroles:\n" <> show rolDefinitions
 
 instance showContext :: Show Context where
   show (Context{id, contextType, properties, roles }) =

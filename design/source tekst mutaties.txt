@@ -77,6 +77,10 @@ We moeten dus per Context of Rol een code tekst kunnen afleiden uit de PropDefs.
 
 Tevens moeten we bij de PropDefs de commentaren kunnen vinden. Uit de code tekst en de commentaren stellen we de volledige tekst samen.
 
+In schema:
+
+Json 		-> text 
+comments 	/
 
 TEKST WIJZIGINGEN MOETEN OMGEZET WORDEN IN WIJZIGINGEN VAN DE JSON
 Uit de nieuwe versie van een tekst leiden we een nieuwe parsetree (met commentaren) af. Deze parse tree zetten we om in Json. 
@@ -84,3 +88,32 @@ Uit de vergelijking van de oude en de nieuwe Json volgen mutaties.
 Deze mutaties versturen we aan de betrokkenen (inclusief de gebruiker).
 De mutaties voeren we ook uit (als TheoryChanges), wat wil zeggen dat ze in het query-netwerk doorgevoerd worden.
 De nieuwe Json slaan we op als PropDefs in de ResourceDefinitions.
+
+In schema:
+
+text -> parseTree -> Json -> PropDefs
+
+Json diff -> mutations 	-> persist
+						-> run -> query updates.	
+
+
+MUTATIE VAN PROPERTIES VAN ROLLEN IN EEN TELESCOOP
+Is het mogelijk een instantie van een rol te beschrijven waarin een property gezet wordt van de binding van die rol (recursief: van één van de rollen in de telescoop)?
+Dat zou betekenen dat we modelreflectie nodig hebben om te bepalen of dat kan.
+Deze semantische controle zou al in de editor uitgevoerd moeten worden.
+Zo'n assignment zou opgeschreven kunnen worden als deze expressie:
+
+	binding.binding. ... binding.propname = value
+
+Dit is dus een expansie van de assignment van een property van een rol in de telescoop.
+
+Dit kan op diverse manieren in Json vertaald worden. 
+
+Maar is dit niet heel raar? De rol, die in de ene tekst beschreven kan worden, krijgt dan in de andere tekst een (andere) waarde voor één van zijn properties!
+
+De ultieme consequentie is dat als die andere tekst geopend wordt, die mutatie zichtbaar wordt; terwijl als de eerste tekst heropend wordt, de waarde waarschijnlijk niet zichtbaar is...
+
+Het is best mogelijk om 'telescoop properties' zichtbaar te maken als een een rol opent in tekst. Maar welke laat je dan zien?
+
+Ik besluit dat dit voorlopig niet toegestaan wordt.
+
