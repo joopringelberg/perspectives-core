@@ -161,7 +161,7 @@ De RDF voor ":Aangifte :aangifte1Aangever" is dan:
 	:aangifte1Aangever psp:type :Aangever
 	:aangifte1Aangever rdf:type :RolInContext
 
-De RDF voor ":Aangever = :Jansen" in de context van ":Aangifte :aangifte1" wordt nu:
+De RDF voor ":Aangever => :Jansen" in de context van ":Aangifte :aangifte1" wordt nu:
 
 	:aangifte1 :Aangever :aangifte1Aangever
 	
@@ -232,7 +232,6 @@ De RDF is voor :Aangever is dan:
 	:Aangever rdf:type :Context
 
 Klopt!
-
 
 CHECK: definitie van een Property van een RolInContextType
 

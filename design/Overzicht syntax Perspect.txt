@@ -156,12 +156,14 @@ dan kijkt het systeem na in de definitie van :RolInContextType wat de mogelijkhe
 
 	:MetaType :RolInContextType
 		:RolInContextType :PropertyType
+		:RolInContextType :PropertyPerspectief
+		:RolInContextType :MogelijkeBinding
 
-Het evalueert dezelfde query: 
+Het evalueert eenzelfde query (maar nu startend in :RolInContextType): 
 
-	:ContextType ## :RolInContextType
+	:RolInContextType ## :RolInContextType
 	
-en komt tot de conclusie dat het enige mogelijke soort onderdeel van een typebeschrijving van een RolInContext een :PropertyType is. En dat klopt (als we even afzien van PropertyPerspectieven, die we natuurlijk ook op kunnen nemen in de beschrijving van :RolInContextType).
+en komt tot de conclusie dat de mogelijke onderdelen van een typebeschrijving van een RolInContext een :PropertyType, een :PropertyPerspectief of een :MogelijkeBinding is. En dat klopt.
 
 Als de modelleur daarentegen gekozen had voor 'private' of 'public':
 
@@ -387,6 +389,7 @@ Eigenlijk is :MetaType onvolledig beschreven want de rollen ontbreken. Het pakt 
 	:ContextType :context_Rol :BuitenRolType
 
 :MetaType :RolInContextType
+	:RolInContextType :type
 	:RolInContextType :PropertyType
 	:RolInContextType :PropertyPerspectief
 	:RolInContextType :MogelijkeBinding
@@ -397,6 +400,7 @@ Eigenlijk is :MetaType onvolledig beschreven want de rollen ontbreken. Het pakt 
 	:RolInContextType rdf:type :Context
 	:RolInContextType :context_Rol :PropertyType
 	:RolInContextType :context_Rol :PropertyPerspectief
+	:RolInContextType :context_Rol :type
 
 Zo ook:
 :MetaType :BuitenRolType

@@ -58,3 +58,4 @@ getSingleGetter :: forall e a.
   -> PropertyName
   -> (Resource -> AsyncPropDefs e (Either String (Maybe a)))
 
+

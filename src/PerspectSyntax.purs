@@ -21,8 +21,8 @@ newtype ContextDefinition = ContextDefinition
   }
 
 newtype RolDefinition = RolDefinition
-  { id :: String
-  , rolType :: String
+  { id :: String                            -- id
+  , rolType :: String                       -- ??
   , binding :: RolAssignment
   , properties :: List PropertyDefinition
   }
