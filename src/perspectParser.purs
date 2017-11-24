@@ -4,13 +4,18 @@ import Perspectives.IndentParser
 import Control.Alt ((<|>))
 import Data.Foldable (elem)
 import Data.List (List(..), filter, many)
+import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..))
+import Data.StrMap (empty)
 import Perspectives.Syntax (Context(..), ContextDefinition(..), Expr(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolAssignmentWithPropertyAssignments(..), RolDefinition(..), SimpleValue(..))
+import Perspectives.Syntax2 (BinnenRol(..), PerspectContext(..), PerspectRol(..))
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>>>), (<*))
 import Text.Parsing.Indent (block, checkIndent, indented, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (optionMaybe, try)
+import Text.Parsing.Parser.Combinators (between, optionMaybe, try)
+import Text.Parsing.Parser.String (whiteSpace)
+import Text.Parsing.Parser.String (string) as S
 
 -----------------------------------------------------------
 -- Lexemes
@@ -56,11 +61,20 @@ dataType = try do
 
 -- | identifier = simpleValue
 propertyAssignment :: IP PropertyAssignment
-propertyAssignment = withPos $ {name: _, op: _, value: _}
+propertyAssignment = privatePropertyAssignment <|> publicPropertyAssignment
+
+typedPropertyAssignment :: String -> IP PropertyAssignment
+typedPropertyAssignment scope = withPos $ {name: _, scope: _, value: _}
     <$> identifier
     <*> (sameOrIndented *> reservedOp "=")
     <*> (sameOrIndented *> (simpleValue <|> dataType))
-  >>= (pure <<< PropertyAssignment)
+  >>= (pure <<< PropertyAssignment <<< (\r -> r {scope = scope}))
+
+publicPropertyAssignment :: IP PropertyAssignment
+publicPropertyAssignment = typedPropertyAssignment "public"
+
+privatePropertyAssignment :: IP PropertyAssignment
+privatePropertyAssignment = withPos $ between (S.string "(") (S.string ")") (typedPropertyAssignment "private") <* whiteSpace
 
 -- rolAssignment = type '=>' identifier BLOCK propertyAssignment*
 -- Consumes a rol binding expression followed by zero or more property assignment expressions.
@@ -137,6 +151,37 @@ context = withPos do
                   ,contextType: typeName
                   , properties: props
                   , roles: roles }
+    -- let
+    --   context = PerspectContext
+    --     { id: instanceName
+    --     , pspType: typeName
+    --     , binnenRol: binnenRol
+    --     , buitenRol: instanceName <> "_buitenRol"
+    --     , rolInContext: empty}
+    --
+    --   binnenRol = BinnenRol
+    --     { id: instanceName <> "_binnenRol"
+    --     , pspType: ":BinnenRol"
+    --     , binding: Just $ instanceName <> "_buitenRol"
+    --     , properties: empty
+    --     }
+    --
+    --   buitenRol = PerspectRol
+    --     { id: instanceName <> "_buitenRol"
+    --     , pspType: ":BuitenRol"
+    --     , binding: Nothing
+    --     , context: context
+    --     , properties: empty
+    --     , gevuldeRollen: empty
+    --     }
+    -- pure context
+    -- where
+
+
+
+-- constructProperties :: List PropertyAssignment -> StrMap (Array String) -> StrMap (Array String)
+-- constructProperties assignments strmap | null assignments = strmap
+-- constructProperties (Cons (PropertyAssignment{op})) strmap
 
 -- contextDefinition = DEF type identifier BLOCK
 -- 	privatePropertyDefinition*
@@ -206,11 +251,20 @@ test7 = """:Aangifte :aangifte1
 test8 :: String
 test8 = """:Aangifte :aangifte1
   :status = "voltooid"
-  :urgentie = 5
+  (:urgentie = 5)
   :Aangever => :Jansen
     :betrouwbaarheid = 10
 """
 -- runIndentParser test8 context
+
+test8a :: String
+test8a = """:Aangifte :aangifte1
+  (:status = "voltooid")
+  :urgentie = 5
+  :Aangever => :Jansen
+    :betrouwbaarheid = 10
+"""
+-- runIndentParser test8a context
 
 test9 :: String
 test9 = """private :betrouwbaarheid

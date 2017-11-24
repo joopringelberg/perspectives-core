@@ -50,7 +50,7 @@ data SimpleValue =
   -- en dan nog date
 
 -- propertyAssignment = type '=' simpleValue
-newtype PropertyAssignment = PropertyAssignment {name :: String, op :: Unit, value :: SimpleValue}
+newtype PropertyAssignment = PropertyAssignment {name :: String, scope :: String, value :: SimpleValue}
 
 -- rolAssignment = type '=>' identifier
 newtype RolAssignment = RolAssignment {name :: String, binding :: String}
@@ -94,7 +94,7 @@ instance showPropertyDefinition :: Show PropertyDefinition where
     "\nProperties:\n" <> show properties
 
 instance showPropertyAssignment :: Show PropertyAssignment where
-  show (PropertyAssignment{name, value}) = show name <> " = " <> show value
+  show (PropertyAssignment{name, scope, value}) = show scope <> ": " <> name <> " = " <> show value
 
 instance showRolDefinition :: Show RolDefinition where
   show (RolDefinition{id, rolType, binding: (RolAssignment{binding: bnd}), properties}) =
