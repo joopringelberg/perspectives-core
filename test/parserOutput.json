@@ -1,0 +1,32 @@
+[
+  {
+    "id": ":aangifte1_buitenRol",
+    "pspType": ":BuitenRol",
+    "binding": {},
+    "context": ":aangifte1",
+    "properties": {
+      ":status": [
+        "\"voltooid\""
+      ]
+    },
+    "gevuldeRollen": {}
+  },
+  {
+    "id": ":aangifte1",
+    "pspType": ":Aangifte",
+    "binnenRol": {
+      "id": ":aangifte1_binnenRol",
+      "pspType": ":BinnenRol",
+      "binding": {
+        "value0": ":aangifte1_buitenRol"
+      },
+      "properties": {
+        ":urgentie": [
+          "5"
+        ]
+      }
+    },
+    "buitenRol": ":aangifte1_buitenRol",
+    "rolInContext": {}
+  }
+]

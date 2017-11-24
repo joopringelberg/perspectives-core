@@ -2,15 +2,18 @@ module Perspectives.Parser where
 
 import Perspectives.IndentParser
 import Control.Alt ((<|>))
+import Data.Array (cons, fromFoldable) as AR
 import Data.Foldable (elem)
-import Data.List (List(..), filter, many)
+import Data.List (filter, foldr, many)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (empty)
-import Perspectives.Syntax (Context(..), ContextDefinition(..), Expr(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolAssignmentWithPropertyAssignments(..), RolDefinition(..), SimpleValue(..))
-import Perspectives.Syntax2 (BinnenRol(..), PerspectContext(..), PerspectRol(..))
+import Data.StrMap (StrMap, empty, insert, fromFoldable)
+import Data.Tuple (Tuple(..))
+import Perspectives.Guid (guid)
+import Perspectives.Syntax (ContextDefinition(..), Expr(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolAssignmentWithPropertyAssignments(..), RolDefinition(..), SimpleValue(..))
+import Perspectives.Syntax2 (PerspectEntity(..), BinnenRol(..), ContextCollection(..), PerspectContext(..), PerspectRol(..))
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, pure, ($), ($>), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>>>), (<*))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (between, optionMaybe, try)
@@ -93,7 +96,7 @@ rolAssignmentWithPropertyAssignments = withPos do
   sameOrIndented *> reservedOp "=>"
   ident <- sameOrIndented *> identifier
   props <- withPos (block $ checkIndent *> propertyAssignment)
-  pure (RolAssignmentWithPropertyAssignments {name: typeName, binding: ident, properties: props})
+  pure (RolAssignmentWithPropertyAssignments {rolInContextType: typeName, binding: ident, properties: props})
 
 propertyAssignmentList :: String -> IP (List PropertyAssignment)
 propertyAssignmentList keyword = withPos do
@@ -140,48 +143,62 @@ rolDefinition = withPos do
 -----------------------------------------------------------
 
 -- context = type identifier BLOCK propertyAssignment* rolAssignmentWithPropertyAssignments*
-context :: IP Context
+context :: IP ContextCollection
 context = withPos do
   typeName <- sameOrIndented *> identifier
   instanceName <- sameOrIndented *> identifier
   indented *> withPos do
     props <- (block propertyAssignment)
     roles <- (block rolAssignmentWithPropertyAssignments)
-    pure $ Context {id: instanceName
-                  ,contextType: typeName
-                  , properties: props
-                  , roles: roles }
-    -- let
-    --   context = PerspectContext
-    --     { id: instanceName
-    --     , pspType: typeName
-    --     , binnenRol: binnenRol
-    --     , buitenRol: instanceName <> "_buitenRol"
-    --     , rolInContext: empty}
-    --
-    --   binnenRol = BinnenRol
-    --     { id: instanceName <> "_binnenRol"
-    --     , pspType: ":BinnenRol"
-    --     , binding: Just $ instanceName <> "_buitenRol"
-    --     , properties: empty
-    --     }
-    --
-    --   buitenRol = PerspectRol
-    --     { id: instanceName <> "_buitenRol"
-    --     , pspType: ":BuitenRol"
-    --     , binding: Nothing
-    --     , context: context
-    --     , properties: empty
-    --     , gevuldeRollen: empty
-    --     }
-    -- pure context
-    -- where
+    let
+      rollen = (constructRoles instanceName roles)
+      ctxt = PerspectContext
+        { id: instanceName
+        , pspType: typeName
+        , binnenRol: binnenRol
+        , buitenRol: instanceName <> "_buitenRol"
+        , rolInContext: (\(PerspectRol{id}) -> id) <$> rollen }
 
+      binnenRol = BinnenRol
+        { id: instanceName <> "_binnenRol"
+        , pspType: ":BinnenRol"
+        , binding: Just $ instanceName <> "_buitenRol"
+        , properties: constructProperties "private" props
+        }
 
+      buitenRol = PerspectRol
+        { id: instanceName <> "_buitenRol"
+        , pspType: ":BuitenRol"
+        , binding: Nothing
+        , context: instanceName
+        , properties: constructProperties "public" props
+        , gevuldeRollen: empty
+        }
+    pure $ ContextCollection $ fromFoldable $
+      AR.cons (Tuple instanceName (Context ctxt))
+      ((\rol@(PerspectRol r) -> Tuple r.id (Rol rol)) <$> AR.cons buitenRol rollen)
 
--- constructProperties :: List PropertyAssignment -> StrMap (Array String) -> StrMap (Array String)
--- constructProperties assignments strmap | null assignments = strmap
--- constructProperties (Cons (PropertyAssignment{op})) strmap
+    where
+      constructProperties :: String ->  List PropertyAssignment -> StrMap (Array String)
+      constructProperties scope assignments = foldr addProp empty assignments where
+        addProp :: PropertyAssignment -> StrMap (Array String) -> StrMap (Array String)
+        addProp (PropertyAssignment{name, scope: s, value}) strmap =
+          case scope == s of
+            true -> insert name [show value] strmap
+            false -> strmap
+
+      constructRoles :: String -> List RolAssignmentWithPropertyAssignments -> Array PerspectRol
+      constructRoles contextID rpas = rpaToRol <$> AR.fromFoldable rpas where
+        rpaToRol :: RolAssignmentWithPropertyAssignments -> PerspectRol
+        rpaToRol (RolAssignmentWithPropertyAssignments{ rolInContextType, binding, properties}) = PerspectRol
+          { id: guid unit
+          , pspType: rolInContextType
+          , binding: Just binding
+          , context: contextID
+          , properties: constructProperties "public" properties
+          , gevuldeRollen: empty
+          }
+
 
 -- contextDefinition = DEF type identifier BLOCK
 -- 	privatePropertyDefinition*

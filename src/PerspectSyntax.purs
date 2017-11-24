@@ -4,8 +4,9 @@ module Perspectives.Syntax where
 
 import Prelude
 import Data.List (List)
+import Perspectives.Syntax2 (ContextCollection)
 
-data Expr = Ctxt Context
+data Expr = Ctxt ContextCollection
           | CtxtDef ContextDefinition
 
 -----------------------------------------------------------
@@ -36,13 +37,6 @@ newtype PropertyDefinition = PropertyDefinition
 -- Instances
 -----------------------------------------------------------
 
-newtype Context = Context
-  { id :: String
-  , contextType :: String
-  , properties :: List PropertyAssignment
-  , roles :: List RolAssignmentWithPropertyAssignments
-  }
-
 data SimpleValue =
     String String
   | Int Int
@@ -57,7 +51,7 @@ newtype RolAssignment = RolAssignment {name :: String, binding :: String}
 
 -- rolAssignment = type '=>' identifier BLOCK propertyAssignment*
 newtype RolAssignmentWithPropertyAssignments = RolAssignmentWithPropertyAssignments
-  {name :: String, binding :: String, properties :: List PropertyAssignment}
+  {rolInContextType :: String, binding :: String, properties :: List PropertyAssignment}
 
 -----------------------------------------------------------
 -- Show instances
@@ -72,7 +66,7 @@ instance showRolAssignment :: Show RolAssignment where
   show (RolAssignment{name, binding}) = show name <> " = " <> show binding
 
 instance showRolAssignmentWithPropertyAssignments :: Show RolAssignmentWithPropertyAssignments where
-  show (RolAssignmentWithPropertyAssignments{name, binding, properties}) = name <> " => " <> binding <> "\n" <> show properties
+  show (RolAssignmentWithPropertyAssignments{rolInContextType, binding, properties}) = rolInContextType <> " => " <> binding <> "\n" <> show properties
 
 instance showContextDefinition :: Show ContextDefinition where
   show (ContextDefinition{id, contextType, privateProperties, publicProperties, rolDefinitions }) =
@@ -80,13 +74,6 @@ instance showContextDefinition :: Show ContextDefinition where
       "\nprivate:\n" <> show privateProperties <>
       "\npublic:\n" <> show publicProperties <>
       "\nroles:\n" <> show rolDefinitions
-
-instance showContext :: Show Context where
-  show (Context{id, contextType, properties, roles }) =
-    "\nType: " <> contextType <>
-    "\nID: " <> id <>
-    "\nProperties:\n" <> show properties <>
-    "\nRoles:\n" <> show roles
 
 instance showPropertyDefinition :: Show PropertyDefinition where
   show (PropertyDefinition {scope, name, properties}) =
