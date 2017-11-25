@@ -5,12 +5,12 @@ import Control.Alt ((<|>))
 import Data.Array (cons, fromFoldable) as AR
 import Data.Foldable (elem)
 import Data.List (filter, foldr, many)
-import Data.List.Types (List(..))
+import Data.List.Types (List)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, insert, fromFoldable)
 import Data.Tuple (Tuple(..))
 import Perspectives.Guid (guid)
-import Perspectives.Syntax (ContextDefinition(..), Expr(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolAssignmentWithPropertyAssignments(..), RolDefinition(..), SimpleValue(..))
+import Perspectives.Syntax (ContextDefinition(..), Expr(..), PropertyAssignment(..), PropertyDefinition(..), RolAssignment(..), RolDefinition(..), SimpleValue(..))
 import Perspectives.Syntax2 (PerspectEntity(..), BinnenRol(..), ContextCollection(..), PerspectContext(..), PerspectRol(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
@@ -90,20 +90,20 @@ rolAssignment = withPos do
 
 -- rolAssignmentWithPropertyAssignments = type '=>' identifier BLOCK propertyAssignment*
 -- Consumes a rol binding expression followed by zero or more property assignment expressions.
-rolAssignmentWithPropertyAssignments :: IP RolAssignmentWithPropertyAssignments
+rolAssignmentWithPropertyAssignments :: IP PerspectRol
 rolAssignmentWithPropertyAssignments = withPos do
   typeName <- sameOrIndented *> identifier
   sameOrIndented *> reservedOp "=>"
   ident <- sameOrIndented *> identifier
   props <- withPos (block $ checkIndent *> propertyAssignment)
-  pure (RolAssignmentWithPropertyAssignments {rolInContextType: typeName, binding: ident, properties: props})
-
-propertyAssignmentList :: String -> IP (List PropertyAssignment)
-propertyAssignmentList keyword = withPos do
-  reserved keyword
-  first <- sameOrIndented *> propertyAssignment
-  rest <- indented *> block propertyAssignment
-  pure (Cons first rest)
+  pure $ PerspectRol
+    { id: guid unit
+    , pspType: typeName
+    , binding: Just ident
+    , context: "contextID"
+    , properties: constructProperties "public" props
+    , gevuldeRollen: empty
+    }
 
 -- propertyDefinition = ('public' | 'private') identifier BLOCK propertyAssignment*
 propertyDefinition :: IP PropertyDefinition
@@ -151,7 +151,7 @@ context = withPos do
     props <- (block propertyAssignment)
     roles <- (block rolAssignmentWithPropertyAssignments)
     let
-      rollen = (constructRoles instanceName roles)
+      rollen = AR.fromFoldable $ (\(PerspectRol r) -> PerspectRol r {context = instanceName}) <$> roles
       ctxt = PerspectContext
         { id: instanceName
         , pspType: typeName
@@ -178,26 +178,13 @@ context = withPos do
       AR.cons (Tuple instanceName (Context ctxt))
       ((\rol@(PerspectRol r) -> Tuple r.id (Rol rol)) <$> AR.cons buitenRol rollen)
 
-    where
-      constructProperties :: String ->  List PropertyAssignment -> StrMap (Array String)
-      constructProperties scope assignments = foldr addProp empty assignments where
-        addProp :: PropertyAssignment -> StrMap (Array String) -> StrMap (Array String)
-        addProp (PropertyAssignment{name, scope: s, value}) strmap =
-          case scope == s of
-            true -> insert name [show value] strmap
-            false -> strmap
-
-      constructRoles :: String -> List RolAssignmentWithPropertyAssignments -> Array PerspectRol
-      constructRoles contextID rpas = rpaToRol <$> AR.fromFoldable rpas where
-        rpaToRol :: RolAssignmentWithPropertyAssignments -> PerspectRol
-        rpaToRol (RolAssignmentWithPropertyAssignments{ rolInContextType, binding, properties}) = PerspectRol
-          { id: guid unit
-          , pspType: rolInContextType
-          , binding: Just binding
-          , context: contextID
-          , properties: constructProperties "public" properties
-          , gevuldeRollen: empty
-          }
+constructProperties :: String ->  List PropertyAssignment -> StrMap (Array String)
+constructProperties scope assignments = foldr addProp empty assignments where
+  addProp :: PropertyAssignment -> StrMap (Array String) -> StrMap (Array String)
+  addProp (PropertyAssignment{name, scope: s, value}) strmap =
+    case scope == s of
+      true -> insert name [show value] strmap
+      false -> strmap
 
 
 -- contextDefinition = DEF type identifier BLOCK
