@@ -4,9 +4,9 @@ module Perspectives.Syntax where
 
 import Prelude
 import Data.List (List)
-import Perspectives.Syntax2 (ContextCollection)
+import Perspectives.Syntax2 (EntityCollection)
 
-data Expr = Ctxt ContextCollection
+data Expr = Ctxt EntityCollection
           | CtxtDef ContextDefinition
 
 -----------------------------------------------------------
