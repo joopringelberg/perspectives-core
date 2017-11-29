@@ -32,7 +32,7 @@ perspectDef = LanguageDef
                 , opStart:         op'
                 , opLetter:        op'
                 , reservedOpNames : ["=", "=>"]
-                , reservedNames   : [ "private","public", "DEF"]
+                , reservedNames   : [ "private","public", "property", "DEF"]
                 , caseSensitive:   true
                 }
   where

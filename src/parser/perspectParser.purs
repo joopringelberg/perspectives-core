@@ -105,13 +105,29 @@ rolAssignmentWithPropertyAssignments = withPos do
     , gevuldeRollen: empty
     }
 
--- propertyDefinition = ('public' | 'private') identifier BLOCK propertyAssignment*
-propertyDefinition :: IP PropertyDefinition
-propertyDefinition = withPos do
+-- contextPropertyDefinition = ('public' | 'private') identifier BLOCK propertyAssignment*
+contextPropertyDefinition :: IP PropertyDefinition
+contextPropertyDefinition = withPos do
   scope <- theScope
   name <- sameOrIndented *> identifier
   props <- indented *> (block propertyAssignment)
   pure $ PropertyDefinition {scope: scope, name: name, properties: props}
+
+-- rolPropertyDefinition = :property identifier BLOCK propertyAssignment*
+rolPropertyDefinition :: IP PerspectRol
+rolPropertyDefinition = withPos do
+  _ <- sameOrIndented *> reserved "property"
+  name <- sameOrIndented *> identifier
+  props <- indented *> (block propertyAssignment)
+  -- pure $ PropertyDefinition {scope: scope, name: name, properties: props}
+  pure $ PerspectRol
+    { id: name
+    , pspType: ":RolInContext"
+    , binding: Nothing
+    , context: "contextID"
+    , properties: constructProperties "public" props
+    , gevuldeRollen: empty
+    }
 
 theScope :: IP String
 theScope = try do
@@ -129,14 +145,16 @@ theScope = try do
 
 -- rolDefinition = type identifier BLOCK
 -- 	rolAssignmentWithPropertyAssignments
--- 	propertyDefinition*
-rolDefinition :: IP RolDefinition
+-- 	rolPropertyDefinition*
+-- TODO: genereer een Context
+rolDefinition :: IP ContextCollection
 rolDefinition = withPos do
   typeName <- identifier
   definedTypeName <- sameOrIndented *> identifier
   binding <- indented *> rolAssignment
-  propDefs <- indented *> (block propertyDefinition)
+  propDefs <- indented *> (block rolPropertyDefinition)
   pure $ RolDefinition {id: definedTypeName, rolType: typeName, binding: binding, properties: propDefs}
+  pure
 
 -----------------------------------------------------------
 -- Context and ContextDefinition
@@ -197,7 +215,7 @@ contextDefinition = withPos do
   typeName <- sameOrIndented *> identifier
   definedTypeName <- sameOrIndented *> identifier
   indented *> withPos do
-    propDefs <- many (checkIndent *> propertyDefinition)
+    propDefs <- many (checkIndent *> contextPropertyDefinition)
     roles <- many rolDefinition
     pure $ ContextDefinition {id: definedTypeName
                   ,contextType: typeName
@@ -275,7 +293,7 @@ test9 = """private :betrouwbaarheid
   :isFunctional = true
     :isVerplicht = false
 """
--- runIndentParser test9 propertyDefinition
+-- runIndentParser test9 contextPropertyDefinition
 
 test10 :: String
 test10 = """public :urgentie
@@ -288,7 +306,7 @@ test11 = """public :urgentie
   :range = Number
 """
 
--- runIndentParser (test9 <> test10 <> test11) (block propertyDefinition)
+-- runIndentParser (test9 <> test10 <> test11) (block contextPropertyDefinition)
 test12 :: String
 test12 = """:RolInContextType :Aangever
   :MogelijkeBinding => :Gebruiker
