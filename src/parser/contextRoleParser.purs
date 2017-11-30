@@ -2,7 +2,8 @@ module Perspectives.ContextRoleParser where
 
 import Perspectives.IndentParser
 import Control.Alt ((<|>))
-import Data.Array (cons, fromFoldable, many) as AR
+import Data.Array (cons, fromFoldable, many, snoc) as AR
+import Data.Char.Unicode (isLower)
 import Data.Foldable (elem)
 import Data.List.Types (List)
 import Data.Maybe (Maybe(..))
@@ -15,8 +16,9 @@ import Perspectives.Token (token)
 import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (<$>), (<*), (<*>), (<>))
 import Text.Parsing.Indent (block, indented, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (notFollowedBy, try)
-import Text.Parsing.Parser.String (oneOf, anyChar)
+import Text.Parsing.Parser.Combinators (try, (<?>))
+import Text.Parsing.Parser.String (char, satisfy)
+import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
 
 -----------------------------------------------------------
@@ -47,21 +49,70 @@ string = String <$> token.stringLiteral
 simpleValue :: IP SimpleValue
 simpleValue = string <|> int <|> bool
 
--- | roleName = lowerCaseChar anyChar*
-roleName :: IP String
-roleName = lexeme (fromCharArray <$> (notFollowedBy upper *> AR.many identLetter))
-
 identLetter :: IP Char
-identLetter = alphaNum <|> oneOf ['_', '\'']
+identLetter = alphaNum <|> STRING.oneOf ['_', '\'']
 
--- | propertyName = lowerCaseChar anyChar*
-propertyName :: IP String
-propertyName = roleName
+identLetterString :: IP String
+identLetterString = fromCharArray <$> AR.many identLetter
 
--- | perspectName = upperCaseChar anyChar*
-perspectName :: IP String
-perspectName = lexeme (f <$> upper <*> AR.many identLetter) where
+capitalizedString :: IP String
+capitalizedString = f <$> upper <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
+
+lower :: IP Char
+lower = satisfy isLower <?> "uppercase letter"
+
+uncapitalizedString :: IP String
+uncapitalizedString = f <$> lower <*> AR.many identLetter where
+  f c ca = fromCharArray $ AR.cons c ca
+
+-- domeinName = 'model:' upper alphaNum* '#'
+domeinName :: IP String
+domeinName = do
+  _ <- STRING.string "model:"
+  domein <- capitalizedString
+  _ <- char '#'
+  pure $ "model:" <> domein <> "#"
+
+-- localResourceName = upper alphaNum*
+localResourceName :: IP String
+localResourceName = capitalizedString
+
+-- localPropertyName = lower alphaNum*
+localPropertyName :: IP String
+localPropertyName = uncapitalizedString
+
+-- prefix = lower* ':'
+prefix :: IP String
+prefix = (f <$> AR.many identLetter <*> char ':') where
+  f ca c = fromCharArray $ AR.snoc ca c
+
+-- prefixedResourceName = prefix localResourceName
+prefixedResourceName :: IP String
+prefixedResourceName = lexeme $ (<>) <$> prefix <*> localResourceName
+
+-- prefixedPropertyName = prefix localPropertyName
+prefixedPropertyName :: IP String
+prefixedPropertyName = lexeme $ (<>) <$> prefix <*> localPropertyName
+
+-- qualifiedResourceName = domeinName localResourceName
+qualifiedResourceName :: IP String
+qualifiedResourceName = lexeme $ (<>) <$> domeinName <*> localResourceName
+
+-- qualifiedPropertyName = domeinName localPropertyName
+qualifiedPropertyName :: IP String
+qualifiedPropertyName = lexeme $ (<>) <$> domeinName <*> localPropertyName
+
+-- resourceName = prefixedResourceName | qualifiedResourceName
+resourceName :: IP String
+resourceName = qualifiedResourceName <|> prefixedResourceName
+
+-- propertyName = prefixedPropertyName | qualifiedPropertyName
+propertyName :: IP String
+propertyName = qualifiedPropertyName <|> prefixedPropertyName
+
+roleName :: IP String
+roleName = propertyName
 
 -----------------------------------------------------------
 -- Datatypes
@@ -77,9 +128,9 @@ dataType = try do
 -- Elementary expression types
 -----------------------------------------------------------
 
--- | typeDeclaration = perspectName perspectName
+-- | typeDeclaration = resourceName resourceName
 typeDeclaration :: IP TypeDeclaration
-typeDeclaration = TypeDeclaration <$> perspectName <*> perspectName
+typeDeclaration = TypeDeclaration <$> resourceName <*> resourceName
 
 typedPropertyAssignment :: String -> IP (Tuple PropertyName (Array String))
 typedPropertyAssignment scope = withPos $ (\pn pv -> Tuple pn [show pv])
@@ -100,7 +151,7 @@ rolePropertyAssignment = withPos $ (\pn pv -> Tuple pn [show pv])
     <$> propertyName <* (sameOrIndented *> reservedOp "=")
     <*> (sameOrIndented *> (simpleValue <|> dataType))
 
--- | roleBinding = roleName '=>' (perspectName | expression) rolePropertyAssignment*
+-- | roleBinding = roleName '=>' (resourceName | expression) rolePropertyAssignment*
 roleBinding :: PerspectName -> IP NamedEntityCollection
 roleBinding contextID =
   withPos $ try do
@@ -124,7 +175,7 @@ roleBinding contextID =
   <|>
   (withPos $ try do
     rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
-    ident <- (sameOrIndented *> perspectName)
+    ident <- (sameOrIndented *> resourceName)
     props <- indented *> (block rolePropertyAssignment)
     rolId <- pure (guid unit)
     pure $ (NamedEntityCollection rolId
@@ -219,7 +270,7 @@ role = withPos do
 
 -- Helper functions for development.
 allTheRest :: IP String
-allTheRest = fromCharArray <$> (AR.many anyChar)
+allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
 -----------------------------------------------------------
 -- Tests
@@ -242,16 +293,16 @@ test2 = """Aangifte Aangifte1
 -- runIndentParser "  public status = \"voltooid\"" (withPos (whiteSpace *> indented *> publicContextPropertyAssignment))
 
 test3 :: String
-test3 = """Aangifte Aangifte1
-  aangever => Jansen""" -- zodra een newline volgt komt de binding niet mee, geindenteerd of niet.
+test3 = """:Aangifte :Aangifte1
+  :aangever => :Jansen""" -- zodra een newline volgt komt de binding niet mee, geindenteerd of niet.
 
 -- runIndentParser "aangever => Jansen" (roleBinding "")
 -- runIndentParser "aangever => Jansen\n  prop = 1" (roleBinding "")
 
 test4 :: String
-test4 = """Aangifte Aangifte1
-  public status = "voltooid"
-  aangever => Jansen
+test4 = """:Aangifte :Aangifte1
+  public :status = "voltooid"
+  :aangever => :Jansen
 """  -- zodra een newline volgt komt de binding niet mee, geindenteerd
 
 test5 :: String

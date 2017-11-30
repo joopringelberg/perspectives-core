@@ -53,7 +53,7 @@ getSecondMatch regex s = case match regex s of
 domeinURIRegex :: Regex
 domeinURIRegex = unsafeRegex "^model:(\\w*)#(\\w*)$" noFlags
 
--- | True iff the string conforms to the model scheme, i.e. "model:#SomeDomein".
+-- | True iff the string conforms to the model scheme, i.e. "model:SomeDomein#identifier".
 isDomeinURI :: String -> Boolean
 isDomeinURI s = test domeinURIRegex s
 
