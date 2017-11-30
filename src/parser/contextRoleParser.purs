@@ -16,7 +16,8 @@ import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (<$>), (<*), (<*>
 import Text.Parsing.Indent (block, indented, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (notFollowedBy, try)
-import Text.Parsing.Parser.Token (letter, upper)
+import Text.Parsing.Parser.String (oneOf, anyChar)
+import Text.Parsing.Parser.Token (alphaNum, upper)
 
 -----------------------------------------------------------
 -- Lexemes
@@ -48,7 +49,10 @@ simpleValue = string <|> int <|> bool
 
 -- | roleName = lowerCaseChar anyChar*
 roleName :: IP String
-roleName = fromCharArray <$> (notFollowedBy upper *> AR.many letter)
+roleName = lexeme (fromCharArray <$> (notFollowedBy upper *> AR.many identLetter))
+
+identLetter :: IP Char
+identLetter = alphaNum <|> oneOf ['_', '\'']
 
 -- | propertyName = lowerCaseChar anyChar*
 propertyName :: IP String
@@ -56,7 +60,7 @@ propertyName = roleName
 
 -- | perspectName = upperCaseChar anyChar*
 perspectName :: IP String
-perspectName = f <$> upper <*> AR.many letter where
+perspectName = lexeme (f <$> upper <*> AR.many identLetter) where
   f c ca = fromCharArray $ AR.cons c ca
 
 -----------------------------------------------------------
@@ -99,28 +103,10 @@ rolePropertyAssignment = withPos $ (\pn pv -> Tuple pn [show pv])
 -- | roleBinding = roleName '=>' (perspectName | expression) rolePropertyAssignment*
 roleBinding :: PerspectName -> IP NamedEntityCollection
 roleBinding contextID =
-  withPos do
+  withPos $ try do
     rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
-    ident <- (sameOrIndented *> perspectName)
-    props <- indented *> withPos (block rolePropertyAssignment)
-    -- pure $ RolBinding rname ident (EntityCollection empty) props
-    pure $ (NamedEntityCollection ident
-      (EntityCollection
-        (singleton
-          ident
-          (Rol (PerspectRol
-            { id: guid unit
-            , pspType: rname
-            , binding: Just ident
-            , context: contextID
-            , properties: fromFoldable props
-            , gevuldeRollen: empty
-            })))))
-  <|>
-  withPos do
-    rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
-    (NamedEntityCollection pname (EntityCollection entities)) <- context <|> role
-    props <- indented *> withPos (block rolePropertyAssignment)
+    (NamedEntityCollection pname (EntityCollection entities)) <- indented *> (context <|> role)
+    props <- indented *> (block rolePropertyAssignment)
     -- pure $ RolBinding rname pname entities props
     rolId <- pure (guid unit)
     pure $ (NamedEntityCollection rolId
@@ -135,6 +121,24 @@ roleBinding contextID =
             , gevuldeRollen: empty
             }))
             entities)))
+  <|>
+  (withPos $ try do
+    rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
+    ident <- (sameOrIndented *> perspectName)
+    props <- indented *> (block rolePropertyAssignment)
+    rolId <- pure (guid unit)
+    pure $ (NamedEntityCollection rolId
+      (EntityCollection
+        (singleton
+          rolId
+          (Rol (PerspectRol
+            { id: rolId
+            , pspType: rname
+            , binding: Just ident
+            , context: contextID
+            , properties: fromFoldable props
+            , gevuldeRollen: empty
+            }))))))
 
 -- TODO: query
 
@@ -212,3 +216,65 @@ role = withPos do
 -- expression :: IP NamedEntityCollection
 -- expression = NamedEntityCollection <$> pure "dummy" <*> (pure $ EntityCollection empty)
 -- expression = context <|> role
+
+-- Helper functions for development.
+allTheRest :: IP String
+allTheRest = fromCharArray <$> (AR.many anyChar)
+
+-----------------------------------------------------------
+-- Tests
+-----------------------------------------------------------
+test1 :: String
+test1 = """Aangifte Aangifte1
+"""
+
+test2 :: String
+test2 = """Aangifte Aangifte1
+  public status = "voltooid"
+"""
+
+-- runIndentParser "public propname = 1" publicContextPropertyAssignment
+-- runIndentParser "private propname = 1" publicContextPropertyAssignment
+-- runIndentParser "private propname = 1" privateContextPropertyAssignment
+-- runIndentParser "public status = \"voltooid\"" publicContextPropertyAssignment
+
+-- import Text.Parsing.Parser.String
+-- runIndentParser "  public status = \"voltooid\"" (withPos (whiteSpace *> indented *> publicContextPropertyAssignment))
+
+test3 :: String
+test3 = """Aangifte Aangifte1
+  aangever => Jansen""" -- zodra een newline volgt komt de binding niet mee, geindenteerd of niet.
+
+-- runIndentParser "aangever => Jansen" (roleBinding "")
+-- runIndentParser "aangever => Jansen\n  prop = 1" (roleBinding "")
+
+test4 :: String
+test4 = """Aangifte Aangifte1
+  public status = "voltooid"
+  aangever => Jansen
+"""  -- zodra een newline volgt komt de binding niet mee, geindenteerd
+
+test5 :: String
+test5 = """Aangifte Aangifte1
+  public status = "voltooid"
+  private aantekening = "bla die bla"
+  aangever => Jansen"""
+
+test6 :: String
+test6 = """Aangifte Aangifte1
+  public status = "voltooid"
+  private aantekening = "bla die bla"
+  aangever => Jansen
+    betrouwbaarheid = 6
+""" -- Dit werkt weer alleen als er een newline volgt!
+
+test7 :: String
+test7 = """aangever => Jansen
+    betrouwbaarheid = 6"""
+-- runIndentParser test7 (roleBinding "")
+
+test8 :: String
+test8 = """aangever => Jansen
+    betrouwbaarheid = 6
+"""
+-- runIndentParser test8 (roleBinding "")

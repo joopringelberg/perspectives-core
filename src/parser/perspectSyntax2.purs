@@ -3,7 +3,7 @@ module Perspectives.Syntax2 where
 import Data.List (List)
 import Data.Maybe (Maybe)
 import Data.StrMap (StrMap, values)
-import Prelude (class Show, show)
+import Prelude (class Show, show, (<>))
 
 data NamedEntityCollection = NamedEntityCollection PerspectName EntityCollection
 
@@ -68,7 +68,10 @@ foreign import jsonStringify :: forall a. {|a} -> String
 instance showPerspectContext :: Show PerspectContext where
   show (PerspectContext r) = jsonStringify r
 
-instance showContextCollection :: Show EntityCollection where
+instance showNamedEntityCollection :: Show NamedEntityCollection where
+  show (NamedEntityCollection name collection) = name <> ": \n" <> show collection 
+
+instance showEntityCollection :: Show EntityCollection where
   show (EntityCollection s) = show (values s)
 
 instance showPerspectEntity :: Show PerspectEntity where
