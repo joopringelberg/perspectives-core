@@ -1,21 +1,19 @@
 module Main where
 
 import Prelude
-
-import Control.Monad.Aff (Aff)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE)
-
-import Data.Maybe (Maybe(..))
-
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Halogen.VDom.Driver (runUI)
-
 import Ace.Types (ACE)
 import AceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Console (CONSOLE)
+import Data.Maybe (Maybe(..))
+import Halogen.VDom.Driver (runUI)
+import Perspectives.ContextRoleParser (context)
+import Perspectives.IndentParser (runIndentParser)
 
 -- | The application state, which in this case just stores the current text in
 -- | the editor.
@@ -59,7 +57,7 @@ ui =
           ]
       , HH.div_
           [ HH.slot AceSlot aceComponent unit handleAceOuput ]
-      , HH.p_
+      , HH.pre_
           [ HH.text ("Current text: " <> text) ]
       ]
 
@@ -72,7 +70,10 @@ ui =
     pure next
 
   handleAceOuput :: AceOutput -> Maybe (Query Unit)
-  handleAceOuput (TextChanged text) = Just $ H.action $ HandleAceUpdate text
+  handleAceOuput (TextChanged text) = Just $ H.action $ HandleAceUpdate (parse text)
+
+parse :: String -> String
+parse source = show $ runIndentParser source context
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (ace :: ACE, console :: CONSOLE)) Unit
