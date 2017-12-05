@@ -1,0 +1,63 @@
+ACE FOLDING
+We willen een fold op:
+	- type declaration
+	- (later) property assignment met een waarde die zich over meerdere regels uitstrekt.
+	- multiline commentaar
+	- meerdere single line commentaar regels
+Kunnen we dat vinden in termen van reguliere expressies?
+1. Als type declaratie op één regel is, hoeft er niet gevouwen te worden.
+2. anders wel, dus match:
+	resourceName '=>'$
+NB: denk aan commentaar!
+
+Maar hoe vind je het eind?
+Het gaat om indentering.
+Dus:
+1. bepaal de beginkolom van de typedeclaration.
+2. vind de regel waar op de beginkolom weer tekst staat. De regel ervoor is het eind.
+
+ACE INDENTING
+We willen inspringen na:
+	- type declaration
+	- roleBinding als begin van inline type declaration
+Er zijn geen omstandigheden waaronder we automatisch kunnen terugspringen, althans niet op basis van de grammatica.
+
+ACE SYNTAX HIGHLIGHTING
+We hebben de volgende typen expressies:
+1.	type declaratie: :Aangifte :a1; 
+2.	public context property assignment: public :urgentie = 7;
+3.	private context property assignment: private :aantekening = “…”;
+4.	rolbinding: :aangever => :Jansen; 
+5.	rol property assignment: :betrouwbaarheid = 6.
+6. query: query :aangever binding
+7. inline typedeclaration en daar gaat het vooral om het bindingsdeel: :aangever =>
+NB: denk aan commentaar!
+
+Kunnen we deze situaties met pattern matching en states herkennen?
+Onderstaande expressies zijn met een regexp te herkennen:
+2.	public context property assignment: public :urgentie = 7;
+3.	private context property assignment: private :aantekening = “…”;
+4.	rolbinding: :aangever => :Jansen; 
+5.	rol property assignment: :betrouwbaarheid = 6.
+6. query: query :aangever binding
+7. inline typedeclaration en daar gaat het vooral om het bindingsdeel: :aangever =>
+
+Blijft over:
+1.	type declaratie: :Aangifte :a1; 
+Dit valt te matchen en bovendien is het het overblijvende geval.
+
+Uitwerken:
+1. Maak een regexp voor elke expressie, die de hele regel dekt in matching groups
+2. Geef elk onderdeel een token.
+3. Definieer css voor de tokens.
+
+UITZOEKEN
+1. Ik zie in de json_worker.js file dat json geparsed wordt en meldingen toegevoegd worden aan een array met errors dat door de worker ge-emit worden (naar Ace, neem ik aan) onder de vlag "annotate".
+
+TODO
+1. RegExps voor commentaar in highlighting.
+2. Breid de contextRoleParser uit met parsers voor commentaar.
+3. Breid de contextRoleParser uit met parsers voor 'text' met prefixes.
+4. Definieer de context 'text'.
+5. Definieer de context 'domein'.
+

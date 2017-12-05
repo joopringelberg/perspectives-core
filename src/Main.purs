@@ -6,7 +6,7 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Ace.Types (ACE)
-import AceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
+import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE)

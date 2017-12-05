@@ -1,0 +1,2 @@
+1. Update de repository bij Github:
+git push --all origin

@@ -1,21 +1,17 @@
-module AceComponent (AceEffects, AceQuery(..), AceOutput(..), aceComponent) where
+module PerspectAceComponent (AceEffects, AceQuery(..), AceOutput(..), aceComponent) where
 
 import Prelude
-
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR)
-
-import Data.Maybe (Maybe(..))
-
+import Ace as Ace
+import Ace.EditSession as Session
+import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-
-import Ace as Ace
-import Ace.Editor as Editor
-import Ace.EditSession as Session
 import Ace.Types (ACE, Editor)
-
+import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Eff.Class (liftEff)
+import Data.Maybe (Maybe(..))
 -- | The state for the ace component - we only need a reference to the editor,
 -- | as Ace editor has its own internal state that we can query instead of
 -- | replicating it within Halogen.
@@ -66,6 +62,8 @@ aceComponent =
         Just el' -> do
           editor <- H.liftEff $ Ace.editNode el' Ace.ace
           session <- H.liftEff $ Editor.getSession editor
+          _ <- liftEff $ Session.setMode "ace/mode/perspectives" session
+          _ <- liftEff $ Editor.setTheme "ace/theme/ambiance" editor
           H.modify (_ { editor = Just editor })
           H.subscribe $ H.eventSource_ (Session.onChange session) (H.request HandleChange)
       pure next

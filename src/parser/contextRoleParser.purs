@@ -55,6 +55,8 @@ identLetter = alphaNum <|> STRING.oneOf ['_', '\'']
 identLetterString :: IP String
 identLetterString = fromCharArray <$> AR.many identLetter
 
+-- /([A-Z]\w*\b)/
+-- /(\p{Uppercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+)/gu
 capitalizedString :: IP String
 capitalizedString = f <$> upper <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
@@ -62,6 +64,8 @@ capitalizedString = f <$> upper <*> AR.many identLetter where
 lower :: IP Char
 lower = satisfy isLower <?> "uppercase letter"
 
+-- /([a-z]\w*\b)/
+-- /(\b\p{Lowercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+\b)/gu
 uncapitalizedString :: IP String
 uncapitalizedString = f <$> lower <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
@@ -84,7 +88,7 @@ localPropertyName = uncapitalizedString
 
 -- prefix = lower* ':'
 prefix :: IP String
-prefix = (f <$> AR.many identLetter <*> char ':') where
+prefix = (f <$> AR.many lower <*> char ':') where
   f ca c = fromCharArray $ AR.snoc ca c
 
 -- prefixedResourceName = prefix localResourceName
