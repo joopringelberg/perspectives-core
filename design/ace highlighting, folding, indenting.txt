@@ -56,9 +56,10 @@ UITZOEKEN
 
 TODO
 1a. RegExps voor commentaar in highlighting. KLAAR
-1b. Indenting.
-1c. Folding 
+1b. Indenting. KLAAR
+1c. Folding KLAAR
 2. Breid de contextRoleParser uit met parsers voor commentaar.
+2a. Zet de voorbeeld tekst in de editor. KLAAR
 3. Breid de contextRoleParser uit met parsers voor 'text' met prefixes.
 4. Definieer de context 'text'.
 5. Definieer de context 'domein'.

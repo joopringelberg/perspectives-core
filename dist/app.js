@@ -1,4 +1,187 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],2:[function(require,module,exports){
+(function (process){
 // Generated by psc-bundle 0.11.4
 var PS = {};
 (function(exports) {
@@ -86,7 +269,16 @@ var PS = {};
 (function(exports) {
   // Generated by purs version 0.11.4
   "use strict";
-  var Control_Category = PS["Control.Category"];
+  var Control_Category = PS["Control.Category"];        
+  var on = function (f) {
+      return function (g) {
+          return function (x) {
+              return function (y) {
+                  return f(g(x))(g(y));
+              };
+          };
+      };
+  };
   var flip = function (f) {
       return function (b) {
           return function (a) {
@@ -101,6 +293,7 @@ var PS = {};
   };
   exports["const"] = $$const;
   exports["flip"] = flip;
+  exports["on"] = on;
 })(PS["Data.Function"] = PS["Data.Function"] || {});
 (function(exports) {
     "use strict";
@@ -970,12 +1163,16 @@ var PS = {};
   var Monoid = function (Semigroup0, mempty) {
       this.Semigroup0 = Semigroup0;
       this.mempty = mempty;
-  };       
+  };                 
+  var monoidString = new Monoid(function () {
+      return Data_Semigroup.semigroupString;
+  }, "");  
   var mempty = function (dict) {
       return dict.mempty;
   };
   exports["Monoid"] = Monoid;
   exports["mempty"] = mempty;
+  exports["monoidString"] = monoidString;
 })(PS["Data.Monoid"] = PS["Data.Monoid"] || {});
 (function(exports) {
   // Generated by purs version 0.11.4
@@ -1242,6 +1439,32 @@ var PS = {};
   };
   var foldl = function (dict) {
       return dict.foldl;
+  };
+  var intercalate = function (dictFoldable) {
+      return function (dictMonoid) {
+          return function (sep) {
+              return function (xs) {
+                  var go = function (v) {
+                      return function (x) {
+                          if (v.init) {
+                              return {
+                                  init: false, 
+                                  acc: x
+                              };
+                          };
+                          return {
+                              init: false, 
+                              acc: Data_Semigroup.append(dictMonoid.Semigroup0())(v.acc)(Data_Semigroup.append(dictMonoid.Semigroup0())(sep)(x))
+                          };
+                      };
+                  };
+                  return (foldl(dictFoldable)(go)({
+                      init: true, 
+                      acc: Data_Monoid.mempty(dictMonoid)
+                  })(xs)).acc;
+              };
+          };
+      };
   }; 
   var foldableMaybe = new Foldable(function (dictMonoid) {
       return function (f) {
@@ -1326,6 +1549,7 @@ var PS = {};
   exports["foldl"] = foldl;
   exports["foldr"] = foldr;
   exports["for_"] = for_;
+  exports["intercalate"] = intercalate;
   exports["notElem"] = notElem;
   exports["sequence_"] = sequence_;
   exports["traverse_"] = traverse_;
@@ -2004,8 +2228,16 @@ var PS = {};
     return value;
   };
 
+  exports.unsafeFromForeign = function (value) {
+    return value;
+  };
+
   exports.typeOf = function (value) {
     return typeof value;
+  };
+
+  exports.tagOf = function (value) {
+    return Object.prototype.toString.call(value).slice(8, -1);
   };
 })(PS["Data.Foreign"] = PS["Data.Foreign"] || {});
 (function(exports) {
@@ -2116,198 +2348,6 @@ var PS = {};
   exports["toNumber"] = $foreign.toNumber;
 })(PS["Data.Int"] = PS["Data.Int"] || {});
 (function(exports) {
-    "use strict";
-
-  exports._charAt = function (just) {
-    return function (nothing) {
-      return function (i) {
-        return function (s) {
-          return i >= 0 && i < s.length ? just(s.charAt(i)) : nothing;
-        };
-      };
-    };
-  };
-
-  exports.singleton = function (c) {
-    return c;
-  };
-
-  exports.fromCharArray = function (a) {
-    return a.join("");
-  };
-
-  exports._indexOf = function (just) {
-    return function (nothing) {
-      return function (x) {
-        return function (s) {
-          var i = s.indexOf(x);
-          return i === -1 ? nothing : just(i);
-        };
-      };
-    };
-  };
-
-  exports.length = function (s) {
-    return s.length;
-  };
-
-  exports.drop = function (n) {
-    return function (s) {
-      return s.substring(n);
-    };
-  };
-
-  exports.split = function (sep) {
-    return function (s) {
-      return s.split(sep);
-    };
-  };
-
-  exports.toCharArray = function (s) {
-    return s.split("");
-  };
-
-  exports.toLower = function (s) {
-    return s.toLowerCase();
-  };
-})(PS["Data.String"] = PS["Data.String"] || {});
-(function(exports) {
-    "use strict";
-
-  exports.charAt = function (i) {
-    return function (s) {
-      if (i >= 0 && i < s.length) return s.charAt(i);
-      throw new Error("Data.String.Unsafe.charAt: Invalid index.");
-    };
-  };
-})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.String.Unsafe"];
-  exports["charAt"] = $foreign.charAt;
-})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.String"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_String_Unsafe = PS["Data.String.Unsafe"];
-  var Prelude = PS["Prelude"];
-  var Pattern = function (x) {
-      return x;
-  };
-  var uncons = function (v) {
-      if (v === "") {
-          return Data_Maybe.Nothing.value;
-      };
-      return new Data_Maybe.Just({
-          head: Data_String_Unsafe.charAt(0)(v), 
-          tail: $foreign.drop(1)(v)
-      });
-  }; 
-  var $$null = function (s) {
-      return s === "";
-  };              
-  var newtypePattern = new Data_Newtype.Newtype(function (n) {
-      return n;
-  }, Pattern);                                                                                
-  var indexOf = $foreign._indexOf(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);      
-  var charAt = $foreign._charAt(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
-  exports["Pattern"] = Pattern;
-  exports["charAt"] = charAt;
-  exports["indexOf"] = indexOf;
-  exports["null"] = $$null;
-  exports["uncons"] = uncons;
-  exports["newtypePattern"] = newtypePattern;
-  exports["drop"] = $foreign.drop;
-  exports["fromCharArray"] = $foreign.fromCharArray;
-  exports["length"] = $foreign.length;
-  exports["singleton"] = $foreign.singleton;
-  exports["split"] = $foreign.split;
-  exports["toCharArray"] = $foreign.toCharArray;
-  exports["toLower"] = $foreign.toLower;
-})(PS["Data.String"] = PS["Data.String"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Data.Foreign"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
-  var Control_Monad_Except = PS["Control.Monad.Except"];
-  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Boolean = PS["Data.Boolean"];
-  var Data_Either = PS["Data.Either"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Function = PS["Data.Function"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_Identity = PS["Data.Identity"];
-  var Data_Int = PS["Data.Int"];
-  var Data_List_NonEmpty = PS["Data.List.NonEmpty"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Show = PS["Data.Show"];
-  var Data_String = PS["Data.String"];
-  var Prelude = PS["Prelude"];
-  var TypeMismatch = (function () {
-      function TypeMismatch(value0, value1) {
-          this.value0 = value0;
-          this.value1 = value1;
-      };
-      TypeMismatch.create = function (value0) {
-          return function (value1) {
-              return new TypeMismatch(value0, value1);
-          };
-      };
-      return TypeMismatch;
-  })();
-  exports["TypeMismatch"] = TypeMismatch;
-  exports["toForeign"] = $foreign.toForeign;
-  exports["typeOf"] = $foreign.typeOf;
-})(PS["Data.Foreign"] = PS["Data.Foreign"] || {});
-(function(exports) {
-    "use strict";
-
-  // module Unsafe.Coerce
-
-  exports.unsafeCoerce = function (x) {
-    return x;
-  };
-})(PS["Unsafe.Coerce"] = PS["Unsafe.Coerce"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var $foreign = PS["Unsafe.Coerce"];
-  exports["unsafeCoerce"] = $foreign.unsafeCoerce;
-})(PS["Unsafe.Coerce"] = PS["Unsafe.Coerce"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var DOM_Event_Types = PS["DOM.Event.Types"];
-  var DOM_Util_FFI = PS["DOM.Util.FFI"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foreign = PS["Data.Foreign"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_Ord = PS["Data.Ord"];
-  var Prelude = PS["Prelude"];
-  var Unsafe_Coerce = PS["Unsafe.Coerce"];                           
-  var elementToNode = Unsafe_Coerce.unsafeCoerce;
-  exports["elementToNode"] = elementToNode;
-})(PS["DOM.Node.Types"] = PS["DOM.Node.Types"] || {});
-(function(exports) {
   // Generated by purs version 0.11.4
   "use strict";
   var Control_Alt = PS["Control.Alt"];
@@ -2343,6 +2383,13 @@ var PS = {};
           return new NonEmpty(a, Control_Plus.empty(dictPlus));
       };
   };
+  var showNonEmpty = function (dictShow) {
+      return function (dictShow1) {
+          return new Data_Show.Show(function (v) {
+              return "(NonEmpty " + (Data_Show.show(dictShow)(v.value0) + (" " + (Data_Show.show(dictShow1)(v.value1) + ")")));
+          });
+      };
+  };
   var functorNonEmpty = function (dictFunctor) {
       return new Data_Functor.Functor(function (f) {
           return function (v) {
@@ -2352,6 +2399,7 @@ var PS = {};
   };
   exports["NonEmpty"] = NonEmpty;
   exports["singleton"] = singleton;
+  exports["showNonEmpty"] = showNonEmpty;
   exports["functorNonEmpty"] = functorNonEmpty;
 })(PS["Data.NonEmpty"] = PS["Data.NonEmpty"] || {});
 (function(exports) {
@@ -2537,6 +2585,19 @@ var PS = {};
           return Data_Foldable.foldr(foldableList)(Cons.create)(ys)(xs);
       };
   });
+  var showList = function (dictShow) {
+      return new Data_Show.Show(function (v) {
+          if (v instanceof Nil) {
+              return "Nil";
+          };
+          return "(" + (Data_Foldable.intercalate(foldableList)(Data_Monoid.monoidString)(" : ")(Data_Functor.map(functorList)(Data_Show.show(dictShow))(v)) + " : Nil)");
+      });
+  };
+  var showNonEmptyList = function (dictShow) {
+      return new Data_Show.Show(function (v) {
+          return "(NonEmptyList " + (Data_Show.show(Data_NonEmpty.showNonEmpty(dictShow)(showList(dictShow)))(v) + ")");
+      });
+  }; 
   var applyList = new Control_Apply.Apply(function () {
       return functorList;
   }, function (v) {
@@ -2576,6 +2637,7 @@ var PS = {};
   exports["Nil"] = Nil;
   exports["Cons"] = Cons;
   exports["NonEmptyList"] = NonEmptyList;
+  exports["showList"] = showList;
   exports["semigroupList"] = semigroupList;
   exports["functorList"] = functorList;
   exports["foldableList"] = foldableList;
@@ -2583,10 +2645,445 @@ var PS = {};
   exports["applicativeList"] = applicativeList;
   exports["altList"] = altList;
   exports["plusList"] = plusList;
+  exports["showNonEmptyList"] = showNonEmptyList;
   exports["functorNonEmptyList"] = functorNonEmptyList;
   exports["applyNonEmptyList"] = applyNonEmptyList;
   exports["applicativeNonEmptyList"] = applicativeNonEmptyList;
 })(PS["Data.List.Types"] = PS["Data.List.Types"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Alt = PS["Control.Alt"];
+  var Control_Alternative = PS["Control.Alternative"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Apply = PS["Control.Apply"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Category = PS["Control.Category"];
+  var Control_Lazy = PS["Control.Lazy"];
+  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Bifunctor = PS["Data.Bifunctor"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Foldable = PS["Data.Foldable"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_List_Types = PS["Data.List.Types"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_NonEmpty = PS["Data.NonEmpty"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Traversable = PS["Data.Traversable"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable = PS["Data.Unfoldable"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];                                                   
+  var uncons = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return Data_Maybe.Nothing.value;
+      };
+      if (v instanceof Data_List_Types.Cons) {
+          return new Data_Maybe.Just({
+              head: v.value0, 
+              tail: v.value1
+          });
+      };
+      throw new Error("Failed pattern match at Data.List line 259, column 1 - line 259, column 21: " + [ v.constructor.name ]);
+  };
+  var toUnfoldable = function (dictUnfoldable) {
+      return Data_Unfoldable.unfoldr(dictUnfoldable)(function (xs) {
+          return Data_Functor.map(Data_Maybe.functorMaybe)(function (rec) {
+              return new Data_Tuple.Tuple(rec.head, rec.tail);
+          })(uncons(xs));
+      });
+  };
+  var tail = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return Data_Maybe.Nothing.value;
+      };
+      if (v instanceof Data_List_Types.Cons) {
+          return new Data_Maybe.Just(v.value1);
+      };
+      throw new Error("Failed pattern match at Data.List line 245, column 1 - line 245, column 19: " + [ v.constructor.name ]);
+  };
+  var reverse = (function () {
+      var go = function (__copy_acc) {
+          return function (__copy_v) {
+              var __tco_acc = __copy_acc;
+              var __tco_done = false;
+              var __tco_result;
+              function __tco_loop(acc, v) {
+                  if (v instanceof Data_List_Types.Nil) {
+                      __tco_done = true;
+                      return acc;
+                  };
+                  if (v instanceof Data_List_Types.Cons) {
+                      __tco_acc = new Data_List_Types.Cons(v.value0, acc);
+                      __copy_v = v.value1;
+                      return;
+                  };
+                  throw new Error("Failed pattern match at Data.List line 365, column 11 - line 368, column 36: " + [ acc.constructor.name, v.constructor.name ]);
+              };
+              while (!__tco_done) {
+                  __tco_result = __tco_loop(__tco_acc, __copy_v);
+              };
+              return __tco_result;
+          };
+      };
+      return go(Data_List_Types.Nil.value);
+  })();
+  var $$null = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return true;
+      };
+      return false;
+  };
+  var some = function (dictAlternative) {
+      return function (dictLazy) {
+          return function (v) {
+              return Control_Apply.apply((dictAlternative.Applicative0()).Apply0())(Data_Functor.map(((dictAlternative.Plus1()).Alt0()).Functor0())(Data_List_Types.Cons.create)(v))(Control_Lazy.defer(dictLazy)(function (v1) {
+                  return many(dictAlternative)(dictLazy)(v);
+              }));
+          };
+      };
+  };
+  var many = function (dictAlternative) {
+      return function (dictLazy) {
+          return function (v) {
+              return Control_Alt.alt((dictAlternative.Plus1()).Alt0())(some(dictAlternative)(dictLazy)(v))(Control_Applicative.pure(dictAlternative.Applicative0())(Data_List_Types.Nil.value));
+          };
+      };
+  };
+  var head = function (v) {
+      if (v instanceof Data_List_Types.Nil) {
+          return Data_Maybe.Nothing.value;
+      };
+      if (v instanceof Data_List_Types.Cons) {
+          return new Data_Maybe.Just(v.value0);
+      };
+      throw new Error("Failed pattern match at Data.List line 230, column 1 - line 230, column 19: " + [ v.constructor.name ]);
+  };
+  exports["head"] = head;
+  exports["many"] = many;
+  exports["null"] = $$null;
+  exports["reverse"] = reverse;
+  exports["some"] = some;
+  exports["tail"] = tail;
+  exports["toUnfoldable"] = toUnfoldable;
+  exports["uncons"] = uncons;
+})(PS["Data.List"] = PS["Data.List"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Category = PS["Control.Category"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Foldable = PS["Data.Foldable"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_List = PS["Data.List"];
+  var Data_List_Types = PS["Data.List.Types"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_NonEmpty = PS["Data.NonEmpty"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semigroup_Foldable = PS["Data.Semigroup.Foldable"];
+  var Data_Semigroup_Traversable = PS["Data.Semigroup.Traversable"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Traversable = PS["Data.Traversable"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unfoldable = PS["Data.Unfoldable"];
+  var Partial_Unsafe = PS["Partial.Unsafe"];
+  var Prelude = PS["Prelude"];
+  var singleton = function ($160) {
+      return Data_List_Types.NonEmptyList(Data_NonEmpty.singleton(Data_List_Types.plusList)($160));
+  };
+  exports["singleton"] = singleton;
+})(PS["Data.List.NonEmpty"] = PS["Data.List.NonEmpty"] || {});
+(function(exports) {
+    "use strict";
+
+  exports._charAt = function (just) {
+    return function (nothing) {
+      return function (i) {
+        return function (s) {
+          return i >= 0 && i < s.length ? just(s.charAt(i)) : nothing;
+        };
+      };
+    };
+  };
+
+  exports.singleton = function (c) {
+    return c;
+  };
+
+  exports.fromCharArray = function (a) {
+    return a.join("");
+  };
+
+  exports._indexOf = function (just) {
+    return function (nothing) {
+      return function (x) {
+        return function (s) {
+          var i = s.indexOf(x);
+          return i === -1 ? nothing : just(i);
+        };
+      };
+    };
+  };
+
+  exports.length = function (s) {
+    return s.length;
+  };
+
+  exports.drop = function (n) {
+    return function (s) {
+      return s.substring(n);
+    };
+  };
+
+  exports.split = function (sep) {
+    return function (s) {
+      return s.split(sep);
+    };
+  };
+
+  exports.toCharArray = function (s) {
+    return s.split("");
+  };
+
+  exports.toLower = function (s) {
+    return s.toLowerCase();
+  };
+})(PS["Data.String"] = PS["Data.String"] || {});
+(function(exports) {
+    "use strict";
+
+  exports.charAt = function (i) {
+    return function (s) {
+      if (i >= 0 && i < s.length) return s.charAt(i);
+      throw new Error("Data.String.Unsafe.charAt: Invalid index.");
+    };
+  };
+})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Data.String.Unsafe"];
+  exports["charAt"] = $foreign.charAt;
+})(PS["Data.String.Unsafe"] = PS["Data.String.Unsafe"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Data.String"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Data_String_Unsafe = PS["Data.String.Unsafe"];
+  var Prelude = PS["Prelude"];
+  var Pattern = function (x) {
+      return x;
+  };
+  var uncons = function (v) {
+      if (v === "") {
+          return Data_Maybe.Nothing.value;
+      };
+      return new Data_Maybe.Just({
+          head: Data_String_Unsafe.charAt(0)(v), 
+          tail: $foreign.drop(1)(v)
+      });
+  }; 
+  var $$null = function (s) {
+      return s === "";
+  };              
+  var newtypePattern = new Data_Newtype.Newtype(function (n) {
+      return n;
+  }, Pattern);                                                                                
+  var indexOf = $foreign._indexOf(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);      
+  var charAt = $foreign._charAt(Data_Maybe.Just.create)(Data_Maybe.Nothing.value);
+  exports["Pattern"] = Pattern;
+  exports["charAt"] = charAt;
+  exports["indexOf"] = indexOf;
+  exports["null"] = $$null;
+  exports["uncons"] = uncons;
+  exports["newtypePattern"] = newtypePattern;
+  exports["drop"] = $foreign.drop;
+  exports["fromCharArray"] = $foreign.fromCharArray;
+  exports["length"] = $foreign.length;
+  exports["singleton"] = $foreign.singleton;
+  exports["split"] = $foreign.split;
+  exports["toCharArray"] = $foreign.toCharArray;
+  exports["toLower"] = $foreign.toLower;
+})(PS["Data.String"] = PS["Data.String"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Data.Foreign"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
+  var Control_Monad_Except = PS["Control.Monad.Except"];
+  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Boolean = PS["Data.Boolean"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Function = PS["Data.Function"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Identity = PS["Data.Identity"];
+  var Data_Int = PS["Data.Int"];
+  var Data_List_NonEmpty = PS["Data.List.NonEmpty"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Data_String = PS["Data.String"];
+  var Prelude = PS["Prelude"];        
+  var ForeignError = (function () {
+      function ForeignError(value0) {
+          this.value0 = value0;
+      };
+      ForeignError.create = function (value0) {
+          return new ForeignError(value0);
+      };
+      return ForeignError;
+  })();
+  var TypeMismatch = (function () {
+      function TypeMismatch(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      TypeMismatch.create = function (value0) {
+          return function (value1) {
+              return new TypeMismatch(value0, value1);
+          };
+      };
+      return TypeMismatch;
+  })();
+  var ErrorAtIndex = (function () {
+      function ErrorAtIndex(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      ErrorAtIndex.create = function (value0) {
+          return function (value1) {
+              return new ErrorAtIndex(value0, value1);
+          };
+      };
+      return ErrorAtIndex;
+  })();
+  var ErrorAtProperty = (function () {
+      function ErrorAtProperty(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      ErrorAtProperty.create = function (value0) {
+          return function (value1) {
+              return new ErrorAtProperty(value0, value1);
+          };
+      };
+      return ErrorAtProperty;
+  })();
+  var JSONError = (function () {
+      function JSONError(value0) {
+          this.value0 = value0;
+      };
+      JSONError.create = function (value0) {
+          return new JSONError(value0);
+      };
+      return JSONError;
+  })();
+  var showForeignError = new Data_Show.Show(function (v) {
+      if (v instanceof ForeignError) {
+          return "(ForeignError " + (Data_Show.show(Data_Show.showString)(v.value0) + ")");
+      };
+      if (v instanceof ErrorAtIndex) {
+          return "(ErrorAtIndex " + (Data_Show.show(Data_Show.showInt)(v.value0) + (" " + (Data_Show.show(showForeignError)(v.value1) + ")")));
+      };
+      if (v instanceof ErrorAtProperty) {
+          return "(ErrorAtProperty " + (Data_Show.show(Data_Show.showString)(v.value0) + (" " + (Data_Show.show(showForeignError)(v.value1) + ")")));
+      };
+      if (v instanceof JSONError) {
+          return "(JSONError " + (Data_Show.show(Data_Show.showString)(v.value0) + ")");
+      };
+      if (v instanceof TypeMismatch) {
+          return "(TypeMismatch " + (Data_Show.show(Data_Show.showString)(v.value0) + (" " + (Data_Show.show(Data_Show.showString)(v.value1) + ")")));
+      };
+      throw new Error("Failed pattern match at Data.Foreign line 65, column 3 - line 66, column 3: " + [ v.constructor.name ]);
+  });
+  var fail = function ($121) {
+      return Control_Monad_Error_Class.throwError(Control_Monad_Except_Trans.monadThrowExceptT(Data_Identity.monadIdentity))(Data_List_NonEmpty.singleton($121));
+  };
+  var unsafeReadTagged = function (tag) {
+      return function (value) {
+          if ($foreign.tagOf(value) === tag) {
+              return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Data_Identity.monadIdentity))($foreign.unsafeFromForeign(value));
+          };
+          if (Data_Boolean.otherwise) {
+              return fail(new TypeMismatch(tag, $foreign.tagOf(value)));
+          };
+          throw new Error("Failed pattern match at Data.Foreign line 105, column 1 - line 107, column 54: " + [ tag.constructor.name, value.constructor.name ]);
+      };
+  };
+  var readString = unsafeReadTagged("String");
+  exports["ForeignError"] = ForeignError;
+  exports["TypeMismatch"] = TypeMismatch;
+  exports["ErrorAtIndex"] = ErrorAtIndex;
+  exports["ErrorAtProperty"] = ErrorAtProperty;
+  exports["JSONError"] = JSONError;
+  exports["fail"] = fail;
+  exports["readString"] = readString;
+  exports["unsafeReadTagged"] = unsafeReadTagged;
+  exports["showForeignError"] = showForeignError;
+  exports["toForeign"] = $foreign.toForeign;
+  exports["typeOf"] = $foreign.typeOf;
+})(PS["Data.Foreign"] = PS["Data.Foreign"] || {});
+(function(exports) {
+    "use strict";
+
+  // module Unsafe.Coerce
+
+  exports.unsafeCoerce = function (x) {
+    return x;
+  };
+})(PS["Unsafe.Coerce"] = PS["Unsafe.Coerce"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Unsafe.Coerce"];
+  exports["unsafeCoerce"] = $foreign.unsafeCoerce;
+})(PS["Unsafe.Coerce"] = PS["Unsafe.Coerce"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var DOM_Event_Types = PS["DOM.Event.Types"];
+  var DOM_Util_FFI = PS["DOM.Util.FFI"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Foreign = PS["Data.Foreign"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Prelude = PS["Prelude"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];                           
+  var elementToNode = Unsafe_Coerce.unsafeCoerce;
+  exports["elementToNode"] = elementToNode;
+})(PS["DOM.Node.Types"] = PS["DOM.Node.Types"] || {});
 (function(exports) {
   // Generated by purs version 0.11.4
   "use strict";
@@ -5330,6 +5827,84 @@ var PS = {};
   exports["monadAffAff"] = monadAffAff;
 })(PS["Control.Monad.Aff.Class"] = PS["Control.Monad.Aff.Class"] || {});
 (function(exports) {
+    "use strict";
+
+  exports.mkEffFn1 = function mkEffFn1(fn) {
+    return function(x) {
+      return fn(x)();
+    };
+  };
+
+  exports.runEffFn2 = function runEffFn2(fn) {
+    return function(a) {
+      return function(b) {
+        return function() {
+          return fn(a, b);
+        };
+      };
+    };
+  };
+
+  exports.runEffFn3 = function runEffFn3(fn) {
+    return function(a) {
+      return function(b) {
+        return function(c) {
+          return function() {
+            return fn(a, b, c);
+          };
+        };
+      };
+    };
+  };
+})(PS["Control.Monad.Eff.Uncurried"] = PS["Control.Monad.Eff.Uncurried"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Control.Monad.Eff.Uncurried"];
+  var Control_Monad_Eff = PS["Control.Monad.Eff"];
+  exports["mkEffFn1"] = $foreign.mkEffFn1;
+  exports["runEffFn2"] = $foreign.runEffFn2;
+  exports["runEffFn3"] = $foreign.runEffFn3;
+})(PS["Control.Monad.Eff.Uncurried"] = PS["Control.Monad.Eff.Uncurried"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Monad_Aff = PS["Control.Monad.Aff"];
+  var Control_Monad_Eff = PS["Control.Monad.Eff"];
+  var Control_Monad_Eff_Exception = PS["Control.Monad.Eff.Exception"];
+  var Control_Monad_Eff_Uncurried = PS["Control.Monad.Eff.Uncurried"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Function = PS["Data.Function"];
+  var Prelude = PS["Prelude"];
+  var fromEffFnAff = function (v) {
+      return Control_Monad_Aff.makeAff(function (k) {
+          return function __do() {
+              var v1 = Control_Monad_Eff_Uncurried.runEffFn2(v)(Control_Monad_Eff_Uncurried.mkEffFn1(function ($4) {
+                  return k(Data_Either.Left.create($4));
+              }))(Control_Monad_Eff_Uncurried.mkEffFn1(function ($5) {
+                  return k(Data_Either.Right.create($5));
+              }))();
+              return function (e) {
+                  return Control_Monad_Aff.makeAff(function (k2) {
+                      return function __do() {
+                          Control_Monad_Eff_Uncurried.runEffFn3(v1)(e)(Control_Monad_Eff_Uncurried.mkEffFn1(function ($6) {
+                              return k2(Data_Either.Left.create($6));
+                          }))(Control_Monad_Eff_Uncurried.mkEffFn1(function ($7) {
+                              return k2(Data_Either.Right.create($7));
+                          }))();
+                          return Control_Monad_Aff.nonCanceler;
+                      };
+                  });
+              };
+          };
+      });
+  };
+  exports["fromEffFnAff"] = fromEffFnAff;
+})(PS["Control.Monad.Aff.Compat"] = PS["Control.Monad.Aff.Compat"] || {});
+(function(exports) {
   // Generated by purs version 0.11.4
   "use strict";
   var Control_Monad_Aff = PS["Control.Monad.Aff"];
@@ -5392,134 +5967,6 @@ var PS = {};
   exports["suspend"] = suspend;
   exports["monadForkAff"] = monadForkAff;
 })(PS["Control.Monad.Fork.Class"] = PS["Control.Monad.Fork.Class"] || {});
-(function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
-  var Control_Alt = PS["Control.Alt"];
-  var Control_Alternative = PS["Control.Alternative"];
-  var Control_Applicative = PS["Control.Applicative"];
-  var Control_Apply = PS["Control.Apply"];
-  var Control_Bind = PS["Control.Bind"];
-  var Control_Category = PS["Control.Category"];
-  var Control_Lazy = PS["Control.Lazy"];
-  var Control_Monad_Rec_Class = PS["Control.Monad.Rec.Class"];
-  var Control_Semigroupoid = PS["Control.Semigroupoid"];
-  var Data_Bifunctor = PS["Data.Bifunctor"];
-  var Data_Boolean = PS["Data.Boolean"];
-  var Data_Eq = PS["Data.Eq"];
-  var Data_Foldable = PS["Data.Foldable"];
-  var Data_Function = PS["Data.Function"];
-  var Data_Functor = PS["Data.Functor"];
-  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
-  var Data_List_Types = PS["Data.List.Types"];
-  var Data_Maybe = PS["Data.Maybe"];
-  var Data_Newtype = PS["Data.Newtype"];
-  var Data_NonEmpty = PS["Data.NonEmpty"];
-  var Data_Ord = PS["Data.Ord"];
-  var Data_Ordering = PS["Data.Ordering"];
-  var Data_Ring = PS["Data.Ring"];
-  var Data_Semigroup = PS["Data.Semigroup"];
-  var Data_Semiring = PS["Data.Semiring"];
-  var Data_Show = PS["Data.Show"];
-  var Data_Traversable = PS["Data.Traversable"];
-  var Data_Tuple = PS["Data.Tuple"];
-  var Data_Unfoldable = PS["Data.Unfoldable"];
-  var Data_Unit = PS["Data.Unit"];
-  var Prelude = PS["Prelude"];                                                   
-  var uncons = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return Data_Maybe.Nothing.value;
-      };
-      if (v instanceof Data_List_Types.Cons) {
-          return new Data_Maybe.Just({
-              head: v.value0, 
-              tail: v.value1
-          });
-      };
-      throw new Error("Failed pattern match at Data.List line 259, column 1 - line 259, column 21: " + [ v.constructor.name ]);
-  };
-  var toUnfoldable = function (dictUnfoldable) {
-      return Data_Unfoldable.unfoldr(dictUnfoldable)(function (xs) {
-          return Data_Functor.map(Data_Maybe.functorMaybe)(function (rec) {
-              return new Data_Tuple.Tuple(rec.head, rec.tail);
-          })(uncons(xs));
-      });
-  };
-  var tail = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return Data_Maybe.Nothing.value;
-      };
-      if (v instanceof Data_List_Types.Cons) {
-          return new Data_Maybe.Just(v.value1);
-      };
-      throw new Error("Failed pattern match at Data.List line 245, column 1 - line 245, column 19: " + [ v.constructor.name ]);
-  };
-  var reverse = (function () {
-      var go = function (__copy_acc) {
-          return function (__copy_v) {
-              var __tco_acc = __copy_acc;
-              var __tco_done = false;
-              var __tco_result;
-              function __tco_loop(acc, v) {
-                  if (v instanceof Data_List_Types.Nil) {
-                      __tco_done = true;
-                      return acc;
-                  };
-                  if (v instanceof Data_List_Types.Cons) {
-                      __tco_acc = new Data_List_Types.Cons(v.value0, acc);
-                      __copy_v = v.value1;
-                      return;
-                  };
-                  throw new Error("Failed pattern match at Data.List line 365, column 11 - line 368, column 36: " + [ acc.constructor.name, v.constructor.name ]);
-              };
-              while (!__tco_done) {
-                  __tco_result = __tco_loop(__tco_acc, __copy_v);
-              };
-              return __tco_result;
-          };
-      };
-      return go(Data_List_Types.Nil.value);
-  })();
-  var $$null = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return true;
-      };
-      return false;
-  };
-  var some = function (dictAlternative) {
-      return function (dictLazy) {
-          return function (v) {
-              return Control_Apply.apply((dictAlternative.Applicative0()).Apply0())(Data_Functor.map(((dictAlternative.Plus1()).Alt0()).Functor0())(Data_List_Types.Cons.create)(v))(Control_Lazy.defer(dictLazy)(function (v1) {
-                  return many(dictAlternative)(dictLazy)(v);
-              }));
-          };
-      };
-  };
-  var many = function (dictAlternative) {
-      return function (dictLazy) {
-          return function (v) {
-              return Control_Alt.alt((dictAlternative.Plus1()).Alt0())(some(dictAlternative)(dictLazy)(v))(Control_Applicative.pure(dictAlternative.Applicative0())(Data_List_Types.Nil.value));
-          };
-      };
-  };
-  var head = function (v) {
-      if (v instanceof Data_List_Types.Nil) {
-          return Data_Maybe.Nothing.value;
-      };
-      if (v instanceof Data_List_Types.Cons) {
-          return new Data_Maybe.Just(v.value0);
-      };
-      throw new Error("Failed pattern match at Data.List line 230, column 1 - line 230, column 19: " + [ v.constructor.name ]);
-  };
-  exports["head"] = head;
-  exports["many"] = many;
-  exports["null"] = $$null;
-  exports["reverse"] = reverse;
-  exports["some"] = some;
-  exports["tail"] = tail;
-  exports["toUnfoldable"] = toUnfoldable;
-  exports["uncons"] = uncons;
-})(PS["Data.List"] = PS["Data.List"] || {});
 (function(exports) {
   // Generated by purs version 0.11.4
   "use strict";
@@ -6194,6 +6641,30 @@ var PS = {};
   };
   exports["querySelector"] = querySelector;
 })(PS["DOM.Node.ParentNode"] = PS["DOM.Node.ParentNode"] || {});
+(function(exports) {
+    "use strict";
+
+  exports._jsonParser = function (fail, succ, s) {
+    try {
+      return succ(JSON.parse(s));
+    }
+    catch (e) {
+      return fail(e.message);
+    }
+  };
+})(PS["Data.Argonaut.Parser"] = PS["Data.Argonaut.Parser"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Data.Argonaut.Parser"];
+  var Data_Argonaut_Core = PS["Data.Argonaut.Core"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];        
+  var jsonParser = function (j) {
+      return $foreign._jsonParser(Data_Either.Left.create, Data_Either.Right.create, j);
+  };
+  exports["jsonParser"] = jsonParser;
+})(PS["Data.Argonaut.Parser"] = PS["Data.Argonaut.Parser"] || {});
 (function(exports) {
     "use strict";       
 
@@ -24683,6 +25154,208 @@ var PS = {};
 (function(exports) {
   // Generated by purs version 0.11.4
   "use strict";
+  var Control_Apply = PS["Control.Apply"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Generic = PS["Data.Generic"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Ordering = PS["Data.Ordering"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Data_String = PS["Data.String"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];        
+  var OPTIONS = (function () {
+      function OPTIONS() {
+
+      };
+      OPTIONS.value = new OPTIONS();
+      return OPTIONS;
+  })();
+  var GET = (function () {
+      function GET() {
+
+      };
+      GET.value = new GET();
+      return GET;
+  })();
+  var HEAD = (function () {
+      function HEAD() {
+
+      };
+      HEAD.value = new HEAD();
+      return HEAD;
+  })();
+  var POST = (function () {
+      function POST() {
+
+      };
+      POST.value = new POST();
+      return POST;
+  })();
+  var PUT = (function () {
+      function PUT() {
+
+      };
+      PUT.value = new PUT();
+      return PUT;
+  })();
+  var DELETE = (function () {
+      function DELETE() {
+
+      };
+      DELETE.value = new DELETE();
+      return DELETE;
+  })();
+  var TRACE = (function () {
+      function TRACE() {
+
+      };
+      TRACE.value = new TRACE();
+      return TRACE;
+  })();
+  var CONNECT = (function () {
+      function CONNECT() {
+
+      };
+      CONNECT.value = new CONNECT();
+      return CONNECT;
+  })();
+  var PROPFIND = (function () {
+      function PROPFIND() {
+
+      };
+      PROPFIND.value = new PROPFIND();
+      return PROPFIND;
+  })();
+  var PROPPATCH = (function () {
+      function PROPPATCH() {
+
+      };
+      PROPPATCH.value = new PROPPATCH();
+      return PROPPATCH;
+  })();
+  var MKCOL = (function () {
+      function MKCOL() {
+
+      };
+      MKCOL.value = new MKCOL();
+      return MKCOL;
+  })();
+  var COPY = (function () {
+      function COPY() {
+
+      };
+      COPY.value = new COPY();
+      return COPY;
+  })();
+  var MOVE = (function () {
+      function MOVE() {
+
+      };
+      MOVE.value = new MOVE();
+      return MOVE;
+  })();
+  var LOCK = (function () {
+      function LOCK() {
+
+      };
+      LOCK.value = new LOCK();
+      return LOCK;
+  })();
+  var UNLOCK = (function () {
+      function UNLOCK() {
+
+      };
+      UNLOCK.value = new UNLOCK();
+      return UNLOCK;
+  })();
+  var PATCH = (function () {
+      function PATCH() {
+
+      };
+      PATCH.value = new PATCH();
+      return PATCH;
+  })();
+  var unCustomMethod = function (v) {
+      return v;
+  };
+  var showMethod = new Data_Show.Show(function (v) {
+      if (v instanceof OPTIONS) {
+          return "OPTIONS";
+      };
+      if (v instanceof GET) {
+          return "GET";
+      };
+      if (v instanceof HEAD) {
+          return "HEAD";
+      };
+      if (v instanceof POST) {
+          return "POST";
+      };
+      if (v instanceof PUT) {
+          return "PUT";
+      };
+      if (v instanceof DELETE) {
+          return "DELETE";
+      };
+      if (v instanceof TRACE) {
+          return "TRACE";
+      };
+      if (v instanceof CONNECT) {
+          return "CONNECT";
+      };
+      if (v instanceof PROPFIND) {
+          return "PROPFIND";
+      };
+      if (v instanceof PROPPATCH) {
+          return "PROPPATCH";
+      };
+      if (v instanceof MKCOL) {
+          return "MKCOL";
+      };
+      if (v instanceof COPY) {
+          return "COPY";
+      };
+      if (v instanceof MOVE) {
+          return "MOVE";
+      };
+      if (v instanceof LOCK) {
+          return "LOCK";
+      };
+      if (v instanceof UNLOCK) {
+          return "UNLOCK";
+      };
+      if (v instanceof PATCH) {
+          return "PATCH";
+      };
+      throw new Error("Failed pattern match at Data.HTTP.Method line 43, column 3 - line 44, column 3: " + [ v.constructor.name ]);
+  });
+  var print = Data_Either.either(Data_Show.show(showMethod))(unCustomMethod);
+  exports["OPTIONS"] = OPTIONS;
+  exports["GET"] = GET;
+  exports["HEAD"] = HEAD;
+  exports["POST"] = POST;
+  exports["PUT"] = PUT;
+  exports["DELETE"] = DELETE;
+  exports["TRACE"] = TRACE;
+  exports["CONNECT"] = CONNECT;
+  exports["PROPFIND"] = PROPFIND;
+  exports["PROPPATCH"] = PROPPATCH;
+  exports["MKCOL"] = MKCOL;
+  exports["COPY"] = COPY;
+  exports["MOVE"] = MOVE;
+  exports["LOCK"] = LOCK;
+  exports["UNLOCK"] = UNLOCK;
+  exports["PATCH"] = PATCH;
+  exports["print"] = print;
+  exports["unCustomMethod"] = unCustomMethod;
+  exports["showMethod"] = showMethod;
+})(PS["Data.HTTP.Method"] = PS["Data.HTTP.Method"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Apply = PS["Control.Apply"];
   var Control_Category = PS["Control.Category"];
@@ -25389,6 +26062,28 @@ var PS = {};
   exports["functorMap"] = functorMap;
   exports["foldableMap"] = foldableMap;
 })(PS["Data.Map"] = PS["Data.Map"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Apply = PS["Control.Apply"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Generic = PS["Data.Generic"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Ord = PS["Data.Ord"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];        
+  var MediaType = function (x) {
+      return x;
+  }; 
+  var newtypeMediaType = new Data_Newtype.Newtype(function (n) {
+      return n;
+  }, MediaType);
+  exports["MediaType"] = MediaType;
+  exports["newtypeMediaType"] = newtypeMediaType;
+})(PS["Data.MediaType"] = PS["Data.MediaType"] || {});
 (function(exports) {
     "use strict";
 
@@ -26827,6 +27522,13 @@ var PS = {};
           return HalogenM(Control_Monad_Free.liftF(Lift.create(Control_Monad_Eff_Class.liftEff(dictMonadEff)(eff))));
       });
   };
+  var monadAffHalogenM = function (dictMonadAff) {
+      return new Control_Monad_Aff_Class.MonadAff(function () {
+          return monadEffHalogenM(dictMonadAff.MonadEff0());
+      }, function (aff) {
+          return HalogenM(Control_Monad_Free.liftF(Lift.create(Control_Monad_Aff_Class.liftAff(dictMonadAff)(aff))));
+      });
+  };
   var monadStateHalogenM = new Control_Monad_State_Class.MonadState(function () {
       return monadHalogenM;
   }, function ($180) {
@@ -26855,6 +27557,7 @@ var PS = {};
   exports["bindHalogenM"] = bindHalogenM;
   exports["monadHalogenM"] = monadHalogenM;
   exports["monadEffHalogenM"] = monadEffHalogenM;
+  exports["monadAffHalogenM"] = monadAffHalogenM;
   exports["monadStateHalogenM"] = monadStateHalogenM;
 })(PS["Halogen.Query.HalogenM"] = PS["Halogen.Query.HalogenM"] || {});
 (function(exports) {
@@ -28310,6 +29013,473 @@ var PS = {};
   };
   exports["runUI"] = runUI;
 })(PS["Halogen.VDom.Driver"] = PS["Halogen.VDom.Driver"] || {});
+(function(exports) {
+  /* global exports */
+  /* global XMLHttpRequest */
+  /* global module */
+  /* global process */
+  "use strict";
+
+  exports._ajax = function () {
+    var platformSpecific = { };
+    if (typeof module !== "undefined" && module.require && !(typeof process !== "undefined" && process.versions["electron"])) {
+      // We are on node.js
+      platformSpecific.newXHR = function () {
+        var XHR = module.require("xhr2");
+        return new XHR();
+      };
+
+      platformSpecific.fixupUrl = function (url) {
+        var urllib = module.require("url");
+        var u = urllib.parse(url);
+        u.protocol = u.protocol || "http:";
+        u.hostname = u.hostname || "localhost";
+        return urllib.format(u);
+      };
+
+      platformSpecific.getResponse = function (xhr) {
+        return xhr.response;
+      };
+    } else {
+      // We are in the browser
+      platformSpecific.newXHR = function () {
+        return new XMLHttpRequest();
+      };
+
+      platformSpecific.fixupUrl = function (url) {
+        return url || "/";
+      };
+
+      platformSpecific.getResponse = function (xhr) {
+        return xhr.response;
+      };
+    }
+
+    return function (mkHeader, options) {
+      return function (errback, callback) {
+        var xhr = platformSpecific.newXHR();
+        var fixedUrl = platformSpecific.fixupUrl(options.url);
+        xhr.open(options.method || "GET", fixedUrl, true, options.username, options.password);
+        if (options.headers) {
+          try {
+            for (var i = 0, header; (header = options.headers[i]) != null; i++) {
+              xhr.setRequestHeader(header.field, header.value);
+            }
+          } catch (e) {
+            errback(e);
+          }
+        }
+        xhr.onerror = function () {
+          errback(new Error("AJAX request failed: " + options.method + " " + options.url));
+        };
+        xhr.onload = function () {
+          callback({
+            status: xhr.status,
+            headers: xhr.getAllResponseHeaders().split("\r\n")
+              .filter(function (header) {
+                return header.length > 0;
+              })
+              .map(function (header) {
+                var i = header.indexOf(":");
+                return mkHeader(header.substring(0, i))(header.substring(i + 2));
+              }),
+            response: platformSpecific.getResponse(xhr)
+          });
+        };
+        xhr.responseType = options.responseType;
+        xhr.withCredentials = options.withCredentials;
+        xhr.send(options.content);
+
+        return function (/* error */) {
+          return function (cancelErrback, cancelCallback) {
+            try {
+              xhr.abort();
+            } catch (e) {
+              return cancelErrback(e);
+            }
+            return cancelCallback();
+          };
+        };
+      };
+    };
+  }();
+})(PS["Network.HTTP.Affjax"] = PS["Network.HTTP.Affjax"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var DOM_File_Types = PS["DOM.File.Types"];
+  var DOM_Node_Types = PS["DOM.Node.Types"];
+  var DOM_XHR_Types = PS["DOM.XHR.Types"];
+  var Data_Argonaut_Core = PS["Data.Argonaut.Core"];
+  var Data_ArrayBuffer_Types = PS["Data.ArrayBuffer.Types"];
+  var Data_FormURLEncoded = PS["Data.FormURLEncoded"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_MediaType = PS["Data.MediaType"];
+  var Data_MediaType_Common = PS["Data.MediaType.Common"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Prelude = PS["Prelude"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];        
+  var Requestable = function (toRequest) {
+      this.toRequest = toRequest;
+  };
+  var toRequest = function (dict) {
+      return dict.toRequest;
+  }; 
+  var defaultToRequest = function ($0) {
+      return Data_Tuple.Tuple.create(Data_Maybe.Nothing.value)(Unsafe_Coerce.unsafeCoerce($0));
+  };                                                                   
+  var requestableUnit = new Requestable(defaultToRequest);
+  exports["Requestable"] = Requestable;
+  exports["toRequest"] = toRequest;
+  exports["requestableUnit"] = requestableUnit;
+})(PS["Network.HTTP.Affjax.Request"] = PS["Network.HTTP.Affjax.Request"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var DOM_File_Types = PS["DOM.File.Types"];
+  var DOM_Node_Types = PS["DOM.Node.Types"];
+  var Data_Argonaut_Core = PS["Data.Argonaut.Core"];
+  var Data_ArrayBuffer_Types = PS["Data.ArrayBuffer.Types"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Foreign = PS["Data.Foreign"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Identity = PS["Data.Identity"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_MediaType = PS["Data.MediaType"];
+  var Data_MediaType_Common = PS["Data.MediaType.Common"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];
+  var Unsafe_Coerce = PS["Unsafe.Coerce"];        
+  var ArrayBufferResponse = (function () {
+      function ArrayBufferResponse() {
+
+      };
+      ArrayBufferResponse.value = new ArrayBufferResponse();
+      return ArrayBufferResponse;
+  })();
+  var BlobResponse = (function () {
+      function BlobResponse() {
+
+      };
+      BlobResponse.value = new BlobResponse();
+      return BlobResponse;
+  })();
+  var DocumentResponse = (function () {
+      function DocumentResponse() {
+
+      };
+      DocumentResponse.value = new DocumentResponse();
+      return DocumentResponse;
+  })();
+  var JSONResponse = (function () {
+      function JSONResponse() {
+
+      };
+      JSONResponse.value = new JSONResponse();
+      return JSONResponse;
+  })();
+  var StringResponse = (function () {
+      function StringResponse() {
+
+      };
+      StringResponse.value = new StringResponse();
+      return StringResponse;
+  })();
+  var Respondable = function (fromResponse, responseType) {
+      this.fromResponse = fromResponse;
+      this.responseType = responseType;
+  }; 
+  var responseTypeToString = function (v) {
+      if (v instanceof ArrayBufferResponse) {
+          return "arraybuffer";
+      };
+      if (v instanceof BlobResponse) {
+          return "blob";
+      };
+      if (v instanceof DocumentResponse) {
+          return "document";
+      };
+      if (v instanceof JSONResponse) {
+          return "text";
+      };
+      if (v instanceof StringResponse) {
+          return "text";
+      };
+      throw new Error("Failed pattern match at Network.HTTP.Affjax.Response line 49, column 1 - line 50, column 1: " + [ v.constructor.name ]);
+  };
+  var responseType = function (dict) {
+      return dict.responseType;
+  };                                                                                                                                                                                                                                                        
+  var responsableString = new Respondable(Data_Foreign.readString, new Data_Tuple.Tuple(Data_Maybe.Nothing.value, StringResponse.value));                               
+  var fromResponse = function (dict) {
+      return dict.fromResponse;
+  };
+  exports["ArrayBufferResponse"] = ArrayBufferResponse;
+  exports["BlobResponse"] = BlobResponse;
+  exports["DocumentResponse"] = DocumentResponse;
+  exports["JSONResponse"] = JSONResponse;
+  exports["StringResponse"] = StringResponse;
+  exports["Respondable"] = Respondable;
+  exports["fromResponse"] = fromResponse;
+  exports["responseType"] = responseType;
+  exports["responseTypeToString"] = responseTypeToString;
+  exports["responsableString"] = responsableString;
+})(PS["Network.HTTP.Affjax.Response"] = PS["Network.HTTP.Affjax.Response"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Data_Eq = PS["Data.Eq"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_MediaType = PS["Data.MediaType"];
+  var Data_Newtype = PS["Data.Newtype"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Prelude = PS["Prelude"];        
+  var Accept = (function () {
+      function Accept(value0) {
+          this.value0 = value0;
+      };
+      Accept.create = function (value0) {
+          return new Accept(value0);
+      };
+      return Accept;
+  })();
+  var ContentType = (function () {
+      function ContentType(value0) {
+          this.value0 = value0;
+      };
+      ContentType.create = function (value0) {
+          return new ContentType(value0);
+      };
+      return ContentType;
+  })();
+  var RequestHeader = (function () {
+      function RequestHeader(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      RequestHeader.create = function (value0) {
+          return function (value1) {
+              return new RequestHeader(value0, value1);
+          };
+      };
+      return RequestHeader;
+  })();
+  var requestHeaderValue = function (v) {
+      if (v instanceof Accept) {
+          return Data_Newtype.unwrap(Data_MediaType.newtypeMediaType)(v.value0);
+      };
+      if (v instanceof ContentType) {
+          return Data_Newtype.unwrap(Data_MediaType.newtypeMediaType)(v.value0);
+      };
+      if (v instanceof RequestHeader) {
+          return v.value1;
+      };
+      throw new Error("Failed pattern match at Network.HTTP.RequestHeader line 30, column 1 - line 30, column 41: " + [ v.constructor.name ]);
+  };
+  var requestHeaderName = function (v) {
+      if (v instanceof Accept) {
+          return "Accept";
+      };
+      if (v instanceof ContentType) {
+          return "Content-Type";
+      };
+      if (v instanceof RequestHeader) {
+          return v.value0;
+      };
+      throw new Error("Failed pattern match at Network.HTTP.RequestHeader line 25, column 1 - line 26, column 1: " + [ v.constructor.name ]);
+  };
+  exports["Accept"] = Accept;
+  exports["ContentType"] = ContentType;
+  exports["RequestHeader"] = RequestHeader;
+  exports["requestHeaderName"] = requestHeaderName;
+  exports["requestHeaderValue"] = requestHeaderValue;
+})(PS["Network.HTTP.RequestHeader"] = PS["Network.HTTP.RequestHeader"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var Control_Apply = PS["Control.Apply"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Generic = PS["Data.Generic"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_Semigroup = PS["Data.Semigroup"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Unit = PS["Data.Unit"];
+  var Prelude = PS["Prelude"];        
+  var ResponseHeader = (function () {
+      function ResponseHeader(value0, value1) {
+          this.value0 = value0;
+          this.value1 = value1;
+      };
+      ResponseHeader.create = function (value0) {
+          return function (value1) {
+              return new ResponseHeader(value0, value1);
+          };
+      };
+      return ResponseHeader;
+  })();
+  var responseHeader = function (field) {
+      return function (value) {
+          return new ResponseHeader(field, value);
+      };
+  };
+  exports["responseHeader"] = responseHeader;
+})(PS["Network.HTTP.ResponseHeader"] = PS["Network.HTTP.ResponseHeader"] || {});
+(function(exports) {
+  // Generated by purs version 0.11.4
+  "use strict";
+  var $foreign = PS["Network.HTTP.Affjax"];
+  var Control_Applicative = PS["Control.Applicative"];
+  var Control_Bind = PS["Control.Bind"];
+  var Control_Monad_Aff = PS["Control.Monad.Aff"];
+  var Control_Monad_Aff_Compat = PS["Control.Monad.Aff.Compat"];
+  var Control_Monad_Eff = PS["Control.Monad.Eff"];
+  var Control_Monad_Eff_Class = PS["Control.Monad.Eff.Class"];
+  var Control_Monad_Eff_Exception = PS["Control.Monad.Eff.Exception"];
+  var Control_Monad_Eff_Ref = PS["Control.Monad.Eff.Ref"];
+  var Control_Monad_Error_Class = PS["Control.Monad.Error.Class"];
+  var Control_Monad_Except = PS["Control.Monad.Except"];
+  var Control_Monad_Except_Trans = PS["Control.Monad.Except.Trans"];
+  var Control_Parallel = PS["Control.Parallel"];
+  var Control_Semigroupoid = PS["Control.Semigroupoid"];
+  var Data_Argonaut_Parser = PS["Data.Argonaut.Parser"];
+  var Data_Array = PS["Data.Array"];
+  var Data_Either = PS["Data.Either"];
+  var Data_Eq = PS["Data.Eq"];
+  var Data_Foldable = PS["Data.Foldable"];
+  var Data_Foreign = PS["Data.Foreign"];
+  var Data_Function = PS["Data.Function"];
+  var Data_Function_Uncurried = PS["Data.Function.Uncurried"];
+  var Data_Functor = PS["Data.Functor"];
+  var Data_HTTP_Method = PS["Data.HTTP.Method"];
+  var Data_HeytingAlgebra = PS["Data.HeytingAlgebra"];
+  var Data_Identity = PS["Data.Identity"];
+  var Data_Int = PS["Data.Int"];
+  var Data_List_Types = PS["Data.List.Types"];
+  var Data_Maybe = PS["Data.Maybe"];
+  var Data_MediaType = PS["Data.MediaType"];
+  var Data_Nullable = PS["Data.Nullable"];
+  var Data_Ring = PS["Data.Ring"];
+  var Data_Semiring = PS["Data.Semiring"];
+  var Data_Show = PS["Data.Show"];
+  var Data_Time_Duration = PS["Data.Time.Duration"];
+  var Data_Tuple = PS["Data.Tuple"];
+  var $$Math = PS["Math"];
+  var Network_HTTP_Affjax_Request = PS["Network.HTTP.Affjax.Request"];
+  var Network_HTTP_Affjax_Response = PS["Network.HTTP.Affjax.Response"];
+  var Network_HTTP_RequestHeader = PS["Network.HTTP.RequestHeader"];
+  var Network_HTTP_ResponseHeader = PS["Network.HTTP.ResponseHeader"];
+  var Network_HTTP_StatusCode = PS["Network.HTTP.StatusCode"];
+  var Prelude = PS["Prelude"];
+  var defaultRequest = {
+      method: new Data_Either.Left(Data_HTTP_Method.GET.value), 
+      url: "/", 
+      headers: [  ], 
+      content: Data_Maybe.Nothing.value, 
+      username: Data_Maybe.Nothing.value, 
+      password: Data_Maybe.Nothing.value, 
+      withCredentials: false
+  };
+  var affjax = function (dictRequestable) {
+      return function (dictRespondable) {
+          return function (req) {
+              var responseSettings = Network_HTTP_Affjax_Response.responseType(dictRespondable);
+              var requestSettings = (function () {
+                  var v = Data_Functor.map(Data_Maybe.functorMaybe)(Network_HTTP_Affjax_Request.toRequest(dictRequestable))(req.content);
+                  if (v instanceof Data_Maybe.Nothing) {
+                      return new Data_Tuple.Tuple(Data_Maybe.Nothing.value, Data_Maybe.Nothing.value);
+                  };
+                  if (v instanceof Data_Maybe.Just) {
+                      return new Data_Tuple.Tuple(v.value0.value0, new Data_Maybe.Just(v.value0.value1));
+                  };
+                  throw new Error("Failed pattern match at Network.HTTP.Affjax line 250, column 21 - line 252, column 49: " + [ v.constructor.name ]);
+              })();
+              var parseJSON = function ($98) {
+                  return Data_Either.either(function ($99) {
+                      return Data_Foreign.fail(Data_Foreign.JSONError.create($99));
+                  })(function ($100) {
+                      return Control_Applicative.pure(Control_Monad_Except_Trans.applicativeExceptT(Data_Identity.monadIdentity))(Data_Foreign.toForeign($100));
+                  })(Data_Argonaut_Parser.jsonParser($98));
+              };
+              var fromResponse$prime = (function () {
+                  var v = Data_Tuple.snd(responseSettings);
+                  if (v instanceof Network_HTTP_Affjax_Response.JSONResponse) {
+                      return Control_Bind.composeKleisliFlipped(Control_Monad_Except_Trans.bindExceptT(Data_Identity.monadIdentity))(Network_HTTP_Affjax_Response.fromResponse(dictRespondable))(Control_Bind.composeKleisliFlipped(Control_Monad_Except_Trans.bindExceptT(Data_Identity.monadIdentity))(parseJSON)(Data_Foreign.readString));
+                  };
+                  return Network_HTTP_Affjax_Response.fromResponse(dictRespondable);
+              })();
+              var addHeader = function (mh) {
+                  return function (hs) {
+                      if (mh instanceof Data_Maybe.Just && !Data_Foldable.any(Data_Foldable.foldableArray)(Data_HeytingAlgebra.heytingAlgebraBoolean)(Data_Function.on(Data_Eq.eq(Data_Eq.eqString))(Network_HTTP_RequestHeader.requestHeaderName)(mh.value0))(hs)) {
+                          return Data_Array.snoc(hs)(mh.value0);
+                      };
+                      return hs;
+                  };
+              };
+              var headers = addHeader(Data_Functor.map(Data_Maybe.functorMaybe)(Network_HTTP_RequestHeader.ContentType.create)(Data_Tuple.fst(requestSettings)))(addHeader(Data_Functor.map(Data_Maybe.functorMaybe)(Network_HTTP_RequestHeader.Accept.create)(Data_Tuple.fst(responseSettings)))(req.headers));
+              var req$prime = {
+                  method: Data_HTTP_Method.print(req.method), 
+                  url: req.url, 
+                  headers: Data_Functor.map(Data_Functor.functorArray)(function (h) {
+                      return {
+                          field: Network_HTTP_RequestHeader.requestHeaderName(h), 
+                          value: Network_HTTP_RequestHeader.requestHeaderValue(h)
+                      };
+                  })(headers), 
+                  content: Data_Nullable.toNullable(Data_Tuple.snd(requestSettings)), 
+                  responseType: Network_HTTP_Affjax_Response.responseTypeToString(Data_Tuple.snd(responseSettings)), 
+                  username: Data_Nullable.toNullable(req.username), 
+                  password: Data_Nullable.toNullable(req.password), 
+                  withCredentials: req.withCredentials
+              };
+              return Control_Bind.bind(Control_Monad_Aff.bindAff)(Control_Monad_Aff_Compat.fromEffFnAff($foreign._ajax(Network_HTTP_ResponseHeader.responseHeader, req$prime)))(function (v) {
+                  var v1 = Data_Functor.map(Data_Either.functorEither)(function (v2) {
+                      var $68 = {};
+                      for (var $69 in v) {
+                          if ({}.hasOwnProperty.call(v, $69)) {
+                              $68[$69] = v[$69];
+                          };
+                      };
+                      $68.response = v2;
+                      return $68;
+                  })(Control_Monad_Except.runExcept(fromResponse$prime(v.response)));
+                  if (v1 instanceof Data_Either.Left) {
+                      return Control_Monad_Error_Class.throwError(Control_Monad_Aff.monadThrowAff)(Control_Monad_Eff_Exception.error(Data_Show.show(Data_List_Types.showNonEmptyList(Data_Foreign.showForeignError))(v1.value0)));
+                  };
+                  if (v1 instanceof Data_Either.Right) {
+                      return Control_Applicative.pure(Control_Monad_Aff.applicativeAff)(v1.value0);
+                  };
+                  throw new Error("Failed pattern match at Network.HTTP.Affjax line 232, column 3 - line 234, column 28: " + [ v1.constructor.name ]);
+              });
+          };
+      };
+  };                                                                   
+  var get = function (dictRespondable) {
+      return function (u) {
+          return affjax(Network_HTTP_Affjax_Request.requestableUnit)(dictRespondable)((function () {
+              var $77 = {};
+              for (var $78 in defaultRequest) {
+                  if ({}.hasOwnProperty.call(defaultRequest, $78)) {
+                      $77[$78] = defaultRequest[$78];
+                  };
+              };
+              $77.url = u;
+              return $77;
+          })());
+      };
+  };
+  exports["affjax"] = affjax;
+  exports["defaultRequest"] = defaultRequest;
+  exports["get"] = get;
+})(PS["Network.HTTP.Affjax"] = PS["Network.HTTP.Affjax"] || {});
 (function(exports) {
     "use strict";
   var Ace = PS["Ace"];
@@ -30125,12 +31295,12 @@ var PS = {};
   exports["uncapitalizedString"] = uncapitalizedString;
 })(PS["Perspectives.ContextRoleParser"] = PS["Perspectives.ContextRoleParser"] || {});
 (function(exports) {
-  // Generated by purs version 0.11.4
-  "use strict";
+    "use strict";
   var Ace_Types = PS["Ace.Types"];
   var Control_Applicative = PS["Control.Applicative"];
   var Control_Bind = PS["Control.Bind"];
   var Control_Monad_Aff = PS["Control.Monad.Aff"];
+  var Control_Monad_Aff_Class = PS["Control.Monad.Aff.Class"];
   var Control_Monad_Eff = PS["Control.Monad.Eff"];
   var Control_Monad_Eff_Console = PS["Control.Monad.Eff.Console"];
   var Control_Monad_State_Class = PS["Control.Monad.State.Class"];
@@ -30154,12 +31324,16 @@ var PS = {};
   var Halogen_Query = PS["Halogen.Query"];
   var Halogen_Query_HalogenM = PS["Halogen.Query.HalogenM"];
   var Halogen_VDom_Driver = PS["Halogen.VDom.Driver"];
+  var Network_HTTP_Affjax = PS["Network.HTTP.Affjax"];
+  var Network_HTTP_Affjax_Response = PS["Network.HTTP.Affjax.Response"];
   var PerspectAceComponent = PS["PerspectAceComponent"];
   var Perspectives_ContextRoleParser = PS["Perspectives.ContextRoleParser"];
   var Perspectives_IndentParser = PS["Perspectives.IndentParser"];
   var Perspectives_Syntax2 = PS["Perspectives.Syntax2"];
   var Prelude = PS["Prelude"];
   var Text_Parsing_Parser = PS["Text.Parsing.Parser"];        
+
+  // | The query algebra for the app.
   var ClearText = (function () {
       function ClearText(value0) {
           this.value0 = value0;
@@ -30169,6 +31343,8 @@ var PS = {};
       };
       return ClearText;
   })();
+
+  // | The query algebra for the app.
   var HandleAceUpdate = (function () {
       function HandleAceUpdate(value0, value1) {
           this.value0 = value0;
@@ -30181,6 +31357,19 @@ var PS = {};
       };
       return HandleAceUpdate;
   })();
+
+  // | The query algebra for the app.
+  var Load = (function () {
+      function Load(value0) {
+          this.value0 = value0;
+      };
+      Load.create = function (value0) {
+          return new Load(value0);
+      };
+      return Load;
+  })();
+
+  // | The slot address type for the Ace component.
   var AceSlot = (function () {
       function AceSlot() {
 
@@ -30203,6 +31392,8 @@ var PS = {};
           return Data_Ordering.EQ.value;
       };
   });
+
+  // | The main UI component definition.
   var ui = (function () {
       var initialState = {
           text: ""
@@ -30211,7 +31402,7 @@ var PS = {};
           return Data_Maybe.Just.create(Halogen_Query.action(HandleAceUpdate.create(parse(v.value0))));
       };
       var render = function (v) {
-          return Halogen_HTML_Elements.div_([ Halogen_HTML_Elements.h1_([ Halogen_HTML_Core.text("ace editor") ]), Halogen_HTML_Elements.div_([ Halogen_HTML_Elements.p_([ Halogen_HTML_Elements.button([ Halogen_HTML_Events.onClick(Halogen_HTML_Events.input_(ClearText.create)) ])([ Halogen_HTML_Core.text("Clear") ]) ]) ]), Halogen_HTML_Elements.div_([ Halogen_HTML.slot(AceSlot.value)(PerspectAceComponent.aceComponent)(Data_Unit.unit)(handleAceOuput) ]), Halogen_HTML_Elements.pre_([ Halogen_HTML_Core.text("Current text: " + v.text) ]) ]);
+          return Halogen_HTML_Elements.div_([ Halogen_HTML_Elements.h1_([ Halogen_HTML_Core.text("ace editor") ]), Halogen_HTML_Elements.div_([ Halogen_HTML_Elements.p_([ Halogen_HTML_Elements.button([ Halogen_HTML_Events.onClick(Halogen_HTML_Events.input_(ClearText.create)) ])([ Halogen_HTML_Core.text("Clear") ]) ]) ]), Halogen_HTML_Elements.div_([ Halogen_HTML_Elements.p_([ Halogen_HTML_Elements.button([ Halogen_HTML_Events.onClick(Halogen_HTML_Events.input_(Load.create)) ])([ Halogen_HTML_Core.text("Load") ]) ]) ]), Halogen_HTML_Elements.div_([ Halogen_HTML.slot(AceSlot.value)(PerspectAceComponent.aceComponent)(Data_Unit.unit)(handleAceOuput) ]), Halogen_HTML_Elements.pre_([ Halogen_HTML_Core.text("Current text: " + v.text) ]) ]);
       };
       var $$eval = function (v) {
           if (v instanceof ClearText) {
@@ -30221,19 +31412,37 @@ var PS = {};
           };
           if (v instanceof HandleAceUpdate) {
               return Control_Bind.discard(Control_Bind.discardUnit)(Halogen_Query_HalogenM.bindHalogenM)(Control_Monad_State_Class.modify(Halogen_Query_HalogenM.monadStateHalogenM)(function (v1) {
-                  var $20 = {};
-                  for (var $21 in v1) {
-                      if ({}.hasOwnProperty.call(v1, $21)) {
-                          $20[$21] = v1[$21];
+                  var $23 = {};
+                  for (var $24 in v1) {
+                      if ({}.hasOwnProperty.call(v1, $24)) {
+                          $23[$24] = v1[$24];
                       };
                   };
-                  $20.text = v.value0;
-                  return $20;
+                  $23.text = v.value0;
+                  return $23;
               }))(function () {
                   return Control_Applicative.pure(Halogen_Query_HalogenM.applicativeHalogenM)(v.value1);
               });
           };
-          throw new Error("Failed pattern match at Main line 65, column 3 - line 67, column 14: " + [ v.constructor.name ]);
+          if (v instanceof Load) {
+              return Control_Bind.bind(Halogen_Query_HalogenM.bindHalogenM)(Control_Monad_Aff_Class.liftAff(Halogen_Query_HalogenM.monadAffHalogenM(Control_Monad_Aff_Class.monadAffAff))(Network_HTTP_Affjax.get(Network_HTTP_Affjax_Response.responsableString)("http://www.pureperspectives.nl/src/editor/perspectives.psp")))(function (v1) {
+                  return Control_Bind.discard(Control_Bind.discardUnit)(Halogen_Query_HalogenM.bindHalogenM)(Control_Monad_State_Class.modify(Halogen_Query_HalogenM.monadStateHalogenM)(function (v2) {
+                      var $29 = {};
+                      for (var $30 in v2) {
+                          if ({}.hasOwnProperty.call(v2, $30)) {
+                              $29[$30] = v2[$30];
+                          };
+                      };
+                      $29.text = v1.response;
+                      return $29;
+                  }))(function () {
+                      return Control_Bind.bind(Halogen_Query_HalogenM.bindHalogenM)(Halogen_Query.query(eqAceSlot)(AceSlot.value)(Halogen_Query.action(PerspectAceComponent.ChangeText.create(v1.response))))(function (v2) {
+                          return Control_Applicative.pure(Halogen_Query_HalogenM.applicativeHalogenM)(v.value0);
+                      });
+                  });
+              });
+          };
+          throw new Error("Failed pattern match at Main line 75, column 3 - line 77, column 14: " + [ v.constructor.name ]);
       };
       return Halogen_Component.parentComponent(ordAceSlot)({
           initialState: Data_Function["const"](initialState), 
@@ -30242,12 +31451,15 @@ var PS = {};
           receiver: Data_Function["const"](Data_Maybe.Nothing.value)
       });
   })();
+
+  // | Run the app!
   var main = Halogen_Aff_Util.runHalogenAff(Control_Bind.bind(Control_Monad_Aff.bindAff)(Halogen_Aff_Util.awaitBody)(function (v) {
       return Halogen_VDom_Driver.runUI(ui)(Data_Unit.unit)(v);
   }));
   exports["AceSlot"] = AceSlot;
   exports["ClearText"] = ClearText;
   exports["HandleAceUpdate"] = HandleAceUpdate;
+  exports["Load"] = Load;
   exports["main"] = main;
   exports["parse"] = parse;
   exports["ui"] = ui;
@@ -30256,4 +31468,5 @@ var PS = {};
 })(PS["Main"] = PS["Main"] || {});
 PS["Main"].main();
 
-},{}]},{},[1]);
+}).call(this,require('_process'))
+},{"_process":1}]},{},[2]);

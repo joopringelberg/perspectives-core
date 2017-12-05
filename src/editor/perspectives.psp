@@ -1,0 +1,40 @@
+-- Dit bestand bevat elke denkbare Perspectives CLR expressie.
+
+:ContextType :Aangifte -- Commentaar op de regel.
+	private :aantekening = "Dit is een prive aantekening bij de definitie van Aangifte."
+	:publicProperty =>
+		:Property :Urgentie
+			public :isFunctioneel = true
+			public :isVerplicht = false
+			public :range = Number
+	:privateProperty =>
+		:Property :Aantekening
+			public :isFunctioneel = true
+			public :isVerplicht = false
+			public :range = String
+	:rolInContext =>
+		:RolInContext :Aangever
+			public :isVerplicht = true
+			public :isFunctioneel = false
+			:rolProperty =>
+				:Property :Betrouwbaarheid
+					public :isFunctioneel = true
+					public :isVerplicht = false
+					public :range = Number
+			:mogelijkeBinding => :Persoon
+			:propertyPerspectief =>
+				:PropertyPerspectief :AangeverBetrouw…Perspectief
+					:propertyReferentie => :Betrouwbaarheid
+					:volgNummer = 1
+	:rolInContext =>
+		:RolInContext :MijnBerekendeRol
+		query :aangever binding
+{-
+commentaar over
+twee regels
+-}
+
+:Aangifte :A1
+	public :urgentie = 8
+	:aangever => :Jansen
+		:betrouwbaarheid = 7
