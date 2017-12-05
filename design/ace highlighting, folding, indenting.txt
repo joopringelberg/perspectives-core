@@ -55,7 +55,9 @@ UITZOEKEN
 1. Ik zie in de json_worker.js file dat json geparsed wordt en meldingen toegevoegd worden aan een array met errors dat door de worker ge-emit worden (naar Ace, neem ik aan) onder de vlag "annotate".
 
 TODO
-1. RegExps voor commentaar in highlighting.
+1a. RegExps voor commentaar in highlighting. KLAAR
+1b. Indenting.
+1c. Folding 
 2. Breid de contextRoleParser uit met parsers voor commentaar.
 3. Breid de contextRoleParser uit met parsers voor 'text' met prefixes.
 4. Definieer de context 'text'.

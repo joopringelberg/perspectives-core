@@ -56,4 +56,6 @@ define( function( require, exports, module ) {
 	exports.composeRegExp = composeRegExp;
 
 	exports.regExpToString = regExpToString;
+
+	exports.disjunctiveRegExp = disjunctiveRegExp;
 });

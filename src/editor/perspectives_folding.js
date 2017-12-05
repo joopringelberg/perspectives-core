@@ -6,30 +6,44 @@ define(function(require, exports, module) {
 	var BaseFoldMode = require("./fold_mode").FoldMode;
 
 	var FoldMode = exports.FoldMode = function() {};
-	oop.inherits(FoldMode, BaseFoldMode);
+	var uriAndCurie = require("../perspectives/uriAndCurie");
+
+	var typeDeclarationRegExp = new RegExp( uriAndCurie.regExpToString( uriAndCurie.resourceName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.resourceName ) );
+	var multiLineCommentStartRegExp = /^({)-/
+
+
+			oop.inherits(FoldMode, BaseFoldMode);
 
 	(function() {
 
 		// regular expressions that identify starting and stopping points
-		this.foldingStartMarker = /^(\{)\-/;
-		this.foldingStopMarker = /^\-(\})/;
+		this.foldingStartMarker = uriAndCurie.disjunctiveRegExp( multiLineCommentStartRegExp, typeDeclarationRegExp);
+		this.foldingStopMarker = /^-(})/;
 
 		this.getFoldWidgetRange = function(session, foldStyle, row) {
-			var line = session.getLine(row);
+			var line = session.getLine(row),
+				range,
+				i;
 
-			// test each line, and return a range of segments to collapse
-			var match = line.match(this.foldingStartMarker);
+			// We fold multiline comments
+			var match = line.match(multiLineCommentStartRegExp);
 			if (match) {
-				var i = match.index;
+				i = match.index;
 
 				if (match[1])
 				{
 					return this.openingBracketBlock(session, match[1], row, i);
 				}
 
-				var range = session.getCommentFoldRange(row, i + match[0].length);
+				range = session.getCommentFoldRange(row, i + match[0].length);
 				range.end.column -= 2;
 				return range;
+			}
+			// We also fold on type declarations.
+			else if ( line.match( typeDeclarationRegExp ))
+			{
+				// Find the next line that outdents. By providing zero as starting column, the function indentationBlock will take the line length as start column.
+				return this.indentationBlock(session, row, 0 );
 			}
 		};
 
