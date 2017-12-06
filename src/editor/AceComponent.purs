@@ -1,4 +1,4 @@
-module PerspectAceComponent (AceEffects, AceQuery(..), AceOutput(..), aceComponent) where
+module PerspectAceComponent (AceEffects, AceQuery(..), Mode, Theme, AceOutput(..), aceComponent) where
 
 import Prelude
 import Ace as Ace
@@ -12,14 +12,18 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
+
 -- | The state for the ace component - we only need a reference to the editor,
 -- | as Ace editor has its own internal state that we can query instead of
 -- | replicating it within Halogen.
 type AceState = { editor :: Maybe Editor }
 
+type Theme = String
+type Mode = String
+
 -- | A basic query algebra for the Ace component.
 data AceQuery a
-  = Initialize a
+  = Initialize Mode Theme a
   | Finalize a
   | ChangeText String a
   | HandleChange (H.SubscribeStatus -> a)
@@ -30,13 +34,13 @@ data AceOutput = TextChanged String
 type AceEffects eff = (ace :: ACE, avar :: AVAR | eff)
 
 -- | The Ace component definition.
-aceComponent :: forall eff. H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects eff))
-aceComponent =
+aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects eff))
+aceComponent mode theme =
   H.lifecycleComponent
     { initialState: const initialState
     , render
     , eval
-    , initializer: Just (H.action Initialize)
+    , initializer: Just (H.action (Initialize mode theme))
     , finalizer: Just (H.action Finalize)
     , receiver: const Nothing
     }
@@ -49,21 +53,23 @@ aceComponent =
   -- placeholder div here and attach the ref property which will let us reference
   -- the element in eval.
   render :: AceState -> H.ComponentHTML AceQuery
-  render = const $ HH.div [ HP.ref (H.RefLabel "ace") ] []
+  render = const $ HH.div [ HP.ref (H.RefLabel "ace")] []
 
   -- The query algebra for the component handles the initialization of the Ace
   -- editor as well as responding to the `ChangeText` action that allows us to
   -- alter the editor's state.
   eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects eff))
   eval = case _ of
-    Initialize next -> do
+    Initialize mod them next -> do
       H.getHTMLElementRef (H.RefLabel "ace") >>= case _ of
         Nothing -> pure unit
         Just el' -> do
           editor <- H.liftEff $ Ace.editNode el' Ace.ace
           session <- H.liftEff $ Editor.getSession editor
-          _ <- liftEff $ Session.setMode "ace/mode/perspectives" session
-          _ <- liftEff $ Editor.setTheme "ace/theme/ambiance" editor
+          _ <- liftEff $ Session.setMode mod session
+          _ <- liftEff $ Editor.setTheme them editor
+          -- _ <- liftEff $ Session.setMode "ace/mode/perspectives" session
+          -- _ <- liftEff $ Editor.setTheme "ace/theme/perspectives" editor
           H.modify (_ { editor = Just editor })
           H.subscribe $ H.eventSource_ (Session.onChange session) (H.request HandleChange)
       pure next

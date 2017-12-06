@@ -153,6 +153,10 @@ type Comment = String
 untilNewline :: IP String
 untilNewline = withPos (many1Till (sameLine *> SP.anyChar) (SP.char '\n')) <* inlineSpace >>= pure <<< charsToLine
 
+-- Consumes any character up to and including the newline.
+untilNewline' :: IP String
+untilNewline' = withPos (manyTill (sameLine *> SP.anyChar) (SP.char '\n')) <* inlineSpace >>= pure <<< charsToLine
+
 -- Concatenate all characters.
 charsToLine :: forall f. Foldable f => f Char -> String
 charsToLine lc = foldr (\c s -> singleton c <> s) "\n" lc

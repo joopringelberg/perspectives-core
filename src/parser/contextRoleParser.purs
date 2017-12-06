@@ -9,20 +9,36 @@ import Data.List.Types (List)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, fromFoldable, insert, singleton, unions)
 import Data.String (fromCharArray)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Perspectives.Guid (guid)
-import Perspectives.Syntax2 (BinnenRol(..), EntityCollection(..), NamedEntityCollection(..), PerspectContext(..), PerspectEntity(..), PerspectRol(..), PropertyName, SimpleValue(..), TypeDeclaration(..), PerspectName)
+import Perspectives.Syntax2 (BinnenRol(..), Comments(..), EntityCollection(..), NamedEntityCollection(..), OptionalComment, PerspectContext(..), PerspectEntity(..), PerspectName, PerspectRol(..), PropertyComments, PropertyName, SimpleValue(..), TypeDeclaration(..), Comment)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (<$>), (<*), (<*>), (<>))
-import Text.Parsing.Indent (block, indented, sameOrIndented, withPos)
+import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (/=), (<$>), (<*), (<*>), (<>))
+import Text.Parsing.Indent (block, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (try, (<?>))
-import Text.Parsing.Parser.String (char, satisfy)
+import Text.Parsing.Parser.Combinators (optionMaybe, try, (<?>))
+import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
 
 -----------------------------------------------------------
--- Lexemes
+-- Comments
+-----------------------------------------------------------
+
+oneLineComment :: IP OptionalComment
+oneLineComment = optionMaybe $ try
+    (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace)))
+
+inLineComment :: IP OptionalComment
+inLineComment = optionMaybe $ try
+    (sameLine *> (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace))))
+
+manyOneLineComments :: IP (Array Comment)
+manyOneLineComments = AR.many
+    (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace)))
+
+-----------------------------------------------------------
+-- Identifiers
 -----------------------------------------------------------
 
 reservedOp :: String -> IP Unit
@@ -97,15 +113,15 @@ prefixedResourceName = lexeme $ (<>) <$> prefix <*> localResourceName
 
 -- prefixedPropertyName = prefix localPropertyName
 prefixedPropertyName :: IP String
-prefixedPropertyName = lexeme $ (<>) <$> prefix <*> localPropertyName
+prefixedPropertyName = lexeme ((<>) <$> prefix <*> localPropertyName)
 
 -- qualifiedResourceName = domeinName localResourceName
 qualifiedResourceName :: IP String
-qualifiedResourceName = lexeme $ (<>) <$> domeinName <*> localResourceName
+qualifiedResourceName = lexeme ((<>) <$> domeinName <*> localResourceName)
 
 -- qualifiedPropertyName = domeinName localPropertyName
 qualifiedPropertyName :: IP String
-qualifiedPropertyName = lexeme $ (<>) <$> domeinName <*> localPropertyName
+qualifiedPropertyName = lexeme ((<>) <$> domeinName <*> localPropertyName)
 
 -- resourceName = prefixedResourceName | qualifiedResourceName
 resourceName :: IP String
@@ -134,66 +150,76 @@ dataType = try do
 
 -- | typeDeclaration = resourceName resourceName
 typeDeclaration :: IP TypeDeclaration
-typeDeclaration = TypeDeclaration <$> resourceName <*> resourceName
+typeDeclaration = TypeDeclaration <$> resourceName <*> resourceName <*> inLineComment
 
-typedPropertyAssignment :: String -> IP (Tuple PropertyName (Array String))
-typedPropertyAssignment scope = withPos $ (\pn pv -> Tuple pn [show pv])
-    <$> identifier <* (sameOrIndented *> reservedOp "=")
+typedPropertyAssignment :: String -> IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+typedPropertyAssignment scope = try $ withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBefore: cb, commentAfter: cmt}) (Tuple pn [show pv]))
+    <$> manyOneLineComments <* reserved scope
+    <*> propertyName <* (sameOrIndented *> reservedOp "=")
     <*> (sameOrIndented *> (simpleValue <|> dataType))
+    <*> inLineComment
 
 -- | publicContextPropertyAssignment = 'public' propertyName '=' simpleValue
-publicContextPropertyAssignment :: IP (Tuple PropertyName (Array String))
-publicContextPropertyAssignment = reserved "public" *> typedPropertyAssignment "public"
+publicContextPropertyAssignment :: IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+publicContextPropertyAssignment = typedPropertyAssignment "public"
 
 -- | privateContextPropertyAssignment = 'private' propertyName '=' simpleValue
-privateContextPropertyAssignment :: IP (Tuple PropertyName (Array String))
-privateContextPropertyAssignment =reserved "private" *> typedPropertyAssignment "private"
+privateContextPropertyAssignment :: IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+privateContextPropertyAssignment = typedPropertyAssignment "private"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
-rolePropertyAssignment :: IP (Tuple PropertyName (Array String))
-rolePropertyAssignment = withPos $ (\pn pv -> Tuple pn [show pv])
-    <$> propertyName <* (sameOrIndented *> reservedOp "=")
+rolePropertyAssignment :: IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+rolePropertyAssignment = withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBefore: cb, commentAfter: cmt}) (Tuple pn [show pv]))
+    <$> manyOneLineComments
+    <*> propertyName <* (sameOrIndented *> reservedOp "=")
     <*> (sameOrIndented *> (simpleValue <|> dataType))
+    <*> inLineComment
 
 -- | roleBinding = roleName '=>' (resourceName | expression) rolePropertyAssignment*
 roleBinding :: PerspectName -> IP NamedEntityCollection
 roleBinding contextID =
   withPos $ try do
-    rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
-    (NamedEntityCollection pname (EntityCollection entities)) <- indented *> (context <|> role)
-    props <- indented *> (block rolePropertyAssignment)
-    -- pure $ RolBinding rname pname entities props
-    rolId <- pure (guid unit)
-    pure $ (NamedEntityCollection rolId
-      (EntityCollection
-        (insert rolId
-          (Rol (PerspectRol
-            { id: rolId
-            , pspType: rname
-            , binding: Just pname
-            , context: contextID
-            , properties: fromFoldable props
-            , gevuldeRollen: empty
-            }))
-            entities)))
+    cmtBefore <- manyOneLineComments
+    withPos do
+      rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
+      cmt <- inLineComment
+      (NamedEntityCollection pname (EntityCollection entities)) <- indented *> (context <|> role)
+      -- props <- indented *> (block rolePropertyAssignment)
+      pure $ (NamedEntityCollection pname
+        (EntityCollection
+          (insert pname
+            (Rol (PerspectRol
+              { id: pname
+              , pspType: rname
+              , binding: Just pname
+              , context: contextID
+              , properties: empty
+              , gevuldeRollen: empty
+              , comments: Just $ Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
+              }))
+              entities)))
   <|>
   (withPos $ try do
-    rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
-    ident <- (sameOrIndented *> resourceName)
-    props <- indented *> (block rolePropertyAssignment)
-    rolId <- pure (guid unit)
-    pure $ (NamedEntityCollection rolId
-      (EntityCollection
-        (singleton
-          rolId
-          (Rol (PerspectRol
-            { id: rolId
-            , pspType: rname
-            , binding: Just ident
-            , context: contextID
-            , properties: fromFoldable props
-            , gevuldeRollen: empty
-            }))))))
+    cmtBefore <- manyOneLineComments
+    withPos do
+      rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
+      ident <- (sameOrIndented *> resourceName)
+      cmt <- inLineComment
+      props <- indented *> (block rolePropertyAssignment)
+      rolId <- pure (guid unit)
+      pure $ (NamedEntityCollection rolId
+        (EntityCollection
+          (singleton
+            rolId
+            (Rol (PerspectRol
+              { id: rolId
+              , pspType: rname
+              , binding: Just ident
+              , context: contextID
+              , properties: fromFoldable (snd <$> props)
+              , gevuldeRollen: empty
+              , comments: Just $ Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props }
+              }))))))
 
 -- TODO: query
 
@@ -207,42 +233,47 @@ roleBinding contextID =
 -- | roleBinding*
 context :: IP NamedEntityCollection
 context = withPos do
-  (TypeDeclaration typeName instanceName) <- typeDeclaration
-  indented *> do
-    (publicProps :: List (Tuple PropertyName (Array String))) <- (block publicContextPropertyAssignment)
-    (privateProps :: List (Tuple PropertyName (Array String))) <- (block privateContextPropertyAssignment)
-    (rolebindings :: List (NamedEntityCollection)) <- (block $ roleBinding instanceName)
-    let
-      ctxt = PerspectContext
-        { id: instanceName
-        , pspType: typeName
-        , binnenRol: binnenRol
-        , buitenRol: instanceName <> "_buitenRol"
-        , rolInContext: AR.fromFoldable $ (\(NamedEntityCollection id _) -> id) <$> rolebindings }
-
-      binnenRol = BinnenRol
-        { id: instanceName <> "_binnenRol"
-        , pspType: ":BinnenRol"
-        , binding: Just $ instanceName <> "_buitenRol"
-        , properties: fromFoldable privateProps
+  cmtBefore <- manyOneLineComments
+  withPos do
+    (TypeDeclaration typeName instanceName cmt) <- typeDeclaration
+    indented *> do
+      (publicProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- (block publicContextPropertyAssignment)
+      (privateProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- (block privateContextPropertyAssignment)
+      (rolebindings :: List (NamedEntityCollection)) <- (block $ roleBinding instanceName)
+      let
+        ctxt = PerspectContext
+          { id: instanceName
+          , pspType: typeName
+          , binnenRol: binnenRol
+          , buitenRol: instanceName <> "_buitenRol"
+          , rolInContext: AR.fromFoldable $ (\(NamedEntityCollection id _) -> id) <$> rolebindings
+          , comments: Just $ Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
         }
 
-      buitenRol = PerspectRol
-        { id: instanceName <> "_buitenRol"
-        , pspType: ":BuitenRol"
-        , binding: Nothing
-        , context: instanceName
-        , properties: fromFoldable publicProps
-        , gevuldeRollen: empty
-        }
+        binnenRol = BinnenRol
+          { id: instanceName <> "_binnenRol"
+          , pspType: ":BinnenRol"
+          , binding: Just $ instanceName <> "_buitenRol"
+          , properties: fromFoldable (snd <$> privateProps)
+          }
 
-      (entities :: StrMap PerspectEntity) =
-        unions $ (\(NamedEntityCollection _ (EntityCollection m)) -> m) <$> rolebindings
+        buitenRol = PerspectRol
+          { id: instanceName <> "_buitenRol"
+          , pspType: ":BuitenRol"
+          , binding: Nothing
+          , context: instanceName
+          , properties: fromFoldable (snd <$> publicProps)
+          , gevuldeRollen: empty
+          , comments: Just $ Comments { commentBefore: [], commentAfter: Nothing, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
+          }
 
-    pure
-      (NamedEntityCollection instanceName
-        (EntityCollection (insert instanceName (Context ctxt)
-          (insert (instanceName <> "_buitenRol") (Rol buitenRol) entities))))
+        (entities :: StrMap PerspectEntity) =
+          unions $ (\(NamedEntityCollection _ (EntityCollection m)) -> m) <$> rolebindings
+
+      pure
+        (NamedEntityCollection instanceName
+          (EntityCollection (insert instanceName (Context ctxt)
+            (insert (instanceName <> "_buitenRol") (Rol buitenRol) entities))))
 
 -- | role = typeDeclaration
 -- | rolePropertyAssignment*
@@ -251,21 +282,24 @@ context = withPos do
 -- TODO: moet er geen binding bij?
 role :: IP NamedEntityCollection
 role = withPos do
-  (TypeDeclaration typeName instanceName) <- typeDeclaration
-  indented *> do
-    props <- (block rolePropertyAssignment)
-    pure
-      (NamedEntityCollection instanceName
-        (EntityCollection
-          (singleton instanceName
-            (Rol (PerspectRol
-              { id: instanceName
-              , pspType: typeName
-              , binding: Nothing
-              , context: instanceName
-              , properties: fromFoldable props
-              , gevuldeRollen: empty
-              })))))
+  cmtBefore <- manyOneLineComments
+  withPos do
+    (TypeDeclaration typeName instanceName _) <- typeDeclaration
+    indented *> do
+      props <- (block rolePropertyAssignment)
+      pure
+        (NamedEntityCollection instanceName
+          (EntityCollection
+            (singleton instanceName
+              (Rol (PerspectRol
+                { id: instanceName
+                , pspType: typeName
+                , binding: Nothing
+                , context: instanceName
+                , properties: fromFoldable $ snd <$> props
+                , gevuldeRollen: empty
+                , comments: Just (Comments { commentBefore: cmtBefore, commentAfter: Nothing, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props})
+                })))))
 
 -- | expression = context | role
 -- expression :: IP NamedEntityCollection
@@ -276,60 +310,123 @@ role = withPos do
 allTheRest :: IP String
 allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
+emptyPropertyComments :: StrMap (Comments ())
+emptyPropertyComments = empty
 -----------------------------------------------------------
 -- Tests
 -----------------------------------------------------------
 test1 :: String
-test1 = """Aangifte Aangifte1
+test1 = """:Aangifte :Aangifte1
 """
+-- runIndentParser test1 typeDeclaration
 
 test2 :: String
-test2 = """Aangifte Aangifte1
-  public status = "voltooid"
+test2 = """:Aangifte :Aangifte1 -- Commentaar bij :Aangifte1
+  public :status = "voltooid\n" -- Commentaar bij status
 """
+-- runIndentParser test2 context
 
--- runIndentParser "public propname = 1" publicContextPropertyAssignment
--- runIndentParser "private propname = 1" publicContextPropertyAssignment
--- runIndentParser "private propname = 1" privateContextPropertyAssignment
--- runIndentParser "public status = \"voltooid\"" publicContextPropertyAssignment
+-- runIndentParser "public :propname = 1" publicContextPropertyAssignment
+-- runIndentParser "private :propname = 1" publicContextPropertyAssignment
+-- runIndentParser "private :propname = 1" privateContextPropertyAssignment
+-- runIndentParser "public :status = \"voltooid\"" publicContextPropertyAssignment
 
 -- import Text.Parsing.Parser.String
 -- runIndentParser "  public status = \"voltooid\"" (withPos (whiteSpace *> indented *> publicContextPropertyAssignment))
 
 test3 :: String
 test3 = """:Aangifte :Aangifte1
-  :aangever => :Jansen""" -- zodra een newline volgt komt de binding niet mee, geindenteerd of niet.
+  :aangever => :Jansen\n""" -- zodra een newline volgt komt de binding niet mee, geindenteerd of niet.
+-- runIndentParser test3 context
 
--- runIndentParser "aangever => Jansen" (roleBinding "")
--- runIndentParser "aangever => Jansen\n  prop = 1" (roleBinding "")
+-- runIndentParser ":aangever => Jansen" (roleBinding "")
+-- runIndentParser ":aangever => Jansen\n  prop = 1" (roleBinding "")
 
 test4 :: String
-test4 = """:Aangifte :Aangifte1
-  public :status = "voltooid"
-  :aangever => :Jansen
-"""  -- zodra een newline volgt komt de binding niet mee, geindenteerd
+test4 = """:Aangifte :Aangifte1 -- Commentaar bij :Aangifte1
+  public :status = "voltooid" -- Commentaar bij :status
+  :aangever => :Jansen -- commentaar bij :aangever"""  -- zodra een newline volgt komt de binding niet mee, geindenteerd
+-- runIndentParser test4 context
 
 test5 :: String
-test5 = """Aangifte Aangifte1
-  public status = "voltooid"
-  private aantekening = "bla die bla"
-  aangever => Jansen"""
+test5 = """--Commentaar voor :Aangifte1
+:Aangifte :Aangifte1 --Commentaar achter :Aangifte1
+  public :status = "voltooid"
+  private :aantekening = "bla die bla"
+  :aangever => :Jansen"""
+-- runIndentParser test5 context
 
 test6 :: String
-test6 = """Aangifte Aangifte1
-  public status = "voltooid"
-  private aantekening = "bla die bla"
-  aangever => Jansen
-    betrouwbaarheid = 6
-""" -- Dit werkt weer alleen als er een newline volgt!
+test6 = """:Aangifte :Aangifte1
+  public :status = "voltooid"
+  private :aantekening = "bla die bla"
+  -- Commentaar voor :aangever
+  :aangever => :Jansen -- Commentaar bij :aangever
+    :betrouwbaarheid = 6 -- Commentaar bij :betrouwbaarheid"""
+
+-- runIndentParser test6 context
+
+test6a :: String
+test6a = """-- Commentaar voor :aangever
+:aangever => :Jansen -- Commentaar bij :aangever
+  :betrouwbaarheid = 6 -- Commentaar bij :betrouwbaarheid
+"""
+-- runIndentParser test6a (roleBinding ":Aangifte1")
+
+test6b :: String
+test6b = """private :aantekening = "bla die bla"
+-- Commentaar voor :aangever
+"""
+-- runIndentParser test6b privateContextPropertyAssignment
+-- Het commentaar wordt geparseerd en genegeerd!
 
 test7 :: String
-test7 = """aangever => Jansen
-    betrouwbaarheid = 6"""
+test7 = """:aangever => :Jansen
+    :betrouwbaarheid = 6"""
 -- runIndentParser test7 (roleBinding "")
 
 test8 :: String
-test8 = """aangever => Jansen
-    betrouwbaarheid = 6
+test8 = """:aangever => :Jansen
+    :betrouwbaarheid = 6
 """
 -- runIndentParser test8 (roleBinding "")
+
+test9 :: String
+test9 = """:ContextType :Aangifte -- Commentaar op de regel.
+    public :isFunctioneel = true --Commentaar 1
+    -- commentaar boven :isVerplicht
+    public :isVerplicht = true --Commentaar 1
+"""
+-- runIndentParser test9 context
+
+test10 :: String
+test10 = """:ContextType :Aangifte
+	-- Commentaar voor rolProperty
+  :rolProperty =>
+		:Property :Betrouwbaarheid
+			public :isFunctioneel = true
+"""
+-- runIndentParser test10 context
+
+test10a :: String
+test10a = """-- Commentaar voor rolProperty
+:rolProperty =>
+	:Property :Betrouwbaarheid
+		public :isFunctioneel = true
+"""
+-- runIndentParser test10a (roleBinding ":Aangifte")
+
+test10b :: String
+test10b = """:rolProperty =>
+	:Property :Betrouwbaarheid
+		public :isFunctioneel = true
+"""
+-- runIndentParser test10b (roleBinding ":Aangifte")
+
+test10c :: String
+test10c = """:ContextType :Aangifte
+	:rolProperty =>
+		:Property :Betrouwbaarheid
+			public :isFunctioneel = true
+"""
+-- runIndentParser test10c context

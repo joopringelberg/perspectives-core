@@ -1,10 +1,14 @@
 -- Dit bestand bevat elke denkbare Perspectives CLR expressie.
 
 :ContextType :Aangifte -- Commentaar op de regel.
-	private :aantekening = "Dit is een prive aantekening bij de definitie van Aangifte."
+	-- Commentaar boven :aantekening
+	private :aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter :aantekening
+	-- Commentaar boven de binding van :Urgentie
 	:publicProperty =>
+		-- Commentaar boven :Urgentie
 		:Property :Urgentie
 			public :isFunctioneel = true
+			-- Commentaar boven :isVerplicht
 			public :isVerplicht = false
 			public :range = Number
 	:privateProperty =>

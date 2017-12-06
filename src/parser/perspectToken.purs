@@ -22,11 +22,13 @@ perspectDef :: IndentLanguageDef
 --                 { reservedOpNames = ["=", "=>"]
 --                 , reservedNames   = [ "private","public"]
 --                 }
+-- | Even though we have comments, we make the Tokenizer none the wizer. This way it won't skip comments.
+-- | We detect comments ourselves and collect them!
 perspectDef = LanguageDef
-                { commentStart    : "{-"
-                , commentEnd      : "-}"
-                , commentLine     : "--"
-                , nestedComments:  true
+                { commentStart    : ""
+                , commentEnd      : ""
+                , commentLine     : ""
+                , nestedComments:  false
                 , identStart      : letter <|> char ':'
                 , identLetter:     alphaNum <|> oneOf ['_', '\'']
                 , opStart:         op'
