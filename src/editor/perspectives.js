@@ -6,7 +6,6 @@ define(function(require, exports, module) {
 	var TextMode = require("ace/mode/text").Mode;
 	var Tokenizer = require("ace/tokenizer").Tokenizer;
 	var MatchingBraceOutdent = require("ace/mode/matching_brace_outdent").MatchingBraceOutdent;
-	var WorkerClient = require("ace/worker/worker_client").WorkerClient;
 
 	// defines the language specific highlighters and folding rules
 	var PerspectivesHighlightRules = require("./perspectives_highlight_rules").PerspectivesHighlightRules;
@@ -57,16 +56,6 @@ define(function(require, exports, module) {
 
 		this.autoOutdent = function(state, doc, row) {
 			this.$outdent.autoOutdent(doc, row);
-		};
-
-		// create worker for live syntax checking
-		this.createWorker = function(session) {
-			var worker = new WorkerClient(["ace"], "ace/mode/perspectives_worker", "PerspectivesWorker");
-			worker.attachToDocument(session.getDocument());
-			worker.on("errors", function(e) {
-				session.setAnnotations(e.data);
-			});
-			return worker;
 		};
 
 	}).call(Mode.prototype);

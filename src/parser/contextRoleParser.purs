@@ -16,7 +16,7 @@ import Perspectives.Token (token)
 import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (/=), (<$>), (<*), (<*>), (<>))
 import Text.Parsing.Indent (block, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (choice, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
@@ -175,7 +175,7 @@ rolePropertyAssignment = withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBef
     <*> (sameOrIndented *> (simpleValue <|> dataType))
     <*> inLineComment
 
--- | roleBinding = roleName '=>' (resourceName | expression) rolePropertyAssignment*
+-- | roleBinding = roleName '=>' (resourceName | context) rolePropertyAssignment*
 roleBinding :: PerspectName -> IP NamedEntityCollection
 roleBinding contextID =
   withPos $ try do
@@ -312,6 +312,21 @@ allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
 emptyPropertyComments :: StrMap (Comments ())
 emptyPropertyComments = empty
+
+-----------------------------------------------------------
+-- Expression
+-----------------------------------------------------------
+
+expression :: IP String
+expression = choice
+  [ try (typeDeclaration *> (pure "typeDeclaration"))
+  , try (publicContextPropertyAssignment *> (pure "publicContextPropertyAssignment"))
+  , try (privateContextPropertyAssignment *> (pure "privateContextPropertyAssignment"))
+  , try (rolePropertyAssignment *> (pure "rolePropertyAssignment"))
+  , try (roleBinding "" *> (pure "roleBinding" ))
+  , try ((STRING.string "--") *> (pure "oneLineComment"))
+  -- query
+  ]
 -----------------------------------------------------------
 -- Tests
 -----------------------------------------------------------

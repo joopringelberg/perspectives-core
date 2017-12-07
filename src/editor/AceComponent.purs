@@ -7,11 +7,13 @@ import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Ace.Types (ACE, Editor)
+import Ace.EditSession (clearAnnotations, getLine, setAnnotations)
+import Ace.Types (ACE, Editor, Position(..))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
+import Perspectives.Parser (AceError, errorsIn)
 
 -- | The state for the ace component - we only need a reference to the editor,
 -- | as Ace editor has its own internal state that we can query instead of
@@ -27,6 +29,8 @@ data AceQuery a
   | Finalize a
   | ChangeText String a
   | HandleChange (H.SubscribeStatus -> a)
+  | SetAnnotations (Array AceError) a
+  | ClearAnnotations a
 
 data AceOutput = TextChanged String
 
@@ -68,8 +72,6 @@ aceComponent mode theme =
           session <- H.liftEff $ Editor.getSession editor
           _ <- liftEff $ Session.setMode mod session
           _ <- liftEff $ Editor.setTheme them editor
-          -- _ <- liftEff $ Session.setMode "ace/mode/perspectives" session
-          -- _ <- liftEff $ Editor.setTheme "ace/theme/perspectives" editor
           H.modify (_ { editor = Just editor })
           H.subscribe $ H.eventSource_ (Session.onChange session) (H.request HandleChange)
       pure next
@@ -93,6 +95,32 @@ aceComponent mode theme =
       case maybeEditor of
         Nothing -> pure unit
         Just editor -> do
-          text <- H.liftEff (Editor.getValue editor)
-          H.raise $ TextChanged text
+          session <- H.liftEff $ Editor.getSession editor
+          (Position {row :r, column}) <- H.liftEff $ Editor.getCursorPosition editor
+          line <- H.liftEff $ getLine r session
+          previousLine <- case r == 0 of
+            true -> pure ""
+            otherwise -> H.liftEff $ getLine (r-1) session
+          case errorsIn previousLine line of
+            (Just annotations) -> H.liftEff $ setAnnotations ((\a@{row} -> a {row = row + r}) <$> annotations) session
+            Nothing -> do
+              _ <- H.liftEff $ clearAnnotations session
+              text <- H.liftEff (Editor.getValue editor)
+              H.raise $ TextChanged text
       pure (reply H.Listening)
+    SetAnnotations annotations next -> do
+      maybeEditor <- H.gets _.editor
+      case maybeEditor of
+        Nothing -> pure next
+        Just editor -> do
+          session <- H.liftEff $ Editor.getSession editor
+          _ <- H.liftEff $ setAnnotations annotations session
+          pure next
+    ClearAnnotations next -> do
+      maybeEditor <- H.gets _.editor
+      case maybeEditor of
+        Nothing -> pure next
+        Just editor -> do
+          session <- H.liftEff $ Editor.getSession editor
+          _ <- H.liftEff $ clearAnnotations session
+          pure next

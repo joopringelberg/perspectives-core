@@ -58,6 +58,10 @@ ATOM/GIT HANDIGHEID
 
 15. Sync a forc: https://help.github.com/articles/syncing-a-fork/
 
+15. List files being tracked:
+
+	git ls-tree -r master --name-only
+
 
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
