@@ -1,12 +1,12 @@
 module Perspectives.ResourceRetrieval
 ( fetchPropDefs
-, fetchRole
+, fetchCouchdbResource
   )
 where
 
 import Prelude
 import Control.Monad.Aff (forkAff)
-import Control.Monad.Aff.AVar (makeEmptyVar, makeVar, putVar, takeVar)
+import Control.Monad.Aff.AVar (makeEmptyVar, putVar, takeVar)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
@@ -17,7 +17,6 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
 import Perspectives.Identifiers (getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
 import Perspectives.ResourceTypes (Resource, AsyncResource, AsyncDomeinFile, PropDefs(..), CouchdbResource)
-import Perspectives.Syntax2 (PerspectRol(..))
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
 -- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
@@ -25,15 +24,6 @@ fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
 fetchPropDefs id = do
   r <- fetchCouchdbResource id
   pure $ PropDefs r
-
--- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
--- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
-fetchRole :: forall e. Resource -> (AsyncDomeinFile e PerspectRol)
-fetchRole id = do
-  r <- fetchCouchdbResource id
-  pure $ castPerspectRol r
-
-foreign import castPerspectRol :: CouchdbResource -> PerspectRol
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
 -- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
