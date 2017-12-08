@@ -15,7 +15,7 @@ import Data.String (fromCharArray)
 import Data.Tuple (snd)
 import Perspectives.Resource (PROPDEFS, getRole)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax2 (Comment, Comments(..), PerspectContext(..), PerspectRol(..))
+import Perspectives.Syntax (Comment, Comments(..), PerspectContext(..), PerspectRol(..))
 import Prelude (Unit, bind, discard, pure, show, unit, ($), (*>), (+), (-), (<>))
 
 type IndentLevel = Int
@@ -51,7 +51,7 @@ comment c = identifier c *> newline
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
 
-prettyPrint :: forall a. a -> PrettyPrinter a ()-> Aff (DomeinFileEffects(prd :: PROPDEFS)) String
+prettyPrint :: forall a. a -> PrettyPrinter a ()-> Aff (DomeinFileEffects (prd :: PROPDEFS)) String
 prettyPrint t pp = prettyPrint' $ pp t
 
 prettyPrint' :: PerspectText () -> Aff (DomeinFileEffects (prd :: PROPDEFS)) String

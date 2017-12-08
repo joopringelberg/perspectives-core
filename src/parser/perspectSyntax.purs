@@ -1,4 +1,4 @@
-module Perspectives.Syntax2 where
+module Perspectives.Syntax where
 
 import Data.List (List)
 import Data.Maybe (Maybe)

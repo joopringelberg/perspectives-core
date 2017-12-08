@@ -7,11 +7,12 @@ import Data.StrMap (lookup)
 import Perspectives.ContextRoleParser (context) as CRP
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, context)
+import Perspectives.Resource (PROPDEFS)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax2 (EntityCollection(..), NamedEntityCollection(..), PerspectEntity(..))
+import Perspectives.Syntax (EntityCollection(..), NamedEntityCollection(..), PerspectEntity(..))
 import Prelude (pure)
 
-test2 :: Aff (DomeinFileEffects()) String
+test2 :: Aff (DomeinFileEffects (prd :: PROPDEFS)) String
 test2 = case runIndentParser "--Commentaar voor :A1\n:Aangifte :A1" CRP.context of
   (Right (NamedEntityCollection ident (EntityCollection j))) -> case lookup ident j of
     Nothing -> pure "onbekende fout"

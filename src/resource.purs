@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, poke, peek)
 import Perspectives.ResourceRetrieval (fetchCouchdbResource)
 import Perspectives.ResourceTypes (DomeinFileEffects, PropDefs(..), Resource, CouchdbResource)
-import Perspectives.Syntax2 (PerspectRol)
+import Perspectives.Syntax (PerspectRol)
 
 -- | The global index of definitions of all resources, indexed by Resource.
 type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
