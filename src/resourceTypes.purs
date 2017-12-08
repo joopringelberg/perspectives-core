@@ -5,6 +5,7 @@ module Perspectives.ResourceTypes
 , AsyncDomeinFile
 , PropDefs(..)
 , Resource
+, CouchdbResource
 )
 
 where
@@ -27,6 +28,9 @@ type DomeinFileEffects e = ResourceEffects (gm :: GLOBALMAP | e)
 
 -- | Type synonym AsyncDomeinFile is some type a in the extensible AsyncDomeinFileM monad.
 type AsyncDomeinFile e a = Aff (DomeinFileEffects e) a
+
+-- | A type for an untyped resource taken from Couchdb.
+type CouchdbResource = StrMap Json
 
 -- | A newtype for the property definitions so we can show them.
 newtype PropDefs = PropDefs (StrMap Json)

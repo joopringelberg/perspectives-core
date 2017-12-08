@@ -25,11 +25,11 @@ import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.ResourceTypes (Resource, PropDefs(..), AsyncDomeinFile)
+import Perspectives.ResourceTypes (AsyncDomeinFile, PropDefs(..), Resource, CouchdbResource)
 import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<>))
 
 -- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
-type DomeinFile = StrMap PropDefs
+type DomeinFile = StrMap CouchdbResource
 
 -- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
 type DomeinCache = GLStrMap (AVar DomeinFile)
@@ -52,7 +52,7 @@ namespaceToDomeinFileName s = replace domeinFileRegex "_" s
 retrieveDomeinResourceDefinition :: forall e.
   Resource
   -> Namespace
-  -> (AsyncDomeinFile e PropDefs)
+  -> (AsyncDomeinFile e CouchdbResource)
 retrieveDomeinResourceDefinition id ns = do
   f <- retrieveDomeinFile (namespaceToDomeinFileName ns)
   case lookup id f of
@@ -97,23 +97,23 @@ objArrayToDomeinFile arr = case traverse g arr of
   Nothing -> Nothing
   (Just tuples) -> Just $ fromFoldable tuples
   where
-  g :: JObject -> Maybe (Tuple String PropDefs)
+  g :: JObject -> Maybe (Tuple String CouchdbResource)
   g def = case lookup "id" def of
     Nothing -> Nothing
     (Just json) -> case toString json of
       Nothing -> Nothing
-      (Just id ) -> Just (Tuple id (PropDefs def))
+      (Just id ) -> Just (Tuple id def)
 
 -- | There can be two error scenarios here: either the returned string cannot be parsed
 -- | by JSON.parse, or the resulting json is not an object. Neither is likely, because Couchdb
 -- | will not store such documents.
-stringToPropDefs :: String -> Either String PropDefs
+stringToPropDefs :: String -> Either String CouchdbResource
 stringToPropDefs s = case jsonParser s of
     (Left err) -> Left $ "stringToPropDefs: cannot parse: " <> s
     (Right json) ->
       case toObject json of
         Nothing -> Left $ "stringToPropDefs: parsed json is not an object!"
-        (Just obj) -> Right $ PropDefs obj
+        (Just obj) -> Right obj
 
 modelsURL :: String
 modelsURL = "http://localhost:5984/models2/"

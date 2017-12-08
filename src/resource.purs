@@ -12,6 +12,7 @@ import Perspectives.ResourceTypes (PropDefs, Resource, DomeinFileEffects)
 
 -- | The global index of definitions of all resources, indexed by Resource.
 type ResourceDefinitions = GLStrMap (AVar PropDefs)
+
 resourceDefinitions :: ResourceDefinitions
 resourceDefinitions = new unit
 

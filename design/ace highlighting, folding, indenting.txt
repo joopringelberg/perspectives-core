@@ -64,3 +64,18 @@ TODO
 4. Definieer de context 'text'.
 5. Definieer de context 'domein'.
 
+=============
+0. Parseer de huidige regel.
+	I. Indien niet correct:
+		1. Bepaal de vorige (niet-commentaar) regel in hetzelfde blok.
+		2. Bepaal welke expressies daarop mogen volgen.
+		3. Detecteer welke expressie de gebruiker opbouwt.
+			a. Indien dat niet één van de toegelaten expressies is, geef een foutmelding.
+			b. Anders: geef het model van de expressie als hint.
+			c. Indien nog niets is ingetikt: geef de mogelijke expressies als hint.
+	II. Indien correct: 
+		1. Bepaal het tekstblok aan de linkerkantlijn waar deze expressie in voorkomt.
+		2. Parseer het hele blok.
+		3. Bepaal de update commando's.
+
+
