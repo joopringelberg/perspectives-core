@@ -1,13 +1,14 @@
 module Test.Main where
 
-import Test.QueryEffects
-import Test.TestEffects
+import Test.PrettyPrinter
+import Test.TestEffects as TE
 import Control.Monad.Aff (Fiber, runAff)
+import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff (Eff)
 import Prelude (Unit)
 
-main :: forall e. Eff (CancelerEffects e) (Fiber (CancelerEffects e) Unit)
-main = runAff handleError test
+main :: forall e. Eff (TestEffects (console :: CONSOLE | e)) (Fiber (TestEffects (console :: CONSOLE | e)) Unit)
+main = runAff TE.handleError test
 
 -- main = test
 

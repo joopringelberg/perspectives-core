@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, poke, peek)
 import Perspectives.ResourceRetrieval (fetchCouchdbResource)
 import Perspectives.ResourceTypes (DomeinFileEffects, PropDefs(..), Resource, CouchdbResource)
-import Perspectives.Syntax (PerspectRol)
+import Perspectives.Syntax (PerspectContext, PerspectRol)
 
 -- | The global index of definitions of all resources, indexed by Resource.
 type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
@@ -32,6 +32,12 @@ getRole id = do
   pure $ castPerspectRol cdbr
 
 foreign import castPerspectRol :: CouchdbResource -> PerspectRol
+
+foreign import castPerspectContext :: CouchdbResource -> PerspectContext
+
+foreign import unwrapPerspectRol :: PerspectRol -> CouchdbResource
+
+foreign import unwrapPerspectContext :: PerspectContext -> CouchdbResource
 
 -- | Get the property definitions of a Resource.
 getCouchdbResource :: forall e. Resource -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) CouchdbResource

@@ -1,8 +1,10 @@
 'use strict';
-/*
- Generate a guid (taken from http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript)
- */
-exports.castPerspectRol = function(obj)
+function id(obj)
 {
   return obj;
 }
+
+exports.castPerspectRol = id
+exports.castPerspectContext = id;
+exports.unwrapPerspectRol = id;
+exports.unwrapPerspectContext = id;
