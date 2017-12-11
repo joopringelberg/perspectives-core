@@ -19,7 +19,7 @@ type OptionalComment = Maybe Comment
 
 newtype Comments e = Comments
   { commentBefore :: Array Comment
-  , commentAfter :: OptionalComment
+  , commentAfter :: Array Comment -- LET OP: NET VERANDERD van OptionalComment. Nog niet uitgewerkt!
   | e}
 
 type PropertyComments = Comments ()
@@ -51,13 +51,14 @@ newtype BinnenRol =
     , pspType :: ID
     , binding :: Maybe ID
     , properties :: StrMap (Array String)
+    , comments :: Maybe ContextRoleComments
     }
 
 type PerspectName = String
 type PropertyName = String
 type RoleName = String
 
-data TypeDeclaration = TypeDeclaration PerspectName PerspectName OptionalComment
+data TypeDeclaration = TypeDeclaration PerspectName PerspectName (Array Comment)
 
 data RolePropertyAssignment = RolePropertyAssignment PropertyName SimpleValue
 

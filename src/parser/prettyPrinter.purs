@@ -9,15 +9,15 @@ import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
 import Data.Array (replicate)
 import Data.Foldable (traverse_)
-import Data.Maybe (maybe)
-import Data.StrMap (StrMap, foldM)
+import Data.Maybe (Maybe(..), maybe)
+import Data.StrMap (StrMap, foldM, lookup)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Perspectives.Resource (PROPDEFS, getRole)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (Comment, Comments(..), PerspectContext(..), PerspectRol(..))
-import Prelude (Unit, bind, discard, pure, unit, ($), (*>), (+), (-), (<>))
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextRoleComments, PerspectContext(..), PerspectRol(..), PropertyName)
+import Prelude (Unit, bind, discard, id, pure, unit, ($), (*>), (+), (-), (<>))
 
 type IndentLevel = Int
 
@@ -52,13 +52,13 @@ space = tell " "
 newline :: forall e. PerspectText e
 newline = tell "\n"
 
--- | Indents and prints the comment.
+-- | Indents and prints the comment, followed by a newline.
 comment :: forall e. PrettyPrinter Comment e
-comment c = identifier c *> newline
+comment c = identifier ( "--" <> c) *> newline
 
--- | Just prints the comment
+-- | Just prints the comment, preceded by a space.
 comment' :: forall e. PrettyPrinter Comment e
-comment' c = identifier' c *> newline
+comment' c = space *> identifier' ( "--" <> c)
 
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
@@ -79,27 +79,73 @@ indent p a = do
   pure result
 
 context :: forall e. PrettyPrinter PerspectContext e
-context (PerspectContext r) = do
+context (PerspectContext c) = do
   typeDeclaration
-  -- LET OP: de buitenrol is geen integraal onderdeel van de context!
-  (PerspectRol buitenRol) <- liftAff $ getRole r.buitenRol
-  strMapTraverse_ publicProperty buitenRol.properties
+  publicProperties
+  privateProperties
+  traverse_ (indent roleBinding) c.rolInContext
   where
     typeDeclaration = do
-      traverse_ comment (maybe [] (\(Comments c) -> c.commentBefore) r.comments)
-      identifier r.pspType
+      traverse_ comment (maybe [] (\(Comments cm) -> cm.commentBefore) c.comments)
+      identifier c.pspType
       space
-      identifier' r.id
+      identifier' c.id
       newline
-    publicProperty :: String -> Array String -> PerspectText e
-    publicProperty prop = indent (\val -> do
-      identifier "public"
-      space
-      identifier' prop
-      identifier' " = "
-      simpleValue val
-      newline)
+    publicProperties = do
+      -- LET OP: de buitenrol is geen integraal onderdeel van de context!
+      (PerspectRol buitenRol) <- liftAff $ getRole c.buitenRol
+      let
+        publicProperty :: String -> Array String -> PerspectText e
+        publicProperty prop = indent (\val -> do
+          traverse_ comment (commentBeforeRolProperty buitenRol.comments prop)
+          identifier ("public " <> prop <> " = ")
+          simpleValue val
+          traverse_ comment' (commentAfterRolProperty buitenRol.comments prop)
+          newline)
+      strMapTraverse_ publicProperty buitenRol.properties
+    privateProperties = do
+      let
+        (BinnenRol binnenRol) = c.binnenRol
+        publicProperty :: String -> Array String -> PerspectText e
+        publicProperty prop = indent (\val -> do
+          traverse_ comment (commentBeforeRolProperty binnenRol.comments prop)
+          identifier ("private " <> prop <> " = ")
+          simpleValue val
+          traverse_ comment' (commentAfterRolProperty binnenRol.comments prop)
+          newline)
+      strMapTraverse_ publicProperty binnenRol.properties
+    roleBinding rolId = do
+      -- NB: This is the role of the context - not yet its binding!
+      (PerspectRol r) <- liftAff $ getRole rolId
+      traverse_ comment (maybe [] (\(Comments cmts)-> cmts.commentBefore) r.comments )
+      identifier $ r.pspType <> " => "
+      -- If the binding is defined inline, recursively display the context or role that is bound.
+      identifier' $ maybe "" id r.binding
+      traverse_ comment' (maybe [] (\(Comments cmts)-> cmts.commentAfter) r.comments )
+      newline
+      let
+        roleProperty :: String -> Array String -> PerspectText e
+        roleProperty prop = indent (\val -> do
+          traverse_ comment (commentBeforeRolProperty r.comments prop)
+          identifier (prop <> " = ")
+          simpleValue val
+          traverse_ comment' (commentAfterRolProperty r.comments prop)
+          newline)
+      strMapTraverse_ roleProperty r.properties
 
+
+
+commentBeforeRolProperty :: Maybe ContextRoleComments -> PropertyName -> Array Comment
+commentBeforeRolProperty Nothing propname = []
+commentBeforeRolProperty (Just (Comments {propertyComments})) propname = case lookup propname propertyComments of
+  Nothing -> []
+  (Just (Comments{commentBefore})) -> commentBefore
+
+commentAfterRolProperty :: Maybe ContextRoleComments -> PropertyName -> Array Comment
+commentAfterRolProperty Nothing propname = []
+commentAfterRolProperty (Just (Comments {propertyComments})) propname = case lookup propname propertyComments of
+  Nothing -> []
+  (Just (Comments{commentAfter})) -> commentAfter
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map

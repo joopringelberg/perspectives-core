@@ -13,10 +13,10 @@ import Data.Tuple (Tuple(..), snd)
 import Perspectives.Guid (guid)
 import Perspectives.Syntax (BinnenRol(..), Comments(..), EntityCollection(..), NamedEntityCollection(..), OptionalComment, PerspectContext(..), PerspectEntity(..), PerspectName, PerspectRol(..), PropertyComments, PropertyName, SimpleValue(..), TypeDeclaration(..), Comment)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (/=), (<$>), (<*), (<*>), (<>))
+import Prelude (Unit, bind, pure, show, unit, ($), ($>), (*>), (/=), (<$>), (<*), (<*>), (<>), discard)
 import Text.Parsing.Indent (block, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (choice, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
@@ -29,9 +29,13 @@ oneLineComment :: IP OptionalComment
 oneLineComment = optionMaybe $ try
     (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace)))
 
-inLineComment :: IP OptionalComment
-inLineComment = optionMaybe $ try
-    (sameLine *> (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace))))
+inLineComment :: IP (Array Comment)
+inLineComment = try $ option [] do
+  sameLine
+  _ <- (STRING.string "--")
+  chars <- AR.many (satisfy (_ /= '\n'))
+  _ <- whiteSpace
+  pure [fromCharArray chars]
 
 manyOneLineComments :: IP (Array Comment)
 manyOneLineComments = AR.many
@@ -255,6 +259,7 @@ context = withPos do
           , pspType: ":BinnenRol"
           , binding: Just $ instanceName <> "_buitenRol"
           , properties: fromFoldable (snd <$> privateProps)
+          , comments: Just $ Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
           }
 
         buitenRol = PerspectRol
@@ -264,7 +269,7 @@ context = withPos do
           , context: instanceName
           , properties: fromFoldable (snd <$> publicProps)
           , gevuldeRollen: empty
-          , comments: Just $ Comments { commentBefore: [], commentAfter: Nothing, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
+          , comments: Just $ Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
           }
 
         (entities :: StrMap PerspectEntity) =
@@ -298,7 +303,7 @@ role = withPos do
                 , context: instanceName
                 , properties: fromFoldable $ snd <$> props
                 , gevuldeRollen: empty
-                , comments: Just (Comments { commentBefore: cmtBefore, commentAfter: Nothing, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props})
+                , comments: Just (Comments { commentBefore: cmtBefore, commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props})
                 })))))
 
 -- | expression = context | role
@@ -445,3 +450,9 @@ test10c = """:ContextType :Aangifte
 			public :isFunctioneel = true
 """
 -- runIndentParser test10c context
+
+test11 :: String
+test11 = """:Aangifte :A
+	--Commentaar voor de properties
+	public :urgentie = 1 -- Commentaar achter de property
+  """
