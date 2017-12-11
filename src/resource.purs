@@ -31,6 +31,12 @@ getRole id = do
   cdbr <- getCouchdbResource id
   pure $ castPerspectRol cdbr
 
+-- | Get the property definitions of a Resource.
+getContext :: forall e. Resource -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) PerspectContext
+getContext id = do
+  cdbr <- getCouchdbResource id
+  pure $ castPerspectContext cdbr
+
 foreign import castPerspectRol :: CouchdbResource -> PerspectRol
 
 foreign import castPerspectContext :: CouchdbResource -> PerspectContext

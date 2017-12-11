@@ -14,7 +14,7 @@ import Data.StrMap (StrMap, foldM, lookup)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
-import Perspectives.Resource (PROPDEFS, getRole)
+import Perspectives.Resource (PROPDEFS, getContext, getRole)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextRoleComments, PerspectContext(..), PerspectRol(..), PropertyName)
 import Prelude (Unit, bind, discard, id, pure, unit, ($), (*>), (+), (-), (<>))
@@ -133,8 +133,6 @@ context (PerspectContext c) = do
           newline)
       strMapTraverse_ roleProperty r.properties
 
-
-
 commentBeforeRolProperty :: Maybe ContextRoleComments -> PropertyName -> Array Comment
 commentBeforeRolProperty Nothing propname = []
 commentBeforeRolProperty (Just (Comments {propertyComments})) propname = case lookup propname propertyComments of
@@ -149,3 +147,24 @@ commentAfterRolProperty (Just (Comments {propertyComments})) propname = case loo
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
+
+sourceText :: forall e. PrettyPrinter PerspectContext e
+sourceText (PerspectContext c) = do
+  textDeclaration
+  newline
+  traverse_ definition c.rolInContext
+  where
+    textDeclaration = do
+      traverse_ comment (maybe [] (\(Comments cm) -> cm.commentBefore) c.comments)
+      identifier "Text "
+      identifier' c.id
+      newline
+    definition rolId = do
+      -- NB: This is the role of the text - not yet the definition itself!
+      (PerspectRol r) <- liftAff $ getRole rolId
+      case r.binding of
+        Nothing -> newline
+        (Just id) -> do
+          def <- liftAff $ getContext id
+          context def
+          newline

@@ -13,9 +13,9 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
-import Perspectives.ContextRoleParser (context) as CRP
+import Perspectives.ContextRoleParser (sourceText) as CRP
 import Perspectives.IndentParser (runIndentParser)
-import Perspectives.PrettyPrinter (context, prettyPrint, strMapTraverse_)
+import Perspectives.PrettyPrinter (prettyPrint, strMapTraverse_, sourceText)
 import Perspectives.Resource (PROPDEFS)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (EntityCollection(..), NamedEntityCollection(..), PerspectEntity(..))
@@ -91,19 +91,18 @@ ui =
     _ <- H.query (AceSlot 1) $ H.action (ChangeText "")
     pure next
   eval (HandleAceUpdate text next) =
-    case runIndentParser text CRP.context of
+    case runIndentParser text CRP.sourceText of
       (Right (NamedEntityCollection ident (EntityCollection j))) -> do
         _ <- H.liftAff $ strMapTraverse_ storePerspectEntityInResourceDefinitions j
         case lookup ident j of
           Nothing -> pure next
           (Just (Context c)) -> do
-            t <- H.liftAff $ prettyPrint c context
+            t <- H.liftAff $ prettyPrint c sourceText
             _ <- H.query (AceSlot 2) $ H.action (ChangeText t)
             H.modify (_ { text = t })
             pure next
           (Just (Rol _)) -> pure next
       otherwise -> pure next
-    -- pure next
   eval (Load next) = do
     response <- H.liftAff $ AX.get ("http://www.pureperspectives.nl/src/editor/perspectives.psp")
     H.modify (_ { text = response.response })

@@ -2,7 +2,7 @@ module Perspectives.Parser where
 
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Perspectives.ContextRoleParser (context, expression)
+import Perspectives.ContextRoleParser (context, expression, sourceText)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Syntax (NamedEntityCollection(..))
 import Prelude (show, (*>), (-))
@@ -17,7 +17,7 @@ type AceError =
   , type :: String }
 
 parse :: String -> Either (Array AceError) String
-parse s = case runIndentParser s context of
+parse s = case runIndentParser s sourceText of
   (Left (ParseError message (Position{line, column}))) -> Left [
     { row: line - 1
     , column: column
@@ -40,6 +40,7 @@ expressionTypeForNextLine :: String -> String
 expressionTypeForNextLine s = case runIndentParser s (whiteSpace *> expression) of
   (Left _) -> "Verwacht: -- commentaar of: Type Instantie"
   (Right etype) -> case etype of
+    "textDeclaration" -> "Verwacht: context."
     "typeDeclaration" -> "Verwacht: (public|private) property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
     "publicContextPropertyAssignment" -> "Verwacht: public|private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
     "privateContextPropertyAssignment" -> "Verwacht: private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."

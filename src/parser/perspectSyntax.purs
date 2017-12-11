@@ -58,6 +58,8 @@ type PerspectName = String
 type PropertyName = String
 type RoleName = String
 
+data TextDeclaration = TextDeclaration PerspectName (Array Comment)
+
 data TypeDeclaration = TypeDeclaration PerspectName PerspectName (Array Comment)
 
 data RolePropertyAssignment = RolePropertyAssignment PropertyName SimpleValue
