@@ -7,7 +7,7 @@ import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Ace.EditSession (clearAnnotations, getLine, setAnnotations)
+import Ace.EditSession (clearAnnotations, getLine, setAnnotations, setUseSoftTabs)
 import Ace.Types (ACE, Editor, Position(..))
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR)
@@ -72,6 +72,7 @@ aceComponent mode theme =
           session <- H.liftEff $ Editor.getSession editor
           _ <- liftEff $ Session.setMode mod session
           _ <- liftEff $ Editor.setTheme them editor
+          _ <- liftEff $ setUseSoftTabs false session
           H.modify (_ { editor = Just editor })
           H.subscribe $ H.eventSource_ (Session.onChange session) (H.request HandleChange)
       pure next
