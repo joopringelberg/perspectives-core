@@ -2,7 +2,7 @@ module Perspectives.Parser where
 
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Perspectives.ContextRoleParser (context, expression, sourceText)
+import Perspectives.ContextRoleParser (expression, sourceText)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Syntax (NamedEntityCollection(..))
 import Prelude (show, (*>), (-))

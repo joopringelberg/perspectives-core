@@ -574,3 +574,10 @@ test15 = """:Aangifte :A
 	:aangever =>
 		:RolDef :Pietersen
 		  :prop = 1"""
+
+test16 :: String
+test16 = """Text :Mytext
+:Aangifte :A
+	:aangever =>
+		:RolDef :Pietersen
+			public :betrouwbaarheid = 1"""

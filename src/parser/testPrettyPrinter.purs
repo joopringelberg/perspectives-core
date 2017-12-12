@@ -23,7 +23,7 @@ test = case runIndentParser "--Commentaar voor :A1\n:Aangifte :A1\n\tpublic :urg
     _ <- strMapTraverse_ storePerspectEntityInResourceDefinitions j
     case lookup ident j of
       Nothing -> pure "onbekende fout"
-      (Just (Context c)) -> prettyPrint c context
+      (Just (Context c)) -> prettyPrint c (context [])
       (Just (Rol _)) -> pure "er is geen rol"
   otherwise -> pure "fout in expressie"
 
