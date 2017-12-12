@@ -42,14 +42,14 @@ fetchCouchdbResource id = if isDomeinURI id
 fetchIndividualCouchDbDefinition :: forall e. Resource -> (AsyncResource e CouchdbResource)
 fetchIndividualCouchDbDefinition id = do
   v <- makeEmptyVar
-  _ <- forkAff do
-        res <- affjax $ userResourceRequest {url = baseURL <> id}
-        case res.status of
-          StatusCode 200 ->
-            case stringToPropDefs res.response of
-              (Left message) -> throwError $ error (message <> " (" <> id <> ")")
-              Right pd -> putVar pd v
-          otherwise -> throwError $ error ("fetchDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+  -- _ <- forkAff do
+  res <- affjax $ userResourceRequest {url = baseURL <> id}
+  case res.status of
+    StatusCode 200 ->
+      case stringToPropDefs res.response of
+        (Left message) -> throwError $ error (message <> " (" <> id <> ")")
+        Right pd -> putVar pd v
+    otherwise -> throwError $ error ("fetchIndividualCouchDbDefinition " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   takeVar v
 
 baseURL :: String

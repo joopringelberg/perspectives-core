@@ -1,7 +1,7 @@
 module Perspectives.Resource where
 
 import Prelude
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (Aff, catchError)
 import Control.Monad.Aff.AVar (AVar, makeVar, readVar)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.Eff.Class (liftEff)
@@ -26,16 +26,20 @@ getPropDefs id = do
   pure $ PropDefs cdbr
 
 -- | Get the property definitions of a Resource.
-getRole :: forall e. Resource -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) PerspectRol
-getRole id = do
-  cdbr <- getCouchdbResource id
-  pure $ castPerspectRol cdbr
+getRole :: forall e. Resource -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectRol)
+getRole id = catchError
+  do
+    cdbr <- getCouchdbResource id
+    pure $ Just $ castPerspectRol cdbr
+  \_ -> pure Nothing
 
 -- | Get the property definitions of a Resource.
-getContext :: forall e. Resource -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) PerspectContext
-getContext id = do
-  cdbr <- getCouchdbResource id
-  pure $ castPerspectContext cdbr
+getContext :: forall e. Resource -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectContext)
+getContext id = catchError
+  do
+    cdbr <- getCouchdbResource id
+    pure $ Just $ castPerspectContext cdbr
+  \_ -> pure Nothing
 
 foreign import castPerspectRol :: CouchdbResource -> PerspectRol
 
