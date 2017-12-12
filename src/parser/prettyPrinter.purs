@@ -129,8 +129,8 @@ context definedResources (PerspectContext c) = do
           case r.binding of
             Nothing -> pure unit
             (Just b) -> do
-              -- If the binding is not defined in the same text, recursively display the context or role that is bound
-              -- (But only if it has been defined at all! Otherwise merely display its name).
+              -- (INLINE CONTEXT)If the binding is not defined in the same text, recursively display the context or
+              -- role that is bound (But only if it has been defined at all! Otherwise merely display its name).
               case elemIndex b definedResources of
                 Nothing -> do
                   maybeContext <- liftAff $ getContext b
@@ -139,6 +139,7 @@ context definedResources (PerspectContext c) = do
                     (Just contxt) -> do
                       newline
                       indent (context definedResources) contxt
+                      strMapTraverse_ (roleProperty r) r.properties
                 otherwise -> reference b r
         Nothing -> pure unit
       where
@@ -147,15 +148,16 @@ context definedResources (PerspectContext c) = do
           identifier' b
           traverse_ comment' (maybe [] (\(Comments cmts)-> cmts.commentAfter) r.comments )
           newline
-          let
-            roleProperty :: String -> Array String -> PerspectText e
-            roleProperty prop = indent (\val -> do
-              traverse_ comment (commentBeforeRolProperty r.comments prop)
-              identifier (prop <> " = ")
-              simpleValue val
-              traverse_ comment' (commentAfterRolProperty r.comments prop)
-              newline)
-          strMapTraverse_ roleProperty r.properties
+          strMapTraverse_ (roleProperty r) r.properties
+
+        roleProperty :: forall f. {comments :: Maybe ContextRoleComments | f} -> String -> Array String -> PerspectText e
+        roleProperty r1 prop = indent (\val -> do
+          traverse_ comment (commentBeforeRolProperty r1.comments prop)
+          identifier (prop <> " = ")
+          simpleValue val
+          traverse_ comment' (commentAfterRolProperty r1.comments prop)
+          newline)
+
 
 commentBeforeRolProperty :: Maybe ContextRoleComments -> PropertyName -> Array Comment
 commentBeforeRolProperty Nothing propname = []
