@@ -109,15 +109,15 @@ context definedResources (PerspectContext c) = do
             publicProperty :: String -> Array String -> PerspectText e
             publicProperty prop = indent (\val -> do
               -- Dit vergt dat we een Comments structuur bewaren voor elke property.
-              withComments (\r-> commentBeforeRolProperty r.comments prop)
-                (\_-> identifier ("public " <> prop <> " = ") *> simpleValue val *> newline)
-                buitenRol)
+              -- withComments (\r-> commentBeforeRolProperty r.comments prop)
+              --   (\_-> identifier ("public " <> prop <> " = ") *> simpleValue val *> newline)
+              --   buitenRol)
 
-              -- traverse_ comment (commentBeforeRolProperty buitenRol.comments prop)
-              -- identifier ("public " <> prop <> " = ")
-              -- simpleValue val
-              -- traverse_ comment' (commentAfterRolProperty buitenRol.comments prop)
-              -- newline)
+              traverse_ comment (commentBeforeRolProperty buitenRol.comments prop)
+              identifier ("public " <> prop <> " = ")
+              simpleValue val
+              traverse_ comment' (commentAfterRolProperty buitenRol.comments prop)
+              newline)
           strMapTraverse_ publicProperty buitenRol.properties
         Nothing -> pure unit
 

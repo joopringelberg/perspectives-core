@@ -9,17 +9,19 @@ import Data.Char.Unicode (isLower)
 import Data.Foldable (elem)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, empty, fromFoldable, insert, singleton, unions)
+import Data.StrMap (StrMap, empty, fromFoldable)
 import Data.String (fromCharArray)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), snd)
 import Perspectives.Guid (guid)
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), EntityCollection(..), NamedEntityCollection(..), OptionalComment, PerspectContext(..), PerspectEntity(..), PerspectName, PerspectRol(..), PropertyComments, PropertyName, SimpleValue(..), TextDeclaration(..), ContextDeclaration(..))
+import Perspectives.ResourceTypes (DomeinFileEffects)
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), PerspectContext(..), PerspectName, PerspectRol(..), PropertyComments, PropertyName, SimpleValue(..), TextDeclaration(..), ID)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<#>), (<$>), (<*), (<*>), (<>), (==))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
-import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>), (<??>))
+import Text.Parsing.Parser.Combinators (choice, option, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
@@ -29,11 +31,7 @@ import Text.Parsing.Parser.Token (alphaNum, upper)
 -- Comments
 -----------------------------------------------------------
 
-oneLineComment :: IP OptionalComment
-oneLineComment = optionMaybe $ try
-    (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace)))
-
-inLineComment :: IP (Array Comment)
+inLineComment :: forall e. IP (Array Comment) e
 inLineComment = try $ option [] do
   sameLine
   _ <- (STRING.string "--")
@@ -41,7 +39,7 @@ inLineComment = try $ option [] do
   _ <- whiteSpace
   pure [fromCharArray chars]
 
-manyOneLineComments :: IP (Array Comment)
+manyOneLineComments :: forall e. IP (Array Comment) e
 manyOneLineComments = AR.many
     (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace)))
 
@@ -49,53 +47,53 @@ manyOneLineComments = AR.many
 -- Identifiers
 -----------------------------------------------------------
 
-reservedOp :: String -> IP Unit
+reservedOp :: forall e. String -> IP Unit e
 reservedOp = token.reservedOp
 
-reserved :: String -> IP Unit
+reserved :: forall e. String -> IP Unit e
 reserved = token.reserved
 
-identifier :: IP String
+identifier :: forall e. IP String e
 identifier = token.identifier
 
-lexeme :: forall a. IP a -> IP a
+lexeme :: forall a e. IP a e -> IP a e
 lexeme = token.lexeme
 
-int :: IP SimpleValue
+int :: forall e. IP SimpleValue e
 int = Int <$> token.integer
 
-bool :: IP SimpleValue
+bool :: forall e. IP SimpleValue e
 bool = reserved "true" $> Bool true <|> reserved "false" $> Bool false
 
-string :: IP SimpleValue
+string :: forall e. IP SimpleValue e
 string = String <$> token.stringLiteral
 
-simpleValue :: IP SimpleValue
+simpleValue :: forall e. IP SimpleValue e
 simpleValue = string <|> int <|> bool
 
-identLetter :: IP Char
+identLetter :: forall e. IP Char e
 identLetter = alphaNum <|> STRING.oneOf ['_', '\'']
 
-identLetterString :: IP String
+identLetterString :: forall e. IP String e
 identLetterString = fromCharArray <$> AR.many identLetter
 
 -- /([A-Z]\w*\b)/
 -- /(\p{Uppercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+)/gu
-capitalizedString :: IP String
+capitalizedString :: forall e. IP String e
 capitalizedString = f <$> upper <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
-lower :: IP Char
+lower :: forall e. IP Char e
 lower = satisfy isLower <?> "uppercase letter"
 
 -- /([a-z]\w*\b)/
 -- /(\b\p{Lowercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+\b)/gu
-uncapitalizedString :: IP String
+uncapitalizedString :: forall e. IP String e
 uncapitalizedString = f <$> lower <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
 -- domeinName = 'model:' upper alphaNum* '#'
-domeinName :: IP String
+domeinName :: forall e. IP String e
 domeinName = do
   _ <- STRING.string "model:"
   domein <- capitalizedString
@@ -103,43 +101,43 @@ domeinName = do
   pure $ "model:" <> domein <> "#"
 
 -- localResourceName = upper alphaNum*
-localResourceName :: IP String
+localResourceName :: forall e. IP String e
 localResourceName = capitalizedString
 
 -- localPropertyName = lower alphaNum*
-localPropertyName :: IP String
+localPropertyName :: forall e. IP String e
 localPropertyName = uncapitalizedString
 
 -- prefix = lower* ':'
-prefix :: IP String
+prefix :: forall e. IP String e
 prefix = (f <$> AR.many lower <*> char ':') where
   f ca c = fromCharArray $ AR.snoc ca c
 
 -- prefixedResourceName = prefix localResourceName
-prefixedResourceName :: IP String
+prefixedResourceName :: forall e. IP String e
 prefixedResourceName = lexeme $ (<>) <$> prefix <*> localResourceName
 
 -- prefixedPropertyName = prefix localPropertyName
-prefixedPropertyName :: IP String
+prefixedPropertyName :: forall e. IP String e
 prefixedPropertyName = lexeme ((<>) <$> prefix <*> localPropertyName)
 
 -- qualifiedResourceName = domeinName localResourceName
-qualifiedResourceName :: IP String
+qualifiedResourceName :: forall e. IP String e
 qualifiedResourceName = lexeme ((<>) <$> domeinName <*> localResourceName)
 
 -- qualifiedPropertyName = domeinName localPropertyName
-qualifiedPropertyName :: IP String
+qualifiedPropertyName :: forall e. IP String e
 qualifiedPropertyName = lexeme ((<>) <$> domeinName <*> localPropertyName)
 
 -- resourceName = prefixedResourceName | qualifiedResourceName
-resourceName :: IP String
+resourceName :: forall e. IP String e
 resourceName = (qualifiedResourceName <|> prefixedResourceName) <?> "the name of a resource (Context or Role)."
 
 -- propertyName = prefixedPropertyName | qualifiedPropertyName
-propertyName :: IP String
+propertyName :: forall e. IP String e
 propertyName = (qualifiedPropertyName <|> prefixedPropertyName) <?> "a property or role name."
 
-roleName :: IP String
+roleName :: forall e. IP String e
 roleName = propertyName
 
 -----------------------------------------------------------
@@ -148,7 +146,7 @@ roleName = propertyName
 dataTypes :: Array String
 dataTypes = ["Number", "String", "Bool", "Date"]
 
-dataType :: IP SimpleValue
+dataType :: forall e. IP SimpleValue e
 dataType = try do
   s <- identifier
   if elem s dataTypes then pure $ String s else fail "one of 'Number', 'String', 'Bool' or 'Date'."
@@ -159,7 +157,7 @@ dataType = try do
 
 -- | @ getPosition @ returns current position
 -- | should probably be added to Text.Parsing.Parser.Pos
-getPosition :: IP Position
+getPosition :: forall e. IP Position e
 getPosition = gets \(ParseState _ pos _) -> pos
 
 sourceColumn :: Position -> Int
@@ -169,7 +167,7 @@ sourceLine :: Position -> Int
 sourceLine (Position {line: l, column: _}) = l
 
 -- | Parses only on the next line as the reference
-nextLine :: IP Unit
+nextLine :: forall e. IP Unit e
 nextLine = do
     pos <- getPosition
     s   <- lift get
@@ -179,14 +177,14 @@ nextLine = do
 -----------------------------------------------------------
 
 -- | contextDeclaration = resourceName resourceName
-textDeclaration :: IP TextDeclaration
+textDeclaration :: forall e. IP TextDeclaration e
 textDeclaration = (TextDeclaration <$> (reserved "Text" *> resourceName) <*> inLineComment) <?> "the text declaration: Text <name>."
 
 -- | contextDeclaration = resourceName resourceName
-contextDeclaration :: IP ContextDeclaration
+contextDeclaration :: forall e. IP ContextDeclaration e
 contextDeclaration = (ContextDeclaration <$> resourceName <*> resourceName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
 
-typedPropertyAssignment :: String -> IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+typedPropertyAssignment :: forall e. String -> IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
 typedPropertyAssignment scope = try $ withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBefore: cb, commentAfter: cmt}) (Tuple pn [show pv]))
     <$> manyOneLineComments <* reserved scope
     <*> propertyName <* (sameOrIndented *> reservedOp "=")
@@ -194,15 +192,15 @@ typedPropertyAssignment scope = try $ withPos $ (\cb pn pv cmt -> Tuple (Comment
     <*> inLineComment
 
 -- | publicContextPropertyAssignment = 'public' propertyName '=' simpleValue
-publicContextPropertyAssignment :: IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+publicContextPropertyAssignment :: forall e. IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
 publicContextPropertyAssignment = (typedPropertyAssignment "public") <?> "public propertyname = value"
 
 -- | privateContextPropertyAssignment = 'private' propertyName '=' simpleValue
-privateContextPropertyAssignment :: IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+privateContextPropertyAssignment :: forall e. IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
 privateContextPropertyAssignment = (typedPropertyAssignment "private") <?> "private propertyname = value"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
-rolePropertyAssignment :: IP (Tuple PropertyComments (Tuple PropertyName (Array String)))
+rolePropertyAssignment :: forall e. IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
 rolePropertyAssignment = try (withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBefore: cb, commentAfter: cmt}) (Tuple pn [show pv]))
     <$> manyOneLineComments
     <*> propertyName <* (sameOrIndented *> reservedOp "=")
@@ -210,7 +208,7 @@ rolePropertyAssignment = try (withPos $ (\cb pn pv cmt -> Tuple (Comments {comme
     <*> inLineComment) <?> "propertyname = value"
 
 -- | roleBinding = roleName '=>' (resourceName | context) rolePropertyAssignment*
-roleBinding :: PerspectName -> IP NamedEntityCollection
+roleBinding :: forall e. PerspectName -> IP String (DomeinFileEffects e)
 roleBinding contextID = ("'rolename =>' followed by context declaration on next line' " <??>
   (withPos $ try do
     cmtBefore <- manyOneLineComments
@@ -218,22 +216,21 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
       rname <- (roleName <* (sameLine *> reservedOp "=>"))
       cmt <- inLineComment
       _ <- nextLine
-      (NamedEntityCollection pname (EntityCollection entities)) <- indented *> context
+      (contextBuitenRol :: String) <- indented *> context
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       rolId <- pure (guid unit)
-      pure $ (NamedEntityCollection rolId
-        (EntityCollection
-          (insert rolId
-            (Rol (PerspectRol
-              { id: rolId
-              , pspType: rname
-              , binding: Just pname
-              , context: contextID
-              , properties: fromFoldable (snd <$> props)
-              , gevuldeRollen: empty
-              , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
-              }))
-              entities)))))
+      lift $ lift $ storeRoleInResourceDefinitions rolId
+        (PerspectRol
+          { id: rolId
+          , pspType: rname
+          , binding: Just contextBuitenRol
+          , context: contextID
+          , properties: fromFoldable (snd <$> props)
+          , gevuldeRollen: empty
+          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
+          })
+      pure rolId))
+
   <|>
   ("rolename => resourcename" <??> (withPos $ try do
     cmtBefore <- manyOneLineComments
@@ -243,19 +240,17 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
       cmt <- inLineComment
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       rolId <- pure (guid unit)
-      pure $ (NamedEntityCollection rolId
-        (EntityCollection
-          (singleton
-            rolId
-            (Rol (PerspectRol
-              { id: rolId
-              , pspType: rname
-              , binding: Just ident
-              , context: contextID
-              , properties: fromFoldable (snd <$> props)
-              , gevuldeRollen: empty
-              , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props }
-              })))))))
+      lift $ lift $ storeRoleInResourceDefinitions rolId
+        (PerspectRol
+          { id: rolId
+          , pspType: rname
+          , binding: Just ident
+          , context: contextID
+          , properties: fromFoldable (snd <$> props)
+          , gevuldeRollen: empty
+          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props }
+          })
+      pure rolId))
 
 -- TODO: query
 
@@ -268,7 +263,7 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
 -- | roleBinding*
 -- | The parser never backtracks over a Context. This means we can safely perform the side
 -- | effect of storing its constituent roles and contexts.
-context :: IP Unit
+context :: forall e. IP String (DomeinFileEffects e)
 context = withPos do
   cmtBefore <- manyOneLineComments
   withPos do
@@ -276,8 +271,8 @@ context = withPos do
     do
       (publicProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- option Nil (indented *> (block publicContextPropertyAssignment))
       (privateProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- option Nil (indented *> (block privateContextPropertyAssignment))
-      (rolebindings :: List (NamedEntityCollection)) <- option Nil (indented *> (block $ roleBinding instanceName))
-      lift $ storeContextInResourceDefinitions instanceName
+      (rolebindings :: List String) <- option Nil (indented *> (block $ roleBinding instanceName))
+      lift $ lift $ storeContextInResourceDefinitions instanceName
         (PerspectContext
           { id: instanceName
           , pspType: typeName
@@ -290,10 +285,10 @@ context = withPos do
               , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
               }
           , buitenRol: instanceName <> "_buitenRol"
-          , rolInContext: AR.fromFoldable $ (\(NamedEntityCollection id _) -> id) <$> rolebindings
+          , rolInContext: AR.fromFoldable rolebindings
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
         })
-      lift $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
+      lift $ lift $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
         (PerspectRol
           { id: instanceName <> "_buitenRol"
           , pspType: ":BuitenRol"
@@ -303,10 +298,11 @@ context = withPos do
           , gevuldeRollen: empty
           , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
           })
+      pure $ instanceName <> "_buitenRol"
 
 
 -- Helper functions for development.
-allTheRest :: IP String
+allTheRest :: forall e. IP String e
 allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
 emptyPropertyComments :: StrMap (Comments ())
@@ -316,7 +312,7 @@ emptyPropertyComments = empty
 -- Expression
 -----------------------------------------------------------
 
-expression :: IP String
+expression :: forall e. IP String (DomeinFileEffects e)
 expression = choice
   [ try (textDeclaration *> (pure "textDeclaration"))
   , try (contextDeclaration *> (pure "contextDeclaration"))
@@ -331,7 +327,7 @@ expression = choice
 -----------------------------------------------------------
 -- Text
 -----------------------------------------------------------
-sourceText :: IP NamedEntityCollection
+sourceText :: forall e. IP ID (DomeinFileEffects e)
 sourceText = withPos do
   cmtBefore <- manyOneLineComments
   withPos do
@@ -339,41 +335,39 @@ sourceText = withPos do
     (publicProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- (block publicContextPropertyAssignment)
     (privateProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- (block privateContextPropertyAssignment)
     defs <- AR.many context
-    roleBindings <- pure $ defs <#> (\(NamedEntityCollection pname (EntityCollection entities)) ->
-      let roleId = guid unit
-      in
-        (NamedEntityCollection roleId
-          (EntityCollection
-            (insert roleId
-              (Rol (PerspectRol
-                { id: roleId
-                , pspType: "psp:text_Item"
-                , binding: Just pname
-                , context: textName
-                , properties: empty
-                , gevuldeRollen: empty
-                , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
-                }))
-                entities))))
-    let
-      ctxt = PerspectContext
+    (roleBindings :: Array String) <- lift $ lift $ traverse (\buitenRolId ->
+      do
+        let roleId = guid unit
+        storeRoleInResourceDefinitions roleId
+          (PerspectRol
+            { id: roleId
+            , pspType: "psp:text_Item"
+            , binding: Just buitenRolId
+            , context: textName
+            , properties: empty
+            , gevuldeRollen: empty
+            , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
+            })
+        pure roleId) defs
+    lift $ lift $ storeContextInResourceDefinitions textName
+      (PerspectContext
         { id: textName
         , pspType: "psp:SourceText"
-        , binnenRol: binnenRol
+        , binnenRol:
+          BinnenRol
+            { id: textName <> "_binnenRol"
+            , pspType: ":BinnenRol"
+            , binding: Just $ textName <> "_buitenRol"
+            , properties: fromFoldable (snd <$> privateProps)
+            , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
+            }
         , buitenRol: textName <> "_buitenRol"
-        , rolInContext: AR.fromFoldable $ (\(NamedEntityCollection id _) -> id) <$> roleBindings
+        , rolInContext: roleBindings
         , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
-      }
+        })
 
-      binnenRol = BinnenRol
-        { id: textName <> "_binnenRol"
-        , pspType: ":BinnenRol"
-        , binding: Just $ textName <> "_buitenRol"
-        , properties: fromFoldable (snd <$> privateProps)
-        , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
-        }
-
-      buitenRol = PerspectRol
+    lift $ lift $ storeRoleInResourceDefinitions (textName <> "_buitenRol")
+      (PerspectRol
         { id: textName <> "_buitenRol"
         , pspType: ":BuitenRol"
         , binding: Nothing
@@ -381,15 +375,8 @@ sourceText = withPos do
         , properties: fromFoldable (snd <$> publicProps)
         , gevuldeRollen: empty
         , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
-        }
-
-      (entities :: StrMap PerspectEntity) =
-        unions $ (\(NamedEntityCollection _ (EntityCollection m)) -> m) <$> roleBindings
-
-    pure
-      (NamedEntityCollection textName
-        (EntityCollection (insert textName (Context ctxt)
-          (insert (textName <> "_buitenRol") (Rol buitenRol) entities))))
+        })
+    pure textName
 
 -----------------------------------------------------------
 -- Tests

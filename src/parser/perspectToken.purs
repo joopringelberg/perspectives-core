@@ -2,22 +2,23 @@ module Perspectives.Token where
 
 import Control.Alt ((<|>))
 import Control.Monad (class Monad)
-import Control.Monad.State (State)
+import Control.Monad.Aff (Aff)
+import Control.Monad.State (StateT)
 import Text.Parsing.Parser (ParserT)
 import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (char, oneOf)
 import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, letter, makeTokenParser)
 
-type IndentTokenParser = GenTokenParser String (State Position)
+type IndentTokenParser e = GenTokenParser String (StateT Position (Aff e))
 
-token :: IndentTokenParser
+token :: forall e. IndentTokenParser e
 token = makeTokenParser perspectDef
 
 -- type LanguageDef = GenLanguageDef String Identity
 
-type IndentLanguageDef = GenLanguageDef String (State Position)
+type IndentLanguageDef e = GenLanguageDef String (StateT Position (Aff e))
 
-perspectDef :: IndentLanguageDef
+perspectDef :: forall e. IndentLanguageDef e
 -- perspectDef = LanguageDef (unGenLanguageDef haskellStyle)
 --                 { reservedOpNames = ["=", "=>"]
 --                 , reservedNames   = [ "private","public"]

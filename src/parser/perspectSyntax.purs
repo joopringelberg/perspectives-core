@@ -1,21 +1,12 @@
 module Perspectives.Syntax where
 
-import Data.List (List)
 import Data.Maybe (Maybe)
-import Data.StrMap (StrMap, values)
+import Data.StrMap (StrMap)
 import Prelude (class Show, show, (<>))
-
-data NamedEntityCollection = NamedEntityCollection PerspectName EntityCollection
-
-newtype EntityCollection = EntityCollection (StrMap PerspectEntity)
 
 type ID = String
 
-data PerspectEntity = Context PerspectContext | Rol PerspectRol
-
 type Comment = String
-
-type OptionalComment = Maybe Comment
 
 newtype Comments e = Comments
   { commentBefore :: Array Comment
@@ -62,13 +53,6 @@ data TextDeclaration = TextDeclaration PerspectName (Array Comment)
 
 data ContextDeclaration = ContextDeclaration PerspectName PerspectName (Array Comment)
 
-data RolePropertyAssignment = RolePropertyAssignment PropertyName SimpleValue
-
-type Scope = String
-data ContextPropertyAssignment = ContextPropertyAssignment PropertyName Scope SimpleValue
-
-data RolBinding = RolBinding RoleName PerspectName EntityCollection (List RolePropertyAssignment)
-
 data SimpleValue =
     String String
   | Int Int
@@ -84,16 +68,6 @@ foreign import jsonStringify :: forall a. {|a} -> String
 
 instance showPerspectContext :: Show PerspectContext where
   show (PerspectContext r) = jsonStringify r
-
-instance showNamedEntityCollection :: Show NamedEntityCollection where
-  show (NamedEntityCollection name collection) = name <> ": \n" <> show collection
-
-instance showEntityCollection :: Show EntityCollection where
-  show (EntityCollection s) = show (values s)
-
-instance showPerspectEntity :: Show PerspectEntity where
-  show (Context ct) = show ct
-  show (Rol r) = show r
 
 instance showPerspectRol :: Show PerspectRol where
   show (PerspectRol r) = jsonStringify r

@@ -14,6 +14,7 @@ import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
 import Perspectives.Parser (AceError, errorsIn)
+import Perspectives.ResourceTypes (DomeinFileEffects)
 
 -- | The state for the ace component - we only need a reference to the editor,
 -- | as Ace editor has its own internal state that we can query instead of
@@ -38,7 +39,7 @@ data AceOutput = TextChanged String
 type AceEffects eff = (ace :: ACE, avar :: AVAR | eff)
 
 -- | The Ace component definition.
-aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects eff))
+aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects (DomeinFileEffects eff)))
 aceComponent mode theme =
   H.lifecycleComponent
     { initialState: const initialState
@@ -62,7 +63,7 @@ aceComponent mode theme =
   -- The query algebra for the component handles the initialization of the Ace
   -- editor as well as responding to the `ChangeText` action that allows us to
   -- alter the editor's state.
-  eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects eff))
+  eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects (DomeinFileEffects eff)))
   eval = case _ of
     Initialize mod them next -> do
       H.getHTMLElementRef (H.RefLabel "ace") >>= case _ of
@@ -102,7 +103,8 @@ aceComponent mode theme =
           previousLine <- case r == 0 of
             true -> pure ""
             otherwise -> H.liftEff $ getLine (r-1) session
-          case errorsIn previousLine line of
+          errors <- H.liftAff $ errorsIn previousLine line
+          case errors of
             (Just annotations) -> H.liftEff $ setAnnotations ((\a@{row} -> a {row = row + r}) <$> annotations) session
             Nothing -> do
               _ <- H.liftEff $ clearAnnotations session

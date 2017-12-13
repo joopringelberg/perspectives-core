@@ -10,15 +10,13 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (lookup)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
 import Perspectives.ContextRoleParser (sourceText) as CRP
 import Perspectives.IndentParser (runIndentParser)
-import Perspectives.PrettyPrinter (prettyPrint, strMapTraverse_, sourceText)
-import Perspectives.Resource (PROPDEFS, storePerspectEntityInResourceDefinitions)
+import Perspectives.PrettyPrinter (prettyPrint, sourceText)
+import Perspectives.Resource (PROPDEFS, getContext)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (EntityCollection(..), NamedEntityCollection(..), PerspectEntity(..))
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects (PerspectEffects ()))) Unit
@@ -89,18 +87,18 @@ ui =
   eval (ClearText next) = do
     _ <- H.query (AceSlot 1) $ H.action (ChangeText "")
     pure next
-  eval (HandleAceUpdate text next) =
-    case runIndentParser text CRP.sourceText of
-      (Right (NamedEntityCollection ident (EntityCollection j))) -> do
-        _ <- H.liftAff $ strMapTraverse_ storePerspectEntityInResourceDefinitions j
-        case lookup ident j of
+  eval (HandleAceUpdate text next) = do
+    parseResult <- H.liftAff $ runIndentParser text CRP.sourceText
+    case parseResult of
+      (Right textName) -> do
+        maybeContext <- H.liftAff $ getContext textName
+        case maybeContext of
           Nothing -> pure next
-          (Just (Context c)) -> do
+          (Just c) -> do
             t <- H.liftAff $ prettyPrint c sourceText
             _ <- H.query (AceSlot 2) $ H.action (ChangeText t)
             H.modify (_ { text = t })
             pure next
-          (Just (Rol _)) -> pure next
       otherwise -> pure next
   eval (Load next) = do
     response <- H.liftAff $ AX.get ("http://www.pureperspectives.nl/src/editor/perspectives.psp")
