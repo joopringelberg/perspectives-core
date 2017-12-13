@@ -19,7 +19,7 @@ type OptionalComment = Maybe Comment
 
 newtype Comments e = Comments
   { commentBefore :: Array Comment
-  , commentAfter :: Array Comment -- LET OP: NET VERANDERD van OptionalComment. Nog niet uitgewerkt!
+  , commentAfter :: Array Comment
   | e}
 
 type PropertyComments = Comments ()
@@ -31,7 +31,7 @@ newtype PerspectContext = PerspectContext
   , binnenRol :: BinnenRol
   , buitenRol :: ID
   , rolInContext :: Array ID
-  , comments :: Maybe ContextRoleComments
+  , comments :: ContextRoleComments
   }
 
 newtype PerspectRol =
@@ -42,7 +42,7 @@ newtype PerspectRol =
     , context :: ID
     , properties :: StrMap (Array String)
     , gevuldeRollen :: StrMap (Array ID)
-    , comments :: Maybe ContextRoleComments
+    , comments :: ContextRoleComments
     }
 
 newtype BinnenRol =
@@ -51,7 +51,7 @@ newtype BinnenRol =
     , pspType :: ID
     , binding :: Maybe ID
     , properties :: StrMap (Array String)
-    , comments :: Maybe ContextRoleComments
+    , comments :: ContextRoleComments
     }
 
 type PerspectName = String
@@ -60,7 +60,7 @@ type RoleName = String
 
 data TextDeclaration = TextDeclaration PerspectName (Array Comment)
 
-data TypeDeclaration = TypeDeclaration PerspectName PerspectName (Array Comment)
+data ContextDeclaration = ContextDeclaration PerspectName PerspectName (Array Comment)
 
 data RolePropertyAssignment = RolePropertyAssignment PropertyName SimpleValue
 
@@ -103,8 +103,8 @@ instance showSimpleValue :: Show SimpleValue where
   show (Int i) = show i
   show (Bool b) = show b
 
-instance showTypeDeclaration :: Show TypeDeclaration where
-  show (TypeDeclaration tp inst cmt) = tp <> "=" <> inst <> show cmt
+instance showTypeDeclaration :: Show ContextDeclaration where
+  show (ContextDeclaration tp inst cmt) = tp <> "=" <> inst <> show cmt
 
 instance showComments :: Show (Comments e) where
   show (Comments {commentBefore, commentAfter}) = "commentBefore: " <> show commentBefore <> "\ncommentAfter: " <> show commentAfter

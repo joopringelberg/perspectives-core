@@ -63,3 +63,15 @@ getCouchdbResource id = do
     (Just avar) -> do
                     pd <- readVar avar
                     pure pd
+
+storeContextInResourceDefinitions :: forall e. String -> PerspectContext -> Aff (DomeinFileEffects e) Unit
+storeContextInResourceDefinitions key c = do
+  av <- makeVar (unwrapPerspectContext c)
+  _ <- liftEff $ poke resourceDefinitions key av
+  pure unit
+
+storeRoleInResourceDefinitions :: forall e. String -> PerspectRol -> Aff (DomeinFileEffects e) Unit
+storeRoleInResourceDefinitions key r = do
+  av <- makeVar (unwrapPerspectRol r)
+  _ <- liftEff $ poke resourceDefinitions key av
+  pure unit

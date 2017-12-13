@@ -52,7 +52,7 @@ define( function( require, exports, module ) {
 				},
 				/////////////// TYPEDECLARATION, BINDING
 				{
-					// typeDeclaration: :Aangifte :a1
+					// contextDeclaration: :Aangifte :a1
 					token: ["type", "text", "text"],
 					regex: new RegExp( uriAndCurie.regExpToString( uriAndCurie.resourceName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.resourceName ) )
 				},

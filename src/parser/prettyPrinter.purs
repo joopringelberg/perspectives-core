@@ -9,7 +9,7 @@ import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
 import Data.Array (catMaybes, elemIndex, replicate)
 import Data.Foldable (traverse_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, foldM, lookup)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
@@ -78,19 +78,28 @@ indent p a = do
   _ <- modify (\i -> i - 1)
   pure result
 
+withComments :: forall a e f. (a -> Comments f) -> PrettyPrinter a e -> PrettyPrinter a e
+withComments getComments p el = do
+  let (Comments{commentBefore, commentAfter}) = getComments el
+  traverse_ comment commentBefore
+  p el
+  traverse_ comment commentAfter
+
+getCommentBefore :: forall f. Comments f -> Array Comment
+getCommentBefore (Comments {commentBefore}) = commentBefore
+
+getCommentAfter :: forall f. Comments f -> Array Comment
+getCommentAfter (Comments {commentAfter}) = commentAfter
+
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
 context definedResources (PerspectContext c) = do
-  typeDeclaration
+  withComments (\r->r.comments) contextDeclaration c
   publicProperties
   privateProperties
   traverse_ (indent roleBinding) c.rolInContext
   where
-    typeDeclaration = do
-      traverse_ comment (maybe [] (\(Comments cm) -> cm.commentBefore) c.comments)
-      identifier c.pspType
-      space
-      identifier' c.id
-      newline
+    contextDeclaration x = identifier x.pspType *> space *> identifier' x.id
+
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
       maybeBuitenRol <- liftAff $ getRole c.buitenRol
@@ -99,13 +108,19 @@ context definedResources (PerspectContext c) = do
           let
             publicProperty :: String -> Array String -> PerspectText e
             publicProperty prop = indent (\val -> do
-              traverse_ comment (commentBeforeRolProperty buitenRol.comments prop)
-              identifier ("public " <> prop <> " = ")
-              simpleValue val
-              traverse_ comment' (commentAfterRolProperty buitenRol.comments prop)
-              newline)
+              -- Dit vergt dat we een Comments structuur bewaren voor elke property.
+              withComments (\r-> commentBeforeRolProperty r.comments prop)
+                (\_-> identifier ("public " <> prop <> " = ") *> simpleValue val *> newline)
+                buitenRol)
+
+              -- traverse_ comment (commentBeforeRolProperty buitenRol.comments prop)
+              -- identifier ("public " <> prop <> " = ")
+              -- simpleValue val
+              -- traverse_ comment' (commentAfterRolProperty buitenRol.comments prop)
+              -- newline)
           strMapTraverse_ publicProperty buitenRol.properties
         Nothing -> pure unit
+
     privateProperties = do
       let
         (BinnenRol binnenRol) = c.binnenRol
@@ -124,12 +139,12 @@ context definedResources (PerspectContext c) = do
       maybeRole <- liftAff $ getRole rolId
       case maybeRole of
         (Just (PerspectRol r)) -> do
-          traverse_ comment (maybe [] (\(Comments cmts)-> cmts.commentBefore) r.comments )
+          traverse_ comment (getCommentBefore c.comments)
           identifier $ r.pspType <> " => "
           case r.binding of
             Nothing -> pure unit
             (Just b) -> do
-              -- (INLINE CONTEXT)If the binding is not defined in the same text, recursively display the context or
+              -- (INLINE CONTEXT) If the binding is not defined in the same text, recursively display the context or
               -- role that is bound (But only if it has been defined at all! Otherwise merely display its name).
               case elemIndex b definedResources of
                 Nothing -> do
@@ -143,14 +158,14 @@ context definedResources (PerspectContext c) = do
                 otherwise -> reference b r
         Nothing -> pure unit
       where
-        reference :: forall f. String -> {properties :: StrMap (Array String), comments :: Maybe ContextRoleComments | f} -> PerspectText e
+        reference :: forall f. String -> {properties :: StrMap (Array String), comments :: ContextRoleComments | f} -> PerspectText e
         reference b r = do
           identifier' b
-          traverse_ comment' (maybe [] (\(Comments cmts)-> cmts.commentAfter) r.comments )
+          traverse_ comment (getCommentAfter c.comments)
           newline
           strMapTraverse_ (roleProperty r) r.properties
 
-        roleProperty :: forall f. {comments :: Maybe ContextRoleComments | f} -> String -> Array String -> PerspectText e
+        roleProperty :: forall f. {comments :: ContextRoleComments | f} -> String -> Array String -> PerspectText e
         roleProperty r1 prop = indent (\val -> do
           traverse_ comment (commentBeforeRolProperty r1.comments prop)
           identifier (prop <> " = ")
@@ -159,15 +174,13 @@ context definedResources (PerspectContext c) = do
           newline)
 
 
-commentBeforeRolProperty :: Maybe ContextRoleComments -> PropertyName -> Array Comment
-commentBeforeRolProperty Nothing propname = []
-commentBeforeRolProperty (Just (Comments {propertyComments})) propname = case lookup propname propertyComments of
+commentBeforeRolProperty :: ContextRoleComments -> PropertyName -> Array Comment
+commentBeforeRolProperty (Comments {propertyComments}) propname = case lookup propname propertyComments of
   Nothing -> []
   (Just (Comments{commentBefore})) -> commentBefore
 
-commentAfterRolProperty :: Maybe ContextRoleComments -> PropertyName -> Array Comment
-commentAfterRolProperty Nothing propname = []
-commentAfterRolProperty (Just (Comments {propertyComments})) propname = case lookup propname propertyComments of
+commentAfterRolProperty :: ContextRoleComments -> PropertyName -> Array Comment
+commentAfterRolProperty (Comments {propertyComments}) propname = case lookup propname propertyComments of
   Nothing -> []
   (Just (Comments{commentAfter})) -> commentAfter
 
@@ -181,7 +194,7 @@ sourceText (PerspectContext theText) = do
   traverse_ definition theText.rolInContext
   where
     textDeclaration = do
-      traverse_ comment (maybe [] (\(Comments cm) -> cm.commentBefore) theText.comments)
+      traverse_ comment (getCommentBefore theText.comments)
       identifier "Text "
       identifier' theText.id
       newline

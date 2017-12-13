@@ -1,19 +1,16 @@
 module Test.PrettyPrinter where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (makeVar)
-import Control.Monad.Eff.Class (liftEff)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (lookup)
 import Perspectives.ContextRoleParser (context) as CRP
-import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (context, prettyPrint, strMapTraverse_)
-import Perspectives.Resource (PROPDEFS, resourceDefinitions, unwrapPerspectContext, unwrapPerspectRol)
+import Perspectives.Resource (PROPDEFS, storePerspectEntityInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (EntityCollection(..), NamedEntityCollection(..), PerspectEntity(..))
-import Prelude (Unit, bind, pure, unit, ($))
+import Prelude (bind, pure)
 
 type TestEffects e = (DomeinFileEffects (prd :: PROPDEFS | e))
 
@@ -26,16 +23,6 @@ test = case runIndentParser "--Commentaar voor :A1\n:Aangifte :A1\n\tpublic :urg
       (Just (Context c)) -> prettyPrint c (context [])
       (Just (Rol _)) -> pure "er is geen rol"
   otherwise -> pure "fout in expressie"
-
-storePerspectEntityInResourceDefinitions :: forall e. String -> PerspectEntity -> Aff (DomeinFileEffects e) Unit
-storePerspectEntityInResourceDefinitions key (Context c) = do
-  av <- makeVar (unwrapPerspectContext c)
-  _ <- liftEff $ poke resourceDefinitions key av
-  pure unit
-storePerspectEntityInResourceDefinitions key (Rol r) = do
-  av <- makeVar (unwrapPerspectRol r)
-  _ <- liftEff $ poke resourceDefinitions key av
-  pure unit
 
 -- traverse_
 --   :: forall a b f m

@@ -41,7 +41,7 @@ expressionTypeForNextLine s = case runIndentParser s (whiteSpace *> expression) 
   (Left _) -> "Verwacht: -- commentaar of: Type Instantie"
   (Right etype) -> case etype of
     "textDeclaration" -> "Verwacht: context."
-    "typeDeclaration" -> "Verwacht: (public|private) property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
+    "contextDeclaration" -> "Verwacht: (public|private) property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
     "publicContextPropertyAssignment" -> "Verwacht: public|private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
     "privateContextPropertyAssignment" -> "Verwacht: private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
     "rolePropertyAssignment" -> "Verwacht: property = value"
