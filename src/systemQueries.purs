@@ -1,7 +1,7 @@
 module Perspectives.SystemQueries where
 
 import Perspectives.PropertyComposition
-import Perspectives.Property (ObjectsGetter)
+import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getRolBinding, getRolContext, getRolType, getRollen)
 import Perspectives.QueryCombinators (closure, concat, hasValue) as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
@@ -48,3 +48,21 @@ rdfsRange = constructTripleGetter "rdfs:range"
 
 owlInverseOf :: forall e. NamedTripleGetter e
 owlInverseOf = constructTripleGetter "owl:inverseOf"
+
+contextType :: forall e. NamedTripleGetter e
+contextType = constructTripleGetterFromArbitraryFunction "psp:type" getContextType
+
+buitenRol :: forall e. NamedTripleGetter e
+buitenRol = constructTripleGetterFromArbitraryFunction "psp:buitenRol" getBuitenRol
+
+rollen :: forall e. NamedTripleGetter e
+rollen =  constructTripleGetterFromArbitraryFunction "psp:rollen" getRollen
+
+rolType :: forall e. NamedTripleGetter e
+rolType = constructTripleGetterFromArbitraryFunction "psp:type" getRolType
+
+binding :: forall e. NamedTripleGetter e
+binding = constructTripleGetterFromArbitraryFunction "psp:binding" getRolBinding
+
+rolContext :: forall e. NamedTripleGetter e
+rolContext = constructTripleGetterFromArbitraryFunction "psp:context" getRolContext
