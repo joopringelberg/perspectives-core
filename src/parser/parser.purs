@@ -54,6 +54,6 @@ expressionTypeForNextLine s = do
       "publicContextPropertyAssignment" -> "Verwacht: public|private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
       "privateContextPropertyAssignment" -> "Verwacht: private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
       "rolePropertyAssignment" -> "Verwacht: property = value"
-      "roleBinding" -> "Verwacht: property = value"
+      "isRoleDeclaration" -> "Verwacht: property = value"
       "oneLineComment" -> "Alles kan."
       otherwise -> "Verwacht: -- commentaar of: Type Instantie"

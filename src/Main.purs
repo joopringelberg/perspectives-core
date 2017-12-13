@@ -15,8 +15,7 @@ import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceCompone
 import Perspectives.ContextRoleParser (sourceText) as CRP
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, sourceText)
-import Perspectives.Resource (PROPDEFS, getContext)
-import Perspectives.ResourceTypes (DomeinFileEffects)
+import Perspectives.Resource (PerspectEffects, getContext)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects (PerspectEffects ()))) Unit
@@ -38,8 +37,6 @@ data Query a
 data AceSlot = AceSlot Int
 derive instance eqAceSlot :: Eq AceSlot
 derive instance ordAceSlot :: Ord AceSlot
-
-type PerspectEffects e = (DomeinFileEffects (prd :: PROPDEFS | e))
 
 -- | The main UI component definition.
 ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AceEffects (PerspectEffects eff)))

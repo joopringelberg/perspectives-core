@@ -3,6 +3,7 @@ module Perspectives.PrettyPrinter where
 import Control.Monad (class Monad)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
+import Control.Monad.Cont (lift)
 import Control.Monad.State (StateT, get, modify)
 import Control.Monad.State.Trans (evalStateT)
 import Control.Monad.Writer (WriterT)
@@ -14,7 +15,7 @@ import Data.StrMap (StrMap, foldM, lookup)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
-import Perspectives.Resource (PROPDEFS, getContext, getRole)
+import Perspectives.Resource (PROPDEFS, PerspectEffects, getContext, getRole)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextRoleComments, PerspectContext(..), PerspectRol(..), PropertyName, ID)
 import Prelude (Unit, bind, discard, pure, unit, ($), (*>), (+), (-), (<$>), (<>))
@@ -189,9 +190,16 @@ strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 sourceText :: forall e. PrettyPrinter PerspectContext e
 sourceText (PerspectContext theText) = do
+
+  -- Compute the array of ids of the other contexts defined in this text.
+  (contextDefs :: Array (Maybe PerspectRol)) <- lift $ lift $ traverse getRole theText.rolInContext
+  definedContexts <- pure $ catMaybes ((\(PerspectRol {binding}) -> binding) <$> (catMaybes contextDefs))
+
+  -- Now print the text.
   textDeclaration
   newline
-  traverse_ definition theText.rolInContext
+  traverse_ (definition definedContexts) theText.rolInContext
+
   where
     textDeclaration = do
       traverse_ comment (getCommentBefore theText.comments)
@@ -199,9 +207,8 @@ sourceText (PerspectContext theText) = do
       identifier' theText.id
       newline
 
-    definition rolId = do
+    definition definedContexts rolId = do
       -- NB: This is the role of the text - not yet the definition itself!
-      -- TODO: only print the binding if there is no reference to it in this text.
       maybeRole <- liftAff $ getRole rolId
       case maybeRole of
         Nothing -> pure unit
@@ -209,11 +216,10 @@ sourceText (PerspectContext theText) = do
           case r.binding of
             Nothing -> newline
             (Just ident) -> do
+              -- Hier moeten we nog een keer de binding ophalen! De rol van de sourceText is gevuld met de buitenrol van de context die we willen.
               maybeDef <- liftAff $ getContext ident
               case maybeDef of
                 Nothing -> pure unit
                 (Just def) -> do
-                  (resourceDefs :: Array (Maybe PerspectRol)) <- liftAff $ traverse getRole theText.rolInContext
-                  definedResources <- pure ((\(PerspectRol {binding}) -> binding) <$> (catMaybes resourceDefs))
-                  context (catMaybes definedResources) def
+                  context definedContexts def
                   newline

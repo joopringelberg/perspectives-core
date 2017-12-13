@@ -207,6 +207,9 @@ rolePropertyAssignment = try (withPos $ (\cb pn pv cmt -> Tuple (Comments {comme
     <*> (sameOrIndented *> (simpleValue <|> dataType))
     <*> inLineComment) <?> "propertyname = value"
 
+isRoleDeclaration :: forall e. IP Unit (DomeinFileEffects e)
+isRoleDeclaration = withPos (roleName <* (sameLine *> reservedOp "=>") *> pure unit)
+
 -- | roleBinding = roleName '=>' (resourceName | context) rolePropertyAssignment*
 roleBinding :: forall e. PerspectName -> IP String (DomeinFileEffects e)
 roleBinding contextID = ("'rolename =>' followed by context declaration on next line' " <??>
@@ -319,7 +322,7 @@ expression = choice
   , try (publicContextPropertyAssignment *> (pure "publicContextPropertyAssignment"))
   , try (privateContextPropertyAssignment *> (pure "privateContextPropertyAssignment"))
   , try (rolePropertyAssignment *> (pure "rolePropertyAssignment"))
-  , try (roleBinding "" *> (pure "roleBinding" ))
+  , try (isRoleDeclaration *> (pure "isRoleDeclaration" ))
   , try ((STRING.string "--") *> (pure "oneLineComment"))
   -- query
   ]
