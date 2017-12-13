@@ -42,6 +42,6 @@ constructTripleGetter pn = NamedFunction pn tripleGetter where
     mt <- liftEff (lookupInTripleIndex id pn)
     case mt of
       Nothing -> do
-        (object' :: Array String) <- getObjectsGetter pn id
-        liftEff (addToTripleIndex id pn object' [] [] tripleGetter)
+        (object :: Array String) <- getObjectsGetter pn id
+        liftEff (addToTripleIndex id pn object [] [] tripleGetter)
       (Just t) -> pure t
