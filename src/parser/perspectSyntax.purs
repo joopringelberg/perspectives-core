@@ -21,7 +21,7 @@ newtype PerspectContext = PerspectContext
   , pspType :: ID
   , binnenRol :: BinnenRol
   , buitenRol :: ID
-  , rolInContext :: Array ID
+  , rolInContext :: StrMap (Array ID)
   , comments :: ContextRoleComments
   }
 

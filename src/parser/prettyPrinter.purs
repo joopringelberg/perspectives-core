@@ -11,14 +11,14 @@ import Control.Monad.Writer.Trans (runWriterT, tell)
 import Data.Array (catMaybes, elemIndex, replicate)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, foldM, lookup)
+import Data.StrMap (StrMap, foldM, lookup, values)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
-import Perspectives.Resource (PROPDEFS, PerspectEffects, getContext, getRole)
+import Perspectives.Resource (PROPDEFS, getContext, getRole)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextRoleComments, PerspectContext(..), PerspectRol(..), PropertyName, ID)
-import Prelude (Unit, bind, discard, pure, unit, ($), (*>), (+), (-), (<$>), (<>))
+import Prelude (Unit, bind, discard, join, pure, unit, ($), (*>), (+), (-), (<$>), (<>))
 
 type IndentLevel = Int
 
@@ -97,7 +97,7 @@ context definedResources (PerspectContext c) = do
   withComments (\r->r.comments) contextDeclaration c
   publicProperties
   privateProperties
-  traverse_ (indent roleBinding) c.rolInContext
+  traverse_ (indent roleBinding) (join (values c.rolInContext))
   where
     contextDeclaration x = identifier x.pspType *> space *> identifier' x.id
 
@@ -192,13 +192,13 @@ sourceText :: forall e. PrettyPrinter PerspectContext e
 sourceText (PerspectContext theText) = do
 
   -- Compute the array of ids of the other contexts defined in this text.
-  (contextDefs :: Array (Maybe PerspectRol)) <- lift $ lift $ traverse getRole theText.rolInContext
+  (contextDefs :: Array (Maybe PerspectRol)) <- lift $ lift $ traverse getRole (join (values theText.rolInContext))
   definedContexts <- pure $ catMaybes ((\(PerspectRol {binding}) -> binding) <$> (catMaybes contextDefs))
 
   -- Now print the text.
   textDeclaration
   newline
-  traverse_ (definition definedContexts) theText.rolInContext
+  traverse_ (definition definedContexts) (join (values theText.rolInContext))
 
   where
     textDeclaration = do
