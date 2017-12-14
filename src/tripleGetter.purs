@@ -2,7 +2,8 @@ module Perspectives.TripleGetter where
 
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (PropertyName, ObjectsGetter, getObjectsGetter)
+import Perspectives.Property (ObjectsGetter, PropertyName, getObjectsGetter, getPrivateProperty, getProperty, getPublicProperty, getRol)
+import Perspectives.Syntax (RoleName)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
 import Prelude (bind, pure, ($))
 
@@ -45,3 +46,42 @@ constructTripleGetter pn = NamedFunction pn tripleGetter where
         (object :: Array String) <- getObjectsGetter pn id
         liftEff (addToTripleIndex id pn object [] [] tripleGetter)
       (Just t) -> pure t
+
+-- | Use this function to construct property getters that memorize in the triple administration. Use with:
+-- | - getRol
+-- | - getPublicProperty
+-- | - getPrivateProperty
+-- | - getProperty
+constructTripleGetter' :: forall e.
+  (String -> ObjectsGetter e) ->
+  PropertyName ->
+  NamedFunction (TripleGetter e)
+constructTripleGetter' objectsGetter pn = NamedFunction pn tripleGetter where
+  tripleGetter :: TripleGetter e
+  tripleGetter id = do
+    mt <- liftEff (lookupInTripleIndex id pn)
+    case mt of
+      Nothing -> do
+        (object :: Array String) <- objectsGetter pn id
+        liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+      (Just t) -> pure t
+
+constructPublicPropertyGetter :: forall e.
+  PropertyName ->
+  NamedFunction (TripleGetter e)
+constructPublicPropertyGetter pn = constructTripleGetter' getPublicProperty pn
+
+constructPrivatePropertyGetter :: forall e.
+  PropertyName ->
+  NamedFunction (TripleGetter e)
+constructPrivatePropertyGetter pn = constructTripleGetter' getPrivateProperty pn
+
+constructPropertyGetter :: forall e.
+  PropertyName ->
+  NamedFunction (TripleGetter e)
+constructPropertyGetter pn = constructTripleGetter' getProperty pn
+
+constructRolGetter :: forall e.
+  RoleName ->
+  NamedFunction (TripleGetter e)
+constructRolGetter pn = constructTripleGetter' getRol pn

@@ -3,7 +3,7 @@ module Perspectives.SystemQueries where
 import Perspectives.PropertyComposition
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getRolBinding, getRolContext, getRolType, getRollen)
 import Perspectives.QueryCombinators (closure, concat, hasValue) as QC
-import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
 identity' :: forall e. ObjectsGetter e
@@ -40,14 +40,18 @@ hasLabel = QC.hasValue label
 hasBinding :: forall e. NamedTripleGetter e
 hasBinding = QC.hasValue rol_RolBinding
 
-isFunctional :: forall e. NamedTripleGetter e
-isFunctional = constructTripleGetter "owl:FunctionalProperty"
+-- isFunctional :: forall e. NamedTripleGetter e
+-- isFunctional = constructTripleGetter "owl:FunctionalProperty"
 
 rdfsRange :: forall e. NamedTripleGetter e
 rdfsRange = constructTripleGetter "rdfs:range"
 
 owlInverseOf :: forall e. NamedTripleGetter e
 owlInverseOf = constructTripleGetter "owl:inverseOf"
+
+-----------------------------------------------------------
+-- Context and Role TripleGetters.
+-----------------------------------------------------------
 
 contextType :: forall e. NamedTripleGetter e
 contextType = constructTripleGetterFromArbitraryFunction "psp:type" getContextType
@@ -66,3 +70,12 @@ binding = constructTripleGetterFromArbitraryFunction "psp:binding" getRolBinding
 
 rolContext :: forall e. NamedTripleGetter e
 rolContext = constructTripleGetterFromArbitraryFunction "psp:context" getRolContext
+
+isFunctional :: forall e. NamedTripleGetter e
+isFunctional = constructPublicPropertyGetter "psp:isFunctional"
+
+isVerplicht :: forall e. NamedTripleGetter e
+isVerplicht = constructPublicPropertyGetter "psp:isVerplicht"
+
+range :: forall e. NamedTripleGetter e
+range = constructPublicPropertyGetter "psp:range"

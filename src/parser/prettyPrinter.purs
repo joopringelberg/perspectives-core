@@ -3,31 +3,31 @@ module Perspectives.PrettyPrinter where
 import Control.Monad (class Monad)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Cont (lift)
 import Control.Monad.State (StateT, get, modify)
 import Control.Monad.State.Trans (evalStateT)
 import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
-import Data.Array (catMaybes, elemIndex, replicate)
+import Data.Array (elemIndex, replicate)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, foldM, lookup, values)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
-import Perspectives.Resource (PROPDEFS, getContext, getRole)
-import Perspectives.ResourceTypes (DomeinFileEffects)
+import Perspectives.Property (PropDefsEffects)
+import Perspectives.PropertyComposition ((>->))
+import Perspectives.Resource (getContext, getRole)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextRoleComments, PerspectContext(..), PerspectRol(..), PropertyName, ID)
-import Prelude (Unit, bind, discard, join, pure, unit, ($), (*>), (+), (-), (<$>), (<>))
+import Perspectives.SystemQueries (binding, rolContext)
+import Perspectives.TripleAdministration (Triple(..), tripleObjects)
+import Perspectives.TripleGetter (constructRolGetter, (##))
+import Prelude (Unit, bind, discard, join, pure, unit, ($), (*>), (+), (-), (<>))
 
 type IndentLevel = Int
 
--- type PerspectText = State IndentLevel String
+type PerspectText' e = StateT IndentLevel (WriterT String (Aff (PropDefsEffects e)))
 
-
-type PerspectText2 e = StateT IndentLevel (WriterT String (Aff (DomeinFileEffects (prd :: PROPDEFS | e))))
--- type PerspectText = StateT IndentLevel (WriterT String Identity) Unit
-type PerspectText e = PerspectText2 e Unit
+type PerspectText e = PerspectText' e Unit
 
 type PrettyPrinter a e = a -> PerspectText e
 
@@ -64,10 +64,10 @@ comment' c = space *> identifier' ( "--" <> c)
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
 
-prettyPrint :: forall a e. a -> PrettyPrinter a e -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) String
+prettyPrint :: forall a e. a -> PrettyPrinter a e -> Aff (PropDefsEffects e) String
 prettyPrint t pp = prettyPrint' $ pp t
 
-prettyPrint' :: forall e. PerspectText e -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) String
+prettyPrint' :: forall e. PerspectText e -> Aff (PropDefsEffects e) String
 prettyPrint' t = do
   x <- runWriterT (evalStateT t 0)
   pure $ snd x
@@ -85,6 +85,7 @@ withComments getComments p el = do
   traverse_ comment commentBefore
   p el
   traverse_ comment commentAfter
+  newline
 
 getCommentBefore :: forall f. Comments f -> Array Comment
 getCommentBefore (Comments {commentBefore}) = commentBefore
@@ -190,36 +191,24 @@ strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 sourceText :: forall e. PrettyPrinter PerspectContext e
 sourceText (PerspectContext theText) = do
-
-  -- Compute the array of ids of the other contexts defined in this text.
-  (contextDefs :: Array (Maybe PerspectRol)) <- lift $ lift $ traverse getRole (join (values theText.rolInContext))
-  definedContexts <- pure $ catMaybes ((\(PerspectRol {binding}) -> binding) <$> (catMaybes contextDefs))
-
-  -- Now print the text.
   textDeclaration
   newline
-  traverse_ (definition definedContexts) (join (values theText.rolInContext))
+
+  (Triple{object: definedContexts}) <- liftAff (theText.id ## (constructRolGetter "psp:text_Item") >-> binding)
+  (contextIds :: Triple e) <- liftAff (theText.id ## (constructRolGetter "psp:text_Item") >-> binding >-> rolContext)
+  traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
   where
+    ppContext :: Array ID -> ID -> PerspectText e
+    ppContext definedContexts id = do
+      mc <- liftAff $ getContext id
+      case mc of
+        (Just c) -> context definedContexts c
+        Nothing -> pure unit
+
+    textDeclaration :: PerspectText e
     textDeclaration = do
       traverse_ comment (getCommentBefore theText.comments)
       identifier "Text "
       identifier' theText.id
       newline
-
-    definition definedContexts rolId = do
-      -- NB: This is the role of the text - not yet the definition itself!
-      maybeRole <- liftAff $ getRole rolId
-      case maybeRole of
-        Nothing -> pure unit
-        (Just (PerspectRol r)) ->
-          case r.binding of
-            Nothing -> newline
-            (Just ident) -> do
-              -- Hier moeten we nog een keer de binding ophalen! De rol van de sourceText is gevuld met de buitenrol van de context die we willen.
-              maybeDef <- liftAff $ getContext ident
-              case maybeDef of
-                Nothing -> pure unit
-                (Just def) -> do
-                  context definedContexts def
-                  newline

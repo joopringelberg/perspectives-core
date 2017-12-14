@@ -7,9 +7,11 @@ import Control.Monad.Except (throwError)
 import Control.Monad.ST (ST)
 import Data.Argonaut (toArray, toString)
 import Data.Array (singleton)
+import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup, values)
 import Data.Traversable (traverse)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getContext, getPropDefs, getRole)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
@@ -24,7 +26,11 @@ type PropertyName = String
 
 type PropDefsEffects e = DomeinFileEffects (st :: ST ResourceDefinitions, prd :: PROPDEFS | e)
 
+type PerspectEffects e = (PropDefsEffects e)
+
 type ObjectsGetter e = Resource -> Aff (PropDefsEffects e) (Array String)
+
+type ObjectGetter e = Resource -> Aff (PropDefsEffects e) String
 
 -- | A function that takes a property name and returns an ObjectsGetter for that property.
 -- | The getter takes a Resource (an ID) and returns a computation of an Array of string values. It can throw one of these errors:
@@ -110,3 +116,14 @@ getRolContext = getRolMember \(PerspectRol{context}) -> [context]
 
 getProperty :: forall e. PropertyName -> ObjectsGetter e
 getProperty pn = getRolMember \(PerspectRol{properties}) -> maybe [] id (lookup pn properties)
+
+-- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
+-- | of getRolContext), others roles (such as the result of getRolBinding). The Partial function below returns that
+-- | single ID instead of the Array holding it, effectively turning an ObjectsGetter into an ObjectGetter.
+toSingle :: forall e. Partial => ObjectsGetter e -> ObjectGetter e
+toSingle og id = do
+  (ar :: Array String) <- og id
+  pure $ ArrayPartial.head ar
+
+getRolBinding' :: forall e. ObjectGetter e
+getRolBinding' = unsafePartial $ toSingle getRolBinding

@@ -15,7 +15,8 @@ import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceCompone
 import Perspectives.ContextRoleParser (sourceText) as CRP
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, sourceText)
-import Perspectives.Resource (PerspectEffects, getContext)
+import Perspectives.Property (PerspectEffects)
+import Perspectives.Resource (getContext)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects (PerspectEffects ()))) Unit

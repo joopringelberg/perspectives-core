@@ -11,8 +11,6 @@ import Perspectives.ResourceRetrieval (fetchCouchdbResource)
 import Perspectives.ResourceTypes (DomeinFileEffects, PropDefs(..), Resource, CouchdbResource)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 
-type PerspectEffects e = (DomeinFileEffects (prd :: PROPDEFS | e))
-
 -- | The global index of definitions of all resources, indexed by Resource.
 type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
 

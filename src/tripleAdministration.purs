@@ -24,6 +24,9 @@ newtype Triple e = Triple
   , supports :: Array TripleRef
   , tripleGetter :: TripleGetter e}
 
+tripleObjects :: forall e. Triple e -> Array String
+tripleObjects (Triple{object}) = object
+
 instance showTriple :: Show (Triple e) where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
 
