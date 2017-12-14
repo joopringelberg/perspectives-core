@@ -91,13 +91,17 @@ ui =
       (Right textName) -> do
         maybeContext <- H.liftAff $ getContext textName
         case maybeContext of
-          Nothing -> pure next
+          Nothing -> do
+            H.modify (_ { text = "Cannot find the contex that represents this text." })
+            pure next
           (Just c) -> do
             t <- H.liftAff $ prettyPrint c sourceText
             _ <- H.query (AceSlot 2) $ H.action (ChangeText t)
             H.modify (_ { text = t })
             pure next
-      otherwise -> pure next
+      (Left e) -> do
+        H.modify (_ { text = show e })
+        pure next
   eval (Load next) = do
     response <- H.liftAff $ AX.get ("http://www.pureperspectives.nl/src/editor/perspectives.psp")
     H.modify (_ { text = response.response })

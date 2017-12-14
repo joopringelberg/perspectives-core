@@ -2,6 +2,8 @@ module Perspectives.ContextRoleParser where
 
 import Perspectives.IndentParser
 import Control.Alt ((<|>))
+import Control.Monad.Aff (runAff_)
+import Control.Monad.Aff.Console (log)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc) as AR
@@ -16,9 +18,9 @@ import Data.Tuple (Tuple(..), snd)
 import Perspectives.Guid (guid)
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyComments, PropertyName, SimpleValue(..), TextDeclaration(..), RoleName)
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
 import Text.Parsing.Parser.Combinators (choice, option, try, (<?>), (<??>))
@@ -184,28 +186,35 @@ textDeclaration = (TextDeclaration <$> (reserved "Text" *> resourceName) <*> inL
 contextDeclaration :: forall e. IP ContextDeclaration e
 contextDeclaration = (ContextDeclaration <$> resourceName <*> resourceName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
 
-typedPropertyAssignment :: forall e. String -> IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
-typedPropertyAssignment scope = try $ withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBefore: cb, commentAfter: cmt}) (Tuple pn [show pv]))
-    <$> manyOneLineComments <* reserved scope
-    <*> propertyName <* (sameOrIndented *> reservedOp "=")
-    <*> (sameOrIndented *> (simpleValue <|> dataType))
-    <*> inLineComment
+withComments :: forall e a. IP a e -> IP (Tuple (Comments ()) a) e
+withComments p = do
+  before <- manyOneLineComments
+  a <- p
+  after <- inLineComment
+  pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
+
+typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple PropertyName PropertyValueWithComments) e
+typedPropertyAssignment scope = go (try (withComments
+  (withPos
+    (Tuple
+      <$> (scope *> (propertyName <* (sameOrIndented *> reservedOp "=")))
+      <*> (sameOrIndented *> (simpleValue <|> dataType))))) )
+  where
+    go x = do
+      (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
+      pure $ Tuple pname (Comments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
 
 -- | publicContextPropertyAssignment = 'public' propertyName '=' simpleValue
-publicContextPropertyAssignment :: forall e. IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
-publicContextPropertyAssignment = (typedPropertyAssignment "public") <?> "public propertyname = value"
+publicContextPropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComments) e
+publicContextPropertyAssignment = (typedPropertyAssignment (reserved "public")) <?> "public propertyname = value"
 
 -- | privateContextPropertyAssignment = 'private' propertyName '=' simpleValue
-privateContextPropertyAssignment :: forall e. IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
-privateContextPropertyAssignment = (typedPropertyAssignment "private") <?> "private propertyname = value"
+privateContextPropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComments) e
+privateContextPropertyAssignment = (typedPropertyAssignment (reserved "private")) <?> "private propertyname = value"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
-rolePropertyAssignment :: forall e. IP (Tuple PropertyComments (Tuple PropertyName (Array String))) e
-rolePropertyAssignment = try (withPos $ (\cb pn pv cmt -> Tuple (Comments {commentBefore: cb, commentAfter: cmt}) (Tuple pn [show pv]))
-    <$> manyOneLineComments
-    <*> propertyName <* (sameOrIndented *> reservedOp "=")
-    <*> (sameOrIndented *> (simpleValue <|> dataType))
-    <*> inLineComment) <?> "propertyname = value"
+rolePropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComments) e
+rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "private propertyname = value"
 
 isRoleDeclaration :: forall e. IP Unit (DomeinFileEffects e)
 isRoleDeclaration = withPos (roleName <* (sameLine *> reservedOp "=>") *> pure unit)
@@ -228,9 +237,9 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
           , pspType: rname
           , binding: Just contextBuitenRol
           , context: contextID
-          , properties: fromFoldable (snd <$> props)
+          , properties: fromFoldable props
           , gevuldeRollen: empty
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
+          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
       pure $ Tuple rname [rolId]))
 
@@ -249,9 +258,9 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
           , pspType: rname
           , binding: Just ident
           , context: contextID
-          , properties: fromFoldable (snd <$> props)
+          , properties: fromFoldable props
           , gevuldeRollen: empty
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> props }
+          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
       pure $ Tuple rname [rolId]))
 
@@ -272,8 +281,8 @@ context = withPos do
   withPos do
     (ContextDeclaration typeName instanceName cmt) <- contextDeclaration
     do
-      (publicProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- option Nil (indented *> (block publicContextPropertyAssignment))
-      (privateProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- option Nil (indented *> (block privateContextPropertyAssignment))
+      (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
+      (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
       (rolebindings :: List (Tuple RoleName (Array ID))) <- option Nil (indented *> (block $ roleBinding instanceName))
       lift $ lift $ storeContextInResourceDefinitions instanceName
         (PerspectContext
@@ -284,12 +293,11 @@ context = withPos do
               { id: instanceName <> "_binnenRol"
               , pspType: ":BinnenRol"
               , binding: Just $ instanceName <> "_buitenRol"
-              , properties: fromFoldable (snd <$> privateProps)
-              , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
+              , properties: fromFoldable privateProps
               }
           , buitenRol: instanceName <> "_buitenRol"
           , rolInContext: fromFoldable rolebindings
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
+          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
         })
       lift $ lift $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
         (PerspectRol
@@ -297,9 +305,9 @@ context = withPos do
           , pspType: ":BuitenRol"
           , binding: Nothing
           , context: instanceName
-          , properties: fromFoldable (snd <$> publicProps)
+          , properties: fromFoldable publicProps
           , gevuldeRollen: empty
-          , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
+          , comments: Comments { commentBefore: [], commentAfter: []}
           })
       pure $ instanceName <> "_buitenRol"
 
@@ -335,8 +343,8 @@ sourceText = withPos do
   cmtBefore <- manyOneLineComments
   withPos do
     (TextDeclaration textName cmt) <- textDeclaration
-    (publicProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- (block publicContextPropertyAssignment)
-    (privateProps :: List (Tuple PropertyComments (Tuple PropertyName (Array String)))) <- (block privateContextPropertyAssignment)
+    (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
+    (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
     defs <- AR.many context
     (roleBindings :: Array String) <- lift $ lift $ traverse (\buitenRolId ->
       do
@@ -349,7 +357,7 @@ sourceText = withPos do
             , context: textName
             , properties: empty
             , gevuldeRollen: empty
-            , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: emptyPropertyComments }
+            , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
         pure roleId) defs
     lift $ lift $ storeContextInResourceDefinitions textName
@@ -361,12 +369,11 @@ sourceText = withPos do
             { id: textName <> "_binnenRol"
             , pspType: ":BinnenRol"
             , binding: Just $ textName <> "_buitenRol"
-            , properties: fromFoldable (snd <$> privateProps)
-            , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
+            , properties: fromFoldable privateProps
             }
         , buitenRol: textName <> "_buitenRol"
         , rolInContext: singleton "psp:text_Item" roleBindings
-        , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt, propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> privateProps }
+        , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
         })
 
     lift $ lift $ storeRoleInResourceDefinitions (textName <> "_buitenRol")
@@ -375,15 +382,23 @@ sourceText = withPos do
         , pspType: ":BuitenRol"
         , binding: Nothing
         , context: textName
-        , properties: fromFoldable (snd <$> publicProps)
+        , properties: fromFoldable publicProps
         , gevuldeRollen: empty
-        , comments: Comments { commentBefore: [], commentAfter: [], propertyComments: fromFoldable $ (\(Tuple cmts (Tuple pn _)) -> Tuple pn cmts) <$> publicProps }
+        , comments: Comments { commentBefore: [], commentAfter: []}
         })
     pure textName
 
 -----------------------------------------------------------
 -- Tests
 -----------------------------------------------------------
+
+-- runAff_ (\_->pure unit) ((runIndentParser test1 context) >>= (\r -> log (show r)))
+
+runTest t =
+  runAff_ (\_->pure unit) (t >>= (\r -> log (show r)))
+
+-- x = runTest (runIndentParser test1 context)
+
 test1 :: String
 test1 = """:Aangifte :Aangifte1
 """
@@ -535,3 +550,8 @@ test16 = """Text :Mytext
 	:aangever =>
 		:RolDef :Pietersen
 			public :betrouwbaarheid = 1"""
+
+test17 :: String
+test17 = """Text :A
+:Aangifte :B12"""
+-- runTest (runIndentParser test17 sourceText)

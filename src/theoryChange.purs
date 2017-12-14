@@ -1,15 +1,17 @@
 module Perspectives.TheoryChange where
 
 import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.State (StateT)
 import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.ResourceTypes (Resource)
-import Perspectives.TripleAdministration (Predicate, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
+import Perspectives.TripleAdministration (Predicate, Triple(..), TripleRef(..), FlexTriple, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($))
 
@@ -33,19 +35,19 @@ type TripleQueue e = Array (Triple e)
 addToQueue :: forall e. TripleQueue e -> Array (Triple e) -> TripleQueue e
 addToQueue q triples = union q (sortBy dependsOn (difference triples q))
 
-updateFromSeeds :: forall e. Array (Triple e) -> Aff (PropDefsEffects e) (Array String)
+updateFromSeeds :: forall e. Array (Triple e) -> StateT Boolean (Aff (PropDefsEffects e)) (Array String)
 updateFromSeeds ts = do
   x <- liftEff (traverse getDependencies ts)
   propagateTheoryDeltas (join x)
 
-propagateTheoryDeltas :: forall e. TripleQueue e -> Aff (PropDefsEffects e) (Array String)
+propagateTheoryDeltas :: forall e. TripleQueue e -> StateT Boolean (Aff (PropDefsEffects e)) (Array String)
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do
     t@(Triple{object, supports} :: Triple e) <- recompute head
-    _ <- saveChangedObject head object
-    _ <- liftEff $ updateDependencies head t
-    _ <- liftEff $ setSupports head supports
+    _ <- liftAff $ saveChangedObject head object
+    _ <- liftAff $ liftEff $ updateDependencies head t
+    _ <- liftAff $ liftEff $ setSupports head supports
     (deps :: Array (Triple e)) <- liftEff (getDependencies head)
     propagateTheoryDeltas (addToQueue tail deps)
 
@@ -67,7 +69,7 @@ getDependencies (Triple{dependencies}) = do
     -- lookupRef :: TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple e))
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
-recompute :: forall e. Triple e -> Aff (PropDefsEffects e) (Triple e)
+recompute :: forall e. Triple e -> FlexTriple e
 recompute (Triple{subject, tripleGetter}) = tripleGetter subject
 
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)
@@ -75,7 +77,7 @@ saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
 
 foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 (Triple e2)
 
-setProperty :: forall e. Resource -> Predicate -> Array String -> Aff (PropDefsEffects e) (Triple e)
+setProperty :: forall e. Resource -> Predicate -> Array String -> FlexTriple e
 setProperty rid pid object =
   do
     mt <- liftEff $ lookupInTripleIndex rid pid
@@ -83,5 +85,5 @@ setProperty rid pid object =
       -- Case Nothing will not happen when we have contexts.
       Nothing -> do
         t <- applyNamedFunction (constructTripleGetter pid) rid
-        saveChangedObject t object
-      (Just t) -> saveChangedObject t object
+        liftAff $ saveChangedObject t object
+      (Just t) -> liftAff $ saveChangedObject t object

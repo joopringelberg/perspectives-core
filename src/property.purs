@@ -15,7 +15,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getContext, getPropDefs, getRole)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), ID, PerspectContext(..), PerspectRol(..), RoleName)
+import Perspectives.Syntax (BinnenRol(..), ID, PerspectContext(..), PerspectRol(..), RoleName, propertyValue)
 
 {-
 Property values are represented by Arrays.
@@ -96,7 +96,7 @@ getPrivateProperty pn ident = do
   (mbr :: Maybe BinnenRol) <- getContextMember' (\(PerspectContext{binnenRol}) -> binnenRol) ident
   case mbr of
     Nothing -> pure []
-    (Just (BinnenRol{properties})) -> pure $ (maybe [] id) (lookup pn properties)
+    (Just (BinnenRol{properties})) -> pure $ (maybe [] propertyValue) (lookup pn properties)
 
 getRolMember :: forall e. (PerspectRol -> Array String) -> ObjectsGetter e
 getRolMember f c = do
@@ -115,7 +115,7 @@ getRolContext :: forall e. ObjectsGetter e
 getRolContext = getRolMember \(PerspectRol{context}) -> [context]
 
 getProperty :: forall e. PropertyName -> ObjectsGetter e
-getProperty pn = getRolMember \(PerspectRol{properties}) -> maybe [] id (lookup pn properties)
+getProperty pn = getRolMember \(PerspectRol{properties}) -> maybe [] propertyValue (lookup pn properties)
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of getRolContext), others roles (such as the result of getRolBinding). The Partial function below returns that

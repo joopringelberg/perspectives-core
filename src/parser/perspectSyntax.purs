@@ -13,36 +13,36 @@ newtype Comments e = Comments
   , commentAfter :: Array Comment
   | e}
 
-type PropertyComments = Comments ()
-type ContextRoleComments = Comments (propertyComments :: StrMap (Comments ()))
-
 newtype PerspectContext = PerspectContext
   { id :: ID
   , pspType :: ID
   , binnenRol :: BinnenRol
   , buitenRol :: ID
   , rolInContext :: StrMap (Array ID)
-  , comments :: ContextRoleComments
+  , comments :: Comments ()
   }
 
 newtype PerspectRol =
-  PerspectRol
+  PerspectRol PerspectRolProperties
+
+type PerspectRolProperties =
     { id :: ID
     , pspType :: ID
     , binding :: Maybe ID
     , context :: ID
-    , properties :: StrMap (Array String)
+    , properties :: StrMap PropertyValueWithComments
     , gevuldeRollen :: StrMap (Array ID)
-    , comments :: ContextRoleComments
+    , comments :: Comments ()
     }
+
+type PropertyValueWithComments = Comments (value :: Array String)
 
 newtype BinnenRol =
   BinnenRol
     { id :: ID
     , pspType :: ID
     , binding :: Maybe ID
-    , properties :: StrMap (Array String)
-    , comments :: ContextRoleComments
+    , properties :: StrMap PropertyValueWithComments
     }
 
 type PerspectName = String
@@ -59,6 +59,8 @@ data SimpleValue =
   | Bool Boolean
   -- en dan nog date
 
+propertyValue :: PropertyValueWithComments -> Array String
+propertyValue (Comments{value}) = value
 
 -----------------------------------------------------------
 -- Show instances

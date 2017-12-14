@@ -1,12 +1,13 @@
 module Perspectives.QueryCombinators where
 
 import Control.Monad.Aff (Aff)
+import Control.Monad.State (StateT, put, get)
 import Data.Array (cons, difference, elemIndex, foldr, null, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
-import Prelude (bind, id, join, map, not, pure, show, ($), (<>), (>=>))
+import Prelude (bind, id, join, map, not, pure, show, ($), (<>), (>=>), discard)
 
 closure :: forall e.
   NamedFunction (TripleGetter e) ->
@@ -80,7 +81,7 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter nam
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
-isNothing :: forall e. Triple e -> Aff (PropDefsEffects e) (Triple e)
+isNothing :: forall e. Triple e -> StateT Boolean (Aff (PropDefsEffects e)) (Triple e)
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
 hasValue :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
@@ -91,3 +92,25 @@ hasValue (NamedFunction nameOfp p) = memorize getter name where
 
   name :: String
   name = "(hasValue " <> nameOfp <> ")"
+
+-- | Ignore the cache of query results for the given named function, i.e. always compute.
+ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+ignoreCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
+  go r =
+    do
+      remember <- get
+      put false
+      result <- p r
+      put remember
+      pure result
+
+-- | Use the cache of query results for the given named function.
+useCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+useCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
+  go r =
+    do
+      remember <- get
+      put true
+      result <- p r
+      put remember
+      pure result

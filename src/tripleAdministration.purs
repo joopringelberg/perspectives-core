@@ -3,6 +3,7 @@ module Perspectives.TripleAdministration where
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.State (StateT, get)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
@@ -12,7 +13,11 @@ import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==))
 
 type Predicate = String
 
-type TripleGetter e = Resource -> Aff (PropDefsEffects e) (Triple e)
+-- type TripleGetter e = Resource -> Aff (PropDefsEffects e) (Triple e)
+
+type FlexTriple e = StateT Boolean (Aff (PropDefsEffects e)) (Triple e)
+
+type TripleGetter e = Resource -> FlexTriple e
 
 data NamedFunction f = NamedFunction String f
 
@@ -110,12 +115,18 @@ ensureResource rid = do
 
 memorize :: forall e. TripleGetter e -> String -> NamedFunction (TripleGetter e)
 memorize getter name = NamedFunction name \id -> do
-  mt <- liftEff (lookupInTripleIndex id name)
-  case mt of
-    Nothing -> do
+  remember <- get
+  case remember of
+    true -> do
+      mt <- liftEff (lookupInTripleIndex id name)
+      case mt of
+        Nothing -> do
+          t <- getter id
+          liftEff $ registerTriple t
+        (Just t) -> pure t
+    false -> do
       t <- getter id
       liftEff $ registerTriple t
-    (Just t) -> pure t
 
 -- TODO: dit moet eigenlijk een apart effect zijn, b.v.: DEPENDENCY.
 foreign import addDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
