@@ -4,19 +4,22 @@ import Control.Alt ((<|>))
 import Control.Monad (class Monad)
 import Control.Monad.Aff (Aff)
 import Control.Monad.State (StateT)
+import Perspectives.IndentParser (ContextRoleParserMonad)
 import Text.Parsing.Parser (ParserT)
 import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (char, oneOf)
 import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, letter, makeTokenParser)
 
-type IndentTokenParser e = GenTokenParser String (StateT Position (Aff e))
+-- type IndentTokenParser e = GenTokenParser String (StateT Position (Aff e))
+type IndentTokenParser e = GenTokenParser String (ContextRoleParserMonad e)
 
 token :: forall e. IndentTokenParser e
 token = makeTokenParser perspectDef
 
 -- type LanguageDef = GenLanguageDef String Identity
 
-type IndentLanguageDef e = GenLanguageDef String (StateT Position (Aff e))
+-- type IndentLanguageDef e = GenLanguageDef String (StateT Position (Aff e))
+type IndentLanguageDef e = GenLanguageDef String (ContextRoleParserMonad e)
 
 perspectDef :: forall e. IndentLanguageDef e
 -- perspectDef = LanguageDef (unGenLanguageDef haskellStyle)

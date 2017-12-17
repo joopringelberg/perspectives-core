@@ -14,7 +14,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, fromFoldable, singleton)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..), snd)
+import Data.Tuple (Tuple(..))
 import Perspectives.Guid (guid)
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
@@ -230,8 +230,10 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
       _ <- nextLine
       (contextBuitenRol :: String) <- indented *> context
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
-      rolId <- pure (guid unit)
-      lift $ lift $ storeRoleInResourceDefinitions rolId
+      _ <- incrementRoleInstances rname
+      nrOfRoleOccurrences <- getRoleOccurrences rname
+      rolId <- pure $ contextID <> "_" <> rname <> "_" <> show nrOfRoleOccurrences
+      liftAffToIP $ storeRoleInResourceDefinitions rolId
         (PerspectRol
           { id: rolId
           , pspType: rname
@@ -252,7 +254,7 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
       cmt <- inLineComment
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       rolId <- pure (guid unit)
-      lift $ lift $ storeRoleInResourceDefinitions rolId
+      liftAffToIP $ storeRoleInResourceDefinitions rolId
         (PerspectRol
           { id: rolId
           , pspType: rname
@@ -266,6 +268,14 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
 
 -- TODO: query
 
+withRoleCounting :: forall a e. IP a e -> IP a e
+withRoleCounting p = do
+  roleInstances <- getRoleInstances
+  setRoleInstances empty
+  r <- p
+  setRoleInstances roleInstances
+  pure r
+
 -----------------------------------------------------------
 -- Context
 -----------------------------------------------------------
@@ -276,40 +286,41 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
 -- | The parser never backtracks over a Context. This means we can safely perform the side
 -- | effect of storing its constituent roles and contexts.
 context :: forall e. IP String (DomeinFileEffects e)
-context = withPos do
-  cmtBefore <- manyOneLineComments
-  withPos do
-    (ContextDeclaration typeName instanceName cmt) <- contextDeclaration
-    do
-      (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
-      (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
-      (rolebindings :: List (Tuple RoleName (Array ID))) <- option Nil (indented *> (block $ roleBinding instanceName))
-      lift $ lift $ storeContextInResourceDefinitions instanceName
-        (PerspectContext
-          { id: instanceName
-          , pspType: typeName
-          , binnenRol:
-            BinnenRol
-              { id: instanceName <> "_binnenRol"
-              , pspType: ":BinnenRol"
-              , binding: Just $ instanceName <> "_buitenRol"
-              , properties: fromFoldable privateProps
-              }
-          , buitenRol: instanceName <> "_buitenRol"
-          , rolInContext: fromFoldable rolebindings
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
-        })
-      lift $ lift $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
-        (PerspectRol
-          { id: instanceName <> "_buitenRol"
-          , pspType: ":BuitenRol"
-          , binding: Nothing
-          , context: instanceName
-          , properties: fromFoldable publicProps
-          , gevuldeRollen: empty
-          , comments: Comments { commentBefore: [], commentAfter: []}
+context = withRoleCounting context' where
+  context' = withPos do
+    cmtBefore <- manyOneLineComments
+    withPos do
+      (ContextDeclaration typeName instanceName cmt) <- contextDeclaration
+      do
+        (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
+        (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
+        (rolebindings :: List (Tuple RoleName (Array ID))) <- option Nil (indented *> (block $ roleBinding instanceName))
+        liftAffToIP $ storeContextInResourceDefinitions instanceName
+          (PerspectContext
+            { id: instanceName
+            , pspType: typeName
+            , binnenRol:
+              BinnenRol
+                { id: instanceName <> "_binnenRol"
+                , pspType: ":BinnenRol"
+                , binding: Just $ instanceName <> "_buitenRol"
+                , properties: fromFoldable privateProps
+                }
+            , buitenRol: instanceName <> "_buitenRol"
+            , rolInContext: fromFoldable rolebindings
+            , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
-      pure $ instanceName <> "_buitenRol"
+        liftAffToIP $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
+          (PerspectRol
+            { id: instanceName <> "_buitenRol"
+            , pspType: ":BuitenRol"
+            , binding: Nothing
+            , context: instanceName
+            , properties: fromFoldable publicProps
+            , gevuldeRollen: empty
+            , comments: Comments { commentBefore: [], commentAfter: []}
+            })
+        pure $ instanceName <> "_buitenRol"
 
 
 -- Helper functions for development.
@@ -339,54 +350,58 @@ expression = choice
 -- Text
 -----------------------------------------------------------
 sourceText :: forall e. IP ID (DomeinFileEffects e)
-sourceText = withPos do
-  cmtBefore <- manyOneLineComments
-  withPos do
-    (TextDeclaration textName cmt) <- textDeclaration
-    (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
-    (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
-    defs <- AR.many context
-    (roleBindings :: Array String) <- lift $ lift $ traverse (\buitenRolId ->
-      do
-        let roleId = guid unit
-        storeRoleInResourceDefinitions roleId
-          (PerspectRol
-            { id: roleId
-            , pspType: "psp:text_Item"
-            , binding: Just buitenRolId
-            , context: textName
-            , properties: empty
-            , gevuldeRollen: empty
-            , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
-            })
-        pure roleId) defs
-    lift $ lift $ storeContextInResourceDefinitions textName
-      (PerspectContext
-        { id: textName
-        , pspType: "psp:SourceText"
-        , binnenRol:
-          BinnenRol
-            { id: textName <> "_binnenRol"
-            , pspType: ":BinnenRol"
-            , binding: Just $ textName <> "_buitenRol"
-            , properties: fromFoldable privateProps
-            }
-        , buitenRol: textName <> "_buitenRol"
-        , rolInContext: singleton "psp:text_Item" roleBindings
-        , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
-        })
+sourceText = withRoleCounting sourceText' where
+  sourceText' = withPos do
+    cmtBefore <- manyOneLineComments
+    withPos do
+      (TextDeclaration textName cmt) <- textDeclaration
+      (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
+      (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
+      defs <- AR.many context
+      (roleBindings :: Array String) <- (traverse (\buitenRolId ->
+        do
+          _ <- incrementRoleInstances "psp:text_Item"
+          nrOfRoleOccurrences <- getRoleOccurrences "psp:text_Item"
+          rolId <- pure $ textName <> "_psp:text_Item_" <> show nrOfRoleOccurrences
+          -- let roleId = guid unit
+          liftAffToIP $ storeRoleInResourceDefinitions rolId
+            (PerspectRol
+              { id: rolId
+              , pspType: "psp:text_Item"
+              , binding: Just buitenRolId
+              , context: textName
+              , properties: empty
+              , gevuldeRollen: empty
+              , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
+              })
+          pure rolId) defs)
+      liftAffToIP $ storeContextInResourceDefinitions textName
+        (PerspectContext
+          { id: textName
+          , pspType: "psp:SourceText"
+          , binnenRol:
+            BinnenRol
+              { id: textName <> "_binnenRol"
+              , pspType: ":BinnenRol"
+              , binding: Just $ textName <> "_buitenRol"
+              , properties: fromFoldable privateProps
+              }
+          , buitenRol: textName <> "_buitenRol"
+          , rolInContext: singleton "psp:text_Item" roleBindings
+          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
+          })
 
-    lift $ lift $ storeRoleInResourceDefinitions (textName <> "_buitenRol")
-      (PerspectRol
-        { id: textName <> "_buitenRol"
-        , pspType: ":BuitenRol"
-        , binding: Nothing
-        , context: textName
-        , properties: fromFoldable publicProps
-        , gevuldeRollen: empty
-        , comments: Comments { commentBefore: [], commentAfter: []}
-        })
-    pure textName
+      liftAffToIP $ storeRoleInResourceDefinitions (textName <> "_buitenRol")
+        (PerspectRol
+          { id: textName <> "_buitenRol"
+          , pspType: ":BuitenRol"
+          , binding: Nothing
+          , context: textName
+          , properties: fromFoldable publicProps
+          , gevuldeRollen: empty
+          , comments: Comments { commentBefore: [], commentAfter: []}
+          })
+      pure textName
 
 -----------------------------------------------------------
 -- Tests
