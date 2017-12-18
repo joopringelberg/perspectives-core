@@ -11,10 +11,11 @@ module Perspectives.Identifiers
 , getSecondMatch
 , Namespace
 , isWellFormedIdentifier
+, roleIndexNr
   )
 
 where
-import Data.Array (unsafeIndex)
+import Data.Array (head, index, unsafeIndex)
 import Data.Foldable (or)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, fromFoldable, lookup)
@@ -23,7 +24,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
-import Prelude (const, flip, (<$>))
+import Prelude (const, flip, id, (<$>))
 
 standardPrefixes2namespaces :: StrMap String
 standardPrefixes2namespaces = fromFoldable [
@@ -96,3 +97,12 @@ isWellFormedIdentifier :: String -> Boolean
 isWellFormedIdentifier s = case isDomeinURI s of
   true -> true
   false -> isStandardNamespaceCURIE s
+
+roleIndexNrRegex :: Regex
+roleIndexNrRegex = unsafeRegex "_(\\d+)$" noFlags
+
+-- | Role names are postfixed with an index to distinghuish between multiple occurrences of the same role type.
+roleIndexNr :: String -> Maybe String
+roleIndexNr s = case match roleIndexNrRegex s of
+  (Just (matches :: Array (Maybe String))) -> maybe Nothing id (index matches 1)
+  _ -> Nothing

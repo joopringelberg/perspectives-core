@@ -7,23 +7,24 @@ import Control.Monad.State (StateT, get, modify)
 import Control.Monad.State.Trans (evalStateT)
 import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
-import Data.Array (elemIndex, replicate)
+import Data.Array (catMaybes, elemIndex, replicate, sortBy, sortWith)
 import Data.Foldable (traverse_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, foldM, values)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Identifiers (roleIndexNr)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getContext, getRole)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments, propertyValue, PerspectRolProperties)
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PerspectRolProperties, PropertyName, PropertyValueWithComments, compareOccurrences, propertyValue)
 import Perspectives.SystemQueries (binding, rolContext)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
-import Prelude (Unit, bind, discard, join, pure, unit, ($), (*>), (+), (-), (<>))
+import Prelude (Unit, bind, discard, id, join, pure, show, unit, ($), (*>), (+), (-), (<<<), (<>))
 
 type IndentLevel = Int
 
@@ -123,9 +124,11 @@ context definedResources (PerspectContext c) = do
   withComments (\r->r.comments) contextDeclaration c
   publicProperties
   privateProperties
-  traverse_ (indent roleBinding) (join (values c.rolInContext))
+  -- Sort the roles according to, first, their type, second, their occurrence.
+  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values c.rolInContext))
+  traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
-    contextDeclaration x = identifier x.pspType *> space *> identifier' x.id
+    contextDeclaration x = identifier x.pspType *> space *> identifier' x.displayName
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
@@ -138,32 +141,29 @@ context definedResources (PerspectContext c) = do
       props = let (BinnenRol{properties}) = c.binnenRol
         in properties
 
-    roleBinding :: ID -> PerspectText e
-    roleBinding rolId = do
+    roleBinding :: PerspectRol -> PerspectText e
+    roleBinding (PerspectRol r) = do
       -- NB: This is the role of the context - not yet its binding!
-      maybeRole <- liftAff $ getRole rolId
-      case maybeRole of
-        (Just (PerspectRol r)) -> do
-          let binding = (unsafePartial $ fromJust r.binding)
-          case elemIndex binding definedResources of
-            Nothing -> do
-              -- (INLINE CONTEXT) If the binding is not defined in the same text at top level, recursively display the
-              -- context that is bound (But only if it has been defined at all!).
-              maybeContext <- liftAff $ getContext binding
-              case maybeContext of
-                Nothing -> withComments' r.comments (identifier $ r.pspType <> " => " <> binding)
-                (Just contxt) -> do
-                  withComments' r.comments (identifier $ r.pspType <> " => ")
-                  newline
-                  indent (context definedResources) contxt
-            otherwise ->
-              -- (REFERENCE) Otherwise, just display a reference to the binding.
-              withComments' r.comments (identifier $ r.pspType <> " => " <> binding)
-          strMapTraverse_ roleProperty r.properties
-        Nothing -> pure unit
-      where
-        reference :: PerspectRolProperties -> PerspectText e
-        reference r = withComments' r.comments (identifier $ r.pspType <> " => " <> (unsafePartial $ fromJust r.binding))
+      let binding = (unsafePartial $ fromJust r.binding)
+      let (occurrence :: String) = maybe "" id (roleIndexNr r.id)
+      case elemIndex binding definedResources of
+        Nothing -> do
+          -- (INLINE CONTEXT) If the binding is not defined in the same text at top level, recursively display the
+          -- context that is bound (But only if it has been defined at all!).
+          maybeContext <- liftAff $ getContext binding
+          case maybeContext of
+            Nothing -> withComments' r.comments (identifier $ r.pspType <> " (" <> occurrence <> ") => " <> binding)
+            (Just contxt) -> do
+              withComments' r.comments (identifier $ r.pspType <> " (" <> occurrence <> ") => ")
+              newline
+              indent (context definedResources) contxt
+        otherwise ->
+          -- (REFERENCE) Otherwise, just display a reference to the binding.
+          withComments' r.comments (identifier $ r.pspType <> "( " <> occurrence <> ") => " <> binding)
+      strMapTraverse_ roleProperty r.properties
+    reference :: PerspectRolProperties -> PerspectText e
+    reference r = withComments' r.comments (identifier $ r.pspType <> " => " <> (unsafePartial $ fromJust r.binding))
+
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map

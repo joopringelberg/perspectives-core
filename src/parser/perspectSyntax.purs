@@ -1,6 +1,7 @@
 module Perspectives.Syntax where
 
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
+import Data.Ord (Ordering(..), compare)
 import Data.StrMap (StrMap)
 import Prelude (class Show, show, (<>))
 
@@ -15,6 +16,7 @@ newtype Comments e = Comments
 
 newtype PerspectContext = PerspectContext
   { id :: ID
+  , displayName :: String
   , pspType :: ID
   , binnenRol :: BinnenRol
   , buitenRol :: ID
@@ -27,6 +29,7 @@ newtype PerspectRol =
 
 type PerspectRolProperties =
     { id :: ID
+    , occurrence :: Maybe Int
     , pspType :: ID
     , binding :: Maybe ID
     , context :: ID
@@ -63,8 +66,15 @@ propertyValue :: PropertyValueWithComments -> Array String
 propertyValue (Comments{value}) = value
 
 -----------------------------------------------------------
--- Show instances
+-- Instances
 -----------------------------------------------------------
+
+compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
+compareOccurrences (PerspectRol{occurrence: a}) (PerspectRol{occurrence: b}) = case a of
+  Nothing -> LT
+  (Just n) -> case b of
+    Nothing -> GT
+    (Just m) -> compare n m
 
 foreign import jsonStringify :: forall a. {|a} -> String
 

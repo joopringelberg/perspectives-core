@@ -1,10 +1,8 @@
 module Perspectives.PropertyComposition where
 
 
-import Control.Monad.Aff (Aff)
 import Data.Array (cons, difference)
 import Data.Traversable (traverse)
-import Perspectives.Property (PropDefsEffects)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
 import Prelude (bind, join, pure, ($), (<>), map)
 

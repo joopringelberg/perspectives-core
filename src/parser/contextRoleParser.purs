@@ -2,7 +2,7 @@ module Perspectives.ContextRoleParser where
 
 import Perspectives.IndentParser
 import Control.Alt ((<|>))
-import Control.Monad.Aff (runAff_)
+import Control.Monad.Aff (Aff, runAff_)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
@@ -10,20 +10,20 @@ import Data.Array (cons, many, snoc) as AR
 import Data.Char.Unicode (isLower)
 import Data.Foldable (elem)
 import Data.List.Types (List(..))
-import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, empty, fromFoldable, singleton)
+import Data.Maybe (Maybe(..), maybe)
+import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.Guid (guid)
-import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
+import Perspectives.Resource (PROPDEFS, getContext, storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
-import Text.Parsing.Parser.Combinators (choice, option, try, (<?>), (<??>))
+import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
@@ -217,25 +217,31 @@ rolePropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComm
 rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "private propertyname = value"
 
 isRoleDeclaration :: forall e. IP Unit (DomeinFileEffects e)
-isRoleDeclaration = withPos (roleName <* (sameLine *> reservedOp "=>") *> pure unit)
+isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence) *> (sameLine *> reservedOp "=>") *> pure unit)
+
+roleOccurrence :: forall e. IP Int e
+roleOccurrence = token.parens token.integer
 
 -- | roleBinding = roleName '=>' (resourceName | context) rolePropertyAssignment*
-roleBinding :: forall e. PerspectName -> IP (Tuple RoleName (Array ID)) (DomeinFileEffects e)
+roleBinding :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBinding contextID = ("'rolename =>' followed by context declaration on next line' " <??>
   (withPos $ try do
     cmtBefore <- manyOneLineComments
     withPos do
-      rname <- (roleName <* (sameLine *> reservedOp "=>"))
+      rname <- roleName
+      occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
+      _ <- (sameLine *> reservedOp "=>")
       cmt <- inLineComment
       _ <- nextLine
       (contextBuitenRol :: String) <- indented *> context
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances rname
-      nrOfRoleOccurrences <- getRoleOccurrences rname
-      rolId <- pure $ contextID <> "_" <> rname <> "_" <> show nrOfRoleOccurrences
+      nrOfRoleOccurrences <- getRoleOccurrences rname -- The position in the sequence.
+      rolId <- pure $ contextID <> "_" <> rname <> "_" <> roleIndex occurrence nrOfRoleOccurrences
       liftAffToIP $ storeRoleInResourceDefinitions rolId
         (PerspectRol
           { id: rolId
+          , occurrence: nrOfRoleOccurrences
           , pspType: rname
           , binding: Just contextBuitenRol
           , context: contextID
@@ -243,20 +249,25 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
           , gevuldeRollen: empty
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
-      pure $ Tuple rname [rolId]))
+      pure $ Tuple rname rolId))
 
   <|>
   ("rolename => resourcename" <??> (withPos $ try do
     cmtBefore <- manyOneLineComments
     withPos do
-      rname <- (roleName <* (sameOrIndented *> reservedOp "=>"))
+      rname <- roleName
+      occurrence <- sameLine *> optionMaybe roleOccurrence
+      _ <- (sameLine *> reservedOp "=>")
       ident <- (sameLine *> resourceName)
       cmt <- inLineComment
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
-      rolId <- pure (guid unit)
+      _ <- incrementRoleInstances rname
+      nrOfRoleOccurrences <- getRoleOccurrences rname
+      rolId <- pure $ contextID <> "_" <> rname <> "_" <> roleIndex occurrence nrOfRoleOccurrences
       liftAffToIP $ storeRoleInResourceDefinitions rolId
         (PerspectRol
           { id: rolId
+          , occurrence: nrOfRoleOccurrences
           , pspType: rname
           , binding: Just ident
           , context: contextID
@@ -264,7 +275,15 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
           , gevuldeRollen: empty
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
-      pure $ Tuple rname [rolId]))
+      pure $ Tuple rname rolId))
+  where
+    -- If there is an index in the text, it prevails.
+    roleIndex :: Maybe Int -> Maybe Int -> String
+    roleIndex nrInText nrInSequence = case nrInText of
+      (Just n) -> show n
+      Nothing -> case nrInSequence of
+        (Just n) -> show n
+        Nothing -> "0"
 
 -- TODO: query
 
@@ -294,10 +313,11 @@ context = withRoleCounting context' where
       do
         (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
         (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
-        (rolebindings :: List (Tuple RoleName (Array ID))) <- option Nil (indented *> (block $ roleBinding instanceName))
+        (rolebindings :: List (Tuple RoleName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
         liftAffToIP $ storeContextInResourceDefinitions instanceName
           (PerspectContext
             { id: instanceName
+            , displayName : instanceName
             , pspType: typeName
             , binnenRol:
               BinnenRol
@@ -307,12 +327,13 @@ context = withRoleCounting context' where
                 , properties: fromFoldable privateProps
                 }
             , buitenRol: instanceName <> "_buitenRol"
-            , rolInContext: fromFoldable rolebindings
+            , rolInContext: collect rolebindings
             , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
         liftAffToIP $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
           (PerspectRol
             { id: instanceName <> "_buitenRol"
+            , occurrence: Nothing
             , pspType: ":BuitenRol"
             , binding: Nothing
             , context: instanceName
@@ -321,6 +342,12 @@ context = withRoleCounting context' where
             , comments: Comments { commentBefore: [], commentAfter: []}
             })
         pure $ instanceName <> "_buitenRol"
+  collect :: List (Tuple RoleName ID) -> StrMap (Array ID)
+  collect Nil = empty
+  collect (Cons (Tuple rname id) r) = let map = collect r in
+    case lookup rname map of
+      Nothing -> insert rname [id] map
+      (Just ids) -> insert rname (AR.cons id ids) map
 
 
 -- Helper functions for development.
@@ -367,6 +394,7 @@ sourceText = withRoleCounting sourceText' where
           liftAffToIP $ storeRoleInResourceDefinitions rolId
             (PerspectRol
               { id: rolId
+              , occurrence: nrOfRoleOccurrences
               , pspType: "psp:text_Item"
               , binding: Just buitenRolId
               , context: textName
@@ -378,6 +406,7 @@ sourceText = withRoleCounting sourceText' where
       liftAffToIP $ storeContextInResourceDefinitions textName
         (PerspectContext
           { id: textName
+          , displayName : textName
           , pspType: "psp:SourceText"
           , binnenRol:
             BinnenRol
@@ -394,6 +423,7 @@ sourceText = withRoleCounting sourceText' where
       liftAffToIP $ storeRoleInResourceDefinitions (textName <> "_buitenRol")
         (PerspectRol
           { id: textName <> "_buitenRol"
+          , occurrence: Nothing
           , pspType: ":BuitenRol"
           , binding: Nothing
           , context: textName
@@ -411,6 +441,10 @@ sourceText = withRoleCounting sourceText' where
 
 runTest t =
   runAff_ (\_->pure unit) (t >>= (\r -> log (show r)))
+
+getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectContext)
+getContextDef id = do
+  getContext id
 
 -- x = runTest (runIndentParser test1 context)
 
@@ -435,9 +469,15 @@ test2 = """:Aangifte :Aangifte1 -- Commentaar bij :Aangifte1
 
 test3 :: String
 test3 = """:Aangifte :Aangifte1
-  :aangever => :Jansen\n""" -- zodra een newline volgt komt de binding niet mee, geindenteerd of niet.
+  :aangever (0) => :Jansen\n"""
 -- runIndentParser test3 context
 
+test3a :: String
+test3a = """:Aangifte :Aangifte1
+  :aangever (0) => :Jansen\n
+  :aangever (1) => :Pietersen\n"""
+
+-- runIndentParser test3 context
 -- runIndentParser ":aangever => Jansen" (roleBinding "")
 -- runIndentParser ":aangever => Jansen\n  prop = 1" (roleBinding "")
 
@@ -570,3 +610,10 @@ test17 :: String
 test17 = """Text :A
 :Aangifte :B12"""
 -- runTest (runIndentParser test17 sourceText)
+
+test18 :: String
+test18 = """Text :T
+:Aangifte :A1
+	:aangever (0) => :Jansen
+	:aangever (1) => :Pietersen
+"""

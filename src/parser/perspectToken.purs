@@ -2,11 +2,8 @@ module Perspectives.Token where
 
 import Control.Alt ((<|>))
 import Control.Monad (class Monad)
-import Control.Monad.Aff (Aff)
-import Control.Monad.State (StateT)
 import Perspectives.IndentParser (ContextRoleParserMonad)
 import Text.Parsing.Parser (ParserT)
-import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (char, oneOf)
 import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, letter, makeTokenParser)
 
