@@ -8,7 +8,7 @@ import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc) as AR
 import Data.Char.Unicode (isLower)
-import Data.Foldable (elem)
+import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
@@ -101,9 +101,13 @@ domeinName = do
   _ <- char '#'
   pure $ "model:" <> domein <> "#"
 
--- localResourceName = upper alphaNum*
-localResourceName :: forall e. IP String e
-localResourceName = capitalizedString
+-- localContextName = upper alphaNum*
+localContextName :: forall e. IP String e
+localContextName = f <$> capitalizedString <*> AR.many (defaultEmbedded capitalizedString) where
+  f first rest = fold $ AR.cons first rest
+
+defaultEmbedded :: forall e. IP String e -> IP String e
+defaultEmbedded p = (<>) <$> STRING.string "#" <*> p
 
 -- localPropertyName = lower alphaNum*
 localPropertyName :: forall e. IP String e
@@ -114,17 +118,17 @@ prefix :: forall e. IP String e
 prefix = (f <$> AR.many lower <*> char ':') where
   f ca c = fromCharArray $ AR.snoc ca c
 
--- prefixedContextName = prefix localResourceName
+-- prefixedContextName = prefix localContextName
 prefixedContextName :: forall e. IP String e
-prefixedContextName = lexeme $ (<>) <$> prefix <*> localResourceName
+prefixedContextName = lexeme $ (<>) <$> prefix <*> localContextName
 
 -- prefixedPropertyName = prefix localPropertyName
 prefixedPropertyName :: forall e. IP String e
 prefixedPropertyName = lexeme ((<>) <$> prefix <*> localPropertyName)
 
--- qualifiedResourceName = domeinName localResourceName
+-- qualifiedResourceName = domeinName localContextName
 qualifiedContextName :: forall e. IP String e
-qualifiedContextName = lexeme ((<>) <$> domeinName <*> localResourceName)
+qualifiedContextName = lexeme ((<>) <$> domeinName <*> localContextName)
 
 -- qualifiedPropertyName = domeinName localPropertyName
 qualifiedPropertyName :: forall e. IP String e
@@ -132,7 +136,7 @@ qualifiedPropertyName = lexeme ((<>) <$> domeinName <*> localPropertyName)
 
 -- contextName = prefixedContextName | qualifiedContextName
 contextName :: forall e. IP String e
-contextName = (qualifiedContextName <|> prefixedContextName) <?> "the name of a resource (Context or Role)."
+contextName = (qualifiedContextName <|> prefixedContextName <|> defaultEmbedded localContextName) <?> "the name of a resource (Context or Role)."
 
 -- propertyName = prefixedPropertyName | qualifiedPropertyName
 propertyName :: forall e. IP String e
