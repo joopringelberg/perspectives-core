@@ -28,13 +28,13 @@ import Prelude (const, flip, id, (<$>))
 
 standardPrefixes2namespaces :: StrMap String
 standardPrefixes2namespaces = fromFoldable [
-  (Tuple "user" "model:user#"),
-  (Tuple "blank" "model:blank#"),
-  (Tuple "_" "model:blank#"),
-  (Tuple "xsd" "http://www.w3.org/2001/XMLSchema#"),
-  (Tuple "rdfs" "http://www.w3.org/2000/01/rdf-schema#"),
-  (Tuple "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns#"),
-  (Tuple "owl" "http://www.w3.org/2002/07/owl#"),
+  (Tuple "user" "model:user$"),
+  (Tuple "blank" "model:blank$"),
+  (Tuple "_" "model:blank$"),
+  (Tuple "xsd" "http://www.w3.org/2001/XMLSchema$"),
+  (Tuple "rdfs" "http://www.w3.org/2000/01/rdf-schema$"),
+  (Tuple "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns$"),
+  (Tuple "owl" "http://www.w3.org/2002/07/owl$"),
   (Tuple "xml" "http://www.w3.org/XML/1998/namespace")]
 
 type Namespace = String
@@ -52,9 +52,9 @@ getSecondMatch regex s = case match regex s of
   _ -> Nothing
 
 domeinURIRegex :: Regex
-domeinURIRegex = unsafeRegex "^model:(\\w*)#(\\w*)$" noFlags
+domeinURIRegex = unsafeRegex "^model:(\\w*)\\$(\\w*)$" noFlags
 
--- | True iff the string conforms to the model scheme, i.e. "model:SomeDomein#identifier".
+-- | True iff the string conforms to the model scheme, i.e. "model:SomeDomein$identifier".
 isDomeinURI :: String -> Boolean
 isDomeinURI s = test domeinURIRegex s
 
@@ -79,12 +79,12 @@ isStandardNamespaceCURIE s =
 isStandardNamespacePrefix :: Prefix -> Boolean
 isStandardNamespacePrefix pre = maybe false (const true) (lookup pre standardPrefixes2namespaces)
 
--- | From "owl:Thing", get "http://www.w3.org/2002/07/owl#"
+-- | From "owl:Thing", get "http://www.w3.org/2002/07/owl$"
 getStandardNamespace :: String -> Maybe Namespace
 getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (getPrefix s)
 
 namespaceRegex :: Regex
-namespaceRegex = unsafeRegex "^(model:\\w*#)\\w*$" noFlags
+namespaceRegex = unsafeRegex "^(model:\\w*\\$)\\w*$" noFlags
 
 getNamespace :: String -> Maybe Namespace
 getNamespace = getFirstMatch namespaceRegex

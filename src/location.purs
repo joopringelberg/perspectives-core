@@ -33,7 +33,6 @@ module Perspectives.Location
 where
 
 import Prelude
-import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff, kind Effect, runPure)
 import Data.Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Data.Maybe (Maybe(..))

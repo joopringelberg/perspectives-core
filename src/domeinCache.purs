@@ -40,11 +40,11 @@ domeinCache = new unit
 storeDomeinFileInCache :: forall e. Namespace -> AVar DomeinFile -> Aff (gm :: GLOBALMAP | e) (AVar DomeinFile)
 storeDomeinFileInCache ns df= liftEff $ poke domeinCache ns df *> pure df
 
--- | Matches all occurrences of :, # and /.
+-- | Matches all occurrences of : and /.
 domeinFileRegex :: Regex
-domeinFileRegex = unsafeRegex "[:#\\/]" global
+domeinFileRegex = unsafeRegex "[:\\/]" global
 
--- | Replace all occurrences of :, # and / by _.
+-- | Replace all occurrences of : and / by _.
 namespaceToDomeinFileName :: String -> String
 namespaceToDomeinFileName s = replace domeinFileRegex "_" s
 

@@ -3,14 +3,15 @@ module Perspectives.ContextRoleParser where
 import Perspectives.IndentParser
 import Control.Alt ((<|>))
 import Control.Monad.Aff (Aff, runAff_)
-import Control.Monad.Aff.Console (log)
+import Control.Monad.Aff.Console (CONSOLE, log)
+import Control.Monad.Eff (Eff)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc) as AR
 import Data.Char.Unicode (isLower)
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
@@ -19,7 +20,7 @@ import Perspectives.Resource (PROPDEFS, getContext, storeContextInResourceDefini
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
+import Prelude (class Show, Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>), (<??>))
@@ -33,7 +34,7 @@ import Text.Parsing.Parser.Token (alphaNum, upper)
 -----------------------------------------------------------
 
 inLineComment :: forall e. IP (Array Comment) e
-inLineComment = try $ option [] do
+inLineComment = option [] do
   sameLine
   _ <- (STRING.string "--")
   chars <- AR.many (satisfy (_ /= '\n'))
@@ -93,13 +94,13 @@ uncapitalizedString :: forall e. IP String e
 uncapitalizedString = f <$> lower <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
--- domeinName = 'model:' upper alphaNum* '#'
+-- domeinName = 'model:' upper alphaNum* '$'
 domeinName :: forall e. IP String e
 domeinName = do
   _ <- STRING.string "model:"
   domein <- capitalizedString
-  _ <- char '#'
-  pure $ "model:" <> domein <> "#"
+  _ <- char '$'
+  pure $ "model:" <> domein <> "$"
 
 -- localContextName = upper alphaNum*
 localContextName :: forall e. IP String e
@@ -107,7 +108,7 @@ localContextName = f <$> capitalizedString <*> AR.many (defaultEmbedded capitali
   f first rest = fold $ AR.cons first rest
 
 defaultEmbedded :: forall e. IP String e -> IP String e
-defaultEmbedded p = (<>) <$> STRING.string "#" <*> p
+defaultEmbedded p = (<>) <$> STRING.string "$" <*> p
 
 -- localPropertyName = lower alphaNum*
 localPropertyName :: forall e. IP String e
@@ -193,7 +194,7 @@ withComments :: forall e a. IP a e -> IP (Tuple (Comments ()) a) e
 withComments p = do
   before <- manyOneLineComments
   a <- p
-  after <- inLineComment
+  after <- withPos inLineComment
   pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
 
 typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple PropertyName PropertyValueWithComments) e
@@ -325,7 +326,7 @@ context = withRoleCounting context' where
             , binnenRol:
               BinnenRol
                 { id: instanceName <> "_binnenRol"
-                , pspType: ":BinnenRol"
+                , pspType: "model:Perspectives$BinnenRol"
                 , binding: Just $ instanceName <> "_buitenRol"
                 , properties: fromFoldable privateProps
                 }
@@ -337,7 +338,7 @@ context = withRoleCounting context' where
           (PerspectRol
             { id: instanceName <> "_buitenRol"
             , occurrence: Nothing
-            , pspType: ":BuitenRol"
+            , pspType: "model:Perspectives$BuitenRol"
             , binding: Nothing
             , context: instanceName
             , properties: fromFoldable publicProps
@@ -410,11 +411,11 @@ sourceText = withRoleCounting sourceText' where
         (PerspectContext
           { id: textName
           , displayName : textName
-          , pspType: "psp:SourceText"
+          , pspType: "model:Perspectives$SourceText"
           , binnenRol:
             BinnenRol
               { id: textName <> "_binnenRol"
-              , pspType: ":BinnenRol"
+              , pspType: "model:Perspectives$BinnenRol"
               , binding: Just $ textName <> "_buitenRol"
               , properties: fromFoldable privateProps
               }
@@ -427,7 +428,7 @@ sourceText = withRoleCounting sourceText' where
         (PerspectRol
           { id: textName <> "_buitenRol"
           , occurrence: Nothing
-          , pspType: ":BuitenRol"
+          , pspType: "model:Perspectives$BuitenRol"
           , binding: Nothing
           , context: textName
           , properties: fromFoldable publicProps
@@ -442,6 +443,7 @@ sourceText = withRoleCounting sourceText' where
 
 -- runAff_ (\_->pure unit) ((runIndentParser test1 context) >>= (\r -> log (show r)))
 
+runTest :: forall e a. Show a => Aff (console :: CONSOLE | e) a -> Eff (console :: CONSOLE | e) Unit
 runTest t =
   runAff_ (\_->pure unit) (t >>= (\r -> log (show r)))
 

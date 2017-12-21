@@ -22,7 +22,7 @@ rdfType :: forall e. NamedTripleGetter e
 rdfType = constructTripleGetter "rdf:type"
 
 rol_RolBinding :: forall e. NamedTripleGetter e
-rol_RolBinding = constructTripleGetter "model:SysteemDomein#rol_RolBinding"
+rol_RolBinding = constructTripleGetter "model:SysteemDomein$rol_RolBinding"
 
 types :: forall e. NamedTripleGetter e
 types = QC.closure rdfType

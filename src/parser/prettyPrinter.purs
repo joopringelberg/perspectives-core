@@ -7,7 +7,7 @@ import Control.Monad.State (StateT, get, modify)
 import Control.Monad.State.Trans (evalStateT)
 import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
-import Data.Array (catMaybes, elemIndex, replicate, sortBy, sortWith)
+import Data.Array (catMaybes, elemIndex, replicate, sortBy)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, foldM, values)
@@ -20,11 +20,11 @@ import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getContext, getRole)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PerspectRolProperties, PropertyName, PropertyValueWithComments, compareOccurrences, propertyValue)
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PerspectRolProperties, PropertyName, PropertyValueWithComments, PerspectContextProperties, compareOccurrences, propertyValue)
 import Perspectives.SystemQueries (binding, rolContext)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
-import Prelude (Unit, bind, discard, id, join, pure, show, unit, ($), (*>), (+), (-), (<<<), (<>))
+import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==))
 
 type IndentLevel = Int
 
@@ -60,9 +60,9 @@ newline = tell "\n"
 comment :: forall e. PrettyPrinter Comment e
 comment c = identifier ( "--" <> c) *> newline
 
--- | Just prints the comment, preceded by a space.
+-- | Just prints the comment, preceded by a space and "--".
 comment' :: forall e. PrettyPrinter Comment e
-comment' c = space *> identifier' ( "--" <> c)
+comment' c = identifier' ( " --" <> c)
 
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
@@ -88,15 +88,16 @@ withComments getComments p el = do
   traverse_ comment commentBefore
   p el
   space
-  traverse_ comment commentAfter
+  traverse_ comment' commentAfter
   newline
 
+-- Prints each of the comments before on a separate line. Then executes the given PerspectText
+-- and follows that with the comment after, terminated by a newline.
 withComments' :: forall e f. Comments f -> PerspectText e -> PerspectText e
 withComments' (Comments{commentBefore, commentAfter}) p = do
   traverse_ comment commentBefore
   p
-  space
-  traverse_ comment commentAfter
+  traverse_ comment' commentAfter
   newline
 
 getCommentBefore :: forall f. Comments f -> Array Comment
@@ -128,6 +129,7 @@ context definedResources (PerspectContext c) = do
   (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values c.rolInContext))
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
+    contextDeclaration :: PerspectContextProperties -> PerspectText e
     contextDeclaration x = identifier x.pspType *> space *> identifier' x.displayName
 
     publicProperties = do
@@ -144,25 +146,28 @@ context definedResources (PerspectContext c) = do
     roleBinding :: PerspectRol -> PerspectText e
     roleBinding (PerspectRol r) = do
       -- NB: This is the role of the context - not yet its binding!
-      let binding = (unsafePartial $ fromJust r.binding)
+      let (binding :: ID) = (unsafePartial $ fromJust r.binding)
       let (occurrence :: String) = maybe "" id (roleIndexNr r.id)
       case elemIndex binding definedResources of
-        Nothing -> do
-          -- (INLINE CONTEXT) If the binding is not defined in the same text at top level, recursively display the
-          -- context that is bound (But only if it has been defined at all!).
-          maybeContext <- liftAff $ getContext binding
-          case maybeContext of
-            Nothing -> withComments' r.comments (identifier $ r.pspType <> " (" <> occurrence <> ") => " <> binding)
-            (Just contxt) -> do
-              withComments' r.comments (identifier $ r.pspType <> " (" <> occurrence <> ") => ")
-              newline
-              indent (context definedResources) contxt
-        otherwise ->
-          -- (REFERENCE) Otherwise, just display a reference to the binding.
-          withComments' r.comments (identifier $ r.pspType <> "( " <> occurrence <> ") => " <> binding)
+        Nothing -> do -- binding is not a BuitenRol of a context defined at top level in the Text.
+          maybeRole <- liftAff $ getRole binding
+          case maybeRole of
+            Nothing -> reference r
+            (Just (PerspectRol role)) -> do
+              case role.pspType == "model:Perspectives$BuitenRol" of
+                true -> do -- The role is a BuitenRol of some context.
+                  maybeContext <- liftAff $ getContext role.context
+                  case maybeContext of
+                    Nothing -> reference r
+                    (Just contxt) -> do
+                      withComments' role.comments (identifier $ r.pspType <> " => ")
+                      indent (context definedResources) contxt
+                false -> reference role -- The role is a RoleInContext of some context.
+        otherwise -> reference r
       strMapTraverse_ roleProperty r.properties
+
     reference :: PerspectRolProperties -> PerspectText e
-    reference r = withComments' r.comments (identifier $ r.pspType <> " => " <> (unsafePartial $ fromJust r.binding))
+    reference r = withComments' r.comments (identifier $ r.pspType <> " => " <> (maybe "" id r.binding))
 
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
@@ -170,11 +175,11 @@ strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 sourceText :: forall e. PrettyPrinter PerspectContext e
 sourceText (PerspectContext theText) = do
-  textDeclaration
+  withComments' theText.comments (identifier( "Text " <> theText.displayName))
   newline
 
-  (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding))
-  (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding >-> rolContext))
+  (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding)) -- Dit zijn dus buitenrollen
+  (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding >-> rolContext)) -- en dit zijn de contexten bij die buitenrollen.
   traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
   where
@@ -184,10 +189,3 @@ sourceText (PerspectContext theText) = do
       case mc of
         (Just c) -> context definedContexts c
         Nothing -> pure unit
-
-    textDeclaration :: PerspectText e
-    textDeclaration = do
-      traverse_ comment (getCommentBefore theText.comments)
-      identifier "Text "
-      identifier' theText.id
-      newline

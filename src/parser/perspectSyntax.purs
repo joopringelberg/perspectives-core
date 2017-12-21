@@ -14,7 +14,9 @@ newtype Comments e = Comments
   , commentAfter :: Array Comment
   | e}
 
-newtype PerspectContext = PerspectContext
+newtype PerspectContext = PerspectContext PerspectContextProperties
+
+type PerspectContextProperties =
   { id :: ID
   , displayName :: String
   , pspType :: ID

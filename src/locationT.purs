@@ -11,7 +11,7 @@ import Control.Monad.Eff.Class (class MonadEff, liftEff)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Prelude (bind, map, pure, (<$>), (<*>), (<<<), (<>))
+import Prelude (bind, map, pure, (<$>), (<*>), (<<<))
 
 newtype LocationT m a = LocationT (m (Location a))
 

@@ -96,7 +96,7 @@ ui =
             pure next
           (Just c) -> do
             t <- H.liftAff $ prettyPrint c sourceText
-            -- _ <- H.query (AceSlot 2) $ H.action (ChangeText t)
+            _ <- H.query (AceSlot 2) $ H.action (ChangeText t)
             H.modify (_ { text = t })
             pure next
       (Left e) -> do

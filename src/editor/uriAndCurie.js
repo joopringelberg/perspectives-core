@@ -33,7 +33,7 @@ define( function( require, exports, module ) {
 
 	var localPropertyName = uncapitalizedString;
 
-	var domeinName = new RegExp( "model:" + regExpToString(capitalizedString) + "#" );
+	var domeinName = new RegExp( "model:" + regExpToString(capitalizedString) + "\\$" );
 
 	var prefix = new RegExp(/[a-z0-9]*:/);
 
