@@ -15,7 +15,6 @@ import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Perspectives.Guid (guid)
 import Perspectives.Resource (PROPDEFS, getContext, storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
@@ -115,25 +114,25 @@ prefix :: forall e. IP String e
 prefix = (f <$> AR.many lower <*> char ':') where
   f ca c = fromCharArray $ AR.snoc ca c
 
--- prefixedResourceName = prefix localResourceName
-prefixedResourceName :: forall e. IP String e
-prefixedResourceName = lexeme $ (<>) <$> prefix <*> localResourceName
+-- prefixedContextName = prefix localResourceName
+prefixedContextName :: forall e. IP String e
+prefixedContextName = lexeme $ (<>) <$> prefix <*> localResourceName
 
 -- prefixedPropertyName = prefix localPropertyName
 prefixedPropertyName :: forall e. IP String e
 prefixedPropertyName = lexeme ((<>) <$> prefix <*> localPropertyName)
 
 -- qualifiedResourceName = domeinName localResourceName
-qualifiedResourceName :: forall e. IP String e
-qualifiedResourceName = lexeme ((<>) <$> domeinName <*> localResourceName)
+qualifiedContextName :: forall e. IP String e
+qualifiedContextName = lexeme ((<>) <$> domeinName <*> localResourceName)
 
 -- qualifiedPropertyName = domeinName localPropertyName
 qualifiedPropertyName :: forall e. IP String e
 qualifiedPropertyName = lexeme ((<>) <$> domeinName <*> localPropertyName)
 
--- resourceName = prefixedResourceName | qualifiedResourceName
-resourceName :: forall e. IP String e
-resourceName = (qualifiedResourceName <|> prefixedResourceName) <?> "the name of a resource (Context or Role)."
+-- contextName = prefixedContextName | qualifiedContextName
+contextName :: forall e. IP String e
+contextName = (qualifiedContextName <|> prefixedContextName) <?> "the name of a resource (Context or Role)."
 
 -- propertyName = prefixedPropertyName | qualifiedPropertyName
 propertyName :: forall e. IP String e
@@ -178,13 +177,13 @@ nextLine = do
 -- Elementary expression types
 -----------------------------------------------------------
 
--- | contextDeclaration = resourceName resourceName
+-- | contextDeclaration = contextName contextName
 textDeclaration :: forall e. IP TextDeclaration e
-textDeclaration = (TextDeclaration <$> (reserved "Text" *> resourceName) <*> inLineComment) <?> "the text declaration: Text <name>."
+textDeclaration = (TextDeclaration <$> (reserved "Text" *> contextName) <*> inLineComment) <?> "the text declaration: Text <name>."
 
--- | contextDeclaration = resourceName resourceName
+-- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
-contextDeclaration = (ContextDeclaration <$> resourceName <*> resourceName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
+contextDeclaration = (ContextDeclaration <$> contextName <*> contextName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
 
 withComments :: forall e a. IP a e -> IP (Tuple (Comments ()) a) e
 withComments p = do
@@ -222,7 +221,7 @@ isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence
 roleOccurrence :: forall e. IP Int e
 roleOccurrence = token.parens token.integer
 
--- | roleBinding = roleName '=>' (resourceName | context) rolePropertyAssignment*
+-- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBinding contextID = ("'rolename =>' followed by context declaration on next line' " <??>
   (withPos $ try do
@@ -252,13 +251,13 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
       pure $ Tuple rname rolId))
 
   <|>
-  ("rolename => resourcename" <??> (withPos $ try do
+  ("rolename => contextName" <??> (withPos $ try do
     cmtBefore <- manyOneLineComments
     withPos do
       rname <- roleName
       occurrence <- sameLine *> optionMaybe roleOccurrence
       _ <- (sameLine *> reservedOp "=>")
-      ident <- (sameLine *> resourceName)
+      ident <- (sameLine *> contextName)
       cmt <- inLineComment
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances rname
