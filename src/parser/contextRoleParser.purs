@@ -114,10 +114,10 @@ defaultEmbedded p = (<>) <$> STRING.string "$" <*> p
 localPropertyName :: forall e. IP String e
 localPropertyName = uncapitalizedString
 
--- prefix = lower* ':'
+-- prefix = lower+ ':'
 prefix :: forall e. IP String e
-prefix = (f <$> AR.many lower <*> char ':') where
-  f ca c = fromCharArray $ AR.snoc ca c
+prefix = (f <$> lower <*> AR.many lower <*> char ':') where
+  f fst ca c = fromCharArray $ AR.cons fst (AR.snoc ca c)
 
 -- prefixedContextName = prefix localContextName
 prefixedContextName :: forall e. IP String e
@@ -137,11 +137,11 @@ qualifiedPropertyName = lexeme ((<>) <$> domeinName <*> localPropertyName)
 
 -- contextName = prefixedContextName | qualifiedContextName
 contextName :: forall e. IP String e
-contextName = (qualifiedContextName <|> prefixedContextName <|> defaultEmbedded localContextName) <?> "the name of a resource (Context or Role)."
+contextName = (qualifiedContextName <|> prefixedContextName <|> lexeme (defaultEmbedded localContextName)) <?> "the name of a resource (Context or Role)."
 
 -- propertyName = prefixedPropertyName | qualifiedPropertyName
 propertyName :: forall e. IP String e
-propertyName = (qualifiedPropertyName <|> prefixedPropertyName) <?> "a property or role name."
+propertyName = (qualifiedPropertyName <|> prefixedPropertyName <|> lexeme (defaultEmbedded localPropertyName)) <?> "a property or role name."
 
 roleName :: forall e. IP String e
 roleName = propertyName
@@ -226,47 +226,21 @@ isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence
 roleOccurrence :: forall e. IP Int e
 roleOccurrence = token.parens token.integer
 
--- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
-roleBinding :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
-roleBinding contextID = ("'rolename =>' followed by context declaration on next line' " <??>
+roleBinding' :: forall e.
+  PerspectName
+  -> IP (Tuple (Array Comment) ID) (DomeinFileEffects e)
+  -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBinding' contextID p = ("rolename => contextName" <??>
   (withPos $ try do
     cmtBefore <- manyOneLineComments
     withPos do
       rname <- roleName
       occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
       _ <- (sameLine *> reservedOp "=>")
-      cmt <- inLineComment
-      _ <- nextLine
-      (contextBuitenRol :: String) <- indented *> context
+      (Tuple cmt ident) <- p
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances rname
       nrOfRoleOccurrences <- getRoleOccurrences rname -- The position in the sequence.
-      rolId <- pure $ contextID <> "_" <> rname <> "_" <> roleIndex occurrence nrOfRoleOccurrences
-      liftAffToIP $ storeRoleInResourceDefinitions rolId
-        (PerspectRol
-          { id: rolId
-          , occurrence: nrOfRoleOccurrences
-          , pspType: rname
-          , binding: Just contextBuitenRol
-          , context: contextID
-          , properties: fromFoldable props
-          , gevuldeRollen: empty
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
-          })
-      pure $ Tuple rname rolId))
-
-  <|>
-  ("rolename => contextName" <??> (withPos $ try do
-    cmtBefore <- manyOneLineComments
-    withPos do
-      rname <- roleName
-      occurrence <- sameLine *> optionMaybe roleOccurrence
-      _ <- (sameLine *> reservedOp "=>")
-      ident <- (sameLine *> contextName)
-      cmt <- inLineComment
-      props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
-      _ <- incrementRoleInstances rname
-      nrOfRoleOccurrences <- getRoleOccurrences rname
       rolId <- pure $ contextID <> "_" <> rname <> "_" <> roleIndex occurrence nrOfRoleOccurrences
       liftAffToIP $ storeRoleInResourceDefinitions rolId
         (PerspectRol
@@ -289,7 +263,22 @@ roleBinding contextID = ("'rolename =>' followed by context declaration on next 
         (Just n) -> show n
         Nothing -> "0"
 
--- TODO: query
+roleBindingWithInlineContext :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBindingWithInlineContext id = roleBinding' id do
+  cmt <- inLineComment
+  _ <- nextLine
+  (contextBuitenRol :: String) <- indented *> context
+  pure $ Tuple cmt contextBuitenRol
+
+roleBindingWithReference :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBindingWithReference id = roleBinding' id do
+  ident <- (sameLine *> contextName)
+  cmt <- inLineComment
+  pure $ Tuple cmt ident
+
+-- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
+roleBinding :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBinding contextID = roleBindingWithInlineContext contextID <|> roleBindingWithReference contextID -- TODO: query
 
 withRoleCounting :: forall a e. IP a e -> IP a e
 withRoleCounting p = do
@@ -622,3 +611,19 @@ test18 = """Text :T
 	:aangever (0) => :Jansen
 	:aangever (1) => :Pietersen
 """
+
+test19 :: String
+test19 = """:ContextType :Aangifte
+	:publicProperty =>
+		:Property $Urgentie
+			public :prop = 3"""
+
+test20 :: String
+test20 = """:publicProperty =>
+	:Property $Urgentie
+		public :prop = 3"""
+
+test21 :: String
+test21 = """:ContextType :Aangifte
+	:publicProperty => $Urgentie
+		:rolprop = 3"""
