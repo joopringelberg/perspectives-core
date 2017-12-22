@@ -37,7 +37,8 @@ $Aangifte $A1
 	public $urgentie = 8
 	$aangever => $Jansen
 		$betrouwbaarheid = 7
--- Alles hierboven wordt correct ontleed en weergegeven.
+
+-- Alles hierboven wordt correct ontleed en weergegeven. LET OP query!
 {-
 commentaar over
 twee regels
