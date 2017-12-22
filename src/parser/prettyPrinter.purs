@@ -38,11 +38,11 @@ type PrettyPrinter a e = a -> PerspectText e
 identifier :: forall e. PrettyPrinter String e
 identifier s = do
   i <- get
-  tell $ (fromCharArray (replicate i '\t')) <> s
+  tell $ (fromCharArray (replicate i '\t')) <> s <> " "
 
 -- | Just prints the string s.
 identifier' :: forall e. PrettyPrinter String e
-identifier' s = tell s
+identifier' s = tell $ s <> " "
 
 simpleValue :: forall e. PrettyPrinter (Array String) e
 simpleValue [v] = identifier' v
@@ -62,7 +62,7 @@ comment c = identifier ( "--" <> c) *> newline
 
 -- | Just prints the comment, preceded by a space and "--".
 comment' :: forall e. PrettyPrinter Comment e
-comment' c = identifier' ( " --" <> c)
+comment' c = identifier' ( "--" <> c)
 
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
@@ -109,7 +109,7 @@ getCommentAfter (Comments {commentAfter}) = commentAfter
 property :: forall e. PerspectText e -> PropertyName -> PropertyValueWithComments -> PerspectText e
 property keyword prop = indent (\pvcomments -> do
   withComments' pvcomments
-    (keyword *> identifier (prop <> " = ") *> simpleValue (propertyValue pvcomments)))
+    (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
 
 publicProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
 publicProperty = property (identifier "public")
@@ -130,7 +130,7 @@ context definedResources (PerspectContext c) = do
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
     contextDeclaration :: PerspectContextProperties -> PerspectText e
-    contextDeclaration x = identifier x.pspType *> space *> identifier' x.displayName
+    contextDeclaration x = identifier x.pspType *> identifier' x.displayName
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!

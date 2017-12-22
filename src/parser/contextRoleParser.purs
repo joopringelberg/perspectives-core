@@ -9,6 +9,7 @@ import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc) as AR
 import Data.Char.Unicode (isLower)
+import Data.Either (fromRight)
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..))
@@ -16,6 +17,7 @@ import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Resource (PROPDEFS, getContext, storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
@@ -190,11 +192,13 @@ textDeclaration = (TextDeclaration <$> (reserved "Text" *> contextName) <*> inLi
 contextDeclaration :: forall e. IP ContextDeclaration e
 contextDeclaration = (ContextDeclaration <$> contextName <*> contextName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
 
+-- | Apply to a single line parser. Will parse a block of contiguous line comments before the line and
+-- | the comment after the expression on the line.
 withComments :: forall e a. IP a e -> IP (Tuple (Comments ()) a) e
 withComments p = do
   before <- manyOneLineComments
-  a <- p
-  after <- withPos inLineComment
+  a <- withPos p
+  after <- inLineComment
   pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
 
 typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple PropertyName PropertyValueWithComments) e
@@ -440,7 +444,10 @@ getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e
 getContextDef id = do
   getContext id
 
+runAndShowContext :: forall e. String -> Eff (DomeinFileEffects (prd :: PROPDEFS, console :: CONSOLE | e)) Unit
+runAndShowContext text = runTest ((runIndentParser text context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))
 -- x = runTest (runIndentParser test1 context)
+-- x = runTest ((runIndentParser test22 context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))
 
 test1 :: String
 test1 = """:Aangifte :Aangifte1
@@ -627,3 +634,9 @@ test21 :: String
 test21 = """:ContextType :Aangifte
 	:publicProperty => $Urgentie
 		:rolprop = 3"""
+
+test22 :: String
+test22 = """$Property $Urgentie
+	public $isFunctioneel = true
+	-- Commentaar boven $isVerplicht
+	public $isVerplicht = false"""
