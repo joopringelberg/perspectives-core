@@ -23,7 +23,7 @@ import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
 import Perspectives.Token (token)
 import Prelude (class Show, Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
-import Text.Parsing.Indent (block, checkIndent, indented, sameLine, sameOrIndented, withPos)
+import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
@@ -236,7 +236,7 @@ roleBinding' :: forall e.
   -> IP (Tuple (Array Comment) ID) (DomeinFileEffects e)
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBinding' contextID p = ("rolename => contextName" <??>
-  (withPos $ try do
+  (try do
     cmtBefore <- manyOneLineComments
     withPos do
       rname <- roleName
@@ -304,7 +304,7 @@ withRoleCounting p = do
 -- | effect of storing its constituent roles and contexts.
 context :: forall e. IP String (DomeinFileEffects e)
 context = withRoleCounting context' where
-  context' = withPos do
+  context' = do
     cmtBefore <- manyOneLineComments
     withPos do
       (ContextDeclaration typeName instanceName cmt) <- contextDeclaration
@@ -376,7 +376,7 @@ expression = choice
 -----------------------------------------------------------
 sourceText :: forall e. IP ID (DomeinFileEffects e)
 sourceText = withRoleCounting sourceText' where
-  sourceText' = withPos do
+  sourceText' = do
     cmtBefore <- manyOneLineComments
     withPos do
       (TextDeclaration textName cmt) <- textDeclaration
