@@ -160,7 +160,7 @@ context definedResources (PerspectContext c) = do
                   case maybeContext of
                     Nothing -> reference r
                     (Just contxt) -> do
-                      withComments' role.comments (identifier $ r.pspType <> " => ")
+                      withComments' r.comments (identifier $ r.pspType <> " => ")
                       indent (context definedResources) contxt
                 false -> reference role -- The role is a RoleInContext of some context.
         otherwise -> reference r
