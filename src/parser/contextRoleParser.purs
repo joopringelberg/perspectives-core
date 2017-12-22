@@ -268,18 +268,18 @@ roleBinding' contextID p = ("rolename => contextName" <??>
         (Just n) -> show n
         Nothing -> "0"
 
-roleBindingWithInlineContext :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBindingWithInlineContext :: forall e. PerspectName -> IP (Tuple Comment ID) (DomeinFileEffects e)
 roleBindingWithInlineContext id = roleBinding' id do
   cmt <- inLineComment
   _ <- nextLine
   (contextBuitenRol :: String) <- indented *> context
   pure $ Tuple cmt contextBuitenRol
 
-roleBindingWithReference :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBindingWithReference :: forall e. PerspectName -> IP (Tuple Comment ID) (DomeinFileEffects e)
 roleBindingWithReference id = roleBinding' id do
   ident <- (sameLine *> contextName)
   cmt <- inLineComment
-  pure $ Tuple cmt ident
+  pure $ Tuple cmt $ ident <> "_buitenRol"
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)

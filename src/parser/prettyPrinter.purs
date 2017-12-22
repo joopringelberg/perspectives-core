@@ -152,7 +152,7 @@ context definedResources (PerspectContext c) = do
         Nothing -> do -- binding is not a BuitenRol of a context defined at top level in the Text.
           maybeRole <- liftAff $ getRole binding
           case maybeRole of
-            Nothing -> reference r
+            Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
             (Just (PerspectRol role)) -> do
               case role.pspType == "model:Perspectives$BuitenRol" of
                 true -> do -- The role is a BuitenRol of some context.
@@ -163,12 +163,16 @@ context definedResources (PerspectContext c) = do
                       withComments' r.comments (identifier $ r.pspType <> " => ")
                       indent (context definedResources) contxt
                 false -> reference role -- The role is a RoleInContext of some context.
-        otherwise -> reference r
+        otherwise -> do
+          maybeRole <- liftAff $ getRole binding
+          case maybeRole of
+            Nothing -> comment $ "Binding does not exist: " <> binding
+            (Just (PerspectRol buitenRol)) -> withComments' r.comments (identifier $ r.pspType <> " => " <> buitenRol.context)
+
       strMapTraverse_ roleProperty r.properties
 
     reference :: PerspectRolProperties -> PerspectText e
     reference r = withComments' r.comments (identifier $ r.pspType <> " => " <> (maybe "" id r.binding))
-
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
@@ -178,8 +182,8 @@ sourceText (PerspectContext theText) = do
   withComments' theText.comments (identifier( "Text " <> theText.displayName))
   newline
 
-  (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding)) -- Dit zijn dus buitenrollen
-  (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding >-> rolContext)) -- en dit zijn de contexten bij die buitenrollen.
+  (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding)) -- These are all a buitenRol.
+  (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
   traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
   where
@@ -187,5 +191,7 @@ sourceText (PerspectContext theText) = do
     ppContext definedContexts id = do
       mc <- liftAff $ getContext id
       case mc of
-        (Just c) -> context definedContexts c
+        (Just c) -> do
+          context definedContexts c
+          newline
         Nothing -> pure unit

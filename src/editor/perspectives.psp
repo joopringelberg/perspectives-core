@@ -27,18 +27,18 @@ $ContextType $Aangifte -- Commentaar op de regel.
 					public $range = Number
 			$mogelijkeBinding => $Persoon
 			$propertyPerspectief =>
-				$PropertyPerspectief $AangeverBetrouw…Perspectief
+				$PropertyPerspectief $AangeverBetrouwbaarheidPerspectief
 					$propertyReferentie => $Betrouwbaarheid
-					$volgNummer = 1
 	$rolInContext =>
 		$RolInContext $MijnBerekendeRol
-		query $aangever binding
-{-
-commentaar over
-twee regels
--}
+--query $aangever binding
 
 $Aangifte $A1
 	public $urgentie = 8
 	$aangever => $Jansen
 		$betrouwbaarheid = 7
+-- Alles hierboven wordt correct ontleed en weergegeven.
+{-
+commentaar over
+twee regels
+-}
