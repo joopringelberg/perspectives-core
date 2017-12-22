@@ -8,7 +8,7 @@ define(function(require, exports, module) {
 	var FoldMode = exports.FoldMode = function() {};
 	var uriAndCurie = require("../perspectives/uriAndCurie");
 
-	var typeDeclarationRegExp = new RegExp( uriAndCurie.regExpToString( uriAndCurie.resourceName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.resourceName ) );
+	var typeDeclarationRegExp = new RegExp( uriAndCurie.regExpToString( uriAndCurie.contextName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.contextName ) );
 	var multiLineCommentStartRegExp = /^({)-/
 
 

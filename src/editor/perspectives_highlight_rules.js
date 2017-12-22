@@ -45,6 +45,11 @@ define( function( require, exports, module ) {
 					token: ["keyword"],
 					regex: /query\b/
 				},
+				{
+					// Text
+					token: ["keyword"],
+					regex: /^Text\b/
+				},
 				/////////////// ROLPROPERTY ASSIGNMENT
 				{
 					token: ["variable", "text"],
@@ -54,7 +59,7 @@ define( function( require, exports, module ) {
 				{
 					// contextDeclaration: :Aangifte :a1
 					token: ["type", "text", "text"],
-					regex: new RegExp( uriAndCurie.regExpToString( uriAndCurie.resourceName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.resourceName ) )
+					regex: new RegExp( uriAndCurie.regExpToString( uriAndCurie.contextName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.contextName ) )
 				},
 				{
 					// rolebinding: :role => :Binding

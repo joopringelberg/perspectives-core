@@ -18,7 +18,7 @@ define(function(require, exports, module) {
 		this.$outdent = new MatchingBraceOutdent();
 		this.foldingRules = new PerspectivesFoldMode();
 	};
-	var typeDeclarationRegExp = new RegExp( uriAndCurie.regExpToString( uriAndCurie.resourceName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.resourceName ) );
+	var typeDeclarationRegExp = new RegExp( uriAndCurie.regExpToString( uriAndCurie.contextName ) + "(\\s+)" + uriAndCurie.regExpToString( uriAndCurie.contextName ) );
 	var roleBindingRegExp = uriAndCurie.composeRegExp( uriAndCurie.propertyName, /(\s+=>)/);
 
 	oop.inherits(Mode, TextMode);

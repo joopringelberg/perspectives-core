@@ -13,6 +13,11 @@ define( function( require, exports, module ) {
 		return new RegExp( "(" + regExpToString(r) + ")" );
 	}
 
+	function nonCatchingGroup(r)
+	{
+		return new RegExp( "(?:" + regExpToString(r) + ")" );
+	}
+
 	function disjunctiveRegExp(r1, r2)
 	{
 		return new RegExp( regExpToString(r1) + "|" + regExpToString(r2));
@@ -29,27 +34,29 @@ define( function( require, exports, module ) {
 
 	var capitalizedString = new RegExp(/[A-Z]\w*\b/);
 
-	var localResourceName = capitalizedString;
+	var defaultEmbedded = new RegExp(/\$/);
+
+	var localContextName = new RegExp( regExpToString(capitalizedString) + "(?:\\$" + regExpToString(capitalizedString) + ")*" );
 
 	var localPropertyName = uncapitalizedString;
 
 	var domeinName = new RegExp( "model:" + regExpToString(capitalizedString) + "\\$" );
 
-	var prefix = new RegExp(/[a-z0-9]*:/);
+	var prefix = new RegExp(/[a-z0-9]+:/);
 
-	var prefixedResourceName = composeRegExp( prefix, localResourceName );
+	var prefixedContextName = composeRegExp( prefix, localContextName );
 
 	var prefixedPropertyName = composeRegExp( prefix, localPropertyName );
 
-	var qualifiedResourceName = composeRegExp( domeinName, localResourceName );
+	var qualifiedContextName = composeRegExp( domeinName, localContextName );
 
 	var qualifiedPropertyName = composeRegExp( domeinName, localPropertyName );
 
-	var resourceName = catchingRegexp( disjunctiveRegExp( qualifiedResourceName, prefixedResourceName ) );
+	var contextName = catchingRegexp( disjunctiveRegExp( qualifiedContextName, disjunctiveRegExp( prefixedContextName, new RegExp( "\\$" + regExpToString( localContextName ) ) ) ) );
 
-	var propertyName = catchingRegexp( disjunctiveRegExp( qualifiedPropertyName, prefixedPropertyName ) );
+	var propertyName = catchingRegexp( disjunctiveRegExp( qualifiedPropertyName, disjunctiveRegExp(prefixedPropertyName, new RegExp( "\\$" + regExpToString( localPropertyName ) ) ) ) );
 
-	exports.resourceName = resourceName;
+	exports.contextName = contextName;
 
 	exports.propertyName = propertyName;
 

@@ -1,44 +1,44 @@
 -- Dit bestand bevat elke denkbare Perspectives CLR expressie.
-Text :Mijntekst
-:ContextType :Aangifte -- Commentaar op de regel.
-	-- Commentaar boven :aantekening
-	private :aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter :aantekening
-	-- Commentaar boven de binding van :Urgentie
-	:publicProperty =>
-		-- Commentaar boven :Urgentie
-		:Property $Urgentie
-			public :isFunctioneel = true
-			-- Commentaar boven :isVerplicht
-			public :isVerplicht = false
-			public :range = Number
-	:privateProperty =>
-		:Property :Aantekening
-			public :isFunctioneel = true
-			public :isVerplicht = false
-			public :range = String
-	:rolInContext =>
-		:RolInContext :Aangever
-			public :isVerplicht = true
-			public :isFunctioneel = false
-			:rolProperty =>
-				:Property :Betrouwbaarheid
-					public :isFunctioneel = true
-					public :isVerplicht = false
-					public :range = Number
-			:mogelijkeBinding => :Persoon
-			:propertyPerspectief =>
-				:PropertyPerspectief :AangeverBetrouw…Perspectief
-					:propertyReferentie => :Betrouwbaarheid
-					:volgNummer = 1
-	:rolInContext =>
-		:RolInContext :MijnBerekendeRol
-		query :aangever binding
+Text $Mijntekst
+$ContextType $Aangifte -- Commentaar op de regel.
+	-- Commentaar boven $aantekening
+	private $aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter $aantekening
+	-- Commentaar boven de binding van $Urgentie
+	$publicProperty =>
+		-- Commentaar boven $Urgentie
+		$Property $Urgentie
+			public $isFunctioneel = true
+			-- Commentaar boven $isVerplicht
+			public $isVerplicht = false
+			public $range = Number
+	$privateProperty =>
+		$Property $Aantekening
+			public $isFunctioneel = true
+			public $isVerplicht = false
+			public $range = String
+	$rolInContext =>
+		$RolInContext $Aangever
+			public $isVerplicht = true
+			public $isFunctioneel = false
+			$rolProperty =>
+				$Property $Betrouwbaarheid
+					public $isFunctioneel = true
+					public $isVerplicht = false
+					public $range = Number
+			$mogelijkeBinding => $Persoon
+			$propertyPerspectief =>
+				$PropertyPerspectief $AangeverBetrouw…Perspectief
+					$propertyReferentie => $Betrouwbaarheid
+					$volgNummer = 1
+	$rolInContext =>
+		$RolInContext $MijnBerekendeRol
+		query $aangever binding
 {-
 commentaar over
 twee regels
 -}
 
-:Aangifte :A1
-	public :urgentie = 8
-	:aangever => :Jansen
-		:betrouwbaarheid = 7
+$Aangifte $A1
+	public $urgentie = 8
+	$aangever => $Jansen
+		$betrouwbaarheid = 7
