@@ -197,16 +197,17 @@ contextDeclaration = (ContextDeclaration <$> contextName <*> contextName <*> inL
 withComments :: forall e a. IP a e -> IP (Tuple (Comments ()) a) e
 withComments p = do
   before <- manyOneLineComments
-  a <- withPos p
-  after <- inLineComment
-  pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
+  withPos do
+    a <- p
+    after <- inLineComment
+    pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
 
 typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple PropertyName PropertyValueWithComments) e
 typedPropertyAssignment scope = go (try (withComments
   (withPos
     (Tuple
-      <$> (scope *> (propertyName <* (sameOrIndented *> reservedOp "=")))
-      <*> (sameOrIndented *> (simpleValue <|> dataType))))) )
+      <$> (scope *> (propertyName <* (sameLine *> reservedOp "=")))
+      <*> (sameLine *> (simpleValue <|> dataType))))))
   where
     go x = do
       (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
@@ -640,3 +641,22 @@ test22 = """$Property $Urgentie
 	public $isFunctioneel = true
 	-- Commentaar boven $isVerplicht
 	public $isVerplicht = false"""
+
+test23 :: String
+test23 = """$ContextType $Aangifte
+	-- Commentaar boven $aantekening
+	public $aantekening = 1 -- Commentaar achter $aantekening
+	-- Commentaar boven de binding van $Urgentie
+	$publicProperty => $Jansen"""
+
+test24 :: String
+test24 = """$ContextType $Aangifte
+	-- Commentaar boven $aantekening
+	public $aantekening = 1 -- Commentaar achter $aantekening"""
+
+test25 :: String
+test25 = """-- Dit bestand bevat elke denkbare Perspectives CLR expressie.
+Text $Mijntekst
+$ContextType $Aangifte
+	-- Commentaar boven $aantekening
+	public $aantekening = 1 -- Commentaar achter $aantekening"""
