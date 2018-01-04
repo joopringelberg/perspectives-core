@@ -3,7 +3,7 @@ module Perspectives.Parser where
 import Control.Monad.Aff (Aff)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Perspectives.ContextRoleParser (expression, sourceText)
+import Perspectives.ContextRoleParser (expression, enclosingContext)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Prelude ((*>), (-), bind, pure, ($))
@@ -19,7 +19,7 @@ type AceError =
 
 parse :: forall e. String -> Aff (DomeinFileEffects e) (Either (Array AceError) String)
 parse s = do
-  parseResult <- runIndentParser s sourceText
+  parseResult <- runIndentParser s enclosingContext
   case parseResult of
     (Left (ParseError message (Position{line, column}))) -> pure $ Left [
       { row: line - 1

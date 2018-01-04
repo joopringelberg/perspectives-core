@@ -12,9 +12,9 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
-import Perspectives.ContextRoleParser (sourceText) as CRP
+import Perspectives.ContextRoleParser (enclosingContext) as CRP
 import Perspectives.IndentParser (runIndentParser)
-import Perspectives.PrettyPrinter (prettyPrint, sourceText)
+import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Property (PerspectEffects)
 import Perspectives.Resource (getContext)
 
@@ -86,7 +86,7 @@ ui =
     _ <- H.query (AceSlot 1) $ H.action (ChangeText "")
     pure next
   eval (HandleAceUpdate text next) = do
-    parseResult <- H.liftAff $ runIndentParser text CRP.sourceText
+    parseResult <- H.liftAff $ runIndentParser text CRP.enclosingContext
     case parseResult of
       (Right textName) -> do
         maybeContext <- H.liftAff $ getContext textName
@@ -95,7 +95,7 @@ ui =
             H.modify (_ { text = "Cannot find the contex that represents this text." })
             pure next
           (Just c) -> do
-            t <- H.liftAff $ prettyPrint c sourceText
+            t <- H.liftAff $ prettyPrint c enclosingContext
             _ <- H.query (AceSlot 2) $ H.action (ChangeText t)
             H.modify (_ { text = t })
             pure next

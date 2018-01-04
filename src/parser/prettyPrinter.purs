@@ -177,8 +177,8 @@ context definedResources (PerspectContext c) = do
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
-sourceText :: forall e. PrettyPrinter PerspectContext e
-sourceText (PerspectContext theText) = do
+enclosingContext :: forall e. PrettyPrinter PerspectContext e
+enclosingContext (PerspectContext theText) = do
   withComments' theText.comments (identifier( "Text " <> theText.displayName))
   newline
 

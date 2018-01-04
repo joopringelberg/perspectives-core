@@ -418,9 +418,9 @@ expression = choice
 -----------------------------------------------------------
 -- Text
 -----------------------------------------------------------
-sourceText :: forall e. IP ID (DomeinFileEffects e)
-sourceText = withRoleCounting sourceText' where
-  sourceText' = do
+enclosingContext :: forall e. IP ID (DomeinFileEffects e)
+enclosingContext = withRoleCounting enclosingContext' where
+  enclosingContext' = do
     cmtBefore <- manyOneLineComments
     withPos do
       (TextDeclaration textName@(Expanded _ localName) cmt) <- textDeclaration
@@ -450,7 +450,7 @@ sourceText = withRoleCounting sourceText' where
         (PerspectContext
           { id: show textName
           , displayName : localName
-          , pspType: "model:Perspectives$SourceText"
+          , pspType: "model:Perspectives$enclosingContext"
           , binnenRol:
             BinnenRol
               { id: (show textName) <> "_binnenRol"
