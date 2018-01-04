@@ -9,7 +9,7 @@ import Data.Argonaut (toArray, toString)
 import Data.Array (singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (lookup, values)
+import Data.StrMap (keys, lookup, values)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (isWellFormedIdentifier)
@@ -83,6 +83,9 @@ getRol rn = getContextMember \(PerspectContext{rolInContext}) -> maybe [] id (lo
 
 getRollen :: forall e. ObjectsGetter e
 getRollen = getContextMember \(PerspectContext{rolInContext}) -> join $ values rolInContext
+
+getRolTypen :: forall e. ObjectsGetter e
+getRolTypen = getContextMember \(PerspectContext{rolInContext}) -> keys rolInContext
 
 getPublicProperty :: forall e. RoleName -> ObjectsGetter e
 getPublicProperty pn id = do

@@ -1,7 +1,7 @@
 module Perspectives.SystemQueries where
 
 import Perspectives.PropertyComposition
-import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getRolBinding, getRolContext, getRolType, getRollen)
+import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.QueryCombinators (closure, concat, hasValue) as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
@@ -61,6 +61,9 @@ buitenRol = constructTripleGetterFromArbitraryFunction "psp:buitenRol" getBuiten
 
 rollen :: forall e. NamedTripleGetter e
 rollen =  constructTripleGetterFromArbitraryFunction "psp:rollen" getRollen
+
+rolTypen :: forall e. NamedTripleGetter e
+rolTypen =  constructTripleGetterFromArbitraryFunction "psp:rolTypen" getRolTypen
 
 rolType :: forall e. NamedTripleGetter e
 rolType = constructTripleGetterFromArbitraryFunction "psp:type" getRolType

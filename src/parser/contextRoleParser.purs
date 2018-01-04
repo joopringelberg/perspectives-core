@@ -10,9 +10,8 @@ import Data.Char.Unicode (isLower)
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
+import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
-import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
@@ -100,6 +99,11 @@ domeinName = do
   _ <- char '$'
   pure $ "model:" <> domein <> "$"
 
+standaloneDomeinName :: forall e. IP Expanded e
+standaloneDomeinName = do
+  dn <- domeinName
+  pure $ Expanded dn ""
+
 -- localContextName = upper alphaNum*
 localContextName :: forall e. IP String e
 localContextName = f <$> capitalizedString <*> AR.many (defaultEmbedded capitalizedString) where
@@ -134,7 +138,7 @@ prefixedPropertyName = prefixedName localPropertyName
 
 -- qualifiedResourceName = domeinName localContextName
 expandedContextName :: forall e. IP Expanded e
-expandedContextName = lexeme (Expanded <$> domeinName <*> localContextName)
+expandedContextName = try $ lexeme (Expanded <$> domeinName <*> localContextName)
 
 -- expandedPropertyName = domeinName localPropertyName
 expandedPropertyName :: forall e. IP Expanded e
@@ -159,7 +163,7 @@ defaultNamespacedContextName = lexeme do
 
 -- cname = prefixedContextName | expandedContextName
 contextName :: forall e. IP Expanded e
-contextName = (expandedContextName <|> prefixedContextName <|> defaultNamespacedContextName) <?> "the name of a resource (Context or Role)."
+contextName = (expandedContextName <|> standaloneDomeinName <|> prefixedContextName <|> defaultNamespacedContextName) <?> "the name of a resource (Context or Role)."
 
 -- propertyName = prefixedPropertyName | expandedPropertyName
 propertyName :: forall e. IP Expanded e
@@ -207,7 +211,7 @@ nextLine = do
 
 -- | contextDeclaration = contextName contextName
 textDeclaration :: forall e. IP TextDeclaration e
-textDeclaration = (TextDeclaration <$> (reserved "Text" *> contextName) <*> inLineComment) <?> "the text declaration: Text <name>."
+textDeclaration = (TextDeclaration <$> (reserved "Context" *> contextName) <*> inLineComment) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
@@ -416,6 +420,38 @@ expression = choice
   ]
 
 -----------------------------------------------------------
+-- Section and definition
+-----------------------------------------------------------
+section :: forall e. IP (Tuple String (Array ID)) (DomeinFileEffects e)
+section = do
+  prop <- reserved "Section" *> propertyName
+  setSection (show prop)
+  ids <- AR.many definition
+  pure $ Tuple (show prop) ids
+
+definition :: forall e. IP ID (DomeinFileEffects e)
+definition = do
+  binding <- context
+  prop <- getSection
+  _ <- incrementRoleInstances prop
+  nrOfRoleOccurrences <- getRoleOccurrences prop
+  enclContext <- getNamespace
+  rolId <- pure $ enclContext <> "_" <> prop <> maybe "0" show nrOfRoleOccurrences
+  liftAffToIP $ storeRoleInResourceDefinitions rolId
+    (PerspectRol
+      { id: rolId
+      , occurrence: maybe 0 id nrOfRoleOccurrences
+      , pspType: prop
+      , binding: Just binding
+      , context: enclContext
+      , properties: empty
+      , gevuldeRollen: empty
+      , comments: Comments { commentBefore: [], commentAfter: []}
+      })
+  pure rolId
+
+
+-----------------------------------------------------------
 -- Text
 -----------------------------------------------------------
 enclosingContext :: forall e. IP ID (DomeinFileEffects e)
@@ -423,29 +459,10 @@ enclosingContext = withRoleCounting enclosingContext' where
   enclosingContext' = do
     cmtBefore <- manyOneLineComments
     withPos do
-      (TextDeclaration textName@(Expanded _ localName) cmt) <- textDeclaration
+      (TextDeclaration textName@(Expanded _ localName) cmt) <- textDeclaration <* whiteSpace
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
-      -- TODO: introduceer Section hier.
-      defs <- AR.many context
-      (roleBindings :: Array String) <- (traverse (\buitenRolId ->
-        do
-          _ <- incrementRoleInstances "psp:text_Item"
-          nrOfRoleOccurrences <- getRoleOccurrences "psp:text_Item"
-          rolId <- pure $ (show textName) <> "_psp:text_Item_" <> maybe "0" show nrOfRoleOccurrences
-          -- let roleId = guid unit
-          liftAffToIP $ storeRoleInResourceDefinitions rolId
-            (PerspectRol
-              { id: rolId
-              , occurrence: maybe 0 id nrOfRoleOccurrences
-              , pspType: "psp:text_Item"
-              , binding: Just buitenRolId
-              , context: show textName
-              , properties: empty
-              , gevuldeRollen: empty
-              , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
-              })
-          pure rolId) defs)
+      defs <- AR.many section
       liftAffToIP $ storeContextInResourceDefinitions (show textName)
         (PerspectContext
           { id: show textName
@@ -459,7 +476,7 @@ enclosingContext = withRoleCounting enclosingContext' where
               , properties: fromFoldable privateProps
               }
           , buitenRol: (show textName) <> "_buitenRol"
-          , rolInContext: singleton "psp:text_Item" roleBindings
+          , rolInContext: fromFoldable defs
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 

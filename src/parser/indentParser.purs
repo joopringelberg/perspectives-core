@@ -17,21 +17,21 @@ import Text.Parsing.Parser.Pos (Position)
 -- | A type to keep track of:
 -- | - the number of occurrences of a role type, and
 -- | - the namespace for context declarations.
-type RoleInstancesAndNamespace = { rolOccurrences :: StrMap Int, namespace :: String}
+type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: String}
 
-initialContextRoleParserMonadState :: RoleInstancesAndNamespace
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives"}
+initialContextRoleParserMonadState :: ContextRoleParserState
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: ""}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is Aff, which we need to access couchdb.
--- | Then we have RoleInstancesAndNamespace, which we need to keep track of the number of
+-- | Then we have ContextRoleParserState, which we need to keep track of the number of
 -- | instances of a particular role type in a context (to generate unique names).
 -- | Finally, the StateT Position part is used by the IndentParser.
-type ContextRoleParserMonad e = (StateT Position (StateT RoleInstancesAndNamespace (Aff e)))
+type ContextRoleParserMonad e = (StateT Position (StateT ContextRoleParserState (Aff e)))
 
 -- | This is the type that is produced by the ContextRoleParser.
 -- | It can also be expressed in terms of the type synonym IndentParser:
--- | type IP a e = IndentParser (StateT RoleInstancesAndNamespace (Aff e)) String a
+-- | type IP a e = IndentParser (StateT ContextRoleParserState (Aff e)) String a
 type IP a e = ParserT String (ContextRoleParserMonad e) a
 
 -- | Apply a parser, keeping only the parsed result.
@@ -78,3 +78,11 @@ extendNamespace extension p = do
   result <- p
   _ <- setNamespace namespace
   pure result
+
+setSection :: forall e. String -> IP Unit e
+setSection propertyName = do
+  s <- lift (lift get)
+  lift (lift (put s {section = propertyName}))
+
+getSection :: forall e. IP String e
+getSection = lift (lift get) >>= pure <<< (_.section)

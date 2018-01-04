@@ -21,7 +21,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getContext, getRole)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PerspectRolProperties, PropertyName, PropertyValueWithComments, PerspectContextProperties, compareOccurrences, propertyValue)
-import Perspectives.SystemQueries (binding, rolContext)
+import Perspectives.SystemQueries (binding, rolContext, rolTypen, rollen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==))
@@ -40,7 +40,7 @@ identifier s = do
   i <- get
   tell $ (fromCharArray (replicate i '\t')) <> s <> " "
 
--- | Just prints the string s.
+-- | Just prints the string s, followed by a blank space.
 identifier' :: forall e. PrettyPrinter String e
 identifier' s = tell $ s <> " "
 
@@ -179,14 +179,22 @@ strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 enclosingContext :: forall e. PrettyPrinter PerspectContext e
 enclosingContext (PerspectContext theText) = do
-  withComments' theText.comments (identifier( "Text " <> theText.displayName))
+  withComments' theText.comments (identifier( "Context " <> theText.displayName))
   newline
-
-  (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding)) -- These are all a buitenRol.
-  (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter "psp:text_Item") >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
-  traverse_ (ppContext definedContexts) (tripleObjects contextIds)
+  sectionIds <- liftAff (theText.id ## (ignoreCache rolTypen))
+  traverse_ section (tripleObjects sectionIds)
 
   where
+    section :: ID -> PerspectText e
+    section sectionId = do
+      identifier' "Section"
+      identifier sectionId
+      newline
+      newline
+      (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
+      (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
+      traverse_ (ppContext definedContexts) (tripleObjects contextIds)
+
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
       mc <- liftAff $ getContext id
