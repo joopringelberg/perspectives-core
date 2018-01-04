@@ -7,22 +7,21 @@ import Control.Monad.Aff.Console (CONSOLE, log)
 import Control.Monad.Eff (Eff)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, many, snoc) as AR
+import Data.Array (dropEnd, intercalate)
+import Data.Array (cons, many, snoc, length) as AR
 import Data.Char.Unicode (isLower)
-import Data.Either (fromRight)
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
-import Data.String (fromCharArray)
+import Data.String (Pattern(..), fromCharArray, split)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Resource (PROPDEFS, getContext, storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), ID, PerspectContext(..), PerspectName, PerspectRol(..), PropertyName, RoleName, SimpleValue(..), TextDeclaration(..), PropertyValueWithComments)
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), DomeinName, Expanded(..), ID, PerspectContext(..), PerspectRol(..), Prefix, PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), TextDeclaration(..))
 import Perspectives.Token (token)
-import Prelude (class Show, Unit, bind, discard, pure, show, unit, ($), ($>), (*>), (+), (/=), (<$>), (<*), (<*>), (<>), (==), (>>=))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>), (>>=))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>), (<??>))
@@ -121,31 +120,55 @@ prefix :: forall e. IP String e
 prefix = (f <$> lower <*> AR.many lower <*> char ':') where
   f fst ca c = fromCharArray $ AR.cons fst (AR.snoc ca c)
 
+prefixedName :: forall e. IP String e -> IP Expanded e
+prefixedName localName = lexeme do
+  pre <- prefix
+  ln <- localName
+  namespace <- prefix2namespace pre
+  pure $ Expanded namespace ln
+
 -- prefixedContextName = prefix localContextName
-prefixedContextName :: forall e. IP String e
-prefixedContextName = lexeme $ (<>) <$> prefix <*> localContextName
+prefixedContextName :: forall e. IP Expanded e
+prefixedContextName = prefixedName localContextName
 
 -- prefixedPropertyName = prefix localPropertyName
-prefixedPropertyName :: forall e. IP String e
-prefixedPropertyName = lexeme ((<>) <$> prefix <*> localPropertyName)
+prefixedPropertyName :: forall e. IP Expanded e
+prefixedPropertyName = prefixedName localPropertyName
 
 -- qualifiedResourceName = domeinName localContextName
-qualifiedContextName :: forall e. IP String e
-qualifiedContextName = lexeme ((<>) <$> domeinName <*> localContextName)
+expandedContextName :: forall e. IP Expanded e
+expandedContextName = lexeme (Expanded <$> domeinName <*> localContextName)
 
--- qualifiedPropertyName = domeinName localPropertyName
-qualifiedPropertyName :: forall e. IP String e
-qualifiedPropertyName = lexeme ((<>) <$> domeinName <*> localPropertyName)
+-- expandedPropertyName = domeinName localPropertyName
+expandedPropertyName :: forall e. IP Expanded e
+expandedPropertyName = lexeme (Expanded <$> domeinName <*> localPropertyName)
 
--- contextName = prefixedContextName | qualifiedContextName
-contextName :: forall e. IP String e
-contextName = (qualifiedContextName <|> prefixedContextName <|> lexeme (defaultEmbedded localContextName)) <?> "the name of a resource (Context or Role)."
+defaultNamespacedContextName :: forall e. IP Expanded e
+defaultNamespacedContextName = lexeme do
+  namespace <- getNamespace
+  namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
+  localName <- localContextName
+  namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
+  pure $ Expanded namespace' ("$" <> localName)
+  where
+    butLastNNamespaceLevels :: String -> Int -> IP String e
+    butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
+    butLastNNamespaceLevels ns 0 = pure ns
+    butLastNNamespaceLevels ns n = do
+      segments <- pure (split (Pattern "$") ns)
+      if (n - 1) > (AR.length segments)
+        then fail "too many levels up"
+        else pure $ intercalate "$" (dropEnd n segments)
 
--- propertyName = prefixedPropertyName | qualifiedPropertyName
-propertyName :: forall e. IP String e
-propertyName = (qualifiedPropertyName <|> prefixedPropertyName <|> lexeme (defaultEmbedded localPropertyName)) <?> "a property or role name."
+-- cname = prefixedContextName | expandedContextName
+contextName :: forall e. IP Expanded e
+contextName = (expandedContextName <|> prefixedContextName <|> defaultNamespacedContextName) <?> "the name of a resource (Context or Role)."
 
-roleName :: forall e. IP String e
+-- propertyName = prefixedPropertyName | expandedPropertyName
+propertyName :: forall e. IP Expanded e
+propertyName = (expandedPropertyName <|> prefixedPropertyName) <?> "a property or role name."
+
+roleName :: forall e. IP Expanded e
 roleName = propertyName
 
 -----------------------------------------------------------
@@ -180,6 +203,7 @@ nextLine = do
     pos <- getPosition
     s   <- lift get
     if sourceLine s + 1 == sourceLine pos then pure unit else fail "not on next line"
+
 -----------------------------------------------------------
 -- Elementary expression types
 -----------------------------------------------------------
@@ -202,7 +226,7 @@ withComments p = do
     after <- inLineComment
     pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
 
-typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple PropertyName PropertyValueWithComments) e
+typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple ID PropertyValueWithComments) e
 typedPropertyAssignment scope = go (try (withComments
   (withPos
     (Tuple
@@ -211,18 +235,18 @@ typedPropertyAssignment scope = go (try (withComments
   where
     go x = do
       (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
-      pure $ Tuple pname (Comments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
+      pure $ Tuple (show pname) (Comments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
 
 -- | publicContextPropertyAssignment = 'public' propertyName '=' simpleValue
-publicContextPropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComments) e
+publicContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
 publicContextPropertyAssignment = (typedPropertyAssignment (reserved "public")) <?> "public propertyname = value"
 
 -- | privateContextPropertyAssignment = 'private' propertyName '=' simpleValue
-privateContextPropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComments) e
+privateContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
 privateContextPropertyAssignment = (typedPropertyAssignment (reserved "private")) <?> "private propertyname = value"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
-rolePropertyAssignment :: forall e. IP (Tuple PropertyName PropertyValueWithComments) e
+rolePropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
 rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "private propertyname = value"
 
 isRoleDeclaration :: forall e. IP Unit (DomeinFileEffects e)
@@ -232,58 +256,69 @@ roleOccurrence :: forall e. IP Int e
 roleOccurrence = token.parens token.integer
 
 roleBinding' :: forall e.
-  PerspectName
+  Expanded
   -> IP (Tuple (Array Comment) ID) (DomeinFileEffects e)
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
-roleBinding' contextID p = ("rolename => contextName" <??>
+roleBinding' cname p = ("rolename => contextName" <??>
   (try do
+    -- Parsing
     cmtBefore <- manyOneLineComments
     withPos do
-      rname <- roleName
+      rname@(Expanded _ localRoleName) <- roleName
       occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
       _ <- (sameLine *> reservedOp "=>")
-      (Tuple cmt ident) <- p
+      (Tuple cmt binding) <- p
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
-      _ <- incrementRoleInstances rname
-      nrOfRoleOccurrences <- getRoleOccurrences rname -- The position in the sequence.
-      rolId <- pure $ contextID <> "_" <> rname <> "_" <> roleIndex occurrence nrOfRoleOccurrences
+      _ <- incrementRoleInstances localRoleName
+
+      -- Naming
+      nrOfRoleOccurrences <- getRoleOccurrences localRoleName -- The position in the sequence.
+      rolId <- pure ((show cname) <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
+
+      -- Storing
       liftAffToIP $ storeRoleInResourceDefinitions rolId
         (PerspectRol
           { id: rolId
-          , occurrence: nrOfRoleOccurrences
-          , pspType: rname
-          , binding: Just ident
-          , context: contextID
-          , properties: fromFoldable props
+          , occurrence: (roleIndex occurrence nrOfRoleOccurrences)
+          , pspType: show rname
+          , binding: Just binding
+          , context: show cname
+          , properties: fromFoldable ((\(Tuple en cm) -> Tuple (show en) cm) <$> props)
           , gevuldeRollen: empty
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
-      pure $ Tuple rname rolId))
+      pure $ Tuple (show rname) rolId))
   where
     -- If there is an index in the text, it prevails.
-    roleIndex :: Maybe Int -> Maybe Int -> String
+    roleIndex :: Maybe Int -> Maybe Int -> Int
     roleIndex nrInText nrInSequence = case nrInText of
-      (Just n) -> show n
+      (Just n) -> n
       Nothing -> case nrInSequence of
-        (Just n) -> show n
-        Nothing -> "0"
+        (Just n) -> n
+        Nothing -> 0
 
-roleBindingWithInlineContext :: forall e. PerspectName -> IP (Tuple Comment ID) (DomeinFileEffects e)
-roleBindingWithInlineContext id = roleBinding' id do
+-- | The inline context may itself use a defaultNamespacedContextName name. However,
+-- | what is returned from the context parser is an ExpandedQN.
+roleBindingWithInlineContext :: forall e. Expanded
+  -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBindingWithInlineContext cName = roleBinding' cName do
   cmt <- inLineComment
   _ <- nextLine
-  (contextBuitenRol :: String) <- indented *> context
+  (contextBuitenRol :: ID) <- indented *> context
   pure $ Tuple cmt contextBuitenRol
 
-roleBindingWithReference :: forall e. PerspectName -> IP (Tuple Comment ID) (DomeinFileEffects e)
-roleBindingWithReference id = roleBinding' id do
-  ident <- (sameLine *> contextName)
+-- | The reference may be defaultNamespacedContextName.
+roleBindingWithReference :: forall e. Expanded
+  -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBindingWithReference cName = roleBinding' cName do
+  (ident :: Expanded) <- (sameLine *> contextName)
   cmt <- inLineComment
-  pure $ Tuple cmt $ ident <> "_buitenRol"
+  pure $ Tuple cmt ((show ident) <> "_buitenRol")
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
-roleBinding :: forall e. PerspectName -> IP (Tuple RoleName ID) (DomeinFileEffects e)
-roleBinding contextID = roleBindingWithInlineContext contextID <|> roleBindingWithReference contextID -- TODO: query
+roleBinding :: forall e. Expanded
+  -> IP (Tuple RoleName ID) (DomeinFileEffects e)
+roleBinding cname = roleBindingWithInlineContext cname <|> roleBindingWithReference cname -- TODO: query
 
 withRoleCounting :: forall a e. IP a e -> IP a e
 withRoleCounting p = do
@@ -302,44 +337,51 @@ withRoleCounting p = do
 -- | roleBinding*
 -- | The parser never backtracks over a Context. This means we can safely perform the side
 -- | effect of storing its constituent roles and contexts.
-context :: forall e. IP String (DomeinFileEffects e)
+context :: forall e. IP ID (DomeinFileEffects e)
 context = withRoleCounting context' where
   context' = do
+    -- Parsing
     cmtBefore <- manyOneLineComments
     withPos do
-      (ContextDeclaration typeName instanceName cmt) <- contextDeclaration
-      do
-        (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
-        (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
-        (rolebindings :: List (Tuple RoleName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
-        liftAffToIP $ storeContextInResourceDefinitions instanceName
-          (PerspectContext
-            { id: instanceName
-            , displayName : instanceName
-            , pspType: typeName
-            , binnenRol:
-              BinnenRol
-                { id: instanceName <> "_binnenRol"
-                , pspType: "model:Perspectives$BinnenRol"
-                , binding: Just $ instanceName <> "_buitenRol"
-                , properties: fromFoldable privateProps
-                }
-            , buitenRol: instanceName <> "_buitenRol"
-            , rolInContext: collect rolebindings
-            , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
-          })
-        liftAffToIP $ storeRoleInResourceDefinitions (instanceName <> "_buitenRol")
-          (PerspectRol
-            { id: instanceName <> "_buitenRol"
-            , occurrence: Nothing
-            , pspType: "model:Perspectives$BuitenRol"
-            , binding: Nothing
-            , context: instanceName
-            , properties: fromFoldable publicProps
-            , gevuldeRollen: empty
-            , comments: Comments { commentBefore: [], commentAfter: []}
+      (ContextDeclaration typeName instanceName@(Expanded dname localName) cmt) <- contextDeclaration
+
+      -- Naming
+      extendNamespace localName
+        do
+          -- Parsing the body
+          (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
+          (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
+          (rolebindings :: List (Tuple RoleName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
+
+          -- Storing
+          liftAffToIP $ storeContextInResourceDefinitions (show instanceName)
+            (PerspectContext
+              { id: (show instanceName)
+              , displayName : localName
+              , pspType: show typeName
+              , binnenRol:
+                BinnenRol
+                  { id: (show instanceName) <> "_binnenRol"
+                  , pspType: "model:Perspectives$BinnenRol"
+                  , binding: Just $ (show instanceName) <> "_buitenRol"
+                  , properties: fromFoldable privateProps
+                  }
+              , buitenRol: (show instanceName) <> "_buitenRol"
+              , rolInContext: collect rolebindings
+              , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
-        pure $ instanceName <> "_buitenRol"
+          liftAffToIP $ storeRoleInResourceDefinitions ((show instanceName) <> "_buitenRol")
+            (PerspectRol
+              { id: (show instanceName) <> "_buitenRol"
+              , occurrence: 0
+              , pspType: "model:Perspectives$BuitenRol"
+              , binding: Nothing
+              , context: (show instanceName)
+              , properties: fromFoldable publicProps
+              , gevuldeRollen: empty
+              , comments: Comments { commentBefore: [], commentAfter: []}
+              })
+          pure $ (show instanceName) <> "_buitenRol"
   collect :: List (Tuple RoleName ID) -> StrMap (Array ID)
   collect Nil = empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
@@ -347,13 +389,18 @@ context = withRoleCounting context' where
       Nothing -> insert rname [id] map
       (Just ids) -> insert rname (AR.cons id ids) map
 
-
 -- Helper functions for development.
 allTheRest :: forall e. IP String e
 allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
-emptyPropertyComments :: StrMap (Comments ())
-emptyPropertyComments = empty
+-----------------------------------------------------------
+-- ContextName and QualifiedName
+-----------------------------------------------------------
+
+-- TODO: look up the prefix in the state!
+prefix2namespace :: forall e. Prefix -> IP DomeinName e
+prefix2namespace prefx = pure prefx
+
 
 -----------------------------------------------------------
 -- Expression
@@ -379,57 +426,58 @@ sourceText = withRoleCounting sourceText' where
   sourceText' = do
     cmtBefore <- manyOneLineComments
     withPos do
-      (TextDeclaration textName cmt) <- textDeclaration
+      (TextDeclaration textName@(Expanded _ localName) cmt) <- textDeclaration
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
+      -- TODO: introduceer Section hier.
       defs <- AR.many context
       (roleBindings :: Array String) <- (traverse (\buitenRolId ->
         do
           _ <- incrementRoleInstances "psp:text_Item"
           nrOfRoleOccurrences <- getRoleOccurrences "psp:text_Item"
-          rolId <- pure $ textName <> "_psp:text_Item_" <> show nrOfRoleOccurrences
+          rolId <- pure $ (show textName) <> "_psp:text_Item_" <> maybe "0" show nrOfRoleOccurrences
           -- let roleId = guid unit
           liftAffToIP $ storeRoleInResourceDefinitions rolId
             (PerspectRol
               { id: rolId
-              , occurrence: nrOfRoleOccurrences
+              , occurrence: maybe 0 id nrOfRoleOccurrences
               , pspType: "psp:text_Item"
               , binding: Just buitenRolId
-              , context: textName
+              , context: show textName
               , properties: empty
               , gevuldeRollen: empty
               , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
               })
           pure rolId) defs)
-      liftAffToIP $ storeContextInResourceDefinitions textName
+      liftAffToIP $ storeContextInResourceDefinitions (show textName)
         (PerspectContext
-          { id: textName
-          , displayName : textName
+          { id: show textName
+          , displayName : localName
           , pspType: "model:Perspectives$SourceText"
           , binnenRol:
             BinnenRol
-              { id: textName <> "_binnenRol"
+              { id: (show textName) <> "_binnenRol"
               , pspType: "model:Perspectives$BinnenRol"
-              , binding: Just $ textName <> "_buitenRol"
+              , binding: Just $ (show textName) <> "_buitenRol"
               , properties: fromFoldable privateProps
               }
-          , buitenRol: textName <> "_buitenRol"
+          , buitenRol: (show textName) <> "_buitenRol"
           , rolInContext: singleton "psp:text_Item" roleBindings
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      liftAffToIP $ storeRoleInResourceDefinitions (textName <> "_buitenRol")
+      liftAffToIP $ storeRoleInResourceDefinitions ((show textName) <> "_buitenRol")
         (PerspectRol
-          { id: textName <> "_buitenRol"
-          , occurrence: Nothing
+          { id: show textName <> "_buitenRol"
+          , occurrence: 0
           , pspType: "model:Perspectives$BuitenRol"
           , binding: Nothing
-          , context: textName
+          , context: show textName
           , properties: fromFoldable publicProps
           , gevuldeRollen: empty
           , comments: Comments { commentBefore: [], commentAfter: []}
           })
-      pure textName
+      pure $ show textName
 
 -----------------------------------------------------------
 -- Tests
@@ -445,8 +493,8 @@ getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e
 getContextDef id = do
   getContext id
 
-runAndShowContext :: forall e. String -> Eff (DomeinFileEffects (prd :: PROPDEFS, console :: CONSOLE | e)) Unit
-runAndShowContext text = runTest ((runIndentParser text context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))
+-- runAndShowContext :: forall e. String -> Eff (DomeinFileEffects (prd :: PROPDEFS, console :: CONSOLE | e)) Unit
+-- runAndShowContext text = runTest ((runIndentParser text context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))
 -- x = runTest (runIndentParser test1 context)
 -- x = runTest ((runIndentParser test22 context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))
 
@@ -470,8 +518,8 @@ test2 = """:Aangifte :Aangifte1 -- Commentaar bij :Aangifte1
 -- runIndentParser "  public status = \"voltooid\"" (withPos (whiteSpace *> indented *> publicContextPropertyAssignment))
 
 test3 :: String
-test3 = """:Aangifte :Aangifte1
-  :aangever (0) => :Jansen\n"""
+test3 = """$Aangifte $Aangifte1
+  $aangever (0) => $Jansen\n"""
 -- runIndentParser test3 context
 
 test3a :: String

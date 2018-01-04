@@ -2,38 +2,38 @@
 Text $Mijntekst
 $ContextType $Aangifte -- Commentaar op de regel.
 	-- Commentaar boven $aantekening
-	private $aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter $aantekening
+	private psp:aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter psp:aantekening
 	-- Commentaar boven de binding van $Urgentie
-	$publicProperty =>
+	psp:publicProperty =>
 		-- Commentaar boven $Urgentie
-		$Property $Urgentie
-			public $isFunctioneel = true
-			-- Commentaar boven $isVerplicht
-			public $isVerplicht = false
-			public $range = Number
-	$privateProperty =>
-		$Property $Aantekening
-			public $isFunctioneel = true
-			public $isVerplicht = false
-			public $range = String
-	$rolInContext =>
-		$RolInContext $Aangever
-			public $isVerplicht = true
-			public $isFunctioneel = false
-			$rolProperty =>
-				$Property $Betrouwbaarheid
-					public $isFunctioneel = true
-					public $isVerplicht = false
-					public $range = Number
-			$mogelijkeBinding => $Persoon
-			$propertyPerspectief =>
-				$PropertyPerspectief $AangeverBetrouwbaarheidPerspectief
-					$propertyReferentie => $Betrouwbaarheid
-	$rolInContext =>
-		$RolInContext $MijnBerekendeRol
+		psp:Property $Urgentie
+			public psp:isFunctioneel = true
+			-- Commentaar boven psp:isVerplicht
+			public psp:isVerplicht = false
+			public psp:range = Number
+	psp:privateProperty =>
+		psp:Property $Aantekening
+			public psp:isFunctioneel = true
+			public psp:isVerplicht = false
+			public psp:range = String
+	psp:rolInContext =>
+		psp:Rol $Aangever
+			public psp:isVerplicht = true
+			public psp:isFunctioneel = false
+			psp:rolProperty =>
+				psp:Property $Betrouwbaarheid
+					public psp:isFunctioneel = true
+					public psp:isVerplicht = false
+					public psp:range = Number
+			psp:mogelijkeBinding => $Persoon
+			psp:propertyPerspectief =>
+				psp:PropertyPerspectief $AangeverBetrouwbaarheidPerspectief
+					psp:propertyReferentie => $Betrouwbaarheid
+	psp:rolInContext =>
+		psp:Rol $MijnBerekendeRol
 --query $aangever binding
 
-$Aangifte $A1
+psp:Aangifte $A1
 	public $urgentie = 8
 	$aangever => $Jansen
 		$betrouwbaarheid = 7

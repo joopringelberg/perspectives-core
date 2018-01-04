@@ -28,7 +28,7 @@ import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError, errorsIn)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (ContextDeclaration(..))
+import Perspectives.Syntax (ContextDeclaration(..), Expanded(..))
 
 -- | As long as the user edits a contextname, we keep the original name here:
 type ContextNameInText = Maybe { name :: String, line :: Int}
@@ -173,7 +173,7 @@ aceComponent mode theme =
           (originalLines :: Array String) <- H.liftEff $ recoverOriginalLines document event
           parseResult <- liftAff $ runIndentParser (unsafePartial $ AP.head $ originalLines) CRP.contextDeclaration
           case parseResult of
-            (Right (ContextDeclaration _ contextName _)) -> do
+            (Right (ContextDeclaration _ (Expanded _ contextName) _)) -> do
               case action of
                 Insert -> case AR.length lines == 1 of
                   true -> H.modify (_ { editedContextName = Just {name: contextName, line: indexOfFirstOriginalLine event} })
@@ -221,9 +221,10 @@ aceComponent mode theme =
         rename :: forall e. String -> Document -> DocumentEvent -> Int -> Aff (AceEffects (DomeinFileEffects e)) Unit
         rename contextName document event line = do
           modifiedDeclaration <- H.liftEff $ Document.getLine line document
+          -- TODO We need to apply runIndentParser to the current default namespace here!
           parseResult' <- liftAff $ runIndentParser modifiedDeclaration CRP.contextDeclaration
           case parseResult' of
-            (Right (ContextDeclaration _ newName _)) -> do
+            (Right (ContextDeclaration _ (Expanded _ newName) _)) -> do
               qualifiedName <- composeFullName (indexOfFirstOriginalLine event) newName
               log $ "The fully qualified new name is: " <> qualifiedName
               -- actually rename contextName newName
@@ -234,19 +235,21 @@ aceComponent mode theme =
             composeFullName row name = do
               parseResult <- runIndentParser name CRP.contextName
               case parseResult of
-                (Right name') -> pure name'
+                (Right (Expanded _ name')) -> pure name'
                 (Left _) -> do
                   maybeName <- findPreviousContextDeclaration row
                   case maybeName of
                     (Just (Tuple previousRow namespacingName)) -> composeFullName previousRow (namespacingName <> name)
                     Nothing -> pure "" -- we should throw an error here.
+            -- TODO. Stop at the line that is not indexed. Then use its namespace, too!
             findPreviousContextDeclaration :: Int -> Aff (AceEffects (DomeinFileEffects e)) (Maybe (Tuple Int String))
             findPreviousContextDeclaration row | row < 0 = pure Nothing
             findPreviousContextDeclaration row | otherwise = do
               previousLine <- liftEff $ Document.getLine row document
+              -- TODO We need to apply runIndentParser to the current default namespace here!
               parseResult <- runIndentParser previousLine CRP.contextDeclaration
               case parseResult of
-                (Right (ContextDeclaration _ cname _)) -> pure $ Just (Tuple row cname)
+                (Right (ContextDeclaration _ (Expanded _ cname) _)) -> pure $ Just (Tuple row cname)
                 otherwise -> findPreviousContextDeclaration (row - 1)
 
 -- showAnchorEvent :: forall e. EditSession ->  AnchorEvent -> Eff (ace :: ACE, console :: CONSOLE | e) Unit

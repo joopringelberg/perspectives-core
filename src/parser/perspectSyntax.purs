@@ -1,12 +1,11 @@
 module Perspectives.Syntax where
 
-import Data.Maybe (Maybe(..))
-import Data.Ord (Ordering(..), compare)
+import Data.Maybe (Maybe)
+import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap)
 import Prelude (class Show, show, (<>))
 
 type ID = String
-
 type Comment = String
 
 newtype Comments e = Comments
@@ -20,7 +19,7 @@ type PerspectContextProperties =
   { id :: ID
   , displayName :: String
   , pspType :: ID
-  , binnenRol :: BinnenRol
+  , binnenRol :: BinnenRol -- TODO: vervang door PerspectRol, zodat de binnenrol ook kan vullen (b.v. rollen van Acties).
   , buitenRol :: ID
   , rolInContext :: StrMap (Array ID)
   , comments :: Comments ()
@@ -31,7 +30,7 @@ newtype PerspectRol =
 
 type PerspectRolProperties =
     { id :: ID
-    , occurrence :: Maybe Int
+    , occurrence :: Int
     , pspType :: ID
     , binding :: Maybe ID
     , context :: ID
@@ -54,9 +53,9 @@ type PerspectName = String
 type PropertyName = String
 type RoleName = String
 
-data TextDeclaration = TextDeclaration PerspectName (Array Comment)
+data TextDeclaration = TextDeclaration Expanded (Array Comment)
 
-data ContextDeclaration = ContextDeclaration PerspectName PerspectName (Array Comment)
+data ContextDeclaration = ContextDeclaration Expanded Expanded (Array Comment)
 
 data SimpleValue =
     String String
@@ -68,15 +67,20 @@ propertyValue :: PropertyValueWithComments -> Array String
 propertyValue (Comments{value}) = value
 
 -----------------------------------------------------------
+-- ContextName
+-----------------------------------------------------------
+type Prefix = String
+type LocalName = String
+type DomeinName = String
+
+data Expanded = Expanded DomeinName LocalName
+
+-----------------------------------------------------------
 -- Instances
 -----------------------------------------------------------
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
-compareOccurrences (PerspectRol{occurrence: a}) (PerspectRol{occurrence: b}) = case a of
-  Nothing -> LT
-  (Just n) -> case b of
-    Nothing -> GT
-    (Just m) -> compare n m
+compareOccurrences (PerspectRol{occurrence: a}) (PerspectRol{occurrence: b}) = compare a b
 
 foreign import jsonStringify :: forall a. {|a} -> String
 
@@ -91,8 +95,8 @@ instance showSimpleValue :: Show SimpleValue where
   show (Int i) = show i
   show (Bool b) = show b
 
-instance showTypeDeclaration :: Show ContextDeclaration where
-  show (ContextDeclaration tp inst cmt) = tp <> "=" <> inst <> show cmt
-
 instance showComments :: Show (Comments e) where
   show (Comments {commentBefore, commentAfter}) = "commentBefore: " <> show commentBefore <> "\ncommentAfter: " <> show commentAfter
+
+instance showExpanded :: Show Expanded where
+  show (Expanded domeinName localName) = domeinName <> localName

@@ -9,7 +9,7 @@ import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Perspectives.Syntax (RoleName)
-import Prelude (Unit, bind, pure, (+), (<<<), (>>=))
+import Prelude (Unit, bind, pure, (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
 import Text.Parsing.Parser.Pos (Position)
@@ -70,3 +70,11 @@ setNamespace :: forall e. String -> IP Unit e
 setNamespace ns = do
   s <- lift (lift get)
   lift (lift (put s {namespace = ns}))
+
+extendNamespace :: forall a e. String -> IP a e -> IP a e
+extendNamespace extension p = do
+  namespace <- getNamespace
+  _ <- setNamespace (namespace <> extension)
+  result <- p
+  _ <- setNamespace namespace
+  pure result
