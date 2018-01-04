@@ -1,0 +1,19 @@
+OVER DE CONTEXTUALISERINGSMATRIX
+
+1. Een Rol//definitie// heeft properties en views als onderdelen.
+Maar een Rol//instantie// heeft geen view als onderdeel. Je kunt een view òp een rolinstantie hebben.
+Een rolinstantie heeft wel een waarde voor een property. 
+2. Een View heeft Properties.
+3. Een Property heeft geen properties. Wat moet dat betekenen?
+4. Je kunt van de matrix zeggen:
+	- het gaat over elk begrip als container van andere begrippen.
+	- het gaat over geneste contexten. Maar dat geldt alleen voor de bovenste zes: dat zijn contexten.
+5. Elk van de tien begrippen kun je in CRL beschrijven en dan zijn het contexten. De beschrijving van een Rol bevat een beschrijving van een Property of een View. De beschrijving van een Rol heeft rollen. Maar een Rol heeft geen rollen! De binding van een Rol is niet een rol van de rol. Dat zou namelijk een eindeloze regressie inhouden.
+6. De bovenste zes regels en linker zes kolommen van de matrix gaan over nesting van contexten.
+7. Kolom en regel 7 gaan over rollen. Die kunnen we samenvatten met: een context heeft rollen en niet andersom.
+8. De regels en kolommen 7, 8 en 0 gaan over de verhoudingen tussen rollen, views en properties.
+9. Dan over regel en kolom 10, functie:
+	a. De 'functies' in Actie zijn assignments. Geen functies.
+	b. Ik kan me iets voorstellen bij een functie in een property - laten we zeggen een calculated property.
+	c. Een property in een functie - daar heb ik geen beeld bij.
+	d. Functie in functie zal functionele decompositie moeten zijn.
