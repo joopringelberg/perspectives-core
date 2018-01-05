@@ -213,7 +213,14 @@ nextLine = do
 
 -- | enclosingContextDeclaration = contextName contextName
 enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
-enclosingContextDeclaration = (EnclosingContextDeclaration <$> (reserved "Context" *> contextName) <*> (optionMaybe (reserved "als" *> prefix)) <*> inLineComment) <?> "the context declaration: Context <name>."
+enclosingContextDeclaration = (do
+  cname <- (reserved "Context" *> contextName)
+  prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
+  cmt <- inLineComment
+  case prfx of
+    Nothing -> pure unit
+    (Just pre) -> setPrefix pre (show cname)
+  pure $ EnclosingContextDeclaration cname cmt) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
@@ -452,6 +459,16 @@ definition = do
       })
   pure rolId
 
+-----------------------------------------------------------
+-- Import
+-----------------------------------------------------------
+importExpression :: forall e. IP Unit e
+importExpression = do
+  ns <- reserved "import" *> contextName
+  mpre <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
+  case mpre of
+    Nothing -> pure unit
+    (Just pre) -> setPrefix pre (show ns)
 
 -----------------------------------------------------------
 -- Text
@@ -461,10 +478,8 @@ enclosingContext = withRoleCounting enclosingContext' where
   enclosingContext' = do
     cmtBefore <- manyOneLineComments
     withPos do
-      (EnclosingContextDeclaration textName@(Expanded _ localName) pre cmt) <- enclosingContextDeclaration <* whiteSpace
-      case pre of
-        Nothing -> pure unit
-        (Just prfx) -> setPrefix prfx (show textName)
+      (EnclosingContextDeclaration textName@(Expanded _ localName) cmt) <- enclosingContextDeclaration
+      _ <- AR.many importExpression
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section

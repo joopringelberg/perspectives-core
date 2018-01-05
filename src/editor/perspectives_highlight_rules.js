@@ -46,9 +46,24 @@ define( function( require, exports, module ) {
 					regex: /query\b/
 				},
 				{
-					// Text
+					// Context
 					token: ["keyword"],
-					regex: /^Text\b/
+					regex: /^Context\b/
+				},
+				{
+					// import
+					token: ["keyword"],
+					regex: /^import\b/
+				},
+				{
+					// Section
+					token: ["keyword"],
+					regex: /^Section\b/
+				},
+				{
+					// als
+					token: ["keyword"],
+					regex: /als\b/
 				},
 				/////////////// ROLPROPERTY ASSIGNMENT
 				{
