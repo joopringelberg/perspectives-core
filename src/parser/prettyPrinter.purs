@@ -179,6 +179,7 @@ strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 enclosingContext :: forall e. PrettyPrinter PerspectContext e
 enclosingContext (PerspectContext theText) = do
+  -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
   withComments' theText.comments (identifier( "Context " <> theText.displayName))
   newline
   sectionIds <- liftAff (theText.id ## (ignoreCache rolTypen))

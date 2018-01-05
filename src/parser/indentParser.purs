@@ -8,7 +8,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup)
-import Perspectives.Syntax (RoleName)
+import Perspectives.Syntax (RoleName, Prefix)
 import Prelude (Unit, bind, pure, (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
@@ -17,10 +17,10 @@ import Text.Parsing.Parser.Pos (Position)
 -- | A type to keep track of:
 -- | - the number of occurrences of a role type, and
 -- | - the namespace for context declarations.
-type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: String}
+type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: String, prefixes :: StrMap String}
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: ""}
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: "", prefixes: empty}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is Aff, which we need to access couchdb.
@@ -42,12 +42,14 @@ runIndentParser s p = evalStateT (runIndent (runParserT s p)) initialContextRole
 liftAffToIP :: forall a e. Aff e a -> IP a e
 liftAffToIP = lift <<< lift <<< lift
 
+-----------------------------------------------------------
+-- RoleOccurrences
+-----------------------------------------------------------
 -- | Reach all the way into the stack to retrieve the number of times a particular
 -- | role has been instantiated in a context:
 getRoleOccurrences :: forall e. RoleName -> IP (Maybe Int) e
 getRoleOccurrences roleName = do
-  g <- lift (lift (gets (\{rolOccurrences} -> lookup roleName rolOccurrences)))
-  pure g
+  lift (lift (gets (\{rolOccurrences} -> lookup roleName rolOccurrences)))
 
 -- | Increment the number of instances of a particular role.
 incrementRoleInstances :: forall e. RoleName -> IP Unit e
@@ -63,6 +65,9 @@ setRoleInstances rmap = do
   s <- lift (lift get)
   lift (lift (put s {rolOccurrences = rmap}))
 
+-----------------------------------------------------------
+-- Namespace
+-----------------------------------------------------------
 getNamespace :: forall e. IP String e
 getNamespace = lift (lift get) >>= pure <<< (_.namespace)
 
@@ -79,6 +84,9 @@ extendNamespace extension p = do
   _ <- setNamespace namespace
   pure result
 
+-----------------------------------------------------------
+-- Section
+-----------------------------------------------------------
 setSection :: forall e. String -> IP Unit e
 setSection propertyName = do
   s <- lift (lift get)
@@ -86,3 +94,14 @@ setSection propertyName = do
 
 getSection :: forall e. IP String e
 getSection = lift (lift get) >>= pure <<< (_.section)
+
+-----------------------------------------------------------
+-- Prefixes
+-----------------------------------------------------------
+setPrefix :: forall e. Prefix -> String -> IP Unit e
+setPrefix pre exp = do
+  (s@{prefixes}) <- lift (lift get)
+  lift (lift (put s {prefixes = insert pre exp prefixes}))
+
+getPrefix :: forall e. Prefix -> IP (Maybe String) e
+getPrefix pre = lift (lift (gets (\{prefixes} -> lookup pre prefixes)))

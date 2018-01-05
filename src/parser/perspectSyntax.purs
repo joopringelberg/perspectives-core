@@ -53,7 +53,7 @@ type PerspectName = String
 type PropertyName = String
 type RoleName = String
 
-data EnclosingContextDeclaration = EnclosingContextDeclaration Expanded (Array Comment)
+data EnclosingContextDeclaration = EnclosingContextDeclaration Expanded (Maybe Prefix) (Array Comment)
 
 data ContextDeclaration = ContextDeclaration Expanded Expanded (Array Comment)
 

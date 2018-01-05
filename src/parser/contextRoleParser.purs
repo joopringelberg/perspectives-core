@@ -100,7 +100,7 @@ domeinName = do
   pure $ "model:" <> domein <> "$"
 
 standaloneDomeinName :: forall e. IP Expanded e
-standaloneDomeinName = do
+standaloneDomeinName = lexeme do
   dn <- domeinName
   pure $ Expanded dn ""
 
@@ -125,8 +125,10 @@ prefixedName :: forall e. IP String e -> IP Expanded e
 prefixedName localName = lexeme do
   pre <- prefix
   ln <- localName
-  namespace <- prefix2namespace pre
-  pure $ Expanded namespace ln
+  namespace <- getPrefix pre
+  case namespace of
+    Nothing -> fail $ "The prefix '" <> pre <> "' has not been declared!"
+    (Just ns) -> pure $ Expanded ns ln
 
 -- prefixedContextName = prefix localContextName
 prefixedContextName :: forall e. IP Expanded e
@@ -211,7 +213,7 @@ nextLine = do
 
 -- | enclosingContextDeclaration = contextName contextName
 enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
-enclosingContextDeclaration = (EnclosingContextDeclaration <$> (reserved "Context" *> contextName) <*> inLineComment) <?> "the context declaration: Context <name>."
+enclosingContextDeclaration = (EnclosingContextDeclaration <$> (reserved "Context" *> contextName) <*> (optionMaybe (reserved "als" *> prefix)) <*> inLineComment) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
@@ -459,7 +461,10 @@ enclosingContext = withRoleCounting enclosingContext' where
   enclosingContext' = do
     cmtBefore <- manyOneLineComments
     withPos do
-      (EnclosingContextDeclaration textName@(Expanded _ localName) cmt) <- enclosingContextDeclaration <* whiteSpace
+      (EnclosingContextDeclaration textName@(Expanded _ localName) pre cmt) <- enclosingContextDeclaration <* whiteSpace
+      case pre of
+        Nothing -> pure unit
+        (Just prfx) -> setPrefix prfx (show textName)
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
