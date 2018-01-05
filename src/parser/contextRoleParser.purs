@@ -15,7 +15,7 @@ import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), DomeinName, Expanded(..), ID, PerspectContext(..), PerspectRol(..), Prefix, PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), TextDeclaration(..))
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), DomeinName, Expanded(..), ID, PerspectContext(..), PerspectRol(..), Prefix, PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -209,9 +209,9 @@ nextLine = do
 -- Elementary expression types
 -----------------------------------------------------------
 
--- | contextDeclaration = contextName contextName
-textDeclaration :: forall e. IP TextDeclaration e
-textDeclaration = (TextDeclaration <$> (reserved "Context" *> contextName) <*> inLineComment) <?> "the context declaration: Context <name>."
+-- | enclosingContextDeclaration = contextName contextName
+enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
+enclosingContextDeclaration = (EnclosingContextDeclaration <$> (reserved "Context" *> contextName) <*> inLineComment) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
@@ -409,7 +409,7 @@ prefix2namespace prefx = pure prefx
 
 expression :: forall e. IP String (DomeinFileEffects e)
 expression = choice
-  [ try (textDeclaration *> (pure "textDeclaration"))
+  [ try (enclosingContextDeclaration *> (pure "enclosingContextDeclaration"))
   , try (contextDeclaration *> (pure "contextDeclaration"))
   , try (publicContextPropertyAssignment *> (pure "publicContextPropertyAssignment"))
   , try (privateContextPropertyAssignment *> (pure "privateContextPropertyAssignment"))
@@ -459,14 +459,14 @@ enclosingContext = withRoleCounting enclosingContext' where
   enclosingContext' = do
     cmtBefore <- manyOneLineComments
     withPos do
-      (TextDeclaration textName@(Expanded _ localName) cmt) <- textDeclaration <* whiteSpace
+      (EnclosingContextDeclaration textName@(Expanded _ localName) cmt) <- enclosingContextDeclaration <* whiteSpace
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
       liftAffToIP $ storeContextInResourceDefinitions (show textName)
         (PerspectContext
           { id: show textName
-          , displayName : localName
+          , displayName : show textName
           , pspType: "model:Perspectives$enclosingContext"
           , binnenRol:
             BinnenRol
