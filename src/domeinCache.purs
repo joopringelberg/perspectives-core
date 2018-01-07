@@ -66,13 +66,14 @@ retrieveDomeinFile ns = do
     Nothing -> do
       v <- makeEmptyVar
       _ <- storeDomeinFileInCache ns v
-      _ <- forkAff do
-            res <- affjax $ domeinRequest {url = modelsURL <> ns}
-            case res.status of
-              StatusCode 200 -> case stringToDomeinFile res.response of
-                (Left err) -> throwError $ error err
-                (Right (df :: DomeinFile)) -> putVar df v
-              otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+      -- forkAff hinders catchError.
+      -- _ <- forkAff do
+      res <- affjax $ domeinRequest {url = modelsURL <> ns}
+      _ <- case res.status of
+        StatusCode 200 -> case stringToDomeinFile res.response of
+          (Left err) -> throwError $ error err
+          (Right (df :: DomeinFile)) -> putVar df v
+        otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
       readVar v
     (Just v) -> readVar v
 
