@@ -15,7 +15,7 @@ import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), DomeinName, Expanded(..), ID, PerspectContext(..), PerspectRol(..), Prefix, PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -152,7 +152,7 @@ defaultNamespacedContextName = lexeme do
   namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
   localName <- localContextName
   namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
-  pure $ Expanded namespace' ("$" <> localName)
+  pure $ Expanded namespace' localName
   where
     butLastNNamespaceLevels :: String -> Int -> IP String e
     butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
@@ -215,6 +215,7 @@ nextLine = do
 enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
 enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> contextName)
+  _ <- setNamespace $ show cname
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
@@ -404,21 +405,14 @@ allTheRest :: forall e. IP String e
 allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
 -----------------------------------------------------------
--- ContextName and QualifiedName
------------------------------------------------------------
-
--- TODO: look up the prefix in the state!
-prefix2namespace :: forall e. Prefix -> IP DomeinName e
-prefix2namespace prefx = pure prefx
-
-
------------------------------------------------------------
 -- Expression
 -----------------------------------------------------------
 
 expression :: forall e. IP String (DomeinFileEffects e)
 expression = choice
   [ try (enclosingContextDeclaration *> (pure "enclosingContextDeclaration"))
+  , try (importExpression *> (pure "importExpression"))
+  , try (sectionHeading *> (pure "sectionHeading") )
   , try (contextDeclaration *> (pure "contextDeclaration"))
   , try (publicContextPropertyAssignment *> (pure "publicContextPropertyAssignment"))
   , try (privateContextPropertyAssignment *> (pure "privateContextPropertyAssignment"))
@@ -433,10 +427,15 @@ expression = choice
 -----------------------------------------------------------
 section :: forall e. IP (Tuple String (Array ID)) (DomeinFileEffects e)
 section = do
-  prop <- reserved "Section" *> propertyName
-  setSection (show prop)
+  prop <- sectionHeading
   ids <- AR.many definition
   pure $ Tuple (show prop) ids
+
+sectionHeading :: forall e. IP ID (DomeinFileEffects e)
+sectionHeading = do
+  prop <- reserved "Section" *> propertyName
+  setSection (show prop)
+  pure $ show prop
 
 definition :: forall e. IP ID (DomeinFileEffects e)
 definition = do
