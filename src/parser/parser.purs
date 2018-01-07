@@ -47,9 +47,11 @@ expressionTypeForNextLine :: forall e. String -> Aff (DomeinFileEffects e) Strin
 expressionTypeForNextLine s = do
   parseResult <- runIndentParser s (whiteSpace *> expression)
   case parseResult of
-    (Left _) -> pure "Verwacht: -- commentaar of: Type Instantie"
+    (Left _) -> pure "Kan de vorige regel niet ontleden."
     (Right etype) -> pure $ case etype of
-      "textDeclaration" -> "Verwacht: context."
+      "enclosingContextDeclaration" -> "Verwacht: Import of Section of rolbinding."
+      "importExpression" -> "Verwacht: Import of Section of rolbinding."
+      "sectionHeading" -> "Verwacht: context declaratie"
       "contextDeclaration" -> "Verwacht: (public|private) property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
       "publicContextPropertyAssignment" -> "Verwacht: public|private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
       "privateContextPropertyAssignment" -> "Verwacht: private property = value, rol => (rol|context) of rol => met type declaratie op volgende regel."
