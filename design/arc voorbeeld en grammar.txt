@@ -1,0 +1,116 @@
+VOORBEELD
+
+-- Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
+Zaak Aangifte heeft
+	properties
+		intern
+			urgentie (String, Verplicht, Niet Functioneel)
+		extern
+			aantekening (String, Niet Verplicht, Functioneel)
+	views
+		Adres met properties
+			straat
+			huisnummer
+			woonplaats
+	rollen
+		UserRol gevuld door Persoon heeft
+			properties
+				betrouwbaarheid (Number, Verplicht, Functioneel)
+			views
+				adres met properties
+					betrouwbaarheid
+		Verbalisant gevuld door Medewerker
+		Start gevuld door
+			Activiteit Intake heeft
+				rollen
+					uitvoerder gevuld door Verbalisant
+	acties
+		Verbalisant beheert locatiegegevens van Verbaal
+
+
+GRAMMATICA
+ContextDeclaration = ContextType ContextIdentifier "heeft"
+ContextType = "Domein" | "Partij" | "Zaak" | "Activiteit" | "Toestand"
+ContextDefinition = ContextDeclaration
+	Properties
+	Rollen
+	Acties
+Properties = "properties" Property+
+Property = ("intern" | "extern") PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")"
+PropertyType = "String" | "Boolean" | "Number" | "Date" | "Memo"
+IsVerplicht = "verplicht" | "niet verplicht"
+IsFunctioneel = "functioneel" | "niet functioneel"
+Views = "views" View+
+View = ("intern" | "extern") ViewIdentifier "met properties" PropertyIdentifier+
+Rollen = "rollen" Rol+
+Rol = RolDeclaration "heeft"
+	RolProperties
+	Views
+RolDeclaration =
+	RolType |
+	RolType "gevuld door" (RolIdentifier | ContextIdentifier | Query | ContextDeclaration)
+	RolIdentifier "gevuld door" (RolIdentifier | ContextIdentifier | Query | ContextDeclaration)
+RolProperties = "properties" RolProperty+
+RolProperty = PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")"
+RolType = "UserRol" | "DingRol"
+Acties = "acties" Actie+
+Actie = 
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) |
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) RolIdentifier
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) ViewIdentifier "van" RolIdentifier	
+InformatieWerkwoord = "beheert" | "raadpleegt" | "creeërt" | "verwijdert"
+
+Opmerkingen
+1. Rol en Actie kunnen compacter opgeschreven worden met optionele componenten, maar deze presentatie geeft goed de verschillende stadia weer.
+2. Query (Functie) ontbreekt nog.
+
+INDENTERING NA
+ContextDeclaration
+RolDeclaration
+"properties"
+("met properties")
+"views"
+"rollen"
+"acties"
+"intern"
+"extern"
+"gevuld door"
+
+FOLDING OP
+ContextDeclaration
+Properties
+Views
+Rollen
+Acties
+View
+
+KEYWORDS
+heeft
+properties
+intern
+extern
+views
+met properties
+rollen
+gevuld door
+acties
+van
+
+CONSTANTS
+Domein
+Partij
+Zaak
+Activiteit
+Toestand
+String
+Boolean
+Number
+Date
+Memo
+Verplicht
+Niet Verplicht
+Functioneel
+Niet Functioneel
+UserRol
+DingRol
+Actor
