@@ -189,13 +189,27 @@ We kunnen dit dus nog niet afdwingen.
 Het volgnummer wordt onderdeel van de naam van de instantie van de rol. Deze wordt opgebouwd uit de naam van de context (een instantie!), de lokale rolnaam en het volgnummer:
 	<contextnaam>_<roltypenaam>_n
 
+BETER:
+* identifiers van items in couchdb moeten stabiel zijn.
+* daarom construeren we vaste ids voor beide, en
+* daarnaast zijn er presentatienamen.
+* voor een context kan de id beginnen als de ingetikte naam. Hij wordt geconstrueerd als:
+	model:<DomeinNaam>#<ingetikteNaam>
+  Wijzigt de modelleur daarna de ingetikte naam, dan blijft de id hetzelfde.
+* voor een rol construeren we een identifier zoals hierboven: <contextnaam>_<roltypenaam>_n
+* daarnaast heeft een rol een property volgnummer.
+De volgorde van rollen kan nu wijzigen zonder dat de identifiers hoeven worden aangepast.
+
+In tekst schrijven we een naam, al naar gelang de tekstuele scope waarin hij voorkomt, meer of minder gekwalificeerd.
+
 HOE LEIDEN WE INFORMATIE TERUG NAAR DE EDITOR?
-Een simpele manier is om tekst te prettyprinten. Je moet dan wel de hele buffer printen, of precies weten welk tekstblok het over gaat.
+Een simpele manier is om tekst te prettyprinten. We weten precies om welk tekstblok het over gaat.
 
 ROLNUMMERING MEENEMEN IN DE PARSER
 Omdat in de parser roleBinding al de naam van de rol wordt gemaakt, moet je daar direct het volgnummer kunnen gebruiken. De aangewezen manier om dat te doen, is de State monad te gebruiken om een telling van rollen bij te houden.
 Bij begin van een context initialiseer je die; aan het eind zet je de oude waarde terug.
 Maar: hoe stapel je de StateT monad transformer?
+De IndentParser is een mooi voorbeeld. Die voegt namelijk StateT toe aan ParserT, die op zich al gebaseerd is op StateT!
 
 
 

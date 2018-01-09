@@ -4,7 +4,7 @@ Minimale representatie van een Context:
 
 	{
 		id: "guid",
-		type: ["the-type"],
+		psptype: ["the-type"],
 		binnenRol: 
 			{
 				binding: ["guid_buitenRol"]
@@ -18,19 +18,19 @@ Minimale representatie van een Rol:
 
 	{
 		id: "guid",
-		type: ["the-type"],
+		psptype: ["the-type"],
 	}
 
 Mogelijke mutaties van een Context:
 1. property binnenrol.
 2. property buitenrol? Mogelijk moet dit een aparte operator zijn.
-3. type.
+3. psptype.
 4. andere rollen.
 5. Verwijder de hele context.
 
 Mogelijke mutaties van een Rol:
 1. binding.
-2. type.
+2. psptype.
 3. properties.
 4. Verwijder de hele rol. NB: kan niet voor een buitenrol!
 

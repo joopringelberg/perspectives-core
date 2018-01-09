@@ -4,6 +4,25 @@
 		:status = "voltooid"
 		:urgentie = 5
 
+	:Aangifte :aangifte1
+		:Aangever => :Jansen
+			:betrouwbaarheid = 10
+		:Aangever => :deVries
+			:betrouwbaarheid = 5
+			:bijnaam = "de neus"
+			:bijnaam = "de kille"
+		:status = "voltooid"
+		:urgentie = 5
+
+	:Aangifte :aangifte1
+		:Aangever => :Jansen
+			:betrouwbaarheid = 10
+		:Aangever => :deVries
+			:betrouwbaarheid = 5
+			:bijnaam = "de neus", "de kille"
+		:status = "voltooid"
+		:urgentie = 5
+
 Een grammatica:
 
 context = type identifier BLOCK (rolAssignment | propertyAssignment)*
@@ -13,20 +32,24 @@ simpleValue = string | number | boolean | date
 
 
 	:ContextType :Aangifte
-		:MogelijkeBinding => :Gebruiker
+		private :status
+			:isFunctional = true
+			:isVerplicht = true
+			:range = "String"
+		private :comment
+			:isFunctional = true
+			:isVerplicht = false
+			:range = "String"
+		public :urgentie
+			:isFunctional = true
+			:isVerplicht = true
+			:range = "Int"
 		:RolInContextType :Aangever
+			:MogelijkeBinding => :Gebruiker
 			:PropertyType :betrouwbaarheid
 				:isFunctional = true
 				:isVerplicht = true
 				:range = "Int"
-		private: :status
-			:isFunctional = true
-			:isVerplicht = true
-			:range = "String"
-		public: :urgentie
-			:isFunctional = true
-			:isVerplicht = true
-			:range = "Int"
 
 een grammatica:
 
@@ -55,14 +78,13 @@ Dan is dit de volledige grammatica:
 file = expr*
 expr = contextDefinition | context
 contextDefinition = type identifier BLOCK 
-	( rolDefinition 
-	| privatePropertyDefinition 
-	| publicPropertyDefinition 
-	| RolAssignment
-	)*
-rolDefinition = type identifier BLOCK context*
-privatePropertyDefinition = 'private' BLOCK propertyAssignment*
-publicPropertyDefinition = 'public' BLOCK propertyAssignment*
+	privatePropertyDefinition*
+	publicPropertyDefinition*
+	rolDefinition*
+rolDefinition = type identifier BLOCK 
+	rolAssignment
+	propertyDefinition*
+propertyDefinition = ('public' | 'private') identifier BLOCK propertyAssignment*
 rolAssignment = type '=>' identifier BLOCK propertyAssignment*
 propertyAssignment = type '=' simpleValue
 simpleValue = 
@@ -70,7 +92,7 @@ simpleValue =
 	| number 
 	| boolean 
 	| date
-context = type identifier BLOCK (rolAssignment | propertyAssignment)*
+-- context = type identifier BLOCK propertyAssignment* rolAssignment*
 
 
 

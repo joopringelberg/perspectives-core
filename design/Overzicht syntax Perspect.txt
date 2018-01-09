@@ -172,7 +172,7 @@ Als de modelleur daarentegen gekozen had voor 'private' of 'public':
 
 Dan zou het deze query evalueren:
 
-	:ContextType ## :BuitenRol ## :PropertyType 
+	:ContextType ## :BuitenRol ~> :PropertyType 
 
 Het resultaat zou in dit geval leeg zijn (want een :ContextType heeft geen specifieke publieke properties). Maar veronderstel dat we hadden gemodelleerd dat er een 'label' hoort bij een :ContextType, dan zou de query die property hebben opgeleverd en de curie van die property zou door het systeem als mogelijk vervolg zijn voorgedragen.
 
@@ -228,7 +228,7 @@ De property psp:describes vult de beschrijving van de meta-types aan. Deze prope
 	:RolInContextType :describes :RolInContext
 	:BuitenRolType :describes :BuitenRol
 	:BinnenRolType :describes :BinnenRol
-	:PropertyType :describes :RolInContext
+	:PropertyType :describes :RolInContext ?? Property
 
 Deze property wordt dus niet in een modelfile vastgelegd maar is onderdeel van de code, net zoals de vijf basisproperties die hierboven opgesomd werden.
 
