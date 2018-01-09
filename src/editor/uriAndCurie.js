@@ -52,9 +52,9 @@ define( function( require, exports, module ) {
 
 	var qualifiedPropertyName = composeRegExp( domeinName, localPropertyName );
 
-	var contextName = catchingRegexp( disjunctiveRegExp( qualifiedContextName, disjunctiveRegExp( prefixedContextName, new RegExp( "\\$" + regExpToString( localContextName ) ) ) ) );
+	var contextName = catchingRegexp( disjunctiveRegExp( qualifiedContextName, disjunctiveRegExp( prefixedContextName, new RegExp( "\\$?" + regExpToString( localContextName ) ) ) ) );
 
-	var propertyName = catchingRegexp( disjunctiveRegExp( qualifiedPropertyName, disjunctiveRegExp(prefixedPropertyName, new RegExp( "\\$" + regExpToString( localPropertyName ) ) ) ) );
+	var propertyName = catchingRegexp( disjunctiveRegExp( qualifiedPropertyName, disjunctiveRegExp(prefixedPropertyName, new RegExp( "\\$?" + regExpToString( localPropertyName ) ) ) ) );
 
 	exports.contextName = contextName;
 
