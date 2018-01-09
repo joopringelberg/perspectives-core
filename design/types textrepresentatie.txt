@@ -1,0 +1,30 @@
+Context model:PerspectivesText$ als pst:
+
+import model:Perspectives$ als psp:
+
+Section psp:model_Item
+
+-- Deze definitie van een property gebruiken we in elke rol van $PerspectText
+psp:Property $RegelNummer
+	private psp:isVerplicht = true
+	private psp:isFunctioneel = true
+	private psp:range = "Integer"
+
+psp:Property $Indentering
+	private psp:isVerplicht = true
+	private psp:isFunctioneel = true
+	private psp:range = "Integer"
+
+psp:ContextType $PerspectText
+	psp:rolInContext =>
+		-- Deze rol representeert een regel met commentaar
+		psp:RolInContext $CommentaarRegel
+			psp:rolProperty => pst:RegelNummer
+			psp:rolProperty => pst:Indentering
+			psp:rolProperty =>
+				psp:Property $Tekst
+					private psp:isVerplicht = true
+					private psp:isFunctioneel = true
+					private psp:range = "String"
+	psp:rolIncontext =>
+		psp:RolInContext $EnclosingContextDeclaratie

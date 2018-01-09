@@ -1,0 +1,117 @@
+OVER TEKSTUELE REPRESENTATIE
+
+CONVENTIES
+1. Contexten en rollen die tekst representeren, noemen we TextContexten en TextRollen.
+2. Op elk moment is de parsetree van de tekst gerepresenteerd als een verzameling TextContexten en TextRollen. Zij worden opgeslagen en heten daarom OpgeslagenTextContexten en OpgeslagenTextRollen. Samen zijn zij de OpgeslagenParseTree.
+3. Met die namen onderscheiden we ze in dit stuk van TextContexten en TextRollen die resulteren uit een nieuwe ontleding van een deel van de tekst, na een tekstwijziging. Soms noemen we ze de 'nieuwe TextContexten of -Rollen'.
+
+OPSLAG
+Omdat we regel voor regel een gewijzigde tekst vergelijken met de opgeslagen tekst, hoeven we de nieuwe TextContexten en Rollen niet op te slaan.
+
+RESULTAAT VAN PARSERS
+1. Elke regelparser levert een nieuwe TextRol. Deze TextRol wordt niet onmiddelijk opgeslagen.
+2. De nieuwe TextRol vergelijken we met de OpgeslagenTextRol. 
+	- als die er niet is, wordt de nieuwe TextRol opgeslagen.
+	- als die er wel is, wordt de OpgeslagenTextRol gewijzigd.
+3. Een nieuwe TextRol die een context declaratie expressie representeert, representeren we met een nieuwe TextContext waarin we die nieuwe TextRol toevoegen. Beiden worden opgeslagen.
+
+IMPORT/PREFIXES
+Prefixes worden alleen bewaard in de tekstuele representatie (de parsetree van de tekst, gerepresenteerd als contexten en rollen).
+
+COMMENTAAR
+Commentaarregels en -blokken worden als rollen gerepresenteerd.
+
+WHITESPACE
+Elke rol die een regel representeert, zorgt voor een regelovergang in de tekst zonder dat die overgang expliciet is gerepresenteerd. 
+Lege regels worden gerepresenteerd met een getal bij de rol die de voorafgaande expressie representeert.
+
+REPRESENTATIE VAN NAMESPACE
+De huidige Context- en Rolrepresentatie moet verrijkt worden:
+- bij context vervangen we displayName door localName en namespace. We gebruiken localName waar we eerder displayName gebruikten.
+- bij Rol vervangen we het type door een Expanded value, of we voegen localName en namespace toe.
+
+NAAMGEVING
+Contexten die tekst representeren, representeren blokken tekst. Zij representeren contexten en rollen. Deze representerende contexten dragen dezelfde id als de context of rol die ze representeren, met een suffix "_text"
+Rollen die tekst representeren, representeren regels: elk soort expressie. Voor rollen kunnen we volstaan met dezelfde strategie als bij de primaire representatie (denk ik).
+
+REGELMUTATIES
+Onder een 'regelmutatie' verstaan we een wijziging van de tekst die niet de structuur verandert, maar alleen de waarden daarin. Dus, bijvoorbeeld, een rolbinding-expressie die in een een property-assignment verandert, is een structuuroperatie - geen regelmutatie.
+
+De binding van elke rol die een regel representeert, is een element van de beschreven context of rol:
+
+TYPE EXPRESSIE			ROLBINDING
+property assignment		rol waar de property bij hoort
+rolbinding				rol
+context declaratie		context
+enclosing context		context
+import					context die de tekst beschrijft
+section					context die de tekst beschrijft
+query					??
+
+We vergelijken de ontleding van de regel met de rol en leiden daar mutaties van de beschreven context of rol uit af.
+
+Een aantal speciale gevallen:
+1. **Van private naar public property en vv**. Vind de binnen- respectievelijk buitenrol; verwijder de property bij de een en voeg toe aan de ander.
+2. **Verandering van het roltype**. Verander het type van de rol; de identifier kan gelijk blijven.
+3. **Verandering van de namespace van een identifier in referentiepositie**. Bij:	
+	- de typenaam in een context-declaratie: verander namespace van de context
+	- de rolnaam in een rolbinding: verander namespace van de rol
+	- de binding in een rolbinding: verander de binding van de rol
+	- de propertynaam in de property assignment expressies: vervang de key van de property in PropertyValueWithComments
+	- alle posities in een query. Onbekend
+4. Verandering van de gedeclareerde naam: verander de namespace, danwel de localName. De identifier blijft gelijk. LET OP: als de gedeclareerde naam als type geldt, moet de tekst opnieuw gegenereerd worden.
+5. import: er is geen effect op de beschreven context(en). Wel moet de tekst in de editor opnieuw worden gegenereerd.
+6. section: er is geen effect op de tekst in de editor. Wel moet het type van de rollen in de betreffende sectie van de enclosing context aangepast worden.
+
+STRUCTUURMUTATIES VAN DE PARSETREE
+We stellen de gebruiker in staat om delen uit de parsetree te verwijderen zonder dat de beschreven context of rol verandert. Hij doet dit door simpelweg een regel uit te vegen.
+Ingetikte toevoegingen aan de parsetree worden altijd in de beschreven context of rol opgenomen.
+
+Nadat een blok geheel is ontleed, kunnen we alle rollen in de (inmiddels gewijzigde) opgeslagen parsetree die niet voorkomen in de nieuwe parsetree (van dat blok) verwijderen. Als resultaat van de parse van een blok hebben we het aantal rollen nodig dat dat blok bevat (na de edit). De rollen met een hoger volgordenummer verwijderen we.
+
+De gebruiker kan ook een rol of property van de beschreven context die nog niet zichtbaar is in de tekst, toevoegen. Hij kan daartoe kiezen uit een lijst mogelijkheden die hem wordt geboden (b.v. ontsloten via een contextmenu). Mogelijke verfijning: alle rollen van een type versus elke individuele rol.
+
+STRUCTUURMUTATIES VAN DE BESCHREVEN CONTEXT OF ROL
+Als de gebruiker een rol of property wil verwijderen, moet hij een daartoe bestemd commando gebruiken (b.v. ontsloten via een contextmenu). Zowel de parsetree als de beschreven context wordt dan gewijzigd.
+
+EEN TEKSTREGEL RELATEREN AAN DE PARSETREE
+In de parsetree nemen we bij elke rol en context op hoeveel tekstregels hij beslaat. Zo kunnen we aan de hand van een regelnummer uit de Ace editor efficient door de parsetree lopen om de rol te vinden die de betreffende regel representeert. Dit vergt het doorlopen van de gesorteerde rollen van elke context.
+Voor contexten en rollen die tekst representeren, geldt:
+	- het aantal regels van een context is de som van het aantal regels per rol plus één;
+	- elke rol telt voor één regel plus het aantal volgende lege regels. Aan een rol die een rolbinding met embedded context declaratie representeert, voegen we het aantal regels toe van de context die de embedded context declaratie representeert.
+
+VOLGORDE VERANDERING
+Als het ontledingsresultaat van een regel met nummer N niet overeenkomt met de rol R die we in de parsetree vonden, zoeken we in de rollen in de context van R naar het ontledingsresultaat. Als we dat resultaat PR vinden, dan verwisselen we de volgnummers van R en PR.
+Merk op dat PR dan op de juiste plek staat, maar R nog niet noodzakelijkerwijs. Echter, zodra we een ontledingsresultaat hebben dat overeenkomt met R, vinden we ook het juiste regelnummer voor R.
+Zoals boven beschreven controleren we aan het eind van het ontleden van het blok of regels zijn verwijderd. Dit zijn de rollen met volgordenummers die groter zijn dan het aantal rollen dat in de nieuwe parse van het blok is gevonden.
+
+
+INCREMENTEEL PARSEREN
+Als we de parser state opslaan in de TextRollen, kunnen we per regel ontleden. Immers, je geeft de parser de in de vorige regel opgeslagen state mee en kunt bepalen welke typen regels acceptabel zijn op basis van de vorige rol in de context (die de vorige regel met dezelfde indentering geeft).
+Hoe slaan we de parser state op?
+- de Text.Parsing.Parser slaat de positie op van de rest van de input stream.
+	- we kunnen voor een regel in de OpgeslagenParseTree het tekst-regelnummer vinden
+	- we kunnen voor een regel in de OpgeslagenParseTree de indentering bepalen (stap door de contexten naar de root, d.w.z. de enclosingContext en vermenigvuldig het aantal niveaus met de indentering per niveau).
+	Overigens, kunnen we niet ook de positie gebruiken die we van Ace meekrijgen, d.w.z. de lines in het DocumentEvent? We kunnen ervan uitgaan dat de OpgeslagenParseTree de tekst vóór wijziging goed representeert. We kunnen uit lines de oorspronkelijke tekst herstellen. We moeten lines opnieuw parseren. Dus kunnen we de positie die Text.Parsing.Parser opslaat, herberekenen.
+
+- de Text.Parsing.Indent parser slaat een additionele referentiepositie op. Deze wordt gebruikt in combinatoren als indented, (indented'), sameLine, withPos en checkIndent (= indented'). Alleen indented' gebruik ik niet in ContextRoleParser.
+	- indented controleert (éénmalig!) of de parser ten opzichte van de referentiepositie geïndenteerd staat (en zet de referentieregel op de huidige)
+	- sameLine controleert (éénmalig!) of de referentieregel gelijk is aan de huidige
+	- withPos zet de referentiepositie op de huidige, voert een parser uit, en herstelt de referentiepositie
+	- checkIndent controleert (éénmalig) of de parser ten opzichte van de referentiepositie geïndenteerd staat (maar verandert de referentiepositie niet)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
