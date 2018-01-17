@@ -1,34 +1,8 @@
 VOORBEELD
+ARC GRAMMATICA
 
--- Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
-Zaak Aangifte heeft
-	properties
-		intern
-			urgentie (String, Verplicht, Niet Functioneel)
-		extern
-			aantekening (String, Niet Verplicht, Functioneel)
-	views
-		Adres met properties
-			straat
-			huisnummer
-			woonplaats
-	rollen
-		UserRol gevuld door Persoon heeft
-			properties
-				betrouwbaarheid (Number, Verplicht, Functioneel)
-			views
-				adres met properties
-					betrouwbaarheid
-		Verbalisant gevuld door Medewerker
-		Start gevuld door
-			Activiteit Intake heeft
-				rollen
-					uitvoerder gevuld door Verbalisant
-	acties
-		Verbalisant beheert locatiegegevens van Verbaal
-
-
-GRAMMATICA
+Text = TextDeclaration (ContextDeclaration | "properties" | "rollen" | "acties")*
+TextDeclaration = "Tekst" String
 ContextDeclaration = ContextType ContextIdentifier "heeft"
 ContextType = "Domein" | "Partij" | "Zaak" | "Activiteit" | "Toestand"
 ContextDefinition = ContextDeclaration
@@ -43,7 +17,7 @@ IsFunctioneel = "functioneel" | "niet functioneel"
 Views = "views" View+
 View = ("intern" | "extern") ViewIdentifier "met properties" PropertyIdentifier+
 Rollen = "rollen" Rol+
-Rol = RolDeclaration "heeft"
+Rol = RolDeclaration "(" "Niet"? "Functioneel" ")" "heeft"
 	RolProperties
 	Views
 RolDeclaration =

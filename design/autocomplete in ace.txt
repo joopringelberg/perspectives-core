@@ -1,0 +1,36 @@
+AUTOCOMPLETE IN ACE
+
+In 
+	bower_components/purescript-ace/example/src/Main.purs 
+is een voorbeeld van completion te vinden:
+
+  Session.setMode "ace/mode/text" session
+  languageTools <- LanguageTools.languageTools
+  Editor.setEnableBasicAutocompletion true editor
+  completer <-
+    Completer.mkCompleter
+    (\_ _ _ inp cb -> do
+        cb $ pure [ { value: inp <> "!!"
+                    , score: 100.0
+                    , caption: pure "???"
+                    , meta: "!!"
+                    }
+                  , { value: "abcde"
+                    , score: 200.0
+                    , caption: Nothing
+                    , meta: "abcde"
+                    } ] )
+  LanguageTools.addCompleter completer languageTools
+
+Een voorbeeld in javascript is te vinden op:
+	http://plnkr.co/edit/6MVntVmXYUbjR0DI82Cr?p=preview
+
+Toelichting op de velden, ontleend aan de plunker:
+value - dit wordt getoond in de dropdown èn ingevuld.
+name - ik kan niet ontdekken waar dit voor is. Is dit hetzelfde als 'caption' in purescript?
+score - positie in de lijst
+meta - staat in de lijst achter de woorden, als categorie van herkomst ofzo.
+
+Hier is de documentatie van cloud9 over Ace:
+
+https://cloud9-sdk.readme.io/docs/cloud9-bundle

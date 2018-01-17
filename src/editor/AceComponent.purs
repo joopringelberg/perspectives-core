@@ -7,9 +7,10 @@ import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import Ace.BackgroundTokenizer (setTokenizer) as BackgroundTokenizer
 import Ace.Document (getLine, onChange) as Document
 import Ace.EditSession (clearAnnotations, getDocument, getLine, setAnnotations, setUseSoftTabs)
-import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), Editor, Position(..))
+import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), EditSession, Editor, Position(..), Tokenizer, TokenInfo)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Aff.Console (log)
@@ -19,6 +20,7 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Data.Array (dropEnd, cons, snoc, length) as AR
 import Data.Array.Partial (head, last, tail) as AP
 import Data.Either (Either(..))
+import Data.Function.Uncurried (mkFn3)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.String (drop, splitAt, take, length)
 import Data.Tuple (Tuple(..))
@@ -123,6 +125,9 @@ aceComponent mode theme =
       case maybeEditor of
         Nothing -> pure unit
         Just editor -> do
+          -- session <- H.liftEff $ Editor.getSession editor
+          -- backgroundTokenizer <- H.liftEff $ Session.getBackgroundTokenizer session
+          -- _ <- H.liftEff $ BackgroundTokenizer.setTokenizer tokenizer backgroundTokenizer
           current <- H.liftEff $ Editor.getValue editor
           when (text /= current) do
             void $ H.liftEff $ Editor.setValue text Nothing editor
@@ -195,6 +200,10 @@ aceComponent mode theme =
                     pure (reply H.Listening)
 
       where
+        tokenizer :: Tokenizer
+        tokenizer = makeTokenizer {getLineTokens : mkFn3 getLineTokens}
+        getLineTokens :: String -> String -> Int ->  { tokens :: Array AceTokenInfo, state :: String }
+        getLineTokens line state row = { tokens: [{type: "text", value: line}], state: "start"}
         recoverOriginalLines :: forall e. Document -> DocumentEvent -> Eff (ace :: ACE | e) (Array String)
         recoverOriginalLines doc (DocumentEvent {action, start: (Position{row, column}), end: (Position{row: r, column: c}), lines}) =
           case action of
@@ -268,3 +277,7 @@ aceComponent mode theme =
 -- showDocumentEvent :: forall e. DocumentEvent -> Eff (ace :: ACE, console :: CONSOLE | e) Unit
 -- showDocumentEvent (DocumentEvent {action, start: (Position{row, column}), end: (Position{row: r, column: c}), lines}) =
 --   log ( showDocumentEventType action <> ": starting at (" <> show row <> "," <> show column <> "), the lines are: " <> show lines <> ". It ends at: ("  <> show r <> "," <> show c <> ")" )
+
+foreign import makeTokenizer :: forall a. a -> Tokenizer
+
+type AceTokenInfo = { type :: String, value :: String}

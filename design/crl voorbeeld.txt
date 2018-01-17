@@ -1,0 +1,48 @@
+Context model:Politie$ als pol:
+psp:Zaak $Aangifte
+	psp:internalProperty =>
+		psp:Property $urgentie
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = false
+			extern psp:range = Number
+	psp:internalProperty =>
+		psp:Property $aantekening
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = false
+			extern psp:range = String
+	psp:rolInContext =>
+		psp:Rol $UserRol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Persoon
+			psp:rolProperty =>
+				psp:Property $betrouwbaarheid
+					extern psp:isFunctioneel = true
+					extern psp:isVerplicht = true
+					extern psp:range = Number
+			psp:viewInRol =>
+				psp:View $Adres
+					psp:propertyReferentie => $$betrouwbaarheid
+	psp:rolInContext =>
+		psp:Rol $Verbalisant
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => pol:Medewerker
+	psp:rolInContext =>
+		psp:Rol $Start
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => 
+				psp:Activiteit $Intake
+					psp:rolInContext => 
+						psp:Rol $Uitvoerder
+							extern psp:isFunctioneel = true
+							psp:mogelijkeBinding => $$Verbalisant
+			psp:rolProperty =>
+				psp:Property $toegewezen
+					extern psp:isFunctioneel = true
+					extern psp:isVerplicht = true
+					extern psp:range = Boolean
+	psp:actieInContext =>
+		psp:Actie $Actie_1
+			psp:actor => $Verbalisant
+			psp:werkwoord => psp:beheert
+			psp:lijdendVoorwerp => $UserRol
+			psp:bijvoegelijkeBepalingVanLijdendVoorwerp => $UserRol$Adres

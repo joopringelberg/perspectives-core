@@ -1,0 +1,32 @@
+-- Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
+
+Tekst "representatief voorbeeld van ARC"
+Omhullende Context is Domein model:Politie$
+
+-- Dit commentaar staat boven de zaak Aangifte.
+Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
+	properties
+		-- Dit commentaar staat boven de sectie intern van Aangifte.
+		intern -- Dit commentaar staat achter het sleutelwoord 'intern'.
+			urgentie (String, Verplicht, Niet Functioneel)
+			-- Dit commentaar staat onderin de sectie 'intern' van Aangifte.
+		extern
+			aantekening (String, Niet Verplicht, Functioneel)
+	rollen
+		UserRol (Functioneel) gevuld door Persoon heeft
+			properties
+				betrouwbaarheid (Number, Verplicht, Functioneel)
+			views
+				adres met properties
+					betrouwbaarheid
+		Verbalisant (Functioneel) gevuld door Medewerker
+		Start (Functioneel) gevuld door
+			Activiteit Intake heeft
+				rollen
+					Uitvoerder (Functioneel) gevuld door Verbalisant
+			heeft
+				properties
+					toegewezen (Boolean, Niet Verplicht, Functioneel)
+	acties
+		Verbalisant beheert locatiegegevens van Verbaal
+

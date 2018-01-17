@@ -1,0 +1,79 @@
+Welke ondersteuning willen we de modelleur in ARC geven?
+
+1. Duidelijke aanwijzingen als hij een fout heeft gemaakt.
+	a. Syntactische fouten, zie de opsomming van mogelijke expressies.
+	b. Semantische fouten:
+		- rolvulling met een niet bestaande rol
+		- rolvulling die niet past bij UserRol
+		- rolvulling die niet past bij Actor van Actie
+		- inbedding van een verkeerd soort context (b.v. Domein in Zaak)
+		- niet bestaande property in een view opgenomen
+		- property in een view opgenomen die niet bij de rol hoort
+		
+2. Hints over wat zijn vervolgstap kan zijn. Zie Opeenvolging Van Expressies.
+
+Soorten expressies in ARC:
+1. Context declaratie:
+	Zaak Aangifte
+2. Sectie:
+	properties
+	rollen
+	views
+	acties
+3. (Context property) scope declaratie:
+	intern
+	extern
+4. Property declaratie:
+	urgentie (String, NietVerplicht, Functioneel)
+5. View declaratie:
+	Adres met properties
+		huisnummer
+6. Rol declaratie met verwijzing:
+	UserRol gevuld door Persoon
+7. Rol declaratie met ingebedde definitie:
+	Start gevuld door
+		Activiteit Intake
+8. Actie
+	Actor beheert Verbaal
+9. RolQuery
+	Verbalisant gevuld door
+		Query ... 
+10. PropertyQuery
+	urgentie (String, Verplicht, Niet Functioneel) is 
+		Query ...
+
+Een paar voorbeelden van mogelijke fouten:
+Ad 1: verkeerd sleutelwoord (Zak in plaats van Zaak)
+Ad 2. idem.
+Ad 3. idem
+Ad 4. Idem en: ontbreken van een kwalificatie (b.v. type)
+
+Foutdetectie bestaat altijd uit twee stappen: 
+wat voor soort expressie probeert de modelleur te schrijven
+welke fout maakt hij daarin?
+Als (1) niet gedetermineerd is, is de beantwoording van (2) lastig.
+
+OPEENVOLGING VAN EXPRESSIES
+Op basis van een syntactische typering van een expressie kunnen we de mogelijkheden voor de volgende expressie sterk beperken.
+
+OP EEN:										VOLGT EEN:
+Context declaratie							Sectie
+Properties Sectie							Scope declaratie
+Rollen Sectie								Rol declaratie
+Views Sectie								View declaratie
+Acties Sectie								Actie
+Scope declaratie							Property declaratie
+Rol declaratie met ingebedde definitie		Context declaratie of Query
+View declaratie								property naam
+PropertyQuery								Query 
+
+Er zijn dus drie expressies waarop meerdere andere soorten expressies kunnen volgen:
+	- context declaratie
+	- properties sectie
+	- rol declaratie met ingebedde definitie
+Er zijn vijf expressies waarop dezelfde soort expressie weer kan volgen:
+	- context declaratie
+	- property declaratie
+	- view declaratie
+	- rol declaratie
+	- actie

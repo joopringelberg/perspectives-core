@@ -1,0 +1,98 @@
+{- NOTA BENE. Dit is een CRL beschrijving van de interne representatie. 
+Er wordt nooit zo'n bestand gegenereerd.
+Ik gebruik deze tekst om een beeld op te bouwen van de interne representatie die 
+ontstaat als je een ARC tekst parseert.
+M.n. de Context en import statements worden natuurlijk niet gemaakt. Ik heb ze hier nodig
+om de eronder staande contexten van namespaces te voorzien.
+-}
+
+Context usr:"representatief voorbeeld van ARC" als t:
+
+import Context model:Politie$ als pol:
+
+-- Let op: deze context is dus geen onderdeel van zichzelf, zou niet in deze tekst voorkomen!
+psp:GepresenteerdeTekst usr:"representatief voorbeeld van ARC"
+	psp:omhullendeContext model:Politie$
+	psp:import => 
+		GepresenteerdeNamespaceGever t:0 
+			psp:prefix = "pol"
+			namespace => model:Politie$
+	psp:commentaar =>
+		psp:Commentaar :t00
+			psp:ervoor "Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat."
+
+Sectie psp:gepresenteerdeContext
+
+psp:GepresenteerdContextType t:1
+	psp:ingeklapt = false
+	psp:ingeklapteProperties = false
+	psp:ingeklapteRollen = false
+	psp:ingeklapteActies = false
+	psp:aantalTekstRegels = 26
+	psp:context => pol:Aangifte
+	psp:commentaar =>
+		psp:Commentaar t:1.1
+			psp:boven = "Dit commentaar staat boven de zaak Aangifte."
+			psp:achter = "Dit commentaar staat op de regel die Aangifte declareert."
+	psp:sectieCommentaar =>
+		psp:Commentaar t:1.2
+			psp:boven = "Dit commentaar staat boven de sectie intern van Aangifte."
+			psp:achter = "Dit commentaar staat achter het sleutelwoord 'intern'."
+			psp:onder = "Dit commentaar staat onderin de sectie 'intern' van Aangifte."
+		sectieNaam = "intern"
+	psp:rol =>
+		psp:GepresenteerdRolType t:2
+			psp:aantalTekstRegels = 1
+			psp:contextRol => psp:internalProperty
+			psp:binding =>
+				psp:GepresenteerdContextType t:3
+					psp:context => pol:Aangifte$urgentie
+	psp:rol =>
+		psp:GepresenteerdRolType t:4
+			psp:contextRol => psp:rolInContext
+			psp:binding =>
+				psp:GepresenteerdContextType t:5
+					psp:context => pol:Aangifte$UserRol_1
+					psp:rol =>
+						psp:GepresenteerdRolType t:6
+							psp:contextRol => psp:rolProperty
+							psp:binding =>
+								psp:GepresenteerdContextType t:7
+									psp:context => pol:Aangifte$UserRol$betrouwbaarheid
+					psp:rol =>
+						psp:GepresenteerdRolType t:8
+							psp:contextRol => psp:viewInRol
+							psp:binding =>
+								psp:GepresenteerdContextType t:9
+									psp:context => pol:Aangifte$UserRol$adres
+	psp:rol =>
+		psp:GepresenteerdRolType t:10
+			psp:contextRol => psp:rolInContext
+			psp:binding =>
+				psp:GepresenteerdContextType t:11
+					psp:context => pol:Aangifte$Start
+					psp:rol =>
+						psp:GepresenteerdRolType t:12
+							psp:contextRol => psp:rolProperty
+							psp:binding =>
+								psp:GepresenteerdContextType t:13
+									psp:context => pol:Aangifte$UserRol$toegewezen
+					psp:rol =>
+						psp:GepresenteerdRolType t:14
+							psp:contextRol => psp:mogelijkeBinding
+							psp:binding => 
+								psp:GepresenteerdContextType t:15
+									psp:context => pol:Aangifte$Start$Intake
+									psp:rol =>
+										psp:GepresenteerdRolType t:16
+											psp:contextRol psp:rolInContext
+											psp:binding =>
+												psp:GepresenteerdContextType t:17
+													psp:context => pol:Aangifte$Start$Intake$Uitvoerder
+	psp:rol =>
+		psp:GepresenteerdRolType t:15
+			psp:contextRol => psp:actieInContext
+			psp:binding =>
+				psp:GepresenteerdContextType t:16
+					psp:context => pol:Aangifte$Actie_1
+					

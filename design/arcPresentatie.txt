@@ -1,0 +1,76 @@
+{--------------------------------------------------------------------------------
+-- MODELLERING VAN DE TUSSENREPRESENTATIE IN ARC
+--------------------------------------------------------------------------------
+-- Selecteert een Domein, Zaak, Partij, Activiteit of Toestand voor
+-- presentatie in een diagram of tekst.
+-- De selectie vindt plaats uit de CRL representatie!
+-- Merk op dat in een diagram de omhullende context niet getoond wordt,
+-- en dat in een tekst de omhullende context altijd op de eerste regel genoemd
+-- wordt.
+-- Alle andere contexten vullen een rol in een GepresenteerdeContext en hebben 
+-- zo een positie.
+-}
+
+-- Een Tekst declaratie in een ARC file genereert een GepresenteerdeTekst instantie.
+-- De ID daarvan is een guid in de user namespace. De ingetikte tekstnaam wordt de local name.
+-- De Tekst declaratie wordt daarom dus niet als onderdeel van GepresenteerdeTekst opgenomen!
+Zaak GepresenteerdeTekst heeft
+	rollen
+		-- Representatie van de Omhullende Context statement.
+		omhullendeContext (Functioneel) gevuld door GepresenteerdeNamespaceGever
+		import (Niet Functioneel) gevuld door GepresenteerdeNamespaceGever
+		commentaar (Functioneel) gevuld door Commentaar
+		psp:gepresenteerdeContext (Niet Functioneel) gevuld door GepresenteerdContextType
+
+Zaak GepresenteerdeNamespaceGever heeft
+	properties
+		prefix (String, Verplicht, Functioneel)
+	rollen
+		namespace (Niet Functioneel) gevuld door Domein, Partij, Zaak, Toestand, Activiteit, Property, Rol, View, Actie
+		commentaar (Functioneel) gevuld door Commentaar
+
+Zaak GepresenteerdContextType heeft
+	extern
+		properties
+			-- Indien true, dan is in de ARC-tekst de sectie met properties 
+			-- van de context ingeklapt.
+			ingeklapt (Boolean, Niet Verplicht, Functioneel)
+			ingeklapteProperties (Boolean, Niet Verplicht, Functioneel)
+			ingeklapteRollen (Boolean, Niet Verplicht, Functioneel)
+			ingeklapteActies (Boolean, Niet Verplicht, Functioneel)
+			aantalTekstregels (Number, Verplicht, Functioneel)
+	rollen
+		-- Dit is de context die gepresenteerd wordt.
+		context (Functioneel) gevuld door Domein, Partij, Zaak, Toestand, Activiteit, Property, Rol, View, Actie
+		-- Dit zijn de onderdelen van de context die gepresenteerd worden, maar
+		-- in een GepresenteerdRolType gewikkeld.
+		rol (Niet Functioneel) gevuld door GepresenteerdRolType
+			properties
+				-- Leg de volgorde van rollen in de ARC-tekst vast.
+				volgnummer (Number, Niet Verplicht, Functioneel)
+				-- Leg de positie van rollen in een diagram vast
+				x (Number, Niet Verplicht, Functioneel)
+				y (Number, Niet Verplicht, Functioneel)
+		commentaar (Functioneel) gevuld door Commentaar
+		sectieCommentaar (Niet Functioneel) gevuld door Commentaar
+			properties
+				sectieNaam (String, Verplicht, Functioneel)
+
+Zaak GepresenteerdRolType heeft
+	extern
+		properties
+			aantalTekstregels (Number, Verplicht, Functioneel)
+	rollen
+		-- Dit zijn mogelijke rollen van de mogelijke vullers van de rol context van GepresenteerdContextType.
+		-- Elk GepresenteerdRolType is immers een onderdeel van de GepresenteerdeContext.
+		-- Niet alle rollen tellen mee, b.v. die van Actie niet.
+		contextRol (Functioneel) gevuld door externalProperty, internalProperty, rolInContext, actieInContext, rolProperty, mogelijkeBinding, view, query
+		binding (Functioneel) gevuld door GepresenteerdeContext
+
+Zaak Commentaar heeft
+	extern
+		properties
+			boven (String, Niet Verplicht, Functioneel)
+			achter (String, Niet Verplicht, Functioneel)
+			onder (String, Niet Verplicht, Functioneel) -- Dit is commentaar dat geïndenteerd is zoals rollen.
+

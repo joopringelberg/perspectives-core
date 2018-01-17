@@ -1,40 +1,40 @@
--- Dit bestand bevat elke denkbare Perspectives CLR expressie.
+-- Dit bestand bevat elke denkbare Perspectives CRL expressie.
 Text $Mijntekst
-$ContextType $Aangifte -- Commentaar op de regel.
+$Context $Aangifte -- Commentaar op de regel.
 	-- Commentaar boven $aantekening
-	private psp:aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter psp:aantekening
+	intern psp:aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter psp:aantekening
 	-- Commentaar boven de binding van $Urgentie
-	psp:publicProperty =>
+	psp:externalProperty =>
 		-- Commentaar boven $Urgentie
 		psp:Property $Urgentie
-			public psp:isFunctioneel = true
+			extern psp:isFunctioneel = true
 			-- Commentaar boven psp:isVerplicht
-			public psp:isVerplicht = false
-			public psp:range = Number
-	psp:privateProperty =>
+			extern psp:isVerplicht = false
+			extern psp:range = Number
+	psp:internalProperty =>
 		psp:Property $Aantekening
-			public psp:isFunctioneel = true
-			public psp:isVerplicht = false
-			public psp:range = String
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = false
+			extern psp:range = String
 	psp:rolInContext =>
 		psp:Rol $Aangever
-			public psp:isVerplicht = true
-			public psp:isFunctioneel = false
+			extern psp:isVerplicht = true
+			extern psp:isFunctioneel = false
 			psp:rolProperty =>
 				psp:Property $Betrouwbaarheid
-					public psp:isFunctioneel = true
-					public psp:isVerplicht = false
-					public psp:range = Number
+					extern psp:isFunctioneel = true
+					extern psp:isVerplicht = false
+					extern psp:range = Number
 			psp:mogelijkeBinding => $Persoon
-			psp:propertyPerspectief =>
-				psp:PropertyPerspectief $AangeverBetrouwbaarheidPerspectief
+			psp:viewinRol =>
+				psp:View $AangeverBetrouwbaarheidPerspectief
 					psp:propertyReferentie => $Betrouwbaarheid
 	psp:rolInContext =>
 		psp:Rol $MijnBerekendeRol
---query $aangever binding
+			--query $aangever binding
 
 psp:Aangifte $A1
-	public $urgentie = 8
+	extern $urgentie = 8
 	$aangever => $Jansen
 		$betrouwbaarheid = 7
 
