@@ -329,7 +329,7 @@ roleBindingWithReference cName = roleBinding' cName do
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding :: forall e. Expanded
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
-roleBinding cname = roleBindingWithInlineContext cname <|> roleBindingWithReference cname -- TODO: query
+roleBinding cname = roleBindingWithInlineContext cname <|> roleBindingWithReference cname -- TODO: query, noBinding
 
 withRoleCounting :: forall a e. IP a e -> IP a e
 withRoleCounting p = do

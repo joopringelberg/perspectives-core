@@ -1,0 +1,226 @@
+SCENARIO PARSER ARC
+
+De parser start met een nieuwe of bestaande instantie van psp:GepresenteerdeTekst.
+Als een tekst ingeladen wordt, bestaat ie; anders maak je een instantie met een guid als ID.
+Dit gebeurt vóór het ontleden! Dus ook voordat de tekstaam ingetikt kan worden.
+
+Het standaard scenario is: de parser krijgt een aantal regels tekst aangeboden die zijn ingevoegd of weggehaald.
+De positie van de cursor vóór de bewerking is zowel bij remove als insert, 'start' van het DocumentEvent.
+
+REGELNUMMERS EN PARSE TREE ONDERDELEN
+Elk parse tree onderdeel dat een deel van de tekst produceert (of daaruit volgt) is 1 regel lang of heeft de property 'aantalTekstRegels'. Er zijn maar twee soorten onderdelen die dat hebben, namelijk commentaar en GepresenteerdContextType. Commentaar met meer regels is multi-line commentaar en komt voor in de GepresenteerdeTekst en in een GepresenteerdContextType.
+
+Alle rollen produceren tekst, behalve: psp:context en psp:rol. Echter, psp:rol is gebonden aan een GepresenteerdContextType en die produceert natuurlijk weer wel tekst.
+
+Elke regel correspondeert met precies één element van de tussenrepresentatie, behalve views. Een view is in de tussenrepresentatie aanwezig als een GepresenteerdContextType met psp:aantalTekstregels > 1, maar die heeft geen onderdelen. Daarvoor moet je naar de onderliggende representatie van de view: psp:View. Die heeft rollen psp:propertyReferentie. De psp:View zelf correspondeert met een regel en elke referentie óók.
+Dus als je de opsomming van properties van een view wijzigt (aanvult, verandert, eruit weghaalt) dan verander je de rollen van een psp:View context. Van de tussenrepresentatie verandert alleen psp:aantalTekstRegels van de instantie van GepresenteerdContextType (en al zijn contexten).
+
+Iets dergelijks gaat gelden voor de facetten van properties.
+
+Vijf GepresenteerdContextType instanties hebben altijd maar 1 tekstregel, namelijk degenen die een rol vullen waarvoor geldt:
+	- psp:contextRolNaam = "psp:internalProperty"
+	- psp:contextRolNaam = "psp:externalProperty"
+	- psp:contextRolNaam = "psp:rolProperty"
+	- psp:contextRolNaam = "psp:actieInContext" (misschien overlopend, maar dat blijft 1 regel voor Ace).
+	- psp:contextRolNaam = "psp:query"
+
+Als je een regel bewerkt, dan heb je één van de volgende elementen geselecteerd in de tussenrepresentatie:
+1. Een psp:omhullendeContext.
+2. Een psp:import
+3. Een psp:commentaar.
+4. Een psp:sectie.
+5. Een GepresenteerdContextType instantie waarvan het type van de psp:context rolbinding een 
+	- psp:Property of psp:Actie of psp:Query is. Deze hebben altijd maar één regel.
+	- psp:Rol is. Je bewerkt dan de rol-declaratie regel zelf (b.v.: "UserRol (Functioneel) gevuld door Persoon heeft").
+	- psp:Domein, psp:Partij, psp:Zaak, psp:Toestand of psp:Activiteit is. Je bewerkt dan de context-declaratie regel zelf (b.v. "Zaak Aangifte heeft"). 
+	Bij deze laatste twee gaat het altijd om de eerste regel van de mogelijk meerdere regels die deze GepresenteerdContextType omspant.
+	- psp:View is. Je bewerkt dan ofwel de view-declaratie zelf, of één van de properties.
+NB. 1 t/m 4 hierboven zijn rollen, 5 betreft de binding van de rol psp:gepresenteerdeContext van GepresenteerdeTekst, of van de rol psp:rol van GepresenteerdContextType (die bindingen zijn altijd een GepresenteerdContextType).
+6. Een GepresenteerdeTekst instantie (het gaat dan om de eerste regel van de tekst, de Tekst declaratie: 'Tekst "naam van de tekst"').
+
+Merk op dat alleen de regels genoemd onder 5 leiden tot elementen van de basisrepresentatie. Alle andere regels (1 t/m 4 en 6) komen terecht in de tussenrepresentatie.
+
+ALGORITME: VINDT HET CORRESPONDERENDE ELEMENT
+Het element dat dit algoritme vindt is één van bovenstaande (een instantie van psp:omhullendeContext, psp:import, psp:commentaar, psp:sectie, psp:GepresenteerdContextType of psp:GepresenteerdeTekst).
+Bepaal het element in de parse tree dat correspondeert met de gezochte regel als volgt.
+0. Begin:
+	- element = de instantie van psp:GepresenteerdeTekst
+	- R is het gezochte regelnummer 
+	- HR = 1 is het huidige regelnummer.
+1. Als HR == R, element het gezochte element. EINDE.
+2. Doorloop anders achtereenvolgens de naar psp:volgnummer geordende rollen van het element. Kies de eerste rol.
+3. Zolang HR + aantalRegels(element) < R: 
+	- HR = HR + aantalRegels(element). 
+	- element = de volgende rol.
+4. Als  HR + aantalRegels(element) > R: 
+	- als de het element de rol psp:commentaar is, dan is die rol het gezochte element. EINDE.
+	- anders is het element een rol waarvan de binding een instantie van GepresenteerdContextType is.
+		- als het type van de psp:binding daarvan psp:View is: element is het gezochte element. EINDE.
+		- anders herhaal vanaf stap 1 met:
+			- element = binding van de rol die element is
+			- R
+			- HR = HR + 1
+
+Merk op dat het gevonden element correspondeert met een tekstregel van vóór de wijziging!
+
+ÉÉN REGEL PARSEREN
+Als de wijziging maar één regel betreft, zet dan de parser in die correspondeert met het gevonden element. Als de parse slaagt, wijzig dan het gevonden element. 
+Slaagt hij niet, dan parseer je de tekst die correspondeert met de context van het element. Motivatie: de veranderde regel kan een correct ander type beschrijven, maar dat hoeft niet in de context te passen. Denk aan een sectie: als de modelleur 'extern' in 'intern' verandert, maar er wàs al een sectie 'intern', is er iets mis.
+
+CONTEXT VAN EEN ELEMENT VAN DE PARSE TREE
+Wat is de context van een element?
+Voor een rol is dat natuurlijk de context van die rol (dit geldt dus voor 1 t/m 4 hierboven). Voor een GepresenteerdContextType is het ofwel de omhullende GepresenteerdContextType instantie, ofwel de GepresenteerdeTekst instantie. Hiertoe moeten we links dubbel representeren, zodat je vanuit een context of rol óók naar de rol kunt waar hij in is gebonden.
+In alle gevallen is de context van een element dus een instantie van GepresenteerdeTekst, of van GepresenteerdContextType.
+
+ALGORITME: VINDT CONTEXT VAN ELEMENT
+0. Stel E op het element waarvan we de context zoeken.
+1. Als E een rol is (het type psp:Rol heeft), dan is de gezochte context de context van die rol.
+2. Als E een GepresenteerdContextType is, dan is de gezochte context de context van de rol psp:context waar E de binding van is.
+
+MEERDERE REGELS PARSEREN
+Als de wijziging meerdere regels betreft, parseer dan direct de tekst die correspondeert met het omhullende element.
+Maar daarbij mogen we niet uitgaan van het element dat correspondeert met de regel die door 'start' van het DocumentEvent wordt aangegeven.
+
+We moeten de regel in lines (de ingevoegde, danwel verwijderde tekst) vinden met de kleinste indentering. Als de regel, aangegeven door 'start', een kleinere indentering heeft, beginnen we daar met zoeken.
+Heeft die regel een grotere indentering, dan moeten we het element vinden waarvan de tekst boven deze regel begint, minder geïndenteerd dan deze regel!
+
+INDENTERING
+Ik ga ervan uit dat psp:GepresenteerdContextType een property psp:indent heeft. Dit zijn de indenteringen van alle rollen van GepresenteerdeTekst en GepresenteerdContextType, behalve de rollen die binden aan een GepresenteerdContextType. Dat heeft namelijk een opgeslagen property indent.
+1. Een psp:omhullendeContext heeft indent=0.
+2. Een psp:import heeft indent=0.
+3. psp:commentaar van GepresenteerdeTekst heeft indent=0.
+4. psp:commentaar van GepresenteerdContextType heeft indent = indent context + 1.
+5. psp:sectie voor 'intern' en 'extern' heeft indent = indent context + 2.
+6. psp:sectie voor alle andere namen heeft indent = indent context + 1.
+ 
+ We kunnen voor elk element de indentering bepalen met dit algoritme:
+ 
+ 0. Is het type van het element psp:GepresenteerdContextType? Dan is indent de waarde van psp:indent van het element.
+ 1. Is het element psp:omhullendeContext of psp:import? Dan is indent = 0.
+ 2. Als het element psp:commentaar is:
+ 	- als de context het type psp:GepresenteerdeTekst heeft, dan is indent = 0.
+ 	- anders geldt: indent = indent context + 1.
+ 3. Als het element psp:sectie is:
+ 	- als psp:sectieNaam gelijk is aan 'intern' of 'extern': indent = indent context + 2.
+ 	- anders: indent = indent context + 1.
+
+ALGORITME: BEPAAL BEGIN PARSERING BIJ MEERDERE GEWIJZIGDE REGELS
+0. Bepaal de kleinste indentering in 'lines' en stel die op I.
+1. Bepaal het element E dat (in de oorspronkelijke tekst) correspondeert met 'start'.
+2. Als:
+	- E een GepresenteerdContextType is waarvan psp:Context gelijk is aan psp:View, 
+	EN
+	- I == Indent(E) - 1
+	EN
+	- 'start' is groter dan het regelnummer van E (dus de view declaratie regel zelf is niet veranderd!)
+	dan is E het gezochte element. EINDE.
+2. I is nu het minimum van I en indent(E).
+3. Zoek de context van E met indent = I - 1.
+
+WAT IS DE BEGINREGEL VAN EEN ELEMENT VAN DE PARSETREE?
+Gegeven een element van de parsetree, met welke regel in de tekst correspondeert het? We houden regelnummers niet bij in de parsetree, alleen de hoeveelheid regels die door een element worden gegenereerd (en waar het uit wordt geparseerd).
+
+EN DAN: MEERDERE REGELS PARSEREN!
+Bepaal eerst de beginregel van de met het element corresponderende tekst.
+Pas dan de deelparser toe die past bij het type van het element.
+Let wel, het element is een GepresenteerdeTekst of een GepresenteerdContextType.
+
+De eerste regel is per constructie (zie het algoritme voor het vinden van het begin element bij het parseren van meerdere regels) NIET gewijzigd.
+
+[De parser bestaat uit een parser voor de eerste regel, gevolgd door meerdere parsers voor de expressies die een onderdeel kunnen zijn van de expressie voor het type van het element. Deze parsers zijn verenigd in wat ik de contentParser voor het type van het element noem.
+Parseer de eerste regel. Als dat faalt, hebben we een onbekende fout.
+Parseer de volgende regel.]
+
+PARSEREN VAN GEPRESENTEERDETEKST
+Nota bene: de parsering van de hier beschreven tekstregels leidt alléén tot een element van de tussenrepresentatie; niet tot een element van de basisrepresentatie.
+
+De eerste regel is per constructie niet gewijzigd. Dit is de Tekst declaratie. Sla die regel over.
+ParserState:
+	- huidigeContext = de instantie van GepresenteerdeTekst
+	- volgnummer = 1.
+	- indentering = 0.
+	- gevondenRollen = []: in de tekst gevonden rollen van de huidigeContext. We hebben dit nodig om rollen te kunnen verwijderen.
+	
+Parseer dan de volgende regel tot een poging slaagt, met elk van de deelparsers voor:
+
+	- psp:commentaar. Deze past een Arc parser toe voor de expressie 'commentaar'. Die levert een purescript data type waarin de tekst en het aantal regels zit. 
+	Vervolgens:
+		- als het element met hetzelfde volgnummer óók een instantie is van psp:commentaar: werk dan die instantie bij met de purescript data.
+		- anders, als de huidigeContext geen element met dit volgnummer heeft: 
+			- maak een instantie van de rol psp:commentaar van waarin de proerties psp:tekst en psp:aantalTekstRegels zijn vastgelegd. Leg volgnummer uit de parser state er ook in vast. 
+			- voeg die nieuwe rol dan toe aan de huidigeContext en sla hem op.
+			- verhoog de volgnummers van alle rollen die een gelijk of hoger volgnummer hebben.
+		ParserState:
+		- voeg de rol toe aan gevondenRollen;
+		- verhoog het volgnummer.
+
+	- psp:omhullendeContext. Deze past een Arc parser toe voor de expressie 'omhullende context'. Hij zoekt vervolgens in de rollen van de huidigeContext een rol psp:omhullendeContext. Die werkt hij bij met:
+			- het volgnummer uit de parser state
+			- voor de binding de gevonden identifier.
+			- het inline commentaar.
+		ParserState:
+		- voeg de rol toe aan gevondenRollen;
+		- verhoog het volgnummer.
+	
+	- psp:import. Deze past een Arc parser toe voor de expressie 'import'. Hij zoekt vervolgens in de rollen van de huidigeContext naar de instanties van psp:import. In die instanties zoekt hij de rol met de betreffende identifier.
+		- als die wordt gevonden, werkt hij daarin de prefix bij, het volgnummer en het inline commentaar.
+		- wordt hij niet gevonden, dan voegt hij een nieuwe rol met de geparseerde karakteristieken toe.
+		ParserState:
+		- voeg de rol toe aan gevondenRollen;
+		- verhoog het volgnummer.
+	
+	- psp:gepresenteerdeContext. Deze past een Arc parser toe voor de 'context declaratie' expressie. Hij neemt vervolgens uit de rollen van de huidige context de instanties van psp:gepresenteerdeContext. Daarin zoekt hij de instantie waarvan de binding een rol psp:context heeft die een binding heeft die gelijk is aan de gevonden identifier.
+		- als die wordt gevonden, werkt hij het volgnummer bij en eventueel de indentering.
+		- als hij niet wordt gevonden, wordt hij toegevoegd. D.w.z. de rol psp:gepresenteerdeContext, een nieuwe psp:GepresenteerdContextType, met een rol psp:context waarvan de binding de gevonden identifier is. De indentering wordt erin vastgelegd.
+		Nu verandert de parser state:
+			- huidigeContext wordt de nieuwe of gevonden psp:GepresenteerdContextType.
+			- volgnummer wordt weer 1.
+			- indentering wordt 1.
+			- gevondenRollen wordt weer leeg.
+		Vervolgens parseren we met de parser voor GepresenteerdContextType.
+		Daarna:
+		- werk psp:aantalTekstregels van de instantie van psp:GepresenteerdContextType bij.
+		- verwijder alle rollen uit de instantie van psp:GepresenteerdeTekst die niet voorkomen in gevondenRollen.
+		- herstel de huidigeContext;
+		- herstel de gevondenRollen;
+		- voeg de rol toe aan gevondenRollen;
+		- verhoog het volgnummer.
+
+Herhaal dit voor telkens de volgende regel totdat elke deelparser faalt (dat is een fout) of tot het einde van de tekst.
+
+PARSEREN VAN GEPRESENTEERDCONTEXTTYPE
+Nota bene: de parsering van de hier beschreven tekstregels leidt tot zowel elementen in de tussenrepresentatie, als elementen van de basisrepresentatie.
+
+Voor de eerste regel is een adequate representatie beschikbaar (namelijk de instantie van psp:GepresenteerdContextType). Sla die regel over.
+ParserState:
+	- huidigeContext = de instantie van GepresenteerdeTekst. Merk op dat de psp:context rol daarvan de huidigeContext vormt voor de basisrepresentatie!
+	- huidigeRol = Nothing
+	- volgnummer = 1.
+	- gevondenRollen = []: in de tekst gevonden rollen van de huidigeContext. We hebben dit nodig om rollen te kunnen verwijderen.
+Parseer dan de volgende regel tot een poging slaagt, met elk van de deelparsers voor:
+
+	- psp:commentaar: als bij GepresenteerdeTekst.
+	
+	- psp:sectie. Past een Arc parser toe voor elke mogelijk sectie. Levert een purescript datastructuur met daarin de sectienaam en het inline commentaar.
+		- zoekt vervolgens in de psp:sectie rollen van de huidige context naar een sectie met dezelfde naam. Elke naam mag maar éénmaal voorkomen!
+			- indien gevonden: pas zo nodig volgnummer aan en het inline commentaar.
+			- anders: maak een instantie van psp:sectie op basis van de purescript data en voeg toe aan huidigeContext.
+		ParserState:
+			- huidigeRol is de rol die past bij de sectie (b.v. 'intern' -> psp:internalProperty, etc.)
+			- verhoog de indentering met één.
+			- verhoog het volgnummer
+			- voeg de psp:sectie rol toe aan gevondenRollen.
+	
+	- psp:rol. Deze past een Arc parser toe voor:
+		- de 'context declaratie' expressie, NB: is onderdeel van context definitie!
+		- de property expressies,
+		- een roldeclaratie expressie, NB: kan opmaat zijn van een in lexicale context gedefinieerde context!
+		- een view expressie, NB: betreft minstens twee regels!
+		- een actie expressie
+		Dit levert een datastructuur op met onder meer een identifier.
+		Hij zoekt vervolgens in de instanties van psp:rol van de huidigeContext een rol waarvan de binding (een GepresenteerdContextType) een psp:context heeft wiens binding de gevonden identifier is.
+			- als die wordt gevonden: 
+				- werk die rol bij met de purescript data.
+			- anders: maak een rol met de purescript data en sla hem op in de huidigeContext.
+			
+			NOTA BENE. Werk dit uit voor de verschillende soorten expressies.

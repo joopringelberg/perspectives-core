@@ -1,7 +1,9 @@
+Tekst "representatief voorbeeld van ARC" -- Deze regel leidt tot de psp:GepresenteerdeTekst instantie.
 -- Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
 
-Tekst "representatief voorbeeld van ARC"
 Omhullende Context is Domein model:Politie$
+
+zaken
 
 -- Dit commentaar staat boven de zaak Aangifte.
 Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
@@ -18,7 +20,8 @@ Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
 				betrouwbaarheid (Number, Verplicht, Functioneel)
 			views
 				adres met properties
-					betrouwbaarheid
+					-- hieronder alle properties van de view.
+					betrouwbaarheid -- Dit is een property van de rol.
 		Verbalisant (Functioneel) gevuld door Medewerker
 		Start (Functioneel) gevuld door
 			Activiteit Intake heeft
@@ -29,4 +32,3 @@ Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
 					toegewezen (Boolean, Niet Verplicht, Functioneel)
 	acties
 		Verbalisant beheert locatiegegevens van Verbaal
-

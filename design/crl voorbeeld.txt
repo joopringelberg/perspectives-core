@@ -1,4 +1,5 @@
 Context model:Politie$ als pol:
+Sectie psp:zaakInContext
 psp:Zaak $Aangifte
 	psp:internalProperty =>
 		psp:Property $urgentie
