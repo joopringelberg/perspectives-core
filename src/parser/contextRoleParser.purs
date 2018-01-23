@@ -158,10 +158,11 @@ defaultNamespacedContextName = lexeme do
     butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
     butLastNNamespaceLevels ns 0 = pure ns
     butLastNNamespaceLevels ns n = do
+      -- segments will have a last segment that is an empty string, because namespaces end in "$".
       segments <- pure (split (Pattern "$") ns)
-      if (n - 1) > (AR.length segments)
+      if (n - 2) > (AR.length segments)
         then fail "too many levels up"
-        else pure $ intercalate "$" (dropEnd n segments)
+        else pure $ (intercalate "$" (dropEnd (n + 1) segments)) <> "$"
 
 -- cname = prefixedContextName | expandedContextName
 contextName :: forall e. IP Expanded e

@@ -1,7 +1,12 @@
 -- Dit bestand bevat elke denkbare Perspectives CRL expressie.
 Context $Mijntekst
+
 import model:Perspectives$ als psp:
+
 Section psp:zaakInContext
+
+psp:Context psp:Persoon
+
 psp:Context $Aangifte -- Commentaar op de regel.
 	-- Commentaar boven $aantekening
 	intern psp:aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter psp:aantekening
@@ -27,21 +32,24 @@ psp:Context $Aangifte -- Commentaar op de regel.
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = false
 					extern psp:range = Number
-			psp:mogelijkeBinding => $Persoon
+			psp:mogelijkeBinding => psp:Persoon
 			psp:viewinRol =>
 				psp:View $AangeverBetrouwbaarheidPerspectief
-					psp:propertyReferentie => $Betrouwbaarheid
+					psp:propertyReferentie => $$Betrouwbaarheid
 	psp:rolInContext =>
 		psp:Rol $MijnBerekendeRol
 			--query $aangever binding
 
-psp:Aangifte $A1
-	extern $urgentie = 8
-	$aangever => $Jansen
-		$betrouwbaarheid = 7
+psp:Context $Jansen
 
 -- Alles hierboven wordt correct ontleed en weergegeven. LET OP query!
 {-
 commentaar over
 twee regels
 -}
+
+-- NB. De typenamespace is nog niet geïmplementeerd, daardoor gaat b.v. $urgentie niet goed.
+psp:Aangifte $A1
+	extern $urgentie = 8
+	$aangever => $Jansen
+		$betrouwbaarheid = 7
