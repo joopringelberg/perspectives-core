@@ -1,7 +1,6 @@
 module Perspectives.Syntax where
 
 import Data.Maybe (Maybe)
-import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap)
 import Prelude (class Show, show, (<>))
 
@@ -78,9 +77,6 @@ data Expanded = Expanded DomeinName LocalName
 -----------------------------------------------------------
 -- Instances
 -----------------------------------------------------------
-
-compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
-compareOccurrences (PerspectRol{occurrence: a}) (PerspectRol{occurrence: b}) = compare a b
 
 foreign import jsonStringify :: forall a. {|a} -> String
 

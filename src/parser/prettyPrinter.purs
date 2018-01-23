@@ -15,13 +15,13 @@ import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (contextToBinnenRol, contextToBuitenRolID, rolToContextID)
+import Perspectives.ContextAndRole (compareOccurrences, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.Identifiers (roleIndexNr)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getContext, getRole)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PerspectRolProperties, PropertyName, PropertyValueWithComments, PerspectContextProperties, compareOccurrences, propertyValue)
+import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext, PerspectRol(..), PropertyName, PropertyValueWithComments, propertyValue)
 import Perspectives.SystemQueries (binding, rolContext, rolTypen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
@@ -122,68 +122,69 @@ roleProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectT
 roleProperty = property (pure unit)
 
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
-context definedResources c@(PerspectContext cProperties) = do
-  withComments (\r->r.comments) contextDeclaration cProperties
+context definedResources c = do
+  withComments (\r-> context_comments r) contextDeclaration c
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
-  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values cProperties.rolInContext))
+  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values (context_rolInContext c)))
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
-    contextDeclaration :: PerspectContextProperties -> PerspectText e
-    contextDeclaration x = identifier x.pspType *> identifier' x.displayName
+    contextDeclaration :: PerspectContext -> PerspectText e
+    contextDeclaration x = identifier (context_pspType x) *> identifier' (context_displayName x)
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
-      maybeBuitenRol <- liftAff $ getRole $ contextToBuitenRolID c
+      maybeBuitenRol <- liftAff $ getRole $ context_buitenRol c
       case maybeBuitenRol of
-        (Just (PerspectRol buitenRol)) -> strMapTraverse_ publicProperty buitenRol.properties
+        (Just buitenRol) -> strMapTraverse_ publicProperty (rol_properties buitenRol)
         Nothing -> pure unit
 
+    -- TODO: vervang de pattern matching zodra de binnenRol een 'echte' rol is.
     privateProperties = strMapTraverse_ privateProperty props where
-      props = let (BinnenRol{properties}) = contextToBinnenRol c
+      props = let (BinnenRol{properties}) = context_binnenRol c
         in properties
 
     roleBinding :: PerspectRol -> PerspectText e
-    roleBinding (PerspectRol r) = do
+    roleBinding role = do
       -- NB: This is the role of the context - not yet its binding!
-      let (binding :: ID) = (unsafePartial $ fromJust r.binding)
-      let (occurrence :: String) = maybe "" id (roleIndexNr r.id)
+      let (binding :: ID) = (unsafePartial $ fromJust (rol_binding role))
+      let (occurrence :: String) = maybe "" id (roleIndexNr (rol_id role))
       case elemIndex binding definedResources of
         Nothing -> do -- binding is not a BuitenRol of a context defined at top level in the Text.
-          maybeRole <- liftAff $ getRole binding
-          case maybeRole of
+          maybeBinding <- liftAff $ getRole binding
+          case maybeBinding of
             Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
-            (Just role@(PerspectRol roleProperties)) -> do
-              case roleProperties.pspType == "model:Perspectives$BuitenRol" of
-                true -> do -- The role is a BuitenRol of some context.
-                  maybeContext <- liftAff $ getContext $ rolToContextID role
+            (Just binding@(PerspectRol bindingProperties)) -> do
+              case rol_pspType binding == "model:Perspectives$BuitenRol" of
+                true -> do -- The binding is a BuitenRol of some context.
+                  maybeContext <- liftAff $ getContext $ rol_context binding
                   case maybeContext of
-                    Nothing -> reference r
+                    Nothing -> reference role
                     (Just contxt) -> do
-                      withComments' r.comments (identifier $ r.pspType <> " => ")
+                      withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => ")
                       indent (context definedResources) contxt
-                false -> reference roleProperties -- The role is a RoleInContext of some context.
+                false -> reference binding -- The binding is a RoleInContext of some context.
         otherwise -> do
-          maybeRole <- liftAff $ getRole binding
-          case maybeRole of
+          maybeBinding <- liftAff $ getRole binding
+          case maybeBinding of
             Nothing -> comment $ "Binding does not exist: " <> binding
-            (Just buitenRol) -> withComments' r.comments (identifier $ r.pspType <> " => " <> rolToContextID buitenRol)
+            (Just buitenRol) -> withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => " <> rol_context buitenRol)
 
-      strMapTraverse_ roleProperty r.properties
+      strMapTraverse_ roleProperty (rol_properties role)
 
-    reference :: PerspectRolProperties -> PerspectText e
-    reference r = withComments' r.comments (identifier $ r.pspType <> " => " <> (maybe "" id r.binding))
+    reference :: PerspectRol -> PerspectText e
+    reference r = withComments' (rol_comments r) (identifier $ (rol_pspType r) <> " => " <> (maybe "" id (rol_binding r)))
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 enclosingContext :: forall e. PrettyPrinter PerspectContext e
-enclosingContext (PerspectContext theText) = do
+enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
-  withComments' theText.comments (identifier( "Context " <> theText.displayName))
+  withComments' (context_comments theText) (identifier( "Context " <> (context_displayName theText)))
   newline
-  sectionIds <- liftAff (theText.id ## (ignoreCache rolTypen))
+  sectionIds <- liftAff ((context_id theText) ## (ignoreCache rolTypen))
   traverse_ section (tripleObjects sectionIds)
 
   where
@@ -193,8 +194,8 @@ enclosingContext (PerspectContext theText) = do
       identifier sectionId
       newline
       newline
-      (Triple{object: definedContexts}) <- liftAff (theText.id ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- liftAff (theText.id ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
+      (Triple{object: definedContexts}) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
+      (contextIds :: Triple e) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     ppContext :: Array ID -> ID -> PerspectText e
