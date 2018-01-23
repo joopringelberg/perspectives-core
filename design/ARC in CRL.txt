@@ -9,25 +9,28 @@ psp:Context psp:Domein
 	psp:rolInContext => psp:rolInContext
 	psp:rolInContext => psp:actieInContext
 
-psp:Partij psp:Domein
+psp:Partij psp:Partij
 	psp:rolInContext => psp:externalProperty
 	psp:rolInContext => psp:internalProperty
 	psp:rolInContext => psp:rolInContext
 	psp:rolInContext => psp:actieInContext
 
-psp:Zaak psp:Domein
+psp:Context psp:Zaak
+	psp:rolInContext => psp:externalProperty
+	psp:rolInContext => psp:internalProperty
+	psp:rolInContext => psp:actieInContext
+	psp:rolInContext => psp:rolInContext
+	psp:rolInContext => psp:zaakInContext
+	psp:rolInContext => psp:activiteitInContext
+	psp:rolInContext => psp:toestandInContext
+
+psp:Toestand psp:Toestand
 	psp:rolInContext => psp:externalProperty
 	psp:rolInContext => psp:internalProperty
 	psp:rolInContext => psp:rolInContext
 	psp:rolInContext => psp:actieInContext
 
-psp:Toestand psp:Domein
-	psp:rolInContext => psp:externalProperty
-	psp:rolInContext => psp:internalProperty
-	psp:rolInContext => psp:rolInContext
-	psp:rolInContext => psp:actieInContext
-
-psp:Activiteit psp:Domein
+psp:Activiteit psp:Activiteit
 	psp:rolInContext => psp:externalProperty
 	psp:rolInContext => psp:internalProperty
 	psp:rolInContext => psp:rolInContext

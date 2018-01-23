@@ -1,0 +1,87 @@
+SAMENVATTING ALGORITMIEK META-PARSER
+
+Ik schets hier het algoritme dat gevolgd moet worden door de handler van de eventSource Document.onChange in de Ace component.
+Hierin is:
+	- R het regelnummer van de start van de gewijzigde regels
+
+HOOFDALGORITME
+1. Is de tekstwijziging een Insert van een newline?
+	- Bepaal het deel van de AST dat correspondeert met de vorige regel (noem het E);
+	- lees het volgnummer daarvan uit en noem dat V;
+	- Bepaal de context van E, noem die C. 
+	- Doorzoek de rollen van C (een instantie van GepresenteerdContextType) vanaf V met telkens een kleiner volgnummer totdat je een sectie vindt, noem die S. 
+		Die sectie S bepaalt het soort expressie als de gebruiker een declaratie gaat intikken. Noem die expressie ET.
+	- Parseer de regel met parsers voor:
+		- ET
+		- import
+		- commentaar
+		- sectie
+
+2. Is de tekstwijziging één regel lang (en meer dan een newline)?
+	- Bepaal het deel van de AST dat correspondeert met deze regel (noem het E);
+	- Bepaal ET uit E.
+	- Parseer de regel met parsers voor:
+		- ET
+		- import
+		- commentaar
+		- sectie
+
+3. Is de tekstwijziging meerdere regels lang èn is regel 1 onderdeel van de wijziging?
+
+4. Is de tekstwijziging meerdere regels lang?
+	- bepaal het begin-element van parsering en noem het E.	Dit is een GepresenteerdContextType instantie.
+	- Is E gelijk aan de root van de tekst? Volg dan de procedure bij 3.
+	- Zo nee, bepaal de eerste tekstregel die met E correspondeert en noem die R.
+	- Construeer de parserState:
+		regelnummer = R + 1 (kolom is waarschijnlijk de eerste non-space kolom)
+		indentering = (psp:indent van E) + 1
+		huidigeTekstContext = E
+		huidigeContext = binding van de psp:context van E
+		volgnummer = 1
+		gevondenRollen = []
+	- parseer de regels met deze indentering of groter met het algoritme PARSEER REGELS ONDER CONTEXT-DECLARATIE
+
+PARSEER REGELS ONDER CONTEXT-DECLARATIE
+Dit algoritme parseert de geïndenteerde regels ònder een context-declaratie-expressie
+1. Bepaal het type van de huidigeContext. Dit is een context-type. Noem het T. Het is nodig voor de sectie-parser.
+2. Parseer herhaaldelijk opeenvolgende regels totdat de indentering kleiner is dan de indentering in de parserState (dus tot outdent).
+  Zolang de huidigeRol onbekend is: Parseer elke regel met de parser die de disjunctie is van de parsers voor:
+	- import 
+	- commentaar
+	- sectie (met T)
+  Zodra de huidigeRol bekend is: voeg aan deze drie de parser voor de corresponderende context-declaratie-expressie toe.
+
+DE DEELPARSER VOOR CONTEXT-DECLARATIES
+1. Parseer de regel met de context-declaratie met een Arc deelparser voor de expressie. Het resultaat is een Tuple van een context-ID en eventueel een inline commentaar. NB: de betreffende context is door de deelparser al aangepast.
+2. Bepaal in de huidigeTekstContext de psp:rol waarvan de binding een psp:context heeft met de gevonden context-ID.
+3. Wordt die gevonden:
+	- pas zo nodig het inline commentaar van de psp:GepresenteerdContextType aan;
+	- maak zo nodig het psp:volgnummer van de psp:rol gelijk aan het volgnummer van de parserState.
+	- voeg de rol toe aan gevondenRollen
+4. Wordt die niet gevonden:
+	- maak een psp:rol aan bij de huidigeTekstContext;
+	- bindt die aan een nieuwe instantie van psp:GepresenteerdContextType;
+	- maak een rol psp:context in die nieuwe instantie en bindt die aan de context met de ID.
+	- voeg de rol toe aan gevondenRollen
+5. Pas de parserState aan:
+	regelnummer = is al aangepast door de declaratie-expressie parser (merk op dat de view-parser meer dan 1 regel kan verwerken)
+	indentering = is al aangepast door de declaratie-expressie parser
+	huidigeContext = de ID uit het purescript Tuple
+	huidigeTekstContext = de gevonden of geconstrueerde instantie
+	volgnummer = 1
+	gevondenRollen = []
+6. PARSEER REGELS ONDER CONTEXT-DECLARATIE
+
+
+DE DEELPARSER VOOR SECTIE
+1. Pas een Arc deelparser toe voor sectie. Dit is een parser die een aantal constanten probeert te herkennen, namelijk de sectienamen die corresponderen met de mogelijke waarden van psp:rolInContext van het type van de huidigeContext. Voor b.v. Zaak zal dat properties, rollen en activiteiten en acties zijn. Het resultaat is een Tuple van sectienaam en inline commentaar.
+2. Zoek vervolgens in de psp:sectie-rollen van de huidigeTekstContext naar een sectie met dezelfde naam. Elke naam mag maar éénmaal voorkomen!
+		- indien gevonden: pas zo nodig het volgnummer aan en het inline commentaar.
+		- anders: 
+			- maak een instantie van psp:sectie op basis van de purescript data en voeg toe aan huidigeTekstContext.
+			- verhoog de volgnummers van alle rollen die een gelijk of hoger volgnummer hebben.
+	ParserState:
+		- huidigeRol is de rol die past bij de sectie (b.v. 'intern' -> psp:internalProperty, etc.)
+		- verhoog de indentering met één.
+		- verhoog het volgnummer
+		- voeg de psp:sectie rol toe aan gevondenRollen.

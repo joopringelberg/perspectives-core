@@ -5,73 +5,45 @@
 -- presentatie in een diagram of tekst.
 -- De selectie vindt plaats uit de CRL representatie!
 -- Merk op dat in een diagram de omhullende context niet getoond wordt,
--- en dat in een tekst de omhullende context altijd op de eerste regel genoemd
--- wordt.
+-- en dat in een tekst de omhullende context altijd in een aparte declaratie genoemd wordt.
 -- Alle andere contexten vullen een rol in een GepresenteerdeContext en hebben 
 -- zo een positie.
 -}
 
--- Een Tekst declaratie in een ARC file genereert een GepresenteerdeTekst instantie.
--- De ID daarvan is een guid in de user namespace. De ingetikte tekstnaam wordt de local name.
--- De Tekst declaratie wordt daarom dus niet als onderdeel van GepresenteerdeTekst opgenomen!
-Zaak GepresenteerdeTekst heeft
-	properties
-		extern
-			inlineCommentaar (String, Niet Verplicht, Functioneel)
-	rollen
-		-- Representatie van de Omhullende Context statement.
-		omhullendeContext (Functioneel) gevuld door Domein, Partij, Zaak, Toestand, Activiteit, Property, Rol, View, Actie heeft
-			properties
-				volgnummer (Number, Verplicht, Functioneel)
-				prefix (String, Verplicht, Functioneel)
-				inlineCommentaar (String, Niet Verplicht, Functioneel)
-		import (Niet Functioneel) gevuld door Domein, Partij, Zaak, Toestand, Activiteit, Property, Rol, View, Actie heeft
-			properties
-				volgnummer (Number, Verplicht, Functioneel)
-				prefix (String, Verplicht, Functioneel)
-				inlineCommentaar (String, Niet Verplicht, Functioneel)
-		commentaar (Niet Functioneel) gevuld door Context heeft
-			properties
-				volgnummer (Number, Verplicht, Functioneel)
-				tekst (String, Niet Verplicht, Functioneel)
-				indentering (Number, Verplicht, Functioneel)
-				aantalTekstregels (Number, Verplicht, Functioneel)
-				isMultiLine (Boolean, Niet Verplicht, Functioneel)
-		sectie (Niet Functioneel) gevuld door Context heeft
-			properties
-				volgnummer (Number, Verplicht, Functioneel)
-				sectieNaam (String, Verplicht, Functioneel)
-				inlineCommentaar (String, Niet Verplicht, Functioneel)
-				ingeklapt (Boolean, Niet Verplicht, Functioneel)
-		psp:gepresenteerdeContext (Niet Functioneel) gevuld door GepresenteerdContextType
-			properties
-				volgnummer (Number, Niet Verplicht, Functioneel)				
-
 -- Elke regel in een ARC tekst waarin een naam wordt gedefinieerd, correspondeert
 -- met een GepresenteerdContextType.
+-- Een Tekst declaratie in een ARC file genereert een GepresenteerdContextType instantie.
+-- De ID daarvan is afgeleid van de omhullende context: b.v. "Aangifte_Tekst" De ingetikte tekstnaam wordt de local name.
 Zaak GepresenteerdContextType heeft
 	extern
 		properties
 			ingeklapt (Boolean, Niet Verplicht, Functioneel)
-			aantalTekstregels (Number, Verplicht, Functioneel)
+			aantalTekstregels (Number, Niet Verplicht, Functioneel)
 			indent (Number, Verplicht, Functioneel)
 			inlineCommentaar (String, Niet Verplicht, Functioneel)
 	rollen
 		-- Dit is de context die gepresenteerd wordt.
 		context (Functioneel) gevuld door Domein, Partij, Zaak, Toestand, Activiteit, Property, Rol, View, Actie
+			properties
+				volgnummer (Number, Verplicht, Functioneel)
+				inlineCommentaar (String, Niet Verplicht, Functioneel)
 		-- Dit zijn de onderdelen van de context die gepresenteerd worden, maar
-		-- in een GepresenteerdRolType gewikkeld.
+		-- in een GepresenteerdContextType gewikkeld.
 		rol (Niet Functioneel) gevuld door GepresenteerdContextType
 			properties
 				-- Dit zijn mogelijke rollen van de mogelijke vullers van de rol context van GepresenteerdContextType.
-				-- Elk GepresenteerdRolType is immers een onderdeel van de GepresenteerdeContext.
-				-- Niet alle rollen tellen mee, b.v. die van Actie niet.
+				-- Oftewel: het is een rol(naam) van 'context', d.w.z. van de onderliggende representatie.
 				contextRolNaam (String, Verplicht, Functioneel)
 				-- Leg de volgorde van rollen in de ARC-tekst vast.
 				volgnummer (Number, Verplicht, Functioneel)
 				-- Leg de positie van rollen in een diagram vast
 				x (Number, Niet Verplicht, Functioneel)
 				y (Number, Niet Verplicht, Functioneel)
+		import (Niet Functioneel) gevuld door Domein, Partij, Zaak, Toestand, Activiteit, Property, Rol, View, Actie heeft
+			properties
+				volgnummer (Number, Verplicht, Functioneel)
+				prefix (String, Verplicht, Functioneel)
+				inlineCommentaar (String, Niet Verplicht, Functioneel)
 		commentaar (Functioneel) gevuld door Context heeft
 			properties
 				volgnummer (Number, Verplicht, Functioneel)

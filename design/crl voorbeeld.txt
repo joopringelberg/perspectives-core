@@ -1,6 +1,7 @@
 Context model:Politie$ als pol:
 Sectie psp:zaakInContext
 psp:Zaak $Aangifte
+	psp:import model:PersoonlijkDomein
 	psp:internalProperty =>
 		psp:Property $urgentie
 			extern psp:isFunctioneel = true
@@ -14,7 +15,7 @@ psp:Zaak $Aangifte
 	psp:rolInContext =>
 		psp:Rol $UserRol
 			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => psp:Persoon
+			psp:mogelijkeBinding => per:Persoon
 			psp:rolProperty =>
 				psp:Property $betrouwbaarheid
 					extern psp:isFunctioneel = true
@@ -30,17 +31,18 @@ psp:Zaak $Aangifte
 	psp:rolInContext =>
 		psp:Rol $Start
 			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => 
-				psp:Activiteit $Intake
-					psp:rolInContext => 
-						psp:Rol $Uitvoerder
-							extern psp:isFunctioneel = true
-							psp:mogelijkeBinding => $$Verbalisant
+			psp:mogelijkeBinding => $$Intake
 			psp:rolProperty =>
 				psp:Property $toegewezen
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = true
 					extern psp:range = Boolean
+	psp:activiteitInContext =>
+		psp:Activiteit $Intake
+			psp:rolInContext => 
+				psp:Rol $Uitvoerder
+					extern psp:isFunctioneel = true
+					psp:mogelijkeBinding => $$Verbalisant
 	psp:actieInContext =>
 		psp:Actie $Actie_1
 			psp:actor => $Verbalisant

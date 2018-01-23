@@ -13,44 +13,50 @@ Context usr:"representatief voorbeeld van ARC" als t:
 import Context model:Politie$ als pol:
 
 -- Let op: deze context is dus geen onderdeel van zichzelf, zou niet in deze tekst voorkomen!
-psp:GepresenteerdeTekst usr:"representatief voorbeeld van ARC"
-	extern psp:inlineCommentaar = "Deze regel leidt tot de psp:GepresenteerdeTekst instantie."
+psp:GepresenteerdContextType usr:"representatief voorbeeld van ARC"
+	extern psp:ingeklapt = false
+	extern psp:aantalTekstRegels = 31
+	extern psp:indent = 0
+	extern psp:inlineCommentaar = "Deze regel geeft de instantie van GepresenteerdContextType van de omhullende context zijn naam."
 	psp:commentaar =>
 		psp:volgnummer = 1
-		psp:tekst = "Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.\n"
-		psp:indentering = 0
-		psp:aantalTekstRegels = 2
+		psp:tekst = "\nDeze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.\n"
+		psp:aantalTekstRegels = 3
 		psp:isMultiLine = true
-	psp:omhullendeContext => model:Politie$
+	psp:context => model:Politie$
 		psp:volgnummer = 2
+		psp:inlineCommentaar = "Commentaar achter de context declaratie."
 	psp:commentaar =>
 		psp:volgnummer = 3
-		psp:indentering = 0
 	psp:sectie =>
 		psp:volgnummer = 4
 		psp:sectieNaam = "zaken"
 	psp:commentaar =>
 		psp:volgnummer = 5
 		psp:tekst = "\nDit commentaar staat boven de zaak Aangifte."
-		psp:indentering = 0
 		psp:aantalTekstregels = 2
-	psp:gepresenteerdeContext => t:1
+	psp:rol => t:2
 		psp:volgnummer = 6
 
-Sectie psp:gepresenteerdeContext
+Sectie psp:rol
 
 psp:GepresenteerdContextType t:2
 	extern psp:ingeklapt = false
-	extern psp:aantalTekstRegels = 26
+	extern psp:aantalTekstRegels = 21
 	extern psp:inlineCommentaar = "Dit commentaar staat op de regel die Aangifte declareert."
+	extern psp:indent = 0
 	psp:context => pol:Aangifte
+		psp:volgnummer = 1
+		psp:inlineCommentaar = "Commentaar achter de context declaratie."
+	psp:import => model:PersoonlijkDomein
+		psp:volgnummer = 2
+		psp: prefix = "per"
 	psp:sectie =>
 		psp:volgnummer = 1
 		psp:sectieNaam = "properties"
 	psp:commentaar =>
 		psp:volgnummer = 2
 		psp:tekst = "Dit commentaar staat boven de sectie intern van Aangifte."
-		psp:indentering = 2
 	psp:sectie =>
 		psp:volgnummer = 3
 		psp:sectieNaam = "intern"
@@ -58,21 +64,27 @@ psp:GepresenteerdContextType t:2
 	psp:rol => 
 		psp:GepresenteerdContextType t:3
 			extern psp:aantalTekstRegels = 1
+			extern psp:indent = 3
 			psp:context => pol:Aangifte$urgentie
 		psp:volgnummer = 4
 		psp:contextRolNaam = "psp:internalProperty"
+	psp:commentaar =>
+		psp:volgnummer = 5
+		psp:tekst = "Dit commentaar staat onderin de sectie 'intern' van Aangifte."
 	psp:sectie =>
-		psp:volgnummer = 4
+		psp:volgnummer = 6
 		psp:sectieNaam = "rollen"
 	psp:rol =>
 		psp:GepresenteerdContextType t:4
-			extern psp:aantalTekstRegels = X
+			extern psp:indent = 2
+			extern psp:aantalTekstRegels = 6
 			psp:context => pol:Aangifte$UserRol_1
 			psp:sectie =>
 				psp:volgnummer = 1
 				psp:sectieNaam = "properties"
 			psp:rol =>
 				psp:GepresenteerdContextType t:5
+					extern psp:indent = 4
 					psp:context => pol:Aangifte$UserRol$betrouwbaarheid
 				psp:volgnummer = 2
 				psp:contextRolNaam = "psp:rolProperty"
@@ -81,44 +93,52 @@ psp:GepresenteerdContextType t:2
 				psp:sectieNaam = "views"
 			psp:rol =>
 				psp:GepresenteerdContextType t:6
+					extern psp:indent = 4
 					psp:context => pol:Aangifte$UserRol$adres
 				psp:volgnummer = 4
 				psp:contextRolNaam = "psp:viewInRol"
-		psp:volgnummer = 5
+		psp:volgnummer = 7
 		psp:contextRolNaam = "psp:rolInContext"
 	psp:rol =>
 		psp:GepresenteerdContextType t:7
-			extern psp:aantalTekstRegels = X
+			extern psp:indent = 2
+			extern psp:aantalTekstRegels = 7
 			psp:context => pol:Aangifte$Start
-			-- Omdat de mogelijkeBinding van $Start geen verwijzing maar een lexicaal geneste definitie is,
-			-- nemen we hier de rol mogelijkeBinding wel op (en bij b.v. $UserRol niet).
-			psp:rol =>
-				psp:GepresenteerdContextType t:8
-					psp:context => pol:Aangifte$Start$Intake
-					psp:sectie =>
-						psp:volgnummer = 1
-						psp:sectieNaam = "rollen"
-					psp:rol =>
-						psp:GepresenteerdContextType t:9
-							psp:context => pol:Aangifte$Start$Intake$Uitvoerder
-						psp:volgnummer = 2
-				psp:volgnummer = 1
-				psp:contextRolNaam = "psp:mogelijkeBinding"	
 			psp:sectie =>
 				psp:volgnummer = 2
 				psp:sectieNaam = "properties"
 			psp:rol =>
 				psp:GepresenteerdContextType t:10
-					psp:context => pol:Aangifte$UserRol$toegewezen
+					extern psp:indent = 5
+					psp:context => pol:Aangifte$Start$toegewezen
 				psp:volgnummer = 3
 				psp:contextRolNaam = "psp:rolProperty"
-		psp:volgnummer = 6
+		psp:volgnummer = 8
 		psp:contextRolNaam = "psp:rolInContext"
 	psp:sectie =>
-		psp:volgnummer = 7
+		psp:volgnummer = 9
+		psp:sectieNaam = "activiteiten"
+	psp:rol =>
+		psp:GepresenteerdContextType t:8
+			extern psp:indent = 3
+			extern psp:aantalTekstRegels = 6
+			psp:context => pol:Aangifte$Intake
+			psp:sectie =>
+				psp:volgnummer = 1
+				psp:sectieNaam = "rollen"
+			psp:rol =>
+				psp:GepresenteerdContextType t:9
+					extern psp:indent = 5
+					psp:context => pol:Aangifte$Intake$Uitvoerder
+				psp:volgnummer = 2
+		psp:volgnummer = 10
+		psp:contextRolNaam = "psp:activiteitInContext"	
+	psp:sectie =>
+		psp:volgnummer = 11
 		psp:sectieNaam = "acties"
 	psp:rol => 
 		psp:GepresenteerdContextType t:11
+			extern psp:indent = 2
 			psp:context => pol:Aangifte$Actie_1
-		psp:volgnummer = 8
+		psp:volgnummer = 12
 		psp:contextRolNaam = "psp:actieInContext"
