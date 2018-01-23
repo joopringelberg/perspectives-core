@@ -10,3 +10,5 @@ pulp browserify --optimise -I test --to output.js
 Maak een bundle voor een specfiek entry point:
 pulp browserify --standalone parser --main Perspectives.Parser.Main --to parser.js
 pulp browserify --standalone <bundle name> --main <name of Perspect module> --to <name of output file>
+
+pulp browserify --optimise --to dist/app.js

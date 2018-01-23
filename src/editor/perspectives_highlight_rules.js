@@ -31,14 +31,14 @@ define( function( require, exports, module ) {
 				/////////////// KEYWORDS
 				// TODO: echte resource identifier match!
 				{
-					// public :urgentie = 7;
+					// extern :urgentie = 7;
 					token: ["keyword", "variable"],
-					regex: uriAndCurie.composeRegExp( /(public\b\s+)/, uriAndCurie.propertyName )
+					regex: uriAndCurie.composeRegExp( /(extern\b\s+)/, uriAndCurie.propertyName )
 				},
 				{
-					// private :urgentie = 7;
+					// intern :urgentie = 7;
 					token: ["keyword", "variable"],
-					regex: uriAndCurie.composeRegExp( /(private\b\s+)/, uriAndCurie.propertyName )
+					regex: uriAndCurie.composeRegExp( /(intern\b\s+)/, uriAndCurie.propertyName )
 				},
 				{
 					// query :aangever binding

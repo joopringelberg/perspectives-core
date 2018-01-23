@@ -21,7 +21,7 @@ type IndentLanguageDef e = GenLanguageDef String (ContextRoleParserMonad e)
 perspectDef :: forall e. IndentLanguageDef e
 -- perspectDef = LanguageDef (unGenLanguageDef haskellStyle)
 --                 { reservedOpNames = ["=", "=>"]
---                 , reservedNames   = [ "private","public"]
+--                 , reservedNames   = [ "intern","extern"]
 --                 }
 -- | Even though we have comments, we make the Tokenizer none the wizer. This way it won't skip comments.
 -- | We detect comments ourselves and collect them!
@@ -35,7 +35,7 @@ perspectDef = LanguageDef
                 , opStart:         op'
                 , opLetter:        op'
                 , reservedOpNames : ["=", "=>"]
-                , reservedNames   : [ "private","public", "property", "Section", "Context", "als", "import"]
+                , reservedNames   : [ "intern","extern", "property", "Section", "Context", "als", "import"]
                 , caseSensitive:   true
                 }
   where

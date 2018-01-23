@@ -15,13 +15,14 @@ import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextAndRole (contextToBinnenRol, contextToBuitenRolID, rolToContextID)
 import Perspectives.Identifiers (roleIndexNr)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getContext, getRole)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext(..), PerspectRol(..), PerspectRolProperties, PropertyName, PropertyValueWithComments, PerspectContextProperties, compareOccurrences, propertyValue)
-import Perspectives.SystemQueries (binding, rolContext, rolTypen, rollen)
+import Perspectives.SystemQueries (binding, rolContext, rolTypen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==))
@@ -112,21 +113,21 @@ property keyword prop = indent (\pvcomments -> do
     (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
 
 publicProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
-publicProperty = property (identifier "public")
+publicProperty = property (identifier "extern")
 
 privateProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
-privateProperty = property (identifier "private")
+privateProperty = property (identifier "intern")
 
 roleProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
 roleProperty = property (pure unit)
 
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
-context definedResources (PerspectContext c) = do
-  withComments (\r->r.comments) contextDeclaration c
+context definedResources c@(PerspectContext cProperties) = do
+  withComments (\r->r.comments) contextDeclaration cProperties
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
-  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values c.rolInContext))
+  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values cProperties.rolInContext))
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
     contextDeclaration :: PerspectContextProperties -> PerspectText e
@@ -134,13 +135,13 @@ context definedResources (PerspectContext c) = do
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
-      maybeBuitenRol <- liftAff $ getRole c.buitenRol
+      maybeBuitenRol <- liftAff $ getRole $ contextToBuitenRolID c
       case maybeBuitenRol of
         (Just (PerspectRol buitenRol)) -> strMapTraverse_ publicProperty buitenRol.properties
         Nothing -> pure unit
 
     privateProperties = strMapTraverse_ privateProperty props where
-      props = let (BinnenRol{properties}) = c.binnenRol
+      props = let (BinnenRol{properties}) = contextToBinnenRol c
         in properties
 
     roleBinding :: PerspectRol -> PerspectText e
@@ -153,21 +154,21 @@ context definedResources (PerspectContext c) = do
           maybeRole <- liftAff $ getRole binding
           case maybeRole of
             Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
-            (Just (PerspectRol role)) -> do
-              case role.pspType == "model:Perspectives$BuitenRol" of
+            (Just role@(PerspectRol roleProperties)) -> do
+              case roleProperties.pspType == "model:Perspectives$BuitenRol" of
                 true -> do -- The role is a BuitenRol of some context.
-                  maybeContext <- liftAff $ getContext role.context
+                  maybeContext <- liftAff $ getContext $ rolToContextID role
                   case maybeContext of
                     Nothing -> reference r
                     (Just contxt) -> do
                       withComments' r.comments (identifier $ r.pspType <> " => ")
                       indent (context definedResources) contxt
-                false -> reference role -- The role is a RoleInContext of some context.
+                false -> reference roleProperties -- The role is a RoleInContext of some context.
         otherwise -> do
           maybeRole <- liftAff $ getRole binding
           case maybeRole of
             Nothing -> comment $ "Binding does not exist: " <> binding
-            (Just (PerspectRol buitenRol)) -> withComments' r.comments (identifier $ r.pspType <> " => " <> buitenRol.context)
+            (Just buitenRol) -> withComments' r.comments (identifier $ r.pspType <> " => " <> rolToContextID buitenRol)
 
       strMapTraverse_ roleProperty r.properties
 

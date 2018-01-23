@@ -1,6 +1,8 @@
 -- Dit bestand bevat elke denkbare Perspectives CRL expressie.
-Text $Mijntekst
-$Context $Aangifte -- Commentaar op de regel.
+Context $Mijntekst
+import model:Perspectives$ als psp:
+Section psp:zaakInContext
+psp:Context $Aangifte -- Commentaar op de regel.
 	-- Commentaar boven $aantekening
 	intern psp:aantekening = "Dit is een prive aantekening bij de definitie van Aangifte." -- Commentaar achter psp:aantekening
 	-- Commentaar boven de binding van $Urgentie

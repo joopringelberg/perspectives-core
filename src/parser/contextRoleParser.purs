@@ -215,7 +215,7 @@ nextLine = do
 enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
 enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> contextName)
-  _ <- setNamespace $ show cname
+  _ <- setNamespace $ (show cname) <> "$"
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
@@ -248,17 +248,17 @@ typedPropertyAssignment scope = go (try (withComments
       (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
       pure $ Tuple (show pname) (Comments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
 
--- | publicContextPropertyAssignment = 'public' propertyName '=' simpleValue
+-- | publicContextPropertyAssignment = 'extern' propertyName '=' simpleValue
 publicContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
-publicContextPropertyAssignment = (typedPropertyAssignment (reserved "public")) <?> "public propertyname = value"
+publicContextPropertyAssignment = (typedPropertyAssignment (reserved "extern")) <?> "extern propertyname = value"
 
--- | privateContextPropertyAssignment = 'private' propertyName '=' simpleValue
+-- | privateContextPropertyAssignment = 'intern' propertyName '=' simpleValue
 privateContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
-privateContextPropertyAssignment = (typedPropertyAssignment (reserved "private")) <?> "private propertyname = value"
+privateContextPropertyAssignment = (typedPropertyAssignment (reserved "intern")) <?> "intern propertyname = value"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
 rolePropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
-rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "private propertyname = value"
+rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "intern propertyname = value"
 
 isRoleDeclaration :: forall e. IP Unit (DomeinFileEffects e)
 isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence) *> (sameLine *> reservedOp "=>") *> pure unit)
@@ -357,7 +357,7 @@ context = withRoleCounting context' where
       (ContextDeclaration typeName instanceName@(Expanded dname localName) cmt) <- contextDeclaration
 
       -- Naming
-      extendNamespace localName
+      extendNamespace (localName <> "$")
         do
           -- Parsing the body
           (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))

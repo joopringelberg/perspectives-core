@@ -20,7 +20,7 @@ import Text.Parsing.Parser.Pos (Position)
 type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: String, prefixes :: StrMap String}
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: "", prefixes: empty}
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives$", section: "", prefixes: empty}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is Aff, which we need to access couchdb.

@@ -12,6 +12,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextAndRole (contextToBuitenRolID, rolToContextID)
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getContext, getPropDefs, getRole)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
@@ -62,6 +63,7 @@ getContextMember f c = do
     (Just perspectContext) -> pure $ f perspectContext
     otherwise -> pure []
 
+-- Even though members of a context will always be present, the context itself may not. Hence we return a Maybe value.
 getContextMember' :: forall a e. (PerspectContext -> a) -> (ID -> Aff (PropDefsEffects e) (Maybe a))
 getContextMember' f c = do
   maybeContext <- getContext c
@@ -72,11 +74,13 @@ getContextMember' f c = do
 getContextType :: forall e. ObjectsGetter e
 getContextType = getContextMember \(PerspectContext{pspType}) -> [pspType]
 
+-- Returns an empty array if the context does not exist.
 getBuitenRol :: forall e. ObjectsGetter e
-getBuitenRol = getContextMember \(PerspectContext{buitenRol}) -> [buitenRol]
+getBuitenRol = getContextMember \c -> [contextToBuitenRolID c]
 
+-- Returns Nothing if the context does not exist.
 getBuitenRol' :: forall e. ID -> Aff (PropDefsEffects e) (Maybe String)
-getBuitenRol' = getContextMember' \(PerspectContext{buitenRol}) -> buitenRol
+getBuitenRol' = getContextMember' \c -> contextToBuitenRolID c
 
 getRol :: forall e. RoleName -> ObjectsGetter e
 getRol rn = getContextMember \(PerspectContext{rolInContext}) -> maybe [] id (lookup rn rolInContext)
@@ -87,14 +91,14 @@ getRollen = getContextMember \(PerspectContext{rolInContext}) -> join $ values r
 getRolTypen :: forall e. ObjectsGetter e
 getRolTypen = getContextMember \(PerspectContext{rolInContext}) -> keys rolInContext
 
-getPublicProperty :: forall e. RoleName -> ObjectsGetter e
+getPublicProperty :: forall e. PropertyName -> ObjectsGetter e
 getPublicProperty pn id = do
   mbr <- getBuitenRol' id
   case mbr of
     Nothing -> pure []
     (Just br) -> getProperty pn br
 
-getPrivateProperty :: forall e. RoleName -> ObjectsGetter e
+getPrivateProperty :: forall e. PropertyName -> ObjectsGetter e
 getPrivateProperty pn ident = do
   (mbr :: Maybe BinnenRol) <- getContextMember' (\(PerspectContext{binnenRol}) -> binnenRol) ident
   case mbr of
@@ -115,7 +119,7 @@ getRolBinding :: forall e. ObjectsGetter e
 getRolBinding = getRolMember \(PerspectRol{binding}) -> maybe [] singleton binding
 
 getRolContext :: forall e. ObjectsGetter e
-getRolContext = getRolMember \(PerspectRol{context}) -> [context]
+getRolContext = getRolMember \rol -> [rolToContextID rol]
 
 getProperty :: forall e. PropertyName -> ObjectsGetter e
 getProperty pn = getRolMember \(PerspectRol{properties}) -> maybe [] propertyValue (lookup pn properties)
