@@ -63,6 +63,24 @@ exports.context_comments = function(c)
   return c.comments;
 };
 
+exports.context_internalProperties = function(r)
+{
+  if ( !r.internalProperties )
+  {
+    r.internalProperties = {};
+  }
+  return r.internalProperties;
+}
+
+exports.context_externalProperties = function(r)
+{
+  if ( !r.externalProperties )
+  {
+    r.externalProperties = {};
+  }
+  return r.externalProperties;
+}
+
 exports.createCompactContext = function(c)
 {
   c.isCompactContext = true;
@@ -74,6 +92,10 @@ exports.createClassicContext = function(c)
   return c;
 };
 
+exports.isCompactContext = function(c)
+{
+  return c.isCompactContext;
+}
 
 // ROL
 exports.rol_id = function(c)
@@ -95,10 +117,16 @@ exports.rol_pspType = function(c)
   return c.pspType;
 }
 
-exports.rol_binding = function(c)
+exports.rol_binding_aux = function(nothing)
 {
-  // NOTA BENE. This should be initialized to Nothing.
-  return c.binding;
+  return function(c)
+  {
+    if ( !c.binding )
+    {
+      c.binding = nothing;
+    }
+    return c.binding;
+  }
 }
 
 exports.rol_context = function(r)
@@ -149,4 +177,9 @@ function isClassicContext(c)
 function isCompactContext(c)
 {
   return c.isCompactContext;
+}
+
+exports.isBuitenRol = function(r)
+{
+  return r.isCompactContext;
 }

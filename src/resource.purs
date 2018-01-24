@@ -70,6 +70,14 @@ storeContextInResourceDefinitions key c = do
   _ <- liftEff $ poke resourceDefinitions key av
   pure unit
 
+storeCompactContextInResourceDefinitions :: forall e. String -> PerspectContext -> Aff (DomeinFileEffects e) Unit
+storeCompactContextInResourceDefinitions key c = do
+  av <- makeVar (unwrapPerspectContext c)
+  _ <- liftEff $ poke resourceDefinitions key av
+  av' <- makeVar (unwrapPerspectContext c)
+  _ <- liftEff $ poke resourceDefinitions (key <> "_buitenRol") av
+  pure unit
+
 storeRoleInResourceDefinitions :: forall e. String -> PerspectRol -> Aff (DomeinFileEffects e) Unit
 storeRoleInResourceDefinitions key r = do
   av <- makeVar (unwrapPerspectRol r)
