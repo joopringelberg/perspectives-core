@@ -8,6 +8,10 @@ exports.context_id = function(c)
 
 exports.context_displayName = function(c)
 {
+  if ( !c.displayName )
+  {
+    c.displayName = c.id.substring( c.id.lastIndexOf("$") + 1 );
+  }
   return c.displayName;
 }
 
@@ -18,26 +22,60 @@ exports.context_pspType = function(c)
 
 exports.context_binnenRol = function(c)
 {
-  return c.binnenRol;
+  // Do a case analysis.
+  if ( c.isCompactContext )
+  {
+    return c;
+  }
+  else
+  {
+    return c.binnenRol;
+  }
 }
 
 exports.context_buitenRol = function(c)
 {
-  return c.buitenRol;
+  if ( c.isCompactContext )
+  {
+    return c.id;
+  }
+  else
+  {
+    return c.buitenRol;
+  }
 }
 
 exports.context_rolInContext = function(c)
 {
+  if ( !c.rolInContext )
+  {
+    c.rolInContext = {};
+  }
   return c.rolInContext;
 }
 
 exports.context_comments = function(c)
 {
+  if (!c.comments)
+  {
+    c.comments = {commentBefore: [], commentAfter: []};
+  }
   return c.comments;
-}
+};
+
+exports.createCompactContext = function(c)
+{
+  c.isCompactContext = true;
+  return c;
+};
+
+exports.createClassicContext = function(c)
+{
+  return c;
+};
+
 
 // ROL
-// This function should call methods of ClassicContext or CompactContext respectively.
 exports.rol_id = function(c)
 {
   return c.id;
@@ -45,6 +83,10 @@ exports.rol_id = function(c)
 
 exports.rol_occurrence = function(c)
 {
+  if (!c.occurrence )
+  {
+    c.occurrence = 0;
+  }
   return c.occurrence;
 }
 
@@ -55,25 +97,56 @@ exports.rol_pspType = function(c)
 
 exports.rol_binding = function(c)
 {
+  // NOTA BENE. This should be initialized to Nothing.
   return c.binding;
 }
 
 exports.rol_context = function(r)
 {
-  return r.context;
+  if (r.isCompactContext )
+  {
+    return r.id;
+  }
+  else
+  {
+    return r.context;
+  }
 }
 
 exports.rol_properties = function(r)
 {
+  if ( !r.properties )
+  {
+    r.properties = {};
+  }
   return r.properties;
 }
 
 exports.rol_gevuldeRollen = function(r)
 {
+  if ( !r.gevuldeRollen )
+  {
+    r.gevuldeRollen = {};
+  }
   return r.gevuldeRollen;
 }
 
 exports.rol_comments = function(r)
 {
+  if (!r.comments)
+  {
+    r.comments = {commentBefore: [], commentAfter: []};
+  }
   return r.comments;
+}
+
+///////////////////// TYPES OF CONTEXT AND ROL /////////////////////
+function isClassicContext(c)
+{
+  return c.isClassicContext;
+}
+
+function isCompactContext(c)
+{
+  return c.isCompactContext;
 }

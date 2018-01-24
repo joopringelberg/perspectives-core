@@ -21,6 +21,10 @@ foreign import context_rolInContext :: PerspectContext -> StrMap (Array ID)
 
 foreign import context_comments :: PerspectContext -> Comments ()
 
+foreign import createCompactContext :: forall a. {|a} -> PerspectContext
+
+foreign import createClassicContext :: forall a. {|a} -> PerspectContext
+
 -- ROL
 
 foreign import rol_id :: PerspectRol -> ID

@@ -13,6 +13,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
+import Perspectives.ContextAndRole (createCompactContext)
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
@@ -367,7 +368,7 @@ context = withRoleCounting context' where
 
           -- Storing
           liftAffToIP $ storeContextInResourceDefinitions (show instanceName)
-            (PerspectContext
+            (createCompactContext
               { id: (show instanceName)
               , displayName : localName
               , pspType: show typeName
@@ -484,7 +485,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
       liftAffToIP $ storeContextInResourceDefinitions (show textName)
-        (PerspectContext
+        (createCompactContext
           { id: show textName
           , displayName : show textName
           , pspType: "model:Perspectives$enclosingContext"

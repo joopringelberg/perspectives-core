@@ -16,7 +16,7 @@ import Perspectives.ContextAndRole (context_buitenRol, context_pspType, context_
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getContext, getPropDefs, getRole)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), ID, PerspectContext(..), PerspectRol(..), RoleName, propertyValue)
+import Perspectives.Syntax (BinnenRol(..), ID, PerspectContext(..), PerspectRol, RoleName, propertyValue)
 
 {-
 Property values are represented by Arrays.
