@@ -13,9 +13,10 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
+import Perspectives.ContextAndRole (createPerspectRol)
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
+import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -106,7 +107,7 @@ standaloneDomeinName = lexeme do
 
 -- localContextName = upper alphaNum*
 localContextName :: forall e. IP String e
-localContextName = f <$> capitalizedString <*> AR.many (defaultEmbedded capitalizedString) where
+localContextName = f <$> identLetterString <*> AR.many (defaultEmbedded identLetterString) where
   f first rest = fold $ AR.cons first rest
 
 defaultEmbedded :: forall e. IP String e -> IP String e
@@ -289,14 +290,13 @@ roleBinding' cname p = ("rolename => contextName" <??>
 
       -- Storing
       liftAffToIP $ storeRoleInResourceDefinitions rolId
-        (PerspectRol
+        (createPerspectRol
           { id: rolId
           , occurrence: (roleIndex occurrence nrOfRoleOccurrences)
           , pspType: show rname
           , binding: Just binding
           , context: show cname
           , properties: fromFoldable ((\(Tuple en cm) -> Tuple (show en) cm) <$> props)
-          , gevuldeRollen: empty
           , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
       pure $ Tuple (show rname) rolId))
@@ -372,7 +372,7 @@ context = withRoleCounting context' where
               , displayName : localName
               , pspType: show typeName
               , binnenRol:
-                BinnenRol
+                createPerspectRol
                   { id: (show instanceName) <> "_binnenRol"
                   , pspType: "model:Perspectives$BinnenRol"
                   , binding: Just $ (show instanceName) <> "_buitenRol"
@@ -383,15 +383,11 @@ context = withRoleCounting context' where
               , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
           liftAffToIP $ storeRoleInResourceDefinitions ((show instanceName) <> "_buitenRol")
-            (PerspectRol
+            (createPerspectRol
               { id: (show instanceName) <> "_buitenRol"
-              , occurrence: 0
               , pspType: "model:Perspectives$BuitenRol"
-              , binding: Nothing
               , context: (show instanceName)
               , properties: fromFoldable publicProps
-              , gevuldeRollen: empty
-              , comments: Comments { commentBefore: [], commentAfter: []}
               })
           pure $ (show instanceName) <> "_buitenRol"
   collect :: List (Tuple RoleName ID) -> StrMap (Array ID)
@@ -447,15 +443,12 @@ definition = do
   enclContext <- getNamespace
   rolId <- pure $ enclContext <> "_" <> prop <> maybe "0" show nrOfRoleOccurrences
   liftAffToIP $ storeRoleInResourceDefinitions rolId
-    (PerspectRol
+    (createPerspectRol
       { id: rolId
       , occurrence: maybe 0 id nrOfRoleOccurrences
       , pspType: prop
       , binding: Just binding
       , context: enclContext
-      , properties: empty
-      , gevuldeRollen: empty
-      , comments: Comments { commentBefore: [], commentAfter: []}
       })
   pure rolId
 
@@ -489,7 +482,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , displayName : show textName
           , pspType: "model:Perspectives$enclosingContext"
           , binnenRol:
-            BinnenRol
+            createPerspectRol
               { id: (show textName) <> "_binnenRol"
               , pspType: "model:Perspectives$BinnenRol"
               , binding: Just $ (show textName) <> "_buitenRol"
@@ -501,14 +494,10 @@ enclosingContext = withRoleCounting enclosingContext' where
           })
 
       liftAffToIP $ storeRoleInResourceDefinitions ((show textName) <> "_buitenRol")
-        (PerspectRol
+        (createPerspectRol
           { id: show textName <> "_buitenRol"
-          , occurrence: 0
           , pspType: "model:Perspectives$BuitenRol"
-          , binding: Nothing
           , context: show textName
           , properties: fromFoldable publicProps
-          , gevuldeRollen: empty
-          , comments: Comments { commentBefore: [], commentAfter: []}
           })
       pure $ show textName

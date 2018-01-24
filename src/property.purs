@@ -12,11 +12,11 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_buitenRol, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.Identifiers (isWellFormedIdentifier)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getContext, getPropDefs, getRole)
 import Perspectives.ResourceTypes (PropDefs(..), Resource, DomeinFileEffects)
-import Perspectives.Syntax (BinnenRol(..), ID, PerspectContext(..), PerspectRol, RoleName, propertyValue)
+import Perspectives.Syntax (ID, PerspectContext, PerspectRol, RoleName, propertyValue)
 
 {-
 Property values are represented by Arrays.
@@ -100,11 +100,11 @@ getPublicProperty pn id = do
 
 getPrivateProperty :: forall e. PropertyName -> ObjectsGetter e
 getPrivateProperty pn ident = do
-  (mbr :: Maybe BinnenRol) <- getContextMember' (\(PerspectContext{binnenRol}) -> binnenRol) ident
+  (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol ident
   case mbr of
     Nothing -> pure []
     -- TODO: vervang de pattern matching zodra binnenRol een 'echte' rol is.
-    (Just (BinnenRol{properties})) -> pure $ (maybe [] propertyValue) (lookup pn properties)
+    (Just rol) -> pure $ (maybe [] propertyValue) (lookup pn (rol_properties rol))
 
 getRolMember :: forall e. (PerspectRol -> Array String) -> ObjectsGetter e
 getRolMember f c = do

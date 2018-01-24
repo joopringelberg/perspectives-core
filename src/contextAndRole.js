@@ -58,9 +58,12 @@ exports.rol_occurrence = function(c)
 {
   if (!c.occurrence )
   {
-    c.occurrence = 0;
+    return 0;
   }
-  return c.occurrence;
+  else
+  {
+    return c.occurrence;
+  }
 }
 
 exports.rol_pspType = function(c)
@@ -74,9 +77,12 @@ exports.rol_binding_aux = function(nothing)
   {
     if ( !c.binding )
     {
-      c.binding = nothing;
+      return nothing;
     }
-    return c.binding;
+    else
+    {
+      return c.binding;
+    }
   }
 }
 
@@ -111,3 +117,5 @@ exports.rol_comments = function(r)
   }
   return r.comments;
 }
+
+exports.createPerspectRol = function(r) {return r;};

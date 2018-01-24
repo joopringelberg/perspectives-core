@@ -21,7 +21,7 @@ import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getContext, getRole)
-import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ID, PerspectContext, PerspectRol(..), PropertyName, PropertyValueWithComments, propertyValue)
+import Perspectives.Syntax (Comment, Comments(..), ID, PerspectContext, PerspectRol(..), PropertyName, PropertyValueWithComments, propertyValue)
 import Perspectives.SystemQueries (binding, rolContext, rolTypen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
@@ -141,9 +141,7 @@ context definedResources c = do
         Nothing -> pure unit
 
     -- TODO: vervang de pattern matching zodra de binnenRol een 'echte' rol is.
-    privateProperties = strMapTraverse_ privateProperty props where
-      props = let (BinnenRol{properties}) = context_binnenRol c
-        in properties
+    privateProperties = strMapTraverse_ privateProperty (rol_properties (context_binnenRol c))
 
     roleBinding :: PerspectRol -> PerspectText e
     roleBinding role = do

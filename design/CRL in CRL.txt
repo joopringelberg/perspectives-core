@@ -1,9 +1,10 @@
-{-
-CRL DEFINITIE
+-- CRL DEFINITIE
 
-We willen properties en rollen met een kleine letter schrijven. Maar hun types worden als contexten gedefinieerd. Dat betekent dat we contexten een naam moeten kunnen geven die met een kleine letter begint.
+Context model:Perspectives$
 
--}
+import model:Perspectives$ als psp:
+
+Section psp:rolInContext
 
 psp:Context psp:Context
 	psp:rolInContext => psp:externalProperty

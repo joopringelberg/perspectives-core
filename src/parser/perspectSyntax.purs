@@ -18,7 +18,7 @@ type PerspectContextProperties =
   { id :: ID
   , displayName :: String
   , pspType :: ID
-  , binnenRol :: BinnenRol -- TODO: vervang door PerspectRol, zodat de binnenrol ook kan vullen (b.v. rollen van Acties).
+  , binnenRol :: PerspectRol -- TODO: vervang door PerspectRol, zodat de binnenrol ook kan vullen (b.v. rollen van Acties).
   , buitenRol :: ID
   , rolInContext :: StrMap (Array ID)
   , comments :: Comments ()
@@ -39,14 +39,6 @@ type PerspectRolProperties =
     }
 
 type PropertyValueWithComments = Comments (value :: Array String)
-
-newtype BinnenRol =
-  BinnenRol
-    { id :: ID
-    , pspType :: ID
-    , binding :: Maybe ID
-    , properties :: StrMap PropertyValueWithComments
-    }
 
 type PerspectName = String
 type PropertyName = String
