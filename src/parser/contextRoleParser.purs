@@ -179,13 +179,14 @@ roleName = propertyName
 -----------------------------------------------------------
 -- Datatypes
 -----------------------------------------------------------
+-- We need the "SimpleValue" 'type' because we want to specify psp:Property's range as precisely that.
 dataTypes :: Array String
-dataTypes = ["Number", "String", "Bool", "Date"]
+dataTypes = ["Number", "String", "Boolean", "Date", "SimpleValue"]
 
 dataType :: forall e. IP SimpleValue e
 dataType = try do
   s <- identifier
-  if elem s dataTypes then pure $ String s else fail "one of 'Number', 'String', 'Bool' or 'Date'."
+  if elem s dataTypes then pure $ String s else fail "one of 'Number', 'String', 'Boolean' or 'Date'."
 
 -----------------------------------------------------------
 -- Handling position
