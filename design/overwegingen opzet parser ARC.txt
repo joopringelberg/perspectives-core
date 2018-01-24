@@ -48,7 +48,7 @@ VAN ARC NAAR CRL PER EXPRESSIE
 0a. Omhullende context declaratie:
 	Omhullende Context is Domein model:Politie$
 wordt in CRL:
-	psp:Domein model:Politie$ als pol:
+	Context model:Politie$ als pol:
 Tevens wordt in de parser state huidigeContext op model:Politie$ gezet.
 Uiteraard hoeft de omhullende context geen Domein te zijn: het moet een context zijn.
 Als het Domein niet bestaat, wordt het gemaakt. 

@@ -34,3 +34,10 @@ meta - staat in de lijst achter de woorden, als categorie van herkomst ofzo.
 Hier is de documentatie van cloud9 over Ace:
 
 https://cloud9-sdk.readme.io/docs/cloud9-bundle
+
+TOOLTIPS
+Er zijn ook tooltips in ace. Autocomplete schijnt tooltip te gebruiken. Ik vind daarvan geen ondersteuning in de purescript wrapper.
+
+
+DISCUSSIE OP GOOGLE GROUPS
+https://groups.google.com/forum/#!forum/ace-discuss

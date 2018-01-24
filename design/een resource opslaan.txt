@@ -1,0 +1,28 @@
+EEN RESOURCE OPSLAAN
+
+Om een context of rol op te slaan, moeten we hem eerst omzetten in een JSON tekst.
+
+
+1. Wat voor functie moeten we gebruiken om een document toe te voegen aan couchb? 
+We moeten de PUT method gebruiken. Module Network.HTTP.Affjax heeft de functie:
+
+	put :: forall e a b. Requestable a => Respondable b => URL -> a -> Affjax e b
+
+Een Requestable is:
+A class for types that can be converted to values that can be sent with XHR requests. An optional mime-type can be specified for a default Content-Type header.
+
+Er is een Requestable instance voor Json van module Data.Argonaut.Core. De interface is:
+
+	toRequest :: a -> Tuple (Maybe MediaType) RequestContent
+
+We kunnen een context en rol omzetten naar Json:
+
+foreign import context2Json  :: PerspectContext -> Json
+
+foreign import rol2Json  :: PerspectRol -> Json
+
+Beide functies kunnen een identiteit zijn.
+
+De representatie van Nothing en Just kan hier wel een probleem zijn. Dit doet zich voor bij de binding van PerspectRol, die is Maybe ID.
+
+De revisie is onderdeel van het opgehaalde document, in de property "_rev".

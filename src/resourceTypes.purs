@@ -6,6 +6,7 @@ module Perspectives.ResourceTypes
 , PropDefs(..)
 , Resource
 , CouchdbResource
+, resource2json
 )
 
 where
@@ -37,3 +38,5 @@ newtype PropDefs = PropDefs (StrMap Json)
 
 instance showPropDefs :: Show PropDefs where
   show (PropDefs s) = "PropDefs=" <> (show $ keys s)
+
+foreign import resource2json :: CouchdbResource -> Json
