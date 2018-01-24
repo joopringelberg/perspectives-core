@@ -13,8 +13,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (createCompactContext)
-import Perspectives.Resource (storeCompactContextInResourceDefinitions, storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
+import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (BinnenRol(..), Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
@@ -367,17 +366,34 @@ context = withRoleCounting context' where
           (rolebindings :: List (Tuple RoleName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
           -- Storing
-          liftAffToIP $ storeCompactContextInResourceDefinitions (show instanceName)
-            (createCompactContext
+          liftAffToIP $ storeContextInResourceDefinitions (show instanceName)
+            (PerspectContext
               { id: (show instanceName)
               , displayName : localName
               , pspType: show typeName
+              , binnenRol:
+                BinnenRol
+                  { id: (show instanceName) <> "_binnenRol"
+                  , pspType: "model:Perspectives$BinnenRol"
+                  , binding: Just $ (show instanceName) <> "_buitenRol"
+                  , properties: fromFoldable privateProps
+                  }
+              , buitenRol: (show instanceName) <> "_buitenRol"
               , rolInContext: collect rolebindings
-              , internalProperties: fromFoldable privateProps
-              , externalProperties: fromFoldable publicProps
               , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
-          pure $ (show instanceName)
+          liftAffToIP $ storeRoleInResourceDefinitions ((show instanceName) <> "_buitenRol")
+            (PerspectRol
+              { id: (show instanceName) <> "_buitenRol"
+              , occurrence: 0
+              , pspType: "model:Perspectives$BuitenRol"
+              , binding: Nothing
+              , context: (show instanceName)
+              , properties: fromFoldable publicProps
+              , gevuldeRollen: empty
+              , comments: Comments { commentBefore: [], commentAfter: []}
+              })
+          pure $ (show instanceName) <> "_buitenRol"
   collect :: List (Tuple RoleName ID) -> StrMap (Array ID)
   collect Nil = empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
@@ -468,7 +484,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
       liftAffToIP $ storeContextInResourceDefinitions (show textName)
-        (createCompactContext
+        (PerspectContext
           { id: show textName
           , displayName : show textName
           , pspType: "model:Perspectives$enclosingContext"

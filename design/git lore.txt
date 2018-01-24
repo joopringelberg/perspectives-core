@@ -4,6 +4,10 @@ ATOM/GIT HANDIGHEID
 
 	git log -5 --pretty=format:"%cr, %s"
 
+	met afgekorte commit hash:
+
+	git log -5 --pretty=format:"%h - %cr, %s"
+
 2. Bestand herstellen tot een vorige commit (met hash xxx):
 
 	git checkout xxx filename
@@ -66,4 +70,3 @@ ATOM/GIT HANDIGHEID
 OPEN
 1. Het zou superhandig zijn als alle voorkomens van een woord oplichten als je het selecteert of de cursor erin plaatst.
 Het mooist zou het zijn als alleen de voorkomens oplichten die in scope zijn (alle voorkomens van een functie parameter b.v.).
-2. Bookmarks, of anderszins een manier om regels te markeren.

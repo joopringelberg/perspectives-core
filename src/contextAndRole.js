@@ -22,27 +22,12 @@ exports.context_pspType = function(c)
 
 exports.context_binnenRol = function(c)
 {
-  // Do a case analysis.
-  if ( c.isCompactContext )
-  {
-    return c;
-  }
-  else
-  {
-    return c.binnenRol;
-  }
+  return c.binnenRol;
 }
 
 exports.context_buitenRol = function(c)
 {
-  if ( c.isCompactContext )
-  {
-    return c.id;
-  }
-  else
-  {
-    return c.buitenRol;
-  }
+  return c.buitenRol;
 }
 
 exports.context_rolInContext = function(c)
@@ -62,40 +47,6 @@ exports.context_comments = function(c)
   }
   return c.comments;
 };
-
-exports.context_internalProperties = function(r)
-{
-  if ( !r.internalProperties )
-  {
-    r.internalProperties = {};
-  }
-  return r.internalProperties;
-}
-
-exports.context_externalProperties = function(r)
-{
-  if ( !r.externalProperties )
-  {
-    r.externalProperties = {};
-  }
-  return r.externalProperties;
-}
-
-exports.createCompactContext = function(c)
-{
-  c.isCompactContext = true;
-  return c;
-};
-
-exports.createClassicContext = function(c)
-{
-  return c;
-};
-
-exports.isCompactContext = function(c)
-{
-  return c.isCompactContext;
-}
 
 // ROL
 exports.rol_id = function(c)
@@ -131,14 +82,7 @@ exports.rol_binding_aux = function(nothing)
 
 exports.rol_context = function(r)
 {
-  if (r.isCompactContext )
-  {
-    return r.id;
-  }
-  else
-  {
-    return r.context;
-  }
+  return r.context;
 }
 
 exports.rol_properties = function(r)
@@ -166,20 +110,4 @@ exports.rol_comments = function(r)
     r.comments = {commentBefore: [], commentAfter: []};
   }
   return r.comments;
-}
-
-///////////////////// TYPES OF CONTEXT AND ROL /////////////////////
-function isClassicContext(c)
-{
-  return c.isClassicContext;
-}
-
-function isCompactContext(c)
-{
-  return c.isCompactContext;
-}
-
-exports.isBuitenRol = function(r)
-{
-  return r.isCompactContext;
 }
