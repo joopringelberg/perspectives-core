@@ -1,6 +1,5 @@
 module Perspectives.DomeinCache
--- ( namespaceToDomeinFileName
--- , retrieveDomeinResourceDefinition )
+-- ( retrieveDomeinResourceDefinition )
 
 where
 
@@ -24,8 +23,8 @@ import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
-import Perspectives.Identifiers (Namespace)
-import Perspectives.ResourceTypes (AsyncDomeinFile, PropDefs(..), Resource, CouchdbResource)
+import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
+import Perspectives.ResourceTypes (AsyncDomeinFile, Resource, CouchdbResource)
 import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<>))
 
 -- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
@@ -40,21 +39,13 @@ domeinCache = new unit
 storeDomeinFileInCache :: forall e. Namespace -> AVar DomeinFile -> Aff (gm :: GLOBALMAP | e) (AVar DomeinFile)
 storeDomeinFileInCache ns df= liftEff $ poke domeinCache ns df *> pure df
 
--- | Matches all occurrences of : and /.
-domeinFileRegex :: Regex
-domeinFileRegex = unsafeRegex "[:\\/]" global
-
--- | Replace all occurrences of : and / by _.
-namespaceToDomeinFileName :: String -> String
-namespaceToDomeinFileName s = replace domeinFileRegex "_" s
-
 -- | Fetch the definition of a resource asynchronously from its Domein.
 retrieveDomeinResourceDefinition :: forall e.
   Resource
   -> Namespace
   -> (AsyncDomeinFile e CouchdbResource)
 retrieveDomeinResourceDefinition id ns = do
-  f <- retrieveDomeinFile (namespaceToDomeinFileName ns)
+  f <- retrieveDomeinFile ns
   case lookup id f of
     Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
     (Just propDefs) -> pure propDefs
@@ -68,7 +59,7 @@ retrieveDomeinFile ns = do
       _ <- storeDomeinFileInCache ns v
       -- forkAff hinders catchError.
       -- _ <- forkAff do
-      res <- affjax $ domeinRequest {url = modelsURL <> ns}
+      res <- affjax $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns}
       _ <- case res.status of
         StatusCode 200 -> case stringToDomeinFile res.response of
           (Left err) -> throwError $ error err

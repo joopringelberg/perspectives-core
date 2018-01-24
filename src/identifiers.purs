@@ -12,6 +12,7 @@ module Perspectives.Identifiers
 , Namespace
 , isWellFormedIdentifier
 , roleIndexNr
+, escapeCouchdbDocumentName
   )
 
 where
@@ -19,6 +20,7 @@ import Data.Array (head, index, unsafeIndex)
 import Data.Foldable (or)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, fromFoldable, lookup)
+import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -106,3 +108,12 @@ roleIndexNr :: String -> Maybe String
 roleIndexNr s = case match roleIndexNrRegex s of
   (Just (matches :: Array (Maybe String))) -> maybe Nothing id (index matches 1)
   _ -> Nothing
+
+{-
+  ESCAPING FOR RETRIEVAL FROM COUCHDB
+  In couchdb kun je documentnamen met een ":" en "$" prima gebruiken. But to retrieve them through http, these
+  characters have to be escaped.
+-}
+
+escapeCouchdbDocumentName :: String -> String
+escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%24") (replaceAll (Pattern "$") (Replacement "%3A") s)
