@@ -17,18 +17,20 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, fromFoldable, lookup)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax (AffjaxRequest, affjax)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.ResourceTypes (AsyncDomeinFile, Resource, CouchdbResource)
-import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<>))
+import Perspectives.ResourceTypes (AsyncDomeinFile, CouchdbResource, Resource, stringToRecord)
+import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<$>), (<>))
 
 -- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
 type DomeinFile = StrMap CouchdbResource
 
 -- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
 type DomeinCache = GLStrMap (AVar DomeinFile)
+
+type URL = String
 
 domeinCache :: DomeinCache
 domeinCache = new unit
@@ -104,8 +106,33 @@ stringToPropDefs s = case jsonParser s of
         Nothing -> Left $ "stringToPropDefs: parsed json is not an object!"
         (Just obj) -> Right obj
 
-modelsURL :: String
-modelsURL = "http://localhost:5984/models2/"
+newtype CouchdbAllDocs = CouchdbAllDocs
+  { offset :: Int
+  , rows :: Array { id :: String, value :: { rev :: String}}
+  , total_rows :: Int
+  , update_seq :: Int
+  }
+
+-- | A name not preceded or followed by a forward slash.
+type DatabaseName = String
+
+documentsInDatabase :: forall e. DatabaseName -> Aff (ajax :: AJAX | e) CouchdbAllDocs
+documentsInDatabase database = do
+  res <- affjax $ domeinRequest {url = baseURL <> escapeCouchdbDocumentName database <> "/_all_docs"}
+  case res.status of
+    StatusCode 200 -> pure $ CouchdbAllDocs (stringToRecord res.response )
+    otherwise -> throwError $ error ("documentsInDatabase " <> database <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+
+documentNamesInDatabase :: forall e. DatabaseName -> Aff (ajax :: AJAX | e) (Array String)
+documentNamesInDatabase database = do
+  (CouchdbAllDocs cad) <- documentsInDatabase database
+  pure $ (\({id}) -> id) <$> cad.rows
+
+modelsURL :: URL
+modelsURL = "http://localhost:5984/perspect_models/"
+
+baseURL :: URL
+baseURL = "http://localhost:5984/"
 
 domeinRequest :: AffjaxRequest Unit
 domeinRequest =
