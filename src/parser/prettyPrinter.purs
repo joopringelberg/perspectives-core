@@ -123,7 +123,7 @@ roleProperty = property (pure unit)
 
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
 context definedResources c = do
-  withComments (\r-> context_comments r) contextDeclaration c
+  withComments context_comments contextDeclaration c
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.

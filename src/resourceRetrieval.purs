@@ -6,23 +6,17 @@ module Perspectives.ResourceRetrieval
 where
 
 import Prelude
-import Control.Monad.Aff (Aff, forkAff)
+import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (makeEmptyVar, putVar, takeVar)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
-import Data.Argonaut (Json, toString)
-import Data.Argonaut.Core (JString)
-import Data.Boolean (otherwise)
+import Data.Argonaut (toString)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup)
-import Data.Tuple (snd)
-import Network.HTTP.Affjax (AJAX, Affjax, AffjaxRequest, affjax, put)
-import Network.HTTP.Affjax.Request (toRequest)
-import Network.HTTP.Affjax.Response (class Respondable, fromResponse)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest, put, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
 import Perspectives.Identifiers (escapeCouchdbDocumentName, getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
 import Perspectives.ResourceTypes (Resource, AsyncResource, AsyncDomeinFile, PropDefs(..), CouchdbResource, resource2json)
@@ -66,14 +60,16 @@ storeCouchdbResource resId resource =
   let
     revision =  maybe "" id (maybe Nothing toString (lookup "_rev" resource))
   in do
+    -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
     res <- put (baseURL <> escapeCouchdbDocumentName resId <> revision) (resource2json resource)
-    case res.status of
-      StatusCode 200 ->
+    (StatusCode n) <- pure res.status
+    case n == 200 || n == 201 of
+      true ->
         -- we **must** use res.response and do this with it, or else get an error...
         case stringToPropDefs res.response of
           (Left message) -> throwError $ error (message <> " (" <> resId <> ")")
           Right pd -> pure $ maybe Nothing toString (lookup "rev" pd)
-      otherwise -> throwError $ error ("storeCouchdbResource " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+      false -> throwError $ error ("storeCouchdbResource " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
 baseURL :: String
 baseURL = "http://localhost:5984/user_cor_contexts2/"

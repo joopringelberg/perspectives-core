@@ -116,4 +116,4 @@ roleIndexNr s = case match roleIndexNrRegex s of
 -}
 
 escapeCouchdbDocumentName :: String -> String
-escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%24") (replaceAll (Pattern "$") (Replacement "%3A") s)
+escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)

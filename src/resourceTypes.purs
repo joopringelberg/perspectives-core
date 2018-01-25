@@ -7,6 +7,7 @@ module Perspectives.ResourceTypes
 , Resource
 , CouchdbResource
 , resource2json
+, stringToRecord
 )
 
 where
@@ -40,3 +41,5 @@ instance showPropDefs :: Show PropDefs where
   show (PropDefs s) = "PropDefs=" <> (show $ keys s)
 
 foreign import resource2json :: CouchdbResource -> Json
+
+foreign import stringToRecord :: forall a. String -> {|a}

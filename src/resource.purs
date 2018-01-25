@@ -2,17 +2,16 @@ module Perspectives.Resource where
 
 import Prelude
 import Control.Monad.Aff (Aff, catchError)
-import Control.Monad.Aff.AVar (AVAR, AVar, isEmptyVar, makeEmptyVar, makeVar, putVar, readVar, status, takeVar)
+import Control.Monad.Aff.AVar (AVAR, AVar, isEmptyVar, makeEmptyVar, makeVar, putVar, readVar, takeVar)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (lookup)
+import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.ContextAndRole (context_id)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.ResourceRetrieval (fetchCouchdbResource, storeCouchdbResource)
 import Perspectives.ResourceTypes (DomeinFileEffects, PropDefs(..), Resource, CouchdbResource)
-import Perspectives.Syntax (PerspectContext(..), PerspectRol)
+import Perspectives.Syntax (PerspectContext, PerspectRol)
 
 -- | The global index of definitions of all resources, indexed by Resource.
 type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
