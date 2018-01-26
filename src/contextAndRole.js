@@ -3,8 +3,20 @@
 // CONTEXT
 exports.context_id = function(c)
 {
-  return c.id;
+  return c._id;
 }
+
+exports.context_rev_aux = function(nothing)
+{
+  return function(c)
+  {
+    if (!c._rev)
+    {
+      return nothing;
+    }
+    return c._rev;
+  };
+};
 
 exports.context_displayName = function(c)
 {
@@ -48,11 +60,25 @@ exports.context_comments = function(c)
   return c.comments;
 };
 
+exports.createPerspectContext = function(r) {return r;};
+
 // ROL
 exports.rol_id = function(c)
 {
-  return c.id;
-}
+  return c._id;
+};
+
+exports.rol_rev_aux = function(nothing)
+{
+  return function(c)
+  {
+    if (!c._rev)
+    {
+      return nothing;
+    }
+    return c._rev;
+  };
+};
 
 exports.rol_occurrence = function(c)
 {
@@ -64,7 +90,7 @@ exports.rol_occurrence = function(c)
   {
     return c.occurrence;
   }
-}
+};
 
 exports.rol_pspType = function(c)
 {

@@ -16,7 +16,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
-import Perspectives.Identifiers (roleIndexNr)
+import Perspectives.Identifiers (isInNamespace, roleIndexNr)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
@@ -121,6 +121,9 @@ privateProperty = property (identifier "intern")
 roleProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
 roleProperty = property (pure unit)
 
+contextDeclaration :: forall e. PerspectContext -> PerspectText e
+contextDeclaration x = identifier (context_pspType x) *> identifier' (context_displayName x)
+
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
 context definedResources c = do
   withComments context_comments contextDeclaration c
@@ -130,8 +133,6 @@ context definedResources c = do
   (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values (context_rolInContext c)))
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
-    contextDeclaration :: PerspectContext -> PerspectText e
-    contextDeclaration x = identifier (context_pspType x) *> identifier' (context_displayName x)
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
@@ -196,11 +197,18 @@ enclosingContext theText = do
       (contextIds :: Triple e) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
+    -- TODO We willen alleen de contexten expanderen die lexicaal genest zijn ten opzicht van theText.
+    -- Van andere willen we alleen de declaratie tonen.
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
       mc <- liftAff $ getContext id
       case mc of
         (Just c) -> do
-          context definedContexts c
-          newline
+          if isInNamespace (context_id theText) id
+            then do
+              withComments context_comments contextDeclaration c
+              newline
+            else do
+              context definedContexts c
+              newline
         Nothing -> pure unit

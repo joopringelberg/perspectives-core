@@ -13,10 +13,10 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (createPerspectRol)
+import Perspectives.ContextAndRole (createPerspectContext, createPerspectRol)
 import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
+import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -292,7 +292,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
       -- Storing
       liftAffToIP $ storeRoleInResourceDefinitions rolId
         (createPerspectRol
-          { id: rolId
+          { _id: rolId
           , occurrence: (roleIndex occurrence nrOfRoleOccurrences)
           , pspType: show rname
           , binding: Just binding
@@ -368,13 +368,13 @@ context = withRoleCounting context' where
 
           -- Storing
           liftAffToIP $ storeContextInResourceDefinitions (show instanceName)
-            (PerspectContext
-              { id: (show instanceName)
+            (createPerspectContext
+              { _id: (show instanceName)
               , displayName : localName
               , pspType: show typeName
               , binnenRol:
                 createPerspectRol
-                  { id: (show instanceName) <> "_binnenRol"
+                  { _id: (show instanceName) <> "_binnenRol"
                   , pspType: "model:Perspectives$BinnenRol"
                   , binding: Just $ (show instanceName) <> "_buitenRol"
                   , properties: fromFoldable privateProps
@@ -385,7 +385,7 @@ context = withRoleCounting context' where
             })
           liftAffToIP $ storeRoleInResourceDefinitions ((show instanceName) <> "_buitenRol")
             (createPerspectRol
-              { id: (show instanceName) <> "_buitenRol"
+              { _id: (show instanceName) <> "_buitenRol"
               , pspType: "model:Perspectives$BuitenRol"
               , context: (show instanceName)
               , properties: fromFoldable publicProps
@@ -442,10 +442,11 @@ definition = do
   _ <- incrementRoleInstances prop
   nrOfRoleOccurrences <- getRoleOccurrences prop
   enclContext <- getNamespace
+  -- TODO. DIT IS NIET GOED
   rolId <- pure $ enclContext <> "_" <> prop <> maybe "0" show nrOfRoleOccurrences
   liftAffToIP $ storeRoleInResourceDefinitions rolId
     (createPerspectRol
-      { id: rolId
+      { _id: rolId
       , occurrence: maybe 0 id nrOfRoleOccurrences
       , pspType: prop
       , binding: Just binding
@@ -478,13 +479,13 @@ enclosingContext = withRoleCounting enclosingContext' where
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
       liftAffToIP $ storeContextInResourceDefinitions (show textName)
-        (PerspectContext
-          { id: show textName
+        (createPerspectContext
+          { _id: show textName
           , displayName : show textName
           , pspType: "model:Perspectives$enclosingContext"
           , binnenRol:
             createPerspectRol
-              { id: (show textName) <> "_binnenRol"
+              { _id: (show textName) <> "_binnenRol"
               , pspType: "model:Perspectives$BinnenRol"
               , binding: Just $ (show textName) <> "_buitenRol"
               , properties: fromFoldable privateProps
@@ -496,7 +497,7 @@ enclosingContext = withRoleCounting enclosingContext' where
 
       liftAffToIP $ storeRoleInResourceDefinitions ((show textName) <> "_buitenRol")
         (createPerspectRol
-          { id: show textName <> "_buitenRol"
+          { _id: show textName <> "_buitenRol"
           , pspType: "model:Perspectives$BuitenRol"
           , context: show textName
           , properties: fromFoldable publicProps

@@ -8,6 +8,7 @@ module Perspectives.ResourceTypes
 , CouchdbResource
 , resource2json
 , stringToRecord
+, recordToJson
 )
 
 where
@@ -43,3 +44,5 @@ instance showPropDefs :: Show PropDefs where
 foreign import resource2json :: CouchdbResource -> Json
 
 foreign import stringToRecord :: forall a. String -> {|a}
+
+foreign import recordToJson :: forall a. {|a} -> Json

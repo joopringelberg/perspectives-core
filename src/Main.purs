@@ -17,11 +17,12 @@ import Halogen.Component.ChildPath (cp1, cp2)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
 import Perspectives.ContextRoleParser (enclosingContext) as CRP
+import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery, ModelSelected(..), modelSelect)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Property (PerspectEffects)
-import Perspectives.Resource (getContext, storeCouchdbResourceInCouchdb)
+import Perspectives.Resource (domeinFileFromContext, getContext, storeCouchdbResourceInCouchdb)
 import Perspectives.Syntax (PerspectContext)
 
 -- | Run the app!
@@ -141,9 +142,16 @@ ui =
     case parseResult of
       (Right textName) -> do
         -- save it
-        H.liftAff $ storeCouchdbResourceInCouchdb textName
-        H.modify (_ { text = show textName })
-        pure next
+        mCtxt <- H.liftAff $ getContext textName
+        case mCtxt of
+          Nothing -> do
+            H.modify (_ { text = "Cannot find context " <> textName })
+            pure next
+          (Just ctxt) -> do
+            df <- H.liftAff $ domeinFileFromContext ctxt
+            H.liftAff $ storeDomeinFileInCouchdb df
+            H.modify (_ { text = show textName })
+            pure next
       (Left e) -> do
         H.modify (_ { text = show e })
         pure next

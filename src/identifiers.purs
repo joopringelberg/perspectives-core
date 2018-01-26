@@ -13,6 +13,7 @@ module Perspectives.Identifiers
 , isWellFormedIdentifier
 , roleIndexNr
 , escapeCouchdbDocumentName
+, isInNamespace
   )
 
 where
@@ -20,13 +21,13 @@ import Data.Array (head, index, unsafeIndex)
 import Data.Foldable (or)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, fromFoldable, lookup)
-import Data.String (Pattern(..), Replacement(..), replaceAll)
+import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
-import Prelude (const, flip, id, (<$>))
+import Prelude (const, flip, id, not, ($), (<$>))
 
 standardPrefixes2namespaces :: StrMap String
 standardPrefixes2namespaces = fromFoldable [
@@ -117,3 +118,10 @@ roleIndexNr s = case match roleIndexNrRegex s of
 
 escapeCouchdbDocumentName :: String -> String
 escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
+
+-- | ident is in ns iff the namespace part of ident equals ns.
+-- | E.g. model:Perspectives$Aangifte$Aangever is in the namespace model:Perspectives$Aangifte$.
+isInNamespace :: String -> String -> Boolean
+isInNamespace ns ident =
+  -- A quick test: strip ns from ident. What remains may not hold a "$".
+  not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern ns) ns))

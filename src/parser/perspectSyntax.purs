@@ -15,7 +15,8 @@ newtype Comments e = Comments
 newtype PerspectContext = PerspectContext PerspectContextProperties
 
 type PerspectContextProperties =
-  { id :: ID
+  { _id :: ID
+  , _rev :: Maybe String
   , displayName :: String
   , pspType :: ID
   , binnenRol :: PerspectRol -- TODO: vervang door PerspectRol, zodat de binnenrol ook kan vullen (b.v. rollen van Acties).
@@ -28,7 +29,8 @@ newtype PerspectRol =
   PerspectRol PerspectRolProperties
 
 type PerspectRolProperties =
-    { id :: ID
+    { _id :: ID
+    , _rev :: Maybe String
     , occurrence :: Int
     , pspType :: ID
     , binding :: Maybe ID

@@ -26,3 +26,42 @@ Beide functies kunnen een identiteit zijn.
 De representatie van Nothing en Just kan hier wel een probleem zijn. Dit doet zich voor bij de binding van PerspectRol, die is Maybe ID.
 
 De revisie is onderdeel van het opgehaalde document, in de property "_rev".
+
+
+DOMEINFILE MAKEN, WIJZIGEN
+Scenarios:
+	- maak een nieuwe en sla op (create)
+	- haal een bestaande op (retrieve)
+	- sla een gewijzigde op (modify)
+Problemen kunnen ontstaan als je deze handelingen zo snel achter elkaar uitvoert dat een vorige nog niet is voltooid.
+
+Je wilt dus kunnen zien dat zo'n handeling bezig is. Dat kun je zien aan een lege AVar, als elke handeling begint met de AVar leeg te maken of leeg te laten.
+
+	- create: create AVar en laat leeg. Sla op in couchdb, vul dan met de domeinFile
+		* indien reeds aanwezig: breek af.
+	- retrieve: create AVar en laat leeg. Vul met opgehaalde domeinFile.
+		* indien (leeg) aangetroffen: wacht tot hij gevuld is en lees dan uit. Doe dit met takeVar
+	- modify: maak leeg. Sla op in Couchdb en vul met de (met revision) bijgewerkte domeinFile.
+		* indien leeg aangetroffen: wacht tot hij weer gevuld is, modify dan. Zo worden meerdere wijzigingen in elk geval geordend aangebracht. doe dit met takeVar.
+		* indien niet aangetroffen: volg procedure bij create.
+
+createOrModify:
+	- haal AVar op
+	- indien niet aanwezig:
+		- maak AVar en laat leeg
+		- sla op in couchdb
+		- vul na afloop met domeinFile waarin revision is opgenomen.
+	- indien wel aanwezig: wacht zo nodig tot hij gevuld is en dan:
+		- maak leeg met takeVar (die wacht tot hij gevuld is)
+		- sla op in couchdb
+		- vul na afloop met domeinFile waarin revision is opgenomen.
+
+retrieve:
+	- haal AVar op
+	- indien niet aanwezig:
+		- maak AVar en laat leeg
+		- haal domeinFile op 
+		- na afloop: vul met domeinFile
+	- indien aanwezig en gevuld: lees uit met readVar
+	- indien aanwezig en leeg: wacht tot gevuld en lees uit. Kan ook met readVar.
+	

@@ -3,29 +3,29 @@ module Perspectives.DomeinCache
 
 where
 
-import Control.Monad.Aff (Aff, forkAff)
-import Control.Monad.Aff.AVar (AVar, makeEmptyVar, makeVar, putVar, readVar)
-import Control.Monad.Eff (Eff)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
-import Data.Argonaut (jsonParser, toArray, toObject, toString)
-import Data.Argonaut.Core (JObject)
+import Data.Argonaut (jsonParser, toObject)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, fromFoldable, lookup)
-import Data.Traversable (traverse)
-import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax)
+import Data.StrMap (StrMap, lookup)
+import Data.String (null)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.ResourceTypes (AsyncDomeinFile, CouchdbResource, Resource, stringToRecord)
-import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<$>), (<>))
+import Perspectives.ResourceTypes (AsyncDomeinFile, CouchdbResource, Resource, recordToJson, stringToRecord)
+import Perspectives.Syntax (ID)
+import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<$>), (<>), (==), (||))
 
--- | A DomeinFile is an immutable map of resource type names to resource definitions in the form of PropDefs.
-type DomeinFile = StrMap CouchdbResource
+type DomeinFile = { _id :: ID, _rev :: String, contexts :: DomeinFileContexts}
+
+-- | DomeinFileContexts is an immutable map of resource type names to resource definitions in the form of PropDefs.
+type DomeinFileContexts = StrMap CouchdbResource
 
 -- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
 type DomeinCache = GLStrMap (AVar DomeinFile)
@@ -44,56 +44,26 @@ retrieveDomeinResourceDefinition :: forall e.
   -> Namespace
   -> (AsyncDomeinFile e CouchdbResource)
 retrieveDomeinResourceDefinition id ns = do
-  f <- retrieveDomeinFile ns
-  case lookup id f of
-    Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFile for " <> ns)
+  ({contexts}) <- retrieveDomeinFile ns
+  case lookup id contexts of
+    Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
     (Just propDefs) -> pure propDefs
 
 retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e DomeinFile
 retrieveDomeinFile ns = do
-  x <- liftEff $ peek domeinCache ns
-  case x of
+  mAvar <- liftEff $ peek domeinCache ns
+  case mAvar of
     Nothing -> do
-      v <- makeEmptyVar
-      _ <- storeDomeinFileInCache ns v
+      ev <- makeEmptyVar
+      _ <- liftEff $ poke domeinCache ns ev
       -- forkAff hinders catchError.
       -- _ <- forkAff do
       res <- affjax $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns}
       _ <- case res.status of
-        StatusCode 200 -> case stringToDomeinFile res.response of
-          (Left err) -> throwError $ error err
-          (Right (df :: DomeinFile)) -> putVar df v
+        StatusCode 200 -> putVar (stringToRecord res.response) ev
         otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
-      readVar v
-    (Just v) -> readVar v
-
-stringToDomeinFile :: String -> Either String DomeinFile
-stringToDomeinFile s = case jsonParser s of
-  (Left err) -> Left $ "stringToDomeinFile: cannot parse: " <> s
-  (Right file) ->
-    case toObject file of
-      Nothing -> Left "stringToDomeinFile: received file is not a JSON object!"
-      (Just obj) -> case lookup "resources" obj of
-        Nothing -> Left "stringToDomeinFile: model object does not have a 'resources' property!"
-        (Just json) -> case toArray json of
-          Nothing -> Left "stringToDomeinFile: value of 'resources' property is not an array!"
-          (Just arr) -> case traverse toObject arr of
-            Nothing -> Left "stringToDomeinFile: not all array elements are objects!"
-            (Just objArr) -> case objArrayToDomeinFile objArr of
-              Nothing -> Left "stringToDomeinFile: not all json objects in the array have an appropriate id!"
-              (Just df) -> Right df
-
-objArrayToDomeinFile :: Array JObject -> Maybe DomeinFile
-objArrayToDomeinFile arr = case traverse g arr of
-  Nothing -> Nothing
-  (Just tuples) -> Just $ fromFoldable tuples
-  where
-  g :: JObject -> Maybe (Tuple String CouchdbResource)
-  g def = case lookup "id" def of
-    Nothing -> Nothing
-    (Just json) -> case toString json of
-      Nothing -> Nothing
-      (Just id ) -> Just (Tuple id def)
+      readVar ev
+    (Just avar) -> readVar avar
 
 -- | There can be two error scenarios here: either the returned string cannot be parsed
 -- | by JSON.parse, or the resulting json is not an object. Neither is likely, because Couchdb
@@ -127,6 +97,41 @@ documentNamesInDatabase :: forall e. DatabaseName -> Aff (ajax :: AJAX | e) (Arr
 documentNamesInDatabase database = do
   (CouchdbAllDocs cad) <- documentsInDatabase database
   pure $ (\({id}) -> id) <$> cad.rows
+
+-- | Either create or modify the DomeinFile in couchdb. Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
+storeDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+storeDomeinFileInCouchdb df@{_id} = do
+  mAvar <- liftEff $ peek domeinCache _id
+  case mAvar of
+    Nothing -> createDomeinFileInCouchdb df
+    (Just avar) -> modifyDomeinFileInCouchdb df avar
+
+createDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+createDomeinFileInCouchdb df@{_id, contexts} = do
+  ev <- makeEmptyVar
+  _ <- liftEff $ poke domeinCache _id ev
+  -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
+  res <- put (modelsURL <> escapeCouchdbDocumentName _id) (recordToJson {_id: _id, contexts: contexts})
+  (StatusCode n) <- pure res.status
+  case n == 200 || n == 201 of
+    true -> putVar (df {_rev = (_.rev $ stringToRecord res.response)}) ev
+    false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+
+modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+modifyDomeinFileInCouchdb df@{_id, _rev} av =
+  if null _rev
+    then do
+      oldDf <- takeVar av
+      -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
+      res <- put (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> _rev) (recordToJson df)
+      (StatusCode n) <- pure res.status
+      case n == 200 || n == 201 of
+        true -> do
+          ({rev}) <- pure (stringToRecord res.response)
+          putVar (df {_rev = rev}) av
+        false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+    -- This may happen if a second create scenario overtakes the first one. The initial DomeinFile has Nothing as revision.
+    else pure unit
 
 modelsURL :: URL
 modelsURL = "http://localhost:5984/perspect_models/"

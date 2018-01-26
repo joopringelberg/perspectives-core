@@ -9,6 +9,11 @@ import Perspectives.Syntax (Comments, ID, PerspectContext, PerspectRol, Property
 
 foreign import context_id :: PerspectContext -> ID
 
+foreign import context_rev_aux :: forall a. Maybe a -> PerspectContext -> Maybe String
+
+context_rev :: PerspectContext -> Maybe String
+context_rev = context_rev_aux Nothing
+
 foreign import context_displayName :: PerspectContext -> String
 
 foreign import context_pspType :: PerspectContext -> ID
@@ -21,9 +26,16 @@ foreign import context_rolInContext :: PerspectContext -> StrMap (Array ID)
 
 foreign import context_comments :: PerspectContext -> Comments ()
 
+foreign import createPerspectContext :: forall a. {|a} -> PerspectContext
+
 -- ROL
 
 foreign import rol_id :: PerspectRol -> ID
+
+foreign import rol_rev_aux :: forall a. Maybe a -> PerspectRol -> Maybe String
+
+rol_rev :: PerspectRol -> Maybe String
+rol_rev = rol_rev_aux Nothing
 
 foreign import rol_occurrence :: PerspectRol -> Int
 
