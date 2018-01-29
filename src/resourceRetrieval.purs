@@ -16,7 +16,7 @@ import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, put, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.DomeinCache (retrieveDomeinResourceDefinition, stringToPropDefs)
-import Perspectives.Identifiers (escapeCouchdbDocumentName, getNamespace, getStandardNamespace, isDomeinURI, isStandardNamespaceCURIE)
+import Perspectives.Identifiers (escapeCouchdbDocumentName, getNamespace, getStandardNamespace, isDomeinURI, isQualifiedWithDomein, isStandardNamespaceCURIE)
 import Perspectives.ResourceTypes (AsyncDomeinFile, AsyncResource, CouchdbResource, PropDefs(..), Resource, resource2json, stringToRecord)
 import Perspectives.Syntax (ID)
 
@@ -30,7 +30,7 @@ fetchPropDefs id = do
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
 -- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
 fetchCouchdbResource :: forall e. Resource -> (AsyncDomeinFile e CouchdbResource)
-fetchCouchdbResource id = if isDomeinURI id
+fetchCouchdbResource id = if isQualifiedWithDomein id
   then case getNamespace id of
     Nothing -> throwError $ error ("Cannot construct namespace out of id " <> id)
     (Just ns) -> retrieveDomeinResourceDefinition id ns

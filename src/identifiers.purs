@@ -14,6 +14,7 @@ module Perspectives.Identifiers
 , roleIndexNr
 , escapeCouchdbDocumentName
 , isInNamespace
+, isQualifiedWithDomein
   )
 
 where
@@ -60,6 +61,12 @@ domeinURIRegex = unsafeRegex "^model:(\\w*)\\$(\\w*)$" noFlags
 -- | True iff the string conforms to the model scheme, i.e. "model:SomeDomein$identifier".
 isDomeinURI :: String -> Boolean
 isDomeinURI s = test domeinURIRegex s
+
+domeinURIQualifiedRegex :: Regex
+domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)\\$(.*)$" noFlags
+
+isQualifiedWithDomein :: String -> Boolean
+isQualifiedWithDomein s = test domeinURIQualifiedRegex s
 
 curieRegEx :: Regex
 curieRegEx = unsafeRegex "^(\\w+)\\:(\\w+)" noFlags
