@@ -10,7 +10,6 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Data.Either (Either(..))
 import Data.Either.Nested (Either2)
-import Data.Function (const)
 import Data.Functor.Coproduct.Nested (Coproduct2)
 import Data.Maybe (Maybe(..))
 import Halogen.Component.ChildPath (cp1, cp2)
@@ -22,7 +21,7 @@ import Perspectives.Editor.ModelSelect (ModelSelectQuery, ModelSelected(..), mod
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Property (PerspectEffects)
-import Perspectives.Resource (domeinFileFromContext, getContext, storeCouchdbResourceInCouchdb)
+import Perspectives.Resource (domeinFileFromContext, getContext)
 import Perspectives.Syntax (PerspectContext)
 
 -- | Run the app!

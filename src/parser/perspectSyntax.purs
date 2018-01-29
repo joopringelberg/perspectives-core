@@ -30,15 +30,22 @@ newtype PerspectRol =
 
 type PerspectRolProperties =
     { _id :: ID
-    , _rev :: Maybe String
-    , occurrence :: Int
     , pspType :: ID
-    , binding :: Maybe ID
     , context :: ID
+    -- While the fields above occurr in every role, those below do not.
+    , _rev :: Maybe String
+    , binding :: Maybe ID
+    -- Not all roles have properties.
     , properties :: StrMap PropertyValueWithComments
+    -- Not all roles fill other roles.
     , gevuldeRollen :: StrMap (Array ID)
+    -- occurrence and comments are only useful for roles created in the CRL parser.
+    -- We know precisely where such roles surface in code.
+    , occurrence :: Int
     , comments :: Comments ()
     }
+
+
 
 type PropertyValueWithComments = Comments (value :: Array String)
 

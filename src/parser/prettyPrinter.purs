@@ -194,7 +194,7 @@ enclosingContext theText = do
       newline
       newline
       (Triple{object: definedContexts}) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the context represented by it.
+      (contextIds :: Triple e) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     -- TODO We willen alleen de contexten expanderen die lexicaal genest zijn ten opzicht van theText.

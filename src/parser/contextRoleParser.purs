@@ -427,7 +427,7 @@ section :: forall e. IP (Tuple String (Array ID)) (DomeinFileEffects e)
 section = do
   prop <- sectionHeading
   ids <- AR.many definition
-  pure $ Tuple (show prop) ids
+  pure $ Tuple prop ids
 
 sectionHeading :: forall e. IP ID (DomeinFileEffects e)
 sectionHeading = do
