@@ -5,7 +5,7 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State.Trans (StateT, evalStateT, get)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (ObjectsGetter, PropertyName, getObjectsGetter, getPrivateProperty, getProperty, getPublicProperty, getRol)
+import Perspectives.Property (ObjectsGetter, PropertyName, getPrivateProperty, getProperty, getPublicProperty, getRol)
 import Perspectives.Syntax (RoleName)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
 import Prelude (bind, pure, ($))
@@ -37,30 +37,32 @@ constructTripleGetterFromArbitraryFunction pn objGetter = memorize getter pn
                   , tripleGetter : getter}
 
 -- | Use this function to construct property getters that memorize in the triple administration.
-constructTripleGetter :: forall e.
-  PropertyName ->
-  NamedFunction (TripleGetter e)
-constructTripleGetter pn = NamedFunction pn tripleGetter where
-  tripleGetter :: TripleGetter e
-  tripleGetter id = do
-    remember <- get
-    case remember of
-      true -> do
-        mt <- liftAff $ liftEff (lookupInTripleIndex id pn)
-        case mt of
-          Nothing -> do
-            (object :: Array String) <- liftAff $ getObjectsGetter pn id
-            liftEff (addToTripleIndex id pn object [] [] tripleGetter)
-          (Just t) -> pure t
-      false -> do
-        (object :: Array String) <- liftAff $ getObjectsGetter pn id
-        liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+-- constructTripleGetter :: forall e.
+--   PropertyName ->
+--   NamedFunction (TripleGetter e)
+-- constructTripleGetter pn = NamedFunction pn tripleGetter where
+--   tripleGetter :: TripleGetter e
+--   tripleGetter id = do
+--     remember <- get
+--     case remember of
+--       true -> do
+--         mt <- liftAff $ liftEff (lookupInTripleIndex id pn)
+--         case mt of
+--           Nothing -> do
+--             (object :: Array String) <- liftAff $ getObjectsGetter pn id
+--             liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+--           (Just t) -> pure t
+--       false -> do
+--         (object :: Array String) <- liftAff $ getObjectsGetter pn id
+--         -- TODO: is addToTripleIndex hier niet overbodig?
+--         liftEff (addToTripleIndex id pn object [] [] tripleGetter)
 
 -- | Use this function to construct property getters that memorize in the triple administration. Use with:
 -- | - getRol
 -- | - getPublicProperty
 -- | - getPrivateProperty
 -- | - getProperty
+-- TODO: Dit wordt momenteel niet gebruikt.
 constructTripleGetter' :: forall e.
   (String -> ObjectsGetter e) ->
   PropertyName ->

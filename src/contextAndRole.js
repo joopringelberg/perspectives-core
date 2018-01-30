@@ -60,8 +60,6 @@ exports.context_comments = function(c)
   return c.comments;
 };
 
-exports.createPerspectContext = function(r) {return r;};
-
 // ROL
 exports.rol_id = function(c)
 {
@@ -143,5 +141,3 @@ exports.rol_comments = function(r)
   }
   return r.comments;
 }
-
-exports.createPerspectRol = function(r) {return r;};

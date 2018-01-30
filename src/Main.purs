@@ -21,7 +21,7 @@ import Perspectives.Editor.ModelSelect (ModelSelectQuery, ModelSelected(..), mod
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Property (PerspectEffects)
-import Perspectives.Resource (domeinFileFromContext, getContext)
+import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 
 -- | Run the app!
@@ -107,7 +107,7 @@ ui =
     parseResult <- H.liftAff $ runIndentParser text CRP.enclosingContext
     case parseResult of
       (Right textName) -> do
-        (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getContext textName
+        (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getPerspectEntiteit textName
         case maybeContext of
           Nothing -> do
             H.modify (_ { text = "Cannot find the context that represents this text." })
@@ -126,7 +126,7 @@ ui =
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText response.response)
     pure next
   eval (LoadContext id next) = do
-    (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getContext id
+    (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getPerspectEntiteit id
     case maybeContext of
       Nothing -> do
         H.modify (_ { text = "Cannot find this context: "  <> id })
@@ -141,7 +141,7 @@ ui =
     case parseResult of
       (Right textName) -> do
         -- save it
-        mCtxt <- H.liftAff $ getContext textName
+        mCtxt <- H.liftAff $ getPerspectEntiteit textName
         case mCtxt of
           Nothing -> do
             H.modify (_ { text = "Cannot find context " <> textName })

@@ -28,7 +28,7 @@ De representatie van Nothing en Just kan hier wel een probleem zijn. Dit doet zi
 De revisie is onderdeel van het opgehaalde document, in de property "_rev".
 
 
-DOMEINFILE MAKEN, WIJZIGEN
+DOMEINFILE MAKEN, WIJZIGEN EN OPHALEN
 Scenarios:
 	- maak een nieuwe en sla op (create)
 	- haal een bestaande op (retrieve)
@@ -49,11 +49,11 @@ createOrModify:
 	- haal AVar op
 	- indien niet aanwezig:
 		- maak AVar en laat leeg
-		- sla op in couchdb
+		- sla op in couchdb zonder revision
 		- vul na afloop met domeinFile waarin revision is opgenomen.
 	- indien wel aanwezig: wacht zo nodig tot hij gevuld is en dan:
 		- maak leeg met takeVar (die wacht tot hij gevuld is)
-		- sla op in couchdb
+		- sla op in couchdb met revision
 		- vul na afloop met domeinFile waarin revision is opgenomen.
 
 retrieve:
@@ -64,4 +64,57 @@ retrieve:
 		- na afloop: vul met domeinFile
 	- indien aanwezig en gevuld: lees uit met readVar
 	- indien aanwezig en leeg: wacht tot gevuld en lees uit. Kan ook met readVar.
+	
+CONTEXT OF ROL MAKEN OF OPHALEN
+Scenarios:
+	- maak een nieuwe en sla op (create)
+	- haal een bestaande op (retrieve)
+	
+Je wilt dus kunnen zien dat zo'n handeling bezig is. Dat kun je zien aan een lege AVar, als elke handeling begint met de AVar leeg te maken of leeg te laten.
+
+	- create: create AVar en laat leeg. Sla op in couchdb, vul dan met de couchdbresource
+		* indien reeds aanwezig: breek af.
+	- retrieve: create AVar en laat leeg. Vul met opgehaalde couchdbresource.
+		* indien (leeg) aangetroffen: wacht tot hij gevuld is en lees dan uit. Doe dit met readVar
+
+MAAR: we hebben de situatie laten ontstaan dat de editor een AVar aanmaakt en vult met een couchdbResource, terwijl die nog niet in couchdb is opgeslagen!
+Als we dat in stand houden, hebben we twee functies nodig:
+	- storeExistingCouchdbResourceInCouchdb
+	- createCouchdbResourceInCouchdb
+
+storeExistingCouchdbResourceInCouchdb:
+	- haal AVar op
+	- indien leeg, breek af (want de operatie is kennelijk al in uitvoering)
+	- anders: lees uit met takeVar
+	- sla op in couchdb, ontvang revision
+	- na afloop: vul AVar met coudhbresource met revision
+	
+
+createCouchdbResourceInCouchdb:
+	- haal AVar op
+	- indien aanwezig: breek af
+	- indien afwezig:
+		- maak AVar 
+		- sla op in couchdb
+		- na afloop: vul AVar met couchdbresource
+
+retrieve:
+	- haal AVar op
+	- indien aanwezig: lees uit met readVar en geef terug.
+	- indien afwezig: 
+		- maak AVar
+		- haal couchdbresource op
+		- na afloop: vul AVar met couchdbresource
+		- geef couchdbresource terug.
+
+OVERZICHT VAN FUNCTIES
+createResourceInCouchdb
+	<- createCouchdbResourceInCouchdb
+	<- storeExistingCouchdbResourceInCouchdb
+	
+fetchCouchdbResource
+	-> retrieveDomeinResourceDefinition
+	-> fetchIndividualCouchDbDefinition: MAAR DIE BESTAAT NIET MEER EN WORDT VERVANGEN DOOR: 
+		- retrieveContextFromDomein
+		- retrieveRolFromDomein
 	

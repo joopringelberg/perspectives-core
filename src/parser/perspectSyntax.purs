@@ -1,61 +1,171 @@
 module Perspectives.Syntax where
 
-import Data.Maybe (Maybe)
+import Data.Foreign.Class (class Decode, class Encode)
+import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap)
-import Prelude (class Show, show, (<>))
+import Prelude (class Show, ($), (<>))
 
-type ID = String
-type Comment = String
+-----------------------------------------------------------
+-- PERSPECTCONTEXT
+-----------------------------------------------------------
+newtype PerspectContext = PerspectContext ContextRecord
 
-newtype Comments e = Comments
-  { commentBefore :: Array Comment
-  , commentAfter :: Array Comment
-  | e}
-
-newtype PerspectContext = PerspectContext PerspectContextProperties
-
-type PerspectContextProperties =
+type ContextRecord =
   { _id :: ID
-  , _rev :: Maybe String
+  , _rev :: Revision
   , displayName :: String
   , pspType :: ID
-  , binnenRol :: PerspectRol -- TODO: vervang door PerspectRol, zodat de binnenrol ook kan vullen (b.v. rollen van Acties).
+  , binnenRol :: PerspectRol
   , buitenRol :: ID
   , rolInContext :: StrMap (Array ID)
-  , comments :: Comments ()
+  , comments :: Comments
   }
 
-newtype PerspectRol =
-  PerspectRol PerspectRolProperties
+derive instance genericRepPerspectContext :: Generic PerspectContext _
 
-type PerspectRolProperties =
-    { _id :: ID
-    , pspType :: ID
-    , context :: ID
-    -- While the fields above occurr in every role, those below do not.
-    , _rev :: Maybe String
-    , binding :: Maybe ID
-    -- Not all roles have properties.
-    , properties :: StrMap PropertyValueWithComments
-    -- Not all roles fill other roles.
-    , gevuldeRollen :: StrMap (Array ID)
-    -- occurrence and comments are only useful for roles created in the CRL parser.
-    -- We know precisely where such roles surface in code.
-    , occurrence :: Int
-    , comments :: Comments ()
-    }
+instance showPerspectContext :: Show PerspectContext where
+  show = genericShow
 
+instance encodePerspectContext :: Encode PerspectContext where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
+instance decodePerspectContext :: Decode PerspectContext where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-type PropertyValueWithComments = Comments (value :: Array String)
+-----------------------------------------------------------
+-- PERSPECTROL
+-----------------------------------------------------------
+newtype PerspectRol = PerspectRol RolRecord
 
+type RolRecord =
+  { _id :: ID
+  , pspType :: ID
+  , context :: ID
+  -- While the fields above occur in every role, those below do not.
+  , _rev :: Revision
+  , binding :: Binding
+  -- The four fields below could also be modeled as Maybe values.
+  , properties :: StrMap PropertyValueWithComments
+  , gevuldeRollen :: StrMap (Array ID)
+  , occurrence :: Int
+  , comments :: Comments
+  }
+
+derive instance genericRepPerspectRol :: Generic PerspectRol _
+
+instance showPerspectRol :: Show PerspectRol where
+  show = genericShow
+
+instance encodePerspectRol :: Encode PerspectRol where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance decodePerspectRol :: Decode PerspectRol where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+-----------------------------------------------------------
+-- REVISION, BINDING
+-----------------------------------------------------------
+type Revision = NullOrUndefined String
+
+fromRevision :: Revision -> Maybe String
+fromRevision = unNullOrUndefined
+
+revision :: String -> Revision
+revision r = NullOrUndefined (Just r)
+
+revision' :: Maybe String -> Revision
+revision' = NullOrUndefined
+
+noRevision :: Revision
+noRevision = NullOrUndefined Nothing
+
+type Binding = NullOrUndefined String
+
+fromBinding :: Binding -> Maybe String
+fromBinding = unNullOrUndefined
+
+binding :: ID -> Binding
+binding id = NullOrUndefined (Just id)
+
+-----------------------------------------------------------
+-- COMMENTS
+-----------------------------------------------------------
+newtype Comments = Comments
+  { commentBefore :: Array Comment
+  , commentAfter :: Array Comment
+  }
+
+derive instance genericRepComments :: Generic Comments _
+
+instance showComments :: Show Comments where
+  show = genericShow
+
+instance encodeComments :: Encode Comments where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance decodeComments :: Decode Comments where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+-----------------------------------------------------------
+-- PROPERTYVALUEWITHCOMMENTS
+-----------------------------------------------------------
+newtype PropertyValueWithComments = PropertyValueWithComments
+  { commentBefore :: Array Comment
+  , commentAfter :: Array Comment
+  , value :: Array String
+  }
+
+derive instance genericRepPropertyValueWithComments :: Generic PropertyValueWithComments _
+
+instance showPropertyValueWithComments :: Show PropertyValueWithComments where
+  show = genericShow
+
+instance encodePropertyValueWithComments :: Encode PropertyValueWithComments where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance decodePropertyValueWithComments :: Decode PropertyValueWithComments where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+propertyValue :: PropertyValueWithComments -> Array String
+propertyValue (PropertyValueWithComments{value}) = value
+
+-----------------------------------------------------------
+-- SIMPLE VALUE ALIASES
+-----------------------------------------------------------
 type PerspectName = String
 type PropertyName = String
 type RoleName = String
+type ID = String
+type Comment = String
+type Prefix = String
+type LocalName = String
+type DomeinName = String
+
+-----------------------------------------------------------
+-- EXPANDED, CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION, SIMPLEVALUE
+-----------------------------------------------------------
+data Expanded = Expanded DomeinName LocalName
+
+instance showExpanded :: Show Expanded where
+  show (Expanded domeinName localName) = domeinName <> localName
+
+data ContextDeclaration = ContextDeclaration Expanded Expanded (Array Comment)
+
+derive instance genericContextDeclaration :: Generic ContextDeclaration _
+
+instance showContextDeclaration :: Show ContextDeclaration where
+  show = genericShow
 
 data EnclosingContextDeclaration = EnclosingContextDeclaration Expanded (Array Comment)
 
-data ContextDeclaration = ContextDeclaration Expanded Expanded (Array Comment)
+derive instance genericEnclosingContextDeclaration :: Generic EnclosingContextDeclaration _
+
+instance showEnclosingContextDeclaration :: Show EnclosingContextDeclaration where
+  show = genericShow
 
 data SimpleValue =
     String String
@@ -63,37 +173,7 @@ data SimpleValue =
   | Bool Boolean
   -- en dan nog date
 
-propertyValue :: PropertyValueWithComments -> Array String
-propertyValue (Comments{value}) = value
-
------------------------------------------------------------
--- ContextName
------------------------------------------------------------
-type Prefix = String
-type LocalName = String
-type DomeinName = String
-
-data Expanded = Expanded DomeinName LocalName
-
------------------------------------------------------------
--- Instances
------------------------------------------------------------
-
-foreign import jsonStringify :: forall a. {|a} -> String
-
-instance showPerspectContext :: Show PerspectContext where
-  show (PerspectContext r) = jsonStringify r
-
-instance showPerspectRol :: Show PerspectRol where
-  show (PerspectRol r) = jsonStringify r
+derive instance genericSimpleValue :: Generic SimpleValue _
 
 instance showSimpleValue :: Show SimpleValue where
-  show (String s) = show s
-  show (Int i) = show i
-  show (Bool b) = show b
-
-instance showComments :: Show (Comments e) where
-  show (Comments {commentBefore, commentAfter}) = "commentBefore: " <> show commentBefore <> "\ncommentAfter: " <> show commentAfter
-
-instance showExpanded :: Show Expanded where
-  show (Expanded domeinName localName) = domeinName <> localName
+  show = genericShow

@@ -10,9 +10,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Property (PropDefsEffects)
-import Perspectives.ResourceTypes (Resource)
-import Perspectives.TripleAdministration (Predicate, Triple(..), TripleRef(..), FlexTriple, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
-import Perspectives.TripleGetter (applyNamedFunction, constructTripleGetter)
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), FlexTriple, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
@@ -77,13 +75,16 @@ saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
 
 foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 (Triple e2)
 
-setProperty :: forall e. Resource -> Predicate -> Array String -> FlexTriple e
-setProperty rid pid object =
-  do
-    mt <- liftEff $ lookupInTripleIndex rid pid
-    case mt of
-      -- Case Nothing will not happen when we have contexts.
-      Nothing -> do
-        t <- applyNamedFunction (constructTripleGetter pid) rid
-        liftAff $ saveChangedObject t object
-      (Just t) -> liftAff $ saveChangedObject t object
+-- TODO Deze functie is niet langer nuttig, maar is wel model voor een serie van andere.
+-- Met RDF konden we alleen resources maken en properties veranderen. Met CRL kunnen
+-- we contexten en rollen maken, rollen binden en properties een waarde geven.
+-- setProperty :: forall e. Resource -> Predicate -> Array String -> FlexTriple e
+-- setProperty rid pid object =
+--   do
+--     mt <- liftEff $ lookupInTripleIndex rid pid
+--     case mt of
+--       -- Case Nothing will not happen when we have contexts.
+--       Nothing -> do
+--         t <- applyNamedFunction (constructTripleGetter pid) rid
+--         liftAff $ saveChangedObject t object
+--       (Just t) -> liftAff $ saveChangedObject t object

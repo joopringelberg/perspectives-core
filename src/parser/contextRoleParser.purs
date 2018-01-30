@@ -13,10 +13,10 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (createPerspectContext, createPerspectRol)
-import Perspectives.Resource (storeContextInResourceDefinitions, storeRoleInResourceDefinitions)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
+import Perspectives.Resource (storePerspectEntiteitInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), Expanded(..), ID, PropertyName, PropertyValueWithComments, RoleName, SimpleValue(..), EnclosingContextDeclaration(..))
+import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments(..), RoleName, SimpleValue(..), binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -232,7 +232,7 @@ contextDeclaration = (ContextDeclaration <$> contextName <*> contextName <*> inL
 
 -- | Apply to a single line parser. Will parse a block of contiguous line comments before the line and
 -- | the comment after the expression on the line.
-withComments :: forall e a. IP a e -> IP (Tuple (Comments ()) a) e
+withComments :: forall e a. IP a e -> IP (Tuple Comments a) e
 withComments p = do
   before <- manyOneLineComments
   withPos do
@@ -249,7 +249,7 @@ typedPropertyAssignment scope = go (try (withComments
   where
     go x = do
       (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
-      pure $ Tuple (show pname) (Comments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
+      pure $ Tuple (show pname) (PropertyValueWithComments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
 
 -- | publicContextPropertyAssignment = 'extern' propertyName '=' simpleValue
 publicContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
@@ -281,7 +281,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
       rname@(Expanded _ localRoleName) <- roleName
       occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
       _ <- (sameLine *> reservedOp "=>")
-      (Tuple cmt binding) <- p
+      (Tuple cmt bindng) <- p
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances localRoleName
 
@@ -290,15 +290,15 @@ roleBinding' cname p = ("rolename => contextName" <??>
       rolId <- pure ((show cname) <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
-      liftAffToIP $ storeRoleInResourceDefinitions rolId
-        (createPerspectRol
-          { _id: rolId
-          , occurrence: (roleIndex occurrence nrOfRoleOccurrences)
-          , pspType: show rname
-          , binding: Just binding
-          , context: show cname
-          , properties: fromFoldable ((\(Tuple en cm) -> Tuple (show en) cm) <$> props)
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt }
+      liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
+        (PerspectRol defaultRolRecord
+          { _id = rolId
+          , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
+          , pspType = show rname
+          , binding = binding bindng
+          , context = show cname
+          , properties = fromFoldable ((\(Tuple en cm) -> Tuple (show en) cm) <$> props)
+          , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
       pure $ Tuple (show rname) rolId))
   where
@@ -367,28 +367,28 @@ context = withRoleCounting context' where
           (rolebindings :: List (Tuple RoleName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
           -- Storing
-          liftAffToIP $ storeContextInResourceDefinitions (show instanceName)
-            (createPerspectContext
-              { _id: (show instanceName)
-              , displayName : localName
-              , pspType: show typeName
-              , binnenRol:
-                createPerspectRol
-                  { _id: (show instanceName) <> "_binnenRol"
-                  , pspType: "model:Perspectives$BinnenRol"
-                  , binding: Just $ (show instanceName) <> "_buitenRol"
-                  , properties: fromFoldable privateProps
+          liftAffToIP $ storePerspectEntiteitInResourceDefinitions (show instanceName)
+            (PerspectContext defaultContextRecord
+              { _id = (show instanceName)
+              , displayName  = localName
+              , pspType = show typeName
+              , binnenRol =
+                PerspectRol defaultRolRecord
+                  { _id = (show instanceName) <> "_binnenRol"
+                  , pspType = "model:Perspectives$BinnenRol"
+                  , binding = binding $ (show instanceName) <> "_buitenRol"
+                  , properties = fromFoldable privateProps
                   }
-              , buitenRol: (show instanceName) <> "_buitenRol"
-              , rolInContext: collect rolebindings
-              , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
+              , buitenRol = (show instanceName) <> "_buitenRol"
+              , rolInContext = collect rolebindings
+              , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
-          liftAffToIP $ storeRoleInResourceDefinitions ((show instanceName) <> "_buitenRol")
-            (createPerspectRol
-              { _id: (show instanceName) <> "_buitenRol"
-              , pspType: "model:Perspectives$BuitenRol"
-              , context: (show instanceName)
-              , properties: fromFoldable publicProps
+          liftAffToIP $ storePerspectEntiteitInResourceDefinitions ((show instanceName) <> "_buitenRol")
+            (PerspectRol defaultRolRecord
+              { _id = (show instanceName) <> "_buitenRol"
+              , pspType = "model:Perspectives$BuitenRol"
+              , context = (show instanceName)
+              , properties = fromFoldable publicProps
               })
           pure $ (show instanceName) <> "_buitenRol"
   collect :: List (Tuple RoleName ID) -> StrMap (Array ID)
@@ -437,20 +437,20 @@ sectionHeading = do
 
 definition :: forall e. IP ID (DomeinFileEffects e)
 definition = do
-  binding <- context
+  bindng <- context
   prop <- getSection
   _ <- incrementRoleInstances prop
   nrOfRoleOccurrences <- getRoleOccurrences prop
   enclContext <- getNamespace
   -- TODO. DIT IS NIET GOED
   rolId <- pure $ enclContext <> "_" <> prop <> maybe "0" show nrOfRoleOccurrences
-  liftAffToIP $ storeRoleInResourceDefinitions rolId
-    (createPerspectRol
-      { _id: rolId
-      , occurrence: maybe 0 id nrOfRoleOccurrences
-      , pspType: prop
-      , binding: Just binding
-      , context: enclContext
+  liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
+    (PerspectRol defaultRolRecord
+      { _id = rolId
+      , occurrence = maybe 0 id nrOfRoleOccurrences
+      , pspType = prop
+      , binding = binding bindng
+      , context = enclContext
       })
   pure rolId
 
@@ -478,28 +478,28 @@ enclosingContext = withRoleCounting enclosingContext' where
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
-      liftAffToIP $ storeContextInResourceDefinitions (show textName)
-        (createPerspectContext
-          { _id: show textName
-          , displayName : show textName
-          , pspType: "model:Perspectives$enclosingContext"
-          , binnenRol:
-            createPerspectRol
-              { _id: (show textName) <> "_binnenRol"
-              , pspType: "model:Perspectives$BinnenRol"
-              , binding: Just $ (show textName) <> "_buitenRol"
-              , properties: fromFoldable privateProps
+      liftAffToIP $ storePerspectEntiteitInResourceDefinitions (show textName)
+        (PerspectContext defaultContextRecord
+          { _id = show textName
+          , displayName  = show textName
+          , pspType = "model:Perspectives$enclosingContext"
+          , binnenRol =
+            PerspectRol defaultRolRecord
+              { _id = (show textName) <> "_binnenRol"
+              , pspType = "model:Perspectives$BinnenRol"
+              , binding = binding $ (show textName) <> "_buitenRol"
+              , properties = fromFoldable privateProps
               }
-          , buitenRol: (show textName) <> "_buitenRol"
-          , rolInContext: fromFoldable defs
-          , comments: Comments { commentBefore: cmtBefore, commentAfter: cmt}
+          , buitenRol = (show textName) <> "_buitenRol"
+          , rolInContext = fromFoldable defs
+          , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      liftAffToIP $ storeRoleInResourceDefinitions ((show textName) <> "_buitenRol")
-        (createPerspectRol
-          { _id: show textName <> "_buitenRol"
-          , pspType: "model:Perspectives$BuitenRol"
-          , context: show textName
-          , properties: fromFoldable publicProps
+      liftAffToIP $ storePerspectEntiteitInResourceDefinitions ((show textName) <> "_buitenRol")
+        (PerspectRol defaultRolRecord
+          { _id = show textName <> "_buitenRol"
+          , pspType = "model:Perspectives$BuitenRol"
+          , context = show textName
+          , properties = fromFoldable publicProps
           })
       pure $ show textName

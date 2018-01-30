@@ -20,8 +20,8 @@ import Perspectives.Identifiers (isInNamespace, roleIndexNr)
 import Perspectives.Property (PropDefsEffects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
-import Perspectives.Resource (getContext, getRole)
-import Perspectives.Syntax (Comment, Comments(..), ID, PerspectContext, PerspectRol(..), PropertyName, PropertyValueWithComments, propertyValue)
+import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.Syntax (Comment, Comments(..), ID, PerspectContext, PerspectRol(..), PropertyName, PropertyValueWithComments(..), propertyValue)
 import Perspectives.SystemQueries (binding, rolContext, rolTypen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
@@ -83,7 +83,7 @@ indent p a = do
   _ <- modify (\i -> i - 1)
   pure result
 
-withComments :: forall a e f. (a -> Comments f) -> PrettyPrinter a e -> PrettyPrinter a e
+withComments :: forall a e. (a -> Comments) -> PrettyPrinter a e -> PrettyPrinter a e
 withComments getComments p el = do
   let (Comments{commentBefore, commentAfter}) = getComments el
   traverse_ comment commentBefore
@@ -94,23 +94,31 @@ withComments getComments p el = do
 
 -- Prints each of the comments before on a separate line. Then executes the given PerspectText
 -- and follows that with the comment after, terminated by a newline.
-withComments' :: forall e f. Comments f -> PerspectText e -> PerspectText e
+withComments' :: forall e. Comments -> PerspectText e -> PerspectText e
 withComments' (Comments{commentBefore, commentAfter}) p = do
   traverse_ comment commentBefore
   p
   traverse_ comment' commentAfter
   newline
 
-getCommentBefore :: forall f. Comments f -> Array Comment
+getCommentBefore :: Comments -> Array Comment
 getCommentBefore (Comments {commentBefore}) = commentBefore
 
-getCommentAfter :: forall f. Comments f -> Array Comment
+getCommentAfter :: Comments -> Array Comment
 getCommentAfter (Comments {commentAfter}) = commentAfter
 
 property :: forall e. PerspectText e -> PropertyName -> PropertyValueWithComments -> PerspectText e
-property keyword prop = indent (\pvcomments -> do
-  withComments' pvcomments
-    (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
+property keyword prop = indent (\pvcomments ->
+  do
+    withPVComments pvcomments
+      (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
+  where
+    withPVComments :: PropertyValueWithComments -> PerspectText e -> PerspectText e
+    withPVComments (PropertyValueWithComments{commentBefore, commentAfter}) p = do
+      traverse_ comment commentBefore
+      p
+      traverse_ comment' commentAfter
+      newline
 
 publicProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
 publicProperty = property (identifier "extern")
@@ -130,13 +138,13 @@ context definedResources c = do
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
-  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getRole) (join (values (context_rolInContext c)))
+  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getPerspectEntiteit) (join (values (context_rolInContext c)))
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
-      maybeBuitenRol <- liftAff $ getRole $ context_buitenRol c
+      maybeBuitenRol <- liftAff $ getPerspectEntiteit $ context_buitenRol c
       case maybeBuitenRol of
         (Just buitenRol) -> strMapTraverse_ publicProperty (rol_properties buitenRol)
         Nothing -> pure unit
@@ -151,13 +159,13 @@ context definedResources c = do
       let (occurrence :: String) = maybe "" id (roleIndexNr (rol_id role))
       case elemIndex binding definedResources of
         Nothing -> do -- binding is not a BuitenRol of a context defined at top level in the Text.
-          maybeBinding <- liftAff $ getRole binding
+          maybeBinding <- liftAff $ getPerspectEntiteit binding
           case maybeBinding of
             Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
             (Just binding@(PerspectRol bindingProperties)) -> do
               case rol_pspType binding == "model:Perspectives$BuitenRol" of
                 true -> do -- The binding is a BuitenRol of some context.
-                  maybeContext <- liftAff $ getContext $ rol_context binding
+                  maybeContext <- liftAff $ getPerspectEntiteit $ rol_context binding
                   case maybeContext of
                     Nothing -> reference role
                     (Just contxt) -> do
@@ -165,7 +173,7 @@ context definedResources c = do
                       indent (context definedResources) contxt
                 false -> reference binding -- The binding is a RoleInContext of some context.
         otherwise -> do
-          maybeBinding <- liftAff $ getRole binding
+          maybeBinding <- liftAff $ getPerspectEntiteit binding
           case maybeBinding of
             Nothing -> comment $ "Binding does not exist: " <> binding
             (Just buitenRol) -> withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => " <> rol_context buitenRol)
@@ -201,7 +209,7 @@ enclosingContext theText = do
     -- Van andere willen we alleen de declaratie tonen.
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
-      mc <- liftAff $ getContext id
+      mc <- liftAff $ getPerspectEntiteit id
       case mc of
         (Just c) -> do
           if isInNamespace (context_id theText) id

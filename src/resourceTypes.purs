@@ -1,25 +1,15 @@
 module Perspectives.ResourceTypes
-( AsyncResource
-, ResourceEffects
-, DomeinFileEffects
-, AsyncDomeinFile
-, PropDefs(..)
-, Resource
-, CouchdbResource
-, resource2json
-, stringToRecord
-, recordToJson
-)
 
 where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Aff.AVar (AVAR, AVar)
 import Data.Argonaut (Json)
 import Data.StrMap (StrMap, keys)
 import Network.HTTP.Affjax (AJAX)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Prelude (class Show, show, ($), (<>))
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new)
+import Perspectives.Syntax (PerspectContext, PerspectRol)
+import Prelude (class Show, show, unit, ($), (<>))
 
 type Resource = String
 
@@ -46,3 +36,13 @@ foreign import resource2json :: CouchdbResource -> Json
 foreign import stringToRecord :: forall a. String -> {|a}
 
 foreign import recordToJson :: forall a. {|a} -> Json
+
+type RolDefinitions = GLStrMap (AVar PerspectRol)
+
+type ContextDefinitions = GLStrMap (AVar PerspectContext)
+
+rolDefinitions :: RolDefinitions
+rolDefinitions = new unit
+
+contextDefinitions :: ContextDefinitions
+contextDefinitions = new unit
