@@ -131,4 +131,4 @@ escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (repl
 isInNamespace :: String -> String -> Boolean
 isInNamespace ns ident =
   -- A quick test: strip ns from ident. What remains may not hold a "$".
-  not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern ns) ns))
+  not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern ns) ident))

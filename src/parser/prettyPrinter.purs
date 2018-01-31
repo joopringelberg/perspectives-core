@@ -214,9 +214,9 @@ enclosingContext theText = do
         (Just c) -> do
           if isInNamespace (context_id theText) id
             then do
-              withComments context_comments contextDeclaration c
+              context definedContexts c
               newline
             else do
-              context definedContexts c
+              withComments context_comments contextDeclaration c
               newline
         Nothing -> pure unit

@@ -87,4 +87,4 @@ test = do
   log ( "'model:Perspectives$Rol_rolInContext_1' ## binding = " <> show l20)
 
   l21 <- "model:Perspectives$Rol_rolInContext_1" ## rolType
-  log ( "'model:Perspectives$Rol_rolInContext_1' ## binding = " <> show l21)
+  log ( "'model:Perspectives$Rol_rolInContext_1' ## rolType = " <> show l21)
