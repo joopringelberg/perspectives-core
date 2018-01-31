@@ -1,6 +1,6 @@
 module Perspectives.SystemQueries where
 
-import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
+import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.QueryCombinators (hasValue) as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
@@ -8,41 +8,52 @@ import Prelude (pure)
 identity' :: forall e. ObjectsGetter e
 identity' id = pure [id]
 
+-----------------------------------------------------------
+-- SYSTEM GETTERS
+-- These getters are defined on other members of PerspectRol and PerspectContext than
+-- rolInContext (PerspectContext) or properties (PerspectRol).
+-----------------------------------------------------------
+
 identity :: forall e. NamedTripleGetter e
 identity = constructTripleGetterFromArbitraryFunction "identity" identity'
 
 contextType :: forall e. NamedTripleGetter e
-contextType = constructTripleGetterFromArbitraryFunction "psp:type" getContextType
+contextType = constructTripleGetterFromArbitraryFunction "model:Perspectives$type" getContextType
 
 buitenRol :: forall e. NamedTripleGetter e
-buitenRol = constructTripleGetterFromArbitraryFunction "psp:buitenRol" getBuitenRol
+buitenRol = constructTripleGetterFromArbitraryFunction "model:Perspectives$buitenRol" getBuitenRol
 
-rollen :: forall e. NamedTripleGetter e
-rollen =  constructTripleGetterFromArbitraryFunction "psp:rollen" getRollen
+iedereRolInContext :: forall e. NamedTripleGetter e
+iedereRolInContext =  constructTripleGetterFromArbitraryFunction "model:Perspectives$iedereRolInContext" getRollen
 
 rolTypen :: forall e. NamedTripleGetter e
-rolTypen =  constructTripleGetterFromArbitraryFunction "psp:rolTypen" getRolTypen
+rolTypen =  constructTripleGetterFromArbitraryFunction "model:Perspectives$rolTypen" getRolTypen
 
 rolType :: forall e. NamedTripleGetter e
-rolType = constructTripleGetterFromArbitraryFunction "psp:type" getRolType
+rolType = constructTripleGetterFromArbitraryFunction "model:Perspectives$type" getRolType
 
 binding :: forall e. NamedTripleGetter e
-binding = constructTripleGetterFromArbitraryFunction "psp:binding" getRolBinding
+binding = constructTripleGetterFromArbitraryFunction "model:Perspectives$binding" getRolBinding
 
 rolContext :: forall e. NamedTripleGetter e
-rolContext = constructTripleGetterFromArbitraryFunction "psp:context" getRolContext
-
-isFunctional :: forall e. NamedTripleGetter e
-isFunctional = constructPublicPropertyGetter "psp:isFunctional"
-
-isVerplicht :: forall e. NamedTripleGetter e
-isVerplicht = constructPublicPropertyGetter "psp:isVerplicht"
-
-range :: forall e. NamedTripleGetter e
-range = constructPublicPropertyGetter "psp:range"
+rolContext = constructTripleGetterFromArbitraryFunction "model:Perspectives$context" getRolContext
 
 label :: forall e. NamedTripleGetter e
-label = constructPublicPropertyGetter "psp:label"
+label = constructTripleGetterFromArbitraryFunction "model:Perspectives$label" getDisplayName
+
+-----------------------------------------------------------
+-- GETTERS BASED ON MODEL:PERSPECTIVES$
+-- These getters are based on properties (defined for roles) and roles (defined for contexts)
+-- as modelled in the definitions of CRL and ARC.
+-----------------------------------------------------------
+isFunctional :: forall e. NamedTripleGetter e
+isFunctional = constructPublicPropertyGetter "model:Perspectives$isFunctional"
+
+isVerplicht :: forall e. NamedTripleGetter e
+isVerplicht = constructPublicPropertyGetter "model:Perspectives$isVerplicht"
+
+range :: forall e. NamedTripleGetter e
+range = constructPublicPropertyGetter "model:Perspectives$range"
 
 hasLabel :: forall e. NamedTripleGetter e
 hasLabel = QC.hasValue label

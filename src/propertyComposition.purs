@@ -1,7 +1,7 @@
 module Perspectives.PropertyComposition where
 
 
-import Data.Array (cons, difference)
+import Data.Array (cons, difference, nub)
 import Data.Traversable (traverse)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
 import Prelude (bind, join, pure, ($), (<>), map)
@@ -18,7 +18,7 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
       t@(Triple{object : objectsOfP}) <- p id
       -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
       (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
-      objects <- pure $ join $ map (\(Triple{object}) -> object) triples
+      objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
                     , predicate : name
                     , object : objects

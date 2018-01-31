@@ -7,10 +7,10 @@ import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Ace.BackgroundTokenizer (setTokenizer) as BackgroundTokenizer
+-- import Ace.BackgroundTokenizer (setTokenizer) as BackgroundTokenizer
 import Ace.Document (getLine, onChange) as Document
 import Ace.EditSession (clearAnnotations, getDocument, getLine, setAnnotations, setUseSoftTabs)
-import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), EditSession, Editor, Position(..), Tokenizer, TokenInfo)
+import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), Editor, Position(..), Tokenizer)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Aff.Console (log)

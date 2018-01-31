@@ -16,7 +16,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.Resource (storePerspectEntiteitInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments(..), RoleName, SimpleValue(..), binding)
+import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments(..), RoleName, binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -59,16 +59,16 @@ identifier = token.identifier
 lexeme :: forall a e. IP a e -> IP a e
 lexeme = token.lexeme
 
-int :: forall e. IP SimpleValue e
-int = Int <$> token.integer
+int :: forall e. IP String e
+int = show <$> token.integer
 
-bool :: forall e. IP SimpleValue e
-bool = reserved "true" $> Bool true <|> reserved "false" $> Bool false
+bool :: forall e. IP String e
+bool = reserved "true" $> "true" <|> reserved "false" $> "false"
 
-string :: forall e. IP SimpleValue e
-string = String <$> token.stringLiteral
+string :: forall e. IP String e
+string = token.stringLiteral
 
-simpleValue :: forall e. IP SimpleValue e
+simpleValue :: forall e. IP String e
 simpleValue = string <|> int <|> bool
 
 identLetter :: forall e. IP Char e
@@ -183,10 +183,10 @@ roleName = propertyName
 dataTypes :: Array String
 dataTypes = ["Number", "String", "Boolean", "Date", "SimpleValue"]
 
-dataType :: forall e. IP SimpleValue e
+dataType :: forall e. IP String e
 dataType = try do
   s <- identifier
-  if elem s dataTypes then pure $ String s else fail "one of 'Number', 'String', 'Boolean' or 'Date'."
+  if elem s dataTypes then pure $ s else fail "one of 'Number', 'String', 'Boolean' or 'Date'."
 
 -----------------------------------------------------------
 -- Handling position
@@ -249,7 +249,7 @@ typedPropertyAssignment scope = go (try (withComments
   where
     go x = do
       (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
-      pure $ Tuple (show pname) (PropertyValueWithComments {value: [show value], commentBefore: commentBefore, commentAfter: commentAfter})
+      pure $ Tuple (show pname) (PropertyValueWithComments {value: [value], commentBefore: commentBefore, commentAfter: commentAfter})
 
 -- | publicContextPropertyAssignment = 'extern' propertyName '=' simpleValue
 publicContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
@@ -287,7 +287,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
 
       -- Naming
       nrOfRoleOccurrences <- getRoleOccurrences localRoleName -- The position in the sequence.
-      rolId <- pure ((show cname) <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
+      rolId <- pure ((show cname) <> "_" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
       liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
@@ -432,23 +432,23 @@ section = do
 sectionHeading :: forall e. IP ID (DomeinFileEffects e)
 sectionHeading = do
   prop <- reserved "Section" *> propertyName
-  setSection (show prop)
+  setSection prop
   pure $ show prop
 
 definition :: forall e. IP ID (DomeinFileEffects e)
 definition = do
   bindng <- context
-  prop <- getSection
-  _ <- incrementRoleInstances prop
-  nrOfRoleOccurrences <- getRoleOccurrences prop
+  prop@(Expanded _ localName) <- getSection
+  _ <- incrementRoleInstances (show prop)
+  nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
   -- TODO. DIT IS NIET GOED
-  rolId <- pure $ enclContext <> "_" <> prop <> maybe "0" show nrOfRoleOccurrences
+  rolId <- pure $ enclContext <> "_" <> localName <> maybe "0" show nrOfRoleOccurrences
   liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
       , occurrence = maybe 0 id nrOfRoleOccurrences
-      , pspType = prop
+      , pspType = (show prop)
       , binding = binding bindng
       , context = enclContext
       })

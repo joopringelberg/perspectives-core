@@ -94,7 +94,7 @@ getStandardNamespace :: String -> Maybe Namespace
 getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (getPrefix s)
 
 namespaceRegex :: Regex
-namespaceRegex = unsafeRegex "^(model:\\w*\\$)\\w*$" noFlags
+namespaceRegex = unsafeRegex "^(model:\\w*\\$)[\\w|\\$]*$" noFlags
 
 getNamespace :: String -> Maybe Namespace
 getNamespace = getFirstMatch namespaceRegex

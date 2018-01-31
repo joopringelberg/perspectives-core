@@ -1,67 +1,90 @@
 module Test.Properties where
 
-import Prelude
-import Perspectives.PropertyComposition
-import Perspectives.SystemQueries
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Console (log)
-import Control.Monad.Eff.Console (logShow)
-import Control.Monad.Eff.Class (liftEff)
-import Perspectives.QueryCombinators (filter) as QC
-import Perspectives.QueryEffect ((~>))
-import Perspectives.TripleGetter ((##))
+import Perspectives.PropertyComposition ((>->))
+import Perspectives.QueryCombinators (ignoreCache)
+import Perspectives.SystemQueries (binding, buitenRol, contextType, hasBinding, hasLabel, identity, isVerplicht, label, range, rolContext, iedereRolInContext, rolType, rolTypen)
+import Perspectives.TripleGetter (constructRolGetter, (##))
+import Prelude (Unit, bind, discard, show, (<>))
 import Test.TestEffects (CancelerEffects)
 
-gebruiker :: String
-gebruiker = "user:xGebruiker"
+rolDef :: String
+rolDef = "model:Perspectives$Rol"
+
+isVerplichtDef :: String
+isVerplichtDef = "model:Perspectives$isVerplicht"
+
+viewDef :: String
+viewDef = "model:Perspectives$view"
+
+psp :: String
+psp = "model:Perspectives$"
 
 test :: forall e. Aff (CancelerEffects e) Unit
 test = do
   log "=========================Test.Properties================================"
-  l <-  gebruiker ## label
-  log ( "gebruiker ## label = " <> (show l))
+  l1 <-  rolDef ## iedereRolInContext
+  log ( "rolDef ## iedereRolInContext = " <> (show l1))
 
+  l2 <-  rolDef ## iedereRolInContext >-> binding
+  log ( " rolDef ## iedereRolInContext >-> binding = " <> (show l2))
 
-  log "========================================================="
-  l1 <-  gebruiker ## (rol_RolBinding >-> label)
-  log ( "gebruiker ## (rol_RolBinding >-> label) = " <> (show l1))
+  l3 <-  rolDef ## iedereRolInContext >-> binding >-> rolContext
+  log ( " rolDef ## iedereRolInContext >-> binding >-> rolContext = " <> (show l3))
 
-  log "========================================================="
-  h <-  gebruiker ## types
-  log ( "gebruiker ## types = " <> (show h))
+  l4 <-  rolDef ## iedereRolInContext >-> identity
+  log ( " rolDef ## iedereRolInContext >-> identity = " <> (show l4))
 
-  log "========================================================="
-  m <-  "model:ExecutieKetenDomein#ExecutieKetenDomein" ## label
-  log ( "\"model:ExecutieKetenDomein#ExecutieKetenDomein\" ## label = " <> (show m))
+  l5 <-  rolDef ## iedereRolInContext >-> binding >-> rolContext >-> contextType
+  log ( " rolDef ## iedereRolInContext >-> identity >-> contextType = " <> (show l5))
 
-  log "========================================================="
-  n <-  "model:ExecutieKetenDomein#ExecutieKetenDomein" ## subClassOf >-> label
-  log ( "\"model:ExecutieKetenDomein#ExecutieKetenDomein\" ## subClassOf >-> label = " <> (show n))
+  l6 <-  rolDef ## buitenRol
+  log ( " rolDef ## buitenRol = " <> (show l6))
 
-  log "========================================================="
-  o <-  gebruiker ## rdfType >-> label
-  log ( "gebruiker ## rdfType >-> label = " <> (show o))
+  l7 <-  rolDef ## rolTypen
+  log ( " rolDef ## rolTypen = " <> (show l7))
 
-  log "========================================================="
-  p <-  gebruiker ## types >-> label
-  log ( "gebruiker ## types >-> label = " <> (show p))
+  l8 <-  rolDef ## iedereRolInContext >-> rolType
+  log ( " rolDef ## iedereRolInContext >-> rolType = " <> (show l8))
 
-  log "========================================================="
-  p' <-  gebruiker ## rol_RolBinding >-> rdfType >-> types >-> subClassOf >-> label
-  log ( "gebruiker ## rol_RolBinding >-> rdfType >-> types >-> subClassOf >-> label = " <> (show p'))
+  l9 <-  isVerplichtDef ## isVerplicht
+  log ( " isVerplichtDef ## isVerplicht = " <> (show l9))
 
-  log "========================================================="
-  q <-  gebruiker ## rdfType >-> superClasses
-  log ( "gebruiker ## rdfType >-> superClasses = " <> (show q))
+  l10 <-  rolDef ## label
+  log ( " isVerplichtDef ## label = " <> (show l10))
 
-  log "========================================================="
-  q' <- gebruiker ## typeSuperClasses >-> identity
-  log ( "gebruiker ## typeSuperClasses >-> identity = " <> (show q'))
+  l11 <-  isVerplichtDef ## range
+  log ( " isVerplichtDef ## range = " <> (show l11))
 
-  log "========================================================="
-  r <-  gebruiker ## typeSuperClasses >-> hasLabel
-  log ( "gebruiker ## typeSuperClasses >-> hasLabel = " <> (show r))
+  l12 <-  rolDef ## hasLabel
+  log ( " rolDef ## hasLabel = " <> (show l12))
 
-  log "========================================================="
-  s <-  gebruiker ## (QC.filter hasLabel typeSuperClasses)
-  log ( "gebruiker ## (QC.filter hasLabel typeSuperClasses) = " <> (show s))
+  l13 <-  viewDef ## iedereRolInContext >-> hasBinding
+  log ( " viewDef ## iedereRolInContext >-> hasBinding = " <> (show l13))
+
+  log "========================= TESTING TO DEBUG MODEL LOADING ================================"
+  l14 <- psp ## rolTypen
+  log ( "psp ## rolTypen = " <> show l14)
+
+  l15 <- psp ## ignoreCache (constructRolGetter "model:Perspectives$rolInContext")
+  log ( "psp ## (constructRolGetter 'model:Perspectives$rolInContext') = " <> show l15)
+
+  l16 <- psp ## ignoreCache (constructRolGetter "model:Perspectives$rolInContext") >-> binding
+  log ( "psp ## (constructRolGetter 'model:Perspectives$rolInContext') >-> binding = " <> show l16)
+
+  l17 <-  rolDef ## (constructRolGetter "model:Perspectives$rolInContext")
+  log ( "rolDef ## (constructRolGetter 'model:Perspectives$rolInContext') = " <> (show l17))
+
+  l18 <- psp ## ignoreCache iedereRolInContext
+  log ( "psp ## iedereRolInContext = " <> show l18)
+
+  l19 <- psp ## ignoreCache iedereRolInContext >-> binding
+  log ( "psp ## iedereRolInContext >-> binding = " <> show l19)
+
+  -- Dit levert een lege lijst!
+  l20 <- "model:Perspectives$Rol_rolInContext_1" ## binding
+  log ( "'model:Perspectives$Rol_rolInContext_1' ## binding = " <> show l20)
+
+  l21 <- "model:Perspectives$Rol_rolInContext_1" ## rolType
+  log ( "'model:Perspectives$Rol_rolInContext_1' ## binding = " <> show l21)

@@ -4,9 +4,10 @@ import Test.TestEffects as TE
 import Control.Monad.Aff (Fiber, runAff)
 import Control.Monad.Aff.Console (CONSOLE)
 import Control.Monad.Eff (Eff)
-import Prelude (Unit, pure)
+import Prelude (Unit)
+import Test.Properties
 
--- main :: forall e. Eff (TE.TestEffects (console :: CONSOLE | e)) (Fiber (TE.TestEffects (console :: CONSOLE | e)) Unit)
--- main = runAff TE.handleError test
+main :: forall e. Eff (TE.TestEffects (console :: CONSOLE | e)) (Fiber (TE.TestEffects (console :: CONSOLE | e)) Unit)
+main = runAff TE.handleError test
 
-main = pure 1
+-- main = pure 1

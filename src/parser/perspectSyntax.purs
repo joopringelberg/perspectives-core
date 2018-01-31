@@ -146,7 +146,7 @@ type LocalName = String
 type DomeinName = String
 
 -----------------------------------------------------------
--- EXPANDED, CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION, SIMPLEVALUE
+-- EXPANDED, CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION
 -----------------------------------------------------------
 data Expanded = Expanded DomeinName LocalName
 
@@ -165,15 +165,4 @@ data EnclosingContextDeclaration = EnclosingContextDeclaration Expanded (Array C
 derive instance genericEnclosingContextDeclaration :: Generic EnclosingContextDeclaration _
 
 instance showEnclosingContextDeclaration :: Show EnclosingContextDeclaration where
-  show = genericShow
-
-data SimpleValue =
-    String String
-  | Int Int
-  | Bool Boolean
-  -- en dan nog date
-
-derive instance genericSimpleValue :: Generic SimpleValue _
-
-instance showSimpleValue :: Show SimpleValue where
   show = genericShow

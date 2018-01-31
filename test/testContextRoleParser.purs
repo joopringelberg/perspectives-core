@@ -5,7 +5,7 @@ import Control.Monad.Aff (Aff, runAff_)
 import Control.Monad.Aff.Console (CONSOLE, log)
 import Control.Monad.Eff (Eff)
 import Data.Maybe (Maybe)
-import Perspectives.Resource (PROPDEFS, getContext)
+import Perspectives.Resource (PROPDEFS, getPerspectEntiteit)
 import Perspectives.ResourceTypes (DomeinFileEffects)
 import Perspectives.Syntax (PerspectContext)
 -----------------------------------------------------------
@@ -20,7 +20,7 @@ runTest t =
 
 getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectContext)
 getContextDef id = do
-  getContext id
+  getPerspectEntiteit id
 
 -- runAndShowContext :: forall e. String -> Eff (DomeinFileEffects (prd :: PROPDEFS, console :: CONSOLE | e)) Unit
 -- runAndShowContext text = runTest ((runIndentParser text context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))

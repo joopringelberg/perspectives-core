@@ -3,12 +3,12 @@ module Perspectives.Property where
 import Prelude
 import Control.Monad.Aff (Aff)
 import Control.Monad.ST (ST)
-import Data.Array (singleton)
+import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPerspectEntiteit)
 import Perspectives.ResourceTypes (Resource, DomeinFileEffects)
 import Perspectives.Syntax (ID, PerspectContext, PerspectRol, RoleName, propertyValue)
@@ -58,10 +58,13 @@ getRol :: forall e. RoleName -> ObjectsGetter e
 getRol rn = getContextMember \context -> maybe [] id (lookup rn (context_rolInContext context))
 
 getRollen :: forall e. ObjectsGetter e
-getRollen = getContextMember \context -> join $ values (context_rolInContext context)
+getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)
 
 getRolTypen :: forall e. ObjectsGetter e
 getRolTypen = getContextMember \context -> keys (context_rolInContext context)
+
+getDisplayName :: forall e. ObjectsGetter e
+getDisplayName = getContextMember \context -> [(context_displayName context)]
 
 getPublicProperty :: forall e. PropertyName -> ObjectsGetter e
 getPublicProperty pn id = do

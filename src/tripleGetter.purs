@@ -62,12 +62,11 @@ constructTripleGetterFromArbitraryFunction pn objGetter = memorize getter pn
 -- | - getPublicProperty
 -- | - getPrivateProperty
 -- | - getProperty
--- TODO: Dit wordt momenteel niet gebruikt.
-constructTripleGetter' :: forall e.
+constructTripleGetter :: forall e.
   (String -> ObjectsGetter e) ->
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructTripleGetter' objectsGetter pn = NamedFunction pn tripleGetter where
+constructTripleGetter objectsGetter pn = NamedFunction pn tripleGetter where
   tripleGetter :: TripleGetter e
   tripleGetter id = do
     memorize <- get
@@ -87,19 +86,19 @@ constructTripleGetter' objectsGetter pn = NamedFunction pn tripleGetter where
 constructPublicPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructPublicPropertyGetter pn = constructTripleGetter' getPublicProperty pn
+constructPublicPropertyGetter pn = constructTripleGetter getPublicProperty pn
 
 constructPrivatePropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructPrivatePropertyGetter pn = constructTripleGetter' getPrivateProperty pn
+constructPrivatePropertyGetter pn = constructTripleGetter getPrivateProperty pn
 
 constructPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructPropertyGetter pn = constructTripleGetter' getProperty pn
+constructPropertyGetter pn = constructTripleGetter getProperty pn
 
 constructRolGetter :: forall e.
   RoleName ->
   NamedFunction (TripleGetter e)
-constructRolGetter pn = constructTripleGetter' getRol pn
+constructRolGetter pn = constructTripleGetter getRol pn
