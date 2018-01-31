@@ -1,6 +1,6 @@
 module Perspectives.ContextAndRole where
 
-import Data.Foreign.NullOrUndefined (NullOrUndefined(..))
+import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..))
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty)
@@ -8,27 +8,32 @@ import Perspectives.Syntax (Comments(..), ContextRecord, ID, PerspectContext(..)
 
 -- CONTEXT
 
-foreign import context_id :: PerspectContext -> ID
-
-foreign import context_rev_aux :: forall a. Maybe a -> PerspectContext -> Maybe String
+context_id :: PerspectContext -> ID
+context_id (PerspectContext{_id})= _id
 
 context_rev :: PerspectContext -> Maybe String
-context_rev = context_rev_aux Nothing
+context_rev (PerspectContext{_rev}) = unNullOrUndefined _rev
 
 context_rev' :: PerspectContext -> Revision
-context_rev' (PerspectContext c) = c._rev
+context_rev' (PerspectContext{_rev}) = _rev
 
-foreign import context_displayName :: PerspectContext -> String
+context_displayName :: PerspectContext -> String
+context_displayName (PerspectContext{displayName})= displayName
 
-foreign import context_pspType :: PerspectContext -> ID
+context_pspType :: PerspectContext -> ID
+context_pspType (PerspectContext{pspType})= pspType
 
-foreign import context_binnenRol :: PerspectContext -> PerspectRol
+context_binnenRol :: PerspectContext -> PerspectRol
+context_binnenRol (PerspectContext{binnenRol})= binnenRol
 
-foreign import context_buitenRol :: PerspectContext -> ID
+context_buitenRol :: PerspectContext -> ID
+context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
-foreign import context_rolInContext :: PerspectContext -> StrMap (Array ID)
+context_rolInContext :: PerspectContext -> StrMap (Array ID)
+context_rolInContext (PerspectContext{rolInContext})= rolInContext
 
-foreign import context_comments :: PerspectContext -> Comments
+context_comments :: PerspectContext -> Comments
+context_comments (PerspectContext{comments})= comments
 
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
@@ -60,32 +65,35 @@ defaultRolRecord =
 
 -- ROL
 
-foreign import rol_id :: PerspectRol -> ID
-
-foreign import rol_rev_aux :: forall a. Maybe a -> PerspectRol -> Maybe String
+rol_id :: PerspectRol -> ID
+rol_id (PerspectRol{_id}) = _id
 
 rol_rev :: PerspectRol -> Maybe String
-rol_rev = rol_rev_aux Nothing
+rol_rev (PerspectRol{_rev}) = unNullOrUndefined _rev
 
 rol_rev' :: PerspectRol -> Revision
-rol_rev' (PerspectRol r)= r._rev
+rol_rev' (PerspectRol{_rev}) = _rev
 
-foreign import rol_occurrence :: PerspectRol -> Int
+rol_occurrence :: PerspectRol -> Int
+rol_occurrence (PerspectRol{occurrence}) = occurrence
 
-foreign import rol_pspType :: PerspectRol -> ID
-
-foreign import rol_binding_aux :: forall a. Maybe a -> PerspectRol -> Maybe ID
+rol_pspType :: PerspectRol -> ID
+rol_pspType (PerspectRol{pspType}) = pspType
 
 rol_binding :: PerspectRol -> Maybe ID
-rol_binding = rol_binding_aux Nothing
+rol_binding (PerspectRol{binding}) = unNullOrUndefined binding
 
-foreign import rol_context :: PerspectRol -> ID
+rol_context :: PerspectRol -> ID
+rol_context (PerspectRol{context}) = context
 
-foreign import rol_properties :: PerspectRol -> StrMap PropertyValueWithComments
+rol_properties :: PerspectRol -> StrMap PropertyValueWithComments
+rol_properties (PerspectRol{properties}) = properties
 
-foreign import rol_gevuldeRollen :: PerspectRol -> StrMap (Array ID)
+rol_gevuldeRollen :: PerspectRol -> StrMap (Array ID)
+rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
 
-foreign import rol_comments :: PerspectRol -> Comments
+rol_comments :: PerspectRol -> Comments
+rol_comments (PerspectRol{comments}) = comments
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)
