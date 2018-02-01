@@ -149,7 +149,6 @@ context definedResources c = do
         (Just buitenRol) -> strMapTraverse_ publicProperty (rol_properties buitenRol)
         Nothing -> pure unit
 
-    -- TODO: vervang de pattern matching zodra de binnenRol een 'echte' rol is.
     privateProperties = strMapTraverse_ privateProperty (rol_properties (context_binnenRol c))
 
     roleBinding :: PerspectRol -> PerspectText e
@@ -158,30 +157,39 @@ context definedResources c = do
       let (binding :: ID) = (unsafePartial $ fromJust (rol_binding role))
       let (occurrence :: String) = maybe "" id (roleIndexNr (rol_id role))
       case elemIndex binding definedResources of
-        Nothing -> do -- binding is not a BuitenRol of a context defined at top level in the Text.
-          maybeBinding <- liftAff $ getPerspectEntiteit binding
-          case maybeBinding of
+        -- binding is NOT a BuitenRol of a context defined at top level in the Text.
+        Nothing -> do
+          maybeRol <- liftAff $ getPerspectEntiteit binding
+          case maybeRol of
             Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
-            (Just binding@(PerspectRol bindingProperties)) -> do
-              case rol_pspType binding == "model:Perspectives$BuitenRol" of
-                true -> do -- The binding is a BuitenRol of some context.
-                  maybeContext <- liftAff $ getPerspectEntiteit $ rol_context binding
-                  case maybeContext of
-                    Nothing -> reference role
-                    (Just contxt) -> do
-                      withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => ")
-                      indent (context definedResources) contxt
-                false -> reference binding -- The binding is a RoleInContext of some context.
+            (Just boundRol@(PerspectRol bindingProperties)) -> do
+              case rol_pspType boundRol == "model:Perspectives$BuitenRol" of
+                -- boundRol is a BuitenRol of some context.
+                true -> if isInNamespace (context_id c) (rol_context boundRol)
+                  -- boundRol is in the namespace of context c
+                  then
+                    do
+                      maybeContext <- liftAff $ getPerspectEntiteit $ rol_context boundRol
+                      case maybeContext of
+                        Nothing -> reference role boundRol
+                        (Just contxt) -> do
+                          withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => ")
+                          -- Only if in namespace of c!
+                          indent (context definedResources) contxt
+                  -- boundRol is not in the namespace of context c.
+                  else reference role boundRol
+                false -> reference role boundRol -- The boundRol is a RoleInContext of some context.
+        -- binding is a BuitenRol of a context defined at top level in the Text.
         otherwise -> do
-          maybeBinding <- liftAff $ getPerspectEntiteit binding
-          case maybeBinding of
+          maybeRol <- liftAff $ getPerspectEntiteit binding
+          case maybeRol of
             Nothing -> comment $ "Binding does not exist: " <> binding
-            (Just buitenRol) -> withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => " <> rol_context buitenRol)
+            (Just buitenRol) -> reference role buitenRol
 
       strMapTraverse_ roleProperty (rol_properties role)
 
-    reference :: PerspectRol -> PerspectText e
-    reference r = withComments' (rol_comments r) (identifier $ (rol_pspType r) <> " => " <> (maybe "" id (rol_binding r)))
+    reference :: PerspectRol -> PerspectRol -> PerspectText e
+    reference role binding = withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => " <> (rol_context binding))
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
@@ -205,8 +213,6 @@ enclosingContext theText = do
       (contextIds :: Triple e) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
-    -- TODO We willen alleen de contexten expanderen die lexicaal genest zijn ten opzicht van theText.
-    -- Van andere willen we alleen de declaratie tonen.
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
       mc <- liftAff $ getPerspectEntiteit id

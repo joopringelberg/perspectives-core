@@ -307,7 +307,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
       _ <- incrementRoleInstances (show rname)
 
       -- Naming
-      nrOfRoleOccurrences <- getRoleOccurrences localRoleName -- The position in the sequence.
+      nrOfRoleOccurrences <- getRoleOccurrences (show rname) -- The position in the sequence.
       rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
