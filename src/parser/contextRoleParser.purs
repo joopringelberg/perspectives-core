@@ -101,8 +101,8 @@ domeinName = do
   domein <- capitalizedString
   pure $ "model:" <> domein
 
-standaloneDomeinName :: forall e. IP ModelName e
-standaloneDomeinName = lexeme do
+modelName :: forall e. IP ModelName e
+modelName = lexeme do
   dn <- domeinName
   pure $ ModelName dn
 
@@ -142,7 +142,6 @@ prefixedPropertyName = prefixedName localPropertyName
 
 -- qualifiedResourceName = domeinName localContextName
 expandedContextName :: forall e. IP QualifiedName e
--- expandedContextName = try $ lexeme (Expanded <$> domeinName <*> localContextName)
 expandedContextName = try $ lexeme $ do
   dn <- domeinName
   _ <- STRING.string "$"
@@ -184,7 +183,7 @@ contextName = (expandedContextName <|> prefixedContextName <|> defaultNamespaced
 perspectEntiteitIdentifier :: forall e. IP PEIdentifier e
 perspectEntiteitIdentifier =
   do
-    d <- standaloneDomeinName
+    d <- modelName
     pure (show d)
   <|>
   do
@@ -333,7 +332,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
         Nothing -> 0
 
 -- | The inline context may itself use a defaultNamespacedContextName name. However,
--- | what is returned from the context parser is an ExpandedQN.
+-- | what is returned from the context parser is an QualifiedName.
 roleBindingWithInlineContext :: forall e. QualifiedName
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBindingWithInlineContext cName = roleBinding' cName do
@@ -480,7 +479,7 @@ definition = do
 -----------------------------------------------------------
 importExpression :: forall e. IP Unit e
 importExpression = do
-  ns@(ModelName mn) <- reserved "import" *> standaloneDomeinName
+  ns@(ModelName mn) <- reserved "import" *> modelName
   mpre <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   case mpre of
     Nothing -> pure unit

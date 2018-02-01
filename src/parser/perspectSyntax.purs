@@ -7,7 +7,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap)
-import Perspectives.Identifiers (ModelName, QualifiedName, PEIdentifier)
+import Perspectives.Identifiers (QualifiedName, PEIdentifier)
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
@@ -135,18 +135,15 @@ propertyValue :: PropertyValueWithComments -> Array String
 propertyValue (PropertyValueWithComments{value}) = value
 
 -----------------------------------------------------------
--- SIMPLE VALUE ALIASES
+-- ALIASES
 -----------------------------------------------------------
-type PerspectName = String
 type PropertyName = String
 type RoleName = String
 type ID = String
 type Comment = String
-type Prefix = String
-type DomeinName = String
 
 -----------------------------------------------------------
--- EXPANDED, CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION
+-- CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION
 -----------------------------------------------------------
 data ContextDeclaration = ContextDeclaration QualifiedName QualifiedName (Array Comment)
 

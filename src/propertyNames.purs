@@ -5,7 +5,7 @@ import Data.String (take, toUpper, drop, toLower)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Perspectives.Identifiers (getFirstMatch, getLocalNameFromCurie, getLocalNameFromURI, getNamespace, getPrefix, getSecondMatch, isStandardNamespaceCURIE)
+import Perspectives.Identifiers (getFirstMatch, deconstructLocalNameFromCurie, deconstructLocalNameFromDomeinURI, deconstructNamespace, deconstructPrefix, getSecondMatch, isStandardNamespaceCURIE)
 import Prelude (id, ($), (<>))
 
 {-
@@ -33,7 +33,7 @@ decapitalizeWord :: String -> String
 decapitalizeWord = toLower
 
 invertIdentifierFromStandardNamespace :: String -> Maybe String
-invertIdentifierFromStandardNamespace s = if isStandardNamespaceCURIE s then Just (((maybe "" id) (getPrefix s)) <> ":inverse_" <> (maybe "" id)  (getLocalNameFromCurie s)) else Nothing
+invertIdentifierFromStandardNamespace s = if isStandardNamespaceCURIE s then Just (((maybe "" id) (deconstructPrefix s)) <> ":inverse_" <> (maybe "" id)  (deconstructLocalNameFromCurie s)) else Nothing
 
 domainRangeRuleRegex :: Regex
 domainRangeRuleRegex = unsafeRegex "(.+?)\\_(.+)" noFlags
@@ -45,8 +45,8 @@ conformsToDomainRangeRule s = test domainRangeRuleRegex s
 invertDomainAndRange :: String -> Maybe String
 invertDomainAndRange pn =
     let
-      namespace = getNamespace pn
-      in case getLocalNameFromURI pn of
+      namespace = deconstructNamespace pn
+      in case deconstructLocalNameFromDomeinURI pn of
         (Just ln) ->
           if conformsToDomainRangeRule ln
             then let

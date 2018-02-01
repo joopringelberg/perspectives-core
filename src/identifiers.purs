@@ -1,17 +1,15 @@
 module Perspectives.Identifiers
-( isDomeinURI
-, isStandardNamespaceCURIE
+( isStandardNamespaceCURIE
 , isStandardNamespacePrefix
 , getStandardNamespace
-, getPrefix
-, getLocalNameFromCurie
-, getLocalNameFromURI
-, getNamespace
+, deconstructPrefix
+, deconstructLocalNameFromCurie
+, deconstructLocalNameFromDomeinURI
+, deconstructNamespace
 , getFirstMatch
 , getSecondMatch
 , Namespace
 , LocalName
-, isWellFormedIdentifier
 , roleIndexNr
 , escapeCouchdbDocumentName
 , isInNamespace
@@ -22,6 +20,7 @@ module Perspectives.Identifiers
 , pe_namespace
 , pe_localName
 , PEIdentifier
+, Prefix
   )
 
 where
@@ -78,7 +77,6 @@ instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName w
   pe_namespace (QualifiedName ns _) = ns
   pe_localName (QualifiedName _ ln) = Just ln
 
-
 getFirstMatch :: Regex -> String -> Maybe String
 getFirstMatch regex s = case match regex s of
   (Just matches) -> unsafePartial unsafeIndex matches 1
@@ -88,13 +86,6 @@ getSecondMatch :: Regex -> String -> Maybe String
 getSecondMatch regex s = case match regex s of
   (Just matches) -> unsafePartial unsafeIndex matches 2
   _ -> Nothing
-
-domeinURIRegex :: Regex
-domeinURIRegex = unsafeRegex "^model:(\\w*)(\\w*)$" noFlags
-
--- | True iff the string conforms to the model scheme, i.e. "model:SomeDomein$identifier".
-isDomeinURI :: String -> Boolean
-isDomeinURI s = test domeinURIRegex s
 
 domeinURIQualifiedRegex :: Regex
 domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)(.*)$" noFlags
@@ -106,12 +97,12 @@ curieRegEx :: Regex
 curieRegEx = unsafeRegex "^(\\w+)\\:(\\w+)" noFlags
 
 -- | Returns 'pre' from 'pre:someurl' or Nothing.
-getPrefix :: String -> Maybe Prefix
-getPrefix = getFirstMatch curieRegEx
+deconstructPrefix :: String -> Maybe Prefix
+deconstructPrefix = getFirstMatch curieRegEx
 
 -- | Returns "someurl" from "pre:someurl" or Nothing
-getLocalNameFromCurie :: String -> Maybe String
-getLocalNameFromCurie = getSecondMatch curieRegEx
+deconstructLocalNameFromCurie :: String -> Maybe String
+deconstructLocalNameFromCurie = getSecondMatch curieRegEx
 
 -- | True iff the string is a curie with a recognizable prefix that is one of prefixes of the standard namespaces: "owl:whatever" returns true.
 isStandardNamespaceCURIE :: String -> Boolean
@@ -125,22 +116,20 @@ isStandardNamespacePrefix pre = maybe false (const true) (lookup pre standardPre
 
 -- | From "owl:Thing", get "http://www.w3.org/2002/07/owl$"
 getStandardNamespace :: String -> Maybe Namespace
-getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (getPrefix s)
+getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (deconstructPrefix s)
 
 namespaceRegex :: Regex
 namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
 
-getNamespace :: String -> Maybe Namespace
-getNamespace = getFirstMatch namespaceRegex
+deconstructNamespace :: String -> Maybe Namespace
+deconstructNamespace = getFirstMatch namespaceRegex
 
--- | Returns "someurl" from "pre:someurl" or Nothing
-getLocalNameFromURI :: String -> Maybe String
-getLocalNameFromURI = getSecondMatch domeinURIRegex
+domeinURIRegex :: Regex
+domeinURIRegex = unsafeRegex "^model:(\\w*)\\$(\\w*)$" noFlags
 
-isWellFormedIdentifier :: String -> Boolean
-isWellFormedIdentifier s = case isDomeinURI s of
-  true -> true
-  false -> isStandardNamespaceCURIE s
+-- | Returns "someurl" from "model:ModelName$someurl" or Nothing
+deconstructLocalNameFromDomeinURI :: String -> Maybe String
+deconstructLocalNameFromDomeinURI = getSecondMatch domeinURIRegex
 
 roleIndexNrRegex :: Regex
 roleIndexNrRegex = unsafeRegex "_(\\d+)$" noFlags

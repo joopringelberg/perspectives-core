@@ -14,7 +14,7 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, put, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Identifiers (escapeCouchdbDocumentName, getNamespace, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE)
+import Perspectives.Identifiers (escapeCouchdbDocumentName, deconstructNamespace, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, decode, representInternally, retrieveFromDomein)
 import Perspectives.ResourceTypes (AsyncDomeinFile, stringToRecord)
 import Perspectives.Syntax (ID)
@@ -30,7 +30,7 @@ import Perspectives.Syntax (ID)
 -- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
 fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> AsyncDomeinFile e a
 fetchPerspectEntiteitFromCouchdb id = if isQualifiedWithDomein id
-  then case getNamespace id of
+  then case deconstructNamespace id of
     Nothing -> throwError $ error ("Cannot construct namespace out of id " <> id)
     (Just ns) -> retrieveFromDomein id ns
   else if isStandardNamespaceCURIE id
