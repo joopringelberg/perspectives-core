@@ -151,7 +151,12 @@ expandedContextName = try $ lexeme $ do
 
 -- expandedPropertyName = domeinName localPropertyName
 expandedPropertyName :: forall e. IP QualifiedName e
-expandedPropertyName = lexeme (QualifiedName <$> domeinName <*> localPropertyName)
+expandedPropertyName =
+  try $ lexeme $ do
+    dn <- domeinName
+    _ <- STRING.string "$"
+    ln <- localPropertyName
+    pure $ QualifiedName dn ln
 
 defaultNamespacedContextName :: forall e. IP QualifiedName e
 defaultNamespacedContextName = lexeme do
