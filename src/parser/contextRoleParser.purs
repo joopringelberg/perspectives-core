@@ -14,9 +14,10 @@ import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
+import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
 import Perspectives.Resource (storePerspectEntiteitInResourceDefinitions)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), Expanded(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments(..), RoleName, binding)
+import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments(..), RoleName, binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -100,10 +101,10 @@ domeinName = do
   domein <- capitalizedString
   pure $ "model:" <> domein
 
-standaloneDomeinName :: forall e. IP Expanded e
+standaloneDomeinName :: forall e. IP ModelName e
 standaloneDomeinName = lexeme do
   dn <- domeinName
-  pure $ Expanded dn ""
+  pure $ ModelName dn
 
 -- localContextName = upper alphaNum*
 localContextName :: forall e. IP String e
@@ -122,43 +123,43 @@ prefix :: forall e. IP String e
 prefix = (f <$> lower <*> AR.many lower <*> char ':') where
   f fst ca c = fromCharArray $ AR.cons fst (AR.snoc ca c)
 
-prefixedName :: forall e. IP String e -> IP Expanded e
+prefixedName :: forall e. IP String e -> IP QualifiedName e
 prefixedName localName = lexeme do
   pre <- prefix
   ln <- localName
   namespace <- getPrefix pre
   case namespace of
     Nothing -> fail $ "The prefix '" <> pre <> "' has not been declared!"
-    (Just ns) -> pure $ Expanded ns ln
+    (Just ns) -> pure $ QualifiedName ns ln
 
 -- prefixedContextName = prefix localContextName
-prefixedContextName :: forall e. IP Expanded e
+prefixedContextName :: forall e. IP QualifiedName e
 prefixedContextName = prefixedName localContextName
 
 -- prefixedPropertyName = prefix localPropertyName
-prefixedPropertyName :: forall e. IP Expanded e
+prefixedPropertyName :: forall e. IP QualifiedName e
 prefixedPropertyName = prefixedName localPropertyName
 
 -- qualifiedResourceName = domeinName localContextName
-expandedContextName :: forall e. IP Expanded e
+expandedContextName :: forall e. IP QualifiedName e
 -- expandedContextName = try $ lexeme (Expanded <$> domeinName <*> localContextName)
 expandedContextName = try $ lexeme $ do
   dn <- domeinName
   _ <- STRING.string "$"
   ln <- localContextName
-  pure $ Expanded dn ln
+  pure $ QualifiedName dn ln
 
 -- expandedPropertyName = domeinName localPropertyName
-expandedPropertyName :: forall e. IP Expanded e
-expandedPropertyName = lexeme (Expanded <$> domeinName <*> localPropertyName)
+expandedPropertyName :: forall e. IP QualifiedName e
+expandedPropertyName = lexeme (QualifiedName <$> domeinName <*> localPropertyName)
 
-defaultNamespacedContextName :: forall e. IP Expanded e
+defaultNamespacedContextName :: forall e. IP QualifiedName e
 defaultNamespacedContextName = lexeme do
   namespace <- getNamespace -- not $-terminated!
   namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
   localName <- localContextName
   namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
-  pure $ Expanded namespace' localName
+  pure $ QualifiedName namespace' localName
   where
     -- Returns a string that is NOT terminated on a "$".
     -- NOTE: in order to be able to fail, we need do this in IP.
@@ -172,14 +173,24 @@ defaultNamespacedContextName = lexeme do
         else pure $ (intercalate "$" (dropEnd n segments))
 
 -- cname = prefixedContextName | expandedContextName
-contextName :: forall e. IP Expanded e
-contextName = (expandedContextName <|> standaloneDomeinName <|> prefixedContextName <|> defaultNamespacedContextName) <?> "the name of a resource (Context or Role)."
+contextName :: forall e. IP QualifiedName e
+contextName = (expandedContextName <|> prefixedContextName <|> defaultNamespacedContextName) <?> "the name of a resource (Context or Role)."
+
+perspectEntiteitIdentifier :: forall e. IP PEIdentifier e
+perspectEntiteitIdentifier =
+  do
+    d <- standaloneDomeinName
+    pure (show d)
+  <|>
+  do
+    d <- contextName
+    pure (show d)
 
 -- propertyName = prefixedPropertyName | expandedPropertyName
-propertyName :: forall e. IP Expanded e
+propertyName :: forall e. IP QualifiedName e
 propertyName = (expandedPropertyName <|> prefixedPropertyName) <?> "a property or role name."
 
-roleName :: forall e. IP Expanded e
+roleName :: forall e. IP QualifiedName e
 roleName = propertyName
 
 -----------------------------------------------------------
@@ -220,16 +231,16 @@ nextLine = do
 -- Elementary expression types
 -----------------------------------------------------------
 
--- | enclosingContextDeclaration = contextName contextName
+-- | enclosingContextDeclaration = Context PerspectEntiteitIdentifier
 enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
 enclosingContextDeclaration = (do
-  cname@(Expanded ns _) <- (reserved "Context" *> contextName)
-  _ <- setNamespace $ ns
+  cname <- (reserved "Context" *> perspectEntiteitIdentifier)
+  _ <- setNamespace $ cname
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
     Nothing -> pure unit
-    (Just pre) -> setPrefix pre ns
+    (Just pre) -> setPrefix pre cname
   pure $ EnclosingContextDeclaration cname cmt) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
@@ -276,7 +287,7 @@ roleOccurrence :: forall e. IP Int e
 roleOccurrence = token.parens token.integer
 
 roleBinding' :: forall e.
-  Expanded
+  QualifiedName
   -> IP (Tuple (Array Comment) ID) (DomeinFileEffects e)
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBinding' cname p = ("rolename => contextName" <??>
@@ -284,12 +295,12 @@ roleBinding' cname p = ("rolename => contextName" <??>
     -- Parsing
     cmtBefore <- manyOneLineComments
     withPos do
-      rname@(Expanded _ localRoleName) <- roleName
+      rname@(QualifiedName _ localRoleName) <- roleName
       occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
       _ <- (sameLine *> reservedOp "=>")
       (Tuple cmt bindng) <- p
       props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
-      _ <- incrementRoleInstances localRoleName
+      _ <- incrementRoleInstances (show rname)
 
       -- Naming
       nrOfRoleOccurrences <- getRoleOccurrences localRoleName -- The position in the sequence.
@@ -318,7 +329,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
 
 -- | The inline context may itself use a defaultNamespacedContextName name. However,
 -- | what is returned from the context parser is an ExpandedQN.
-roleBindingWithInlineContext :: forall e. Expanded
+roleBindingWithInlineContext :: forall e. QualifiedName
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBindingWithInlineContext cName = roleBinding' cName do
   cmt <- inLineComment
@@ -327,15 +338,15 @@ roleBindingWithInlineContext cName = roleBinding' cName do
   pure $ Tuple cmt contextBuitenRol
 
 -- | The reference may be defaultNamespacedContextName.
-roleBindingWithReference :: forall e. Expanded
+roleBindingWithReference :: forall e. QualifiedName
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBindingWithReference cName = roleBinding' cName do
-  (ident :: Expanded) <- (sameLine *> contextName)
+  (ident :: QualifiedName) <- (sameLine *> contextName)
   cmt <- inLineComment
   pure $ Tuple cmt ((show ident) <> "_buitenRol")
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
-roleBinding :: forall e. Expanded
+roleBinding :: forall e. QualifiedName
   -> IP (Tuple RoleName ID) (DomeinFileEffects e)
 roleBinding cname = roleBindingWithInlineContext cname <|> roleBindingWithReference cname -- TODO: query, noBinding
 
@@ -362,7 +373,7 @@ context = withRoleCounting context' where
     -- Parsing
     cmtBefore <- manyOneLineComments
     withPos do
-      (ContextDeclaration typeName instanceName@(Expanded dname localName) cmt) <- contextDeclaration
+      (ContextDeclaration typeName instanceName@(QualifiedName dname localName) cmt) <- contextDeclaration
 
       -- Naming
       extendNamespace localName
@@ -444,7 +455,7 @@ sectionHeading = do
 definition :: forall e. IP ID (DomeinFileEffects e)
 definition = do
   bindng <- context
-  prop@(Expanded _ localName) <- getSection
+  prop@(QualifiedName _ localName) <- getSection
   _ <- incrementRoleInstances (show prop)
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
@@ -464,7 +475,7 @@ definition = do
 -----------------------------------------------------------
 importExpression :: forall e. IP Unit e
 importExpression = do
-  ns@(Expanded mn _) <- reserved "import" *> contextName
+  ns@(ModelName mn) <- reserved "import" *> standaloneDomeinName
   mpre <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   case mpre of
     Nothing -> pure unit
@@ -478,33 +489,34 @@ enclosingContext = withRoleCounting enclosingContext' where
   enclosingContext' = do
     cmtBefore <- manyOneLineComments
     withPos do
-      (EnclosingContextDeclaration textName@(Expanded _ localName) cmt) <- enclosingContextDeclaration
+      -- TODO dit kan ook een ModelName zijn!
+      (EnclosingContextDeclaration textName cmt) <- enclosingContextDeclaration
       _ <- AR.many importExpression
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
-      liftAffToIP $ storePerspectEntiteitInResourceDefinitions (show textName)
+      liftAffToIP $ storePerspectEntiteitInResourceDefinitions textName
         (PerspectContext defaultContextRecord
-          { _id = show textName
-          , displayName  = show textName
+          { _id = textName
+          , displayName  = textName
           , pspType = "model:Perspectives$Context"
           , binnenRol =
             PerspectRol defaultRolRecord
-              { _id = (show textName) <> "_binnenRol"
+              { _id = textName <> "_binnenRol"
               , pspType = "model:Perspectives$BinnenRol"
-              , binding = binding $ (show textName) <> "_buitenRol"
+              , binding = binding $ textName <> "_buitenRol"
               , properties = fromFoldable privateProps
               }
-          , buitenRol = (show textName) <> "_buitenRol"
+          , buitenRol = textName <> "_buitenRol"
           , rolInContext = fromFoldable defs
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      liftAffToIP $ storePerspectEntiteitInResourceDefinitions ((show textName) <> "_buitenRol")
+      liftAffToIP $ storePerspectEntiteitInResourceDefinitions (textName <> "_buitenRol")
         (PerspectRol defaultRolRecord
-          { _id = show textName <> "_buitenRol"
+          { _id = textName <> "_buitenRol"
           , pspType = "model:Perspectives$BuitenRol"
-          , context = show textName
+          , context = textName
           , properties = fromFoldable publicProps
           })
-      pure $ show textName
+      pure $ textName

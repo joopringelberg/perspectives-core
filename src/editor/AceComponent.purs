@@ -26,11 +26,11 @@ import Data.Tuple (Tuple(..))
 import Halogen.Query (liftAff)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
-import Perspectives.Identifiers (perspectRI_localName)
+import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError, errorsIn)
 import Perspectives.ResourceTypes (DomeinFileEffects)
-import Perspectives.Syntax (ContextDeclaration(..), Expanded(..))
+import Perspectives.Syntax (ContextDeclaration(..))
 
 -- | As long as the user edits a contextname, we keep the original name here:
 type ContextNameInText = Maybe { name :: String, line :: Int}
@@ -178,15 +178,15 @@ aceComponent mode theme =
           (originalLines :: Array String) <- H.liftEff $ recoverOriginalLines document event
           parseResult <- liftAff $ runIndentParser (unsafePartial $ AP.head $ originalLines) CRP.contextDeclaration
           case parseResult of
-            (Right (ContextDeclaration _ (Expanded _ declaredName) _)) -> do
+            (Right (ContextDeclaration _ (QualifiedName _ declaredName) _)) -> do
               case action of
                 Insert -> case AR.length lines == 1 of
-                  true -> H.modify (_ { editedContextName = Just {name: (perspectRI_localName declaredName), line: indexOfFirstOriginalLine event} })
+                  true -> H.modify (_ { editedContextName = Just {name: declaredName, line: indexOfFirstOriginalLine event} })
                   false -> do
-                    H.liftAff $ rename (perspectRI_localName declaredName) document event (indexOfFirstOriginalLine event)
+                    H.liftAff $ rename declaredName document event (indexOfFirstOriginalLine event)
                     H.modify (_ { editedContextName = Nothing })
                 Remove -> do
-                  H.modify (_ { editedContextName = Just {name: (perspectRI_localName declaredName), line: indexOfFirstOriginalLine event} })
+                  H.modify (_ { editedContextName = Just {name: declaredName, line: indexOfFirstOriginalLine event} })
               pure (reply H.Listening)
             otherwise -> do
               editedContextName <- H.gets _.editedContextName
@@ -233,7 +233,7 @@ aceComponent mode theme =
           -- TODO We need to apply runIndentParser to the current default namespace here!
           parseResult' <- liftAff $ runIndentParser modifiedDeclaration CRP.contextDeclaration
           case parseResult' of
-            (Right (ContextDeclaration _ (Expanded _ newName) _)) -> do
+            (Right (ContextDeclaration _ (QualifiedName _ newName) _)) -> do
               qualifiedName <- composeFullName (indexOfFirstOriginalLine event) newName
               log $ "The fully qualified new name is: " <> qualifiedName
               -- actually rename contextName newName
@@ -244,7 +244,7 @@ aceComponent mode theme =
             composeFullName row name = do
               parseResult <- runIndentParser name CRP.contextName
               case parseResult of
-                (Right (Expanded _ name')) -> pure name'
+                (Right (QualifiedName _ name')) -> pure name'
                 (Left _) -> do
                   maybeName <- findPreviousContextDeclaration row
                   case maybeName of
@@ -258,7 +258,7 @@ aceComponent mode theme =
               -- TODO We need to apply runIndentParser to the current default namespace here!
               parseResult <- runIndentParser previousLine CRP.contextDeclaration
               case parseResult of
-                (Right (ContextDeclaration _ (Expanded _ cname) _)) -> pure $ Just (Tuple row cname)
+                (Right (ContextDeclaration _ (QualifiedName _ cname) _)) -> pure $ Just (Tuple row cname)
                 otherwise -> findPreviousContextDeclaration (row - 1)
 
 -- showAnchorEvent :: forall e. EditSession ->  AnchorEvent -> Eff (ace :: ACE, console :: CONSOLE | e) Unit

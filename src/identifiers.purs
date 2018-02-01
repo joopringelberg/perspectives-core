@@ -16,9 +16,12 @@ module Perspectives.Identifiers
 , escapeCouchdbDocumentName
 , isInNamespace
 , isQualifiedWithDomein
-, PerspectRI(..)
-, perspectRI_namespace
-, perspectRI_localName
+, ModelName(..)
+, QualifiedName(..)
+, class PerspectEntiteitIdentifier
+, pe_namespace
+, pe_localName
+, PEIdentifier
   )
 
 where
@@ -49,23 +52,32 @@ type Namespace = String
 type LocalName = String
 type Prefix = String
 
-data PerspectRI = MN ModelName | QN QualifiedName
+type PEIdentifier = String
 
+-- | Only a psp:Context can have a ModelName. In other words, if something has a ModelName, its pspType is psp:Context.
+-- | However, a psp:Context may have a QualifiedName!
 newtype ModelName = ModelName Namespace
+
+instance showModelName :: Show ModelName where
+  show (ModelName mn) = mn
 
 data QualifiedName = QualifiedName Namespace LocalName
 
-instance showPerspectRI :: Show PerspectRI where
-  show (MN (ModelName ns)) = ns
-  show (QN (QualifiedName ns ln)) = ns <> "$" <> ln
+instance showQualifiedName :: Show QualifiedName where
+  show (QualifiedName mn ln) = mn <> "$" <> ln
 
-perspectRI_namespace :: PerspectRI -> Namespace
-perspectRI_namespace (MN (ModelName ns)) = ns
-perspectRI_namespace (QN (QualifiedName ns _)) = ns
+class PerspectEntiteitIdentifier a where
+  pe_namespace :: a -> Namespace
+  pe_localName :: a -> Maybe LocalName
 
-perspectRI_localName :: PerspectRI -> Maybe LocalName
-perspectRI_localName (MN _) = Nothing
-perspectRI_localName (QN (QualifiedName _ ln)) = Just ln
+instance peIdentifierModelName :: PerspectEntiteitIdentifier ModelName where
+  pe_namespace (ModelName ns) = ns
+  pe_localName _ = Nothing
+
+instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName where
+  pe_namespace (QualifiedName ns _) = ns
+  pe_localName (QualifiedName _ ln) = Just ln
+
 
 getFirstMatch :: Regex -> String -> Maybe String
 getFirstMatch regex s = case match regex s of
@@ -153,4 +165,4 @@ escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (repl
 isInNamespace :: String -> String -> Boolean
 isInNamespace ns ident =
   -- A quick test: strip ns from ident. What remains may not hold a "$".
-  not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern ns) ident))
+  not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern (ns <> "$")) ident))

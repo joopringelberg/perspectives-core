@@ -9,7 +9,7 @@ import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup, singleton)
 import Data.String (null)
-import Perspectives.Identifiers (PerspectRI(..))
+import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.Syntax (Prefix, RoleName)
 import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
@@ -21,10 +21,13 @@ import Text.Parsing.Parser.Pos (Position)
 -- | - the namespace for context declarations. The namespace does not terminate on a $!
 -- | - the section, i.e. the current role that should be used to stick a role in a context;
 -- | - the prefixes: a map of prefixes to namespaces.
-type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: PerspectRI, prefixes :: StrMap String}
+type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: QualifiedName, prefixes :: StrMap String}
+
+defaultPrefixes :: StrMap String
+defaultPrefixes = singleton "psp" "model:Perspectives"
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: QualifiedName "model:Perspectives" "rolInContext", prefixes: singleton "psp" "model:Perspectives"}
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is Aff, which we need to access couchdb.
@@ -95,12 +98,12 @@ extendNamespace extension p = do
 -----------------------------------------------------------
 -- Section
 -----------------------------------------------------------
-setSection :: forall e. PerspectRI -> IP Unit e
+setSection :: forall e. QualifiedName -> IP Unit e
 setSection propertyName = do
   s <- lift (lift get)
   lift (lift (put s {section = propertyName}))
 
-getSection :: forall e. IP PerspectRI e
+getSection :: forall e. IP QualifiedName e
 getSection = lift (lift get) >>= pure <<< (_.section)
 
 -----------------------------------------------------------

@@ -7,9 +7,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap)
-import Data.String (null)
-import Perspectives.Identifiers (LocalName, PerspectRI(..))
-import Prelude (class Show, ($), (<>))
+import Perspectives.Identifiers (ModelName, QualifiedName, PEIdentifier)
+import Prelude (class Show, ($))
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
@@ -149,20 +148,14 @@ type DomeinName = String
 -----------------------------------------------------------
 -- EXPANDED, CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION
 -----------------------------------------------------------
-data Expanded = Expanded DomeinName LocalName
-
-instance showExpanded :: Show Expanded where
-  show (Expanded domeinName localName) | null localName = domeinName
-  show (Expanded domeinName localName) =  domeinName <> "$" <> localName
-
-data ContextDeclaration = ContextDeclaration PerspectRI PerspectRI (Array Comment)
+data ContextDeclaration = ContextDeclaration QualifiedName QualifiedName (Array Comment)
 
 derive instance genericContextDeclaration :: Generic ContextDeclaration _
 
 instance showContextDeclaration :: Show ContextDeclaration where
   show = genericShow
 
-data EnclosingContextDeclaration = EnclosingContextDeclaration PerspectRI (Array Comment)
+data EnclosingContextDeclaration = EnclosingContextDeclaration PEIdentifier (Array Comment)
 
 derive instance genericEnclosingContextDeclaration :: Generic EnclosingContextDeclaration _
 
