@@ -141,7 +141,7 @@ domeinFileFromContext c' = do
                   case mBinding of
                     Nothing -> pure unit
                     (Just (binding :: ID)) ->
-                      if isInNamespace binding roleId
+                      if isInNamespace (context_id c) binding
                         then do
                           (mBuitenRol :: Maybe PerspectRol) <- lift $ getPerspectEntiteit binding
                           case mBuitenRol of

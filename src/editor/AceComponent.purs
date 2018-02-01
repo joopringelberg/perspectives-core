@@ -7,7 +7,6 @@ import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
--- import Ace.BackgroundTokenizer (setTokenizer) as BackgroundTokenizer
 import Ace.Document (getLine, onChange) as Document
 import Ace.EditSession (clearAnnotations, getDocument, getLine, setAnnotations, setUseSoftTabs)
 import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), Editor, Position(..), Tokenizer)
@@ -27,6 +26,7 @@ import Data.Tuple (Tuple(..))
 import Halogen.Query (liftAff)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
+import Perspectives.Identifiers (perspectRI_localName)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError, errorsIn)
 import Perspectives.ResourceTypes (DomeinFileEffects)
@@ -178,15 +178,15 @@ aceComponent mode theme =
           (originalLines :: Array String) <- H.liftEff $ recoverOriginalLines document event
           parseResult <- liftAff $ runIndentParser (unsafePartial $ AP.head $ originalLines) CRP.contextDeclaration
           case parseResult of
-            (Right (ContextDeclaration _ (Expanded _ contextName) _)) -> do
+            (Right (ContextDeclaration _ (Expanded _ declaredName) _)) -> do
               case action of
                 Insert -> case AR.length lines == 1 of
-                  true -> H.modify (_ { editedContextName = Just {name: contextName, line: indexOfFirstOriginalLine event} })
+                  true -> H.modify (_ { editedContextName = Just {name: (perspectRI_localName declaredName), line: indexOfFirstOriginalLine event} })
                   false -> do
-                    H.liftAff $ rename contextName document event (indexOfFirstOriginalLine event)
+                    H.liftAff $ rename (perspectRI_localName declaredName) document event (indexOfFirstOriginalLine event)
                     H.modify (_ { editedContextName = Nothing })
                 Remove -> do
-                  H.modify (_ { editedContextName = Just {name: contextName, line: indexOfFirstOriginalLine event} })
+                  H.modify (_ { editedContextName = Just {name: (perspectRI_localName declaredName), line: indexOfFirstOriginalLine event} })
               pure (reply H.Listening)
             otherwise -> do
               editedContextName <- H.gets _.editedContextName

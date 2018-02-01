@@ -10,15 +10,19 @@ module Perspectives.Identifiers
 , getFirstMatch
 , getSecondMatch
 , Namespace
+, LocalName
 , isWellFormedIdentifier
 , roleIndexNr
 , escapeCouchdbDocumentName
 , isInNamespace
 , isQualifiedWithDomein
+, PerspectRI(..)
+, perspectRI_namespace
+, perspectRI_localName
   )
 
 where
-import Data.Array (head, index, unsafeIndex)
+import Data.Array (index, unsafeIndex)
 import Data.Foldable (or)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, fromFoldable, lookup)
@@ -28,7 +32,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
-import Prelude (const, flip, id, not, ($), (<$>))
+import Prelude (class Show, const, flip, id, not, ($), (<$>), (<>))
 
 standardPrefixes2namespaces :: StrMap String
 standardPrefixes2namespaces = fromFoldable [
@@ -42,8 +46,26 @@ standardPrefixes2namespaces = fromFoldable [
   (Tuple "xml" "http://www.w3.org/XML/1998/namespace")]
 
 type Namespace = String
-
+type LocalName = String
 type Prefix = String
+
+data PerspectRI = MN ModelName | QN QualifiedName
+
+newtype ModelName = ModelName Namespace
+
+data QualifiedName = QualifiedName Namespace LocalName
+
+instance showPerspectRI :: Show PerspectRI where
+  show (MN (ModelName ns)) = ns
+  show (QN (QualifiedName ns ln)) = ns <> "$" <> ln
+
+perspectRI_namespace :: PerspectRI -> Namespace
+perspectRI_namespace (MN (ModelName ns)) = ns
+perspectRI_namespace (QN (QualifiedName ns _)) = ns
+
+perspectRI_localName :: PerspectRI -> Maybe LocalName
+perspectRI_localName (MN _) = Nothing
+perspectRI_localName (QN (QualifiedName _ ln)) = Just ln
 
 getFirstMatch :: Regex -> String -> Maybe String
 getFirstMatch regex s = case match regex s of
@@ -56,14 +78,14 @@ getSecondMatch regex s = case match regex s of
   _ -> Nothing
 
 domeinURIRegex :: Regex
-domeinURIRegex = unsafeRegex "^model:(\\w*)\\$(\\w*)$" noFlags
+domeinURIRegex = unsafeRegex "^model:(\\w*)(\\w*)$" noFlags
 
 -- | True iff the string conforms to the model scheme, i.e. "model:SomeDomein$identifier".
 isDomeinURI :: String -> Boolean
 isDomeinURI s = test domeinURIRegex s
 
 domeinURIQualifiedRegex :: Regex
-domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)\\$(.*)$" noFlags
+domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)(.*)$" noFlags
 
 isQualifiedWithDomein :: String -> Boolean
 isQualifiedWithDomein s = test domeinURIQualifiedRegex s
@@ -94,7 +116,7 @@ getStandardNamespace :: String -> Maybe Namespace
 getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (getPrefix s)
 
 namespaceRegex :: Regex
-namespaceRegex = unsafeRegex "^(model:\\w*\\$)[\\w|\\$]*$" noFlags
+namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
 
 getNamespace :: String -> Maybe Namespace
 getNamespace = getFirstMatch namespaceRegex

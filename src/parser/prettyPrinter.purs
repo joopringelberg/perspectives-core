@@ -130,7 +130,7 @@ roleProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectT
 roleProperty = property (pure unit)
 
 contextDeclaration :: forall e. PerspectContext -> PerspectText e
-contextDeclaration x = identifier (context_pspType x) *> identifier' (context_displayName x)
+contextDeclaration x = identifier (context_pspType x) *> identifier' ("$" <> (context_displayName x))
 
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
 context definedResources c = do

@@ -75,7 +75,8 @@ identLetter :: forall e. IP Char e
 identLetter = alphaNum <|> STRING.oneOf ['_', '\'']
 
 identLetterString :: forall e. IP String e
-identLetterString = fromCharArray <$> AR.many identLetter
+identLetterString = f <$> identLetter <*> AR.many identLetter where
+  f c ca = fromCharArray $ AR.cons c ca
 
 -- /([A-Z]\w*\b)/
 -- /(\p{Uppercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+)/gu
@@ -97,8 +98,7 @@ domeinName :: forall e. IP String e
 domeinName = do
   _ <- STRING.string "model:"
   domein <- capitalizedString
-  _ <- char '$'
-  pure $ "model:" <> domein <> "$"
+  pure $ "model:" <> domein
 
 standaloneDomeinName :: forall e. IP Expanded e
 standaloneDomeinName = lexeme do
@@ -141,7 +141,12 @@ prefixedPropertyName = prefixedName localPropertyName
 
 -- qualifiedResourceName = domeinName localContextName
 expandedContextName :: forall e. IP Expanded e
-expandedContextName = try $ lexeme (Expanded <$> domeinName <*> localContextName)
+-- expandedContextName = try $ lexeme (Expanded <$> domeinName <*> localContextName)
+expandedContextName = try $ lexeme $ do
+  dn <- domeinName
+  _ <- STRING.string "$"
+  ln <- localContextName
+  pure $ Expanded dn ln
 
 -- expandedPropertyName = domeinName localPropertyName
 expandedPropertyName :: forall e. IP Expanded e
@@ -149,21 +154,22 @@ expandedPropertyName = lexeme (Expanded <$> domeinName <*> localPropertyName)
 
 defaultNamespacedContextName :: forall e. IP Expanded e
 defaultNamespacedContextName = lexeme do
-  namespace <- getNamespace
+  namespace <- getNamespace -- not $-terminated!
   namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
   localName <- localContextName
   namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
   pure $ Expanded namespace' localName
   where
+    -- Returns a string that is NOT terminated on a "$".
+    -- NOTE: in order to be able to fail, we need do this in IP.
     butLastNNamespaceLevels :: String -> Int -> IP String e
     butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
     butLastNNamespaceLevels ns 0 = pure ns
     butLastNNamespaceLevels ns n = do
-      -- segments will have a last segment that is an empty string, because namespaces end in "$".
       segments <- pure (split (Pattern "$") ns)
-      if (n - 2) > (AR.length segments)
+      if (n - 1) > (AR.length segments)
         then fail "too many levels up"
-        else pure $ (intercalate "$" (dropEnd (n + 1) segments)) <> "$"
+        else pure $ (intercalate "$" (dropEnd n segments))
 
 -- cname = prefixedContextName | expandedContextName
 contextName :: forall e. IP Expanded e
@@ -217,13 +223,13 @@ nextLine = do
 -- | enclosingContextDeclaration = contextName contextName
 enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
 enclosingContextDeclaration = (do
-  cname <- (reserved "Context" *> contextName)
-  _ <- setNamespace $ (show cname) <> "$"
+  cname@(Expanded ns _) <- (reserved "Context" *> contextName)
+  _ <- setNamespace $ ns
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
     Nothing -> pure unit
-    (Just pre) -> setPrefix pre (show cname)
+    (Just pre) -> setPrefix pre ns
   pure $ EnclosingContextDeclaration cname cmt) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
@@ -287,7 +293,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
 
       -- Naming
       nrOfRoleOccurrences <- getRoleOccurrences localRoleName -- The position in the sequence.
-      rolId <- pure ((show cname) <> "_" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
+      rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
       liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
@@ -359,7 +365,7 @@ context = withRoleCounting context' where
       (ContextDeclaration typeName instanceName@(Expanded dname localName) cmt) <- contextDeclaration
 
       -- Naming
-      extendNamespace (localName <> "$")
+      extendNamespace localName
         do
           -- Parsing the body
           (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
@@ -442,8 +448,7 @@ definition = do
   _ <- incrementRoleInstances (show prop)
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
-  -- TODO. DIT IS NIET GOED
-  rolId <- pure $ enclContext <> "_" <> localName <> maybe "0" show nrOfRoleOccurrences
+  rolId <- pure $ enclContext <> "$" <> localName <> maybe "0" show nrOfRoleOccurrences
   liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
@@ -459,11 +464,11 @@ definition = do
 -----------------------------------------------------------
 importExpression :: forall e. IP Unit e
 importExpression = do
-  ns <- reserved "import" *> contextName
+  ns@(Expanded mn _) <- reserved "import" *> contextName
   mpre <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   case mpre of
     Nothing -> pure unit
-    (Just pre) -> setPrefix pre (show ns)
+    (Just pre) -> setPrefix pre mn
 
 -----------------------------------------------------------
 -- Text
@@ -482,7 +487,7 @@ enclosingContext = withRoleCounting enclosingContext' where
         (PerspectContext defaultContextRecord
           { _id = show textName
           , displayName  = show textName
-          , pspType = "model:Perspectives$enclosingContext"
+          , pspType = "model:Perspectives$Context"
           , binnenRol =
             PerspectRol defaultRolRecord
               { _id = (show textName) <> "_binnenRol"

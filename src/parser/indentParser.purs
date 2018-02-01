@@ -7,20 +7,24 @@ import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
-import Data.StrMap (StrMap, empty, insert, lookup)
-import Perspectives.Syntax (Expanded(..), Prefix, RoleName)
-import Prelude (Unit, bind, pure, (+), (<<<), (<>), (>>=))
+import Data.StrMap (StrMap, empty, insert, lookup, singleton)
+import Data.String (null)
+import Perspectives.Identifiers (PerspectRI(..))
+import Perspectives.Syntax (Prefix, RoleName)
+import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
 import Text.Parsing.Parser.Pos (Position)
 
 -- | A type to keep track of:
 -- | - the number of occurrences of a role type, and
--- | - the namespace for context declarations.
-type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: Expanded, prefixes :: StrMap String}
+-- | - the namespace for context declarations. The namespace does not terminate on a $!
+-- | - the section, i.e. the current role that should be used to stick a role in a context;
+-- | - the prefixes: a map of prefixes to namespaces.
+type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: PerspectRI, prefixes :: StrMap String}
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives$", section: Expanded "" "", prefixes: empty}
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: QualifiedName "model:Perspectives" "rolInContext", prefixes: singleton "psp" "model:Perspectives"}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is Aff, which we need to access couchdb.
@@ -76,10 +80,14 @@ setNamespace ns = do
   s <- lift (lift get)
   lift (lift (put s {namespace = ns}))
 
+-- Note that the namespace in state is not terminated by a $.
 extendNamespace :: forall a e. String -> IP a e -> IP a e
 extendNamespace extension p = do
   namespace <- getNamespace
-  _ <- setNamespace (namespace <> extension)
+  case null extension of
+    false -> setNamespace (namespace <> "$" <> extension)
+    otherwise -> pure unit
+  -- _ <- setNamespace (namespace <> "$" <> extension)
   result <- p
   _ <- setNamespace namespace
   pure result
@@ -87,12 +95,12 @@ extendNamespace extension p = do
 -----------------------------------------------------------
 -- Section
 -----------------------------------------------------------
-setSection :: forall e. Expanded -> IP Unit e
+setSection :: forall e. PerspectRI -> IP Unit e
 setSection propertyName = do
   s <- lift (lift get)
   lift (lift (put s {section = propertyName}))
 
-getSection :: forall e. IP Expanded e
+getSection :: forall e. IP PerspectRI e
 getSection = lift (lift get) >>= pure <<< (_.section)
 
 -----------------------------------------------------------

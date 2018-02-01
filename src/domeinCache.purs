@@ -178,11 +178,12 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
     false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
 modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
-modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id, _rev}) av = do
+modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
+  (DomeinFile {_rev}) <- readVar av
   originalRevision <- pure $ unsafePartial $ fromJust $ fromRevision _rev
   oldDf <- takeVar av
   -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
-  (res :: AffjaxResponse String) <- put (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision) (encodeJSON df)
+  (res :: AffjaxResponse String) <- put (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision) (encodeJSON (DomeinFile dfr {_rev = _rev}))
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
     true -> do

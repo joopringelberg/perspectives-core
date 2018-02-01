@@ -1,8 +1,8 @@
 -- CRL DEFINITIE
 
-Context model:Perspectives$
+Context model:Perspectives
 
-import model:Perspectives$ als psp:
+import model:Perspectives als psp:
 
 Section psp:rolInContext
 
@@ -60,4 +60,3 @@ psp:Context psp:Rol
 	psp:externalProperty => psp:isVerplicht
 	psp:externalProperty => psp:isFunctioneel
 	psp:rolInContext => psp:query
-
