@@ -1,8 +1,6 @@
 -- CRL DEFINITIE
 
-Context model:Perspectives
-
-import model:Perspectives als psp:
+Context model:Perspectives als psp:
 
 Section psp:rolInContext
 

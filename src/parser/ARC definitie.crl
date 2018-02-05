@@ -1,9 +1,8 @@
 -- ARC DEFINITIE
 
-Context model:Arc
+Context model:Arc als arc:
 
 import model:Perspectives als psp:
-import model:Arc als arc:
 
 Section psp:rolInContext
 

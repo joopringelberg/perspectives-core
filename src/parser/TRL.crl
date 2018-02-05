@@ -1,0 +1,8 @@
+-- TEXT REPRESENTATIE LANGUAGE DEFINITIE
+
+Context model:TRL als txt:
+
+import model:Perspectives als psp:
+import model:Arc als arc:
+
+Section psp:rolInContext
