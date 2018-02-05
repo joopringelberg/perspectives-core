@@ -22,7 +22,9 @@
     "purescript-parsing": "^4.3.1",
     "purescript-halogen": "^3.0.1",
     "purescript-ace": "^4.0.0",
-    "purescript-foreign-generic": "^5.0.0"
+    "purescript-foreign-generic": "^5.0.0",
+    "purescript-dom-classy": "^2.1.0",
+    "purescript-dom-filereader": "^3.0.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

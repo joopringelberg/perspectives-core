@@ -5,6 +5,7 @@ import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
@@ -41,6 +42,7 @@ data Query a
   | Load a
   | LoadContext String a
   | Save a
+  | FileSelect String a
 
 -- | The query algebra for the children
 type ChildQuery = Coproduct2 AceQuery ModelSelectQuery
@@ -82,6 +84,11 @@ ui =
               , HH.button
                   [ HE.onClick (HE.input_ Load) ]
                   [ HH.text "Load" ]
+              , HH.input
+                  [ HP.type_ HP.InputFile
+                  , HE.onValueInput (HE.input handleFileSelect)
+                   -- [ onFilesChange (E.input (SetFiles <<< Just))
+                  ]
               , HH.button
                   [ HE.onClick (HE.input_ Save) ]
                   [ HH.text "Save" ]
@@ -160,3 +167,7 @@ ui =
 
   handleModelSelect :: ModelSelected -> Maybe (Query Unit)
   handleModelSelect (ModelSelected modelname) = Just $ H.action $ LoadContext modelname
+
+  -- Ik denk dat dit een filelist produceert die de handler in kan.
+  -- handleFileSelect target =
+  -- fileList = unsafeReadTagged "FileList" =<< Foreign.prop "files" (toForeign target)
