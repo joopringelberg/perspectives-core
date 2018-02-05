@@ -9,16 +9,18 @@ import Halogen.HTML.Properties as HP
 import Network.HTTP.Affjax as AX
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
+import DOM (DOM)
 import Data.Either (Either(..))
-import Data.Either.Nested (Either2)
-import Data.Functor.Coproduct.Nested (Coproduct2)
+import Data.Either.Nested (Either2, Either3)
+import Data.Functor.Coproduct.Nested (Coproduct2, Coproduct3)
 import Data.Maybe (Maybe(..))
-import Halogen.Component.ChildPath (cp1, cp2)
+import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
 import Perspectives.ContextRoleParser (enclosingContext) as CRP
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery, ModelSelected(..), modelSelect)
+import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Property (PerspectEffects)
@@ -39,14 +41,13 @@ type State = { text :: String }
 data Query a
   = ClearText a
   | HandleAceUpdate String a
-  | Load a
+  | Load String a
   | LoadContext String a
   | Save a
-  | FileSelect String a
 
 -- | The query algebra for the children
-type ChildQuery = Coproduct2 AceQuery ModelSelectQuery
-type ChildSlot = Either2 AceSlot Unit
+type ChildQuery = Coproduct3 AceQuery ModelSelectQuery ReadTextFileQuery
+type ChildSlot = Either3 AceSlot Unit Unit
 
 -- | The slot address type for the Ace component.
 data AceSlot = AceSlot Int
@@ -57,8 +58,13 @@ data ModelSelectSlot = ModelSelectSlot Int
 derive instance eqModelSelectSlot :: Eq ModelSelectSlot
 derive instance ordModelSelectSlot :: Ord ModelSelectSlot
 
+data ReadTextFileSlot = ReadTextFileSlot Int
+derive instance eqReadTextFileSlot :: Eq ReadTextFileSlot
+derive instance ordReadTextFileSlot :: Ord ReadTextFileSlot
+
+
 -- | The main UI component definition.
-ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AceEffects (PerspectEffects eff)))
+ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AceEffects (PerspectEffects (dom :: DOM | eff))))
 ui =
   H.parentComponent
     { initialState: const initialState
@@ -71,7 +77,7 @@ ui =
   initialState :: State
   initialState = { text: "" }
 
-  render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (AceEffects (PerspectEffects eff)))
+  render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (AceEffects (PerspectEffects (dom :: DOM | eff))))
   render { text: text } =
     HH.div_
       [ HH.h1_
@@ -81,14 +87,12 @@ ui =
               [ HH.button
                   [ HE.onClick (HE.input_ ClearText) ]
                   [ HH.text "Clear" ]
-              , HH.button
-                  [ HE.onClick (HE.input_ Load) ]
-                  [ HH.text "Load" ]
-              , HH.input
-                  [ HP.type_ HP.InputFile
-                  , HE.onValueInput (HE.input handleFileSelect)
-                   -- [ onFilesChange (E.input (SetFiles <<< Just))
-                  ]
+              , HH.slot' cp3 unit readTextFile unit handleTextFileRead
+              -- , HH.input
+              --     [ HP.type_ HP.InputFile
+              --     , HE.onValueInput (HE.input handleFileSelect)
+              --      -- [ onFilesChange (E.input (SetFiles <<< Just))
+              --     ]
               , HH.button
                   [ HE.onClick (HE.input_ Save) ]
                   [ HH.text "Save" ]
@@ -106,7 +110,7 @@ ui =
           [ HH.text ("Current text: " <> text) ]
       ]
 
-  eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (AceEffects (PerspectEffects eff)))
+  eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (AceEffects (PerspectEffects (dom :: DOM | eff))))
   eval (ClearText next) = do
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText "")
     pure next
@@ -127,10 +131,9 @@ ui =
       (Left e) -> do
         H.modify (_ { text = show e })
         pure next
-  eval (Load next) = do
-    response <- H.liftAff $ AX.get ("http://www.pureperspectives.nl/src/parser/CRL definitie.crl")
-    H.modify (_ { text = response.response })
-    _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText response.response)
+  eval (Load text next) = do
+    H.modify (_ { text = text })
+    _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText text)
     pure next
   eval (LoadContext id next) = do
     (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getPerspectEntiteit id
@@ -167,6 +170,9 @@ ui =
 
   handleModelSelect :: ModelSelected -> Maybe (Query Unit)
   handleModelSelect (ModelSelected modelname) = Just $ H.action $ LoadContext modelname
+
+  handleTextFileRead :: TextFileRead -> Maybe (Query Unit)
+  handleTextFileRead (TextFileRead text) = Just $ H.action $ Load text
 
   -- Ik denk dat dit een filelist produceert die de handler in kan.
   -- handleFileSelect target =

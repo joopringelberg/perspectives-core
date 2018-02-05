@@ -50,26 +50,34 @@ readTextFile = H.component
     render state =
       HH.input
         [ HP.type_ HP.InputFile
-        , HP.prop (wrap "accept")  "*.crl"
+        , HP.prop (wrap "accept")  ".crl"
+        -- By using HE.input rather than HE.input_ we will receive an argument, in this case the event object.
         , HE.onChange (HE.input FileSet)
         ]
 
     eval :: ReadTextFileQuery ~> H.ComponentDSL State ReadTextFileQuery TextFileRead (Aff (ajax :: AJAX, dom :: DOM | e))
     eval = case _ of
       FileSet evt next -> do
+        -- In order to be able to throw exceptions, we use runExcepT.
         (result :: Either String String) <- lift $ runExceptT do
+          -- The function target will give us a Node as defined in DOM.Classy. However, to retrieve the files
+          -- we need a typed HTMLInputElement. This we get by using fromNode. It is part of a Class of which
+          -- all typed HTML nodes are a member.
           let (targetNode :: Maybe HTMLInputElement) = fromNode $ target evt
           (fileList :: FileList) <- do
             case targetNode of
               Nothing -> throwError "ReadTextFile component could not convert event target to input element"
               (Just inputElement) -> do
+                -- The attribute files of an HTMLInputElement gives us a typed (!) FileList.
                 onNothing "no file found" =<< (lift <<< H.liftEff <<< files $ inputElement)
 
+          -- item is here a function in the DOM.File.FileList module.
           case (item 0 fileList) of
             Nothing -> throwError "ReadTextFile component did not receive a file"
+            -- readAsText is a convenience as defined in DOM.File.FileReader.Aff.
             (Just file) -> lift $ readAsText (fileToBlob file)
         case result of
-          (Left m) -> pure next -- We should do something with this error.
+          (Left m) -> pure next -- We should do something with this error, such as show it to the user.
           (Right (text :: String)) -> do
             H.raise $ TextFileRead text
             pure next
