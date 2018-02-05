@@ -19,7 +19,7 @@ import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
 import Perspectives.ContextRoleParser (enclosingContext) as CRP
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
-import Perspectives.Editor.ModelSelect (ModelSelectQuery, ModelSelected(..), modelSelect)
+import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect)
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
@@ -88,11 +88,6 @@ ui =
                   [ HE.onClick (HE.input_ ClearText) ]
                   [ HH.text "Clear" ]
               , HH.slot' cp3 unit readTextFile unit handleTextFileRead
-              -- , HH.input
-              --     [ HP.type_ HP.InputFile
-              --     , HE.onValueInput (HE.input handleFileSelect)
-              --      -- [ onFilesChange (E.input (SetFiles <<< Just))
-              --     ]
               , HH.button
                   [ HE.onClick (HE.input_ Save) ]
                   [ HH.text "Save" ]
@@ -160,6 +155,8 @@ ui =
             df <- H.liftAff $ domeinFileFromContext ctxt
             H.liftAff $ storeDomeinFileInCouchdb df
             H.modify (_ { text = show textName })
+            -- notify the ModelSelect
+            _ <- H.query' cp2 unit $ H.action Reload
             pure next
       (Left e) -> do
         H.modify (_ { text = show e })

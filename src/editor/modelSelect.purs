@@ -17,6 +17,7 @@ data ModelSelectQuery a
   = Initialize a
   | Finalize a
   | Change Int a
+  | Reload a
 
 -- No input to this component.
 type Input = Unit
@@ -47,6 +48,10 @@ modelSelect =
     eval :: ModelSelectQuery ~> H.ComponentDSL State ModelSelectQuery ModelSelected (Aff (ajax :: AJAX | e))
     eval = case _ of
       Initialize next -> do
+        (models :: Array String) <- H.liftAff $ documentNamesInDatabase "perspect_models"
+        H.put { models: models, index: Just 0, selectedModel: head models }
+        pure next
+      Reload next -> do
         (models :: Array String) <- H.liftAff $ documentNamesInDatabase "perspect_models"
         H.put { models: models, index: Just 0, selectedModel: head models }
         pure next
