@@ -7,15 +7,15 @@ import Control.Monad.State (StateT, get)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
-import Perspectives.Property (PropDefsEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.ResourceTypes (Resource)
 import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==))
 
 type Predicate = String
 
--- type TripleGetter e = Resource -> Aff (PropDefsEffects e) (Triple e)
+-- type TripleGetter e = Resource -> Aff (AjaxAvarCache e) (Triple e)
 
-type FlexTriple e = StateT Boolean (Aff (PropDefsEffects e)) (Triple e)
+type FlexTriple e = StateT Boolean (Aff (AjaxAvarCache e)) (Triple e)
 
 type TripleGetter e = Resource -> FlexTriple e
 

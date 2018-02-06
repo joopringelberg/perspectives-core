@@ -1,7 +1,7 @@
 module Perspectives.PerspectEntiteit where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar)
+import Control.Monad.Aff.AVar (AVar, makeEmptyVar)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Except (runExcept)
 import Data.Either (Either)
@@ -11,9 +11,10 @@ import Data.Foreign.Generic (decodeJSON, encodeJSON)
 import Data.Maybe (Maybe)
 import Perspectives.ContextAndRole (context_id, context_rev', rol_id, rol_rev')
 import Perspectives.DomeinCache (retrieveContextFromDomein, retrieveRolFromDomein)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, poke, peek)
+import Perspectives.Effects (AvarCache, AjaxAvarCache)
+import Perspectives.GlobalUnsafeStrMap (poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.ResourceTypes (AsyncDomeinFile, contextDefinitions, rolDefinitions)
+import Perspectives.ResourceTypes (contextDefinitions, rolDefinitions)
 import Perspectives.Syntax (ID, PerspectContext(..), PerspectRol(..), Revision, revision)
 import Prelude (bind, pure, ($), (<<<))
 
@@ -22,13 +23,13 @@ class (Encode a, Decode a) <=  PerspectEntiteit a where
   setRevision :: String -> a -> a
   getId :: a -> ID
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
-  representInternally :: forall e. ID -> Aff (avar :: AVAR, gm :: GLOBALMAP | e) (AVar a)
-  retrieveInternally :: forall e. ID -> Aff (avar :: AVAR, gm :: GLOBALMAP | e) (Maybe (AVar a))
+  representInternally :: forall e. ID -> Aff (AvarCache e) (AVar a)
+  retrieveInternally :: forall e. ID -> Aff (AvarCache e) (Maybe (AVar a))
   -- | A default implementation for encode is encodeJSON.
   encode :: a -> String
   -- | A default implementation for decode is decodeJSON.
   decode :: String -> Either MultipleErrors a
-  retrieveFromDomein :: forall e. ID -> Namespace -> AsyncDomeinFile e a
+  retrieveFromDomein :: forall e. ID -> Namespace -> Aff (AjaxAvarCache e) a
 
 instance perspectEntiteitContext :: PerspectEntiteit PerspectContext where
   getRevision = context_rev'

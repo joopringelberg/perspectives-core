@@ -5,7 +5,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Perspectives.ContextRoleParser (expression, enclosingContext)
 import Perspectives.IndentParser (runIndentParser)
-import Perspectives.ResourceTypes (DomeinFileEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Prelude ((*>), (-), bind, pure, ($))
 import Text.Parsing.Parser (ParseError(..))
 import Text.Parsing.Parser.Pos (Position(..))
@@ -17,7 +17,7 @@ type AceError =
   , text :: String
   , type :: String }
 
-parse :: forall e. String -> Aff (DomeinFileEffects e) (Either (Array AceError) String)
+parse :: forall e. String -> Aff (AjaxAvarCache e) (Either (Array AceError) String)
 parse s = do
   parseResult <- runIndentParser s enclosingContext
   case parseResult of
@@ -29,7 +29,7 @@ parse s = do
       }]
     otherwise -> pure $ Right "Parse succeeded, resources stored!"
 
-errorsIn :: forall e. String -> String -> Aff (DomeinFileEffects e) (Maybe (Array AceError))
+errorsIn :: forall e. String -> String -> Aff (AjaxAvarCache e) (Maybe (Array AceError))
 errorsIn previousLine s = do
   parseResult <- runIndentParser s (whiteSpace *> expression)
   case parseResult of
@@ -43,7 +43,7 @@ errorsIn previousLine s = do
       }]
     otherwise -> pure Nothing
 
-expressionTypeForNextLine :: forall e. String -> Aff (DomeinFileEffects e) String
+expressionTypeForNextLine :: forall e. String -> Aff (AjaxAvarCache e) String
 expressionTypeForNextLine s = do
   parseResult <- runIndentParser s (whiteSpace *> expression)
   case parseResult of

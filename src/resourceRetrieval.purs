@@ -14,21 +14,15 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, put, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (escapeCouchdbDocumentName, deconstructNamespace, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, decode, representInternally, retrieveFromDomein)
-import Perspectives.ResourceTypes (AsyncDomeinFile, stringToRecord)
+import Perspectives.ResourceTypes (stringToRecord)
 import Perspectives.Syntax (ID)
 
--- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
--- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
--- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
--- fetchPropDefs id = do
---   r <- fetchPerspectEntiteitFromCouchdb id
---   pure $ PropDefs r
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
--- fetchPropDefs :: forall e. Resource -> (AsyncDomeinFile e PropDefs)
-fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> AsyncDomeinFile e a
+fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 fetchPerspectEntiteitFromCouchdb id = if isQualifiedWithDomein id
   then case deconstructNamespace id of
     Nothing -> throwError $ error ("Cannot construct namespace out of id " <> id)
@@ -40,7 +34,7 @@ fetchPerspectEntiteitFromCouchdb id = if isQualifiedWithDomein id
     else fetchIndividualCouchDbDefinition id
 
 -- | Fetch the definition of a resource asynchronously.
-fetchIndividualCouchDbDefinition :: forall e a. PerspectEntiteit a => ID -> AsyncDomeinFile e a
+fetchIndividualCouchDbDefinition :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 fetchIndividualCouchDbDefinition id = do
   v <- representInternally id
   -- _ <- forkAff do

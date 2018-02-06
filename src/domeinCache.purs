@@ -4,7 +4,7 @@ module Perspectives.DomeinCache
 where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, readVar, takeVar)
+import Control.Monad.Aff.AVar (AVar, makeEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (runExcept, throwError)
@@ -20,9 +20,10 @@ import Data.StrMap (StrMap, empty, lookup)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.ResourceTypes (AsyncDomeinFile, CouchdbResource, Resource)
+import Perspectives.ResourceTypes (CouchdbResource, Resource)
 import Perspectives.Syntax (ID, PerspectContext, PerspectRol, Revision, fromRevision, noRevision, revision)
 import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<$>), (<>), (==), (||))
 
@@ -66,7 +67,7 @@ storeDomeinFileInCache ns df= liftEff $ poke domeinCache ns df *> pure df
 retrieveContextFromDomein :: forall e.
   Resource
   -> Namespace
-  -> (AsyncDomeinFile e PerspectContext)
+  -> (Aff (AjaxAvarCache e) PerspectContext)
 retrieveContextFromDomein id ns = do
   (DomeinFile {contexts}) <- retrieveDomeinFile ns
   case lookup id contexts of
@@ -77,14 +78,14 @@ retrieveContextFromDomein id ns = do
 retrieveRolFromDomein :: forall e.
   Resource
   -> Namespace
-  -> (AsyncDomeinFile e PerspectRol)
+  -> (Aff (AjaxAvarCache e) PerspectRol)
 retrieveRolFromDomein id ns = do
   (DomeinFile {roles}) <- retrieveDomeinFile ns
   case lookup id roles of
     Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
     (Just rol) -> pure rol
 
-retrieveDomeinFile :: forall e. Namespace -> AsyncDomeinFile e DomeinFile
+retrieveDomeinFile :: forall e. Namespace -> Aff (AjaxAvarCache e) DomeinFile
 retrieveDomeinFile ns = do
   mAvar <- liftEff $ peek domeinCache ns
   case mAvar of
@@ -159,14 +160,14 @@ documentNamesInDatabase database = do
   pure $ (\(DocReference{id}) -> id) <$> cad.rows
 
 -- | Either create or modify the DomeinFile in couchdb. Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
-storeDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+storeDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (AjaxAvarCache e) Unit
 storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
   mAvar <- liftEff $ peek domeinCache _id
   case mAvar of
     Nothing -> createDomeinFileInCouchdb df
     (Just avar) -> modifyDomeinFileInCouchdb df avar
 
-createDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+createDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (AjaxAvarCache e) Unit
 createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
   ev <- makeEmptyVar
   _ <- liftEff $ poke domeinCache _id ev
@@ -177,7 +178,7 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
     true -> putVar (DomeinFile (dfr {_rev = (revision res.response)})) ev
     false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
-modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> Aff (AjaxAvar e) Unit
 modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   (DomeinFile {_rev}) <- readVar av
   originalRevision <- pure $ unsafePartial $ fromJust $ fromRevision _rev

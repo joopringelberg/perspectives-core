@@ -5,7 +5,7 @@ import Control.Monad.State (StateT, put, get)
 import Data.Array (cons, difference, elemIndex, foldr, null, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.Property (PropDefsEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
 import Prelude (bind, id, join, map, not, pure, show, ($), (<>), (>=>), discard)
 
@@ -81,7 +81,7 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter nam
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
-isNothing :: forall e. Triple e -> StateT Boolean (Aff (PropDefsEffects e)) (Triple e)
+isNothing :: forall e. Triple e -> StateT Boolean (Aff (AjaxAvarCache e)) (Triple e)
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
 hasValue :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)

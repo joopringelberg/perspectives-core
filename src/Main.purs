@@ -23,12 +23,12 @@ import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..),
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
-import Perspectives.Property (PerspectEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 
 -- | Run the app!
-main :: Eff (HA.HalogenEffects (AceEffects (PerspectEffects ()))) Unit
+main :: Eff (HA.HalogenEffects (AceEffects (AjaxAvarCache ()))) Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
   runUI ui unit body
@@ -64,7 +64,7 @@ derive instance ordReadTextFileSlot :: Ord ReadTextFileSlot
 
 
 -- | The main UI component definition.
-ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AceEffects (PerspectEffects (dom :: DOM | eff))))
+ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AceEffects (AjaxAvarCache (dom :: DOM | eff))))
 ui =
   H.parentComponent
     { initialState: const initialState
@@ -77,7 +77,7 @@ ui =
   initialState :: State
   initialState = { text: "" }
 
-  render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (AceEffects (PerspectEffects (dom :: DOM | eff))))
+  render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (AceEffects (AjaxAvarCache (dom :: DOM | eff))))
   render { text: text } =
     HH.div_
       [ HH.h1_
@@ -105,7 +105,7 @@ ui =
           [ HH.text ("Current text: " <> text) ]
       ]
 
-  eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (AceEffects (PerspectEffects (dom :: DOM | eff))))
+  eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (AceEffects (AjaxAvarCache (dom :: DOM | eff))))
   eval (ClearText next) = do
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText "")
     pure next

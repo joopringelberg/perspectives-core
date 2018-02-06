@@ -2,15 +2,15 @@ module Perspectives.Property where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.ST (ST)
 import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
-import Perspectives.Resource (PROPDEFS, ResourceDefinitions, getPerspectEntiteit)
-import Perspectives.ResourceTypes (Resource, DomeinFileEffects)
+import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.ResourceTypes (Resource)
 import Perspectives.Syntax (ID, PerspectContext, PerspectRol, RoleName, propertyValue)
 
 {-
@@ -20,13 +20,9 @@ We need functions that give us an array of values for a given property for a giv
 
 type PropertyName = String
 
-type PropDefsEffects e = DomeinFileEffects (st :: ST ResourceDefinitions, prd :: PROPDEFS | e)
+type ObjectsGetter e = Resource -> Aff (AjaxAvarCache e) (Array String)
 
-type PerspectEffects e = (PropDefsEffects e)
-
-type ObjectsGetter e = Resource -> Aff (PropDefsEffects e) (Array String)
-
-type ObjectGetter e = Resource -> Aff (PropDefsEffects e) String
+type ObjectGetter e = Resource -> Aff (AjaxAvarCache e) String
 
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
 getContextMember f c = do
@@ -36,7 +32,7 @@ getContextMember f c = do
     otherwise -> pure []
 
 -- Even though members of a context will always be present, the context itself may not. Hence we return a Maybe value.
-getContextMember' :: forall a e. (PerspectContext -> a) -> (ID -> Aff (PropDefsEffects e) (Maybe a))
+getContextMember' :: forall a e. (PerspectContext -> a) -> (ID -> Aff (AjaxAvarCache e) (Maybe a))
 getContextMember' f c = do
   maybeContext <- getPerspectEntiteit c
   case maybeContext of
@@ -51,7 +47,7 @@ getBuitenRol :: forall e. ObjectsGetter e
 getBuitenRol = getContextMember \c -> [context_buitenRol c]
 
 -- Returns Nothing if the context does not exist.
-getBuitenRol' :: forall e. ID -> Aff (PropDefsEffects e) (Maybe String)
+getBuitenRol' :: forall e. ID -> Aff (AjaxAvarCache e) (Maybe String)
 getBuitenRol' = getContextMember' \c -> context_buitenRol c
 
 getRol :: forall e. RoleName -> ObjectsGetter e

@@ -9,7 +9,7 @@ import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, uni
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.Property (PropDefsEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.TripleAdministration (Triple(..), TripleRef(..), FlexTriple, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($))
 
@@ -33,12 +33,12 @@ type TripleQueue e = Array (Triple e)
 addToQueue :: forall e. TripleQueue e -> Array (Triple e) -> TripleQueue e
 addToQueue q triples = union q (sortBy dependsOn (difference triples q))
 
-updateFromSeeds :: forall e. Array (Triple e) -> StateT Boolean (Aff (PropDefsEffects e)) (Array String)
+updateFromSeeds :: forall e. Array (Triple e) -> StateT Boolean (Aff (AjaxAvarCache e)) (Array String)
 updateFromSeeds ts = do
   x <- liftEff (traverse getDependencies ts)
   propagateTheoryDeltas (join x)
 
-propagateTheoryDeltas :: forall e. TripleQueue e -> StateT Boolean (Aff (PropDefsEffects e)) (Array String)
+propagateTheoryDeltas :: forall e. TripleQueue e -> StateT Boolean (Aff (AjaxAvarCache e)) (Array String)
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do

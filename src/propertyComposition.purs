@@ -31,12 +31,12 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
 
 infixl 9 compose as >->
 
--- type MagicProperty e = Array (Triple e) -> Aff (PropDefsEffects e) (Array (Triple e))
+-- type MagicProperty e = Array (Triple e) -> Aff (AjaxAvarCache e) (Array (Triple e))
 --
 -- magic :: forall e. NamedFunction( TripleGetter e) ->  MagicProperty e
 -- magic ntg tripleArr = do
 --   x <- traverse (magic' ntg) tripleArr
 --   pure $ join x
 --   where
---     magic' :: NamedFunction( TripleGetter e) -> Triple e -> Aff (PropDefsEffects e) (Array (Triple e))
+--     magic' :: NamedFunction( TripleGetter e) -> Triple e -> Aff (AjaxAvarCache e) (Array (Triple e))
 --     magic' (NamedFunction _ q) (Triple{subject, object}) = traverse q (difference object [subject])

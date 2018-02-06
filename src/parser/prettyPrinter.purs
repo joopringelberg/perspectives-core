@@ -17,7 +17,7 @@ import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
-import Perspectives.Property (PropDefsEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -29,7 +29,7 @@ import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), 
 
 type IndentLevel = Int
 
-type PerspectText' e = StateT IndentLevel (WriterT String (Aff (PropDefsEffects e)))
+type PerspectText' e = StateT IndentLevel (WriterT String (Aff (AjaxAvarCache e)))
 
 type PerspectText e = PerspectText' e Unit
 
@@ -68,10 +68,10 @@ comment' c = identifier' ( "--" <> c)
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
 
-prettyPrint :: forall a e. a -> PrettyPrinter a e -> Aff (PropDefsEffects e) String
+prettyPrint :: forall a e. a -> PrettyPrinter a e -> Aff (AjaxAvarCache e) String
 prettyPrint t pp = prettyPrint' $ pp t
 
-prettyPrint' :: forall e. PerspectText e -> Aff (PropDefsEffects e) String
+prettyPrint' :: forall e. PerspectText e -> Aff (AjaxAvarCache e) String
 prettyPrint' t = do
   x <- runWriterT (evalStateT t 0)
   pure $ snd x

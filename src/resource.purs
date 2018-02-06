@@ -2,7 +2,8 @@ module Perspectives.Resource where
 
 import Prelude
 import Control.Monad.Aff (Aff, catchError)
-import Control.Monad.Aff.AVar (AVAR, AVar, isEmptyVar, makeEmptyVar, putVar, readVar, takeVar)
+import Control.Monad.Aff.AVar (
+  AVar, isEmptyVar, makeEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
@@ -11,14 +12,14 @@ import Control.Monad.State (StateT, execStateT, lift, modify)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (insert)
-import Network.HTTP.Affjax (AJAX)
 import Perspectives.ContextAndRole (context_id, context_rev, context_rolInContext, rol_binding, rol_context, rol_id, rol_pspType)
 import Perspectives.DomeinCache (DomeinFile(..), defaultDomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
+import Perspectives.Effects (AjaxAvarCache, AvarCache)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally, setRevision)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, createResourceInCouchdb)
-import Perspectives.ResourceTypes (CouchdbResource, Resource, ResourceEffects, DomeinFileEffects)
+import Perspectives.ResourceTypes (CouchdbResource, Resource)
 import Perspectives.Syntax (ID, PerspectContext, PerspectRol, revision')
 
 -- | The global index of definitions of all resources, indexed by Resource.
@@ -27,7 +28,8 @@ type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
 resourceDefinitions :: ResourceDefinitions
 resourceDefinitions = new unit
 
-getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (ResourceEffects e) (Maybe a)
+-- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
+getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) (Maybe a)
 getPerspectEntiteit id =
   catchError
     do
@@ -43,19 +45,7 @@ getPerspectEntiteit id =
           pure $ Just pe
     \_ -> pure Nothing
 
--- | Get the property definitions of a Resource.
-getCouchdbResource :: forall e a. PerspectEntiteit a => ID -> Aff (ResourceEffects e) a
-getCouchdbResource id = do
-  av <- retrieveInternally id
-  case av of
-    (Just avar) -> readVar avar
-    Nothing -> do
-      avar <- representInternally id
-      pd <- fetchPerspectEntiteitFromCouchdb id
-      putVar pd avar
-      pure pd
-
-getResourceAVar :: forall e. Resource -> Aff (avar :: AVAR, gm :: GLOBALMAP | e) (AVar CouchdbResource)
+getResourceAVar :: forall e. Resource -> Aff (AvarCache e) (AVar CouchdbResource)
 getResourceAVar id = do
   propDefs <- liftEff $ peek resourceDefinitions id
   case propDefs of
@@ -65,11 +55,14 @@ getResourceAVar id = do
       pure ev
     (Just avar) -> pure avar
 
-storePerspectEntiteitInResourceDefinitions :: forall e a. PerspectEntiteit a => ID -> a -> Aff (DomeinFileEffects e) Unit
+-- | Store an internally created PerspectEntiteit for the first time in the local store.
+storePerspectEntiteitInResourceDefinitions :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AvarCache e) Unit
 storePerspectEntiteitInResourceDefinitions id r = do
   (av :: AVar a) <- representInternally id
   putVar r av
   pure unit
+
+-- changePerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AjaxAvarCache)
 
 {-
 	- haal AVar op
@@ -80,7 +73,7 @@ storePerspectEntiteitInResourceDefinitions id r = do
 		- na afloop: vul AVar met couchdbresource inclusief revision.
 -}
 -- | Store a freshly created and not yet internally stored resource both internally and in couchdb.
-createPerspectEntiteitInCouchdb :: forall e a. PerspectEntiteit a => a -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+createPerspectEntiteitInCouchdb :: forall e a. PerspectEntiteit a => a -> Aff (AjaxAvarCache e) Unit
 createPerspectEntiteitInCouchdb pe = do
     (mAvar :: Maybe (AVar a)) <- retrieveInternally (getId pe)
     case mAvar of
@@ -99,7 +92,7 @@ createPerspectEntiteitInCouchdb pe = do
 -}
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
-storeExistingCouchdbResourceInCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (ajax :: AJAX, avar :: AVAR, gm :: GLOBALMAP | e) Unit
+storeExistingCouchdbResourceInCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) Unit
 storeExistingCouchdbResourceInCouchdb id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -114,7 +107,7 @@ storeExistingCouchdbResourceInCouchdb id = do
           putVar (setRevision rev pe) avar
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
-domeinFileFromContext :: forall e. PerspectContext -> Aff (ResourceEffects e) DomeinFile
+domeinFileFromContext :: forall e. PerspectContext -> Aff (AjaxAvarCache e) DomeinFile
 domeinFileFromContext c' = do
   (DomeinFile df) <- execStateT (collect c') defaultDomeinFile
   -- pure { _id : context_id c'
@@ -123,7 +116,7 @@ domeinFileFromContext c' = do
   --   }
   pure $ DomeinFile $ df {_rev = revision' (context_rev c'), _id = (context_id c')}
   where
-    collect :: PerspectContext -> StateT DomeinFile (Aff (ResourceEffects e)) Unit
+    collect :: PerspectContext -> StateT DomeinFile (Aff (AjaxAvarCache e)) Unit
     collect c = do
       modify $ insertContext  c
       for_ (context_rolInContext c)

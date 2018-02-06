@@ -29,7 +29,7 @@ import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
 import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError, errorsIn)
-import Perspectives.ResourceTypes (DomeinFileEffects)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Syntax (ContextDeclaration(..))
 
 -- | As long as the user edits a contextname, we keep the original name here:
@@ -59,7 +59,7 @@ data AceOutput = TextChanged String
 type AceEffects eff = (ace :: ACE, avar :: AVAR, console :: CONSOLE | eff)
 
 -- | The Ace component definition.
-aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects (DomeinFileEffects eff)))
+aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects (AjaxAvarCache eff)))
 aceComponent mode theme =
   H.lifecycleComponent
     { initialState: const initialState
@@ -83,7 +83,7 @@ aceComponent mode theme =
   -- The query algebra for the component handles the initialization of the Ace
   -- editor as well as responding to the `ChangeText` action that allows us to
   -- alter the editor's state.
-  eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects (DomeinFileEffects eff)))
+  eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects (AjaxAvarCache eff)))
   eval = case _ of
     Initialize mod them next -> do
       H.getHTMLElementRef (H.RefLabel "ace") >>= case _ of
@@ -227,7 +227,7 @@ aceComponent mode theme =
           case action of
             Insert -> r
             Remove -> row
-        rename :: forall e. String -> Document -> DocumentEvent -> Int -> Aff (AceEffects (DomeinFileEffects e)) Unit
+        rename :: forall e. String -> Document -> DocumentEvent -> Int -> Aff (AceEffects (AjaxAvarCache e)) Unit
         rename contextName document event line = do
           modifiedDeclaration <- H.liftEff $ Document.getLine line document
           -- TODO We need to apply runIndentParser to the current default namespace here!
@@ -240,7 +240,7 @@ aceComponent mode theme =
               pure unit
             otherwise -> pure unit
           where
-            composeFullName :: Int -> String -> Aff (AceEffects (DomeinFileEffects e)) String
+            composeFullName :: Int -> String -> Aff (AceEffects (AjaxAvarCache e)) String
             composeFullName row name = do
               parseResult <- runIndentParser name CRP.contextName
               case parseResult of
@@ -251,7 +251,7 @@ aceComponent mode theme =
                     (Just (Tuple previousRow namespacingName)) -> composeFullName previousRow (namespacingName <> name)
                     Nothing -> pure "" -- we should throw an error here.
             -- TODO. Stop at the line that is not indexed. Then use its namespace, too!
-            findPreviousContextDeclaration :: Int -> Aff (AceEffects (DomeinFileEffects e)) (Maybe (Tuple Int String))
+            findPreviousContextDeclaration :: Int -> Aff (AceEffects (AjaxAvarCache e)) (Maybe (Tuple Int String))
             findPreviousContextDeclaration row | row < 0 = pure Nothing
             findPreviousContextDeclaration row | otherwise = do
               previousLine <- liftEff $ Document.getLine row document
