@@ -1,2 +1,6 @@
 https://git.gueux.org/tiny-crowdfunding.git/tree/tiny-crowdfunding-client/src/Crowdfunding.purs
-https://github.com/justinwoo?utf8=%E2%9C%93&tab=repositories&q=&type=&language=purescript
+https://github.com/justinwoo/purescript-web-audio-player-demo
+https://github.com/zudov/purescript-halogen-filepicker
+https://github.com/rnons/purescript-halogen-day-picker
+https://github.com/nwolverson/purescript-dom-filereader
+https://lettier.github.io/posts/2017-01-15-linear-regression-and-the-amazing-beard.html

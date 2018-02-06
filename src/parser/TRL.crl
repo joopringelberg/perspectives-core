@@ -6,3 +6,112 @@ import model:Perspectives als psp:
 import model:Arc als arc:
 
 Section psp:rolInContext
+
+psp:Property txt:ingeklapt
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	extern psp:range = Boolean
+
+psp:Property txt:aantalTekstRegels
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = Number
+
+psp:Property txt:indent
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = Number
+
+psp:Property txt:inlineCommentaar
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	extern psp:range = String
+
+psp:Property txt:volgNummer
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = Number
+
+psp:Property txt:contextRolNaam
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = String
+
+psp:Property txt:x
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	extern psp:range = Number
+
+psp:Property txt:y
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	extern psp:range = Number
+
+psp:Property txt:prefix
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = String
+
+psp:Property txt:tekst
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	extern psp:range = String
+
+psp:Property txt:sectieNaam
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = String
+
+psp:Rol txt:context
+	extern psp:isFunctioneel = true
+	psp:mogelijkeBinding => txt:GepresenteerdContextType
+	psp:rolProperty => txt:volgNummer
+	psp:rolProperty => txt:inlineCommentaar
+
+psp:Rol txt:rol
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => txt:GepresenteerdContextType
+	psp:rolProperty => txt:volgNummer
+	psp:rolProperty => txt:contextRolNaam
+	psp:rolProperty => txt:x
+	psp:rolProperty => txt:y
+
+psp:Rol txt:import
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => arc:Domein
+	psp:mogelijkeBinding => arc:Partij
+	psp:mogelijkeBinding => arc:Zaak
+	psp:mogelijkeBinding => arc:Toestand
+	psp:mogelijkeBinding => arc:Activiteit
+	psp:mogelijkeBinding => psp:Property
+	psp:mogelijkeBinding => psp:Rol
+	psp:mogelijkeBinding => psp:view
+	psp:mogelijkeBinding => arc:Actie
+	psp:rolProperty => txt:volgNummer
+	psp:rolProperty => txt:inlineCommentaar
+	psp:rolProperty => txt:prefix
+
+psp:Rol txt:commentaar
+	extern psp:isFunctioneel = true
+	psp:rolProperty => txt:volgNummer
+	psp:rolProperty => txt:indent
+	psp:rolProperty => txt:aantalTekstRegels
+	psp:rolProperty => txt:tekst
+
+psp:Rol txt:sectie
+	extern psp:isFunctioneel = false
+	psp:rolProperty => txt:volgNummer
+	psp:rolProperty => txt:inlineCommentaar
+	psp:rolProperty => txt:ingeklapt
+	psp:rolProperty => txt:sectieNaam
+
+psp:Context txt:GepresenteerdContextType
+	psp:externalProperty => txt:ingeklapt
+	psp:externalProperty => txt:aantalTekstRegels
+	psp:externalProperty => txt:indent
+	psp:externalProperty => txt:inlineCommentaar
+	psp:rolInContext => txt:context
+	psp:rolInContext => txt:rol
+	psp:rolInContext => txt:import
+	psp:rolInContext => txt:commentaar
+	psp:rolInContext => txt:sectieNaam
