@@ -4,6 +4,7 @@ where
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVAR, AVar)
+import Control.Monad.Eff (kind Effect)
 import Data.Argonaut (Json)
 import Data.StrMap (StrMap, keys)
 import Network.HTTP.Affjax (AJAX)
@@ -13,11 +14,13 @@ import Prelude (class Show, show, unit, ($), (<>))
 
 type Resource = String
 
-type ResourceEffects e = (avar :: AVAR, ajax :: AJAX | e)
+type DomeinFileEffects e = (avar :: AVAR, ajax :: AJAX, gm :: GLOBALMAP | e)
+
+type ResourceEffects e = DomeinFileEffects (prd :: PROPDEFS | e)
 
 type AsyncResource e a = Aff (ResourceEffects e) a
 
-type DomeinFileEffects e = ResourceEffects (gm :: GLOBALMAP | e)
+foreign import data PROPDEFS :: Effect
 
 -- | Type synonym AsyncDomeinFile is some type a in the extensible AsyncDomeinFileM monad.
 type AsyncDomeinFile e a = Aff (DomeinFileEffects e) a

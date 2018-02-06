@@ -18,7 +18,7 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally, setRevision)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, createResourceInCouchdb)
-import Perspectives.ResourceTypes (CouchdbResource, DomeinFileEffects, Resource)
+import Perspectives.ResourceTypes (CouchdbResource, Resource, ResourceEffects, DomeinFileEffects)
 import Perspectives.Syntax (ID, PerspectContext, PerspectRol, revision')
 
 -- | The global index of definitions of all resources, indexed by Resource.
@@ -27,9 +27,7 @@ type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
 resourceDefinitions :: ResourceDefinitions
 resourceDefinitions = new unit
 
-foreign import data PROPDEFS :: Effect
-
-getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe a)
+getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (ResourceEffects e) (Maybe a)
 getPerspectEntiteit id =
   catchError
     do
@@ -46,7 +44,7 @@ getPerspectEntiteit id =
     \_ -> pure Nothing
 
 -- | Get the property definitions of a Resource.
-getCouchdbResource :: forall e a. PerspectEntiteit a => ID -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) a
+getCouchdbResource :: forall e a. PerspectEntiteit a => ID -> Aff (ResourceEffects e) a
 getCouchdbResource id = do
   av <- retrieveInternally id
   case av of
@@ -116,7 +114,7 @@ storeExistingCouchdbResourceInCouchdb id = do
           putVar (setRevision rev pe) avar
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
-domeinFileFromContext :: forall e. PerspectContext -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) DomeinFile
+domeinFileFromContext :: forall e. PerspectContext -> Aff (ResourceEffects e) DomeinFile
 domeinFileFromContext c' = do
   (DomeinFile df) <- execStateT (collect c') defaultDomeinFile
   -- pure { _id : context_id c'
@@ -125,7 +123,7 @@ domeinFileFromContext c' = do
   --   }
   pure $ DomeinFile $ df {_rev = revision' (context_rev c'), _id = (context_id c')}
   where
-    collect :: PerspectContext -> StateT DomeinFile (Aff (DomeinFileEffects (prd :: PROPDEFS | e))) Unit
+    collect :: PerspectContext -> StateT DomeinFile (Aff (ResourceEffects e)) Unit
     collect c = do
       modify $ insertContext  c
       for_ (context_rolInContext c)
