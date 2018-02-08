@@ -2,12 +2,14 @@ module Perspectives.QueryCombinators where
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.State (StateT, put, get)
-import Data.Array (cons, difference, elemIndex, foldr, null, union)
+import Control.Monad.State.Trans (evalStateT)
+import Data.Array (cons, difference, elemIndex, foldr, head, null, union, (!!))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
-import Prelude (bind, id, join, map, not, pure, show, ($), (<>), (>=>), discard)
+import Perspectives.ResourceTypes (Resource)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
+import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
 
 closure :: forall e.
   NamedFunction (TripleGetter e) ->
@@ -92,6 +94,15 @@ hasValue (NamedFunction nameOfp p) = memorize getter name where
 
   name :: String
   name = "(hasValue " <> nameOfp <> ")"
+
+-- | Construct a function that returns a bool in Aff, from a TripleGetter.
+toBoolean :: forall e. NamedFunction (TripleGetter e) -> Resource -> Aff (AjaxAvarCache e) Boolean
+toBoolean (NamedFunction nameOfp p) r = do
+  result <- evalStateT (p r) true
+  arrWithBool <- pure $ tripleObjects result
+  case head arrWithBool of
+    Nothing -> pure false
+    (Just x) -> pure (x == "true")
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
 ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)

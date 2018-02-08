@@ -15,7 +15,11 @@ type Predicate = String
 
 -- type TripleGetter e = Resource -> Aff (AjaxAvarCache e) (Triple e)
 
-type FlexTriple e = StateT Boolean (Aff (AjaxAvarCache e)) (Triple e)
+-- | If UseCache == true, we will look up a result in the triple cache
+-- | before computing it.
+type UseCache = Boolean
+
+type FlexTriple e = StateT UseCache (Aff (AjaxAvarCache e)) (Triple e)
 
 type TripleGetter e = Resource -> FlexTriple e
 
