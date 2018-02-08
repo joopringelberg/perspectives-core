@@ -1,0 +1,99 @@
+Een RolInContext kan gevuld worden met een andere RIC of met een Context:
+Verbalisant (Functioneel) gevuld door Persoon
+Start (Functioneel) gevuld door Intake
+In termen van CRL is de instantie van Start gevuld door de buitenrol van Intake. De context van die buitenrol is de instantie van Intake zelf.
+
+Laat A een aangifte zijn. Dan verwacht de modelleur als resultaat van deze query:
+	A ## Verbalisant ~> binding
+de RolInContext die een instantie is van Persoon.
+Ik vermoed dat hij als resultaat van deze query:
+	A ## Start ~> binding
+dan ook de Context verwacht die een instantie is van Intake en niet de buitenrol van die instantie. Hij heeft immers niet gespecificeerd dat Start gevuld wordt door de buitenrol van Intake. 
+Maar als ik geen gevalsonderscheiding doe in de implementatie van 'binding' op RIC's die gevuld worden door RIC's en RIC's die gevuld worden door buitenrollen, levert de tweede query gewoon die buitenrol. Dus als je de context zelf wil, moet je dit doen:
+	A ## Start ~> binding ~> context
+Laat 'afgerond' een externe property zijn van Intake, dan vraag je die op met:
+	A ## Start ~> binding ~> afgerond
+Een property 'toegewezen' van de rol Start vraag je natuurlijk zo op:
+	A ## Start ~> toegewezen
+Een interne property 'aantekening' van Intake vraag je dan zo op:
+	A ## Start ~> binding ~> context ~> aantekening
+(merk op dat de binnenrol overgeslagen wordt)
+
+
+
+Als we het eens over een andere boeg gooien? Stel dat je met de query
+	A ## Verbalisant
+direct de RIC krijgt die de Persoon representeert. De binding dus van de rol Verbalisant. 
+Als je dus schrijft:
+	A ## Verbalisant ~> voornaam
+krijg je direct de voornaam van de persoon die gebonden is aan de verbalisant. Met de operator 'binding' kun je nog steeds de binding van een rol opvragen:
+	A ## Verbalisant ~> binding
+levert je dan de binding van Persoon, laten we zeggen dat dat de Gebruiker is.
+
+Wil je de rol zelf, b.v. omdat je een property van de rol wil, dan schrijf je dit:
+	A ## rol Verbalisant ~> beoordeling
+(laat beoordeling even een rapportcijfer zijn voor zijn prestatie bij deze aangifte)
+(dus "rol Verbalisant binding" is hetzelfde als alleen "Verbalisant").
+
+Dit geldt voor een RIC gebonden aan een RIC maar ook voor een RIC gebonden aan een Context, waarbij we dan meteen doorprikken naar de achterliggende context.
+
+Dus voor gebonden contexten, krijg je bij:
+	A ## Start 
+direct de context die de Intake representeert. Je slaat hier dus twee rollen over. Dit maakt het mogelijk om te schrijven:
+	A ## Start ~> Uitvoerder
+(waar Uitvoerder een rol van Intake is).
+
+Met:
+	A ## rol Start ~> toegewezen
+krijg je echter, net als bij Verbalisant, (een property van) de rol in context. Een property van de buitenrol vraag je dan zo op:
+	A ## extern Start ~> afgerond
+Dus de werking van de operator 'extern' is dat automatisch de binding van de rol in context wordt opgehaald.
+
+Dit past in de compositionele aanpak van queries, waarbij ik van links naar rechts de query termen kan vertalen in operators. Ik kan dit implementeren met behulp van reflectie op het type van de mogelijke vulling van een rol. Is dat een RIC, dan pak ik de binding van de rol; is het een Context, dan pak ik de binding van de binding van de rol.
+
+Merk op dat "A ## Start extern afgerond" niet werkt, want als je van links naar rechts loopt heb je de Context al te pakken voor je weet dat je alleen zijn buitenrol nodig had. Uiteraard kunnen we andere namen voor de operatoren kiezen (persoonlijk zou ik iets met de betekenis van proxy beter vinden dan extern).
+
+
+Of nog weer anders.
+
+	A ## Verbalisant ~> beoordeling
+
+werkt klassiek, dus je vraagt hier de property van de rol Verbalisant. Met 
+
+	A ## Verbalisant ~> binding ~> voornaam
+
+vraag je de property 'voornaam' van de instantie van Persoon die de rol Verbalisant vult.
+
+En met
+	
+	A ## Start ~> binding ~> afgerond
+	
+vraag je de property 'afgerond' van de buitenrol van Intake op.
+Maar met:
+
+	A ## Start ~> gebondenContext ~> Uitvoerder
+
+pak je ineens de rol Uitvoerder van de instantie van Intake. Oftewel, gebondenContext == binding ~> context.
+
+
+
+Nog een syntactisch alternatief:
+
+	A ## Start ~> toegewezen
+	
+	A ## Start ~~> afgerond
+	
+	A ## Start ~~~> Uitvoerder
+	
+En:
+
+	A ## Verbalisant ~> beoordeling
+	
+	A ## Verbalisant ~~> voornaam
+	
+	A ## Verbalisant ~~~> X
+
+De laatste expressie levert de rol of property X van de context van de binding van Verbalisant. 
+
+~~> == ~> binding
+~~~> == ~> binding ~> context
