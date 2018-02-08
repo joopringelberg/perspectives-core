@@ -1,6 +1,7 @@
 module Perspectives.ResourceRetrieval
 ( fetchPerspectEntiteitFromCouchdb
 , createResourceInCouchdb
+, modifyResourceInCouchdb
   )
 where
 
@@ -12,9 +13,9 @@ import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, put, affjax)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.Identifiers (escapeCouchdbDocumentName, deconstructNamespace, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, decode, representInternally, retrieveFromDomein)
 import Perspectives.ResourceTypes (stringToRecord)
@@ -58,6 +59,16 @@ createResourceInCouchdb resId resource =
       true ->
         pure $ _.rev $ stringToRecord res.response
       false -> throwError $ error ("createResourceInCouchdb " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+
+modifyResourceInCouchdb :: forall e. ID -> String -> String -> Aff (AjaxAvar e) String
+modifyResourceInCouchdb resId originalRevision resource = do
+  -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
+  (res :: AffjaxResponse String) <- put (baseURL <> escapeCouchdbDocumentName resId <> "?_rev=" <> originalRevision) resource
+  (StatusCode n) <- pure res.status
+  case n == 200 || n == 201 of
+    true -> do
+      pure $ _.rev $ stringToRecord res.response
+    false -> throwError $ error ("modifyResourceInCouchdb " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
 baseURL :: String
 baseURL = "http://localhost:5984/user_cor_contexts2/"

@@ -4,15 +4,22 @@ import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..))
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty)
-import Perspectives.Syntax (Comments(..), ContextRecord, ID, PerspectContext(..), PerspectRol(..), PropertyValueWithComments, Revision, RolRecord, noRevision)
+import Perspectives.Syntax (Comments(..), ContextRecord, ID, PerspectContext(..), PerspectRol(..), PropertyValueWithComments, Revision, RolRecord, noRevision, toRevision)
+import Prelude (($))
 
 -- CONTEXT
 
 context_id :: PerspectContext -> ID
 context_id (PerspectContext{_id})= _id
 
+changeContext_id :: ID -> PerspectContext -> PerspectContext
+changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}
+
 context_rev :: PerspectContext -> Maybe String
 context_rev (PerspectContext{_rev}) = unNullOrUndefined _rev
+
+changeContext_rev :: String -> PerspectContext -> PerspectContext
+changeContext_rev rev (PerspectContext cr) = PerspectContext $ cr {_rev = toRevision $ Just rev}
 
 context_rev' :: PerspectContext -> Revision
 context_rev' (PerspectContext{_rev}) = _rev
@@ -22,6 +29,9 @@ context_displayName (PerspectContext{displayName})= displayName
 
 context_pspType :: PerspectContext -> ID
 context_pspType (PerspectContext{pspType})= pspType
+
+changeContext_type :: ID -> PerspectContext -> PerspectContext
+changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = tp}
 
 context_binnenRol :: PerspectContext -> PerspectRol
 context_binnenRol (PerspectContext{binnenRol})= binnenRol

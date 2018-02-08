@@ -57,12 +57,18 @@ getResourceAVar id = do
 
 -- | Store an internally created PerspectEntiteit for the first time in the local store.
 storePerspectEntiteitInResourceDefinitions :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AvarCache e) Unit
-storePerspectEntiteitInResourceDefinitions id r = do
+storePerspectEntiteitInResourceDefinitions id e = do
   (av :: AVar a) <- representInternally id
-  putVar r av
+  putVar e av
   pure unit
 
--- changePerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AjaxAvarCache)
+-- | Modify a PerspectEntiteit in the cache.
+changePerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AvarCache e) Unit
+changePerspectEntiteit id e = do
+  mAvar <- retrieveInternally id
+  case mAvar of
+    Nothing -> throwError $ error $ "changePerspectEntiteit: cannot change an entiteit that is not cached: " <> id
+    (Just avar) -> putVar e avar
 
 {-
 	- haal AVar op

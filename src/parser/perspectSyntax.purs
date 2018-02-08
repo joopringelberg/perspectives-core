@@ -75,6 +75,9 @@ type Revision = NullOrUndefined String
 fromRevision :: Revision -> Maybe String
 fromRevision = unNullOrUndefined
 
+toRevision :: Maybe String -> Revision
+toRevision = NullOrUndefined
+
 revision :: String -> Revision
 revision r = NullOrUndefined (Just r)
 
