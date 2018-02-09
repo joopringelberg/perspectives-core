@@ -5,9 +5,8 @@ import Control.Monad.Eff (Eff, runPure)
 import Control.Monad.Eff.Exception (Error, catchException)
 import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.Error.Class (class MonadThrow)
-import Control.Monad.State (evalStateT)
-import Control.Monad.State.Trans (StateT, execStateT, lift, get)
-import Data.Array (elemIndex, head)
+import Control.Monad.State.Trans (StateT, execStateT, lift, get, put)
+import Data.Array (cons, deleteAt, elemIndex, findIndex, head)
 import Data.DateTime (DateTime)
 import Data.DateTime.Instant (toDateTime)
 import Data.Eq (class Eq)
@@ -19,10 +18,10 @@ import Data.Foreign.NullOrUndefined (NullOrUndefined(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.JSDate (fromDateTime, toISOString)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty)
 import Data.TraversableWithIndex (forWithIndex)
-import Network.HTTP.Affjax (AffjaxResponse, put)
+import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.ContextAndRole (changeContext_rev, changeContext_type, context_rev)
 import Perspectives.Effects (AjaxAvarCache)
@@ -34,7 +33,7 @@ import Perspectives.Syntax (ID, PerspectContext, PerspectRol)
 import Perspectives.SystemQueries (identity, isFunctional)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter ((##))
-import Prelude (class Show, Unit, bind, discard, pure, show, unit, ($), (<>), (==), (||))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (||))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -104,23 +103,39 @@ ZO NEE:
 	Anders: voeg de nieuwe toe.
 -}
 addContextDelta :: forall e. ContextDelta -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
-addContextDelta cd@(ContextDelta{rolName}) = do
-  t@(Transactie{contextDeltas}) <- get
+addContextDelta cd@(ContextDelta{id: id', rolName, deltaType, rolID}) = do
+  t@(Transactie tf@{contextDeltas}) <- get
   case elemIndex cd contextDeltas of
     (Just _) -> pure unit
     Nothing -> do
       (isfunc :: Boolean) <- lift $ (toBoolean isFunctional) rolName
       if isfunc
         then pure unit
-        else pure unit
+        else do
+          x <- pure $ findIndex equalExceptDeltaType contextDeltas
+          case x of
+            Nothing -> put (add cd t)
+            (Just i) -> put $ Transactie tf {contextDeltas = maybe contextDeltas id (deleteAt i contextDeltas)}
+          -- pure unit
   pure unit
+  where
+    equalExceptDeltaType :: ContextDelta  -> Boolean
+    equalExceptDeltaType
+      (ContextDelta{id: i, rolName: r, deltaType: d, rolID: ri}) =
+        id' == i &&
+        rolName == r &&
+        rolID == ri &&
+        ((deltaType == Add && d == Remove) || (deltaType == Remove && d == Add))
+    add :: ContextDelta -> Transactie -> Transactie
+    add delta (Transactie tf@{contextDeltas}) = Transactie tf {contextDeltas = cons delta contextDeltas}
+
 
 
 sendTransactieToUser :: forall e. ID -> Transactie -> Aff (AjaxAvarCache e) Unit
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ## identity
   (userIP :: String) <- onNothing' ("sendTransactieToUser: user has no IP: " <> userId) (head (tripleObjects tripleUserIP))
-  (res :: AffjaxResponse String)  <- put (userIP <> "/" <> userId <> "_post/" <> "transactie id hier") (encodeJSON t)
+  (res :: AJ.AffjaxResponse String)  <- AJ.put (userIP <> "/" <> userId <> "_post/" <> "transactie id hier") (encodeJSON t)
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
     true -> pure unit
