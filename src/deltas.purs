@@ -6,7 +6,7 @@ import Control.Monad.Eff.Exception (Error, catchException)
 import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.State.Trans (StateT, execStateT, lift, get, put)
-import Data.Array (cons, deleteAt, elemIndex, findIndex, head)
+import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head)
 import Data.DateTime (DateTime)
 import Data.DateTime.Instant (toDateTime)
 import Data.Eq (class Eq)
@@ -18,11 +18,12 @@ import Data.Foreign.NullOrUndefined (NullOrUndefined(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.JSDate (fromDateTime, toISOString)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, empty)
 import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (changeContext_rev, changeContext_type, context_rev)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectEntiteit (encode)
@@ -103,20 +104,34 @@ ZO NEE:
 	Anders: voeg de nieuwe toe.
 -}
 addContextDelta :: forall e. ContextDelta -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
-addContextDelta cd@(ContextDelta{id: id', rolName, deltaType, rolID}) = do
+addContextDelta newCD@(ContextDelta{id: id', rolName, deltaType, rolID}) = do
   t@(Transactie tf@{contextDeltas}) <- get
-  case elemIndex cd contextDeltas of
+  case elemIndex newCD contextDeltas of
     (Just _) -> pure unit
     Nothing -> do
       (isfunc :: Boolean) <- lift $ (toBoolean isFunctional) rolName
       if isfunc
-        then pure unit
+        then do
+          x <- pure $ findIndex equalExceptRolID contextDeltas
+          case x of
+            (Just oldCD) -> put (replace oldCD newCD t)
+            Nothing -> do
+              mCdelta <- pure $ find equalIdRolName contextDeltas
+              case mCdelta of
+                Nothing -> put (add newCD t)
+                (Just oldCD@(ContextDelta oldF@{deltaType: d})) -> do
+                  indexOld <- pure (unsafePartial (fromJust (elemIndex oldCD contextDeltas)))
+                  case d of
+                    Add | (deltaType == Remove) -> put (remove oldCD t)
+                    Remove | (deltaType == Add) -> put (remove oldCD t)
+                    Change | (deltaType == Remove) -> put (replace indexOld newCD t)
+                    Add | (deltaType == Change) -> put (replace indexOld (ContextDelta oldF {rolID = rolID}) t)
+                    otherwise -> put (add newCD t)
         else do
           x <- pure $ findIndex equalExceptDeltaType contextDeltas
           case x of
-            Nothing -> put (add cd t)
-            (Just i) -> put $ Transactie tf {contextDeltas = maybe contextDeltas id (deleteAt i contextDeltas)}
-          -- pure unit
+            Nothing -> put (add newCD t)
+            (Just i) -> put (replace i newCD t)
   pure unit
   where
     equalExceptDeltaType :: ContextDelta  -> Boolean
@@ -126,9 +141,22 @@ addContextDelta cd@(ContextDelta{id: id', rolName, deltaType, rolID}) = do
         rolName == r &&
         rolID == ri &&
         ((deltaType == Add && d == Remove) || (deltaType == Remove && d == Add))
+    equalExceptRolID :: ContextDelta -> Boolean
+    equalExceptRolID
+      (ContextDelta{id: i, rolName: r, deltaType: d}) =
+        id' == i &&
+        rolName == r &&
+        deltaType == d
+    equalIdRolName :: ContextDelta -> Boolean
+    equalIdRolName (ContextDelta{id: i, rolName: r}) =
+      id' == i &&
+      rolName == r
     add :: ContextDelta -> Transactie -> Transactie
     add delta (Transactie tf@{contextDeltas}) = Transactie tf {contextDeltas = cons delta contextDeltas}
-
+    replace :: Int -> ContextDelta -> Transactie -> Transactie
+    replace i delta (Transactie tf@{contextDeltas}) = Transactie tf {contextDeltas = cons newCD (maybe contextDeltas id (deleteAt i contextDeltas))}
+    remove :: ContextDelta -> Transactie -> Transactie
+    remove i (Transactie tf@{contextDeltas}) = Transactie tf {contextDeltas = (delete i contextDeltas)}
 
 
 sendTransactieToUser :: forall e. ID -> Transactie -> Aff (AjaxAvarCache e) Unit
