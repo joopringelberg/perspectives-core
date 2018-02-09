@@ -8,10 +8,11 @@ import Control.Monad.State (StateT)
 import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.TripleAdministration (Triple(..), TripleRef(..), FlexTriple, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
-import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($))
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.ResourceTypes (Resource)
+import Perspectives.TripleAdministration (FlexTriple, Predicate, Triple(..), TripleRef(..), UseCache, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
+import Prelude (Ordering(..), Unit, bind, id, join, pure, void, whenM, ($), (<<<), (>>=))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -70,6 +71,7 @@ getDependencies (Triple{dependencies}) = do
 recompute :: forall e. Triple e -> FlexTriple e
 recompute (Triple{subject, tripleGetter}) = tripleGetter subject
 
+-- Change the object of the triple to the array of IDs passed to the function.
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)
 saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
 
@@ -78,13 +80,12 @@ foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> 
 -- TODO Deze functie is niet langer nuttig, maar is wel model voor een serie van andere.
 -- Met RDF konden we alleen resources maken en properties veranderen. Met CRL kunnen
 -- we contexten en rollen maken, rollen binden en properties een waarde geven.
--- setProperty :: forall e. Resource -> Predicate -> Array String -> FlexTriple e
--- setProperty rid pid object =
---   do
---     mt <- liftEff $ lookupInTripleIndex rid pid
---     case mt of
---       -- Case Nothing will not happen when we have contexts.
---       Nothing -> do
---         t <- applyNamedFunction (constructTripleGetter pid) rid
---         liftAff $ saveChangedObject t object
---       (Just t) -> liftAff $ saveChangedObject t object
+-- Destructively change the objects of an existing triple.
+-- Returns a Triple that can be used as a seed for delta propagation, i.e. (wrapped in an array) as argument to updateFromSeeds.
+setProperty :: forall e. Resource -> Predicate -> Array String -> (Aff (gm :: GLOBALMAP | e)) (Maybe (Triple e))
+setProperty rid pid object =
+  do
+    mt <- liftEff $ lookupInTripleIndex rid pid
+    case mt of
+      Nothing -> pure Nothing
+      (Just t) -> liftAff $ (saveChangedObject t object) >>= pure <<< Just

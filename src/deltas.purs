@@ -24,17 +24,19 @@ import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (changeContext_rev, changeContext_type, context_rev)
+import Perspectives.ContextAndRole (addContext_rolInContext, changeContext_rev, changeContext_type, context_rev)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectEntiteit (encode)
+import Perspectives.Property (getRol)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (modifyResourceInCouchdb)
-import Perspectives.Syntax (ID, PerspectContext, PerspectRol)
+import Perspectives.Syntax (ID, PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (identity, isFunctional)
+import Perspectives.TheoryChange (setProperty)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter ((##))
-import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (||))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<>), (==), (||))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -58,6 +60,8 @@ newtype Transactie = Transactie
   , contextDeltas :: Array ContextDelta
   , createdContexts :: Array PerspectContext
   , createdRoles :: Array PerspectRol
+  , deletedContexts :: Array ID
+  , deletedRoles :: Array ID
   }
 
 derive instance genericRepTransactie :: Generic Transactie _
@@ -72,7 +76,7 @@ createTransactie :: forall e. String -> Eff (now :: NOW | e) Transactie
 createTransactie author =
   do
     n <- now
-    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), rolDeltas: [], contextDeltas: [], createdContexts: [], createdRoles: []}
+    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), rolDeltas: [], contextDeltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: []}
 
 runInTransactie :: forall e. StateT Transactie (Aff (AjaxAvarCache (now :: NOW | e))) Unit -> Aff (AjaxAvarCache (now :: NOW | e)) Unit
 runInTransactie m = do
@@ -85,6 +89,30 @@ distributeTransactie t = do
   (others :: StrMap Transactie) <- selectDeltasForUsers t
   _ <- forWithIndex others sendTransactieToUser
   pure unit
+
+addContextToTransactie :: forall e. PerspectContext -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+addContextToTransactie c = do
+  (Transactie tf@{createdContexts}) <- get
+  put $ Transactie tf {createdContexts = cons c createdContexts}
+
+addRolToTransactie :: forall e. PerspectRol -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+addRolToTransactie c = do
+  (Transactie tf@{createdRoles}) <- get
+  put $ Transactie tf {createdRoles = cons c createdRoles}
+
+deleteContextFromTransactie :: forall e. PerspectContext -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+deleteContextFromTransactie c@(PerspectContext{_id}) = do
+  (Transactie tf@{createdContexts, deletedContexts}) <- get
+  case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
+    Nothing -> put (Transactie tf{deletedContexts = cons _id deletedContexts})
+    (Just i) -> put (Transactie tf{createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
+
+deleteRolFromTransactie :: forall e. PerspectRol -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+deleteRolFromTransactie c@(PerspectRol{_id}) = do
+  (Transactie tf@{createdRoles, deletedRoles}) <- get
+  case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
+    Nothing -> put (Transactie tf{deletedRoles = cons _id deletedRoles})
+    (Just i) -> put (Transactie tf{createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
 {-
 1. Bepaal of de delta precies zo voorkomt in de lijst in de transactie. Zo ja, negeer dan de nieuwe delta.
@@ -264,6 +292,7 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
   - de gewijzigde context opslaan;
 -}
 
+-- TODO: wijziging doorvoeren in triple administratie.
 setContextType :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 setContextType cid theType = do
   (context :: PerspectContext) <- lift $ onNothing ("setContextType: cannot find this context: " <> cid) (getPerspectEntiteit cid)
@@ -277,10 +306,68 @@ setContextType cid theType = do
   -- Create a delta and add it to the Transactie.
   addContextDelta $ ContextDelta
     { id : cid
-    , rolName: "psp:type"
+    , rolName: "model:Perspectives$type"
     , deltaType: Change
     , rolID: NullOrUndefined (Just theType)
     }
+  -- Register the change in the TripleAdministration.
+  -- TODO: If a triple is returned, push it into the state.
+  void $ lift $ setProperty cid "model:Perspectives$type" [theType]
+
+{-
+Wat verschilt:
+  - de manier waarop de entiteit veranderd wordt;
+  - de delta die gemaakt wordt;
+  - de manier waarop de objects samengesteld worden waarmee de triple administratie bijgewerkt moet worden.
+TypeClass:
+  - wat is het type? addRol, setContextType.
+  - wat zijn de members?
+    - changeEntity
+    - createDelta
+    - getObjects
+Je krijgt dan één functie voor alle instanties, een generieke update functie. UpdatePerspectEntiteit
+Maar er zijn twee soorten veranderingen:
+  - van properties of rollen;
+  - van specifieke members van PerspectContext of PerspectRol.
+Dus een verdubbelaar:
+  - UpdatePerspectEntiteitMember
+  - UpdatePerspectEntiteitKeyValue
+De classes:
+  - MemberUpdateClass, met instanties:
+      - setContextType
+      - setRolType
+      - setContextDisplayName
+      - setContext
+      - setBinding
+  - KeyValueUpdateClass, met instanties:
+      - addRol
+      - removeRol
+      - addProperty
+      - removeProperty
+
+-}
+
+addRol :: forall e. ID -> ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+addRol cid rolName rolId = do
+  (context :: PerspectContext) <- lift $ onNothing ("setContextType: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  -- Change the entity in cache:
+  changedEntity <- lift $ changePerspectEntiteit cid (addContext_rolInContext context rolId cid)
+  rev <- lift $ onNothing' ("setContextType: context has no revision, deltas are impossible: " <> cid) (context_rev context)
+  -- Store the changed entity in couchdb.
+  newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
+  -- Set the new revision in the entity.
+  lift $ changePerspectEntiteit cid (changeContext_rev newRev context)
+  -- Create a delta and add it to the Transactie.
+  addContextDelta $ ContextDelta
+    { id : cid
+    , rolName: rolName
+    , deltaType: Change
+    , rolID: NullOrUndefined (Just rolId)
+    }
+  -- Register the change in the TripleAdministration.
+  -- TODO: If a triple is returned, push it into the state.
+  objects <- lift $ getRol rolId cid
+  void $ lift $ setProperty cid "model:Perspectives$type" objects
 
 onNothing :: forall a m. MonadThrow Error m => String -> m (Maybe a) -> m a
 onNothing message ma = do

@@ -1,9 +1,10 @@
 module Perspectives.ContextAndRole where
 
+import Data.Array (cons, elemIndex)
 import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..))
 import Data.Ord (Ordering, compare)
-import Data.StrMap (StrMap, empty)
+import Data.StrMap (StrMap, empty, lookup, insert)
 import Perspectives.Syntax (Comments(..), ContextRecord, ID, PerspectContext(..), PerspectRol(..), PropertyValueWithComments, Revision, RolRecord, noRevision, toRevision)
 import Prelude (($))
 
@@ -41,6 +42,15 @@ context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
 context_rolInContext :: PerspectContext -> StrMap (Array ID)
 context_rolInContext (PerspectContext{rolInContext})= rolInContext
+
+addContext_rolInContext :: PerspectContext -> ID -> ID -> PerspectContext
+addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
+  case lookup rolName rolInContext of
+    Nothing -> PerspectContext cr {rolInContext = insert rolName [rolID] rolInContext}
+    (Just roles) -> do
+      case elemIndex rolID roles of
+        Nothing -> PerspectContext cr {rolInContext = insert rolName (cons rolID roles) rolInContext}
+        otherwise -> ct
 
 context_comments :: PerspectContext -> Comments
 context_comments (PerspectContext{comments})= comments

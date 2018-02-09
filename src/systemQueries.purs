@@ -11,11 +11,11 @@ identity' id = pure [id]
 -----------------------------------------------------------
 -- SYSTEM GETTERS
 -- These getters are defined on other members of PerspectRol and PerspectContext than
--- rolInContext (PerspectContext) or properties (PerspectRol).
+-- rolInContext (PerspectContext) or properties (PerspectRol). All are memorizing.
 -----------------------------------------------------------
 
 identity :: forall e. NamedTripleGetter e
-identity = constructTripleGetterFromArbitraryFunction "identity" identity'
+identity = constructTripleGetterFromArbitraryFunction "model:Perspectives$identity" identity'
 
 contextType :: forall e. NamedTripleGetter e
 contextType = constructTripleGetterFromArbitraryFunction "model:Perspectives$type" getContextType
