@@ -109,8 +109,14 @@ changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = tp}
 rol_binding :: PerspectRol -> Maybe ID
 rol_binding (PerspectRol{binding}) = unNullOrUndefined binding
 
+changeRol_binding :: ID -> PerspectRol -> PerspectRol
+changeRol_binding b (PerspectRol cr) = PerspectRol $ cr {binding = NullOrUndefined (Just b)}
+
 rol_context :: PerspectRol -> ID
 rol_context (PerspectRol{context}) = context
+
+changeRol_context :: ID -> PerspectRol -> PerspectRol
+changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 
 rol_properties :: PerspectRol -> StrMap PropertyValueWithComments
 rol_properties (PerspectRol{properties}) = properties

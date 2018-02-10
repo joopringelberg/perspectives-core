@@ -24,10 +24,11 @@ import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (changeContext_displayName, changeContext_type, changeRol_type)
+import Perspectives.ContextAndRole (addContext_rolInContext, changeContext_displayName, changeContext_rev, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, context_rev)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getRevision, setRevision)
+import Perspectives.Property (getRol)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (modifyResourceInCouchdb)
@@ -82,6 +83,7 @@ runInTransactie :: forall e. StateT Transactie (Aff (AjaxAvarCache (now :: NOW |
 runInTransactie m = do
   s <- liftEff' (createTransactie "Joop")
   t <- execStateT m s
+  -- TODO: propagate the triple changes.
   distributeTransactie t
 
 distributeTransactie :: forall e. Transactie -> Aff (AjaxAvarCache e) Unit
@@ -333,6 +335,9 @@ updatePerspectEntiteit changeContext createDelta setProp cid value = do
   -- TODO: If a triple is returned, push it into the state.
   void $ lift $ setProp cid value
 
+-- TODO: voorzie elk van deze met een 'forContext' of 'forRol' functie die ervoor zorgt
+-- dat updatePerspectEntiteit de delta aan de juiste member van Transactie toevoegt.
+
 setContextType :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 setContextType = updatePerspectEntiteit
   changeContext_type
@@ -366,37 +371,27 @@ setContextDisplayName = updatePerspectEntiteit
     })
   \cid displayName -> setProperty cid "model:Perspectives$label" [displayName]
 
--- setContext :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
--- setContextDisplayName = updatePerspectEntiteit
---   changeContext_displayName
---   (\cid context -> RolDelta
---     { id : cid
---     , rolName: "model:Perspectives$label"
---     , deltaType: Change
---     , rolID: NullOrUndefined (Just displayName)
---     })
---   \cid displayName -> setProperty cid "model:Perspectives$label" [displayName]
+setContext :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+setContext = updatePerspectEntiteit
+  changeRol_context
+  (\cid rol -> Delta
+    { id : cid
+    , memberName: "model:Perspectives$context"
+    , deltaType: Change
+    , value: NullOrUndefined (Just rol)
+    })
+  \cid displayName -> setProperty cid "model:Perspectives$context" [displayName]
 
--- setContextType' :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
--- setContextType' cid theType = do
---   (context :: PerspectContext) <- lift $ onNothing ("setContextType: cannot find this context: " <> cid) (getPerspectEntiteit cid)
---   -- Change the entity in cache:
---   changedEntity <- lift $ changePerspectEntiteit cid (changeContext_type theType context)
---   rev <- lift $ onNothing' ("setContextType: context has no revision, deltas are impossible: " <> cid) (context_rev context)
---   -- Store the changed entity in couchdb.
---   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
---   -- Set the new revision in the entity.
---   lift $ changePerspectEntiteit cid (changeContext_rev newRev context)
---   -- Create a delta and add it to the Transactie.
---   addContextDelta $ ContextDelta
---     { id : cid
---     , rolName: "model:Perspectives$type"
---     , deltaType: Change
---     , rolID: NullOrUndefined (Just theType)
---     }
---   -- Register the change in the TripleAdministration.
---   -- TODO: If a triple is returned, push it into the state.
---   void $ lift $ setProperty cid "model:Perspectives$type" [theType]
+setBinding :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+setBinding = updatePerspectEntiteit
+  changeRol_binding
+  (\rid binding -> Delta
+    { id : rid
+    , memberName: "model:Perspectives$binding"
+    , deltaType: Change
+    , value: NullOrUndefined (Just binding)
+    })
+  \rid binding -> setProperty rid "model:Perspectives$binding" [binding]
 
 {-
 Wat verschilt:
@@ -431,27 +426,28 @@ De classes:
 
 -}
 
--- addRol :: forall e. ID -> ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
--- addRol cid rolName rolId = do
---   (context :: PerspectContext) <- lift $ onNothing ("setContextType: cannot find this context: " <> cid) (getPerspectEntiteit cid)
---   -- Change the entity in cache:
---   changedEntity <- lift $ changePerspectEntiteit cid (addContext_rolInContext context rolId cid)
---   rev <- lift $ onNothing' ("setContextType: context has no revision, deltas are impossible: " <> cid) (context_rev context)
---   -- Store the changed entity in couchdb.
---   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
---   -- Set the new revision in the entity.
---   lift $ changePerspectEntiteit cid (changeContext_rev newRev context)
---   -- Create a delta and add it to the Transactie.
---   addContextDelta $ ContextDelta
---     { id : cid
---     , rolName: rolName
---     , deltaType: Change
---     , rolID: NullOrUndefined (Just rolId)
---     }
---   -- Register the change in the TripleAdministration.
---   -- TODO: If a triple is returned, push it into the state.
---   objects <- lift $ getRol rolId cid
---   void $ lift $ setProperty cid "model:Perspectives$type" objects
+-- TODO maak addProperty, removeRol en removeProperty.
+addRol :: forall e. ID -> ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+addRol cid rolName rolId = do
+  (context :: PerspectContext) <- lift $ onNothing ("addRol: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  -- Change the entity in cache:
+  changedEntity <- lift $ changePerspectEntiteit cid (addContext_rolInContext context rolId cid)
+  rev <- lift $ onNothing' ("addRol: context has no revision, deltas are impossible: " <> cid) (context_rev context)
+  -- Store the changed entity in couchdb.
+  newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
+  -- Set the new revision in the entity.
+  lift $ changePerspectEntiteit cid (changeContext_rev newRev context)
+  -- Create a delta and add it to the Transactie.
+  addContextDelta $ Delta
+    { id : cid
+    , memberName: rolName
+    , deltaType: Add
+    , value: NullOrUndefined (Just rolId)
+    }
+  -- Register the change in the TripleAdministration.
+  -- TODO: If a triple is returned, push it into the state.
+  objects <- lift $ getRol rolId cid
+  void $ lift $ setProperty cid "model:Perspectives$type" objects
 
 onNothing :: forall a m. MonadThrow Error m => String -> m (Maybe a) -> m a
 onNothing message ma = do
