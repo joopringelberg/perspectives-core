@@ -28,6 +28,9 @@ context_rev' (PerspectContext{_rev}) = _rev
 context_displayName :: PerspectContext -> String
 context_displayName (PerspectContext{displayName})= displayName
 
+changeContext_displayName :: String -> PerspectContext -> PerspectContext
+changeContext_displayName dn (PerspectContext cr) = PerspectContext $ cr {displayName = dn}
+
 context_pspType :: PerspectContext -> ID
 context_pspType (PerspectContext{pspType})= pspType
 
@@ -99,6 +102,9 @@ rol_occurrence (PerspectRol{occurrence}) = occurrence
 
 rol_pspType :: PerspectRol -> ID
 rol_pspType (PerspectRol{pspType}) = pspType
+
+changeRol_type :: ID -> PerspectRol -> PerspectRol
+changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = tp}
 
 rol_binding :: PerspectRol -> Maybe ID
 rol_binding (PerspectRol{binding}) = unNullOrUndefined binding
