@@ -26,7 +26,7 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, changeContext_rev, changeContext_type, context_rev)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.PerspectEntiteit (encode)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode)
 import Perspectives.Property (getRol)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
@@ -131,6 +131,7 @@ ZO NEE:
 	Indien gevonden: verwijder de oude.
 	Anders: voeg de nieuwe toe.
 -}
+-- TODO: replace ContextDelta and RolDelta with a single Delta. Keep them apart in the Transaction. Generalize this function to Delta.
 addContextDelta :: forall e. ContextDelta -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 addContextDelta newCD@(ContextDelta{id: id', rolName, deltaType, rolID}) = do
   t@(Transactie tf@{contextDeltas}) <- get
@@ -291,8 +292,50 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
   - de consequenties doorvoeren in de triple administratie;
   - de gewijzigde context opslaan;
 -}
+newtype Delta = Delta {}
 
--- TODO: wijziging doorvoeren in triple administratie.
+class MemberUpdateClass a b where
+  changeEntity :: a -> b -> String -> b
+  createDelta :: a -> b-> ID -> ID -> ContextDelta -- Delta
+  getObjects :: a -> b -> ID -> Array ID
+
+data SetContextType = SetContextType
+instance memberUpdateClassSetContextType :: MemberUpdateClass SetContextType PerspectContext where
+  changeEntity x (context :: PerspectContext) theType = changeContext_type theType context
+  createDelta x c cid theType = ContextDelta
+    { id : cid
+    , rolName: "model:Perspectives$type"
+    , deltaType: Change
+    , rolID: NullOrUndefined (Just theType)
+    }
+  getObjects x c theType = [theType]
+
+-- Geef aan welke instantie van MemberUpdateClass we nodig hebben met het eerste argument.
+-- setContextType' cid theType = updatePerspectEntiteitMember SetContextType cid theType
+
+updatePerspectEntiteitMember :: forall e t ent. MemberUpdateClass t ent => t -> ent -> ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+updatePerspectEntiteitMember t ent cid theType = do
+  (context :: PerspectContext) <- lift $ onNothing ("setContextType: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  -- Change the entity in cache:
+  changedEntity <- lift $ changePerspectEntiteit cid (changeContext_type theType context)
+  rev <- lift $ onNothing' ("setContextType: context has no revision, deltas are impossible: " <> cid) (context_rev context)
+  -- Store the changed entity in couchdb.
+  newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
+  -- Set the new revision in the entity.
+  lift $ changePerspectEntiteit cid (changeContext_rev newRev context)
+  -- Create a delta and add it to the Transactie.
+  addContextDelta $ ContextDelta
+    { id : cid
+    , rolName: "model:Perspectives$type"
+    , deltaType: Change
+    , rolID: NullOrUndefined (Just theType)
+    }
+  -- Register the change in the TripleAdministration.
+  -- TODO: If a triple is returned, push it into the state.
+  void $ lift $ setProperty cid "model:Perspectives$type" [theType]
+
+-- Implementeer in termen van de members van MemberUpdateClass.
+-- Er komt dan een extra parameter om de instantie van die class te bepalen.
 setContextType :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 setContextType cid theType = do
   (context :: PerspectContext) <- lift $ onNothing ("setContextType: cannot find this context: " <> cid) (getPerspectEntiteit cid)
@@ -325,13 +368,13 @@ TypeClass:
     - changeEntity
     - createDelta
     - getObjects
-Je krijgt dan één functie voor alle instanties, een generieke update functie. UpdatePerspectEntiteit
+Je krijgt dan één functie voor alle instanties, een generieke update functie. updatePerspectEntiteit
 Maar er zijn twee soorten veranderingen:
   - van properties of rollen;
   - van specifieke members van PerspectContext of PerspectRol.
 Dus een verdubbelaar:
-  - UpdatePerspectEntiteitMember
-  - UpdatePerspectEntiteitKeyValue
+  - updatePerspectEntiteitMember
+  - updatePerspectEntiteitKeyValue
 De classes:
   - MemberUpdateClass, met instanties:
       - setContextType
