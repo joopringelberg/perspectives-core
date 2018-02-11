@@ -5,14 +5,17 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (StateT)
-import Data.Array (cons, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
+import Data.Foreign.NullOrUndefined (unNullOrUndefined)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.ResourceTypes (Resource)
 import Perspectives.TripleAdministration (FlexTriple, Predicate, Triple(..), TripleRef(..), UseCache, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
-import Prelude (Ordering(..), Unit, bind, id, join, pure, void, whenM, ($), (<<<), (>>=))
+import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
+import Prelude (Ordering(..), Unit, bind, id, join, pure, unit, void, whenM, ($), (<<<), (>>=))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -77,9 +80,22 @@ saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
 
 foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 (Triple e2)
 
--- TODO Deze functie is niet langer nuttig, maar is wel model voor een serie van andere.
--- Met RDF konden we alleen resources maken en properties veranderen. Met CRL kunnen
--- we contexten en rollen maken, rollen binden en properties een waarde geven.
+modifyTriple :: forall e1 e2. Delta -> Aff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
+modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
+  do
+    value' <- pure (unsafePartial (fromJust (unNullOrUndefined value)))
+    mt <- liftEff $ lookupInTripleIndex rid pid
+    case mt of
+      Nothing -> pure Nothing
+      (Just t@(Triple tr@{object})) -> do
+        changedObject <- case deltaType of
+          Add -> pure $ cons value' object
+          Remove -> pure $ delete value' object
+          Change -> pure [value']
+        changedTriple <- (saveChangedObject t changedObject)
+        pure $ Just changedTriple
+
+
 -- Destructively change the objects of an existing triple.
 -- Returns a Triple that can be used as a seed for delta propagation, i.e. (wrapped in an array) as argument to updateFromSeeds.
 setProperty :: forall e. Resource -> Predicate -> Array String -> (Aff (gm :: GLOBALMAP | e)) (Maybe (Triple e))
