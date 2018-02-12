@@ -8,8 +8,6 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (unit)
 
-type Resource = String
-
 type RolDefinitions = GLStrMap (AVar PerspectRol)
 
 type ContextDefinitions = GLStrMap (AVar PerspectContext)

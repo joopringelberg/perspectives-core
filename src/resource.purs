@@ -19,14 +19,8 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally, setRevision)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, createResourceInCouchdb)
-import Perspectives.ResourceTypes (CouchdbResource, Resource)
-import Perspectives.Syntax (ID, PerspectContext, PerspectRol, revision')
-
--- | The global index of definitions of all resources, indexed by Resource.
-type ResourceDefinitions = GLStrMap (AVar CouchdbResource)
-
-resourceDefinitions :: ResourceDefinitions
-resourceDefinitions = new unit
+import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
+import Perspectives.EntiteitAndRDFAliases (ID)
 
 -- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
 getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) (Maybe a)
@@ -44,16 +38,6 @@ getPerspectEntiteit id =
           putVar pe avar
           pure $ Just pe
     \_ -> pure Nothing
-
-getResourceAVar :: forall e. Resource -> Aff (AvarCache e) (AVar CouchdbResource)
-getResourceAVar id = do
-  propDefs <- liftEff $ peek resourceDefinitions id
-  case propDefs of
-    Nothing -> do
-      ev <- makeEmptyVar
-      _ <- liftEff $ poke resourceDefinitions id ev
-      pure ev
-    (Just avar) -> pure avar
 
 -- | Store an internally created PerspectEntiteit for the first time in the local store.
 storePerspectEntiteitInResourceDefinitions :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AvarCache e) Unit

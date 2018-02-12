@@ -11,11 +11,11 @@ import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.EntiteitAndRDFAliases (Subject, Predicate)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.ResourceTypes (Resource)
-import Perspectives.TripleAdministration (FlexTriple, Predicate, Triple(..), TripleRef(..), UseCache, getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
+import Perspectives.TripleAdministration (FlexTriple, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
-import Prelude (Ordering(..), Unit, bind, id, join, pure, unit, void, whenM, ($), (<<<), (>>=))
+import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), (<<<), (>>=))
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc
@@ -98,7 +98,7 @@ modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
 
 -- Destructively change the objects of an existing triple.
 -- Returns a Triple that can be used as a seed for delta propagation, i.e. (wrapped in an array) as argument to updateFromSeeds.
-setProperty :: forall e. Resource -> Predicate -> Array String -> (Aff (gm :: GLOBALMAP | e)) (Maybe (Triple e))
+setProperty :: forall e. Subject -> Predicate -> Array String -> (Aff (gm :: GLOBALMAP | e)) (Maybe (Triple e))
 setProperty rid pid object =
   do
     mt <- liftEff $ lookupInTripleIndex rid pid

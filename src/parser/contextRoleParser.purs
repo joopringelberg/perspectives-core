@@ -17,7 +17,7 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
 import Perspectives.Resource (storePerspectEntiteitInResourceDefinitions)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Syntax (Comment, Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), ID, PerspectContext(..), PerspectRol(..), PropertyName, PropertyValueWithComments(..), RoleName, binding)
+import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
@@ -27,7 +27,7 @@ import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
-
+import Perspectives.EntiteitAndRDFAliases
 -----------------------------------------------------------
 -- Comments
 -----------------------------------------------------------
@@ -293,7 +293,7 @@ roleOccurrence = token.parens token.integer
 roleBinding' :: forall e.
   QualifiedName
   -> IP (Tuple (Array Comment) ID) (AjaxAvarCache e)
-  -> IP (Tuple RoleName ID) (AjaxAvarCache e)
+  -> IP (Tuple RolName ID) (AjaxAvarCache e)
 roleBinding' cname p = ("rolename => contextName" <??>
   (try do
     -- Parsing
@@ -334,7 +334,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
 -- | The inline context may itself use a defaultNamespacedContextName name. However,
 -- | what is returned from the context parser is an QualifiedName.
 roleBindingWithInlineContext :: forall e. QualifiedName
-  -> IP (Tuple RoleName ID) (AjaxAvarCache e)
+  -> IP (Tuple RolName ID) (AjaxAvarCache e)
 roleBindingWithInlineContext cName = roleBinding' cName do
   cmt <- inLineComment
   _ <- nextLine
@@ -343,7 +343,7 @@ roleBindingWithInlineContext cName = roleBinding' cName do
 
 -- | The reference may be defaultNamespacedContextName.
 roleBindingWithReference :: forall e. QualifiedName
-  -> IP (Tuple RoleName ID) (AjaxAvarCache e)
+  -> IP (Tuple RolName ID) (AjaxAvarCache e)
 roleBindingWithReference cName = roleBinding' cName do
   (ident :: QualifiedName) <- (sameLine *> contextName)
   cmt <- inLineComment
@@ -351,7 +351,7 @@ roleBindingWithReference cName = roleBinding' cName do
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding :: forall e. QualifiedName
-  -> IP (Tuple RoleName ID) (AjaxAvarCache e)
+  -> IP (Tuple RolName ID) (AjaxAvarCache e)
 roleBinding cname = roleBindingWithInlineContext cname <|> roleBindingWithReference cname -- TODO: query, noBinding
 
 withRoleCounting :: forall a e. IP a e -> IP a e
@@ -385,7 +385,7 @@ context = withRoleCounting context' where
           -- Parsing the body
           (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
           (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
-          (rolebindings :: List (Tuple RoleName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
+          (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
           -- Storing
           liftAffToIP $ storePerspectEntiteitInResourceDefinitions (show instanceName)
@@ -412,7 +412,7 @@ context = withRoleCounting context' where
               , properties = fromFoldable publicProps
               })
           pure $ (show instanceName) <> "_buitenRol"
-  collect :: List (Tuple RoleName ID) -> StrMap (Array ID)
+  collect :: List (Tuple RolName ID) -> StrMap (Array ID)
   collect Nil = empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
     case lookup rname map of

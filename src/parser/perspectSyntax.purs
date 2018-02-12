@@ -8,6 +8,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap)
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
+import Perspectives.EntiteitAndRDFAliases
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
@@ -136,14 +137,6 @@ instance decodePropertyValueWithComments :: Decode PropertyValueWithComments whe
 
 propertyValue :: PropertyValueWithComments -> Array String
 propertyValue (PropertyValueWithComments{value}) = value
-
------------------------------------------------------------
--- ALIASES
------------------------------------------------------------
-type PropertyName = String
-type RoleName = String
-type ID = String
-type Comment = String
 
 -----------------------------------------------------------
 -- CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION

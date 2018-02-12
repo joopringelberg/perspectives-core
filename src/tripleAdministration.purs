@@ -8,12 +8,10 @@ import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.ResourceTypes (Resource)
 import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==))
+import Perspectives.EntiteitAndRDFAliases
 
-type Predicate = String
-
--- type TripleGetter e = Resource -> Aff (AjaxAvarCache e) (Triple e)
+-- type TripleGetter e = Subject -> Aff (AjaxAvarCache e) (Triple e)
 
 -- | If UseCache == true, we will look up a result in the triple cache
 -- | before computing it.
@@ -21,14 +19,14 @@ type UseCache = Boolean
 
 type FlexTriple e = StateT UseCache (Aff (AjaxAvarCache e)) (Triple e)
 
-type TripleGetter e = Resource -> FlexTriple e
+type TripleGetter e = Subject -> FlexTriple e
 
 data NamedFunction f = NamedFunction String f
 
 newtype Triple e = Triple
-  { subject :: Resource
+  { subject :: Subject
   , predicate :: Predicate
-  , object :: Array String
+  , object :: Array Value
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
   , tripleGetter :: TripleGetter e}
@@ -42,7 +40,7 @@ instance showTriple :: Show (Triple e) where
 instance eqTriple :: Eq (Triple e) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
-newtype TripleRef = TripleRef { subject :: Resource, predicate :: Predicate}
+newtype TripleRef = TripleRef { subject :: Subject, predicate :: Predicate}
 
 instance eqTripleRef :: Eq TripleRef where
   eq (TripleRef({subject: s1, predicate: p1})) (TripleRef({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
@@ -53,17 +51,17 @@ instance showTripleRef :: Show TripleRef where
 getRef :: forall e. Triple e -> TripleRef
 getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}
 
--- | An index of Predicate-Object combinations, indexed by Resource.
+-- | An index of Predicate-Object combinations, indexed by Subject.
 type TripleIndex e = GLStrMap (PredicateIndex e)
 
 -- An index of objects indexed by Predicate.
 type PredicateIndex e = GLStrMap (Triple e)
 
--- | A global store of triples, indexed by Resource and Predicate.
+-- | A global store of triples, indexed by Subject and Predicate.
 tripleIndex :: forall e. TripleIndex e
 tripleIndex = new unit
 
-lookupInTripleIndex :: forall e1 e2. Resource -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
+lookupInTripleIndex :: forall e1 e2. Subject -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
 lookupInTripleIndex rid pid = do
   preds <- peek tripleIndex rid
   case preds of
@@ -80,9 +78,9 @@ getTriple :: forall e1 e2. TripleRef -> Eff (gm :: GLOBALMAP | e1) (Maybe (Tripl
 getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 -- | Add a triple to the index. The object value of the triple should comply to the type of the TripleIndex!
--- | Will add an entry for the Resource if it is not yet present.
+-- | Will add an entry for the Subject if it is not yet present.
 addToTripleIndex :: forall e1 e2.
-  Resource ->
+  Subject ->
   Predicate ->
   (Array String) ->
   Array TripleRef ->
@@ -107,7 +105,7 @@ addToTripleIndex rid pid val deps sups tripleGetter =
 registerTriple :: forall e1 e2. Triple e2 -> Eff (gm :: GLOBALMAP | e1) (Triple e2)
 registerTriple (Triple{subject, predicate, object, dependencies, supports, tripleGetter}) = addToTripleIndex subject predicate object dependencies supports tripleGetter
 
-ensureResource :: forall e1 e2. Resource -> Eff (gm :: GLOBALMAP | e1) (PredicateIndex e2)
+ensureResource :: forall e1 e2. Subject -> Eff (gm :: GLOBALMAP | e1) (PredicateIndex e2)
 ensureResource rid = do
   pid <- peek tripleIndex rid
   case pid of

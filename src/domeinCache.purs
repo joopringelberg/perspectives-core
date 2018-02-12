@@ -8,7 +8,6 @@ import Control.Monad.Aff.AVar (AVar, makeEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (runExcept, throwError)
-import Data.Argonaut (jsonParser, toObject)
 import Data.Either (Either(..))
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (decodeJSON, defaultOptions, encodeJSON, genericDecode, genericEncode)
@@ -21,13 +20,11 @@ import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
+import Perspectives.EntiteitAndRDFAliases (ContextID, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.ResourceTypes (CouchdbResource, Resource)
-import Perspectives.Syntax (ID, PerspectContext, PerspectRol, Revision, fromRevision, noRevision, revision)
+import Perspectives.Syntax (PerspectContext, PerspectRol, Revision, fromRevision, noRevision, revision)
 import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<$>), (<>), (==), (||))
-
-type DomeinFile' = { _id :: ID, _rev :: String, contexts :: DomeinFileContexts }
 
 newtype DomeinFile = DomeinFile
   { _rev :: Revision
@@ -47,7 +44,7 @@ instance decodeDomeinFile :: Decode DomeinFile where
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile{ _rev: noRevision, _id: "", contexts: empty, roles: empty}
 
--- | DomeinFileContexts is an immutable map of resource type names to resource definitions in the form of PropDefs.
+-- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
 type DomeinFileContexts = StrMap PerspectContext
 
 type DomeinFileRoles = StrMap PerspectRol
@@ -65,7 +62,7 @@ storeDomeinFileInCache ns df= liftEff $ poke domeinCache ns df *> pure df
 
 -- | Fetch a PerspectContext asynchronously from its Domein, loading the Domein file if necessary.
 retrieveContextFromDomein :: forall e.
-  Resource
+  ContextID
   -> Namespace
   -> (Aff (AjaxAvarCache e) PerspectContext)
 retrieveContextFromDomein id ns = do
@@ -76,7 +73,7 @@ retrieveContextFromDomein id ns = do
 
 -- | Fetch a PerspectRol asynchronously from its Domein, loading the Domein file if necessary.
 retrieveRolFromDomein :: forall e.
-  Resource
+  RolID
   -> Namespace
   -> (Aff (AjaxAvarCache e) PerspectRol)
 retrieveRolFromDomein id ns = do
@@ -103,17 +100,6 @@ retrieveDomeinFile ns = do
         otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
       readVar ev
     (Just avar) -> readVar avar
-
--- | There can be two error scenarios here: either the returned string cannot be parsed
--- | by JSON.parse, or the resulting json is not an object. Neither is likely, because Couchdb
--- | will not store such documents.
-stringToPropDefs :: String -> Either String CouchdbResource
-stringToPropDefs s = case jsonParser s of
-    (Left err) -> Left $ "stringToPropDefs: cannot parse: " <> s
-    (Right json) ->
-      case toObject json of
-        Nothing -> Left $ "stringToPropDefs: parsed json is not an object!"
-        (Just obj) -> Right obj
 
 newtype CouchdbAllDocs = CouchdbAllDocs
   { offset :: Int

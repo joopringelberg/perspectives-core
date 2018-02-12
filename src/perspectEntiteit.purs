@@ -14,8 +14,9 @@ import Perspectives.DomeinCache (retrieveContextFromDomein, retrieveRolFromDomei
 import Perspectives.Effects (AvarCache, AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.ResourceTypes (contextDefinitions, rolDefinitions)
-import Perspectives.Syntax (ID, PerspectContext(..), PerspectRol(..), Revision, revision)
+import Perspectives.EntiteitCache (contextDefinitions, rolDefinitions)
+import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision, revision)
+import Perspectives.EntiteitAndRDFAliases (ID)
 import Prelude (bind, pure, ($), (<<<))
 
 class (Encode a, Decode a) <=  PerspectEntiteit a where

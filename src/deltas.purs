@@ -32,12 +32,13 @@ import Perspectives.Property (getRol)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (modifyResourceInCouchdb)
-import Perspectives.Syntax (ID, PerspectContext(..), PerspectRol(..))
+import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (identity, isFunctional)
 import Perspectives.TheoryChange (modifyTriple, setProperty, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter ((##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
+import Perspectives.EntiteitAndRDFAliases (ID, PropertyName)
 import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<>), (==), (||))
 
 -----------------------------------------------------------
@@ -249,10 +250,10 @@ updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
   (String -> a -> a) ->
   (ID -> String -> Delta) ->
   ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
-updatePerspectEntiteit changeContext createDelta cid value = do
+updatePerspectEntiteit changeEntity createDelta cid value = do
   (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
-  changedEntity <- lift $ changePerspectEntiteit cid (changeContext value context)
+  changedEntity <- lift $ changePerspectEntiteit cid (changeEntity value context)
   rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
   -- Store the changed entity in couchdb.
   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
@@ -316,45 +317,12 @@ setBinding = updatePerspectEntiteit
     , isContext: false
     })
 
-{-
-Wat verschilt:
-  - de manier waarop de entiteit veranderd wordt;
-  - de delta die gemaakt wordt;
-  - de manier waarop de objects samengesteld worden waarmee de triple administratie bijgewerkt moet worden.
-TypeClass:
-  - wat is het type? addRol, setContextType.
-  - wat zijn de members?
-    - changeEntity
-    - createDelta
-    - getObjects
-Je krijgt dan één functie voor alle instanties, een generieke update functie. updatePerspectEntiteit
-Maar er zijn twee soorten veranderingen:
-  - van properties of rollen;
-  - van specifieke members van PerspectContext of PerspectRol.
-Dus een verdubbelaar:
-  - updatePerspectEntiteitMember
-  - updatePerspectEntiteitKeyValue
-De classes:
-  - MemberUpdateClass, met instanties:
-      - setContextType
-      - setRolType
-      - setContextDisplayName
-      - setContext
-      - setBinding
-  - KeyValueUpdateClass, met instanties:
-      - addRol
-      - removeRol
-      - addProperty
-      - removeProperty
-
--}
-
--- TODO maak addProperty, removeRol en removeProperty.
+-- TODO maak addProperty, removeRol en removeProperty. ChangeProperty, ChangeRol voor functionele properties en rollen?
 addRol :: forall e. ID -> ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 addRol cid rolName rolId = do
   (context :: PerspectContext) <- lift $ onNothing ("addRol: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
-  changedEntity <- lift $ changePerspectEntiteit cid (addContext_rolInContext context rolId cid)
+  changedEntity <- lift $ changePerspectEntiteit cid (addContext_rolInContext context rolName rolId)
   rev <- lift $ onNothing' ("addRol: context has no revision, deltas are impossible: " <> cid) (context_rev context)
   -- Store the changed entity in couchdb.
   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
@@ -368,6 +336,22 @@ addRol cid rolName rolId = do
     , value: NullOrUndefined (Just rolId)
     , isContext: true
     }
+
+-- updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
+--   (String -> a -> a) ->
+--   (a -> PropertyName -> String -> Delta) ->
+--   ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+-- updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
+--   (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+--   -- Change the entity in cache:
+--   changedEntity <- lift $ changePerspectEntiteit cid (changeEntityMember context memberName value)
+--   rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
+--   -- Store the changed entity in couchdb.
+--   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
+--   -- Set the new revision in the entity.
+--   lift $ changePerspectEntiteit cid (setRevision newRev context)
+--   -- Create a delta and add it to the Transactie.
+--   addDelta $ createDelta cid value
 
 onNothing :: forall a m. MonadThrow Error m => String -> m (Maybe a) -> m a
 onNothing message ma = do

@@ -11,7 +11,7 @@ import Data.Foreign.Generic.Class (class GenericEncode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Perspectives.Syntax (ID)
+import Perspectives.EntiteitAndRDFAliases (ID)
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------

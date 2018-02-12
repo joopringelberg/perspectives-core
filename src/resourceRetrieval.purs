@@ -18,8 +18,8 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.Identifiers (escapeCouchdbDocumentName, deconstructNamespace, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, decode, representInternally, retrieveFromDomein)
-import Perspectives.ResourceTypes (stringToRecord)
-import Perspectives.Syntax (ID)
+import Perspectives.EntiteitCache (stringToRecord)
+import Perspectives.EntiteitAndRDFAliases (ID)
 
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.

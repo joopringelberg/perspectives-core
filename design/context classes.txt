@@ -1,0 +1,98 @@
+Er vielen me twee zaken in met betrekking tot de relatie tussen Perspectives en Purescript/Haskell.
+Eén: contexten en rollen als types. Je weet, functionele talen zijn opgebouwd uit Product- en Sum types en een handvol kleinere basistypes zoals Identity (de rest moet ik nakijken). Misschien kunnen we de roltelescoop zien als een Product type: een rol is het product van alle delen in zijn telescoop. Datgene dat de gebruiker die de rol vult, kan doen, daarentegen - zijn perspectief, oftewel de acties die bij die rol horen - is een Sum type: het is de disjunctie van al die acties. Elk kan uitgevoerd worden. Dan hebben we nog Context en dat is dan weer een Product van alle rollen. Dus:
+	roltelescoop is een Product van rollen;
+	perspectief is een Sum van acties;
+	context is een Product van rollen.
+
+Twee: type classes. Pro memori: een type class geeft een 'interface' in termen van types die alle instanties van de class moeten implementeren. Dat kan 'gedrag' betreffen als je bedenkt dat functies óók types zijn. 
+
+Eigenlijk vormt een type class een constraint op types. Als een type een instantie is van een class, moeten bepaalde andere types bestaan (en die zijn mede opgebouwd uit de instantie)
+
+Vat een perspectief op als een Sum van acties (conform bovenstaande), een type dus. Als we dat type (het perspectief) een instantie maken van een type class, moeten de types die de type class verplicht stelt, geïmplementeerd worden. M.i. kunnen we dat opvatten als dat een aantal acties volgt uit het instantiëren van een type class.
+
+Vat een context op als een Sum van rollen. Als we een context een instantie maken van een type class, betekent dat dat bepaalde rollen deel moeten uitmaken van die instantie.
+
+Maar wat is 'deel uitmaken van'? Laten we een voorbeeld nemen. Een vervoerszaak heeft, stellen we, een bestuurder- en een passagiersrol. Een verkoopzaak heeft, stellen we, een verkoper en een koper. Laten we beiden tot type classes verheffen (whatever it takes). Nu kunnen we een taxi een instantie van beiden willen maken. Immers, de taxi combineert vervoer met verkoop. Maar dat betekent niet dat de taxi vier rollen krijgt (bestuurder, passagier, verkoper, koper). Het betekent dat de rol taxichauffeur een instantie wordt van de rol bestuurder èn van de rol verkoper en op dezelfde manier wordt taxipassagier een instantie van passagier en koper.
+
+We zien dus dat als een zaak een type class wordt, zijn rollen óók type classes worden. Een instantie van een context-type class moet dus zijn rollen óók instanties van de rol-type classes van de context-type class maken. 
+Kunt U Het Nog Volgen?
+
+Volgens mij sluit het aardig.
+
+Ik vermoed ook, dat 'instantie worden van een type class' een nieuw soort modelleerconstruct is voor Arc. Heel misschien is het meervoudig binden, maar ik denk het niet, al was het maar dat dat voor contexten niet zo voor de hand ligt (we zouden dan buitenrollen moeten vullen).
+
+
+
+Het 'unit type' is als de 1 voor product, maar dan voor product types (in Haskell schrijf je unit als (), in Purescript als Unit). 
+Het 'void type' is als de 0 voor som, maar dan voor sum types (in Haskell schrijf je void als Void, in Purescript ook).
+
+Met Unit en Void en Product en Sum kun je alle algebraische datatypes maken, als ik mij niet vergis. Ongetwijfeld komen de 'primitieve' types zoals Int en String ook ergens in beeld.
+
+Mijn mail van vanmorgen teruglezend zie ik dat we alleen producten en sommen hebben van respectievelijk rollen en acties. Een context is een product.
+
+Compositie is beperkt. Er is bijvoorbeeld (nog) geen product of som van contexten.
+
+Wat zou Unit en Void zijn, in Perspect?
+Kunnen we bedenken hoe we compositie onbeperkt kunnen toepassen? Wat betekent dat?
+
+Ik zal eens nazoeken bij Bartosz wat type classes zijn in termen van CT.
+
+
+
+we hebben al eerder bedacht hoe contextualiseren moet werken. In het licht van het idee van type classes zou je dat als volgt kunnen herformuleren.
+
+Net zoals voor een type class een default implementatie van een verplicht type gegeven kan worden, waarvan de programmeur gebruik kan maken om invulling te geven aan een bepaalde instantie, kunnen we in Perspect de modelleur een Actie van de type class aanbieden om de vereiste Actie van de instantie te maken. Hij doet dat door te contextualiseren. Dat doet hij toch al, want het is de manier om een context een instantie te maken van een context type class: je moet rollen van de instantie afbeelden op rollen van de context type class.
+
+Daarmee wordt de Actie van de context type class gecontextualiseerd naar de instantie context: de bindingen van onderwerp en lijdend voorwerp kunnen nu worden gekoppeld aan rollen van de instantie context.
+
+We hebben eerder gezien dat die afbeelding van rollen aan voorwaarden moet voldoen. Meer in het bijzonder, de view bij elke rol van de actie zoals gedefinieerd bij de context type class moet ondersteund worden door de rol van de instantie context. Dat betekent dat de roltelescopen van beiden tot op een bepaald punt moeten overeenkomen.
+
+Oftewel: contextualiseren is sterk verwant aan het instantieren van een type class.
+
+Nu denk ik dat het begint bij het contextualiseren van een actie. Dat vergt de koppeling van rollen, wat een - in elk geval gedeeltelijke - afbeelding van de ene op de andere context vergt. Ik vermoed dat je een willekeurige context kunt beschouwen als een context type class en dat je niet àlle rollen van de context type class hoeft te identificeren met die van de instantie type class. Je kunt, voor een actie, volstaan met de rollen die in die actie zijn gebonden.
+
+=============
+Maar wàt is dat afbeelden? Wat is de relatie tussen een rol van een type class en een rol van de instantie?
+De restrictie op overlappende delen van de roltelescoop betekent, dat je de rol van de instantie context zou kunnen vullen met elk van de rollen van elke type class context. Maar dat lijkt onvoldoende.
+
+Taxi is een instantie van Vervoer waarbij
+	taxichauffeur de rol vult van bestuurder
+		waarbij heeftRijbewijs gelijkgesteld wordt aan isGekwalificeerd
+	klant de rol vervult van passagier
+
+Taxi is een instantie van Verkoop waarbij
+	taxichauffeur de rol vervult van verkoper
+	klant de rol vervult van koper
+
+=============
+Er gelden wederzijdse constraints tussen rollen, contexten, views en perspectieven.
+Een rol vervult syntactische rollen in de acties van zijn perspectief. De acties vereisen views, en de properties in de views moeten aanwezig zijn in de rollen. Een actie heeft syntactische rollen die gevuld moeten worden door rollen in de context.
+Dus:
+	- een actie is een constraint op een context: elke syntactische rol moet worden gevuld.
+	- een view is een constraint op een roltelescoop: elke property moet aanwezig zijn in de telescoop
+
+Conceptueel begint alles bij een actie. 
+	- Een syntactische rol stelt eisen aan zijn vullers (de view drukt die eisen uit)
+	- Een actie stelt eisen aan de context (via zijn views eisende syntactische rollen).
+Als je een context tot instantie van een andere (als context class) verklaart, dan gelden de gezamenlijke eisen van de acties van de context class voor de instantie.
+	
+Als je het omdraait, dan maakt een set roltelescopen contextualisering van bepaalde acties uit andere contexten mogelijk.
+Dat is dan een vorm van classificatie: een context kan in een bestaande class passen.
+
+Contexten worden vergelijkbaar in termen van hun acties. Twee contexten die gelijk zijn op elk een aantal acties na, spannen zo als het ware een class op.
+
+Merk op dat type classes superclasses hebben. Dat is vanwege het feit dat interfaces onderling geordend kunnen worden.
+
+In functionele talen kun je overigens een type class niet instantieren. Een type class is geen type. Evenmin is het een kind.
+
+De constraints werken beide richtingen op.
+	- als je een context met rollen met nog onbepaalde bindingsmogelijkheden tot een instantie van een context class verklaart, legt dat beperkingen op aan de mogelijke bindingen van die rollen
+	- als je een context met rollen met bepaalde bindingsmogelijkheden tot instantie van context classes wilt maken, ben je beperkt in je keuze door de mogelijkheden van de aanwezige roltelescopen.
+Uiteraard kun je constraint schendingen ook opheffen door properties toe te voegen.
+
+Daarbij kunnen we ook nog property-afbeelding toestaan. Bijvoorbeeld: een bestuurder moet gekwalificeerd zijn. Voor een auto gaat dat om een rijbewijs, voor een helikopter om een brevet, enz. Het taxi voorbeeld wordt dan:
+
+Taxi is een instantie van Vervoer waarbij
+	taxichauffeur de rol vult van bestuurder waarbij
+		heeftRijbewijs gelijkgesteld wordt aan isGekwalificeerd
+	klant de rol vervult van passagier

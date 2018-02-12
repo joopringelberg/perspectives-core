@@ -5,9 +5,9 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State.Trans (StateT, evalStateT, get)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (ObjectsGetter, PropertyName, getPrivateProperty, getProperty, getPublicProperty, getRol)
-import Perspectives.Syntax (RoleName)
+import Perspectives.Property (ObjectsGetter, getPrivateProperty, getProperty, getPublicProperty, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
+import Perspectives.EntiteitAndRDFAliases
 import Prelude (bind, pure, ($))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
@@ -103,6 +103,6 @@ constructPropertyGetter :: forall e.
 constructPropertyGetter pn = constructTripleGetter getProperty pn
 
 constructRolGetter :: forall e.
-  RoleName ->
+  RolName ->
   NamedFunction (TripleGetter e)
 constructRolGetter pn = constructTripleGetter getRol pn

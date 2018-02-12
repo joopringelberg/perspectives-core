@@ -10,7 +10,7 @@ import Data.Maybe (Maybe, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup, singleton)
 import Data.String (null)
 import Perspectives.Identifiers (Prefix, QualifiedName(..))
-import Perspectives.Syntax (RoleName)
+import Perspectives.EntiteitAndRDFAliases (RolName)
 import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
@@ -54,12 +54,12 @@ liftAffToIP = lift <<< lift <<< lift
 -----------------------------------------------------------
 -- | Reach all the way into the stack to retrieve the number of times a particular
 -- | role has been instantiated in a context:
-getRoleOccurrences :: forall e. RoleName -> IP (Maybe Int) e
+getRoleOccurrences :: forall e. RolName -> IP (Maybe Int) e
 getRoleOccurrences roleName = do
   lift (lift (gets (\{rolOccurrences} -> lookup roleName rolOccurrences)))
 
 -- | Increment the number of instances of a particular role.
-incrementRoleInstances :: forall e. RoleName -> IP Unit e
+incrementRoleInstances :: forall e. RolName -> IP Unit e
 incrementRoleInstances roleName = lift (lift (modify f))
   where
     f s@{rolOccurrences} = s {rolOccurrences = insert roleName (maybe 1 ((+)1) (lookup roleName rolOccurrences)) rolOccurrences}

@@ -7,7 +7,7 @@ import Data.Array (cons, difference, elemIndex, foldr, head, null, union, (!!))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.ResourceTypes (Resource)
+import Perspectives.EntiteitAndRDFAliases (RolID)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
 
@@ -96,7 +96,7 @@ hasValue (NamedFunction nameOfp p) = memorize getter name where
   name = "(hasValue " <> nameOfp <> ")"
 
 -- | Construct a function that returns a bool in Aff, from a TripleGetter.
-toBoolean :: forall e. NamedFunction (TripleGetter e) -> Resource -> Aff (AjaxAvarCache e) Boolean
+toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> Aff (AjaxAvarCache e) Boolean
 toBoolean (NamedFunction nameOfp p) r = do
   result <- evalStateT (p r) true
   arrWithBool <- pure $ tripleObjects result

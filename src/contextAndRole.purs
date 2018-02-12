@@ -5,7 +5,8 @@ import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..))
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty, lookup, insert)
-import Perspectives.Syntax (Comments(..), ContextRecord, ID, PerspectContext(..), PerspectRol(..), PropertyValueWithComments, Revision, RolRecord, noRevision, toRevision)
+import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments, Revision, RolRecord, noRevision, toRevision)
+import Perspectives.EntiteitAndRDFAliases
 import Prelude (($))
 
 -- CONTEXT

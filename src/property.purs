@@ -10,19 +10,17 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.ResourceTypes (Resource)
-import Perspectives.Syntax (ID, PerspectContext, PerspectRol, RoleName, propertyValue)
+import Perspectives.Syntax (PerspectContext, PerspectRol, propertyValue)
+import Perspectives.EntiteitAndRDFAliases
 
 {-
 Property values are represented by Arrays.
 We need functions that give us an array of values for a given property for a given resource.
 -}
 
-type PropertyName = String
+type ObjectsGetter e = ID -> Aff (AjaxAvarCache e) (Array String)
 
-type ObjectsGetter e = Resource -> Aff (AjaxAvarCache e) (Array String)
-
-type ObjectGetter e = Resource -> Aff (AjaxAvarCache e) String
+type ObjectGetter e = ID -> Aff (AjaxAvarCache e) String
 
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
 getContextMember f c = do
@@ -50,7 +48,7 @@ getBuitenRol = getContextMember \c -> [context_buitenRol c]
 getBuitenRol' :: forall e. ID -> Aff (AjaxAvarCache e) (Maybe String)
 getBuitenRol' = getContextMember' \c -> context_buitenRol c
 
-getRol :: forall e. RoleName -> ObjectsGetter e
+getRol :: forall e. RolName -> ObjectsGetter e
 getRol rn = getContextMember \context -> maybe [] id (lookup rn (context_rolInContext context))
 
 getRollen :: forall e. ObjectsGetter e
