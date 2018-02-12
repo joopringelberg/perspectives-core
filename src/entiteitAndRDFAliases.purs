@@ -17,5 +17,6 @@ type ContextID = String
 type RolID = String
 type PropertyName = String
 type RolName = String
+type MemberName = String
 type Comment = String
 type Value = String

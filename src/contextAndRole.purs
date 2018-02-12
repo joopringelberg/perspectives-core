@@ -5,16 +5,16 @@ import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..))
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty, lookup, insert)
-import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments, Revision, RolRecord, noRevision, toRevision)
+import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, noRevision, toRevision)
 import Perspectives.EntiteitAndRDFAliases
 import Prelude (($))
 
 -- CONTEXT
 
-context_id :: PerspectContext -> ID
+context_id :: PerspectContext -> ContextID
 context_id (PerspectContext{_id})= _id
 
-changeContext_id :: ID -> PerspectContext -> PerspectContext
+changeContext_id :: ContextID -> PerspectContext -> PerspectContext
 changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}
 
 context_rev :: PerspectContext -> Maybe String
@@ -32,22 +32,22 @@ context_displayName (PerspectContext{displayName})= displayName
 changeContext_displayName :: String -> PerspectContext -> PerspectContext
 changeContext_displayName dn (PerspectContext cr) = PerspectContext $ cr {displayName = dn}
 
-context_pspType :: PerspectContext -> ID
+context_pspType :: PerspectContext -> ContextID
 context_pspType (PerspectContext{pspType})= pspType
 
-changeContext_type :: ID -> PerspectContext -> PerspectContext
+changeContext_type :: ContextID -> PerspectContext -> PerspectContext
 changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = tp}
 
 context_binnenRol :: PerspectContext -> PerspectRol
 context_binnenRol (PerspectContext{binnenRol})= binnenRol
 
-context_buitenRol :: PerspectContext -> ID
+context_buitenRol :: PerspectContext -> RolID
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
-context_rolInContext :: PerspectContext -> StrMap (Array ID)
+context_rolInContext :: PerspectContext -> StrMap (Array RolID)
 context_rolInContext (PerspectContext{rolInContext})= rolInContext
 
-addContext_rolInContext :: PerspectContext -> ID -> ID -> PerspectContext
+addContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
 addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
   case lookup rolName rolInContext of
     Nothing -> PerspectContext cr {rolInContext = insert rolName [rolID] rolInContext}
@@ -89,7 +89,7 @@ defaultRolRecord =
 
 -- ROL
 
-rol_id :: PerspectRol -> ID
+rol_id :: PerspectRol -> RolID
 rol_id (PerspectRol{_id}) = _id
 
 rol_rev :: PerspectRol -> Maybe String
@@ -101,28 +101,43 @@ rol_rev' (PerspectRol{_rev}) = _rev
 rol_occurrence :: PerspectRol -> Int
 rol_occurrence (PerspectRol{occurrence}) = occurrence
 
-rol_pspType :: PerspectRol -> ID
+rol_pspType :: PerspectRol -> ContextID
 rol_pspType (PerspectRol{pspType}) = pspType
 
-changeRol_type :: ID -> PerspectRol -> PerspectRol
+changeRol_type :: ContextID -> PerspectRol -> PerspectRol
 changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = tp}
 
-rol_binding :: PerspectRol -> Maybe ID
+rol_binding :: PerspectRol -> Maybe RolID
 rol_binding (PerspectRol{binding}) = unNullOrUndefined binding
 
-changeRol_binding :: ID -> PerspectRol -> PerspectRol
+changeRol_binding :: RolID -> PerspectRol -> PerspectRol
 changeRol_binding b (PerspectRol cr) = PerspectRol $ cr {binding = NullOrUndefined (Just b)}
 
-rol_context :: PerspectRol -> ID
+rol_context :: PerspectRol -> ContextID
 rol_context (PerspectRol{context}) = context
 
-changeRol_context :: ID -> PerspectRol -> PerspectRol
+changeRol_context :: ContextID -> PerspectRol -> PerspectRol
 changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 
 rol_properties :: PerspectRol -> StrMap PropertyValueWithComments
 rol_properties (PerspectRol{properties}) = properties
 
-rol_gevuldeRollen :: PerspectRol -> StrMap (Array ID)
+addRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
+addRol_property ct@(PerspectRol pr@{properties}) propertyName value =
+  case lookup propertyName properties of
+    Nothing -> PerspectRol pr {properties = insert
+      propertyName
+      (PropertyValueWithComments {value: [value], commentBefore: [], commentAfter: [] })
+      properties}
+    (Just (PropertyValueWithComments pvc@{value: values})) -> do
+      case elemIndex value values of
+        Nothing -> PerspectRol pr {properties = insert
+          propertyName
+          (PropertyValueWithComments pvc {value = (cons value values)})
+          properties}
+        otherwise -> ct
+
+rol_gevuldeRollen :: PerspectRol -> StrMap (Array RolID)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
 
 rol_comments :: PerspectRol -> Comments

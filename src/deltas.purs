@@ -25,21 +25,20 @@ import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (addContext_rolInContext, changeContext_displayName, changeContext_rev, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, context_rev)
+import Perspectives.ContextAndRole (addContext_rolInContext, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getRevision, setRevision)
-import Perspectives.Property (getRol)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (modifyResourceInCouchdb)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (identity, isFunctional)
-import Perspectives.TheoryChange (modifyTriple, setProperty, updateFromSeeds)
+import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter ((##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
-import Perspectives.EntiteitAndRDFAliases (ID, PropertyName)
-import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<>), (==), (||))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (||))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -247,9 +246,9 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -}
 
 updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
-  (String -> a -> a) ->
-  (ID -> String -> Delta) ->
-  ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+  (Value -> a -> a) ->
+  (ID -> ID -> Delta) ->
+  ID -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 updatePerspectEntiteit changeEntity createDelta cid value = do
   (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
@@ -317,41 +316,49 @@ setBinding = updatePerspectEntiteit
     , isContext: false
     })
 
--- TODO maak addProperty, removeRol en removeProperty. ChangeProperty, ChangeRol voor functionele properties en rollen?
-addRol :: forall e. ID -> ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
-addRol cid rolName rolId = do
-  (context :: PerspectContext) <- lift $ onNothing ("addRol: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
+  (a -> MemberName -> Value -> a) ->
+  (ID -> MemberName -> Value -> Delta) ->
+  ID -> MemberName -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
+  (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
-  changedEntity <- lift $ changePerspectEntiteit cid (addContext_rolInContext context rolName rolId)
-  rev <- lift $ onNothing' ("addRol: context has no revision, deltas are impossible: " <> cid) (context_rev context)
+  changedEntity <- lift $ changePerspectEntiteit cid (changeEntityMember context memberName value)
+  rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
   -- Store the changed entity in couchdb.
   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- Set the new revision in the entity.
-  lift $ changePerspectEntiteit cid (changeContext_rev newRev context)
+  lift $ changePerspectEntiteit cid (setRevision newRev context)
   -- Create a delta and add it to the Transactie.
-  addDelta $ Delta
-    { id : cid
-    , memberName: rolName
-    , deltaType: Add
-    , value: NullOrUndefined (Just rolId)
-    , isContext: true
-    }
+  addDelta $ createDelta cid memberName value
 
--- updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
---   (String -> a -> a) ->
---   (a -> PropertyName -> String -> Delta) ->
---   ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
--- updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
---   (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
---   -- Change the entity in cache:
---   changedEntity <- lift $ changePerspectEntiteit cid (changeEntityMember context memberName value)
---   rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
---   -- Store the changed entity in couchdb.
---   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
---   -- Set the new revision in the entity.
---   lift $ changePerspectEntiteit cid (setRevision newRev context)
---   -- Create a delta and add it to the Transactie.
---   addDelta $ createDelta cid value
+addRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+addRol =
+  updatePerspectEntiteitMember
+    addContext_rolInContext
+    (\cid rolName rolId ->
+      Delta
+        { id : cid
+        , memberName: rolName
+        , deltaType: Add
+        , value: NullOrUndefined (Just rolId)
+        , isContext: true
+        })
+
+addProperty :: forall e. RolID -> PropertyName -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+addProperty =
+  updatePerspectEntiteitMember
+    addRol_property
+    (\rid propertyName value ->
+      Delta
+        { id : rid
+        , memberName: propertyName
+        , deltaType: Add
+        , value: NullOrUndefined (Just value)
+        , isContext: false
+        })
+
+-- TODO maak removeRol en removeProperty. ChangeProperty, ChangeRol voor functionele properties en rollen?
 
 onNothing :: forall a m. MonadThrow Error m => String -> m (Maybe a) -> m a
 onNothing message ma = do
