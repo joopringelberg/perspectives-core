@@ -2,7 +2,7 @@ module Perspectives.SystemQueries where
 
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.QueryCombinators (hasValue, closure') as QC
-import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructRolGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
 identity' :: forall e. ObjectsGetter e
@@ -63,3 +63,9 @@ hasBinding = QC.hasValue binding
 
 rolUser :: forall e. NamedTripleGetter e
 rolUser = QC.closure' binding
+
+lijdendVoorwerpBepaling :: forall e. NamedTripleGetter e
+lijdendVoorwerpBepaling = constructRolGetter "model:Perspectives$lijdendVoorwerpBepaling"
+
+propertyReferentie :: forall e. NamedTripleGetter e
+propertyReferentie = constructRolGetter "model:Perspectives$propertyReferentie"

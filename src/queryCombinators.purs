@@ -3,15 +3,16 @@ module Perspectives.QueryCombinators where
 import Control.Monad.Aff (Aff)
 import Control.Monad.State (StateT, put, get)
 import Control.Monad.State.Trans (evalStateT)
-import Data.Array (cons, difference, elemIndex, foldr, head, null, union, (!!))
+import Data.Array (cons, difference, elemIndex, foldr, head, index, null, union, (!!))
 import Data.Boolean (otherwise)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, RolName)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
-import Perspectives.TripleGetter (applyNamedFunction, constructRolGetter)
-import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
+import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, RolName, ID)
+import Perspectives.Property (ObjectsGetter, getRol)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, FlexTriple, getRef, memorize, tripleObjects)
+import Perspectives.TripleGetter (applyNamedFunction, constructRolGetter, constructTripleGetterFromArbitraryFunction)
+import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>), (>>=))
 
 closure :: forall e.
   NamedFunction (TripleGetter e) ->
@@ -134,7 +135,20 @@ toBoolean (NamedFunction nameOfp p) r = do
     (Just x) -> pure (x == "true")
 
 rolesOf :: forall e. ContextID -> NamedFunction (TripleGetter e)
-rolesOf cid = NamedFunction "" \rolname -> applyNamedFunction (constructRolGetter rolname) cid
+rolesOf cid = constructTripleGetterFromArbitraryFunction
+  ("model:Perspectives$rolesOf" <> cid) f where
+  f :: ObjectsGetter e
+  f rolName = getRol rolName cid
+-- rolesOf cid = NamedFunction ("rolesOf_" <> cid) \rolname -> applyNamedFunction (constructRolGetter rolname) cid
+
+contains :: forall e. ID -> NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+contains id' (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunction ("model:Perspectives$contains" <> id') f where
+  f :: ObjectsGetter e
+  f id = do
+    (Triple{object}) <- evalStateT (p id) true
+    case elemIndex id' object of
+      Nothing -> pure ["false"]
+      otherwise -> pure ["true"]
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
 ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)

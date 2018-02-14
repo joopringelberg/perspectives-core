@@ -31,11 +31,11 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getRevision, setRevision)
 import Perspectives.Property (getRolBinding)
 import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (rolesOf, toBoolean)
+import Perspectives.QueryCombinators (contains, rolesOf, toBoolean, filter)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (modifyResourceInCouchdb)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, rolContext, rolUser)
+import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, lijdendVoorwerpBepaling, propertyReferentie, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, (##))
@@ -213,12 +213,13 @@ sendTransactieToUser userId t = do
 usersInvolvedInDelta :: forall e. Delta -> Aff (AjaxAvarCache e) (Array ID)
 usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInContext dlt else usersInvolvedInRol dlt
   where
+
   usersInvolvedInRol :: Delta -> Aff (AjaxAvarCache e) (Array ID)
-  usersInvolvedInRol (Delta{id}) =
+  usersInvolvedInRol (Delta{id, memberName}) =
     do
       queryResult <-
         -- Get the RolInContext (types) that have a perspective on (the context represented by) 'id'.
-        id ## actiesWithThatLijdendVoorwerp >-> onderwerpFillers >->
+        id ## (filter (hasRelevantView memberName) actiesWithThatLijdendVoorwerp) >-> onderwerpFillers >->
         -- Get the instances of these roles in 'id'
         (rolesOf id) >->
         -- Get the users that are at the bottom of the telescope of these role instances.
@@ -226,12 +227,13 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
       pure $ tripleObjects queryResult
     where
       actiesWithThatLijdendVoorwerp = isLijdendVoorwerpIn >-> rolContext
+
   usersInvolvedInContext :: Delta -> Aff (AjaxAvarCache e) (Array ID)
-  usersInvolvedInContext (Delta{id}) =
+  usersInvolvedInContext (Delta{id, memberName}) =
     do
       queryResult <-
         -- Get the RolInContext (types) that have a perspective on (the context represented by) 'id'.
-        id ## actiesWithThatLijdendVoorwerp >-> onderwerpFillers >->
+        id ## (filter (hasRelevantView memberName) actiesWithThatLijdendVoorwerp) >-> onderwerpFillers >->
         -- Get the instances of these roles in 'id'
         (rolesOf id) >->
         -- Get the users that are at the bottom of the telescope of these role instances.
@@ -239,10 +241,13 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
       pure $ tripleObjects queryResult
     where
       actiesWithThatLijdendVoorwerp = contextType >-> buitenRol >-> isLijdendVoorwerpIn >-> rolContext
+
   -- Roles that fill the syntactic role "LijdendVoorwerp".
   isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp")
-  -- Roles that are bound to the syntactic role "Onderwerp".
+  -- Fillers of the syntactic role "Onderwerp".
   onderwerpFillers = (constructRolGetter "model:Perspectives$onderwerp") >-> binding
+  -- Tests an Actie for having memberName in the view that is its lijdendVoorwerpBepaling.
+  hasRelevantView id = contains id (lijdendVoorwerpBepaling >-> propertyReferentie)
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.

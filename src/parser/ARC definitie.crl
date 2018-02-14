@@ -44,7 +44,7 @@ psp:Context arc:Activiteit
 	psp:rolInContext => psp:rolInContext
 	psp:rolInContext => arc:actieInContext
 
-psp:Rol arc:actor
+psp:Rol arc:onderwerp
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
 	psp:mogelijkeBinding => psp:Rol
@@ -66,6 +66,6 @@ psp:Context arc:creeërt
 psp:Context arc:verwijdert
 
 psp:Context arc:Actie
-	psp:rolInContext => arc:actor
+	psp:rolInContext => arc:onderwerp
 	psp:rolInContext => arc:werkwoord
 	psp:rolInContext => arc:lijdendVoorwerp
