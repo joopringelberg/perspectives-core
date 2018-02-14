@@ -208,29 +208,41 @@ sendTransactieToUser userId t = do
     false -> throwError $ error ("sendTransactieToUser " <> "transactie id hier" <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   pure unit
 
-{-
-Bepaal de actietypen die (het type van) de entiteit van de delta als lijdend voorwerp hebben.
-Bepaal dan de onderwerpen van die acties.
-Dat zijn de betrokken roltypen.
-Bepaal dan de instanties van die roltypen van de entiteit van de delta.
--}
+-- | The (IDs of the) users that play a role in, and have a relevant perspective on, the Context that is modified;
+-- | or the users that play a role in the context of the Role that is modified and have a relevant perspective on that Role.
 usersInvolvedInDelta :: forall e. Delta -> Aff (AjaxAvarCache e) (Array ID)
 usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInContext dlt else usersInvolvedInRol dlt
   where
   usersInvolvedInRol :: Delta -> Aff (AjaxAvarCache e) (Array ID)
-  usersInvolvedInRol d = pure []
+  usersInvolvedInRol (Delta{id}) =
+    do
+      queryResult <-
+        -- Get the RolInContext (types) that have a perspective on (the context represented by) 'id'.
+        id ## actiesWithThatLijdendVoorwerp >-> onderwerpFillers >->
+        -- Get the instances of these roles in 'id'
+        (rolesOf id) >->
+        -- Get the users that are at the bottom of the telescope of these role instances.
+        rolUser
+      pure $ tripleObjects queryResult
+    where
+      actiesWithThatLijdendVoorwerp = isLijdendVoorwerpIn >-> rolContext
   usersInvolvedInContext :: Delta -> Aff (AjaxAvarCache e) (Array ID)
   usersInvolvedInContext (Delta{id}) =
     do
-      users <- id ## contextType >->
-        buitenRol >->
-        (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp") >->
-        rolContext >-> -- This will be an Actie
-        (constructRolGetter "model:Perspectives$onderwerp") >-> binding >-> -- RolInContext that have a perspective on the context represented by id.
-        -- Now we want the instances of these roles of the context represented by id.
-        (rolesOf id) >-> -- Then we need the users that eventually fill these roles.
+      queryResult <-
+        -- Get the RolInContext (types) that have a perspective on (the context represented by) 'id'.
+        id ## actiesWithThatLijdendVoorwerp >-> onderwerpFillers >->
+        -- Get the instances of these roles in 'id'
+        (rolesOf id) >->
+        -- Get the users that are at the bottom of the telescope of these role instances.
         rolUser
-      pure []
+      pure $ tripleObjects queryResult
+    where
+      actiesWithThatLijdendVoorwerp = contextType >-> buitenRol >-> isLijdendVoorwerpIn >-> rolContext
+  -- Roles that fill the syntactic role "LijdendVoorwerp".
+  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp")
+  -- Roles that are bound to the syntactic role "Onderwerp".
+  onderwerpFillers = (constructRolGetter "model:Perspectives$onderwerp") >-> binding
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
