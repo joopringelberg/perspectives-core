@@ -1,12 +1,12 @@
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, elemIndex)
+import Perspectives.EntiteitAndRDFAliases
+import Data.Array (cons, delete, elemIndex)
 import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..))
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty, lookup, insert)
 import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, noRevision, toRevision)
-import Perspectives.EntiteitAndRDFAliases
 import Prelude (($))
 
 -- CONTEXT
@@ -55,6 +55,19 @@ addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
       case elemIndex rolID roles of
         Nothing -> PerspectContext cr {rolInContext = insert rolName (cons rolID roles) rolInContext}
         otherwise -> ct
+
+removeContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
+removeContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
+  case lookup rolName rolInContext of
+    Nothing -> ct
+    (Just (roles :: Array RolID)) -> do
+      case elemIndex rolID roles of
+        Nothing -> ct
+        otherwise -> PerspectContext cr {rolInContext = insert rolName (delete rolID roles) rolInContext}
+
+setContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
+setContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
+  PerspectContext cr {rolInContext = insert rolName [rolID] rolInContext}
 
 context_comments :: PerspectContext -> Comments
 context_comments (PerspectContext{comments})= comments
@@ -123,22 +136,65 @@ rol_properties :: PerspectRol -> StrMap PropertyValueWithComments
 rol_properties (PerspectRol{properties}) = properties
 
 addRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
-addRol_property ct@(PerspectRol pr@{properties}) propertyName value =
+addRol_property rl@(PerspectRol rp@{properties}) propertyName value =
   case lookup propertyName properties of
-    Nothing -> PerspectRol pr {properties = insert
+    Nothing -> PerspectRol rp {properties = insert
       propertyName
       (PropertyValueWithComments {value: [value], commentBefore: [], commentAfter: [] })
       properties}
     (Just (PropertyValueWithComments pvc@{value: values})) -> do
       case elemIndex value values of
-        Nothing -> PerspectRol pr {properties = insert
+        Nothing -> PerspectRol rp {properties = insert
           propertyName
           (PropertyValueWithComments pvc {value = (cons value values)})
           properties}
-        otherwise -> ct
+        otherwise -> rl
+
+removeRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
+removeRol_property rl@(PerspectRol rp@{properties}) propertyName value =
+  case lookup propertyName properties of
+    Nothing -> rl
+    (Just (PropertyValueWithComments pvc@{value: values})) -> do
+      case elemIndex value values of
+        Nothing -> rl
+        otherwise -> PerspectRol rp {properties = insert
+          propertyName
+          (PropertyValueWithComments pvc {value = (delete value values)})
+          properties}
+
+setRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
+setRol_property rl@(PerspectRol rp@{properties}) propertyName value =
+  case lookup propertyName properties of
+    Nothing -> PerspectRol rp {properties = insert
+      propertyName
+      (PropertyValueWithComments {value: [value], commentBefore: [], commentAfter: [] })
+      properties}
+    (Just (PropertyValueWithComments pvc)) -> do
+      PerspectRol rp {properties = insert
+          propertyName
+          (PropertyValueWithComments pvc {value = [value]})
+          properties}
 
 rol_gevuldeRollen :: PerspectRol -> StrMap (Array RolID)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
+
+addRol_gevuldeRollen :: PerspectRol -> RolName -> RolID -> PerspectRol
+addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
+  case lookup rolName gevuldeRollen of
+    Nothing -> PerspectRol cr {gevuldeRollen = insert rolName [rolID] gevuldeRollen}
+    (Just roles) -> do
+      case elemIndex rolID roles of
+        Nothing -> PerspectRol cr {gevuldeRollen = insert rolName (cons rolID roles) gevuldeRollen}
+        otherwise -> ct
+
+removeRol_gevuldeRollen :: PerspectRol -> RolName -> RolID -> PerspectRol
+removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
+  case lookup rolName gevuldeRollen of
+    Nothing -> ct
+    (Just (roles :: Array RolID)) -> do
+      case elemIndex rolID roles of
+        Nothing -> ct
+        otherwise -> PerspectRol cr {gevuldeRollen = insert rolName (delete rolID roles) gevuldeRollen}
 
 rol_comments :: PerspectRol -> Comments
 rol_comments (PerspectRol{comments}) = comments

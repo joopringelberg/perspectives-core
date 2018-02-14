@@ -52,7 +52,7 @@ type RolRecord =
   , binding :: Binding
   -- The four fields below could also be modeled as Maybe values.
   , properties :: StrMap PropertyValueWithComments
-  , gevuldeRollen :: StrMap (Array ID)
+  , gevuldeRollen :: StrMap (Array RolID)
   , occurrence :: Int
   , comments :: Comments
   }
@@ -88,12 +88,12 @@ revision' = NullOrUndefined
 noRevision :: Revision
 noRevision = NullOrUndefined Nothing
 
-type Binding = NullOrUndefined String
+type Binding = NullOrUndefined RolID
 
-fromBinding :: Binding -> Maybe String
+fromBinding :: Binding -> Maybe RolID
 fromBinding = unNullOrUndefined
 
-binding :: ID -> Binding
+binding :: RolID -> Binding
 binding id = NullOrUndefined (Just id)
 
 -----------------------------------------------------------

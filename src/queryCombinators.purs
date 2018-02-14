@@ -4,11 +4,13 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.State (StateT, put, get)
 import Control.Monad.State.Trans (evalStateT)
 import Data.Array (cons, difference, elemIndex, foldr, head, null, union, (!!))
+import Data.Boolean (otherwise)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (RolID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, RolName)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
+import Perspectives.TripleGetter (applyNamedFunction, constructRolGetter)
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
 
 closure :: forall e.
@@ -28,6 +30,33 @@ closure (NamedFunction nameOfp p) =
                     , dependencies : []
                     , supports : map getRef (cons t triples)
                     , tripleGetter : getter}
+
+    name :: String
+    name = "(closure " <>  nameOfp <> ")"
+
+-- | Return the last element in the chain
+closure' :: forall e.
+  NamedFunction (TripleGetter e) ->
+  NamedFunction (TripleGetter e)
+closure' (NamedFunction nameOfp p) =
+  memorize getter name
+  where
+    getter :: TripleGetter e
+    getter id = do
+      t@(Triple{subject, object : objectsOfP}) <- p id
+      case head objectsOfP of
+        Nothing -> pure t
+        (Just o) -> do
+          pt@(Triple{object:bottom}) <- getter o
+          case head bottom of
+            Nothing -> pure t
+            otherwise ->
+              pure $ Triple { subject: id
+                            , predicate : name
+                            , object : bottom
+                            , dependencies : []
+                            , supports : [getRef pt]
+                            , tripleGetter : getter}
 
     name :: String
     name = "(closure " <>  nameOfp <> ")"
@@ -103,6 +132,9 @@ toBoolean (NamedFunction nameOfp p) r = do
   case head arrWithBool of
     Nothing -> pure false
     (Just x) -> pure (x == "true")
+
+rolesOf :: forall e. ContextID -> NamedFunction (TripleGetter e)
+rolesOf cid = NamedFunction "" \rolname -> applyNamedFunction (constructRolGetter rolname) cid
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
 ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)

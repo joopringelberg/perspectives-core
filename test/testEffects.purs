@@ -6,11 +6,11 @@ import Control.Monad.Eff.Console (log)
 import Control.Monad.Eff.Exception (EXCEPTION, Error)
 import Data.Either (Either(..))
 import Data.Show (class Show, show)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.Property (PropDefsEffects)
 import Prelude (Unit, (<>), ($))
 
-type CancelerEffects e = (PropDefsEffects (console :: CONSOLE, gm :: GLOBALMAP | e))
+type CancelerEffects e = (AjaxAvarCache (console :: CONSOLE, gm :: GLOBALMAP | e))
 type TestEffects e = CancelerEffects (exception :: EXCEPTION | e)
 
 handleError :: forall e a. Show a => (Either Error a -> Eff (console :: CONSOLE | e) Unit)

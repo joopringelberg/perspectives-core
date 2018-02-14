@@ -10,7 +10,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.Syntax (PerspectContext, PerspectRol, propertyValue)
+import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
 import Perspectives.EntiteitAndRDFAliases
 
 {-
@@ -87,6 +87,9 @@ getRolType = getRolMember \rol -> [rol_pspType rol]
 
 getRolBinding :: forall e. ObjectsGetter e
 getRolBinding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
+
+getGebondenAls :: forall e. RolName -> ObjectsGetter e
+getGebondenAls rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)
 
 getRolContext :: forall e. ObjectsGetter e
 getRolContext = getRolMember \rol -> [rol_context rol]

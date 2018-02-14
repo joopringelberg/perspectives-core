@@ -5,8 +5,7 @@ import Control.Monad.Aff (Aff, runAff_)
 import Control.Monad.Aff.Console (CONSOLE, log)
 import Control.Monad.Eff (Eff)
 import Data.Maybe (Maybe)
-import Perspectives.Resource (PROPDEFS, getPerspectEntiteit)
-import Perspectives.ResourceTypes (DomeinFileEffects)
+import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 -----------------------------------------------------------
 -- Tests
@@ -18,7 +17,7 @@ runTest :: forall e a. Show a => Aff (console :: CONSOLE | e) a -> Eff (console 
 runTest t =
   runAff_ (\_->pure unit) (t >>= (\r -> log (show r)))
 
-getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectContext)
+-- getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectContext)
 getContextDef id = do
   getPerspectEntiteit id
 

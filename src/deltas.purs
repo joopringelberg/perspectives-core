@@ -25,18 +25,20 @@ import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type)
+import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getRevision, setRevision)
-import Perspectives.QueryCombinators (toBoolean)
+import Perspectives.Property (getRolBinding)
+import Perspectives.PropertyComposition ((>->))
+import Perspectives.QueryCombinators (rolesOf, toBoolean)
 import Perspectives.Resource (changePerspectEntiteit, getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (modifyResourceInCouchdb)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Perspectives.SystemQueries (identity, isFunctional)
+import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
-import Perspectives.TripleGetter ((##))
+import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (||))
 
@@ -206,15 +208,36 @@ sendTransactieToUser userId t = do
     false -> throwError $ error ("sendTransactieToUser " <> "transactie id hier" <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   pure unit
 
--- TODO Uitwerken.
-usersInvolvedInTransactie :: forall e. Transactie -> Aff e (Array ID)
-usersInvolvedInTransactie t = pure []
+{-
+Bepaal de actietypen die (het type van) de entiteit van de delta als lijdend voorwerp hebben.
+Bepaal dan de onderwerpen van die acties.
+Dat zijn de betrokken roltypen.
+Bepaal dan de instanties van die roltypen van de entiteit van de delta.
+-}
+usersInvolvedInDelta :: forall e. Delta -> Aff (AjaxAvarCache e) (Array ID)
+usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInContext dlt else usersInvolvedInRol dlt
+  where
+  usersInvolvedInRol :: Delta -> Aff (AjaxAvarCache e) (Array ID)
+  usersInvolvedInRol d = pure []
+  usersInvolvedInContext :: Delta -> Aff (AjaxAvarCache e) (Array ID)
+  usersInvolvedInContext (Delta{id}) =
+    do
+      users <- id ## contextType >->
+        buitenRol >->
+        (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp") >->
+        rolContext >-> -- This will be an Actie
+        (constructRolGetter "model:Perspectives$onderwerp") >-> binding >-> -- RolInContext that have a perspective on the context represented by id.
+        -- Now we want the instances of these roles of the context represented by id.
+        (rolesOf id) >-> -- Then we need the users that eventually fill these roles.
+        rolUser
+      pure []
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
-Doorloop elke verzameling deltas en bepaal per delta welke gebruikers betrokken zijn.
+Doorloop de verzameling deltas en bepaal per delta welke gebruikers betrokken zijn.
 Bouw al doende een StrMap van userId en gespecialiseerde transacties op, waarbij je een transactie toevoegt voor een gebruiker die nog niet in de StrMap voorkomt.
 -}
+-- TODO Uitwerken.
 selectDeltasForUsers :: forall e. Transactie -> Aff (AjaxAvarCache e)(StrMap Transactie)
 selectDeltasForUsers t = pure empty
 
@@ -244,12 +267,19 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
   - de consequenties doorvoeren in de triple administratie;
   - de gewijzigde context opslaan;
 -}
-
+-- | Create update functions on PerspectContext or PerspectRol.
 updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
   ID -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 updatePerspectEntiteit changeEntity createDelta cid value = do
+  updatePerspectEntiteit' changeEntity cid value
+  addDelta $ createDelta cid value
+
+updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
+  (Value -> a -> a) ->
+  ID -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+updatePerspectEntiteit' changeEntity cid value = do
   (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
   changedEntity <- lift $ changePerspectEntiteit cid (changeEntity value context)
@@ -258,8 +288,6 @@ updatePerspectEntiteit changeEntity createDelta cid value = do
   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- Set the new revision in the entity.
   lift $ changePerspectEntiteit cid (setRevision newRev context)
-  -- Create a delta and add it to the Transactie.
-  addDelta $ createDelta cid value
 
 setContextType :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 setContextType = updatePerspectEntiteit
@@ -306,32 +334,47 @@ setContext = updatePerspectEntiteit
     })
 
 setBinding :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
-setBinding = updatePerspectEntiteit
-  changeRol_binding
-  (\rid binding -> Delta
+setBinding rid binding = do
+  oldBinding <- lift $ getRolBinding rid
+  updatePerspectEntiteit' changeRol_binding rid binding
+  case head oldBinding of
+    Nothing -> pure unit
+    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob "model:Perspectives$binding" rid
+  updatePerspectEntiteitMember' addRol_gevuldeRollen binding "model:Perspectives$binding" rid
+  addDelta $ Delta
     { id : rid
     , memberName: "model:Perspectives$binding"
     , deltaType: Change
     , value: NullOrUndefined (Just binding)
     , isContext: false
-    })
+    }
 
+-----------------------------------------------------------
+-- UPDATEPERSPECTENTITEITMEMBER
+-----------------------------------------------------------
 updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
   ID -> MemberName -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
-  (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  updatePerspectEntiteitMember' changeEntityMember cid memberName value
+  addDelta $ createDelta cid memberName value
+
+updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
+  (a -> MemberName -> Value -> a) ->
+  ID -> MemberName -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
+  (context) <- lift $ onNothing ("updateRoleProperty: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
   changedEntity <- lift $ changePerspectEntiteit cid (changeEntityMember context memberName value)
-  rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
+  rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
   -- Store the changed entity in couchdb.
   newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- Set the new revision in the entity.
   lift $ changePerspectEntiteit cid (setRevision newRev context)
-  -- Create a delta and add it to the Transactie.
-  addDelta $ createDelta cid memberName value
 
+-- | Add a rol to a context (and inversely register the context with the rol)
+-- | In a functional rol, remove an old
 addRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 addRol =
   updatePerspectEntiteitMember
@@ -341,6 +384,32 @@ addRol =
         { id : cid
         , memberName: rolName
         , deltaType: Add
+        , value: NullOrUndefined (Just rolId)
+        , isContext: true
+        })
+
+removeRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+removeRol =
+  updatePerspectEntiteitMember
+    removeContext_rolInContext
+    (\cid rolName rolId ->
+      Delta
+        { id : cid
+        , memberName: rolName
+        , deltaType: Remove
+        , value: NullOrUndefined (Just rolId)
+        , isContext: true
+        })
+
+setRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+setRol =
+  updatePerspectEntiteitMember
+    setContext_rolInContext
+    (\cid rolName rolId ->
+      Delta
+        { id : cid
+        , memberName: rolName
+        , deltaType: Change
         , value: NullOrUndefined (Just rolId)
         , isContext: true
         })
@@ -358,7 +427,31 @@ addProperty =
         , isContext: false
         })
 
--- TODO maak removeRol en removeProperty. ChangeProperty, ChangeRol voor functionele properties en rollen?
+removeProperty :: forall e. RolID -> PropertyName -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+removeProperty =
+  updatePerspectEntiteitMember
+    removeRol_property
+    (\rid propertyName value ->
+      Delta
+        { id : rid
+        , memberName: propertyName
+        , deltaType: Remove
+        , value: NullOrUndefined (Just value)
+        , isContext: false
+        })
+
+setProperty :: forall e. RolID -> PropertyName -> Value -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
+setProperty =
+  updatePerspectEntiteitMember
+    setRol_property
+    (\rid propertyName value ->
+      Delta
+        { id : rid
+        , memberName: propertyName
+        , deltaType: Change
+        , value: NullOrUndefined (Just value)
+        , isContext: false
+        })
 
 onNothing :: forall a m. MonadThrow Error m => String -> m (Maybe a) -> m a
 onNothing message ma = do

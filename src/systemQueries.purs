@@ -1,7 +1,7 @@
 module Perspectives.SystemQueries where
 
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
-import Perspectives.QueryCombinators (hasValue) as QC
+import Perspectives.QueryCombinators (hasValue, closure') as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (pure)
 
@@ -60,3 +60,6 @@ hasLabel = QC.hasValue label
 
 hasBinding :: forall e. NamedTripleGetter e
 hasBinding = QC.hasValue binding
+
+rolUser :: forall e. NamedTripleGetter e
+rolUser = QC.closure' binding

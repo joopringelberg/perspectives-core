@@ -1,13 +1,13 @@
 module Perspectives.TripleGetter where
 
+import Perspectives.EntiteitAndRDFAliases
 import Control.Monad (class Monad)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State.Trans (StateT, evalStateT, get)
 import Data.Maybe (Maybe(..))
-import Perspectives.Property (ObjectsGetter, getPrivateProperty, getProperty, getPublicProperty, getRol)
+import Perspectives.Property (ObjectsGetter, getGebondenAls, getPrivateProperty, getProperty, getPublicProperty, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
-import Perspectives.EntiteitAndRDFAliases
 import Prelude (bind, pure, ($))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
@@ -106,3 +106,8 @@ constructRolGetter :: forall e.
   RolName ->
   NamedFunction (TripleGetter e)
 constructRolGetter pn = constructTripleGetter getRol pn
+
+constructInverseRolGetter :: forall e.
+  RolName ->
+  NamedFunction (TripleGetter e)
+constructInverseRolGetter pn = constructTripleGetter getGebondenAls pn

@@ -20,3 +20,4 @@ type RolName = String
 type MemberName = String
 type Comment = String
 type Value = String
+type Values = Array String
