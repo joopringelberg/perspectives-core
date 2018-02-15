@@ -19,8 +19,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.JSDate (fromDateTime, toISOString)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.StrMap (StrMap, empty)
-import Data.Traversable (traverse)
+import Data.StrMap (StrMap, empty, insert, lookup)
+import Data.Traversable (for_, traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
@@ -40,7 +40,7 @@ import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
-import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (||))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (>>=), (||))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -81,6 +81,9 @@ createTransactie author =
     n <- now
     pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: []}
 
+transactieID :: Transactie -> String
+transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
+
 runInTransactie :: forall e. StateT Transactie (Aff (AjaxAvarCache (now :: NOW | e))) Unit -> Aff (AjaxAvarCache (now :: NOW | e)) Unit
 runInTransactie m = do
   -- TODO: hier moet de user id worden gebruikt.
@@ -96,8 +99,8 @@ runInTransactie m = do
 
 distributeTransactie :: forall e. Transactie -> Aff (AjaxAvarCache e) Unit
 distributeTransactie t = do
-  (others :: StrMap Transactie) <- selectDeltasForUsers t
-  _ <- forWithIndex others sendTransactieToUser
+  (customizedTransacties :: StrMap Transactie) <- transactieForEachUser t
+  _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
 addContextToTransactie :: forall e. PerspectContext -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
@@ -201,11 +204,11 @@ sendTransactieToUser :: forall e. ID -> Transactie -> Aff (AjaxAvarCache e) Unit
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ## identity
   (userIP :: String) <- onNothing' ("sendTransactieToUser: user has no IP: " <> userId) (head (tripleObjects tripleUserIP))
-  (res :: AJ.AffjaxResponse String)  <- AJ.put (userIP <> "/" <> userId <> "_post/" <> "transactie id hier") (encodeJSON t)
+  (res :: AJ.AffjaxResponse String)  <- AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
     true -> pure unit
-    false -> throwError $ error ("sendTransactieToUser " <> "transactie id hier" <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+    false -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   pure unit
 
 -- | The (IDs of the) users that play a role in, and have a relevant perspective on, the Context that is modified;
@@ -254,10 +257,22 @@ Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
 Doorloop de verzameling deltas en bepaal per delta welke gebruikers betrokken zijn.
 Bouw al doende een StrMap van userId en gespecialiseerde transacties op, waarbij je een transactie toevoegt voor een gebruiker die nog niet in de StrMap voorkomt.
 -}
--- TODO Uitwerken.
-selectDeltasForUsers :: forall e. Transactie -> Aff (AjaxAvarCache e)(StrMap Transactie)
-selectDeltasForUsers t = pure empty
-
+transactieForEachUser :: forall e. Transactie -> Aff (AjaxAvarCache e)(StrMap Transactie)
+transactieForEachUser t@(Transactie{deltas}) = do
+  execStateT
+    (for_ deltas (\d -> (lift $ usersInvolvedInDelta d) >>= (\users -> transactieForEachUser' d users)))
+    empty
+  where
+    transactieForEachUser' :: Delta -> (Array ID) -> StateT (StrMap Transactie) (Aff (AjaxAvarCache e)) Unit
+    transactieForEachUser' d users = do
+      trs <- get
+      for_
+        users
+        (\user -> case lookup user trs of
+          Nothing -> put $ insert user (transactieCloneWithJustDelta t d) trs
+          (Just (Transactie tr@{deltas: ds})) -> put $ insert user (Transactie tr {deltas = cons d ds}) trs)
+    transactieCloneWithJustDelta :: Transactie -> Delta -> Transactie
+    transactieCloneWithJustDelta (Transactie tr) d = Transactie tr {deltas = [d]}
 -----------------------------------------------------------
 -- UPDATEPERSPECTENTITEIT
 -----------------------------------------------------------
