@@ -40,6 +40,7 @@ import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
+import Perspectives.User (getUser)
 import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), (&&), (<>), (==), (>>=), (||))
 
 -----------------------------------------------------------
@@ -86,8 +87,8 @@ transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
 
 runInTransactie :: forall e. StateT Transactie (Aff (AjaxAvarCache (now :: NOW | e))) Unit -> Aff (AjaxAvarCache (now :: NOW | e)) Unit
 runInTransactie m = do
-  -- TODO: hier moet de user id worden gebruikt.
-  s <- liftEff (createTransactie "Joop")
+  user <- getUser
+  s <- liftEff (createTransactie user)
   t@(Transactie{deltas}) <- execStateT m s
   -- register a triple for each delta, add it to the queue, run the queue.
   maybeTriples <- traverse modifyTriple deltas
