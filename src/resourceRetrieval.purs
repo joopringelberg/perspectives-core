@@ -70,6 +70,7 @@ modifyResourceInCouchdb resId originalRevision resource = do
       pure $ _.rev $ stringToRecord res.response
     false -> throwError $ error ("modifyResourceInCouchdb " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
+-- TODO: gebruik de user.
 baseURL :: String
 baseURL = "http://localhost:5984/user_cor_contexts2/"
 

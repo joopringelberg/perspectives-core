@@ -2,10 +2,8 @@ module Perspectives.Resource where
 
 import Prelude
 import Control.Monad.Aff (Aff, catchError)
-import Control.Monad.Aff.AVar (
-  AVar, isEmptyVar, makeEmptyVar, putVar, readVar, takeVar)
+import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Eff (kind Effect)
-import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, execStateT, lift, modify)
@@ -15,12 +13,11 @@ import Data.StrMap (insert)
 import Perspectives.ContextAndRole (context_id, context_rev, context_rolInContext, rol_binding, rol_context, rol_id, rol_pspType)
 import Perspectives.DomeinCache (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
-import Perspectives.Identifiers (isInNamespace)
+import Perspectives.EntiteitAndRDFAliases (ID)
+import Perspectives.Identifiers (isInNamespace, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally, setRevision)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, createResourceInCouchdb)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
-import Perspectives.EntiteitAndRDFAliases (ID)
 
 -- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
 getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) (Maybe a)
@@ -82,7 +79,7 @@ createPerspectEntiteitInCouchdb pe = do
 -}
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
-storeExistingCouchdbResourceInCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) Unit
+storeExistingCouchdbResourceInCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 storeExistingCouchdbResourceInCouchdb id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -90,11 +87,12 @@ storeExistingCouchdbResourceInCouchdb id = do
     (Just avar) -> do
       empty <- isEmptyVar avar
       if empty
-        then pure unit
+        then throwError $ error ("storeExistingCouchdbResourceInCouchdb needs a locally stored and filled resource for " <> id)
         else do
           pe <- takeVar avar
           (rev :: String) <- createResourceInCouchdb id (encode pe)
           putVar (setRevision rev pe) avar
+          pure pe
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> Aff (AjaxAvarCache e) DomeinFile
@@ -135,7 +133,19 @@ domeinFileFromContext c' = do
                                   (Just context) -> collect context
                               else pure unit
                             Nothing -> pure unit
-                        else pure unit
+                        else if isUserURI binding
+                          -- Save the resource by itself, iff it is in the user domein.
+                        then do
+                          (mBuitenRol :: Maybe PerspectRol) <- lift $ getPerspectEntiteit binding
+                          case mBuitenRol of
+                            (Just (buitenRol :: PerspectRol)) -> if rol_pspType buitenRol == "model:Perspectives$BuitenRol"
+                              then do
+                                (_ :: PerspectRol) <- lift (storeExistingCouchdbResourceInCouchdb binding)
+                                (_ :: PerspectContext) <- lift $ storeExistingCouchdbResourceInCouchdb (rol_context buitenRol)
+                                pure unit
+                              else pure unit
+                            Nothing -> pure unit
+                          else pure unit
 
     insertContext :: PerspectContext -> DomeinFile -> DomeinFile
     insertContext c (DomeinFile dfc@{contexts}) = DomeinFile $ dfc {contexts = insert (context_id c) c contexts}

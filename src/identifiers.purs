@@ -21,6 +21,7 @@ module Perspectives.Identifiers
 , pe_localName
 , PEIdentifier
 , Prefix
+, isUserURI
   )
 
 where
@@ -38,9 +39,6 @@ import Prelude (class Show, const, flip, id, not, ($), (<$>), (<>))
 
 standardPrefixes2namespaces :: StrMap String
 standardPrefixes2namespaces = fromFoldable [
-  (Tuple "user" "model:user$"),
-  (Tuple "blank" "model:blank$"),
-  (Tuple "_" "model:blank$"),
   (Tuple "xsd" "http://www.w3.org/2001/XMLSchema$"),
   (Tuple "rdfs" "http://www.w3.org/2000/01/rdf-schema$"),
   (Tuple "rdf" "http://www.w3.org/1999/02/22-rdf-syntax-ns$"),
@@ -117,6 +115,20 @@ isStandardNamespacePrefix pre = maybe false (const true) (lookup pre standardPre
 -- | From "owl:Thing", get "http://www.w3.org/2002/07/owl$"
 getStandardNamespace :: String -> Maybe Namespace
 getStandardNamespace s = maybe Nothing (flip lookup standardPrefixes2namespaces) (deconstructPrefix s)
+
+userCurieRegEx :: Regex
+userCurieRegEx = unsafeRegex "^usr:" noFlags
+
+-- | True iff the string starts on "usr:"
+isUserCurie :: String -> Boolean
+isUserCurie = test userCurieRegEx
+
+userUriRegEx :: Regex
+userUriRegEx = unsafeRegex "^model:User\\$" noFlags
+
+-- | True iff the string starts on "model:User$"
+isUserURI :: String -> Boolean
+isUserURI = test userUriRegEx
 
 namespaceRegex :: Regex
 namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
