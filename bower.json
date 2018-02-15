@@ -28,7 +28,8 @@
     "purescript-dom-filereader": "^3.0.0",
     "purescript-now": "^3.0.0",
     "purescript-js-date": "^5.1.0",
-    "purescript-datetime": "^3.4.1"
+    "purescript-datetime": "^3.4.1",
+    "purescript-uri": "^4.2.4"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

@@ -5,15 +5,19 @@ import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties as HP
-import Network.HTTP.Affjax as AX
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (Aff, liftEff')
+import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff)
 import DOM (DOM)
+import DOM.HTML (window)
+import DOM.HTML.Location (search)
+import DOM.HTML.Window (location)
 import Data.Either (Either(..))
-import Data.Either.Nested (Either2, Either3)
-import Data.Functor.Coproduct.Nested (Coproduct2, Coproduct3)
+import Data.Either.Nested (Either3)
+import Data.Functor.Coproduct.Nested (Coproduct3)
 import Data.Maybe (Maybe(..))
+import Data.StrMap (fromFoldable, lookup)
+import Data.URI.Query (Query(..), parser) as URI
 import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent)
@@ -21,17 +25,33 @@ import Perspectives.ContextRoleParser (enclosingContext) as CRP
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect)
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
-import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
+import Perspectives.User (setUser)
+import Text.Parsing.StringParser (runParser)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects (AjaxAvarCache ()))) Unit
 main = HA.runHalogenAff do
+  userFromLocation
   body <- HA.awaitBody
   runUI ui unit body
+
+userFromLocation :: forall e. Aff (dom :: DOM, avar :: AVAR | e ) Unit
+userFromLocation = do
+  parseResult <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
+  case parseResult of
+    (Left m) -> pure unit
+    (Right (URI.Query kvp)) -> do
+      keyValueMap <- pure $ fromFoldable kvp
+      case lookup "user" keyValueMap of
+        Nothing -> pure unit
+        (Just mUser) -> case mUser of
+          Nothing -> pure unit
+          (Just user) -> setUser user
 
 -- | The application state, which in this case just stores the current text in
 -- | the editor.
