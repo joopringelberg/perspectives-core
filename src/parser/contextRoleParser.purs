@@ -15,7 +15,7 @@ import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
-import Perspectives.Resource (storePerspectEntiteitInResourceDefinitions)
+import Perspectives.PerspectEntiteit (cacheEntiteit)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
@@ -311,7 +311,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
       rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
-      liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
+      liftAffToIP $ cacheEntiteit rolId
         (PerspectRol defaultRolRecord
           { _id = rolId
           , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
@@ -388,7 +388,7 @@ context = withRoleCounting context' where
           (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
           -- Storing
-          liftAffToIP $ storePerspectEntiteitInResourceDefinitions (show instanceName)
+          liftAffToIP $ cacheEntiteit (show instanceName)
             (PerspectContext defaultContextRecord
               { _id = (show instanceName)
               , displayName  = localName
@@ -404,7 +404,7 @@ context = withRoleCounting context' where
               , rolInContext = collect rolebindings
               , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
-          liftAffToIP $ storePerspectEntiteitInResourceDefinitions ((show instanceName) <> "_buitenRol")
+          liftAffToIP $ cacheEntiteit ((show instanceName) <> "_buitenRol")
             (PerspectRol defaultRolRecord
               { _id = (show instanceName) <> "_buitenRol"
               , pspType = "model:Perspectives$BuitenRol"
@@ -464,7 +464,7 @@ definition = do
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
   rolId <- pure $ enclContext <> "$" <> localName <> maybe "0" show nrOfRoleOccurrences
-  liftAffToIP $ storePerspectEntiteitInResourceDefinitions rolId
+  liftAffToIP $ cacheEntiteit rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
       , occurrence = maybe 0 id nrOfRoleOccurrences
@@ -499,7 +499,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
-      liftAffToIP $ storePerspectEntiteitInResourceDefinitions textName
+      liftAffToIP $ cacheEntiteit textName
         (PerspectContext defaultContextRecord
           { _id = textName
           , displayName  = textName
@@ -516,7 +516,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      liftAffToIP $ storePerspectEntiteitInResourceDefinitions (textName <> "_buitenRol")
+      liftAffToIP $ cacheEntiteit (textName <> "_buitenRol")
         (PerspectRol defaultRolRecord
           { _id = textName <> "_buitenRol"
           , pspType = "model:Perspectives$BuitenRol"

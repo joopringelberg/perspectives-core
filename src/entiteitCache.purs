@@ -18,5 +18,5 @@ rolDefinitions = new unit
 contextDefinitions :: ContextDefinitions
 contextDefinitions = new unit
 
--- TODO: alleen gebruikt in createResourceInCouchdb van module Perspectives.ResourceRetrieval.
+-- TODO: alleen gebruikt in saveUnversionedEntiteit van module Perspectives.ResourceRetrieval.
 foreign import stringToRecord :: forall a. String -> {|a}

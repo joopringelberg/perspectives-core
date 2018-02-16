@@ -16,7 +16,7 @@ import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (isInNamespace, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally, setRevision)
-import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, createResourceInCouchdb)
+import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, saveEntiteit, saveUnversionedEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 
 -- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
@@ -34,65 +34,8 @@ getPerspectEntiteit id =
           pe <- fetchPerspectEntiteitFromCouchdb id
           putVar pe avar
           pure $ Just pe
+    -- ignore errors.
     \_ -> pure Nothing
-
--- | Store an internally created PerspectEntiteit for the first time in the local store.
-storePerspectEntiteitInResourceDefinitions :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AvarCache e) Unit
-storePerspectEntiteitInResourceDefinitions id e = do
-  (av :: AVar a) <- representInternally id
-  putVar e av
-  pure unit
-
--- | Modify a PerspectEntiteit in the cache.
-changePerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AvarCache e) Unit
-changePerspectEntiteit id e = do
-  mAvar <- retrieveInternally id
-  case mAvar of
-    Nothing -> throwError $ error $ "changePerspectEntiteit: cannot change an entiteit that is not cached: " <> id
-    (Just avar) -> putVar e avar
-
-{-
-	- haal AVar op
-	- indien aanwezig: breek af
-	- indien afwezig:
-		- maak AVar
-		- sla op in couchdb
-		- na afloop: vul AVar met couchdbresource inclusief revision.
--}
--- | Store a freshly created and not yet internally stored resource both internally and in couchdb.
-createPerspectEntiteitInCouchdb :: forall e a. PerspectEntiteit a => a -> Aff (AjaxAvarCache e) Unit
-createPerspectEntiteitInCouchdb pe = do
-    (mAvar :: Maybe (AVar a)) <- retrieveInternally (getId pe)
-    case mAvar of
-      Nothing -> do
-        (avar :: AVar a) <- representInternally (getId pe)
-        (rev :: String) <- createResourceInCouchdb (getId pe) (encode pe)
-        putVar (setRevision rev pe) avar
-      (Just avar) -> pure unit
-
-{-
-	- haal AVar op
-	- indien leeg, breek af (want de operatie is kennelijk al in uitvoering)
-	- anders: lees uit met takeVar
-	- sla op in couchdb, ontvang revision
-	- na afloop: vul AVar met coudhbresource met revision
--}
--- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
--- | couchdb with this function.
-storeExistingCouchdbResourceInCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
-storeExistingCouchdbResourceInCouchdb id = do
-  (mAvar :: Maybe (AVar a)) <- retrieveInternally id
-  case mAvar of
-    Nothing -> throwError $ error ("storeExistingCouchdbResourceInCouchdb needs a locally stored resource for " <> id)
-    (Just avar) -> do
-      empty <- isEmptyVar avar
-      if empty
-        then throwError $ error ("storeExistingCouchdbResourceInCouchdb needs a locally stored and filled resource for " <> id)
-        else do
-          pe <- takeVar avar
-          (rev :: String) <- createResourceInCouchdb id (encode pe)
-          putVar (setRevision rev pe) avar
-          pure pe
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> Aff (AjaxAvarCache e) DomeinFile
@@ -140,8 +83,8 @@ domeinFileFromContext c' = do
                           case mBuitenRol of
                             (Just (buitenRol :: PerspectRol)) -> if rol_pspType buitenRol == "model:Perspectives$BuitenRol"
                               then do
-                                (_ :: PerspectRol) <- lift (storeExistingCouchdbResourceInCouchdb binding)
-                                (_ :: PerspectContext) <- lift $ storeExistingCouchdbResourceInCouchdb (rol_context buitenRol)
+                                (_ :: PerspectRol) <- lift (saveEntiteit binding)
+                                (_ :: PerspectContext) <- lift $ saveEntiteit (rol_context buitenRol)
                                 pure unit
                               else pure unit
                             Nothing -> pure unit
