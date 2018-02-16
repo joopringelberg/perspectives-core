@@ -26,6 +26,9 @@ changeContext_rev rev (PerspectContext cr) = PerspectContext $ cr {_rev = toRevi
 context_rev' :: PerspectContext -> Revision
 context_rev' (PerspectContext{_rev}) = _rev
 
+changeContext_rev' :: Revision -> PerspectContext -> PerspectContext
+changeContext_rev' rev (PerspectContext cr) = PerspectContext $ cr {_rev = rev}
+
 context_displayName :: PerspectContext -> String
 context_displayName (PerspectContext{displayName})= displayName
 
@@ -108,8 +111,14 @@ rol_id (PerspectRol{_id}) = _id
 rol_rev :: PerspectRol -> Maybe String
 rol_rev (PerspectRol{_rev}) = unNullOrUndefined _rev
 
+changeRol_rev :: String -> PerspectRol -> PerspectRol
+changeRol_rev rev (PerspectRol cr) = PerspectRol $ cr {_rev = toRevision $ Just rev}
+
 rol_rev' :: PerspectRol -> Revision
 rol_rev' (PerspectRol{_rev}) = _rev
+
+changeRol_rev' :: Revision -> PerspectRol -> PerspectRol
+changeRol_rev' rev (PerspectRol cr) = PerspectRol $ cr {_rev = rev}
 
 rol_occurrence :: PerspectRol -> Int
 rol_occurrence (PerspectRol{occurrence}) = occurrence

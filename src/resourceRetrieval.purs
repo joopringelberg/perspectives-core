@@ -21,7 +21,7 @@ import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.EntiteitCache (stringToRecord)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheEntiteitAgain, decode, encode, getRevision, readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, decode, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
 
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
@@ -57,7 +57,7 @@ fetchEntiteit id = do
 saveEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 saveEntiteit id = do
   pe <- readEntiteitFromCache id
-  case unNullOrUndefined $ getRevision pe of
+  case unNullOrUndefined $ getRevision' pe of
     Nothing -> saveUnversionedEntiteit id
     otherwise -> saveVersionedEntiteit id pe
 {-
@@ -99,13 +99,13 @@ saveUnversionedEntiteit id = do
 
 saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AjaxAvarCache e) a
 saveVersionedEntiteit entId entiteit = do
-  case (unNullOrUndefined (getRevision entiteit)) of
+  case (unNullOrUndefined (getRevision' entiteit)) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
       -- Store the changed entity in couchdb.
       newRev <- modifyResourceInCouchdb entId rev (encode entiteit)
       -- Set the new revision in the entity.
-      cacheEntiteitAgain entId (setRevision newRev entiteit)
+      cacheCachedEntiteit entId (setRevision newRev entiteit)
   where
     modifyResourceInCouchdb :: forall eff.ID -> String -> String -> Aff (AjaxAvar eff) String
     modifyResourceInCouchdb resId originalRevision resource = do

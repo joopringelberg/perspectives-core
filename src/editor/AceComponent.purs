@@ -138,17 +138,18 @@ aceComponent mode theme =
       case maybeEditor of
         Nothing -> pure unit
         Just editor -> do
-          session <- H.liftEff $ Editor.getSession editor
-          (Position {row :r, column}) <- H.liftEff $ Editor.getCursorPosition editor
-          line <- H.liftEff $ getLine r session
-          previousLine <- case r == 0 of
-            true -> pure ""
-            otherwise -> H.liftEff $ getLine (r-1) session
-          errors <- H.liftAff $ errorsIn previousLine line
-          case errors of
-            (Just annotations) -> H.liftEff $ setAnnotations ((\a@{row} -> a {row = row + r}) <$> annotations) session
-            Nothing -> do
-              _ <- H.liftEff $ clearAnnotations session
+      -- TODO. Dit is verouderd en werkt niet meer. We ontvangen ALTIJD annotations.
+      --     session <- H.liftEff $ Editor.getSession editor
+      --     (Position {row :r, column}) <- H.liftEff $ Editor.getCursorPosition editor
+      --     line <- H.liftEff $ getLine r session
+      --     previousLine <- case r == 0 of
+      --       true -> pure ""
+      --       otherwise -> H.liftEff $ getLine (r-1) session
+      --     errors <- H.liftAff $ errorsIn previousLine line
+      --     case errors of
+      --       (Just annotations) -> H.liftEff $ setAnnotations ((\a@{row} -> a {row = row + r}) <$> annotations) session
+      --       Nothing -> do
+      --         _ <- H.liftEff $ clearAnnotations session
               text <- H.liftEff (Editor.getValue editor)
               H.raise $ TextChanged text
       pure (reply H.Listening)

@@ -15,14 +15,14 @@ import Perspectives.DomeinCache (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (isInNamespace, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally, setRevision)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, saveEntiteit, saveUnversionedEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 
 -- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
 getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) (Maybe a)
 getPerspectEntiteit id =
-  catchError
+  -- catchError
     do
       (av :: Maybe (AVar a)) <- retrieveInternally id
       case av of
@@ -35,7 +35,7 @@ getPerspectEntiteit id =
           putVar pe avar
           pure $ Just pe
     -- ignore errors.
-    \_ -> pure Nothing
+    -- \_ -> pure Nothing
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> Aff (AjaxAvarCache e) DomeinFile

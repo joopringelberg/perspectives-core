@@ -28,7 +28,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheEntiteitAgain)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit)
 import Perspectives.Property (getRolBinding)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, rolesOf, toBoolean, filter)
@@ -315,14 +315,14 @@ updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
 updatePerspectEntiteit' changeEntity cid value = do
   (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
-  void $ lift $ cacheEntiteitAgain cid (changeEntity value context)
+  void $ lift $ cacheCachedEntiteit cid (changeEntity value context)
   void $ lift $ saveVersionedEntiteit cid context
 
-  -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
+  -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision' context))
   -- -- Store the changed entity in couchdb.
   -- newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- -- Set the new revision in the entity.
-  -- lift $ cacheEntiteitAgain cid (setRevision newRev context)
+  -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
 setContextType :: forall e. ID -> ID -> StateT Transactie (Aff (AjaxAvarCache e)) Unit
 setContextType = updatePerspectEntiteit
@@ -401,14 +401,14 @@ updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
 updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
   (context) <- lift $ onNothing ("updateRoleProperty: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
-  void $ lift $ cacheEntiteitAgain cid (changeEntityMember context memberName value)
+  void $ lift $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
   void $ lift $ saveVersionedEntiteit cid context
 
-  -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision context))
+  -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision' context))
   -- -- Store the changed entity in couchdb.
   -- newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- -- Set the new revision in the entity.
-  -- lift $ cacheEntiteitAgain cid (setRevision newRev context)
+  -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | In a functional rol, remove an old

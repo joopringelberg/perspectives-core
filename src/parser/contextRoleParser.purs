@@ -1,6 +1,7 @@
 module Perspectives.ContextRoleParser where
 
 import Perspectives.IndentParser
+import Perspectives.EntiteitAndRDFAliases
 import Control.Alt ((<|>))
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
@@ -14,9 +15,9 @@ import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
-import Perspectives.PerspectEntiteit (cacheEntiteit)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
+import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
@@ -27,7 +28,6 @@ import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
-import Perspectives.EntiteitAndRDFAliases
 -----------------------------------------------------------
 -- Comments
 -----------------------------------------------------------
@@ -311,7 +311,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
       rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
-      liftAffToIP $ cacheEntiteit rolId
+      liftAffToIP $ cacheEntiteitPreservingVersion rolId
         (PerspectRol defaultRolRecord
           { _id = rolId
           , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
@@ -388,7 +388,7 @@ context = withRoleCounting context' where
           (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
           -- Storing
-          liftAffToIP $ cacheEntiteit (show instanceName)
+          liftAffToIP $ cacheEntiteitPreservingVersion (show instanceName)
             (PerspectContext defaultContextRecord
               { _id = (show instanceName)
               , displayName  = localName
@@ -404,7 +404,7 @@ context = withRoleCounting context' where
               , rolInContext = collect rolebindings
               , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
             })
-          liftAffToIP $ cacheEntiteit ((show instanceName) <> "_buitenRol")
+          liftAffToIP $ cacheEntiteitPreservingVersion ((show instanceName) <> "_buitenRol")
             (PerspectRol defaultRolRecord
               { _id = (show instanceName) <> "_buitenRol"
               , pspType = "model:Perspectives$BuitenRol"
@@ -464,7 +464,7 @@ definition = do
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
   rolId <- pure $ enclContext <> "$" <> localName <> maybe "0" show nrOfRoleOccurrences
-  liftAffToIP $ cacheEntiteit rolId
+  liftAffToIP $ cacheEntiteitPreservingVersion rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
       , occurrence = maybe 0 id nrOfRoleOccurrences
@@ -499,7 +499,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
       defs <- AR.many section
-      liftAffToIP $ cacheEntiteit textName
+      liftAffToIP $ cacheEntiteitPreservingVersion textName
         (PerspectContext defaultContextRecord
           { _id = textName
           , displayName  = textName
@@ -516,7 +516,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      liftAffToIP $ cacheEntiteit (textName <> "_buitenRol")
+      liftAffToIP $ cacheEntiteitPreservingVersion (textName <> "_buitenRol")
         (PerspectRol defaultRolRecord
           { _id = textName <> "_buitenRol"
           , pspType = "model:Perspectives$BuitenRol"

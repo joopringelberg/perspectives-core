@@ -5,9 +5,10 @@ import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Control.Monad.Aff (Aff, liftEff')
+import Control.Monad.Aff (Aff, liftEff', throwError)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Exception (error)
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Location (search)
