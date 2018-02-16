@@ -44,6 +44,16 @@ instance decodeDomeinFile :: Decode DomeinFile where
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile{ _rev: noRevision, _id: "", contexts: empty, roles: empty}
 
+newtype CouchdbPutResponse = CouchdbPutResponse
+  { ok :: Boolean
+  , id :: String
+  , rev :: String}
+
+derive instance genericCouchdbPutResponse :: Generic CouchdbPutResponse _
+
+instance decodeCouchdbPutResponse :: Decode CouchdbPutResponse where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
 -- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
 type DomeinFileContexts = StrMap PerspectContext
 
@@ -161,8 +171,12 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
   (res :: AffjaxResponse String)  <- put (modelsURL <> escapeCouchdbDocumentName _id) (encodeJSON df)
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
-    true -> putVar (DomeinFile (dfr {_rev = (revision res.response)})) ev
+    true -> do
+      case runExcept (decodeJSON res.response) of
+        (Left m) -> throwError $ error ("createDomeinFileInCouchdb cannot parse response from couchdb for " <> _id <> ": " <> show m)
+        (Right (CouchdbPutResponse {rev})) -> putVar (DomeinFile (dfr {_rev = (revision rev)})) ev
     false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+
 
 modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> Aff (AjaxAvar e) Unit
 modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
@@ -174,8 +188,10 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
     true -> do
-      putVar (DomeinFile (dfr {_rev = (revision res.response)})) av
-    false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+      case runExcept (decodeJSON res.response) of
+        (Left m) -> throwError $ error ("modifyDomeinFileInCouchdb cannot parse response from couchdb for " <> _id <> ": " <> show m)
+        (Right (CouchdbPutResponse {rev})) -> putVar (DomeinFile (dfr {_rev = (revision rev)})) av
+    false -> throwError $ error ("modifyDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
 modelsURL :: URL
 modelsURL = "http://localhost:5984/perspect_models/"
