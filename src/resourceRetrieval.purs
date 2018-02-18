@@ -8,7 +8,7 @@ where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, takeVar)
+import Control.Monad.Aff.AVar (AVAR, AVar, isEmptyVar, putVar, takeVar)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
@@ -23,6 +23,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, decode, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
+import Perspectives.User (getUser)
 
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
@@ -45,7 +46,8 @@ fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 fetchEntiteit id = do
   v <- representInternally id
   -- _ <- forkAff do
-  res <- affjax $ userResourceRequest {url = baseURL <> id}
+  base <- baseURL
+  res <- affjax $ userResourceRequest {url = base <> id}
   case res.status of
     StatusCode 200 ->
       case decode res.response of
@@ -61,13 +63,7 @@ saveEntiteit id = do
   case unNullOrUndefined $ getRevision' pe of
     Nothing -> saveUnversionedEntiteit id
     otherwise -> saveVersionedEntiteit id pe
-{-
-	- haal AVar op
-	- indien leeg, breek af (want de operatie is kennelijk al in uitvoering)
-	- anders: lees uit met takeVar
-	- sla op in couchdb, ontvang revision
-	- na afloop: vul AVar met coudhbresource met revision
--}
+
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
 saveUnversionedEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
@@ -81,7 +77,8 @@ saveUnversionedEntiteit id = do
         then throwError $ error ("saveUnversionedEntiteit needs a locally stored and filled resource for " <> id)
         else do
           pe <- takeVar avar
-          (res :: AffjaxResponse PutCouchdbDocument) <- put (baseURL <> escapeCouchdbDocumentName id) (encode pe)
+          base <- baseURL
+          (res :: AffjaxResponse PutCouchdbDocument) <- put (base <> escapeCouchdbDocumentName id) (encode pe)
           (StatusCode n) <- pure res.status
           case n == 200 || n == 201 of
             true -> putVar (setRevision (unwrap res.response).rev pe) avar
@@ -93,15 +90,18 @@ saveVersionedEntiteit entId entiteit = do
   case (unNullOrUndefined (getRevision' entiteit)) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
-      (res :: AffjaxResponse PutCouchdbDocument) <- put (baseURL <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
+      base <- baseURL
+      (res :: AffjaxResponse PutCouchdbDocument) <- put (base <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
       (StatusCode n) <- pure res.status
       case n == 200 || n == 201 of
         true -> cacheCachedEntiteit entId (setRevision (unwrap res.response).rev entiteit)
         false -> throwError $ error ("saveVersionedEntiteit " <> entId <> " fails: " <> (show res.status))
 
 -- TODO: gebruik de user.
-baseURL :: String
-baseURL = "http://localhost:5984/user_cor_contexts2/"
+baseURL :: forall e. Aff (avar :: AVAR | e ) String
+baseURL = do
+  usr <- getUser
+  pure $ "http://localhost:5984/user_" <> usr <> "_contexts2/"
 
 userResourceRequest :: AffjaxRequest Unit
 userResourceRequest =
