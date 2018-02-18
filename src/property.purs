@@ -1,6 +1,6 @@
 module Perspectives.Property where
 
-import Prelude
+import Prelude (bind, id, join, pure, ($))
 import Control.Monad.Aff (Aff)
 import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
@@ -11,7 +11,8 @@ import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, contex
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
-import Perspectives.EntiteitAndRDFAliases
+import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
+
 
 {-
 Property values are represented by Arrays.

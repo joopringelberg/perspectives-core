@@ -15,11 +15,12 @@ import Data.Either (Either(..))
 import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
+import Data.Newtype (unwrap)
+import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
+import Perspectives.Couchdb (PutCouchdbDocument)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.EntiteitCache (stringToRecord)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, decode, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
 
@@ -73,49 +74,30 @@ saveUnversionedEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvar
 saveUnversionedEntiteit id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error ("storeCachedButUnsafedPerspectEntiteitInCouchdb needs a locally stored resource for " <> id)
+    Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> id)
     (Just avar) -> do
       empty <- isEmptyVar avar
       if empty
-        then throwError $ error ("storeCachedButUnsafedPerspectEntiteitInCouchdb needs a locally stored and filled resource for " <> id)
+        then throwError $ error ("saveUnversionedEntiteit needs a locally stored and filled resource for " <> id)
         else do
           pe <- takeVar avar
-          (rev :: String) <- save' id (encode pe)
-          putVar (setRevision rev pe) avar
+          (res :: AffjaxResponse PutCouchdbDocument) <- put (baseURL <> escapeCouchdbDocumentName id) (encode pe)
+          (StatusCode n) <- pure res.status
+          case n == 200 || n == 201 of
+            true -> putVar (setRevision (unwrap res.response).rev pe) avar
+            false -> throwError $ error ("save' " <> id <> " fails: " <> (show res.status))
           pure pe
-  where
-
-    -- | Create a document in couchdb that is not yet there (so, no revision available!).
-    save' :: forall eff. ID -> String -> Aff (ajax :: AJAX | eff) String
-    save' resId resource =
-      do
-        -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
-        res <- put (baseURL <> escapeCouchdbDocumentName resId) resource
-        (StatusCode n) <- pure res.status
-        case n == 200 || n == 201 of
-          true ->
-            pure $ _.rev $ stringToRecord res.response
-          false -> throwError $ error ("save' " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
 
 saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AjaxAvarCache e) a
 saveVersionedEntiteit entId entiteit = do
   case (unNullOrUndefined (getRevision' entiteit)) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
-      -- Store the changed entity in couchdb.
-      newRev <- modifyResourceInCouchdb entId rev (encode entiteit)
-      -- Set the new revision in the entity.
-      cacheCachedEntiteit entId (setRevision newRev entiteit)
-  where
-    modifyResourceInCouchdb :: forall eff.ID -> String -> String -> Aff (AjaxAvar eff) String
-    modifyResourceInCouchdb resId originalRevision resource = do
-      -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
-      (res :: AffjaxResponse String) <- put (baseURL <> escapeCouchdbDocumentName resId <> "?_rev=" <> originalRevision) resource
+      (res :: AffjaxResponse PutCouchdbDocument) <- put (baseURL <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
       (StatusCode n) <- pure res.status
       case n == 200 || n == 201 of
-        true -> do
-          pure $ _.rev $ stringToRecord res.response
-        false -> throwError $ error ("modifyResourceInCouchdb " <> resId <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+        true -> cacheCachedEntiteit entId (setRevision (unwrap res.response).rev entiteit)
+        false -> throwError $ error ("saveVersionedEntiteit " <> entId <> " fails: " <> (show res.status))
 
 -- TODO: gebruik de user.
 baseURL :: String

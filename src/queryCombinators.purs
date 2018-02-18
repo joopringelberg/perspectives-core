@@ -3,16 +3,15 @@ module Perspectives.QueryCombinators where
 import Control.Monad.Aff (Aff)
 import Control.Monad.State (StateT, put, get)
 import Control.Monad.State.Trans (evalStateT)
-import Data.Array (cons, difference, elemIndex, foldr, head, index, null, union, (!!))
-import Data.Boolean (otherwise)
+import Data.Array (cons, difference, elemIndex, foldr, head, null, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, RolName, ID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.Property (ObjectsGetter, getRol)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, FlexTriple, getRef, memorize, tripleObjects)
-import Perspectives.TripleGetter (applyNamedFunction, constructRolGetter, constructTripleGetterFromArbitraryFunction)
-import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>), (>>=))
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
+import Perspectives.TripleGetter (constructTripleGetterFromArbitraryFunction)
+import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
 
 closure :: forall e.
   NamedFunction (TripleGetter e) ->

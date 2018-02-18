@@ -1,22 +1,20 @@
 module Perspectives.Resource where
 
 import Prelude
-import Control.Monad.Aff (Aff, catchError)
-import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, readVar, takeVar)
+import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.AVar (AVar, putVar, readVar)
 import Control.Monad.Eff (kind Effect)
-import Control.Monad.Eff.Exception (error)
-import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, execStateT, lift, modify)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (insert)
 import Perspectives.ContextAndRole (context_id, context_rev, context_rolInContext, rol_binding, rol_context, rol_id, rol_pspType)
 import Perspectives.DomeinCache (DomeinFile(..), defaultDomeinFile)
-import Perspectives.Effects (AjaxAvarCache, AvarCache)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (isInNamespace, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, encode, getId, representInternally, retrieveInternally)
-import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, saveEntiteit, saveUnversionedEntiteit)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, representInternally, retrieveInternally)
+import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 
 -- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
