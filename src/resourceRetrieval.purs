@@ -8,7 +8,7 @@ where
 
 import Prelude
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR, AVar, isEmptyVar, putVar, takeVar)
+import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, takeVar)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
@@ -19,7 +19,7 @@ import Data.Newtype (unwrap)
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.Couchdb (PutCouchdbDocument)
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, decode, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
@@ -46,6 +46,7 @@ fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 fetchEntiteit id = do
   v <- representInternally id
   -- _ <- forkAff do
+  usr <- getUser
   base <- baseURL
   res <- affjax $ userResourceRequest {url = base <> id}
   case res.status of
@@ -98,10 +99,8 @@ saveVersionedEntiteit entId entiteit = do
         false -> throwError $ error ("saveVersionedEntiteit " <> entId <> " fails: " <> (show res.status))
 
 -- TODO: gebruik de user.
-baseURL :: forall e. Aff (avar :: AVAR | e ) String
-baseURL = do
-  usr <- getUser
-  pure $ "http://localhost:5984/user_" <> usr <> "_contexts2/"
+baseURL :: forall e. Aff (AvarCache e ) String
+baseURL = getUser >>= \usr -> pure $ "http://localhost:5984/user_" <> usr <> "_contexts2/"
 
 userResourceRequest :: AffjaxRequest Unit
 userResourceRequest =

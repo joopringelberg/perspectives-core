@@ -6,7 +6,6 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Control.Monad.Aff (Aff, liftEff')
-import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff)
 import DOM (DOM)
 import DOM.HTML (window)
@@ -25,7 +24,7 @@ import Perspectives.ContextRoleParser (enclosingContext) as CRP
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect)
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
@@ -40,7 +39,7 @@ main = HA.runHalogenAff do
   body <- HA.awaitBody
   runUI ui unit body
 
-userFromLocation :: forall e. Aff (dom :: DOM, avar :: AVAR | e ) Unit
+userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) Unit
 userFromLocation = do
   parseResult <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
   case parseResult of
