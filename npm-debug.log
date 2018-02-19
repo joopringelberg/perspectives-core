@@ -1,0 +1,19 @@
+0 info it worked if it ends with ok
+1 verbose cli [ '/Users/joopringelberg/.nvm/versions/node/v6.5.0/bin/node',
+1 verbose cli   '/Users/joopringelberg/.nvm/versions/node/v6.5.0/bin/npm',
+1 verbose cli   'explore',
+1 verbose cli   'atom-ide-purescript' ]
+2 info using npm@3.10.3
+3 info using node@v6.5.0
+4 verbose stack Error: It doesn't look like atom-ide-purescript is installed.
+4 verbose stack     at /Users/joopringelberg/.nvm/versions/node/v6.5.0/lib/node_modules/npm/lib/explore.js:40:17
+4 verbose stack     at FSReqWrap.oncomplete (fs.js:123:15)
+5 verbose cwd /Users/joopringelberg/Code/perspectivesInPurescript
+6 error Darwin 16.4.0
+7 error argv "/Users/joopringelberg/.nvm/versions/node/v6.5.0/bin/node" "/Users/joopringelberg/.nvm/versions/node/v6.5.0/bin/npm" "explore" "atom-ide-purescript"
+8 error node v6.5.0
+9 error npm  v3.10.3
+10 error It doesn't look like atom-ide-purescript is installed.
+11 error If you need help, you may report this error at:
+11 error     <https://github.com/npm/npm/issues>
+12 verbose exit [ 1, true ]

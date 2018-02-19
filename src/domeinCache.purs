@@ -19,15 +19,14 @@ import Data.StrMap (StrMap, empty, lookup)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
-import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument)
+import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
 import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.Syntax (PerspectContext, PerspectRol, Revision, fromRevision, noRevision, revision)
-import Prelude (Unit, bind, pure, show, unit, ($), (*>), (<$>), (<>), (==), (||))
+import Prelude (Unit, bind, pure, unit, ($), (*>), (<$>), (<>), discard)
 
 newtype DomeinFile = DomeinFile
   { _rev :: Revision
@@ -96,10 +95,7 @@ retrieveDomeinFile ns = do
       -- forkAff hinders catchError.
       -- _ <- forkAff do
       res <- affjax $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns}
-      _ <- case res.status of
-        StatusCode 200 ->
-          putVar res.response ev
-        otherwise -> throwError $ error ("retrieveDomeinFile " <> ns <> " fails: " <> (show res.status))
+      onAccepted res.status [200, 304] "retrieveDomeinFile" $ putVar res.response ev
       readVar ev
     (Just avar) -> readVar avar
 
@@ -109,9 +105,8 @@ type DatabaseName = String
 documentsInDatabase :: forall e. DatabaseName -> Aff (ajax :: AJAX | e) GetCouchdbAllDocs
 documentsInDatabase database = do
   res <- affjax $ domeinRequest {url = baseURL <> escapeCouchdbDocumentName database <> "/_all_docs"}
-  case res.status of
-    StatusCode 200 -> pure res.response
-    otherwise -> throwError $ error ("documentsInDatabase " <> database <> " fails: " <> (show res.status))
+  onAccepted res.status [200] "documentsInDatabase"
+    $ pure res.response
 
 documentNamesInDatabase :: forall e. DatabaseName -> Aff (ajax :: AJAX | e) (Array String)
 documentNamesInDatabase database = do
@@ -130,25 +125,20 @@ createDomeinFileInCouchdb :: forall e. DomeinFile -> Aff (AjaxAvarCache e) Unit
 createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
   ev <- makeEmptyVar
   _ <- liftEff $ poke domeinCache _id ev
-  -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
   (res :: AffjaxResponse PutCouchdbDocument)  <- put (modelsURL <> escapeCouchdbDocumentName _id) (encodeJSON df)
-  (StatusCode n) <- pure res.status
-  case n == 200 || n == 201 of
-    true -> putVar (DomeinFile (dfr {_rev = (revision (_.rev (unwrap res.response)))})) ev
-    false -> throwError $ error ("createDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status))
-
+  onAccepted res.status [200, 201] "createDomeinFileInCouchdb"
+    $ putVar (DomeinFile (dfr {_rev = (revision (_.rev (unwrap res.response)))})) ev
 
 modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> Aff (AjaxAvar e) Unit
 modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   (DomeinFile {_rev}) <- readVar av
   originalRevision <- pure $ unsafePartial $ fromJust $ fromRevision _rev
   oldDf <- takeVar av
-  -- TODO. Misschien een uitgebreidere analyse van de statuscodes? Zie http://127.0.0.1:5984/_utils/docs/api/document/common.html
-  (res :: AffjaxResponse PutCouchdbDocument) <- put (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision) (encodeJSON (DomeinFile dfr {_rev = _rev}))
-  (StatusCode n) <- pure res.status
-  case n == 200 || n == 201 of
-    true -> putVar (DomeinFile (dfr {_rev = (revision (_.rev (unwrap res.response)))})) av
-    false -> throwError $ error ("modifyDomeinFileInCouchdb " <> _id <> " fails: " <> (show res.status))
+  (res :: AffjaxResponse PutCouchdbDocument) <- put
+    (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision)
+    (encodeJSON (DomeinFile dfr {_rev = _rev}))
+  onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb"
+    $ putVar (DomeinFile (dfr {_rev = (revision (_.rev (unwrap res.response)))})) av
 
 modelsURL :: URL
 modelsURL = "http://localhost:5984/perspect_models/"
