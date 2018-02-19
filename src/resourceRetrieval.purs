@@ -17,7 +17,6 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
-import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
@@ -73,10 +72,8 @@ saveUnversionedEntiteit id = do
           pe <- takeVar avar
           base <- baseURL
           (res :: AffjaxResponse PutCouchdbDocument) <- put (base <> escapeCouchdbDocumentName id) (encode pe)
-          (StatusCode n) <- pure res.status
-          case n == 200 || n == 201 of
-            true -> putVar (setRevision (unwrap res.response).rev pe) avar
-            false -> throwError $ error ("save' " <> id <> " fails: " <> (show res.status))
+          onAccepted res.status [200, 201] "saveUnversionedEntiteit"
+            $ putVar (setRevision (unwrap res.response).rev pe) avar
           pure pe
 
 saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AjaxAvarCache e) a
@@ -86,12 +83,9 @@ saveVersionedEntiteit entId entiteit = do
     (Just rev) -> do
       base <- baseURL
       (res :: AffjaxResponse PutCouchdbDocument) <- put (base <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
-      (StatusCode n) <- pure res.status
-      case n == 200 || n == 201 of
-        true -> cacheCachedEntiteit entId (setRevision (unwrap res.response).rev entiteit)
-        false -> throwError $ error ("saveVersionedEntiteit " <> entId <> " fails: " <> (show res.status))
+      onAccepted res.status [200, 201] "saveUnversionedEntiteit"
+        $ cacheCachedEntiteit entId (setRevision (unwrap res.response).rev entiteit)
 
--- TODO: gebruik de user.
 baseURL :: forall e. Aff (AvarCache e ) String
 baseURL = getUser >>= \usr -> pure $ "http://localhost:5984/user_" <> usr <> "_contexts2/"
 
