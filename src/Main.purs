@@ -29,13 +29,15 @@ import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
-import Perspectives.User (setUser)
+import Perspectives.User (setCouchdbBaseURL, setCouchdbPassword, setUser)
 import Text.Parsing.StringParser (runParser)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects (AjaxAvarCache ()))) Unit
 main = HA.runHalogenAff do
   userFromLocation
+  setCouchdbPassword "geheim"
+  setCouchdbBaseURL "http://127.0.0.1:5984/"
   body <- HA.awaitBody
   runUI ui unit body
 

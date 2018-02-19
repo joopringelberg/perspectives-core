@@ -3,18 +3,30 @@ module Perspectives.Couchdb where
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
+import Data.Argonaut.Core (JObject)
 import Data.Array (elemIndex)
 import Data.Foreign.Class (class Decode)
-import Data.Foreign.Generic (defaultOptions, genericDecode)
+import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map, fromFoldable, lookup)
 import Data.Maybe (Maybe(..))
+import Data.Monoid (mempty)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
+import Network.HTTP.Affjax.Request (class Requestable, RequestContent(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Network.HTTP.StatusCode (StatusCode(..))
 import Prelude (show, ($), (<>))
+
+-----------------------------------------------------------
+-- ALIASES
+-----------------------------------------------------------
+-- | URL terminated with a forward slash, e.g. http://www.perspectives.nl/.
+type TerminatedURL = String
+type User = String
+type Password = String
+type DatabaseName = String
 
 -----------------------------------------------------------
 -- DOCUMENT
@@ -65,6 +77,21 @@ instance decodeRev :: Decode Rev where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
+-- AUTHENTICATION
+-----------------------------------------------------------
+newtype PostCouchdb_session = PostCouchdb_session
+  { ok :: String
+  , name :: User
+  , roles :: Array String
+  }
+
+derive instance genericPostCouchdb_session :: Generic PostCouchdb_session _
+derive instance newtypePostCouchdb_session :: Newtype PostCouchdb_session _ 
+instance respondablePostCouchdb_session :: Respondable PostCouchdb_session where
+  responseType = Tuple Nothing JSONResponse
+  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+-----------------------------------------------------------
 -- STATUS CODES
 -----------------------------------------------------------
 
@@ -93,8 +120,20 @@ couchdDBStatusCodes = fromFoldable
 -- onAccepted :: forall m a. MonadError Error m => StatusCode -> Array Int -> String -> m a -> m a
 onAccepted :: forall a e. StatusCode -> Array Int -> String -> Aff e a -> Aff e a
 onAccepted (StatusCode n) statusCodes fname f = case elemIndex n statusCodes of
-  Nothing -> do
-    case lookup n couchdDBStatusCodes of
-      (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
-      Nothing ->  throwError $ error $ "Failure in " <> fname <> ". " <> "Unknown HTTP statuscode " <> show n
+  Nothing -> handleError n mempty fname
   otherwise -> f
+
+onAccepted' :: forall a e. CouchdbStatusCodes -> StatusCode -> Array Int -> String -> Aff e a -> Aff e a
+onAccepted' specialCodes (StatusCode n) statusCodes fname f = case elemIndex n statusCodes of
+  Nothing -> do
+    handleError n specialCodes fname
+  otherwise -> f
+
+handleError :: forall a e. Int -> CouchdbStatusCodes -> String -> Aff e a
+handleError n statusCodes fname =
+  case lookup n statusCodes of
+    (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
+    Nothing ->
+      case lookup n couchdDBStatusCodes of
+        (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
+        Nothing -> throwError $ error $ "Failure in " <> fname <> ". " <> "Unknown HTTP statuscode " <> show n
