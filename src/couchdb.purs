@@ -1,8 +1,8 @@
 module Perspectives.Couchdb where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Exception (Error, error)
-import Control.Monad.Error.Class (class MonadError, throwError)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Error.Class (throwError)
 import Data.Array (elemIndex)
 import Data.Foreign.Class (class Decode)
 import Data.Foreign.Generic (defaultOptions, genericDecode)

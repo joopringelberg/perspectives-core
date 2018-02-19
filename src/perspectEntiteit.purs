@@ -10,6 +10,7 @@ import Data.Foreign (MultipleErrors)
 import Data.Foreign.Class (class Encode, class Decode)
 import Data.Foreign.Generic (decodeJSON, encodeJSON)
 import Data.Maybe (Maybe(..))
+import Network.HTTP.Affjax.Response (class Respondable)
 import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', changeContext_type, changeRol_rev, changeRol_rev', changeRol_type, context_id, context_pspType, context_rev', rol_id, rol_pspType, rol_rev')
 import Perspectives.DomeinCache (retrieveContextFromDomein, retrieveRolFromDomein)
 import Perspectives.Effects (AvarCache, AjaxAvarCache)
@@ -20,7 +21,7 @@ import Perspectives.Identifiers (Namespace)
 import Perspectives.Syntax (PerspectContext, PerspectRol, Revision)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>))
 
-class (Encode a, Decode a) <=  PerspectEntiteit a where
+class (Encode a, Decode a, Respondable a) <=  PerspectEntiteit a where
   getRevision' :: a -> Revision
   setRevision' :: Revision -> a -> a
   setRevision :: String -> a -> a

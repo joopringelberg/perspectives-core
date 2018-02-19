@@ -1,5 +1,6 @@
 module Perspectives.Syntax where
 
+import Perspectives.EntiteitAndRDFAliases
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
@@ -7,8 +8,9 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap)
+import Data.Tuple (Tuple(..))
+import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
-import Perspectives.EntiteitAndRDFAliases
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
@@ -37,6 +39,10 @@ instance encodePerspectContext :: Encode PerspectContext where
 
 instance decodePerspectContext :: Decode PerspectContext where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance respondablePerspectContext :: Respondable PerspectContext where
+  responseType = Tuple Nothing JSONResponse
+  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
 -- PERSPECTROL
@@ -67,6 +73,10 @@ instance encodePerspectRol :: Encode PerspectRol where
 
 instance decodePerspectRol :: Decode PerspectRol where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance respondablePerspectRol :: Respondable PerspectRol where
+  responseType = Tuple Nothing JSONResponse
+  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
 -- REVISION, BINDING

@@ -18,11 +18,11 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Couchdb (PutCouchdbDocument)
+import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, decode, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
 import Perspectives.User (getUser)
 
 
@@ -46,17 +46,10 @@ fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 fetchEntiteit id = do
   v <- representInternally id
   -- _ <- forkAff do
-  usr <- getUser
   base <- baseURL
-  res <- affjax $ userResourceRequest {url = base <> id}
-  case res.status of
-    StatusCode 200 ->
-      case decode res.response of
-        (Left message) -> throwError $ error (show message <> " (" <> id <> ")")
-        (Right pe) -> putVar pe v
-    otherwise -> throwError $ error ("fetchEntiteit " <> id <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+  (res :: AffjaxResponse a) <- affjax $ userResourceRequest {url = base <> id}
+  onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
   takeVar v
-
 
 saveEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
 saveEntiteit id = do

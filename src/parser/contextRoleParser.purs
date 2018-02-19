@@ -1,6 +1,6 @@
 module Perspectives.ContextRoleParser where
 
-import Perspectives.IndentParser
+import Perspectives.IndentParser (IP, extendNamespace, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection)
 import Perspectives.EntiteitAndRDFAliases
 import Control.Alt ((<|>))
 import Control.Monad.State (get, gets)
