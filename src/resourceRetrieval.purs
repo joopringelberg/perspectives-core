@@ -4,11 +4,11 @@ module Perspectives.ResourceRetrieval
 , saveVersionedEntiteit
 , saveEntiteit
   )
-where
+where 
 
 import Prelude
-import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, takeVar)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
@@ -23,12 +23,13 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.User (entitiesDatabase)
 
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
 -- TODO rename
-fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
+fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 fetchPerspectEntiteitFromCouchdb id = if isUserURI id
   then fetchEntiteit id
   else if isQualifiedWithDomein id
@@ -42,16 +43,16 @@ fetchPerspectEntiteitFromCouchdb id = if isUserURI id
       else throwError $ error ("fetchPerspectEntiteitFromCouchdb: Unknown URI structure for " <> id)
 
 -- | Fetch the definition of a resource asynchronously.
-fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
+fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 fetchEntiteit id = do
   v <- representInternally id
   -- _ <- forkAff do
   ebase <- entitiesDatabase
-  (res :: AffjaxResponse a) <- affjax $ userResourceRequest {url = ebase <> id}
-  onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
-  takeVar v
+  (res :: AffjaxResponse a) <- liftAff $ affjax $ userResourceRequest {url = ebase <> id}
+  liftAff $ onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
+  liftAff $ takeVar v
 
-saveEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
+saveEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 saveEntiteit id = do
   pe <- readEntiteitFromCache id
   case unNullOrUndefined $ getRevision' pe of
@@ -60,30 +61,30 @@ saveEntiteit id = do
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
-saveUnversionedEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) a
+saveUnversionedEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 saveUnversionedEntiteit id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
     Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> id)
     (Just avar) -> do
-      empty <- isEmptyVar avar
+      empty <- liftAff $ isEmptyVar avar
       if empty
         then throwError $ error ("saveUnversionedEntiteit needs a locally stored and filled resource for " <> id)
         else do
-          pe <- takeVar avar
+          pe <- liftAff $ takeVar avar
           ebase <- entitiesDatabase
-          (res :: AffjaxResponse PutCouchdbDocument) <- put (ebase <> escapeCouchdbDocumentName id) (encode pe)
-          onAccepted res.status [200, 201] "saveUnversionedEntiteit"
+          (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName id) (encode pe)
+          liftAff $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
             $ putVar (setRevision (unwrap res.response).rev pe) avar
           pure pe
 
-saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> Aff (AjaxAvarCache e) a
+saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AjaxAvarCache e) a
 saveVersionedEntiteit entId entiteit = do
   case (unNullOrUndefined (getRevision' entiteit)) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
       ebase <- entitiesDatabase
-      (res :: AffjaxResponse PutCouchdbDocument) <- put (ebase <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
+      (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
       onAccepted res.status [200, 201] "saveUnversionedEntiteit"
         $ cacheCachedEntiteit entId (setRevision (unwrap res.response).rev entiteit)
 

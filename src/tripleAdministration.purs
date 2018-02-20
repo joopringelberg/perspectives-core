@@ -1,23 +1,18 @@
 module Perspectives.TripleAdministration where
 
-import Control.Monad.Aff (Aff)
+import Perspectives.EntiteitAndRDFAliases
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State (StateT, get)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
+import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults)
 import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==))
-import Perspectives.EntiteitAndRDFAliases
 
 -- type TripleGetter e = Subject -> Aff (AjaxAvarCache e) (Triple e)
 
--- | If UseCache == true, we will look up a result in the triple cache
--- | before computing it.
-type UseCache = Boolean
-
-type FlexTriple e = StateT UseCache (Aff (AjaxAvarCache e)) (Triple e)
+type FlexTriple e = MonadPerspectives (AjaxAvarCache e) (Triple e)
 
 type TripleGetter e = Subject -> FlexTriple e
 
@@ -117,7 +112,7 @@ ensureResource rid = do
 
 memorize :: forall e. TripleGetter e -> String -> NamedFunction (TripleGetter e)
 memorize getter name = NamedFunction name \id -> do
-  remember <- get
+  remember <- memorizeQueryResults
   case remember of
     true -> do
       mt <- liftEff (lookupInTripleIndex id name)

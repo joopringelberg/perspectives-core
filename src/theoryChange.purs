@@ -4,7 +4,6 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State (StateT)
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -13,6 +12,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Subject, Predicate)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.TripleAdministration (FlexTriple, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), (<<<), (>>=))
@@ -37,12 +37,12 @@ type TripleQueue e = Array (Triple e)
 addToQueue :: forall e. TripleQueue e -> Array (Triple e) -> TripleQueue e
 addToQueue q triples = union q (sortBy dependsOn (difference triples q))
 
-updateFromSeeds :: forall e. Array (Triple e) -> StateT Boolean (Aff (AjaxAvarCache e)) (Array String)
+updateFromSeeds :: forall e. Array (Triple e) -> MonadPerspectives (AjaxAvarCache e) (Array String)
 updateFromSeeds ts = do
   x <- liftEff (traverse getDependencies ts)
   propagateTheoryDeltas (join x)
 
-propagateTheoryDeltas :: forall e. TripleQueue e -> StateT Boolean (Aff (AjaxAvarCache e)) (Array String)
+propagateTheoryDeltas :: forall e. TripleQueue e -> MonadPerspectives (AjaxAvarCache e) (Array String)
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do

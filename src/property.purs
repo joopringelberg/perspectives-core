@@ -1,7 +1,5 @@
 module Perspectives.Property where
 
-import Prelude (bind, id, join, pure, ($))
-import Control.Monad.Aff (Aff)
 import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
@@ -9,9 +7,11 @@ import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
-import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
+import Prelude (bind, id, join, pure, ($))
 
 
 {-
@@ -19,9 +19,9 @@ Property values are represented by Arrays.
 We need functions that give us an array of values for a given property for a given resource.
 -}
 
-type ObjectsGetter e = ID -> Aff (AjaxAvarCache e) (Array String)
+type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array String)
 
-type ObjectGetter e = ID -> Aff (AjaxAvarCache e) String
+type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
 
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
 getContextMember f c = do
@@ -31,7 +31,7 @@ getContextMember f c = do
     otherwise -> pure []
 
 -- Even though members of a context will always be present, the context itself may not. Hence we return a Maybe value.
-getContextMember' :: forall a e. (PerspectContext -> a) -> (ID -> Aff (AjaxAvarCache e) (Maybe a))
+getContextMember' :: forall a e. (PerspectContext -> a) -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe a))
 getContextMember' f c = do
   maybeContext <- getPerspectEntiteit c
   case maybeContext of
@@ -46,7 +46,7 @@ getBuitenRol :: forall e. ObjectsGetter e
 getBuitenRol = getContextMember \c -> [context_buitenRol c]
 
 -- Returns Nothing if the context does not exist.
-getBuitenRol' :: forall e. ID -> Aff (AjaxAvarCache e) (Maybe String)
+getBuitenRol' :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String)
 getBuitenRol' = getContextMember' \c -> context_buitenRol c
 
 getRol :: forall e. RolName -> ObjectsGetter e

@@ -1,42 +1,43 @@
 module Perspectives.Resource where
 
 import Prelude
-import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar, putVar, readVar)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (insert)
 import Perspectives.ContextAndRole (context_id, context_rev, context_rolInContext, rol_binding, rol_context, rol_id, rol_pspType)
-import Perspectives.DomeinCache (DomeinFile(..), defaultDomeinFile)
+import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (isInNamespace, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, representInternally, retrieveInternally)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 
 -- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
-getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> Aff (AjaxAvarCache e) (Maybe a)
+getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) (Maybe a)
 getPerspectEntiteit id =
   -- catchError
     do
       (av :: Maybe (AVar a)) <- retrieveInternally id
       case av of
         (Just avar) -> do
-          pe <- readVar avar
+          pe <- liftAff $ readVar avar
           pure $ Just pe
         Nothing -> do
           (avar :: (AVar a)) <- representInternally id
           pe <- fetchPerspectEntiteitFromCouchdb id
-          putVar pe avar
+          liftAff $ putVar pe avar
           pure $ Just pe
     -- ignore errors.
     -- \_ -> pure Nothing
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
-domeinFileFromContext :: forall e. PerspectContext -> Aff (AjaxAvarCache e) DomeinFile
+domeinFileFromContext :: forall e. PerspectContext -> MonadPerspectives (AjaxAvarCache e) DomeinFile
 domeinFileFromContext c' = do
   (DomeinFile df) <- execStateT (collect c') defaultDomeinFile
   -- pure { _id : context_id c'
@@ -45,7 +46,10 @@ domeinFileFromContext c' = do
   --   }
   pure $ DomeinFile $ df {_rev = revision' (context_rev c'), _id = (context_id c')}
   where
-    collect :: PerspectContext -> StateT DomeinFile (Aff (AjaxAvarCache e)) Unit
+    -- TODO. Je kunt hier niet het type synoniem MonadPerspectives gebruiken, want de compiler klaagt dan over
+    -- PartiallyAppliedSynonym: Type synonym Perspectives.PerspectivesState.MonadPerspectives is partially applied.
+    -- Type synonyms must be applied to all of their type arguments.
+    collect :: PerspectContext -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Unit
     collect c = do
       modify $ insertContext  c
       for_ (context_rolInContext c)

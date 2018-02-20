@@ -4,7 +4,7 @@ import Control.Monad (class Monad)
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.State (StateT, get, modify)
-import Control.Monad.State.Trans (evalStateT)
+import Control.Monad.State.Trans (evalStateT, lift)
 import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
 import Data.Array (catMaybes, elemIndex, replicate, sortBy)
@@ -16,13 +16,14 @@ import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
-import Perspectives.Identifiers (isInNamespace, roleIndexNr)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
+import Perspectives.Identifiers (isInNamespace, roleIndexNr)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Perspectives.EntiteitAndRDFAliases( Comment, ID, PropertyName)
 import Perspectives.SystemQueries (binding, rolContext, rolTypen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
@@ -30,7 +31,7 @@ import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), 
 
 type IndentLevel = Int
 
-type PerspectText' e = StateT IndentLevel (WriterT String (Aff (AjaxAvarCache e)))
+type PerspectText' e = StateT IndentLevel (WriterT String (MonadPerspectives (AjaxAvarCache e)))
 
 type PerspectText e = PerspectText' e Unit
 
@@ -69,10 +70,10 @@ comment' c = identifier' ( "--" <> c)
 -- prettyPrintContext :: PerspectContext -> String
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
 
-prettyPrint :: forall a e. a -> PrettyPrinter a e -> Aff (AjaxAvarCache e) String
+prettyPrint :: forall a e. a -> PrettyPrinter a e -> MonadPerspectives (AjaxAvarCache e) String
 prettyPrint t pp = prettyPrint' $ pp t
 
-prettyPrint' :: forall e. PerspectText e -> Aff (AjaxAvarCache e) String
+prettyPrint' :: forall e. PerspectText e -> MonadPerspectives (AjaxAvarCache e) String
 prettyPrint' t = do
   x <- runWriterT (evalStateT t 0)
   pure $ snd x
@@ -160,9 +161,9 @@ context definedResources c = do
       case elemIndex binding definedResources of
         -- binding is NOT a BuitenRol of a context defined at top level in the Text.
         Nothing -> do
-          maybeRol <- liftAff $ getPerspectEntiteit binding
+          maybeRol <- getPerspectEntiteit binding
           case maybeRol of
-            Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
+            Nothing -> lift $ comment $ "Binding does not exist: " <> binding -- Error situation!
             (Just boundRol@(PerspectRol bindingProperties)) -> do
               case rol_pspType boundRol == "model:Perspectives$BuitenRol" of
                 -- boundRol is a BuitenRol of some context.

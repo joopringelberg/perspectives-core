@@ -1,13 +1,11 @@
 module Perspectives.QueryCombinators where
 
-import Control.Monad.Aff (Aff)
-import Control.Monad.State (StateT, put, get)
-import Control.Monad.State.Trans (evalStateT)
 import Data.Array (cons, difference, elemIndex, foldr, head, null, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
+import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.Property (ObjectsGetter, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
 import Perspectives.TripleGetter (constructTripleGetterFromArbitraryFunction)
@@ -112,7 +110,7 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter nam
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
-isNothing :: forall e. Triple e -> StateT Boolean (Aff (AjaxAvarCache e)) (Triple e)
+isNothing :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Triple e)
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
 hasValue :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
@@ -125,9 +123,9 @@ hasValue (NamedFunction nameOfp p) = memorize getter name where
   name = "(hasValue " <> nameOfp <> ")"
 
 -- | Construct a function that returns a bool in Aff, from a TripleGetter.
-toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> Aff (AjaxAvarCache e) Boolean
+toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> MonadPerspectives (AjaxAvarCache e) Boolean
 toBoolean (NamedFunction nameOfp p) r = do
-  result <- evalStateT (p r) true
+  result <- p r
   arrWithBool <- pure $ tripleObjects result
   case head arrWithBool of
     Nothing -> pure false
@@ -144,7 +142,7 @@ contains :: forall e. ID -> NamedFunction (TripleGetter e) -> NamedFunction (Tri
 contains id' (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunction ("model:Perspectives$contains" <> id') f where
   f :: ObjectsGetter e
   f id = do
-    (Triple{object}) <- evalStateT (p id) true
+    (Triple{object}) <- p id
     case elemIndex id' object of
       Nothing -> pure ["false"]
       otherwise -> pure ["true"]
@@ -154,10 +152,10 @@ ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (Triple
 ignoreCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
   go r =
     do
-      remember <- get
-      put false
+      remember <- memorizeQueryResults
+      setMemorizeQueryResults false
       result <- p r
-      put remember
+      setMemorizeQueryResults remember
       pure result
 
 -- | Use the cache of query results for the given named function.
@@ -165,8 +163,8 @@ useCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGet
 useCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
   go r =
     do
-      remember <- get
-      put true
+      remember <- memorizeQueryResults
+      setMemorizeQueryResults true
       result <- p r
-      put remember
+      setMemorizeQueryResults remember
       pure result

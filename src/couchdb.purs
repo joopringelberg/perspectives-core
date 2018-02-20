@@ -1,8 +1,9 @@
 module Perspectives.Couchdb where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Eff.Exception (error)
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Aff.Class (class MonadAff)
+import Control.Monad.Eff.Exception (Error, error)
+import Control.Monad.Error.Class (class MonadError, class MonadThrow, throwError)
 import Data.Argonaut.Core (JObject)
 import Data.Array (elemIndex)
 import Data.Foreign.Class (class Decode)
@@ -17,7 +18,8 @@ import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Request (class Requestable, RequestContent(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Network.HTTP.StatusCode (StatusCode(..))
-import Prelude (show, ($), (<>))
+import Perspectives.PerspectivesState (MonadPerspectives)
+import Prelude (class Monad, show, ($), (<>))
 
 -----------------------------------------------------------
 -- ALIASES
@@ -86,7 +88,7 @@ newtype PostCouchdb_session = PostCouchdb_session
   }
 
 derive instance genericPostCouchdb_session :: Generic PostCouchdb_session _
-derive instance newtypePostCouchdb_session :: Newtype PostCouchdb_session _ 
+derive instance newtypePostCouchdb_session :: Newtype PostCouchdb_session _
 instance respondablePostCouchdb_session :: Respondable PostCouchdb_session where
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
@@ -118,18 +120,18 @@ couchdDBStatusCodes = fromFoldable
   ]
 
 -- onAccepted :: forall m a. MonadError Error m => StatusCode -> Array Int -> String -> m a -> m a
-onAccepted :: forall a e. StatusCode -> Array Int -> String -> Aff e a -> Aff e a
+onAccepted :: forall a m. MonadError Error m => StatusCode -> Array Int -> String -> m a -> m a
 onAccepted (StatusCode n) statusCodes fname f = case elemIndex n statusCodes of
   Nothing -> handleError n mempty fname
   otherwise -> f
 
-onAccepted' :: forall a e. CouchdbStatusCodes -> StatusCode -> Array Int -> String -> Aff e a -> Aff e a
+onAccepted' :: forall a m. MonadError Error m => CouchdbStatusCodes -> StatusCode -> Array Int -> String -> m a -> m a
 onAccepted' specialCodes (StatusCode n) statusCodes fname f = case elemIndex n statusCodes of
   Nothing -> do
     handleError n specialCodes fname
   otherwise -> f
 
-handleError :: forall a e. Int -> CouchdbStatusCodes -> String -> Aff e a
+handleError :: forall a m. MonadError Error m => Int -> CouchdbStatusCodes -> String -> m a
 handleError n statusCodes fname =
   case lookup n statusCodes of
     (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
