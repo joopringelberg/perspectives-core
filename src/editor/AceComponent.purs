@@ -7,11 +7,11 @@ import Ace.Editor as Editor
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import DOM (DOM)
 import Ace.Document (getLine, onChange) as Document
 import Ace.EditSession (clearAnnotations, getDocument, getLine, setAnnotations, setUseSoftTabs)
 import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), Editor, Position(..), Tokenizer)
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
@@ -56,10 +56,10 @@ data AceQuery a
 data AceOutput = TextChanged String
 
 -- | Effects embedding the Ace editor requires.
-type AceEffects eff = (ace :: ACE, avar :: AVAR, console :: CONSOLE | eff)
+type AceEffects eff = AjaxAvarCache (ace :: ACE, dom :: DOM, console :: CONSOLE | eff)
 
 -- | The Ace component definition.
-aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects (AjaxAvarCache eff)))
+aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (Aff (AceEffects eff))
 aceComponent mode theme =
   H.lifecycleComponent
     { initialState: const initialState
@@ -83,7 +83,7 @@ aceComponent mode theme =
   -- The query algebra for the component handles the initialization of the Ace
   -- editor as well as responding to the `ChangeText` action that allows us to
   -- alter the editor's state.
-  eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects (AjaxAvarCache eff)))
+  eval :: AceQuery ~> H.ComponentDSL AceState AceQuery AceOutput (Aff (AceEffects eff))
   eval = case _ of
     Initialize mod them next -> do
       H.getHTMLElementRef (H.RefLabel "ace") >>= case _ of
@@ -228,7 +228,7 @@ aceComponent mode theme =
           case action of
             Insert -> r
             Remove -> row
-        rename :: forall e. String -> Document -> DocumentEvent -> Int -> Aff (AceEffects (AjaxAvarCache e)) Unit
+        rename :: forall e. String -> Document -> DocumentEvent -> Int -> Aff (AceEffects e) Unit
         rename contextName document event line = do
           modifiedDeclaration <- H.liftEff $ Document.getLine line document
           -- TODO We need to apply runIndentParser to the current default namespace here!
@@ -241,7 +241,7 @@ aceComponent mode theme =
               pure unit
             otherwise -> pure unit
           where
-            composeFullName :: Int -> String -> Aff (AceEffects (AjaxAvarCache e)) String
+            composeFullName :: Int -> String -> Aff (AceEffects e) String
             composeFullName row name = do
               parseResult <- runIndentParser name CRP.contextName
               case parseResult of
@@ -252,7 +252,7 @@ aceComponent mode theme =
                     (Just (Tuple previousRow namespacingName)) -> composeFullName previousRow (namespacingName <> name)
                     Nothing -> pure "" -- we should throw an error here.
             -- TODO. Stop at the line that is not indexed. Then use its namespace, too!
-            findPreviousContextDeclaration :: Int -> Aff (AceEffects (AjaxAvarCache e)) (Maybe (Tuple Int String))
+            findPreviousContextDeclaration :: Int -> Aff (AceEffects e) (Maybe (Tuple Int String))
             findPreviousContextDeclaration row | row < 0 = pure Nothing
             findPreviousContextDeclaration row | otherwise = do
               previousLine <- liftEff $ Document.getLine row document

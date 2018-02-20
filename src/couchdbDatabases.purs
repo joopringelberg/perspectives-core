@@ -1,9 +1,10 @@
 module Perspectives.Couchdb.Databases where
 
 import Control.Monad.Aff (Aff)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.State.Trans (StateT, get, lift, put)
+import Control.Monad.State.Trans (StateT, get, put)
 import Data.Argonaut (fromObject, fromString)
 import Data.Map (fromFoldable)
 import Data.StrMap (fromFoldable) as StrMap
@@ -16,6 +17,8 @@ import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
 import Prelude (Unit, bind, (<>), ($), pure, unit, discard)
 
 type Authenticated = Boolean
+-- CouchdbSession is an instance of MonadAff.
+-- So, with liftAff we lift an operation in Aff to CouchdbSession.
 type CouchdbSession e a = StateT Authenticated (Aff e) a
 
 -- TODO: relogin if expired. Catch and save the cookie for the server version.
@@ -23,13 +26,14 @@ ensureAuthentication :: forall e a. Aff (AjaxAvarCache e) a -> CouchdbSession (A
 ensureAuthentication a = do
   authenticated <- get
   if authenticated
-    then lift a
+    then liftAff a
     else do
       authenticate
-      lift a
+      liftAff a
 
 -----------------------------------------------------------
 -- CREATEFIRSTADMIN
+-- Notice: no authentication. Requires Couchdb to be in party mode.
 -----------------------------------------------------------
 createFirstAdmin :: forall e. User -> Password -> Aff (AjaxAvarCache e) Unit
 createFirstAdmin user password = do
@@ -66,10 +70,10 @@ deleteDatabase dbname = ensureAuthentication do
 -- TODO: Catch and save the cookie for the server version.
 authenticate :: forall e. CouchdbSession (AjaxAvarCache e) Unit
 authenticate = do
-  base <- lift getCouchdbBaseURL
-  usr <- lift getUser
-  pwd <- lift getCouchdbPassword
-  (res :: AJ.AffjaxResponse PostCouchdb_session) <- lift $ AJ.put
+  base <- liftAff getCouchdbBaseURL
+  usr <- liftAff getUser
+  pwd <- liftAff getCouchdbPassword
+  (res :: AJ.AffjaxResponse PostCouchdb_session) <- liftAff $ AJ.put
     (base <> "_session")
     (fromObject (StrMap.fromFoldable [Tuple "name" (fromString usr), Tuple "password" (fromString pwd)]))
   case res.status of
