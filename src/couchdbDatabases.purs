@@ -14,16 +14,15 @@ import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, Password, PostCou
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectivesState (MonadPerspectives, couchdbSessionStarted, setCouchdbSessionStarted)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
-import Prelude (Unit, bind, (<>), ($), pure, unit, discard)
+import Prelude (Unit, bind, discard, ifM, pure, unit, ($), (<>))
 
 
 -- TODO: relogin if expired. Catch and save the cookie for the server version.
 ensureAuthentication :: forall e a. Aff (AjaxAvarCache e) a -> MonadPerspectives (AjaxAvarCache e) a
-ensureAuthentication a = do
-  authenticated <- couchdbSessionStarted
-  if authenticated
-    then liftAff a
-    else do
+ensureAuthentication a =
+  ifM couchdbSessionStarted
+    (liftAff a)
+    do
       authenticate
       liftAff a
 
