@@ -21,36 +21,13 @@ import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
+import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, poke, peek)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.Syntax (PerspectContext, PerspectRol, Revision, fromRevision, noRevision, revision)
+import Perspectives.Syntax (PerspectContext, PerspectRol, fromRevision, revision)
 import Prelude (Unit, bind, pure, unit, ($), (*>), (<$>), (<>), discard)
-
-newtype DomeinFile = DomeinFile
-  { _rev :: Revision
-  , _id :: String
-  , contexts :: DomeinFileContexts
-  , roles ::DomeinFileRoles
-  }
-
-derive instance genericDomeinFile :: Generic DomeinFile _
-
-instance encodeDomeinFile :: Encode DomeinFile where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-
-instance respondableDomeinFile :: Respondable DomeinFile where
-  responseType = Tuple Nothing JSONResponse
-  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
-defaultDomeinFile :: DomeinFile
-defaultDomeinFile = DomeinFile{ _rev: noRevision, _id: "", contexts: empty, roles: empty}
-
--- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
-type DomeinFileContexts = StrMap PerspectContext
-
-type DomeinFileRoles = StrMap PerspectRol
 
 -- | The global index of all cached Domein files, indexed by namespace name, is a mutable unsafe map.
 type DomeinCache = GLStrMap (AVar DomeinFile)

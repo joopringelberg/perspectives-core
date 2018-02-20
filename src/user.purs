@@ -7,6 +7,12 @@ import Perspectives.Effects (AvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Prelude (Unit, bind, unit, void, ($), discard, pure, (<>))
 
+type UserInfo =
+  { userName :: String
+  , couchdbPassword :: String
+  , couchdbBaseURL :: String
+  }
+
 type UserCache = GLStrMap (AVar String)
 
 userCache :: UserCache
