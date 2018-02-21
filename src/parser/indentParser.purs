@@ -9,8 +9,9 @@ import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup, singleton)
 import Data.String (null)
-import Perspectives.Identifiers (Prefix, QualifiedName(..))
 import Perspectives.EntiteitAndRDFAliases (RolName)
+import Perspectives.Identifiers (Prefix, QualifiedName(..))
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
@@ -34,7 +35,7 @@ initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:P
 -- | Then we have ContextRoleParserState, which we need to keep track of the number of
 -- | instances of a particular role type in a context (to generate unique names).
 -- | Finally, the StateT Position part is used by the IndentParser.
-type ContextRoleParserMonad e = (StateT Position (StateT ContextRoleParserState (Aff e)))
+type ContextRoleParserMonad e = (StateT Position (StateT ContextRoleParserState (MonadPerspectives e)))
 
 -- | This is the type that is produced by the ContextRoleParser.
 -- | It can also be expressed in terms of the type synonym IndentParser:
@@ -42,11 +43,11 @@ type ContextRoleParserMonad e = (StateT Position (StateT ContextRoleParserState 
 type IP a e = ParserT String (ContextRoleParserMonad e) a
 
 -- | Apply a parser, keeping only the parsed result.
-runIndentParser :: forall a e. String -> IP a e -> Aff e (Either ParseError a)
+runIndentParser :: forall a e. String -> IP a e -> MonadPerspectives e (Either ParseError a)
 runIndentParser s p = evalStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
 
 -- | As convienience, to lift functions on Aff all the way up:
-liftAffToIP :: forall a e. Aff e a -> IP a e
+liftAffToIP :: forall a e. MonadPerspectives e a -> IP a e
 liftAffToIP = lift <<< lift <<< lift
 
 -----------------------------------------------------------

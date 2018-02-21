@@ -1,10 +1,8 @@
 module Perspectives.PrettyPrinter where
 
 import Control.Monad (class Monad)
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.State (StateT, get, modify)
-import Control.Monad.State.Trans (evalStateT, lift)
+import Control.Monad.State (StateT, get, modify, lift)
+import Control.Monad.State.Trans (evalStateT)
 import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
 import Data.Array (catMaybes, elemIndex, replicate, sortBy)
@@ -140,13 +138,13 @@ context definedResources c = do
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
-  (bindings :: Array (Maybe (PerspectRol))) <- traverse (liftAff <<< getPerspectEntiteit) (join (values (context_rolInContext c)))
+  (bindings :: Array (Maybe (PerspectRol))) <- traverse (lift <<< lift <<< getPerspectEntiteit) (join (values (context_rolInContext c)))
   traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
   where
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
-      maybeBuitenRol <- liftAff $ getPerspectEntiteit $ context_buitenRol c
+      maybeBuitenRol <- lift $ lift $ getPerspectEntiteit $ context_buitenRol c
       case maybeBuitenRol of
         (Just buitenRol) -> strMapTraverse_ publicProperty (rol_properties buitenRol)
         Nothing -> pure unit
@@ -161,9 +159,9 @@ context definedResources c = do
       case elemIndex binding definedResources of
         -- binding is NOT a BuitenRol of a context defined at top level in the Text.
         Nothing -> do
-          maybeRol <- getPerspectEntiteit binding
+          maybeRol <- lift $ lift $ getPerspectEntiteit binding
           case maybeRol of
-            Nothing -> lift $ comment $ "Binding does not exist: " <> binding -- Error situation!
+            Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
             (Just boundRol@(PerspectRol bindingProperties)) -> do
               case rol_pspType boundRol == "model:Perspectives$BuitenRol" of
                 -- boundRol is a BuitenRol of some context.
@@ -171,7 +169,7 @@ context definedResources c = do
                   -- boundRol is in the namespace of context c
                   then
                     do
-                      maybeContext <- liftAff $ getPerspectEntiteit $ rol_context boundRol
+                      maybeContext <- lift $ lift $ getPerspectEntiteit $ rol_context boundRol
                       case maybeContext of
                         Nothing -> reference role boundRol
                         (Just contxt) -> do
@@ -183,7 +181,7 @@ context definedResources c = do
                 false -> reference role boundRol -- The boundRol is a RoleInContext of some context.
         -- binding is a BuitenRol of a context defined at top level in the Text.
         otherwise -> do
-          maybeRol <- liftAff $ getPerspectEntiteit binding
+          maybeRol <- lift $ lift $ getPerspectEntiteit binding
           case maybeRol of
             Nothing -> comment $ "Binding does not exist: " <> binding
             (Just buitenRol) -> reference role buitenRol
@@ -201,7 +199,7 @@ enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
   withComments' (context_comments theText) (identifier( "Context " <> (context_displayName theText)))
   newline
-  sectionIds <- liftAff ((context_id theText) ## (ignoreCache rolTypen))
+  sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache rolTypen))
   traverse_ section (tripleObjects sectionIds)
 
   where
@@ -211,13 +209,13 @@ enclosingContext theText = do
       identifier sectionId
       newline
       newline
-      (Triple{object: definedContexts}) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- liftAff ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
+      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
-      mc <- liftAff $ getPerspectEntiteit id
+      mc <- lift $ lift $ getPerspectEntiteit id
       case mc of
         (Just c) -> do
           if isInNamespace (context_id theText) id

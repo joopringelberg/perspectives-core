@@ -516,7 +516,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      liftAffToIP $ cacheEntiteitPreservingVersion (textName <> "_buitenRol")
+      lift $ lift $ lift $ cacheEntiteitPreservingVersion (textName <> "_buitenRol")
         (PerspectRol defaultRolRecord
           { _id = textName <> "_buitenRol"
           , pspType = "model:Perspectives$BuitenRol"

@@ -4,7 +4,6 @@ import Perspectives.EntiteitAndRDFAliases
 import Control.Monad (class Monad)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State.Trans (StateT, evalStateT)
 import Data.Maybe (Maybe(..))
 import Perspectives.PerspectivesState (memorizeQueryResults)
 import Perspectives.Property (ObjectsGetter, getGebondenAls, getPrivateProperty, getProperty, getPublicProperty, getRol)
@@ -14,8 +13,8 @@ import Prelude (bind, ifM, pure, ($))
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
 
-applyToNamedFunction :: forall a b m. Monad m => a -> NamedFunction (a -> StateT Boolean m b) -> m b
-applyToNamedFunction a (NamedFunction _ f)= evalStateT (f a) true
+applyToNamedFunction :: forall a b m. Monad m => a -> NamedFunction (a -> m b) -> m b
+applyToNamedFunction a (NamedFunction _ f)= f a
 
 infix 0 applyToNamedFunction as ##
 
