@@ -5,11 +5,11 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Control.Monad.Aff (Aff)
 import Data.Array (head, index)
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.DomeinCache (documentNamesInDatabase)
+import Perspectives.PerspectivesState (MonadPerspectives)
 
 type State = { models :: Array String, index :: Maybe Int, selectedModel :: Maybe String }
 
@@ -24,7 +24,7 @@ type Input = Unit
 
 newtype ModelSelected = ModelSelected String
 
-modelSelect :: forall e. H.Component HH.HTML ModelSelectQuery Input ModelSelected (Aff (ajax :: AJAX | e))
+modelSelect :: forall e. H.Component HH.HTML ModelSelectQuery Input ModelSelected (MonadPerspectives (ajax :: AJAX | e))
 modelSelect =
   H.lifecycleComponent
     { initialState: const initialState
@@ -45,7 +45,7 @@ modelSelect =
         [ HE.onSelectedIndexChange (HE.input Change)]
         (map (\v -> HH.option [HP.value v] [HH.text v]) state.models)
 
-    eval :: ModelSelectQuery ~> H.ComponentDSL State ModelSelectQuery ModelSelected (Aff (ajax :: AJAX | e))
+    eval :: ModelSelectQuery ~> H.ComponentDSL State ModelSelectQuery ModelSelected (MonadPerspectives (ajax :: AJAX | e))
     eval = case _ of
       Initialize next -> do
         (models :: Array String) <- H.liftAff $ documentNamesInDatabase "perspect_models"

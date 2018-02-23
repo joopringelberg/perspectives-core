@@ -5,7 +5,6 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Control.Monad.Aff (Aff)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.Except.Trans (lift)
@@ -22,6 +21,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (wrap)
 import Network.HTTP.Affjax (AJAX)
+import Perspectives.PerspectivesState (MonadPerspectives)
 
 type State = {}
 
@@ -34,7 +34,7 @@ type Input = Unit
 -- Message from this component.
 newtype TextFileRead = TextFileRead String
 
-readTextFile :: forall e. H.Component HH.HTML ReadTextFileQuery Input TextFileRead (Aff (ajax :: AJAX, dom :: DOM |e))
+readTextFile :: forall e. H.Component HH.HTML ReadTextFileQuery Input TextFileRead (MonadPerspectives (ajax :: AJAX, dom :: DOM |e))
 readTextFile = H.component
   { initialState: const initialState
   , render
@@ -55,11 +55,11 @@ readTextFile = H.component
         , HE.onChange (HE.input FileSet)
         ]
 
-    eval :: ReadTextFileQuery ~> H.ComponentDSL State ReadTextFileQuery TextFileRead (Aff (ajax :: AJAX, dom :: DOM | e))
+    eval :: ReadTextFileQuery ~> H.ComponentDSL State ReadTextFileQuery TextFileRead (MonadPerspectives (ajax :: AJAX, dom :: DOM | e))
     eval = case _ of
       FileSet evt next -> do
         -- In order to be able to throw exceptions, we use runExcepT.
-        (result :: Either String String) <- lift $ runExceptT do
+        (result :: Either String String) <- lift $ lift $ runExceptT do
           -- The function target will give us a Node as defined in DOM.Classy. However, to retrieve the files
           -- we need a typed HTMLInputElement. This we get by using fromNode. It is part of a Class of which
           -- all typed HTML nodes are a member.

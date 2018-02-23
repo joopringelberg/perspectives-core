@@ -1,16 +1,18 @@
 module Perspectives.PerspectivesState where
 
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (Aff, liftEff')
 import Control.Monad.Aff.AVar (AVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State.Trans (StateT, modify, gets)
+import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef)
+import Control.Monad.Reader (ReaderT, ask)
+import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (Unit, bind, pure, unit, ($))
+import Prelude (Unit, bind, flip, pure, unit, ($), (<<<), (>>=))
 
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
@@ -43,24 +45,54 @@ newPerspectivesState uinfo =
 
 -- | MonadPerspectives is an instance of MonadAff.
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
-type MonadPerspectives e = StateT PerspectivesState (Aff e)
+type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e))
 
+-----------------------------------------------------------
+-- GLOBAL STATE IN READERT
+-----------------------------------------------------------
+-- | Get the global state reference.
+getRefWithGlobalState :: forall e. MonadPerspectives e (Ref PerspectivesState)
+getRefWithGlobalState = ask
+
+-- | Read the contents of the global state reference.
+-- | Compares with StateT get.
+getGlobalState :: forall e. MonadPerspectives e PerspectivesState
+getGlobalState = getRefWithGlobalState >>= lift <<< liftEff' <<< readRef
+
+-- | Apply a function to the contents of the global state reference.
+-- | Compares with StateT gets.
+getsGlobalState :: forall a e. (PerspectivesState -> a) -> MonadPerspectives e a
+getsGlobalState f = getGlobalState >>= pure <<< f
+
+-- | Write into the global state reference.
+-- | Compares with StateT put.
+putGlobalState :: forall e. PerspectivesState -> MonadPerspectives e Unit
+putGlobalState v = getRefWithGlobalState >>= (lift <<< liftEff' <<< (flip writeRef v))
+
+-- | Apply a function to the contents of the global state reference and save it.
+-- | Compares with StateT modify.
+modifyGlobalState :: forall e. (PerspectivesState -> PerspectivesState) -> MonadPerspectives e Unit
+modifyGlobalState f = getGlobalState >>= putGlobalState <<< f
+
+-----------------------------------------------------------
+-- FUNCTIONS THAT GET OR MODIFY PARTS OF PERSPECTIVESSTATE
+-----------------------------------------------------------
 couchdbSessionStarted :: forall e. MonadPerspectives e Boolean
-couchdbSessionStarted = gets _.couchdbSessionStarted
+couchdbSessionStarted = getsGlobalState _.couchdbSessionStarted
 
 setCouchdbSessionStarted :: forall e. Boolean -> MonadPerspectives e Unit
-setCouchdbSessionStarted b = modify \ps -> ps {couchdbSessionStarted = b}
+setCouchdbSessionStarted b = modifyGlobalState \ps -> ps {couchdbSessionStarted = b}
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
 memorizeQueryResults :: forall e. MonadPerspectives e Boolean
-memorizeQueryResults = gets _.memorizeQueryResults
+memorizeQueryResults = getsGlobalState _.memorizeQueryResults
 
 setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectives e Unit
-setMemorizeQueryResults b = modify \ps -> ps {memorizeQueryResults = b}
+setMemorizeQueryResults b = modifyGlobalState \ps -> ps {memorizeQueryResults = b}
 
 contextDefinitions :: forall e. MonadPerspectives e ContextDefinitions
-contextDefinitions = gets _.contextDefinitions
+contextDefinitions = getsGlobalState _.contextDefinitions
 
 contextDefinitionsLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP | e) (Maybe (AVar PerspectContext))
 contextDefinitionsLookup = lookup contextDefinitions
@@ -69,7 +101,7 @@ contextDefinitionsInsert :: forall e. String -> AVar PerspectContext -> MonadPer
 contextDefinitionsInsert = insert contextDefinitions
 
 rolDefinitions :: forall e. MonadPerspectives e RolDefinitions
-rolDefinitions = gets _.rolDefinitions
+rolDefinitions = getsGlobalState _.rolDefinitions
 
 rolDefinitionsLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP | e) (Maybe (AVar PerspectRol))
 rolDefinitionsLookup = lookup rolDefinitions
@@ -78,7 +110,7 @@ rolDefinitionsInsert :: forall e. String -> AVar PerspectRol -> MonadPerspective
 rolDefinitionsInsert = insert rolDefinitions
 
 domeinCache :: forall e. MonadPerspectives e DomeinCache
-domeinCache = gets _.domeinCache
+domeinCache = getsGlobalState _.domeinCache
 
 domeinCacheLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP | e) (Maybe (AVar DomeinFile))
 domeinCacheLookup = lookup domeinCache

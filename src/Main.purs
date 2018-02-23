@@ -7,6 +7,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Control.Monad.Aff (Aff, liftEff')
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Ref (newRef)
+import Control.Monad.Reader (runReaderT)
+import Control.Monad.Trans.Class (lift)
 import DOM (DOM)
 import DOM.HTML (window)
 import DOM.HTML.Location (search)
@@ -15,7 +18,7 @@ import Data.Either (Either(..))
 import Data.Either.Nested (Either3)
 import Data.Functor.Coproduct.Nested (Coproduct3)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (fromFoldable, lookup)
+import Data.StrMap (fromFoldable, lookup) 
 import Data.URI.Query (Query(..), parser) as URI
 import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
@@ -26,6 +29,7 @@ import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..),
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.Effects (AvarCache)
 import Perspectives.IndentParser (runIndentParser)
+import Perspectives.PerspectivesState (MonadPerspectives, newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
@@ -35,24 +39,20 @@ import Text.Parsing.StringParser (runParser)
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects ())) Unit
 main = HA.runHalogenAff do
-  userFromLocation
-  setCouchdbPassword "geheim"
-  setCouchdbBaseURL "http://127.0.0.1:5984/"
+  -- usr <- userFromLocation
+  usr <- pure "admin"
+  pw <- pure "geheim"
+  url <- pure "http://127.0.0.1:5984/"
   body <- HA.awaitBody
-  runUI ui unit body
+  rf <- liftEff' $ newRef $ newPerspectivesState {userName: usr, couchdbPassword: pw, couchdbBaseURL: url}
+  runUI (H.hoist (flip runReaderT rf) ui) unit body
 
-userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) Unit
-userFromLocation = do
-  parseResult <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
-  case parseResult of
-    (Left m) -> pure unit
-    (Right (URI.Query kvp)) -> do
-      keyValueMap <- pure $ fromFoldable kvp
-      case lookup "user" keyValueMap of
-        Nothing -> pure unit
-        (Just mUser) -> case mUser of
-          Nothing -> pure unit
-          (Just user) -> setUser user
+-- userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe String)
+-- userFromLocation = do
+--   parseResult <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
+--   case parseResult of
+--     (Left m) -> pure Nothing
+--     (Right (URI.Query kvp)) -> pure $ lookup "user" $ fromFoldable kvp
 
 -- | The application state, which in this case just stores the current text in
 -- | the editor.
@@ -85,7 +85,7 @@ derive instance ordReadTextFileSlot :: Ord ReadTextFileSlot
 
 
 -- | The main UI component definition.
-ui :: forall eff. H.Component HH.HTML Query Unit Void (Aff (AceEffects eff))
+ui :: forall eff. H.Component HH.HTML Query Unit Void (MonadPerspectives (AceEffects eff))
 ui =
   H.parentComponent
     { initialState: const initialState
@@ -98,7 +98,7 @@ ui =
   initialState :: State
   initialState = { text: "" }
 
-  render :: State -> H.ParentHTML Query ChildQuery ChildSlot (Aff (AceEffects eff))
+  render :: State -> H.ParentHTML Query ChildQuery ChildSlot (MonadPerspectives (AceEffects eff))
   render { text: text } =
     HH.div_
       [ HH.h1_
@@ -126,21 +126,21 @@ ui =
           [ HH.text ("Current text: " <> text) ]
       ]
 
-  eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (Aff (AceEffects eff))
+  eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (MonadPerspectives (AceEffects eff))
   eval (ClearText next) = do
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText "")
     pure next
   eval (HandleAceUpdate text next) = do
-    parseResult <- H.liftAff $ runIndentParser text CRP.enclosingContext
+    parseResult <- lift $ runIndentParser text CRP.enclosingContext
     case parseResult of
       (Right textName) -> do
-        (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getPerspectEntiteit textName
+        (maybeContext :: Maybe PerspectContext) <- lift $ getPerspectEntiteit textName
         case maybeContext of
           Nothing -> do
             H.modify (_ { text = "Cannot find the context that represents this text." })
             pure next
           (Just (c :: PerspectContext)) -> do
-            t <- H.liftAff $ prettyPrint c enclosingContext
+            t <- lift $ prettyPrint c enclosingContext
             _ <- H.query' cp1 (AceSlot 2) $ H.action (ChangeText t)
             H.modify (_ { text = text })
             pure next
@@ -152,29 +152,29 @@ ui =
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText text)
     pure next
   eval (LoadContext id next) = do
-    (maybeContext :: Maybe PerspectContext) <- H.liftAff $ getPerspectEntiteit id
+    (maybeContext :: Maybe PerspectContext) <- lift $ getPerspectEntiteit id
     case maybeContext of
       Nothing -> do
         H.modify (_ { text = "Cannot find this context: "  <> id })
         pure next
       (Just (c :: PerspectContext)) -> do
-        t <- H.liftAff $ prettyPrint c enclosingContext
+        t <- lift $ prettyPrint c enclosingContext
         _ <- H.query' cp1 (AceSlot 1) $ H.action (ChangeText t)
         pure next
   eval (Save next) = do
     text <- H.gets _.text
-    parseResult <- H.liftAff $ runIndentParser text CRP.enclosingContext
+    parseResult <- lift $ runIndentParser text CRP.enclosingContext
     case parseResult of
       (Right textName) -> do
         -- save it
-        mCtxt <- H.liftAff $ getPerspectEntiteit textName
+        mCtxt <- lift $ getPerspectEntiteit textName
         case mCtxt of
           Nothing -> do
             H.modify (_ { text = "Cannot find context " <> textName })
             pure next
           (Just ctxt) -> do
-            df <- H.liftAff $ domeinFileFromContext ctxt
-            H.liftAff $ storeDomeinFileInCouchdb df
+            df <- lift $ domeinFileFromContext ctxt
+            lift $ storeDomeinFileInCouchdb df
             H.modify (_ { text = show textName })
             -- notify the ModelSelect
             _ <- H.query' cp2 unit $ H.action Reload

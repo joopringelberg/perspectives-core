@@ -30,6 +30,8 @@ ensureAuthentication a =
 createFirstAdmin :: forall e. User -> Password -> MonadPerspectives (AjaxAvarCache e) Unit
 createFirstAdmin user password = do
   base <- getCouchdbBaseURL
+  -- TODO. Het _config endpoint bestaat niet meer in Couchdb ^2.0. In plaats daarvan: /_node//_config/.
+  -- Zie ook: http://docs.couchdb.org/en/2.1.1/config/auth.html
   (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put (base <> "_config/admins/" <> user) password
   onAccepted res.status [200] "createFirstAdmin"
     $ pure unit
