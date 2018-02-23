@@ -17,8 +17,8 @@ import DOM.HTML.Window (location)
 import Data.Either (Either(..))
 import Data.Either.Nested (Either3)
 import Data.Functor.Coproduct.Nested (Coproduct3)
-import Data.Maybe (Maybe(..))
-import Data.StrMap (fromFoldable, lookup) 
+import Data.Maybe (Maybe(..), maybe)
+import Data.StrMap (fromFoldable, lookup)
 import Data.URI.Query (Query(..), parser) as URI
 import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
@@ -33,26 +33,28 @@ import Perspectives.PerspectivesState (MonadPerspectives, newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
-import Perspectives.User (setCouchdbBaseURL, setCouchdbPassword, setUser)
-import Text.Parsing.StringParser (runParser)
+import Text.Parsing.StringParser (ParseError, runParser)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (AceEffects ())) Unit
 main = HA.runHalogenAff do
   -- usr <- userFromLocation
-  usr <- pure "admin"
+  (usr :: Maybe String) <- userFromLocation
+  -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
   pw <- pure "geheim"
   url <- pure "http://127.0.0.1:5984/"
   body <- HA.awaitBody
-  rf <- liftEff' $ newRef $ newPerspectivesState {userName: usr, couchdbPassword: pw, couchdbBaseURL: url}
+  rf <- liftEff' $ newRef $ newPerspectivesState {userName: (maybe "admin" id usr), couchdbPassword: pw, couchdbBaseURL: url}
   runUI (H.hoist (flip runReaderT rf) ui) unit body
 
--- userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe String)
--- userFromLocation = do
---   parseResult <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
---   case parseResult of
---     (Left m) -> pure Nothing
---     (Right (URI.Query kvp)) -> pure $ lookup "user" $ fromFoldable kvp
+userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe String)
+userFromLocation = do
+  (parseResult :: Either ParseError URI.Query) <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
+  case parseResult of
+    (Left m) -> pure Nothing
+    (Right (URI.Query kvp)) -> case lookup "user" $ fromFoldable kvp of
+      Nothing -> pure Nothing
+      (Just mv) -> pure mv
 
 -- | The application state, which in this case just stores the current text in
 -- | the editor.
