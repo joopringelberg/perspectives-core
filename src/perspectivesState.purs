@@ -1,7 +1,7 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.Aff (Aff, liftEff')
-import Control.Monad.Aff.AVar (AVar)
+import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF, Ref, readRef, writeRef)
@@ -24,6 +24,7 @@ type PerspectivesState =
   , domeinCache :: DomeinCache
   , userInfo :: UserInfo
   , couchdbSessionStarted :: Boolean
+  , sessionCookie :: AVar String
   , memorizeQueryResults :: Boolean
   }
 
@@ -33,13 +34,14 @@ type UserInfo =
   , couchdbBaseURL :: String
   }
 
-newPerspectivesState :: UserInfo -> PerspectivesState
-newPerspectivesState uinfo =
+newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
+newPerspectivesState uinfo av =
   { rolDefinitions: new unit
   , contextDefinitions: new unit
   , domeinCache: new unit
   , userInfo: uinfo
   , couchdbSessionStarted: false
+  , sessionCookie: av
   , memorizeQueryResults: true
   }
 
@@ -71,6 +73,7 @@ putGlobalState v = getRefWithGlobalState >>= (lift <<< liftEff' <<< (flip writeR
 
 -- | Apply a function to the contents of the global state reference and save it.
 -- | Compares with StateT modify.
+
 modifyGlobalState :: forall e. (PerspectivesState -> PerspectivesState) -> MonadPerspectives e Unit
 modifyGlobalState f = getGlobalState >>= putGlobalState <<< f
 
@@ -82,6 +85,15 @@ couchdbSessionStarted = getsGlobalState _.couchdbSessionStarted
 
 setCouchdbSessionStarted :: forall e. Boolean -> MonadPerspectives e Unit
 setCouchdbSessionStarted b = modifyGlobalState \ps -> ps {couchdbSessionStarted = b}
+
+sessionCookie :: forall e. MonadPerspectives e (AVar String)
+sessionCookie = getsGlobalState _.sessionCookie
+
+sessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) String
+sessionCookieValue = getsGlobalState _.sessionCookie >>= lift <<< takeVar
+
+setSessionCookie :: forall e. String -> MonadPerspectives (avar :: AVAR | e) Unit
+setSessionCookie c = sessionCookie >>= (lift <<< putVar c)
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.

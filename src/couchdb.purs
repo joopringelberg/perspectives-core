@@ -6,6 +6,7 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadError, class MonadThrow, throwError)
 import Data.Argonaut.Core (JObject)
 import Data.Array (elemIndex)
+import Data.Either.Nested (E10)
 import Data.Foreign.Class (class Decode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
@@ -19,7 +20,7 @@ import Network.HTTP.Affjax.Request (class Requestable, RequestContent(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.PerspectivesState (MonadPerspectives)
-import Prelude (class Monad, show, ($), (<>))
+import Prelude (class Monad, show, ($), (<>), (==))
 
 -----------------------------------------------------------
 -- ALIASES
@@ -82,8 +83,8 @@ instance decodeRev :: Decode Rev where
 -- AUTHENTICATION
 -----------------------------------------------------------
 newtype PostCouchdb_session = PostCouchdb_session
-  { ok :: String
-  , name :: User
+  { ok :: Boolean
+  , name :: NullOrUndefined User
   , roles :: Array String
   }
 
@@ -133,9 +134,12 @@ onAccepted' specialCodes (StatusCode n) statusCodes fname f = case elemIndex n s
 
 handleError :: forall a m. MonadError Error m => Int -> CouchdbStatusCodes -> String -> m a
 handleError n statusCodes fname =
-  case lookup n statusCodes of
-    (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
-    Nothing ->
-      case lookup n couchdDBStatusCodes of
+  if n == 401
+    then throwError $ error "UNAUTHORIZED"
+    else
+      case lookup n statusCodes of
         (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
-        Nothing -> throwError $ error $ "Failure in " <> fname <> ". " <> "Unknown HTTP statuscode " <> show n
+        Nothing ->
+          case lookup n couchdDBStatusCodes of
+            (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
+            Nothing -> throwError $ error $ "Failure in " <> fname <> ". " <> "Unknown HTTP statuscode " <> show n
