@@ -25,7 +25,7 @@ import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent) as ACE
 import Perspectives.ContextRoleParser (enclosingContext) as CRP
-import Perspectives.Couchdb.Databases (requestAuthentication)
+import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase, requestAuthentication)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect) as MS
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
@@ -138,6 +138,8 @@ ui =
   eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (MonadPerspectives (ACE.AceEffects eff))
   eval (Initialize next) =  do
     lift requestAuthentication
+    lift $ createDatabase "test1"
+    lift $ deleteDatabase "test1"
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do

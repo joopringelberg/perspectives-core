@@ -1,12 +1,14 @@
 module Test.Properties where
 
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.Console (log)
+import Control.Monad.Aff.Console (log) as AC
+import Control.Monad.Eff.Console (CONSOLE)
+import Control.Monad.Trans.Class (lift)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.SystemQueries (binding, buitenRol, contextType, hasBinding, hasLabel, identity, isVerplicht, label, range, rolContext, iedereRolInContext, rolType, rolTypen)
 import Perspectives.TripleGetter (constructRolGetter, (##))
-import Prelude (Unit, bind, discard, show, (<>))
+import Prelude (Unit, bind, discard, show, (<<<), (<>))
 import Test.TestEffects (CancelerEffects)
 
 rolDef :: String
@@ -21,7 +23,7 @@ viewDef = "model:Perspectives$view"
 psp :: String
 psp = "model:Perspectives$"
 
-test :: forall e. Aff (CancelerEffects e) Unit
+test :: forall e. MonadPerspectives (CancelerEffects e) Unit
 test = do
   log "=========================Test.Properties================================"
   l1 <-  rolDef ## iedereRolInContext
@@ -88,3 +90,6 @@ test = do
 
   l21 <- "model:Perspectives$Rol_rolInContext_1" ## rolType
   log ( "'model:Perspectives$Rol_rolInContext_1' ## rolType = " <> show l21)
+
+log :: forall e. String -> MonadPerspectives (console :: CONSOLE | e) Unit
+log = lift <<< AC.log

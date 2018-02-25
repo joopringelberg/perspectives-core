@@ -4,7 +4,7 @@ module Perspectives.ResourceRetrieval
 , saveVersionedEntiteit
 , saveEntiteit
   )
-where 
+where
 
 import Prelude
 import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, takeVar)
