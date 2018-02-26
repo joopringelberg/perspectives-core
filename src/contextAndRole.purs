@@ -3,9 +3,11 @@ module Perspectives.ContextAndRole where
 import Perspectives.EntiteitAndRDFAliases
 import Data.Array (cons, delete, elemIndex)
 import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty, lookup, insert)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, noRevision, toRevision)
 import Prelude (($))
 
@@ -13,6 +15,9 @@ import Prelude (($))
 
 context_id :: PerspectContext -> ContextID
 context_id (PerspectContext{_id})= _id
+
+context_Namespace :: PerspectContext -> Namespace
+context_Namespace (PerspectContext{_id}) = unsafePartial $ fromJust $ deconstructNamespace _id
 
 changeContext_id :: ContextID -> PerspectContext -> PerspectContext
 changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}

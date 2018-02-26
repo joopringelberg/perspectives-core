@@ -13,28 +13,23 @@ import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (isInNamespace, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, representInternally, retrieveInternally)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, retrieveInternally)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb, saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 
--- TODO: moeten we hier wel fouten afhandelen? En zeker niet stilletjes!
+-- TODO: DE MAYBE KAN ERAF
 getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) (Maybe a)
 getPerspectEntiteit id =
-  -- catchError
-    do
-      (av :: Maybe (AVar a)) <- retrieveInternally id
-      case av of
-        (Just avar) -> do
-          pe <- liftAff $ readVar avar
-          pure $ Just pe
-        Nothing -> do
-          (avar :: (AVar a)) <- representInternally id
-          pe <- fetchPerspectEntiteitFromCouchdb id
-          liftAff $ putVar pe avar
-          pure $ Just pe
-    -- ignore errors.
-    -- \_ -> pure Nothing
+  do
+    (av :: Maybe (AVar a)) <- retrieveInternally id
+    case av of
+      (Just avar) -> do
+        pe <- liftAff $ readVar avar
+        pure $ Just pe
+      Nothing -> do
+        (ent :: a) <- fetchPerspectEntiteitFromCouchdb id
+        pure $ Just ent
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> MonadPerspectives (AjaxAvarCache e) DomeinFile

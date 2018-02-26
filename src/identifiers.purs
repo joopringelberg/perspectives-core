@@ -54,7 +54,7 @@ instance showQualifiedName :: Show QualifiedName where
 -----------------------------------------------------------
 -- CLASS PERSPECTENTITEITIDENTIFIER
 -----------------------------------------------------------
--- | Abstracts over identifiers for Perspect. There are two instances: ModelName and QualifiedName.
+-- | Abstracts over identifiers for Perspect, used in the CRL parser. There are two instances: ModelName and QualifiedName.
 class PerspectEntiteitIdentifier a where
   pe_namespace :: a -> Namespace
   pe_localName :: a -> Maybe LocalName

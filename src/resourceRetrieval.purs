@@ -35,7 +35,11 @@ fetchPerspectEntiteitFromCouchdb id = if isUserURI id
   else if isQualifiedWithDomein id
     then case deconstructNamespace id of
       Nothing -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: Cannot construct namespace out of id " <> id)
-      (Just ns) -> retrieveFromDomein id ns
+      (Just ns) -> do
+        ent <- retrieveFromDomein id ns
+        v <- representInternally id
+        liftAff $ putVar ent v
+        pure ent
     else throwError $ error ("fetchPerspectEntiteitFromCouchdb: Unknown URI structure for " <> id)
 
 -- | Fetch the definition of a resource asynchronously.

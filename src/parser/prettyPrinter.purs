@@ -13,7 +13,7 @@ import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (compareOccurrences, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
@@ -132,6 +132,9 @@ roleProperty = property (pure unit)
 contextDeclaration :: forall e. PerspectContext -> PerspectText e
 contextDeclaration x = identifier (context_pspType x) *> identifier' ("$" <> (context_displayName x))
 
+fullContextDeclaration :: forall e. PerspectContext -> PerspectText e
+fullContextDeclaration x = identifier (context_pspType x) *> identifier' (context_Namespace x <> "$" <> (context_displayName x))
+
 context :: forall e. Array ID -> PrettyPrinter PerspectContext e
 context definedResources c = do
   withComments context_comments contextDeclaration c
@@ -223,6 +226,6 @@ enclosingContext theText = do
               context definedContexts c
               newline
             else do
-              withComments context_comments contextDeclaration c
+              withComments context_comments fullContextDeclaration c
               newline
         Nothing -> pure unit

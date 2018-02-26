@@ -17,7 +17,7 @@ import Perspectives.Effects (AvarCache, AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.GlobalUnsafeStrMap (poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.PerspectivesState (MonadPerspectives, contextDefinitionsInsert, contextDefinitionsLookup, rolDefinitions)
+import Perspectives.PerspectivesState (MonadPerspectives, contextDefinitions, contextDefinitionsInsert, contextDefinitionsLookup, rolDefinitions, rolDefinitionsInsert, rolDefinitionsLookup)
 import Perspectives.Syntax (PerspectContext, PerspectRol, Revision)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
 
@@ -57,14 +57,8 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   getType = rol_pspType
   setType = changeRol_type
   getId = rol_id
-  representInternally c = do
-    av <- liftAff $ makeEmptyVar
-    rolDefs <- rolDefinitions
-    _ <- liftEff $ poke rolDefs c av
-    pure av
-  retrieveInternally id = do
-    rolDefs <- rolDefinitions
-    liftEff $ peek rolDefs id
+  representInternally c = (liftAff makeEmptyVar) >>= rolDefinitionsInsert c
+  retrieveInternally = rolDefinitionsLookup
   encode = encodeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveRolFromDomein
@@ -75,13 +69,9 @@ cacheEntiteitPreservingVersion id e = do
   case mAvar of
     Nothing -> cacheUncachedEntiteit id e
     (Just avar) -> do
-      empty <- liftAff $ isEmptyVar avar
-      if empty
-        then liftAff $ putVar e avar
-        else do
-          ent <- liftAff $ takeVar avar
-          e' <- pure $ setRevision' (getRevision' ent) e
-          liftAff $ putVar e' avar
+      ent <- liftAff $ takeVar avar
+      e' <- pure $ setRevision' (getRevision' ent) e
+      liftAff $ putVar e' avar
 
 cacheEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AvarCache e) Unit
 cacheEntiteit id e = do

@@ -11,9 +11,3 @@ import Prelude (unit)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
 
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
-
-rolDefinitions :: RolDefinitions
-rolDefinitions = new unit
-
-contextDefinitions :: ContextDefinitions
-contextDefinitions = new unit
