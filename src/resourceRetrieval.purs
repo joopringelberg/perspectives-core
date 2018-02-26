@@ -21,7 +21,7 @@ import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
 import Perspectives.Couchdb.Databases (ensureAuthentication, defaultRequest)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
+import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, isQualifiedWithDomein, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.User (entitiesDatabase)
@@ -36,11 +36,7 @@ fetchPerspectEntiteitFromCouchdb id = if isUserURI id
     then case deconstructNamespace id of
       Nothing -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: Cannot construct namespace out of id " <> id)
       (Just ns) -> retrieveFromDomein id ns
-    else if isStandardNamespaceCURIE id
-      then case getStandardNamespace id of
-        Nothing -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: Cannot construct standard namespace out of id " <> id)
-        (Just ns) -> retrieveFromDomein id ns
-      else throwError $ error ("fetchPerspectEntiteitFromCouchdb: Unknown URI structure for " <> id)
+    else throwError $ error ("fetchPerspectEntiteitFromCouchdb: Unknown URI structure for " <> id)
 
 -- | Fetch the definition of a resource asynchronously.
 fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a

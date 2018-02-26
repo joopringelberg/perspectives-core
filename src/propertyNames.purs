@@ -5,7 +5,7 @@ import Data.String (take, toUpper, drop, toLower)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Perspectives.Identifiers (getFirstMatch, deconstructLocalNameFromCurie, deconstructLocalNameFromDomeinURI, deconstructNamespace, deconstructPrefix, getSecondMatch, isStandardNamespaceCURIE)
+import Perspectives.Identifiers (getFirstMatch, deconstructLocalNameFromDomeinURI, deconstructNamespace, getSecondMatch)
 import Prelude (id, ($), (<>))
 
 {-
@@ -18,22 +18,14 @@ c. If the above two cases did not succeed, just prefix the name with "inverse_"
 
 -}
 
-getInversePropertyName :: String -> String
-getInversePropertyName pn =
-  case invertIdentifierFromStandardNamespace pn of
-    (Just n) -> n
-    Nothing -> case invertDomainAndRange pn of
-      (Just n) -> n
-      Nothing -> "inverse_" <> pn
+getInversePropertyName :: String -> Maybe String
+getInversePropertyName = invertDomainAndRange
 
 capitalizeWord :: String -> String
 capitalizeWord word = (toUpper $ take 1 word) <> drop 1 word
 
 decapitalizeWord :: String -> String
 decapitalizeWord = toLower
-
-invertIdentifierFromStandardNamespace :: String -> Maybe String
-invertIdentifierFromStandardNamespace s = if isStandardNamespaceCURIE s then Just (((maybe "" id) (deconstructPrefix s)) <> ":inverse_" <> (maybe "" id)  (deconstructLocalNameFromCurie s)) else Nothing
 
 domainRangeRuleRegex :: Regex
 domainRangeRuleRegex = unsafeRegex "(.+?)\\_(.+)" noFlags
