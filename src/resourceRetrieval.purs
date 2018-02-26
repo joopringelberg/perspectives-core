@@ -7,7 +7,7 @@ module Perspectives.ResourceRetrieval
 where
 
 import Prelude
-import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, takeVar)
+import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
@@ -18,7 +18,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
-import Perspectives.Couchdb.Databases (ensureAuthentication)
+import Perspectives.Couchdb.Databases (ensureAuthentication, defaultRequest)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace, escapeCouchdbDocumentName, getStandardNamespace, isQualifiedWithDomein, isStandardNamespaceCURIE, isUserURI)
@@ -48,9 +48,10 @@ fetchEntiteit id = do
   v <- representInternally id
   -- _ <- forkAff do
   ebase <- entitiesDatabase
-  (res :: AffjaxResponse a) <- liftAff $ affjax $ userResourceRequest {url = ebase <> id}
+  (rq :: (AffjaxRequest Unit)) <- defaultRequest
+  (res :: AffjaxResponse a) <- liftAff $ affjax $ rq {url = ebase <> id}
   liftAff $ onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
-  liftAff $ takeVar v
+  liftAff $ readVar v
 
 saveEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 saveEntiteit id = do
@@ -73,7 +74,9 @@ saveUnversionedEntiteit id = do
         else do
           pe <- liftAff $ takeVar avar
           ebase <- entitiesDatabase
-          (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName id) (encode pe)
+          (rq :: (AffjaxRequest Unit)) <- defaultRequest
+          -- (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName id) (encode pe)
+          (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> id), content = Just (encode pe)}
           liftAff $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
             $ putVar (setRevision (unwrap res.response).rev pe) avar
           pure pe
@@ -84,17 +87,8 @@ saveVersionedEntiteit entId entiteit = do
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
       ebase <- entitiesDatabase
-      (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
-      onAccepted res.status [200, 201] "saveUnversionedEntiteit"
+      (rq :: (AffjaxRequest Unit)) <- defaultRequest
+      -- (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
+      (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> entId <> "?_rev=" <> rev), content = Just (encode entiteit)}
+      onAccepted res.status [200, 201] "saveVersionedEntiteit"
         $ cacheCachedEntiteit entId (setRevision (unwrap res.response).rev entiteit)
-
-userResourceRequest :: AffjaxRequest Unit
-userResourceRequest =
-  { method: Left GET
-  , url: "http://localhost:5984/user_cor_contexts2/user:xGebruiker"
-  , headers: []
-  , content: Nothing
-  , username: Just "cor"
-  , password: Just "geheim"
-  , withCredentials: true
-  }

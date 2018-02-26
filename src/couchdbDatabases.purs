@@ -10,7 +10,7 @@ import Data.Argonaut (fromObject, fromString)
 import Data.Array (cons, find)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Map (fromFoldable)
+import Data.Map (fromFoldable, insert)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable) as StrMap
 import Data.Tuple (Tuple(..))
@@ -25,17 +25,8 @@ import Perspectives.PerspectivesState (MonadPerspectives, sessionCookie, takeSes
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
 import Prelude (Unit, bind, const, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (==), (>>=))
 
-ensureAuthentication :: forall e a. MonadPerspectives (AjaxAvarCache e) a -> MonadPerspectives (AjaxAvarCache e) a
-ensureAuthentication a =
-  ifM (sessionCookie >>= lift <<< isEmptyVar)
-    (authenticate *> a)
-    (catchJust predicate a (const (authenticate *> a)))
-  where
-    predicate :: Error -> Maybe Unit
-    predicate e = if message e == "UNAUTHORIZED" then Just unit else Nothing
-
 -----------------------------------------------------------
--- QUALIFIEDREQUEST
+-- QUALIFYREQUEST
 -----------------------------------------------------------
 -- | On the browser, do nothing; otherwise add a Cookie header containing the cached cookie.
 qualifyRequest :: forall e a. AffjaxRequest a -> MonadPerspectives (avar :: AVAR | e) (AffjaxRequest a)
@@ -56,46 +47,6 @@ defaultRequest = qualifyRequest
   , password: Nothing
   , withCredentials: true
 }
-
------------------------------------------------------------
--- CREATEFIRSTADMIN
--- Notice: no authentication. Requires Couchdb to be in party mode.
------------------------------------------------------------
-createFirstAdmin :: forall e. User -> Password -> MonadPerspectives (AjaxAvarCache e) Unit
-createFirstAdmin user password = do
-  base <- getCouchdbBaseURL
-  -- TODO. Het _config endpoint bestaat niet meer in Couchdb ^2.0.
-  -- In plaats van:
-  --    _config/
-  --    _node/couchdb@localhost/_config/
-  -- Zie ook: http://docs.couchdb.org/en/2.1.1/config/auth.html
-  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put (base <> "_node/couchdb@localhost/_config/admins/" <> user) password
-  onAccepted res.status [200] "createFirstAdmin"
-    $ pure unit
------------------------------------------------------------
--- CREATE, DELETE, DATABASE
------------------------------------------------------------
-createStatusCodes :: CouchdbStatusCodes
-createStatusCodes = fromFoldable
-  [ Tuple 400 "Bad Request. Invalid database name."
-  , Tuple 401 "Unauthorized. CouchDB Server Administrator privileges required."
-  , Tuple 412 "Precondition failed. Database already exists."]
-
-createDatabase :: forall e. DatabaseName -> MonadPerspectives (AjaxAvarCache e) Unit
-createDatabase dbname = ensureAuthentication do
-  base <- getCouchdbBaseURL
-  (rq :: (AffjaxRequest Unit)) <- defaultRequest
-  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.affjax $ rq {method = Left PUT, url = (base <> dbname)}
-  -- (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
-  liftAff $ onAccepted' createStatusCodes res.status [201] "createDatabase" $ pure unit
-
-deleteDatabase :: forall e. DatabaseName -> MonadPerspectives (AjaxAvarCache e) Unit
-deleteDatabase dbname = ensureAuthentication do
-  base <- getCouchdbBaseURL
-  (rq :: (AffjaxRequest Unit)) <- defaultRequest
-  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.affjax $ rq {method = Left DELETE, url = (base <> dbname)}
-  -- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
-  liftAff $ onAccepted' createStatusCodes res.status [201] "createDatabase" $ pure unit
 
 -----------------------------------------------------------
 -- AUTHENTICATION
@@ -131,3 +82,57 @@ requestAuthentication = do
     (Just h) -> do
       -- NOTE. The Node implementation of Affjax depends on https://www.npmjs.com/package/xhr2. However, this emulation does not implement cookie authentication. Hence, we cannot use Perspectives from the command line.
       setSessionCookie $ responseHeaderValue h
+
+ensureAuthentication :: forall e a. MonadPerspectives (AjaxAvarCache e) a -> MonadPerspectives (AjaxAvarCache e) a
+ensureAuthentication a =
+  ifM (sessionCookie >>= lift <<< isEmptyVar)
+    (authenticate *> a)
+    (catchJust predicate a (const (authenticate *> a)))
+  where
+    predicate :: Error -> Maybe Unit
+    predicate e = if message e == "UNAUTHORIZED" then Just unit else Nothing
+
+-----------------------------------------------------------
+-- CREATEFIRSTADMIN
+-- Notice: no authentication. Requires Couchdb to be in party mode.
+-----------------------------------------------------------
+createFirstAdmin :: forall e. User -> Password -> MonadPerspectives (AjaxAvarCache e) Unit
+createFirstAdmin user password = do
+  base <- getCouchdbBaseURL
+  -- TODO. Het _config endpoint bestaat niet meer in Couchdb ^2.0.
+  -- In plaats van:
+  --    _config/
+  --    _node/couchdb@localhost/_config/
+  -- Zie ook: http://docs.couchdb.org/en/2.1.1/config/auth.html
+  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put (base <> "_node/couchdb@localhost/_config/admins/" <> user) password
+  onAccepted res.status [200] "createFirstAdmin"
+    $ pure unit
+-----------------------------------------------------------
+-- CREATE, DELETE, DATABASE
+-----------------------------------------------------------
+databaseStatusCodes :: CouchdbStatusCodes
+databaseStatusCodes = fromFoldable
+  [ Tuple 400 "Bad Request. Invalid database name."
+  , Tuple 401 "Unauthorized. CouchDB Server Administrator privileges required."]
+
+createDatabase :: forall e. DatabaseName -> MonadPerspectives (AjaxAvarCache e) Unit
+createDatabase dbname = ensureAuthentication do
+  base <- getCouchdbBaseURL
+  (rq :: (AffjaxRequest Unit)) <- defaultRequest
+  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.affjax $ rq {method = Left PUT, url = (base <> dbname)}
+  -- (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
+  liftAff $ onAccepted' createStatusCodes res.status [201] "createDatabase" $ pure unit
+  where
+    createStatusCodes = insert 412 "Precondition failed. Database already exists."
+      databaseStatusCodes
+
+deleteDatabase :: forall e. DatabaseName -> MonadPerspectives (AjaxAvarCache e) Unit
+deleteDatabase dbname = ensureAuthentication do
+  base <- getCouchdbBaseURL
+  (rq :: (AffjaxRequest Unit)) <- defaultRequest
+  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.affjax $ rq {method = Left DELETE, url = (base <> dbname)}
+  -- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
+  liftAff $ onAccepted' deleteStatusCodes res.status [200] "deleteDatabase" $ pure unit
+  where
+    deleteStatusCodes = insert 412 "Precondition failed. Database does not exist."
+      databaseStatusCodes

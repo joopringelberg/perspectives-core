@@ -2,7 +2,7 @@ module Perspectives.PerspectivesState where
 
 import Control.Monad.Aff (Aff, liftEff')
 import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, putVar, readVar, takeVar)
-import Control.Monad.Aff.Class (liftAff)
+import Control.Monad.Aff.Class (class MonadAff, liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF, Ref, newRef, readRef, writeRef)
 import Control.Monad.Reader (ReaderT, ask, runReaderT)

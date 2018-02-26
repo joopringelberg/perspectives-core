@@ -138,8 +138,6 @@ ui =
   eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (MonadPerspectives (ACE.AceEffects eff))
   eval (Initialize next) =  do
     lift requestAuthentication
-    lift $ createDatabase "test1"
-    lift $ deleteDatabase "test1"
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do
