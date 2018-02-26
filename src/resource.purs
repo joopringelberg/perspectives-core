@@ -1,7 +1,7 @@
 module Perspectives.Resource where
 
 import Prelude
-import Control.Monad.Aff.AVar (AVar, putVar, readVar)
+import Control.Monad.Aff.AVar (AVar, readVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify)
