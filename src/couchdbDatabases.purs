@@ -34,6 +34,7 @@ qualifyRequest req@{headers} = do
   cookie <- readSessionCookieValue
   case cookie of
     "Browser" -> pure req
+    "" -> pure req
     otherwise -> pure $ req {headers = cons (RequestHeader "Cookie" cookie) headers}
 
 defaultRequest :: forall e. MonadPerspectives (avar :: AVAR | e) (AffjaxRequest Unit)
@@ -92,21 +93,6 @@ ensureAuthentication a =
     predicate :: Error -> Maybe Unit
     predicate e = if message e == "UNAUTHORIZED" then Just unit else Nothing
 
------------------------------------------------------------
--- CREATEFIRSTADMIN
--- Notice: no authentication. Requires Couchdb to be in party mode.
------------------------------------------------------------
-createFirstAdmin :: forall e. User -> Password -> MonadPerspectives (AjaxAvarCache e) Unit
-createFirstAdmin user password = do
-  base <- getCouchdbBaseURL
-  -- TODO. Het _config endpoint bestaat niet meer in Couchdb ^2.0.
-  -- In plaats van:
-  --    _config/
-  --    _node/couchdb@localhost/_config/
-  -- Zie ook: http://docs.couchdb.org/en/2.1.1/config/auth.html
-  (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put (base <> "_node/couchdb@localhost/_config/admins/" <> user) password
-  onAccepted res.status [200] "createFirstAdmin"
-    $ pure unit
 -----------------------------------------------------------
 -- CREATE, DELETE, DATABASE
 -----------------------------------------------------------

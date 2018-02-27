@@ -1,0 +1,20 @@
+COUCHDB OPZETTEN
+
+0. Zet Couchdb uit.
+
+1. Verwijder de oude installatie. 
+	
+	cd ~/Code/perspectivesInPurescript
+	sudo ./removeCouchdb
+
+2. Unzip Apache-CouchDB-2.1.1-1.zip in ~/Code/perspectivesInPurescript/dist
+
+3. Sleep de Couchdb app naar Programma's in de finder.
+
+4. Start Couchdb (b.v. in de launcher)
+
+5. Run, in dezelfde directory:
+
+	 ./setupCouchdb 
+
+6. Start nu Perspectives.

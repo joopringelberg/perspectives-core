@@ -5,6 +5,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Control.Monad.Except.Trans (catchError)
 import Data.Array (head, index)
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX)
@@ -48,7 +49,8 @@ modelSelect =
     eval :: ModelSelectQuery ~> H.ComponentDSL State ModelSelectQuery ModelSelected (MonadPerspectives (ajax :: AJAX | e))
     eval = case _ of
       Initialize next -> do
-        (models :: Array String) <- H.liftAff $ documentNamesInDatabase "perspect_models"
+        (models :: Array String) <- H.liftAff $ catchError (documentNamesInDatabase "perspect_models")
+          \_ -> pure []
         H.put { models: models, index: Just 0, selectedModel: head models }
         pure next
       Reload next -> do

@@ -34,20 +34,22 @@ import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PerspectivesState (MonadPerspectives, newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
+import Perspectives.SetupCouchdb (configureCORS, createUserDatabases, setupCouchdb)
 import Perspectives.Syntax (PerspectContext)
+import Perspectives.User (getUser)
 import Text.Parsing.StringParser (ParseError, runParser)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (ACE.AceEffects ())) Unit
 main = HA.runHalogenAff do
-  -- usr <- userFromLocation
   (usr :: Maybe String) <- userFromLocation
   -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
   pw <- pure "geheim"
   url <- pure "http://127.0.0.1:5984/"
   (av :: AVar String) <- makeVar "ignore"
   body <- HA.awaitBody
-  rf <- liftEff' $ newRef $ newPerspectivesState {userName: (maybe "admin" id usr), couchdbPassword: pw, couchdbBaseURL: url} av
+  -- TODO. Als geen waarde in usr beschikbaar is, moet de gebruiker een naam (opnieuw) invoeren!
+  rf <- liftEff' $ newRef $ newPerspectivesState {userName: (maybe "cor" id usr), couchdbPassword: pw, couchdbBaseURL: url} av
   runUI (H.hoist (flip runReaderT rf) ui) unit body
 
 userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe String)
@@ -138,6 +140,7 @@ ui =
   eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (MonadPerspectives (ACE.AceEffects eff))
   eval (Initialize next) =  do
     lift requestAuthentication
+    lift $ setupCouchdb
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do
