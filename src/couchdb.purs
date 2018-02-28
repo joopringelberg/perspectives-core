@@ -1,14 +1,10 @@
 module Perspectives.Couchdb where
 
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.Class (class MonadAff)
 import Control.Monad.Eff.Exception (Error, error)
-import Control.Monad.Error.Class (class MonadError, class MonadThrow, throwError)
-import Data.Argonaut.Core (JObject)
+import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (elemIndex)
-import Data.Either.Nested (E10)
 import Data.Foreign.Class (class Decode)
-import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Foreign.Generic (defaultOptions, genericDecode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map, fromFoldable, lookup)
@@ -16,11 +12,9 @@ import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax.Request (class Requestable, RequestContent(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.PerspectivesState (MonadPerspectives)
-import Prelude (class Monad, show, ($), (<>), (==))
+import Prelude (show, ($), (<>), (==))
 
 -----------------------------------------------------------
 -- ALIASES
@@ -45,6 +39,16 @@ derive instance genericPutCouchdbDocument :: Generic PutCouchdbDocument _
 derive instance newtypePutCouchdbDocument :: Newtype PutCouchdbDocument _
 
 instance respondablePutCouchdbDocument :: Respondable PutCouchdbDocument where
+  responseType = Tuple Nothing JSONResponse
+  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+-----------------------------------------------------------
+-- DBS
+-----------------------------------------------------------
+newtype DBS = DBS (Array String)
+derive instance genericDBS :: Generic DBS _
+derive instance newtypeDBS :: Newtype DBS _
+instance respondableDBS :: Respondable DBS where
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 

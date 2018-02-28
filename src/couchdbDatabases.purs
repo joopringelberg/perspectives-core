@@ -12,14 +12,15 @@ import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Map (fromFoldable, insert)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.StrMap (fromFoldable) as StrMap
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax (AffjaxRequest)
-import Network.HTTP.Affjax (AffjaxResponse, affjax) as AJ
+import Network.HTTP.Affjax (AJAX, AffjaxRequest)
+import Network.HTTP.Affjax (AffjaxResponse, affjax, get) as AJ
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Network.HTTP.ResponseHeader (ResponseHeader, responseHeaderName, responseHeaderValue)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted')
+import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted', DBS)
 import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
 import Perspectives.PerspectivesState (MonadPerspectives, sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
@@ -135,3 +136,12 @@ deleteDatabase dbname = ensureAuthentication do
   where
     deleteStatusCodes = insert 412 "Precondition failed. Database does not exist."
       databaseStatusCodes
+
+-----------------------------------------------------------
+-- ALLDBS
+-----------------------------------------------------------
+allDbs :: forall e. MonadPerspectives (ajax :: AJAX | e) (Array String)
+allDbs = do
+  base <- getCouchdbBaseURL
+  (res :: AJ.AffjaxResponse DBS) <- lift $ AJ.get (base <> "_all_dbs")
+  pure $ unwrap res.response

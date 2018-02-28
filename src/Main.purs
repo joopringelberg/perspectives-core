@@ -6,7 +6,7 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Control.Monad.Aff (Aff, error, liftEff', throwError)
-import Control.Monad.Aff.AVar (AVar, makeEmptyVar, makeVar)
+import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (newRef)
 import Control.Monad.Reader (runReaderT)
@@ -36,7 +36,7 @@ import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PerspectivesState (MonadPerspectives, newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
-import Perspectives.SetupCouchdb (setupCouchdb)
+import Perspectives.SetupCouchdb (partyMode, setupCouchdb)
 import Perspectives.Syntax (PerspectContext)
 import Text.Parsing.StringParser (ParseError, runParser)
 
@@ -50,7 +50,7 @@ main = HA.runHalogenAff $
       (Just (Tuple usr pwd)) -> do
         -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
         url <- pure "http://127.0.0.1:5984/"
-        (av :: AVar String) <- makeVar "ignore"
+        (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
         body <- HA.awaitBody
         rf <- liftEff' $ newRef $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
         runUI (H.hoist (flip runReaderT rf) ui) unit body
@@ -146,9 +146,10 @@ ui =
       ]
 
   eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (MonadPerspectives (ACE.AceEffects eff))
-  eval (Initialize next) =  do
-    lift $ setupCouchdb
-    lift $ requestAuthentication
+  eval (Initialize next) = do
+    ifM (lift partyMode)
+      (lift setupCouchdb)
+      (lift requestAuthentication)
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do

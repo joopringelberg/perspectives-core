@@ -1,7 +1,6 @@
 module Perspectives.IndentParser where
   -- type Parser s = ParserT s Identity
 
-import Control.Monad.Aff (Aff)
 import Control.Monad.State (StateT, evalStateT)
 import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)

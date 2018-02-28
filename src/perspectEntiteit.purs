@@ -2,7 +2,6 @@ module Perspectives.PerspectEntiteit where
 
 import Control.Monad.Aff.AVar (AVar, isEmptyVar, makeEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError, runExcept)
 import Data.Either (Either)
@@ -15,9 +14,8 @@ import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', chang
 import Perspectives.DomeinCache (retrieveContextFromDomein, retrieveRolFromDomein)
 import Perspectives.Effects (AvarCache, AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.GlobalUnsafeStrMap (poke, peek)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.PerspectivesState (MonadPerspectives, contextDefinitions, contextDefinitionsInsert, contextDefinitionsLookup, rolDefinitions, rolDefinitionsInsert, rolDefinitionsLookup)
+import Perspectives.PerspectivesState (MonadPerspectives, contextDefinitionsInsert, contextDefinitionsLookup, rolDefinitionsInsert, rolDefinitionsLookup)
 import Perspectives.Syntax (PerspectContext, PerspectRol, Revision)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
 
