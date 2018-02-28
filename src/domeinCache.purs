@@ -125,6 +125,6 @@ domeinRequest =
   , headers: []
   , content: Nothing
   , username: Just "cor"
-  , password: Just "geheim"
+  , password: Just "geheim" 
   , withCredentials: true
   }

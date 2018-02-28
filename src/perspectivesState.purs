@@ -1,8 +1,8 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.Aff (Aff, liftEff')
-import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, putVar, readVar, takeVar)
-import Control.Monad.Aff.Class (class MonadAff, liftAff)
+import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, readVar, takeVar, tryReadVar)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF, Ref, newRef, readRef, writeRef)
 import Control.Monad.Reader (ReaderT, ask, runReaderT)
@@ -53,7 +53,7 @@ type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e)
 runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR | e) a
   -> Aff (avar :: AVAR, ref :: REF | e) a
 runPerspectives userName password mp = do
-  (av :: AVar String) <- makeVar "ignore"
+  (av :: AVar String) <- makeEmptyVar
   (rf :: Ref PerspectivesState) <- liftEff' $ newRef $
     newPerspectivesState
       { userName: userName
@@ -107,6 +107,9 @@ takeSessionCookieValue = getsGlobalState _.sessionCookie >>= lift <<< takeVar
 
 readSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) String
 readSessionCookieValue = getsGlobalState _.sessionCookie >>= lift <<< readVar
+
+tryReadSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) (Maybe String)
+tryReadSessionCookieValue = getsGlobalState _.sessionCookie >>= lift <<< tryReadVar
 
 setSessionCookie :: forall e. String -> MonadPerspectives (avar :: AVAR | e) Unit
 setSessionCookie c = sessionCookie >>= (lift <<< putVar c)

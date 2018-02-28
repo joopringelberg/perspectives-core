@@ -5,8 +5,8 @@ import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Control.Monad.Aff (Aff, liftEff')
-import Control.Monad.Aff.AVar (AVar, makeVar)
+import Control.Monad.Aff (Aff, error, liftEff', throwError)
+import Control.Monad.Aff.AVar (AVar, makeEmptyVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (newRef)
 import Control.Monad.Reader (runReaderT)
@@ -18,14 +18,16 @@ import DOM.HTML.Window (location)
 import Data.Either (Either(..))
 import Data.Either.Nested (Either3)
 import Data.Functor.Coproduct.Nested (Coproduct3)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable, lookup)
+import Data.Tuple (Tuple(..))
 import Data.URI.Query (Query(..), parser) as URI
 import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent) as ACE
 import Perspectives.ContextRoleParser (enclosingContext) as CRP
-import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase, requestAuthentication)
+import Perspectives.Couchdb (User, Password)
+import Perspectives.Couchdb.Databases (requestAuthentication)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect) as MS
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
@@ -34,32 +36,38 @@ import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PerspectivesState (MonadPerspectives, newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (domeinFileFromContext, getPerspectEntiteit)
-import Perspectives.SetupCouchdb (configureCORS, createUserDatabases, setupCouchdb)
+import Perspectives.SetupCouchdb (setupCouchdb)
 import Perspectives.Syntax (PerspectContext)
-import Perspectives.User (getUser)
 import Text.Parsing.StringParser (ParseError, runParser)
 
 -- | Run the app!
 main :: Eff (HA.HalogenEffects (ACE.AceEffects ())) Unit
-main = HA.runHalogenAff do
-  (usr :: Maybe String) <- userFromLocation
-  -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
-  pw <- pure "geheim"
-  url <- pure "http://127.0.0.1:5984/"
-  (av :: AVar String) <- makeVar "ignore"
-  body <- HA.awaitBody
-  -- TODO. Als geen waarde in usr beschikbaar is, moet de gebruiker een naam (opnieuw) invoeren!
-  rf <- liftEff' $ newRef $ newPerspectivesState {userName: (maybe "cor" id usr), couchdbPassword: pw, couchdbBaseURL: url} av
-  runUI (H.hoist (flip runReaderT rf) ui) unit body
+main = HA.runHalogenAff $
+  do
+    mt <- credentialsFromQueryString
+    case mt of
+      Nothing -> throwError $ error "Both the user and password key-value pairs have to be present in the query string!"
+      (Just (Tuple usr pwd)) -> do
+        -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
+        url <- pure "http://127.0.0.1:5984/"
+        (av :: AVar String) <- makeVar "ignore"
+        body <- HA.awaitBody
+        rf <- liftEff' $ newRef $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
+        runUI (H.hoist (flip runReaderT rf) ui) unit body
 
-userFromLocation :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe String)
-userFromLocation = do
+-- TODO. Als geen waarde in usr beschikbaar is, moet de gebruiker een naam (opnieuw) invoeren!
+credentialsFromQueryString :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe (Tuple User Password))
+credentialsFromQueryString = do
   (parseResult :: Either ParseError URI.Query) <- liftEff' ((runParser URI.parser) <$> (window >>= location >>= search))
   case parseResult of
     (Left m) -> pure Nothing
     (Right (URI.Query kvp)) -> case lookup "user" $ fromFoldable kvp of
-      Nothing -> pure Nothing
-      (Just mv) -> pure mv
+      (Just (Just usr)) ->
+        case lookup "password" $ fromFoldable kvp of
+          (Just (Just pwd)) -> pure $ Just (Tuple usr pwd)
+          otherwise -> pure Nothing
+      otherwise -> pure Nothing
+
 
 -- | The application state, which in this case just stores the current text in
 -- | the editor.
@@ -139,8 +147,8 @@ ui =
 
   eval :: Query ~> H.ParentDSL State Query ChildQuery ChildSlot Void (MonadPerspectives (ACE.AceEffects eff))
   eval (Initialize next) =  do
-    lift requestAuthentication
     lift $ setupCouchdb
+    lift $ requestAuthentication
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do

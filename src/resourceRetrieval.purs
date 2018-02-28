@@ -18,7 +18,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
-import Perspectives.Couchdb.Databases (ensureAuthentication, defaultRequest)
+import Perspectives.Couchdb.Databases (ensureAuthentication, defaultPerspectRequest)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace, isQualifiedWithDomein, isUserURI)
@@ -48,7 +48,7 @@ fetchEntiteit id = ensureAuthentication $ do
   v <- representInternally id
   -- _ <- forkAff do
   ebase <- entitiesDatabase
-  (rq :: (AffjaxRequest Unit)) <- defaultRequest
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
   (res :: AffjaxResponse a) <- liftAff $ affjax $ rq {url = ebase <> id}
   liftAff $ onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
   liftAff $ readVar v
@@ -74,7 +74,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
         else do
           pe <- liftAff $ takeVar avar
           ebase <- entitiesDatabase
-          (rq :: (AffjaxRequest Unit)) <- defaultRequest
+          (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
           -- (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName id) (encode pe)
           (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> id), content = Just (encode pe)}
           liftAff $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
@@ -87,7 +87,7 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
       ebase <- entitiesDatabase
-      (rq :: (AffjaxRequest Unit)) <- defaultRequest
+      (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
       -- (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName entId <> "?_rev=" <> rev) (encode entiteit)
       (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> entId <> "?_rev=" <> rev), content = Just (encode entiteit)}
       onAccepted res.status [200, 201] "saveVersionedEntiteit"

@@ -15,30 +15,30 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable) as StrMap
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AffjaxRequest)
-import Network.HTTP.Affjax (AffjaxResponse, put, post, affjax) as AJ
+import Network.HTTP.Affjax (AffjaxResponse, affjax) as AJ
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Network.HTTP.ResponseHeader (ResponseHeader, responseHeaderName, responseHeaderValue)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, Password, PostCouchdb_session, User, onAccepted, onAccepted')
-import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
-import Perspectives.PerspectivesState (MonadPerspectives, sessionCookie, takeSessionCookieValue, readSessionCookieValue, setSessionCookie)
+import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted')
+import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
+import Perspectives.PerspectivesState (MonadPerspectives, sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
-import Prelude (Unit, bind, const, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, const, ifM, pure, unit, void, ($), (*>), (/=), (<<<), (<>), (==), (>>=))
 
 -----------------------------------------------------------
 -- QUALIFYREQUEST
 -----------------------------------------------------------
--- | On the browser, do nothing; otherwise add a Cookie header containing the cached cookie.
+-- | On the browser, do nothing; otherwise add a Cookie header containing the cached cookie. This is a synchronous function.
 qualifyRequest :: forall e a. AffjaxRequest a -> MonadPerspectives (avar :: AVAR | e) (AffjaxRequest a)
 qualifyRequest req@{headers} = do
-  cookie <- readSessionCookieValue
+  cookie <- tryReadSessionCookieValue
   case cookie of
-    "Browser" -> pure req
-    "" -> pure req
-    otherwise -> pure $ req {headers = cons (RequestHeader "Cookie" cookie) headers}
+    (Just x) | x /= "Browser" -> pure req
+    (Just ck) -> pure $ req {headers = cons (RequestHeader "Cookie" ck) headers}
+    otherwise -> pure req
 
-defaultRequest :: forall e. MonadPerspectives (avar :: AVAR | e) (AffjaxRequest Unit)
-defaultRequest = qualifyRequest
+defaultPerspectRequest :: forall e. MonadPerspectives (avar :: AVAR | e) (AffjaxRequest Unit)
+defaultPerspectRequest = qualifyRequest
   { method: Left GET
   , url: "http://localhost:5984/"
   , headers: []
@@ -61,15 +61,23 @@ authenticate =
     -- New authentication is necessary.
     requestAuthentication
 
+-- | To be called when the cookie is no longer valid.
 requestAuthentication :: forall e. MonadPerspectives (AjaxAvar e) Unit
 requestAuthentication = do
   _ <- takeSessionCookieValue
-  base <- getCouchdbBaseURL
   usr <- getUser
   pwd <- getCouchdbPassword
-  (res :: AJ.AffjaxResponse PostCouchdb_session) <- lift $ AJ.post
-    (base <> "_session")
-    (fromObject (StrMap.fromFoldable [Tuple "name" (fromString usr), Tuple "password" (fromString pwd)]))
+  requestAuthentication' usr pwd
+
+-- | To be called if there is no cookie at all.
+requestAuthentication' :: forall e. User -> Password -> MonadPerspectives (AjaxAvar e) Unit
+requestAuthentication' usr pwd = do
+  base <- getCouchdbBaseURL
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+  (res :: AJ.AffjaxResponse PostCouchdb_session) <- liftAff $ AJ.affjax $ rq {method = Left POST, url = (base <> "_session"), content = Just (fromObject (StrMap.fromFoldable [Tuple "name" (fromString usr), Tuple "password" (fromString pwd)]))}
+  -- (res :: AJ.AffjaxResponse PostCouchdb_session) <- lift $ AJ.post
+    -- (base <> "_session")
+    -- (fromObject (StrMap.fromFoldable [Tuple "name" (fromString usr), Tuple "password" (fromString pwd)]))
   case res.status of
     (StatusCode 200) -> saveCookie res.headers
     (StatusCode 203) -> saveCookie res.headers
@@ -93,6 +101,11 @@ ensureAuthentication a =
     predicate :: Error -> Maybe Unit
     predicate e = if message e == "UNAUTHORIZED" then Just unit else Nothing
 
+-- | A logout is purely client side, as Couchdb keeps no session state.
+-- | (see: http://127.0.0.1:5984/_utils/docs/api/server/authn.html#api-auth-cookie)
+logout :: forall e. MonadPerspectives (AvarCache e) Unit
+logout = void takeSessionCookieValue
+
 -----------------------------------------------------------
 -- CREATE, DELETE, DATABASE
 -----------------------------------------------------------
@@ -104,7 +117,7 @@ databaseStatusCodes = fromFoldable
 createDatabase :: forall e. DatabaseName -> MonadPerspectives (AjaxAvarCache e) Unit
 createDatabase dbname = ensureAuthentication do
   base <- getCouchdbBaseURL
-  (rq :: (AffjaxRequest Unit)) <- defaultRequest
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
   (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.affjax $ rq {method = Left PUT, url = (base <> dbname)}
   -- (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
   liftAff $ onAccepted' createStatusCodes res.status [201] "createDatabase" $ pure unit
@@ -115,7 +128,7 @@ createDatabase dbname = ensureAuthentication do
 deleteDatabase :: forall e. DatabaseName -> MonadPerspectives (AjaxAvarCache e) Unit
 deleteDatabase dbname = ensureAuthentication do
   base <- getCouchdbBaseURL
-  (rq :: (AffjaxRequest Unit)) <- defaultRequest
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
   (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.affjax $ rq {method = Left DELETE, url = (base <> dbname)}
   -- liftAff $ AJ.put' (base <> dbname) (Nothing :: Maybe String)
   liftAff $ onAccepted' deleteStatusCodes res.status [200] "deleteDatabase" $ pure unit

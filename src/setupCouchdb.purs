@@ -1,9 +1,5 @@
 module Perspectives.SetupCouchdb where
 
------------------------------------------------------------
--- CREATEFIRSTADMIN
--- Notice: no authentication. Requires Couchdb to be in party mode.
------------------------------------------------------------
 import Control.Monad.Aff.Class (liftAff)
 import Data.Argonaut (fromString)
 import Data.Either (Either(..))
@@ -11,24 +7,28 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, put, affjax)
 import Perspectives.Couchdb (Password, User, onAccepted)
-import Perspectives.Couchdb.Databases (createDatabase, defaultRequest)
+import Perspectives.Couchdb.Databases (createDatabase, defaultPerspectRequest, ensureAuthentication, logout, requestAuthentication')
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.PerspectivesState (MonadPerspectives, takeSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
-import Prelude (Unit, bind, pure, unit, ($), (<>), discard)
+import Prelude (Unit, bind, discard, pure, unit, ($), (<>))
 
 -----------------------------------------------------------
 -- SETUPCOUCHDB
--- Notice: no authentication. Requires Couchdb to be in party mode.
+-- Notice: Requires Couchdb to have a server admin user "admin" whose password is "admin"
+-- and the "_users" database available.
 -----------------------------------------------------------
 setupCouchdb :: forall e. MonadPerspectives (AjaxAvarCache e) Unit
 setupCouchdb = do
+  _ <- takeSessionCookieValue
+  requestAuthentication' "admin" "admin"
   usr <- getUser
   pwd <- getCouchdbPassword
-  -- createFirstAdmin usr pwd
+  createAnotherAdmin usr pwd
   createSystemDatabases
   createUserDatabases usr
   createDatabase "perspectives_models"
+  logout
   -- configureCORS
 
 -----------------------------------------------------------
@@ -42,6 +42,17 @@ createFirstAdmin user password = do
   (res :: AffjaxResponse String) <- liftAff $ put (base <> "_node/couchdb@localhost/_config/admins/" <> user) (fromString password)
   onAccepted res.status [200] "createFirstAdmin"
     $ pure unit
+
+-----------------------------------------------------------
+-- CREATEANOTHERADMIN
+-- Notice: requires authentication!
+-----------------------------------------------------------
+createAnotherAdmin :: forall e. User -> Password -> MonadPerspectives (AjaxAvarCache e) Unit
+createAnotherAdmin user password = ensureAuthentication do
+  base <- getCouchdbBaseURL
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+  (res :: AffjaxResponse String) <- liftAff $ affjax $ rq {method = Left PUT, url = (base <> "_node/couchdb@localhost/_config/admins/" <> user), content = Just (fromString password)}
+  liftAff $ onAccepted res.status [200] "createAnotherAdmin" $ pure unit
 
 -----------------------------------------------------------
 -- CONFIGURECORS
@@ -72,7 +83,7 @@ configureCORS =
   where
     setKey key value = do
       base <- getCouchdbBaseURL
-      (rq :: (AffjaxRequest Unit)) <- defaultRequest
+      (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
       (res :: AffjaxResponse String) <- liftAff $ affjax $ rq {method = Left PUT, url = (base <> "_node/couchdb@localhost/_config/" <> key), content = Just $ fromString value}
       -- (res :: AJ.AffjaxResponse String) <- liftAff $ AJ.put (base <> "_node/couchdb@localhost/_config/cors/" <> key) value
       onAccepted res.status [200] "configureCORS" $ pure unit

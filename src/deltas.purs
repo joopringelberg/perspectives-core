@@ -214,6 +214,7 @@ sendTransactieToUser :: forall e. ID -> Transactie -> MonadPerspectives (AjaxAva
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ## identity
   (userIP :: String) <- onNothing' ("sendTransactieToUser: user has no IP: " <> userId) (head (tripleObjects tripleUserIP))
+  -- TODO controleer of hier authentication nodig is!
   (res :: AJ.AffjaxResponse String)  <- liftAff $ AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
