@@ -11,7 +11,7 @@ import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
-import Prelude (bind, id, join, pure, ($))
+import Prelude (bind, id, join, pure, show, ($), (==))
 
 
 {-

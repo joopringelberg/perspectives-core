@@ -42,7 +42,7 @@ retrieveContextFromDomein :: forall e.
 retrieveContextFromDomein id ns = do
   (DomeinFile {contexts}) <- retrieveDomeinFile ns
   case lookup id contexts of
-    Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
+    Nothing -> throwError $ error ("retrieveContextFromDomein: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
     (Just context) -> pure context
 
 -- | Fetch a PerspectRol asynchronously from its Domein, loading the Domein file if necessary.
@@ -53,7 +53,7 @@ retrieveRolFromDomein :: forall e.
 retrieveRolFromDomein id ns = do
   (DomeinFile {roles}) <- retrieveDomeinFile ns
   case lookup id roles of
-    Nothing -> throwError $ error ("retrieveDomeinResourceDefinition: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
+    Nothing -> throwError $ error ("retrieveRolFromDomein: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
     (Just rol) -> pure rol
 
 retrieveDomeinFile :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) DomeinFile
@@ -125,6 +125,6 @@ domeinRequest =
   , headers: []
   , content: Nothing
   , username: Just "cor"
-  , password: Just "geheim" 
+  , password: Just "geheim"
   , withCredentials: true
   }

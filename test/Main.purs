@@ -8,7 +8,7 @@ import Control.Monad.Eff.Ref (REF)
 import Perspectives.PerspectivesState (runPerspectives)
 import Prelude (class Show, Unit, pure, unit, (>>=), show)
 
-import Test.Properties
+import Test.BoundContexts
 
 main :: forall e. Eff (TE.CancelerEffects (ref :: REF | e)) (Fiber (TE.CancelerEffects (ref :: REF | e)) Unit)
 main = runAff TE.handleError tt

@@ -1,0 +1,13 @@
+-- TRYING TO SAVE USER RESOURCES
+
+Context model:Test als tst:
+
+import model:Perspectives als psp:
+import model:User als usr:
+
+Section psp:rolInContext
+
+psp:Context usr:Gebruiker
+
+psp:Context usr:Systeem
+  psp:rolInContext => usr:Gebruiker
