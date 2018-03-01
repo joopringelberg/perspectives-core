@@ -1,9 +1,13 @@
 module Perspectives.SystemQueries where
 
+import Data.Array (elemIndex)
+import Data.Maybe (maybe)
+import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
-import Perspectives.QueryCombinators (hasValue, closure') as QC
+import Perspectives.PropertyComposition ((>->))
+import Perspectives.QueryCombinators (hasValue, closure', filter) as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructRolGetter, constructTripleGetterFromArbitraryFunction)
-import Prelude (pure)
+import Prelude (const, pure, (<>), (>=>))
 
 identity' :: forall e. ObjectsGetter e
 identity' id = pure [id]
@@ -41,6 +45,10 @@ rolContext = constructTripleGetterFromArbitraryFunction "model:Perspectives$cont
 label :: forall e. NamedTripleGetter e
 label = constructTripleGetterFromArbitraryFunction "model:Perspectives$label" getDisplayName
 
+rolHasType :: forall e. ID -> NamedTripleGetter e
+rolHasType typeId = constructTripleGetterFromArbitraryFunction ("model:Perspectives$rolHasType" <> "_" <> typeId)
+  (getRolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
+
 -----------------------------------------------------------
 -- GETTERS BASED ON MODEL:PERSPECTIVES$
 -- These getters are based on properties (defined for roles) and roles (defined for contexts)
@@ -69,3 +77,9 @@ lijdendVoorwerpBepaling = constructRolGetter "model:Perspectives$lijdendVoorwerp
 
 propertyReferentie :: forall e. NamedTripleGetter e
 propertyReferentie = constructRolGetter "model:Perspectives$propertyReferentie"
+
+isContext :: forall e. NamedTripleGetter e
+isContext = QC.hasValue rolContext
+
+boundContexts :: forall e. NamedTripleGetter e
+boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRolInContext >-> binding)) >-> rolContext

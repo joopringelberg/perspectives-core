@@ -3,10 +3,12 @@ module Perspectives.QueryCombinators where
 import Data.Array (cons, difference, elemIndex, foldr, head, null, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
+import Perspectives.ContextAndRole (rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.Property (ObjectsGetter, getRol)
+import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
 import Perspectives.TripleGetter (constructTripleGetterFromArbitraryFunction)
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
@@ -66,12 +68,12 @@ filter :: forall e.
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e) ->
   NamedFunction (TripleGetter e)
-filter (NamedFunction nameOfc c) (NamedFunction nameOfp p) =
+filter (NamedFunction nameOfc criterium) (NamedFunction nameOfp p) =
   memorize getter name where
     getter :: TripleGetter e
     getter id = do
       t@(Triple{object}) <- p id
-      (triples :: Array (Triple e)) <- traverse c (difference object [id])
+      (triples :: Array (Triple e)) <- traverse criterium (difference object [id])
       (objects :: Array String) <- pure $ foldr addSubjectIfTrue [] triples
       pure $ Triple { subject: id
                     , predicate : name
