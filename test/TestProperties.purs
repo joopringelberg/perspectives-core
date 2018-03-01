@@ -21,7 +21,7 @@ viewDef :: String
 viewDef = "model:Perspectives$view"
 
 psp :: String
-psp = "model:Perspectives$"
+psp = "model:Perspectives"
 
 test :: forall e. MonadPerspectives (CancelerEffects e) Unit
 test = do
@@ -85,11 +85,11 @@ test = do
   log ( "psp ## iedereRolInContext >-> binding = " <> show l19)
 
   -- Dit levert een lege lijst!
-  l20 <- "model:Perspectives$Rol_rolInContext_1" ## binding
-  log ( "'model:Perspectives$Rol_rolInContext_1' ## binding = " <> show l20)
+  l20 <- "model:Perspectives$rolInContext1" ## binding
+  log ( "'model:Perspectives$rolInContext1' ## binding = " <> show l20)
 
-  l21 <- "model:Perspectives$Rol_rolInContext_1" ## rolType
-  log ( "'model:Perspectives$Rol_rolInContext_1' ## rolType = " <> show l21)
+  l21 <- "model:Perspectives$rolInContext1" ## rolType
+  log ( "'model:Perspectives$rolInContext1' ## rolType = " <> show l21)
 
 log :: forall e. String -> MonadPerspectives (console :: CONSOLE | e) Unit
 log = lift <<< AC.log
