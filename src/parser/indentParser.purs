@@ -6,8 +6,9 @@ import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
-import Data.StrMap (StrMap, empty, insert, lookup, singleton)
+import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, singleton)
 import Data.String (null)
+import Data.Tuple (Tuple(..))
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (Prefix, QualifiedName(..))
 import Perspectives.PerspectivesState (MonadPerspectives)
@@ -24,7 +25,7 @@ import Text.Parsing.Parser.Pos (Position)
 type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, section :: QualifiedName, prefixes :: StrMap String}
 
 defaultPrefixes :: StrMap String
-defaultPrefixes = singleton "psp" "model:Perspectives"
+defaultPrefixes = fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
 initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes}
