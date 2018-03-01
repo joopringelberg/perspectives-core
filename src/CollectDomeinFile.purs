@@ -35,27 +35,24 @@ domeinFileFromContext enclosingContext = do
         (pure unit)
       where
         recursiveCollect :: ContextID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Unit
-        recursiveCollect subContextId = do
-          (mSubContext :: (Maybe PerspectContext)) <- lift $ getPerspectEntiteit subContextId
-          case mSubContext of
-            (Just subContext) -> collect subContext ((context_id c) == (context_id enclosingContext))
-            Nothing -> pure unit
+        recursiveCollect subContextId =
+          ifNothing (lift $ getPerspectEntiteit subContextId)
+            (pure unit)
+            (flip collect ((context_id c) == (context_id enclosingContext)))
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
         saveContext ctxt definedAtToplevel' = if isInNamespace (context_id ctxt) (context_id enclosingContext)
           then
             do
               modify $ insertContextInDomeinFile ctxt
-              mBuitenRol <- lift $ getPerspectEntiteit (context_buitenRol ctxt)
-              case mBuitenRol of
-                (Just buitenRol) -> modify $ insertRolInDomeinFile buitenRol
-                Nothing -> pure unit
+              ifNothing (lift $ getPerspectEntiteit (context_buitenRol ctxt))
+                (pure unit)
+                (modify <<< insertRolInDomeinFile)
               rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
               for_ (tripleObjects rollen)
-                \rolID -> do
-                  (mRol :: Maybe PerspectRol) <- lift $ getPerspectEntiteit rolID
-                  case mRol of
-                    Nothing -> pure unit
-                    (Just rol) -> (modify $ insertRolInDomeinFile rol)
+                \rolID ->
+                  ifNothing (lift $ getPerspectEntiteit rolID)
+                    (pure unit)
+                    (modify <<< insertRolInDomeinFile)
               pure true
           else if definedAtToplevel'
             then do
@@ -73,3 +70,13 @@ domeinFileFromContext enclosingContext = do
 
         insertRolInDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
         insertRolInDomeinFile r (DomeinFile dfc@{roles}) = DomeinFile $ dfc {roles = insert (rol_id r) r roles}
+
+maybeM :: forall a b m. Monad m => m a -> (b -> m a) -> m (Maybe b) -> m a
+maybeM default fromJust monadicValue = do
+  mv <- monadicValue
+  case mv of
+    Nothing -> default
+    (Just v) -> fromJust v
+
+ifNothing :: forall a b m. Monad m => m (Maybe b) -> m a -> (b -> m a) -> m a
+ifNothing monadicValue default fromJust = maybeM default fromJust monadicValue
