@@ -29,7 +29,7 @@ import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Show, id, not, ($), (<>))
+import Prelude (class Show, id, not, ($), (<>), (==), (||))
 
 -- | A Namespace has the form "model:Name"
 type Namespace = String
@@ -148,7 +148,8 @@ escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (repl
 isInNamespace :: String -> String -> Boolean
 isInNamespace ns ident =
   -- A quick test: strip ns from ident. What remains may not hold a "$".
-  not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern (ns <> "$")) ident))
+  ns == ident ||
+    (not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern (ns <> "$")) ident)))
 
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS
