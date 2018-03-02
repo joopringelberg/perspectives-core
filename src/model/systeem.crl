@@ -32,3 +32,11 @@ arc:Zaak sys:TrustedCluster
 			arc:werkwoord => arc:raadpleegt
 			arc:lijdendVoorwerp => $$clusterGenoot
 			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$clusterGenoot$Adressering
+	psp:actieInContext =>
+		psp:Actie $RaadpleegtTrustedCluster
+			arc:onderwerp => $$clusterGenoot
+			arc:werkwoord => arc:raadpleegt
+			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$viewInterneAantekening
+	psp:interneView =>
+		psp:View $viewInterneAantekening
+			psp:propertyReferentie => $$aantekening

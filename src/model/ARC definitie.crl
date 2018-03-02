@@ -63,7 +63,7 @@ psp:Rol arc:lijdendVoorwerp
 psp:Rol arc:bijvoegelijkeBepalingVanLijdendVoorwerp
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = false
-	psp:mogelijkeBinding => psp:View
+	psp:mogelijkeBinding => psp:view
 
 psp:Context arc:beheert
 psp:Context arc:raadpleegt

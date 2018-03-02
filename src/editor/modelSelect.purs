@@ -6,7 +6,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Control.Monad.Except.Trans (catchError)
-import Data.Array (head, index)
+import Data.Array (cons, head, index)
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.DomeinCache (documentNamesInDatabase)
@@ -44,7 +44,8 @@ modelSelect =
     render state =
       HH.select
         [ HE.onSelectedIndexChange (HE.input Change)]
-        (map (\v -> HH.option [HP.value v] [HH.text v]) state.models)
+        (cons (HH.option [HP.value ""] [HH.text "..."])
+          (map (\v -> HH.option [HP.value v] [HH.text v]) state.models))
 
     eval :: ModelSelectQuery ~> H.ComponentDSL State ModelSelectQuery ModelSelected (MonadPerspectives (ajax :: AJAX | e))
     eval = case _ of
@@ -60,8 +61,8 @@ modelSelect =
       Finalize next -> pure next
       Change i next -> do
         models <- H.gets _.models
-        H.modify (_ { index = Just i, selectedModel = index models i })
-        case index models i of
+        H.modify (_ { index = Just (i - 1), selectedModel = index models (i - 1) })
+        case index models (i - 1) of
           Nothing -> pure next
           (Just m) -> do
             H.raise $ ModelSelected m

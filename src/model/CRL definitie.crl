@@ -10,6 +10,8 @@ psp:Context psp:rolProperty
 psp:Context psp:query
 psp:Context psp:rolInContext
 psp:Context psp:viewInRol
+psp:Context psp:interneView
+psp:Context psp:externeView
 
 psp:Property psp:isFunctioneel
 	extern psp:isFunctioneel = true
@@ -43,18 +45,20 @@ psp:Property psp:volgNummer
 	extern psp:isVerplicht = true
 	extern psp:range = Number
 
-psp:Context psp:view
+psp:Context psp:View
 	psp:rolInContext => psp:propertyReferentie
 
 psp:Context psp:Context
 	psp:rolInContext => psp:externalProperty
 	psp:rolInContext => psp:internalProperty
 	psp:rolInContext => psp:rolInContext
+	psp:rolInContext => psp:interneView
+	psp:rolInContext => psp:externeView
 
 psp:Context psp:Rol
 	psp:rolInContext => psp:rolProperty
 	psp:rolInContext => psp:mogelijkeBinding
-	psp:rolInContext => psp:view
+	psp:rolInContext => psp:viewInRol
 	psp:externalProperty => psp:isVerplicht
 	psp:externalProperty => psp:isFunctioneel
 	psp:rolInContext => psp:query
