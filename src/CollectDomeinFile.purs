@@ -2,14 +2,14 @@ module Perspectives.CollectDomeinFile where
 
 import Prelude
 import Control.Monad.Eff (kind Effect)
-import Control.Monad.State (StateT, execStateT, lift, modify)
+import Control.Monad.State (StateT, execStateT, lift, modify, get)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
-import Data.StrMap (insert)
+import Data.Maybe (Maybe(..), maybe)
+import Data.StrMap (insert, lookup)
 import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev, rol_id)
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -42,26 +42,31 @@ domeinFileFromContext enclosingContext = do
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
         saveContext ctxt definedAtToplevel' = if isInNamespace (context_id ctxt) (context_id enclosingContext)
           then
-            do
-              modify $ insertContextInDomeinFile ctxt
-              ifNothing (lift $ getPerspectEntiteit (context_buitenRol ctxt))
-                (pure unit)
-                (modify <<< insertRolInDomeinFile)
-              rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
-              for_ (tripleObjects rollen)
-                \rolID ->
-                  ifNothing (lift $ getPerspectEntiteit rolID)
-                    (pure unit)
-                    (modify <<< insertRolInDomeinFile)
-              pure true
+            ifM (inDomeinFile (context_id ctxt))
+              (pure false)
+              do
+                modify $ insertContextInDomeinFile ctxt
+                ifNothing (lift $ getPerspectEntiteit (context_buitenRol ctxt))
+                  (pure unit)
+                  (modify <<< insertRolInDomeinFile)
+                rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
+                for_ (tripleObjects rollen)
+                  \rolID ->
+                    ifNothing (lift $ getPerspectEntiteit rolID)
+                      (pure unit)
+                      (modify <<< insertRolInDomeinFile)
+                pure true
           else if definedAtToplevel'
-            then do
-              lift $ void ((saveEntiteit (context_buitenRol ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-              rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
-              for_ (tripleObjects rollen)
-                \rolID -> lift ((saveEntiteit rolID)  :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-              lift $ void ((saveEntiteit (context_id ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)
-              pure true
+            then if (savedToCouchdb ctxt)
+              then pure false
+              else
+                do
+                lift $ void ((saveEntiteit (context_buitenRol ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
+                rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
+                for_ (tripleObjects rollen)
+                  \rolID -> lift ((saveEntiteit rolID)  :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
+                lift $ void ((saveEntiteit (context_id ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)
+                pure true
             else pure false
 
         -- The same context may be inserted multiple times without consequence; it is an idempotent operation.
@@ -70,6 +75,18 @@ domeinFileFromContext enclosingContext = do
 
         insertRolInDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
         insertRolInDomeinFile r (DomeinFile dfc@{roles}) = DomeinFile $ dfc {roles = insert (rol_id r) r roles}
+
+        inDomeinFile :: ID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
+        inDomeinFile id = do
+          (DomeinFile {contexts, roles}) <- get
+          case lookup id contexts of
+            (Just _) -> pure true
+            Nothing -> case lookup id roles of
+              (Just _) -> pure true
+              otherwise -> pure false
+
+        savedToCouchdb :: PerspectContext -> Boolean
+        savedToCouchdb ctxt = maybe false (const true) (context_rev ctxt)
 
 maybeM :: forall a b m. Monad m => m a -> (b -> m a) -> m (Maybe b) -> m a
 maybeM default fromJust monadicValue = do
