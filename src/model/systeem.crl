@@ -1,0 +1,34 @@
+-- MODELLERING VAN TRUSTEDCLUSTER
+Context model:Systeem als sys:
+import model:Arc als arc:
+import model:Perspectives als psp:
+
+Section psp:zaakInContext
+
+arc:Zaak sys:Systeem
+	psp:rolInContext =>
+		psp:Rol $gebruiker
+
+arc:Zaak sys:TrustedCluster
+	psp:internalProperty =>
+		psp:Property $aantekening
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = false
+			extern psp:range = String
+	psp:rolInContext =>
+		psp:Rol $clusterGenoot
+			psp:mogelijkeBinding => sys:Systeem$gebruiker
+			psp:rolProperty =>
+				psp:Property $url
+					extern psp:isFunctioneel = true
+					extern psp:isVerplicht = true
+					extern psp:range = String
+			psp:viewInRol =>
+				psp:View $Adressering
+					psp:propertyReferentie => $$url
+	psp:actieInContext =>
+		psp:Actie $RaadpleegtClusterGenoot
+			arc:onderwerp => $$clusterGenoot
+			arc:werkwoord => arc:raadpleegt
+			arc:lijdendVoorwerp => $$clusterGenoot
+			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$clusterGenoot$Adressering

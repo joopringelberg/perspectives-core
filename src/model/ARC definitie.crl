@@ -60,6 +60,11 @@ psp:Rol arc:lijdendVoorwerp
 	psp:mogelijkeBinding => psp:Rol
 	psp:mogelijkeBinding => psp:Context
 
+psp:Rol arc:bijvoegelijkeBepalingVanLijdendVoorwerp
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	psp:mogelijkeBinding => psp:View
+
 psp:Context arc:beheert
 psp:Context arc:raadpleegt
 psp:Context arc:creeërt
