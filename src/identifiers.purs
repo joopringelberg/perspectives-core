@@ -10,6 +10,7 @@ module Perspectives.Identifiers
 , roleIndexNr
 , escapeCouchdbDocumentName
 , isInNamespace
+, isSubNamespace
 , isQualifiedWithDomein
 , ModelName(..)
 , QualifiedName(..)
@@ -150,6 +151,9 @@ isInNamespace ns ident =
   -- A quick test: strip ns from ident. What remains may not hold a "$".
   ns == ident ||
     (not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern (ns <> "$")) ident)))
+
+isSubNamespace :: String -> String -> Boolean
+isSubNamespace ns ident = contains (Pattern ns) ident
 
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS

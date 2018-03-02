@@ -10,7 +10,7 @@ import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev, 
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.Identifiers (isInNamespace)
+import Perspectives.Identifiers (isSubNamespace)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
@@ -40,7 +40,7 @@ domeinFileFromContext enclosingContext = do
             (pure unit)
             (flip collect ((context_id c) == (context_id enclosingContext)))
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
-        saveContext ctxt definedAtToplevel' = if isInNamespace (context_id ctxt) (context_id enclosingContext)
+        saveContext ctxt definedAtToplevel' = if isSubNamespace (context_id enclosingContext) (context_id ctxt)
           then
             ifM (inDomeinFile (context_id ctxt))
               (pure false)
