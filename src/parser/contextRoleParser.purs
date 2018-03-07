@@ -330,7 +330,7 @@ roleBinding' cname p = ("rolename => contextName" <??>
           , pspType = show rname
           , binding = binding bindng
           , context = show cname
-          , properties = fromFoldable ((\(Tuple en cm) -> Tuple (show en) cm) <$> props)
+          , properties = fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
       pure $ Tuple (show rname) rolId))

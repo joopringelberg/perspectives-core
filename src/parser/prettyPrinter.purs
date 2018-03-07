@@ -25,7 +25,7 @@ import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), Prop
 import Perspectives.SystemQueries (binding, rolContext, rolTypen)
 import Perspectives.TripleAdministration (Triple(..), tripleObjects)
 import Perspectives.TripleGetter (constructRolGetter, (##))
-import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==))
+import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
 type IndentLevel = Int
 
@@ -111,7 +111,7 @@ property :: forall e. PerspectText e -> PropertyName -> PropertyValueWithComment
 property keyword prop = indent (\pvcomments ->
   do
     withPVComments pvcomments
-      (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
+      (keyword *> identifier (prop <> " =") *> simpleValue (propertyValue pvcomments)))
   where
     withPVComments :: PropertyValueWithComments -> PerspectText e -> PerspectText e
     withPVComments (PropertyValueWithComments{commentBefore, commentAfter}) p = do
@@ -221,7 +221,7 @@ enclosingContext theText = do
       mc <- lift $ lift $ getPerspectEntiteit id
       case mc of
         (Just c) -> do
-          if isInNamespace (context_id theText) id
+          if isInNamespace (context_id theText) id || isInNamespace "model:User" id
             then do
               context definedContexts c
               newline
