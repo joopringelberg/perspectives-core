@@ -1,6 +1,5 @@
 module Perspectives.ContextRoleParser where
 
-import Perspectives.IndentParser (IP, extendNamespace, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection)
 import Perspectives.EntiteitAndRDFAliases
 import Control.Alt ((<|>))
 import Control.Monad.State (get, gets)
@@ -17,6 +16,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
+import Perspectives.IndentParser (IP, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedNamespace, withExtendedTypeNamespace, withTypeNamespace)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
@@ -164,21 +164,31 @@ defaultNamespacedContextName = lexeme do
   localName <- localContextName
   namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
   pure $ QualifiedName namespace' localName
-  where
-    -- Returns a string that is NOT terminated on a "$".
-    -- NOTE: in order to be able to fail, we need do this in IP.
-    butLastNNamespaceLevels :: String -> Int -> IP String e
-    butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
-    butLastNNamespaceLevels ns 0 = pure ns
-    butLastNNamespaceLevels ns n = do
-      segments <- pure (split (Pattern "$") ns)
-      if (n - 1) > (AR.length segments)
-        then fail "too many levels up"
-        else pure $ (intercalate "$" (dropEnd n segments))
 
--- cname = prefixedContextName | expandedContextName
+-- Returns a string that is NOT terminated on a "$".
+-- NOTE: in order to be able to fail, we need do this in IP.
+butLastNNamespaceLevels :: forall e. String -> Int -> IP String e
+butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
+butLastNNamespaceLevels ns 0 = pure ns
+butLastNNamespaceLevels ns n = do
+  segments <- pure (split (Pattern "$") ns)
+  if (n - 1) > (AR.length segments)
+    then fail "too many levels up"
+    else pure $ (intercalate "$" (dropEnd n segments))
+
+defaultTypeNamespacedName :: forall e. IP QualifiedName e
+defaultTypeNamespacedName = lexeme do
+  namespace <- getTypeNamespace -- not $-terminated!
+  namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
+  localName <- localContextName
+  namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
+  pure $ QualifiedName namespace' localName
+
 contextName :: forall e. IP QualifiedName e
 contextName = (expandedContextName <|> prefixedContextName <|> defaultNamespacedContextName) <?> "the name of a resource (Context or Role)."
+
+typeContextName :: forall e. IP QualifiedName e
+typeContextName = (expandedContextName <|> prefixedContextName <|> defaultTypeNamespacedName) <?> "the name of a resource (Context or Role)."
 
 perspectEntiteitIdentifier :: forall e. IP PEIdentifier e
 perspectEntiteitIdentifier =
@@ -192,7 +202,7 @@ perspectEntiteitIdentifier =
 
 -- propertyName = prefixedPropertyName | expandedPropertyName
 propertyName :: forall e. IP QualifiedName e
-propertyName = (expandedPropertyName <|> prefixedPropertyName) <?> "a property or role name."
+propertyName = (expandedPropertyName <|> prefixedPropertyName <|> defaultTypeNamespacedName) <?> "a property or role name."
 
 roleName :: forall e. IP QualifiedName e
 roleName = propertyName
@@ -240,6 +250,7 @@ enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
 enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> perspectEntiteitIdentifier)
   _ <- setNamespace $ cname
+  _ <- setTypeNamespace $ cname
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
@@ -249,7 +260,7 @@ enclosingContextDeclaration = (do
 
 -- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
-contextDeclaration = (ContextDeclaration <$> contextName <*> contextName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
+contextDeclaration = (ContextDeclaration <$> typeContextName <*> contextName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
 
 -- | Apply to a single line parser. Will parse a block of contiguous line comments before the line and
 -- | the comment after the expression on the line.
@@ -303,7 +314,8 @@ roleBinding' cname p = ("rolename => contextName" <??>
       occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
       _ <- (sameLine *> reservedOp "=>")
       (Tuple cmt bindng) <- p
-      props <- option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
+      props <- withExtendedTypeNamespace localRoleName $
+            option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
       _ <- incrementRoleInstances (show rname)
 
       -- Naming
@@ -380,38 +392,39 @@ context = withRoleCounting context' where
       (ContextDeclaration typeName instanceName@(QualifiedName dname localName) cmt) <- contextDeclaration
 
       -- Naming
-      extendNamespace localName
-        do
-          -- Parsing the body
-          (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
-          (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
-          (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
+      withExtendedNamespace localName $
+        withTypeNamespace (show typeName)
+          do
+            -- Parsing the body
+            (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
+            (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
+            (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
-          -- Storing
-          liftAffToIP $ cacheEntiteitPreservingVersion (show instanceName)
-            (PerspectContext defaultContextRecord
-              { _id = (show instanceName)
-              , displayName  = localName
-              , pspType = show typeName
-              , binnenRol =
-                PerspectRol defaultRolRecord
-                  { _id = (show instanceName) <> "_binnenRol"
-                  , pspType = "model:Perspectives$BinnenRol"
-                  , binding = binding $ (show instanceName) <> "_buitenRol"
-                  , properties = fromFoldable privateProps
-                  }
-              , buitenRol = (show instanceName) <> "_buitenRol"
-              , rolInContext = collect rolebindings
-              , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
-            })
-          liftAffToIP $ cacheEntiteitPreservingVersion ((show instanceName) <> "_buitenRol")
-            (PerspectRol defaultRolRecord
-              { _id = (show instanceName) <> "_buitenRol"
-              , pspType = "model:Perspectives$BuitenRol"
-              , context = (show instanceName)
-              , properties = fromFoldable publicProps
+            -- Storing
+            liftAffToIP $ cacheEntiteitPreservingVersion (show instanceName)
+              (PerspectContext defaultContextRecord
+                { _id = (show instanceName)
+                , displayName  = localName
+                , pspType = show typeName
+                , binnenRol =
+                  PerspectRol defaultRolRecord
+                    { _id = (show instanceName) <> "_binnenRol"
+                    , pspType = "model:Perspectives$BinnenRol"
+                    , binding = binding $ (show instanceName) <> "_buitenRol"
+                    , properties = fromFoldable privateProps
+                    }
+                , buitenRol = (show instanceName) <> "_buitenRol"
+                , rolInContext = collect rolebindings
+                , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
               })
-          pure $ (show instanceName) <> "_buitenRol"
+            liftAffToIP $ cacheEntiteitPreservingVersion ((show instanceName) <> "_buitenRol")
+              (PerspectRol defaultRolRecord
+                { _id = (show instanceName) <> "_buitenRol"
+                , pspType = "model:Perspectives$BuitenRol"
+                , context = (show instanceName)
+                , properties = fromFoldable publicProps
+                })
+            pure $ (show instanceName) <> "_buitenRol"
   collect :: List (Tuple RolName ID) -> StrMap (Array ID)
   collect Nil = empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
