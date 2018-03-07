@@ -12,16 +12,8 @@ psp:Context q:Query
 			extern psp:isVerplicht = true
 			extern psp:range = String
 
-psp:Context q:RolGetter
-	psp:rolInContext =>
-		psp:Rol $rol
-
-psp:Context q:UnaryCombinator
-
-q:UnaryCombinator q:laatste
-	psp:rolInContext =>
-		psp:Rol $vanRol
-			psp:isFunctioneel = true
+q:Query q:RolQuery
+	intern $resultaatType = "entiteitID"
 
 q:Query q:PropertyQuery
 	intern $resultaatType = "simpleValue"
@@ -31,23 +23,45 @@ q:Query q:PropertyQuery
 			extern psp:isVerplicht = true
 			extern psp:range = String
 
+psp:Context q:RolGetter
+	psp:rolInContext =>
+		psp:Rol $rol
+
+psp:Context q:SystemMethod
+q:SystemMethod q:laatste
+
+-- Het resultaatType van een met UnaryCombinator samengestelde query is gelijk aan
+-- dat van zijn argument.
+psp:Context q:UnaryCombinator
+	psp:rolInContext =>
+		psp:Rol $query
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:Query
+	psp:rolInContext =>
+		psp:Rol $method
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:SystemMethod
+
+q:UnaryCombinator q:berekenLaatste
+	$method => q:laatste
+
+-- We hebben een query nodig met de lokale naam "resultaatType" waar we altijd naar kunnen verwijzen.
 q:PropertyQuery q:resultaatType
 	intern $valueType = "string"
 
+-- Compose heeft een berekende property 'resultaatType', die de waarde van de gelijknamige
+-- property van de laatste operand heeft.
 q:Query q:compose
 	psp:internalProperty =>
 		q:compose $resultaatType
 			$operand (1) =>
-				q:laatste $laatsteOperand
-					$vanRol => $$$operand
+				q:berekenLaatste $laatsteOperand
+					$query => $$$operand
 			$operand (2) => q:resultaatType
 	psp:rolInContext =>
 		psp:Rol $operand
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
-
-q:Query q:RolQuery
-	intern $resultaatType = "entiteitID"
 
 q:PropertyQuery q:Criterium
 	intern $valueType = "boolean"
