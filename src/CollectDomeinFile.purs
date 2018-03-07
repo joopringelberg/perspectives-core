@@ -10,7 +10,7 @@ import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev, 
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.Identifiers (isSubNamespace)
+import Perspectives.Identifiers (isInNamespace, isSubNamespace)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
@@ -56,7 +56,7 @@ domeinFileFromContext enclosingContext = do
                       (pure unit)
                       (modify <<< insertRolInDomeinFile)
                 pure true
-          else if definedAtToplevel'
+          else if definedAtToplevel' && isInNamespace "model:User" (context_id ctxt)
             then if (savedToCouchdb ctxt)
               then pure false
               else
