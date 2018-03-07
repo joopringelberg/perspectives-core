@@ -18,6 +18,7 @@ compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
       t@(Triple{object : objectsOfP}) <- p id
       -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
       (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
+      -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
                     , predicate : name
