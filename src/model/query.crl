@@ -1,0 +1,55 @@
+-- QUERY ABSTRACT SYNTAX TREE
+-- intern $resultaatType = $operand1 >-> psp:type >-> $resultaatType
+Context model:QueryAst als q:
+import model:Perspectives als psp:
+
+Section psp:rolInContext
+
+psp:Context q:Query
+	psp:internalProperty =>
+		psp:Property $resultaatType
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+
+psp:Context q:RolGetter
+	psp:rolInContext =>
+		psp:Rol $rol
+
+psp:Context q:UnaryCombinator
+
+q:UnaryCombinator q:laatste
+	psp:rolInContext =>
+		psp:Rol $vanRol
+			psp:isFunctioneel = true
+
+psp:Context q:resultaatType
+
+q:Query q:compose
+	psp:internalProperty =>
+		q:compose $resultaatType
+			$operand (1) =>
+				q:laatste $laatsteOperand
+					$vanRol => $$$operand
+			$operand (2) => q:resultaatType
+	psp:rolInContext =>
+		psp:Rol $operand
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:Query
+
+q:Query q:PropertyQuery
+	intern $resultaatType = "simpleValue"
+	psp:internalProperty =>
+		psp:Property $valueType
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+
+q:Query q:RolQuery
+	intern $resultaatType = "entiteitID"
+
+q:PropertyQuery q:Criterium
+	intern $valueType = "boolean"
+
+q:RolQuery q:binding
+q:RolQuery psp:type
