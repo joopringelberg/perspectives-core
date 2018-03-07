@@ -111,7 +111,7 @@ property :: forall e. PerspectText e -> PropertyName -> PropertyValueWithComment
 property keyword prop = indent (\pvcomments ->
   do
     withPVComments pvcomments
-      (keyword *> identifier (prop <> " =") *> simpleValue (propertyValue pvcomments)))
+      (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
   where
     withPVComments :: PropertyValueWithComments -> PerspectText e -> PerspectText e
     withPVComments (PropertyValueWithComments{commentBefore, commentAfter}) p = do
@@ -127,7 +127,7 @@ privateProperty :: forall e. PropertyName -> PropertyValueWithComments -> Perspe
 privateProperty = property (identifier "intern")
 
 roleProperty :: forall e. PropertyName -> PropertyValueWithComments -> PerspectText e
-roleProperty = property (pure unit)
+roleProperty = property (identifier "")
 
 contextDeclaration :: forall e. PerspectContext -> PerspectText e
 contextDeclaration x = identifier (context_pspType x) *> identifier' ("$" <> (context_displayName x))
