@@ -2,6 +2,7 @@
 Context model:Systeem als sys:
 import model:Arc als arc:
 import model:Perspectives als psp:
+import model:User als usr:
 
 Section psp:zaakInContext
 
@@ -40,3 +41,11 @@ arc:Zaak sys:TrustedCluster
 	psp:interneView =>
 		psp:View $viewInterneAantekening
 			psp:propertyReferentie => $$aantekening
+
+--sys:Systeem usr:Systeem
+--	sys:Systeem$gebruiker => ??
+-- We hebbeb geen syntax voor een rol zonder binding?
+
+--sys:TrustedCluster usr:TrustedCluster
+--	sys:TrustedCluster$clusterGenoot => usr:Systeem$gebruiker 
+-- LET OP: hier zou je moeten verwijzen naar de rol van usr:Systeem. Maar die identifier is verborgen.

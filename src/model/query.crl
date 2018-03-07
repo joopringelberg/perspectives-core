@@ -23,7 +23,16 @@ q:UnaryCombinator q:laatste
 		psp:Rol $vanRol
 			psp:isFunctioneel = true
 
-psp:Context q:resultaatType
+q:Query q:PropertyQuery
+	intern $resultaatType = "simpleValue"
+	psp:internalProperty =>
+		psp:Property $valueType
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+
+q:PropertyQuery q:resultaatType
+	intern $valueType = "string"
 
 q:Query q:compose
 	psp:internalProperty =>
@@ -36,14 +45,6 @@ q:Query q:compose
 		psp:Rol $operand
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
-
-q:Query q:PropertyQuery
-	intern $resultaatType = "simpleValue"
-	psp:internalProperty =>
-		psp:Property $valueType
-			extern psp:isFunctioneel = true
-			extern psp:isVerplicht = true
-			extern psp:range = String
 
 q:Query q:RolQuery
 	intern $resultaatType = "entiteitID"

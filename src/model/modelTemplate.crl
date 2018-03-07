@@ -10,6 +10,10 @@ blijven opslaan.
 Maar als een model al wel bestaat (in couchdb) moet je het eerst inlezen. Daarna kun je het wijzigen en weer opslaan.
 Bij inlezen wordt het geprettyprint in de editor. Helaas worden namespace prefixes niet gebruikt (ze zijn geen onderdeel
 van CRL). Je kunt wel de tekst uit een tekstfile eroverheen inlezen, of met kopiëren en plakken de tekst in de editor vervangen.
+
+Alle definities in de Context namespace worden in het betreffende domein opgeslagen.
+Definities in de model:User namespace op topniveau (tegen de linker kantlijn) worden in de entities database opgeslagen.
+Alle andere definities worden bij opslaan genegeerd.
 -}
 
 Context model:YourModelName als yourprefix:
