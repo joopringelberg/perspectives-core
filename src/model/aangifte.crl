@@ -1,0 +1,14 @@
+-- POLITIE MODEL MET AANGIFTE
+Context model:Test als tst:
+
+import model:Perspectives als psp:
+import model:Arc als arc:
+import model:Politie als pol:
+
+Section arc:zaakInContext
+
+pol:Medewerker usr:Jansen
+
+pol:Aangifte usr:MijnAangifte
+	$Verbalisant => usr:Jansen
+		$betrouwbaarheid = 8

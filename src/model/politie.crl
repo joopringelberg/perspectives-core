@@ -1,7 +1,15 @@
-Context model:Politie$ als pol:
-Sectie psp:zaakInContext
-psp:Zaak $Aangifte
-	psp:import model:PersoonlijkDomein
+-- POLITIE MODEL MET AANGIFTE
+Context model:Politie als pol:
+
+import model:Perspectives als psp:
+import model:Arc als arc:
+
+Section arc:zaakInContext
+
+arc:Partij pol:Persoon
+arc:Partij pol:Medewerker
+
+arc:Zaak $Aangifte
 	psp:internalProperty =>
 		psp:Property $urgentie
 			extern psp:isFunctioneel = true
@@ -15,7 +23,7 @@ psp:Zaak $Aangifte
 	psp:rolInContext =>
 		psp:Rol $UserRol
 			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => per:Persoon
+			psp:mogelijkeBinding => pol:Persoon
 			psp:rolProperty =>
 				psp:Property $betrouwbaarheid
 					extern psp:isFunctioneel = true
@@ -28,6 +36,12 @@ psp:Zaak $Aangifte
 		psp:Rol $Verbalisant
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => pol:Medewerker
+	psp:activiteitInContext =>
+			psp:Activiteit $Intake
+				psp:rolInContext =>
+					psp:Rol $Uitvoerder
+						extern psp:isFunctioneel = true
+						psp:mogelijkeBinding => $$$Verbalisant
 	psp:rolInContext =>
 		psp:Rol $Start
 			extern psp:isFunctioneel = true
@@ -37,15 +51,9 @@ psp:Zaak $Aangifte
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = true
 					extern psp:range = Boolean
-	psp:activiteitInContext =>
-		psp:Activiteit $Intake
-			psp:rolInContext => 
-				psp:Rol $Uitvoerder
-					extern psp:isFunctioneel = true
-					psp:mogelijkeBinding => $$Verbalisant
-	psp:actieInContext =>
-		psp:Actie $Actie_1
-			psp:actor => $Verbalisant
-			psp:werkwoord => psp:beheert
-			psp:lijdendVoorwerp => $UserRol
-			psp:bijvoegelijkeBepalingVanLijdendVoorwerp => $UserRol$Adres
+	arc:actieInContext =>
+		arc:Actie $Actie_1
+			arc:onderwerp => $$Verbalisant
+			arc:werkwoord => arc:beheert
+			arc:lijdendVoorwerp => $$UserRol
+			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$UserRol$Adres
