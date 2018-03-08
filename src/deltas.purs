@@ -40,7 +40,7 @@ import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, lijdendVoorwerpBepaling, propertyReferentie, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
-import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, (##))
+import Perspectives.TripleGetter (NamedTripleGetter, constructInverseRolGetter, constructRolGetter, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
 import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<>), (==), (>>=), (||), (<<<))
@@ -261,6 +261,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   -- Fillers of the syntactic role "Onderwerp".
   onderwerpFillers = (constructRolGetter "model:Perspectives$onderwerp") >-> binding
   -- Tests an Actie for having memberName in the view that is its lijdendVoorwerpBepaling.
+  hasRelevantView :: ID -> NamedTripleGetter e
   hasRelevantView id = contains id (lijdendVoorwerpBepaling >-> propertyReferentie)
 
 {-

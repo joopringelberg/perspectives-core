@@ -174,7 +174,7 @@ ui =
         H.modify (_ { text = show e })
         pure next
   eval (Load text next) = do
-    H.modify (_ { text = text })
+    -- H.modify (_ { text = text })
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ACE.ChangeText text)
     pure next
   eval (LoadContext id next) = do

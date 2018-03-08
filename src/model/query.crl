@@ -1,5 +1,10 @@
--- QUERY ABSTRACT SYNTAX TREE
--- intern $resultaatType = $operand1 >-> psp:type >-> $resultaatType
+
+{-
+This model gives definitions for basic queries such as "binding", query constructors such as
+constructInternalPropertyGetter and combinators such as compose and filter.
+Any query can be described using these definitions.
+-}
+
 Context model:QueryAst als q:
 import model:Perspectives als psp:
 
@@ -23,41 +28,113 @@ q:Query q:PropertyQuery
 			extern psp:isVerplicht = true
 			extern psp:range = String
 
-psp:Context q:RolGetter
+-- We need a query with the local name "resultaatType" that we can refer to from any position.
+q:PropertyQuery q:resultaatType
+	intern $valueType = "string"
+
+--------------------------------------------------------------------------------
+-- SYSTEM GETTERS
+--------------------------------------------------------------------------------
+q:query q:identity -- Can yield both a Rol ID and Context ID!
+q:RolQuery q:contextType
+q:RolQuery q:buitenRol
+q:RolQuery q:iedereRolInContext
+q:RolQuery q:rolTypen
+q:RolQuery q:rolType
+q:RolQuery q:binding
+q:Query q:context -- Should be a ContextQuery but we do not have that.
+q:PropertyQuery q:label
+
+--------------------------------------------------------------------------------
+-- QUERY CONSTRUCTORS
+--------------------------------------------------------------------------------
+q:Context q:constructExternalPropertyGetter
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+q:Context q:constructExternalPropertyLookup
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+q:Context q:constructInternalPropertyGetter
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+q:Context q:constructInternalPropertyLookup
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+q:Context q:constructRolPropertyGetter
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+q:Context q:constructRolPropertyLookup
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+q:Context q:constructRolGetter
 	psp:rolInContext =>
 		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
 
-psp:Context q:SystemMethod
-q:SystemMethod q:laatste
+q:Context q:constructRolLookup
+	psp:rolInContext =>
+		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
 
--- Het resultaatType van een met UnaryCombinator samengestelde query is gelijk aan
--- dat van zijn argument.
-psp:Context q:UnaryCombinator
+q:Context q:constructInverseRolGetter
+	psp:rolInContext =>
+		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
+
+-- It is unlikely we will use this constructor in a model.
+q:Context q:rolesOf
+	psp:rolInContext =>
+		psp:Rol $context
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Context
+
+--------------------------------------------------------------------------------
+-- COMBINATORS
+--------------------------------------------------------------------------------
+q:Query q:laatste
+	psp:internalProperty =>
+		q:compose $resultaatType
+			$operand (1) => $$query
+			$operand (2) =>
+				q:constructInternalPropertyGetter $x
+					$property => q:resultaatType
 	psp:rolInContext =>
 		psp:Rol $query
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
-	psp:rolInContext =>
-		psp:Rol $method
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => q:SystemMethod
 
-q:UnaryCombinator q:berekenLaatste
-	$method => q:laatste
-
--- We hebben een query nodig met de lokale naam "resultaatType" waar we altijd naar kunnen verwijzen.
-q:PropertyQuery q:resultaatType
-	intern $valueType = "string"
-
--- Compose heeft een berekende property 'resultaatType', die de waarde van de gelijknamige
--- property van de laatste operand heeft.
+-- The computed property 'resultaatType' returns the value of the property of the same name
+-- of the last operand.
 q:Query q:compose
 	psp:internalProperty =>
 		q:compose $resultaatType
 			$operand (1) =>
-				q:berekenLaatste $laatsteOperand
+				q:laatste $laatsteOperand
 					$query => $$$operand
-			$operand (2) => q:resultaatType
+			$operand (2) =>
+				q:constructInternalPropertyGetter $x
+					$property => q:resultaatType
 	psp:rolInContext =>
 		psp:Rol $operand
 			extern psp:isFunctioneel = true
@@ -66,5 +143,56 @@ q:Query q:compose
 q:PropertyQuery q:Criterium
 	intern $valueType = "boolean"
 
-q:RolQuery q:binding
-q:RolQuery psp:type
+q:PropertyQuery q:hasValue
+	psp:rolInContext =>
+		psp:Rol $query
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:Query
+
+q:RolQuery q:closure
+	psp:rolInContext =>
+		psp:Rol $query
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:RolQuery
+
+q:RolQuery q:closure'
+	psp:rolInContext =>
+	 	psp:Rol $query
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:RolQuery
+
+q:RolQuery q:filter
+	psp:rolInContext =>
+	 	psp:Rol $criterium
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:Criterium
+	psp:rolInContext =>
+		psp:Rol $candidates
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding q:RolQuery
+
+q:Query q:concat
+	psp:internalProperty =>
+		q:compose $resultaatType
+			$operand (1) => $$operand
+			$operand (2) =>
+				q:constructInternalPropertyGetter $x
+					$property => q:resultaatType
+	psp:rolInContext =>
+		psp:Rol $operand
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding q:Query
+
+--------------------------------------------------------------------------------
+-- COMBINATOR CONSTRUCTORS
+--------------------------------------------------------------------------------
+-- It is unlikely we will use this constructor in a model.
+q:Context q:contains
+	psp:rolInContext =>
+		psp:Rol $valueOrId
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Context
+	psp:rolInContext =>
+		psp:Rol $query
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:Query

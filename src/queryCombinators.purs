@@ -133,6 +133,8 @@ toBoolean (NamedFunction nameOfp p) r = do
     Nothing -> pure false
     (Just x) -> pure (x == "true")
 
+-- | This query constructor takes a context id as argument. The query step that results can be applied to a role id
+-- | and will result in all instances of that role for the given context.
 rolesOf :: forall e. ContextID -> NamedFunction (TripleGetter e)
 rolesOf cid = constructTripleGetterFromArbitraryFunction
   ("model:Perspectives$rolesOf" <> cid) f where
@@ -140,6 +142,8 @@ rolesOf cid = constructTripleGetterFromArbitraryFunction
   f rolName = getRol rolName cid
 -- rolesOf cid = NamedFunction ("rolesOf_" <> cid) \rolname -> applyNamedFunction (constructRolGetter rolname) cid
 
+-- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
+-- | a triple whose object is boolean value.
 contains :: forall e. ID -> NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
 contains id' (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunction ("model:Perspectives$contains" <> id') f where
   f :: ObjectsGetter e
