@@ -6,7 +6,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (hasValue, closure', filter) as QC
-import Perspectives.TripleGetter (NamedTripleGetter, constructPublicPropertyGetter, constructRolGetter, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (const, pure, (<>), (>=>))
 
 identity' :: forall e. ObjectsGetter e
@@ -55,13 +55,13 @@ rolHasType typeId = constructTripleGetterFromArbitraryFunction ("model:Perspecti
 -- as modelled in the definitions of CRL and ARC.
 -----------------------------------------------------------
 isFunctional :: forall e. NamedTripleGetter e
-isFunctional = constructPublicPropertyGetter "model:Perspectives$isFunctional"
+isFunctional = constructExternalPropertyGetter "model:Perspectives$isFunctional"
 
 isVerplicht :: forall e. NamedTripleGetter e
-isVerplicht = constructPublicPropertyGetter "model:Perspectives$isVerplicht"
+isVerplicht = constructExternalPropertyGetter "model:Perspectives$isVerplicht"
 
 range :: forall e. NamedTripleGetter e
-range = constructPublicPropertyGetter "model:Perspectives$range"
+range = constructExternalPropertyGetter "model:Perspectives$range"
 
 hasLabel :: forall e. NamedTripleGetter e
 hasLabel = QC.hasValue label

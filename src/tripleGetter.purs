@@ -6,7 +6,7 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
 import Perspectives.PerspectivesState (memorizeQueryResults)
-import Perspectives.Property (ObjectsGetter, getGebondenAls, getPrivateProperty, getProperty, getPublicProperty, getRol)
+import Perspectives.Property (ObjectsGetter, getGebondenAls, getInternalProperty, getProperty, getExternalProperty, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
 import Prelude (bind, ifM, pure, ($))
 
@@ -42,8 +42,8 @@ constructTripleGetterFromArbitraryFunction pn objGetter = memorize getter pn
 
 -- | Use this function to construct property getters that memorize in the triple administration. Use with:
 -- | - getRol
--- | - getPublicProperty
--- | - getPrivateProperty
+-- | - getExternalProperty
+-- | - getInternalProperty
 -- | - getProperty
 constructTripleGetter :: forall e.
   (String -> ObjectsGetter e) ->
@@ -63,20 +63,20 @@ constructTripleGetter objectsGetter pn = NamedFunction pn tripleGetter where
       (object :: Array String) <- objectsGetter pn id
       liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
 
-constructPublicPropertyGetter :: forall e.
+constructExternalPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructPublicPropertyGetter pn = constructTripleGetter getPublicProperty pn
+constructExternalPropertyGetter pn = constructTripleGetter getExternalProperty pn
 
-constructPrivatePropertyGetter :: forall e.
+constructInternalPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructPrivatePropertyGetter pn = constructTripleGetter getPrivateProperty pn
+constructInternalPropertyGetter pn = constructTripleGetter getInternalProperty pn
 
-constructPropertyGetter :: forall e.
+constructRolPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructPropertyGetter pn = constructTripleGetter getProperty pn
+constructRolPropertyGetter pn = constructTripleGetter getProperty pn
 
 constructRolGetter :: forall e.
   RolName ->

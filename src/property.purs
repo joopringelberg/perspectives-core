@@ -76,15 +76,15 @@ getRolTypen = getContextMember \context -> keys (context_rolInContext context)
 getDisplayName :: forall e. ObjectsGetter e
 getDisplayName = getContextMember \context -> [(context_displayName context)]
 
-getPublicProperty :: forall e. PropertyName -> ObjectsGetter e
-getPublicProperty pn id = do
+getExternalProperty :: forall e. PropertyName -> ObjectsGetter e
+getExternalProperty pn id = do
   mbr <- getBuitenRol' id
   case mbr of
     Nothing -> pure []
     (Just br) -> getProperty pn br
 
-getPrivateProperty :: forall e. PropertyName -> ObjectsGetter e
-getPrivateProperty pn ident = do
+getInternalProperty :: forall e. PropertyName -> ObjectsGetter e
+getInternalProperty pn ident = do
   (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol ident
   case mbr of
     Nothing -> pure []
