@@ -5,7 +5,7 @@ import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
 import Perspectives.Identifiers (LocalName, deconstructNamespace)
@@ -39,20 +39,6 @@ getContextMember' f c = do
     (Just perspectContext) -> pure $ Just $ f perspectContext
     otherwise -> pure Nothing
 
-getRolFromContextTypeHierarchy :: forall e. LocalName -> ObjectsGetter e
-getRolFromContextTypeHierarchy ln contextId = do
-  maybeContext <- getPerspectEntiteit contextId
-  case maybeContext of
-    (Just perspectContext) -> case lookup localNameInContextNamespace (context_rolInContext perspectContext) of
-      Nothing -> if (contextId == context_pspType perspectContext)
-        then pure []
-        else getRolFromContextTypeHierarchy ln (context_pspType perspectContext)
-      (Just value) -> pure value
-    otherwise -> pure []
-  where
-    localNameInContextNamespace :: ID
-    localNameInContextNamespace = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
-
 getContextType :: forall e. ObjectsGetter e
 getContextType = getContextMember \context -> [context_pspType context]
 
@@ -66,6 +52,20 @@ getBuitenRol' = getContextMember' \c -> context_buitenRol c
 
 getRol :: forall e. RolName -> ObjectsGetter e
 getRol rn = getContextMember \context -> maybe [] id (lookup rn (context_rolInContext context))
+
+getRolFromContextTypeHierarchy :: forall e. LocalName -> ObjectsGetter e
+getRolFromContextTypeHierarchy ln contextId = do
+  maybeContext <- getPerspectEntiteit contextId
+  case maybeContext of
+    (Just perspectContext) -> case lookup localNameInContextNamespace (context_rolInContext perspectContext) of
+      Nothing -> if (contextId == context_pspType perspectContext)
+        then pure []
+        else getRolFromContextTypeHierarchy ln (context_pspType perspectContext)
+      (Just value) -> pure value
+    otherwise -> pure []
+  where
+    localNameInContextNamespace :: ID
+    localNameInContextNamespace = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
 
 getRollen :: forall e. ObjectsGetter e
 getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)
@@ -83,6 +83,10 @@ getExternalProperty pn id = do
     Nothing -> pure []
     (Just br) -> getProperty pn br
 
+-- | Look up a local name in the rol telescope of the buitenrol.
+lookupExternalProperty :: forall e. LocalName -> ObjectsGetter e
+lookupExternalProperty pn id = getPropertyFromRolTelescope pn $ id <> "_buitenRol"
+
 getInternalProperty :: forall e. PropertyName -> ObjectsGetter e
 getInternalProperty pn ident = do
   (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol ident
@@ -91,26 +95,20 @@ getInternalProperty pn ident = do
     -- TODO: vervang de pattern matching zodra binnenRol een 'echte' rol is.
     (Just rol) -> pure $ (maybe [] propertyValue) (lookup pn (rol_properties rol))
 
+-- | Look up a local name in the rol telescope of the binnenrol.
+lookupInternalProperty :: forall e. LocalName -> ObjectsGetter e
+lookupInternalProperty pn id = do
+  maybeBinnenRol <- getContextMember' context_binnenRol id
+  case maybeBinnenRol of
+    Nothing -> pure []
+    (Just binnenRol) -> getPropertyFromRolTelescope' pn binnenRol
+
 getRolMember :: forall e. (PerspectRol -> Array String) -> ObjectsGetter e
 getRolMember f c = do
   maybeRol <- getPerspectEntiteit c
   case maybeRol of
     (Just perspectRol) -> pure $ f perspectRol
     otherwise -> pure []
-
-getPropertyFromRolTelescope :: forall e. LocalName -> ObjectsGetter e
-getPropertyFromRolTelescope ln rolId = do
-  maybeRol <- getPerspectEntiteit rolId
-  case maybeRol of
-    (Just perspectRol) -> case lookup localNameInRolNamespace (rol_properties perspectRol) of
-      Nothing -> if (rolId == rol_pspType perspectRol)
-        then pure []
-        else getPropertyFromRolTelescope ln (rol_pspType perspectRol)
-      (Just (PropertyValueWithComments{value})) -> pure value
-    otherwise -> pure []
-  where
-    localNameInRolNamespace :: ID
-    localNameInRolNamespace = (maybe "" id (deconstructNamespace rolId)) <> "$" <> ln
 
 getRolType :: forall e. ObjectsGetter e
 getRolType = getRolMember \rol -> [rol_pspType rol]
@@ -126,6 +124,26 @@ getRolContext = getRolMember \rol -> [rol_context rol]
 
 getProperty :: forall e. PropertyName -> ObjectsGetter e
 getProperty pn = getRolMember \rol -> maybe [] propertyValue (lookup pn (rol_properties rol))
+
+getPropertyFromRolTelescope :: forall e. LocalName -> ObjectsGetter e
+getPropertyFromRolTelescope ln rolId = do
+  maybeRol <- getPerspectEntiteit rolId
+  case maybeRol of
+    (Just perspectRol) -> getPropertyFromRolTelescope' ln perspectRol
+    otherwise -> pure []
+
+getPropertyFromRolTelescope' :: forall e. LocalName -> PerspectRol -> MonadPerspectives (AjaxAvarCache e) (Array String)
+getPropertyFromRolTelescope' ln perspectRol =
+  case lookup localNameInRolNamespace (rol_properties perspectRol) of
+    Nothing -> case rol_binding perspectRol of
+      Nothing -> pure []
+      (Just i) -> if i == (rol_id perspectRol)
+        then pure []
+        else getPropertyFromRolTelescope ln i
+    (Just (PropertyValueWithComments{value})) -> pure value
+  where
+    localNameInRolNamespace :: ID
+    localNameInRolNamespace = (maybe "" id (deconstructNamespace (rol_id perspectRol))) <> "$" <> ln
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of getRolContext), others roles (such as the result of getRolBinding). The Partial function below returns that

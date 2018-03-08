@@ -5,8 +5,9 @@ import Control.Monad (class Monad)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Maybe (Maybe(..))
+import Perspectives.Identifiers (LocalName)
 import Perspectives.PerspectivesState (memorizeQueryResults)
-import Perspectives.Property (ObjectsGetter, getGebondenAls, getInternalProperty, getProperty, getExternalProperty, getRol)
+import Perspectives.Property (ObjectsGetter, getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize)
 import Prelude (bind, ifM, pure, ($))
 
@@ -68,20 +69,40 @@ constructExternalPropertyGetter :: forall e.
   NamedFunction (TripleGetter e)
 constructExternalPropertyGetter pn = constructTripleGetter getExternalProperty pn
 
+constructExternalPropertyLookup :: forall e.
+  LocalName ->
+  NamedFunction (TripleGetter e)
+constructExternalPropertyLookup ln = constructTripleGetter lookupExternalProperty ln
+
 constructInternalPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
 constructInternalPropertyGetter pn = constructTripleGetter getInternalProperty pn
+
+constructInternalPropertyLookup :: forall e.
+  LocalName ->
+  NamedFunction (TripleGetter e)
+constructInternalPropertyLookup ln = constructTripleGetter lookupInternalProperty ln
 
 constructRolPropertyGetter :: forall e.
   PropertyName ->
   NamedFunction (TripleGetter e)
 constructRolPropertyGetter pn = constructTripleGetter getProperty pn
 
+constructRolPropertyLookup :: forall e.
+  LocalName ->
+  NamedFunction (TripleGetter e)
+constructRolPropertyLookup ln = constructTripleGetter getPropertyFromRolTelescope ln
+
 constructRolGetter :: forall e.
   RolName ->
   NamedFunction (TripleGetter e)
 constructRolGetter pn = constructTripleGetter getRol pn
+
+constructRolLookup :: forall e.
+  LocalName ->
+  NamedFunction (TripleGetter e)
+constructRolLookup rn = constructTripleGetter getRolFromContextTypeHierarchy rn
 
 constructInverseRolGetter :: forall e.
   RolName ->
