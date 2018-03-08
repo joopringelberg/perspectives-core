@@ -8,10 +8,11 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
+import Perspectives.Identifiers (LocalName, deconstructNamespace)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
-import Prelude (bind, id, join, pure, show, ($), (==))
+import Perspectives.Syntax (PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
+import Prelude (bind, id, join, pure, ($), (<>), (==))
 
 
 {-
@@ -37,6 +38,20 @@ getContextMember' f c = do
   case maybeContext of
     (Just perspectContext) -> pure $ Just $ f perspectContext
     otherwise -> pure Nothing
+
+getRolFromContextTypeHierarchy :: forall e. LocalName -> ObjectsGetter e
+getRolFromContextTypeHierarchy ln contextId = do
+  maybeContext <- getPerspectEntiteit contextId
+  case maybeContext of
+    (Just perspectContext) -> case lookup localNameInContextNamespace (context_rolInContext perspectContext) of
+      Nothing -> if (contextId == context_pspType perspectContext)
+        then pure []
+        else getRolFromContextTypeHierarchy ln (context_pspType perspectContext)
+      (Just value) -> pure value
+    otherwise -> pure []
+  where
+    localNameInContextNamespace :: ID
+    localNameInContextNamespace = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
 
 getContextType :: forall e. ObjectsGetter e
 getContextType = getContextMember \context -> [context_pspType context]
@@ -82,6 +97,20 @@ getRolMember f c = do
   case maybeRol of
     (Just perspectRol) -> pure $ f perspectRol
     otherwise -> pure []
+
+getPropertyFromRolTelescope :: forall e. LocalName -> ObjectsGetter e
+getPropertyFromRolTelescope ln rolId = do
+  maybeRol <- getPerspectEntiteit rolId
+  case maybeRol of
+    (Just perspectRol) -> case lookup localNameInRolNamespace (rol_properties perspectRol) of
+      Nothing -> if (rolId == rol_pspType perspectRol)
+        then pure []
+        else getPropertyFromRolTelescope ln (rol_pspType perspectRol)
+      (Just (PropertyValueWithComments{value})) -> pure value
+    otherwise -> pure []
+  where
+    localNameInRolNamespace :: ID
+    localNameInRolNamespace = (maybe "" id (deconstructNamespace rolId)) <> "$" <> ln
 
 getRolType :: forall e. ObjectsGetter e
 getRolType = getRolMember \rol -> [rol_pspType rol]
