@@ -5,9 +5,9 @@ import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName)
+import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName, ContextID)
 import Perspectives.Identifiers (LocalName, deconstructNamespace)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -52,6 +52,12 @@ getBuitenRol' = getContextMember' \c -> context_buitenRol c
 
 getRol :: forall e. RolName -> ObjectsGetter e
 getRol rn = getContextMember \context -> maybe [] id (lookup rn (context_rolInContext context))
+
+rolNameInContext :: LocalName -> ContextID -> RolName
+rolNameInContext ln contextId = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
+
+getRolByLocalName :: forall e. RolName -> ObjectsGetter e
+getRolByLocalName rn = getContextMember \context -> maybe [] id (lookup (rolNameInContext rn (context_id context)) (context_rolInContext context))
 
 getRolFromContextTypeHierarchy :: forall e. LocalName -> ObjectsGetter e
 getRolFromContextTypeHierarchy ln contextId = do
