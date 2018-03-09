@@ -1,6 +1,6 @@
 module Perspectives.QueryCombinators where
 
-import Data.Array (cons, difference, elemIndex, foldr, head, null, union)
+import Data.Array (cons, difference, elemIndex, foldr, head, last, null, singleton, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
@@ -8,8 +8,8 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.Property (ObjectsGetter, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
-import Perspectives.TripleGetter (constructTripleGetterFromArbitraryFunction)
-import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<>), (==), (>=>))
+import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
+import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
 
 closure :: forall e.
   NamedFunction (TripleGetter e) ->
@@ -150,6 +150,11 @@ contains id' (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunct
     case elemIndex id' object of
       Nothing -> pure ["false"]
       otherwise -> pure ["true"]
+
+lastElement :: forall e. NamedTripleGetter e -> NamedTripleGetter e
+lastElement (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunction
+  ("(lastElement " <> nameOfp <> ")")
+  (p >=> pure <<< (maybe [] singleton) <<< last <<< tripleObjects)
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
 ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
