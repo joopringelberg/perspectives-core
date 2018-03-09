@@ -10,16 +10,18 @@ import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (getContextType, getRolByLocalName)
 import Perspectives.PropertyComposition (compose)
-import Perspectives.QueryCombinators (closure, closure', concat, contains, filter, hasValue, lastElement, rolesOf, toBoolean)
+import Perspectives.QueryCombinators (closure, closure', concat, contains, filter, notEmpty, lastElement, rolesOf, toBoolean)
 import Perspectives.SystemQueries (identity)
 import Perspectives.TripleAdministration (NamedFunction, TripleGetter)
 import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromArbitraryFunction)
 import Prelude (bind, pure, ($))
 
-constructRolGetter'  :: forall e.
+-- | From a qualified name for a Rol, construct a function that computes the instances of that Rol for a given context.
+-- | The Rol may be defined as computed.
+rolQuery  :: forall e.
   RolName ->
   MonadPerspectives (AjaxAvarCache e) (NamedFunction (TripleGetter e))
-constructRolGetter' rn = do
+rolQuery rn = do
   -- Is the type of rolType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
   if isAQuery
@@ -63,7 +65,7 @@ constructQueryFunction typeDescriptionID = do
     (Just "model:QueryAst$rolesOf") -> do
       ids <- getRolByLocalName "context" typeDescriptionID
       pure $ maybe identity rolesOf (head ids)
-    (Just "model:QueryAst$hasValue") -> applyUnaryCombinator hasValue
+    (Just "model:QueryAst$notEmpty") -> applyUnaryCombinator notEmpty
     (Just "model:QueryAst$closure") -> applyUnaryCombinator closure
     (Just "model:QueryAst$closure'") -> applyUnaryCombinator closure'
     (Just "model:QueryAst$lastElement'") -> applyUnaryCombinator lastElement

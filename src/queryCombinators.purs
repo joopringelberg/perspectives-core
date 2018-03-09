@@ -113,14 +113,14 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter nam
 isNothing :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Triple e)
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
-hasValue :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
-hasValue (NamedFunction nameOfp p) = memorize getter name where
+notEmpty :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+notEmpty (NamedFunction nameOfp p) = memorize getter name where
 
   getter :: TripleGetter e
   getter = p >=> isNothing >=> \(Triple t) -> pure (Triple(t {predicate = name, tripleGetter = getter}))
 
   name :: String
-  name = "(hasValue " <> nameOfp <> ")"
+  name = "(notEmpty " <> nameOfp <> ")"
 
 -- | Construct a function that returns a bool in Aff, from a TripleGetter.
 toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> MonadPerspectives (AjaxAvarCache e) Boolean

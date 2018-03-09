@@ -5,7 +5,7 @@ import Data.Maybe (maybe)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (hasValue, closure', filter) as QC
+import Perspectives.QueryCombinators (notEmpty, closure', filter) as QC
 import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromArbitraryFunction)
 import Prelude (const, pure, (<>), (>=>))
 
@@ -64,10 +64,10 @@ range :: forall e. NamedTripleGetter e
 range = constructExternalPropertyGetter "model:Perspectives$range"
 
 hasLabel :: forall e. NamedTripleGetter e
-hasLabel = QC.hasValue label
+hasLabel = QC.notEmpty label
 
 hasBinding :: forall e. NamedTripleGetter e
-hasBinding = QC.hasValue binding
+hasBinding = QC.notEmpty binding
 
 rolUser :: forall e. NamedTripleGetter e
 rolUser = QC.closure' binding
@@ -79,7 +79,7 @@ propertyReferentie :: forall e. NamedTripleGetter e
 propertyReferentie = constructRolGetter "model:Perspectives$propertyReferentie"
 
 isContext :: forall e. NamedTripleGetter e
-isContext = QC.hasValue rolContext
+isContext = QC.notEmpty rolContext
 
 boundContexts :: forall e. NamedTripleGetter e
 boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRolInContext >-> binding)) >-> rolContext
