@@ -27,9 +27,11 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.DomeinCache (saveCachedDomeinFile)
+import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit)
+import Perspectives.Identifiers (deconstructNamespace, isUserEntiteitID)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (getRolBinding)
 import Perspectives.PropertyComposition ((>->))
@@ -68,6 +70,7 @@ newtype Transactie = Transactie
   , createdRoles :: Array PerspectRol
   , deletedContexts :: Array ID
   , deletedRoles :: Array ID
+  , changedDomeinFiles :: Array ID
   }
 
 derive instance genericRepTransactie :: Generic Transactie _
@@ -82,7 +85,7 @@ createTransactie :: forall e. String -> Eff (now :: NOW | e) Transactie
 createTransactie author =
   do
     n <- now
-    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: []}
+    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: [], changedDomeinFiles: []}
 
 transactieID :: Transactie -> String
 transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
@@ -91,17 +94,18 @@ type MonadTransactie e = StateT Transactie (MonadPerspectives (AjaxAvarCache e))
 
 runInTransactie :: forall e.
   -- MonadTransactie (now :: NOW | e) Unit
-  StateT Transactie (MonadPerspectives (AjaxAvarCache (now :: NOW | e))) Unit ->
-  MonadPerspectives (AjaxAvarCache (now :: NOW | e)) Unit
+  StateT Transactie (MonadPerspectives (TransactieEffects e)) Unit ->
+  MonadPerspectives (TransactieEffects e) Unit
 runInTransactie m = do
   user <- getUser
   s <- liftEff (createTransactie user)
-  t@(Transactie{deltas}) <- execStateT m s
+  t@(Transactie{deltas, changedDomeinFiles}) <- execStateT m s
   -- register a triple for each delta, add it to the queue, run the queue.
   maybeTriples <- traverse (lift <<< modifyTriple) deltas
   modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
   -- Propagate the triple changes.
   _ <- updateFromSeeds modifiedTriples
+  for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
   distributeTransactie t
 
@@ -136,6 +140,13 @@ deleteRolFromTransactie c@(PerspectRol{_id}) = do
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
     Nothing -> put (Transactie tf{deletedRoles = cons _id deletedRoles})
     (Just i) -> put (Transactie tf{createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
+
+addDomeinFileToTransactie :: forall e. ID -> MonadTransactie e Unit
+addDomeinFileToTransactie dfId = do
+  (Transactie tf@{changedDomeinFiles}) <- get
+  case elemIndex dfId changedDomeinFiles of
+    Nothing -> put $ Transactie tf {changedDomeinFiles = cons dfId changedDomeinFiles}
+    otherwise -> pure unit
 
 {-
 1. Bepaal of de delta precies zo voorkomt in de lijst in de transactie. Zo ja, negeer dan de nieuwe delta.
@@ -315,19 +326,25 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
-  ID -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+  ID -> Value -> MonadTransactie e Unit
 updatePerspectEntiteit changeEntity createDelta cid value = do
   updatePerspectEntiteit' changeEntity cid value
   addDelta $ createDelta cid value
 
 updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
-  ID -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+  ID -> Value -> MonadTransactie e Unit
 updatePerspectEntiteit' changeEntity cid value = do
-  (context) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
-  -- Change the entity in cache:
-  void $ lift $ cacheCachedEntiteit cid (changeEntity value context)
-  void $ lift $ saveVersionedEntiteit cid context
+  (entity) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  if (isUserEntiteitID cid)
+    then do
+      -- Change the entity in cache:
+      void $ lift $ cacheCachedEntiteit cid (changeEntity value entity)
+      void $ lift $ saveVersionedEntiteit cid entity
+    else do
+      let dfId = (unsafePartial (fromJust (deconstructNamespace cid)))
+      addDomeinFileToTransactie dfId
+      lift $ cacheInDomeinFile dfId (changeEntity value entity)
 
   -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision' context))
   -- -- Store the changed entity in couchdb.
@@ -357,7 +374,7 @@ setRolType = updatePerspectEntiteit
     , isContext: false
     })
 
-setContextDisplayName :: forall e. ID -> ID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setContextDisplayName :: forall e. ID -> ID -> MonadTransactie e Unit
 setContextDisplayName = updatePerspectEntiteit
   changeContext_displayName
   (\cid displayName -> Delta
