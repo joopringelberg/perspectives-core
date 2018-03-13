@@ -98,6 +98,7 @@ modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
 
 -- Destructively change the objects of an existing triple.
 -- Returns a Triple that can be used as a seed for delta propagation, i.e. (wrapped in an array) as argument to updateFromSeeds.
+-- NOTA BENE. This function is superceded by the functions in deltas.purs.
 setProperty :: forall e. Subject -> Predicate -> Array String -> (Aff (gm :: GLOBALMAP | e)) (Maybe (Triple e))
 setProperty rid pid object =
   do

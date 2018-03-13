@@ -19,9 +19,9 @@ addEffectToQuery (NamedFunction tgName tg) (NamedFunction effectName effect) =
       t@(Triple{subject, predicate, object}) <- tg id
       et <- effectFun t id
       liftEff $ registerTriple et
-      where
-        endResult :: TripleRef
-        endResult = TripleRef{subject: id, predicate: name}
+      -- where
+      --   endResult :: TripleRef
+      --   endResult = TripleRef{subject: id, predicate: name}
 
     -- propagateTheoryDeltas will use the tripleGetter to recompute,
     -- i.e. to sort the effect again and it will use the resulting triple to

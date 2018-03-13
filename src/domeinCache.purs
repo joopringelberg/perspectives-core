@@ -20,7 +20,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (MonadPerspectives, domeinCache, domeinCacheInsert, domeinCacheLookup)
@@ -41,7 +41,7 @@ modifyDomeinFileInCache ns modifier = do
   case mAvar of
     Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
     (Just avar) -> do
-      df <- liftAff $ readVar avar
+      df <- liftAff $ takeVar avar
       liftAff $ putVar (modifier df) avar
 
 -- | Fetch a PerspectContext asynchronously from its Domein, loading the Domein file if necessary.
@@ -92,6 +92,15 @@ documentNamesInDatabase :: forall e. DatabaseName -> Aff (ajax :: AJAX | e) (Arr
 documentNamesInDatabase database = do
   (GetCouchdbAllDocs cad) <- documentsInDatabase database
   pure $ (\(DocReference{id}) -> id) <$> cad.rows
+
+saveCachedDomeinFile :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) Unit
+saveCachedDomeinFile ns = do
+  mAvar <- domeinCacheLookup ns
+  case mAvar of
+    Nothing -> throwError $ error $ "saveCachedDomeinFile: cannot find domeinfile in cache: " <> ns
+    (Just avar) -> do
+      df <- liftAff $ readVar avar
+      modifyDomeinFileInCouchdb df avar
 
 -- | Either create or modify the DomeinFile in couchdb. Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
 storeDomeinFileInCouchdb :: forall e. DomeinFile -> MonadPerspectives (AjaxAvarCache e) Unit

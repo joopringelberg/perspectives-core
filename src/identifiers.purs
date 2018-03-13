@@ -20,6 +20,7 @@ module Perspectives.Identifiers
 , PEIdentifier
 , Prefix
 , isUserURI
+, isUserEntiteitID
   )
 
 where
@@ -122,6 +123,9 @@ userUriRegEx = unsafeRegex "^model:User\\$" noFlags
 -- | True iff the string starts on "model:User$"
 isUserURI :: String -> Boolean
 isUserURI = test userUriRegEx
+
+isUserEntiteitID :: String -> Boolean
+isUserEntiteitID id = isUserURI id || isUserURI id
 
 -----------------------------------------------------------
 -- ROLNAMES
