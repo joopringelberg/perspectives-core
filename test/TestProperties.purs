@@ -54,7 +54,7 @@ test = do
   log ( " isVerplichtDef ## isVerplicht = " <> (show l9))
 
   l10 <-  rolDef ## label
-  log ( " isVerplichtDef ## label = " <> (show l10))
+  log ( " rolDef ## label = " <> (show l10))
 
   l11 <-  isVerplichtDef ## range
   log ( " isVerplichtDef ## range = " <> (show l11))

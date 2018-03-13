@@ -1,30 +1,30 @@
 module Test.QueryEffects where
 
 import Perspectives.SystemQueries
-import Control.Monad.Aff (Aff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, logShow)
+import Perspectives.Deltas (runInTransactie, setContextDisplayName, setProperty)
+import Perspectives.Effects (TransactieEffects)
+import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryEffect ((~>))
-import Perspectives.TheoryChange (setProperty, updateFromSeeds)
 import Perspectives.TripleAdministration (NamedFunction(..), lookupInTripleIndex)
 import Perspectives.TripleGetter (NamedTripleGetter, (##))
-import Prelude (class Show, Unit, bind, discard, void)
+import Prelude (class Show, Unit, discard, void, ($))
 import Test.TestEffects (CancelerEffects)
 
-test :: forall e. Aff (CancelerEffects e) Unit
+rolDef :: String
+rolDef = "model:Perspectives$Rol"
+
+test :: forall e. MonadPerspectives (TransactieEffects (console :: CONSOLE | e)) Unit
 test = do
-  void ("user:xGebruiker" ## label ~> showOnConsole)
-  void ("user:xGebruiker" ## rol_RolBinding >-> label ~> showOnConsole)
+  void (rolDef ## (label ~> showOnConsole))
   void (liftEff (logShow "======================"))
-  t <- setProperty "user:xGebruiker" "rdfs:label" ["Nieuw label voor gebruiker!"]
-  t' <- setProperty "user:yNatuurlijkPersoon" "rdfs:label" ["Nieuw label voor NatuurlijkPersoon"]
-  x <- setProperty "user:xGebruiker" "model:SysteemDomein#rol_RolBinding" ["model:SysteemDomein#Gebruiker"]
-  void (updateFromSeeds [t, t', x])
+  runInTransactie $ setContextDisplayName rolDef "Rol"
   void (liftEff (logShow "======================"))
 
-  void (liftEff (lookupInTripleIndex "user:xGebruiker" "rdfs:label"))
+  -- void (liftEff (lookupInTripleIndex "user:xGebruiker" "rdfs:label"))
 
 showGebruikerLabel :: forall e. NamedTripleGetter (console :: CONSOLE | e)
 showGebruikerLabel = label ~> (NamedFunction "log" logShow)
