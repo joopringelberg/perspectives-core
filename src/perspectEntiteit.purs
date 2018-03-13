@@ -11,7 +11,8 @@ import Data.Foreign.Generic (decodeJSON, encodeJSON)
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax.Response (class Respondable)
 import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', changeContext_type, changeRol_rev, changeRol_rev', changeRol_type, context_id, context_pspType, context_rev', rol_id, rol_pspType, rol_rev')
-import Perspectives.DomeinCache (retrieveContextFromDomein, retrieveRolFromDomein)
+import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveContextFromDomein, retrieveRolFromDomein)
+import Perspectives.DomeinFile (addContextToDomeinFile, addRolToDomeinFile)
 import Perspectives.Effects (AvarCache, AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace)
@@ -34,6 +35,7 @@ class (Encode a, Decode a, Respondable a) <=  PerspectEntiteit a where
   -- | A default implementation for decode is decodeJSON.
   decode :: String -> Either MultipleErrors a
   retrieveFromDomein :: forall e. ID -> Namespace -> MonadPerspectives (AjaxAvarCache e) a
+  cacheInDomeinFile :: forall e. ID -> a -> MonadPerspectives (AvarCache e) Unit
 
 instance perspectEntiteitContext :: PerspectEntiteit PerspectContext where
   getRevision' = context_rev'
@@ -47,6 +49,7 @@ instance perspectEntiteitContext :: PerspectEntiteit PerspectContext where
   encode = encodeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveContextFromDomein
+  cacheInDomeinFile ns c = modifyDomeinFileInCache ns (addContextToDomeinFile c)
 
 instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   getRevision' = rol_rev'
@@ -60,6 +63,7 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   encode = encodeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveRolFromDomein
+  cacheInDomeinFile ns c = modifyDomeinFileInCache ns (addRolToDomeinFile c)
 
 cacheEntiteitPreservingVersion :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AvarCache e) Unit
 cacheEntiteitPreservingVersion id e = do

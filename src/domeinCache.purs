@@ -19,7 +19,7 @@ import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
+import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
@@ -34,6 +34,16 @@ storeDomeinFileInCache ns df= do
   dc <- domeinCache
   liftAff $ liftEff $ poke dc ns df *> pure df
 
+-- | Change the domeinfile in cache. NOTA BENE: does not store the modified file in Couchdb!
+modifyDomeinFileInCache :: forall e. Namespace -> (DomeinFile -> DomeinFile) -> MonadPerspectives (AvarCache e) Unit
+modifyDomeinFileInCache ns modifier = do
+  mAvar <- domeinCacheLookup ns
+  case mAvar of
+    Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
+    (Just avar) -> do
+      df <- liftAff $ readVar avar
+      liftAff $ putVar (modifier df) avar
+
 -- | Fetch a PerspectContext asynchronously from its Domein, loading the Domein file if necessary.
 retrieveContextFromDomein :: forall e.
   ContextID
@@ -42,7 +52,7 @@ retrieveContextFromDomein :: forall e.
 retrieveContextFromDomein id ns = do
   (DomeinFile {contexts}) <- retrieveDomeinFile ns
   case lookup id contexts of
-    Nothing -> throwError $ error ("retrieveContextFromDomein: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
+    Nothing -> throwError $ error ("retrieveContextFromDomein: cannot find definition of " <> id <> " in retrieveContextFromDomein for " <> ns)
     (Just context) -> pure context
 
 -- | Fetch a PerspectRol asynchronously from its Domein, loading the Domein file if necessary.
@@ -53,7 +63,7 @@ retrieveRolFromDomein :: forall e.
 retrieveRolFromDomein id ns = do
   (DomeinFile {roles}) <- retrieveDomeinFile ns
   case lookup id roles of
-    Nothing -> throwError $ error ("retrieveRolFromDomein: cannot find definition of " <> id <> " in DomeinFileContexts for " <> ns)
+    Nothing -> throwError $ error ("retrieveRolFromDomein: cannot find definition of " <> id <> " in retrieveRolFromDomein for " <> ns)
     (Just rol) -> pure rol
 
 retrieveDomeinFile :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) DomeinFile

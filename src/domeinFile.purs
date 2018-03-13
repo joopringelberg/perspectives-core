@@ -4,10 +4,10 @@ import Data.Foreign.Class (class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, empty)
+import Data.StrMap (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
-import Perspectives.Syntax (PerspectContext, PerspectRol, Revision, noRevision)
+import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision, noRevision)
 import Prelude (($))
 
 newtype DomeinFile = DomeinFile
@@ -33,3 +33,9 @@ defaultDomeinFile = DomeinFile{ _rev: noRevision, _id: "", contexts: empty, role
 type DomeinFileContexts = StrMap PerspectContext
 
 type DomeinFileRoles = StrMap PerspectRol
+
+addContextToDomeinFile :: PerspectContext -> DomeinFile -> DomeinFile
+addContextToDomeinFile c@(PerspectContext {_id}) (DomeinFile dff@{contexts}) = DomeinFile dff {contexts = insert _id c contexts}
+
+addRolToDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
+addRolToDomeinFile c@(PerspectRol {_id}) (DomeinFile dff@{roles}) = DomeinFile dff {roles = insert _id c roles}
