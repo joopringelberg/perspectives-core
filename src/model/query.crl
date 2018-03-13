@@ -143,6 +143,7 @@ q:Query q:compose
 q:PropertyQuery q:Criterium
 	intern $valueType = "boolean"
 
+-- notEmpty is itself not a Criterium, but the application of notEmpty to a Query is.
 q:Criterium q:notEmpty
 	psp:rolInContext =>
 		psp:Rol $query

@@ -4,6 +4,10 @@ Context model:Perspectives als psp:
 
 Section psp:rolInContext
 
+--------------------------------------------------------------------------------
+-- SYSTEM BASE
+--------------------------------------------------------------------------------
+
 psp:Context psp:internalProperty
 psp:Context psp:externalProperty
 psp:Context psp:rolProperty
@@ -62,3 +66,11 @@ psp:Context psp:Rol
 	psp:externalProperty => psp:isVerplicht
 	psp:externalProperty => psp:isFunctioneel
 	psp:rolInContext => psp:query
+
+--------------------------------------------------------------------------------
+-- SYSTEM ENTITIES
+--------------------------------------------------------------------------------
+psp:Property psp:label
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	extern psp:range = String
