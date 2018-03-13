@@ -13,7 +13,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Subject, Predicate)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesState (MonadPerspectives)
-import Perspectives.TripleAdministration (FlexTriple, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency, setSupports)
+import Perspectives.TripleAdministration (FlexTriple, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency_, setSupports_)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), (<<<), (>>=))
 
@@ -49,7 +49,7 @@ propagateTheoryDeltas q = case popFromQueue q of
     t@(Triple{object, supports} :: Triple e) <- recompute head
     _ <- liftAff $ saveChangedObject head object
     _ <- liftAff $ liftEff $ updateDependencies head t
-    _ <- liftAff $ liftEff $ setSupports head supports
+    _ <- liftAff $ liftEff $ setSupports_ head supports
     (deps :: Array (Triple e)) <- liftEff (getDependencies head)
     propagateTheoryDeltas (addToQueue tail deps)
 
@@ -60,7 +60,7 @@ updateDependencies t@(Triple{supports: old}) (Triple{supports: new}) =
     remove ref = void do
       mt <- getTriple ref
       case mt of
-        (Just supportingTriple) -> removeDependency supportingTriple (getRef t)
+        (Just supportingTriple) -> removeDependency_ supportingTriple (getRef t)
         Nothing -> pure ref
 
 getDependencies :: forall e eff. Triple e ->  Eff (gm :: GLOBALMAP | eff) (Array (Triple e))

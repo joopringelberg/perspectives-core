@@ -3,12 +3,13 @@ module Perspectives.TripleAdministration where
 import Perspectives.EntiteitAndRDFAliases
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
+import Data.Array (catMaybes)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
 import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults)
-import Prelude (class Eq, Unit, bind, pure, unit, void, ($), (&&), (<>), (==))
+import Prelude (class Eq, Unit, bind, discard, flip, pure, unit, void, ($), (&&), (<$>), (<>), (==))
 
 -- type TripleGetter e = Subject -> Aff (AjaxAvarCache e) (Triple e)
 
@@ -49,7 +50,7 @@ getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: pre
 -- | An index of Predicate-Object combinations, indexed by Subject.
 type TripleIndex e = GLStrMap (PredicateIndex e)
 
--- An index of objects indexed by Predicate.
+-- An index of objects indexed by Predicate (for a single Subject).
 type PredicateIndex e = GLStrMap (Triple e)
 
 -- | A global store of triples, indexed by Subject and Predicate.
@@ -93,13 +94,31 @@ addToTripleIndex rid pid val deps sups tripleGetter =
                 , tripleGetter: tripleGetter
                 })
       predIndex <- poke m pid triple
-      _ <- poke tripleIndex rid predIndex
-      _ <- foreachE sups (addDependency_ (getRef triple))
+      -- _ <- poke tripleIndex rid predIndex
+      _ <- foreachE sups (addDependency (getRef triple))
       pure triple
+
+-- | Remove the triple identified by the reference from the index (removes the dependency from its supports, too)
+unRegisterTriple :: forall e1. TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+unRegisterTriple (TripleRef{subject, predicate}) = do
+  preds <- peek tripleIndex subject
+  case preds of
+    Nothing ->
+      pure unit
+    (Just (p :: PredicateIndex e1)) -> do
+      objls <- peek p predicate
+      case objls of
+        Nothing ->
+          pure unit
+        (Just t@(Triple{supports})) -> do
+          void $ delete p predicate
+          foreachE supports (removeDependency (getRef t))
 
 registerTriple :: forall e1 e2. Triple e2 -> Eff (gm :: GLOBALMAP | e1) (Triple e2)
 registerTriple (Triple{subject, predicate, object, dependencies, supports, tripleGetter}) = addToTripleIndex subject predicate object dependencies supports tripleGetter
 
+-- | Make sure an entry for the given resource identifier is in the tripleIndex. Return the PredicateIndex for the
+-- | resource.
 ensureResource :: forall e1 e2. Subject -> Eff (gm :: GLOBALMAP | e1) (PredicateIndex e2)
 ensureResource rid = do
   pid <- peek tripleIndex rid
@@ -125,14 +144,25 @@ memorize getter name = NamedFunction name \id -> do
       t <- getter id
       liftEff $ registerTriple t
 
--- TODO: dit moet eigenlijk een apart effect zijn, b.v.: DEPENDENCY.
-foreign import addDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
-foreign import removeDependency :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
-foreign import setSupports ::  forall e1 e2. Triple e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+-- | Add the reference to the triple.
+foreign import addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
 
-addDependency_ :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
-addDependency_ dependentRef supportingRef = do
+-- | Remove the reference from the triple.
+foreign import removeDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+foreign import setSupports_ ::  forall e1 e2. Triple e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+
+-- | Add the dependentRef (first argument) as a dependency to the triple identified by the supportingRef (second argument).
+addDependency :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+addDependency dependentRef supportingRef = do
   ms <- getTriple supportingRef
   case ms of
-    (Just support) -> void (addDependency support dependentRef)
+    (Just support) -> void (addDependency_ support dependentRef)
+    Nothing -> pure unit
+
+-- | Remove the dependentRef (first argument) as a dependency from the triple identified by the supportingRef (second argument).
+removeDependency :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+removeDependency dependentRef supportingRef = do
+  ms <- getTriple supportingRef
+  case ms of
+    (Just support) -> void (removeDependency_ support dependentRef)
     Nothing -> pure unit

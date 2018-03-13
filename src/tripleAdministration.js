@@ -1,6 +1,6 @@
 "use strict";
 
-exports.addDependency = function( triple ) {
+exports.addDependency_ = function( triple ) {
 	return function( tripleRef ) {
 		return function() {
 			if( !triple.dependencies.find( function( ref ) {
@@ -14,7 +14,7 @@ exports.addDependency = function( triple ) {
 	};
 };
 
-exports.removeDependency = function( triple ) {
+exports.removeDependency_ = function( triple ) {
 	return function( tripleRef ) {
 		return function() {
 			var index = triple.dependencies.findIndex( function( ref ) {
@@ -26,7 +26,7 @@ exports.removeDependency = function( triple ) {
 	};
 };
 
-exports.setSupports = function( triple )
+exports.setSupports_ = function( triple )
 {
 	return function(supports)
 	{

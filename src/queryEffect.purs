@@ -4,12 +4,15 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), getRef, registerTriple)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, registerTriple)
 import Perspectives.TripleGetter (NamedTripleGetter)
 import Prelude (Unit, bind, pure, ($), (<>))
 
 type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit)
 
+-- | Make an effect function (QueryEffect) dependent on the objects of a tripleGetter.
+-- | The result of the function (a Triple) should be unsubscribed from the triple index in order to
+-- | make the effect function no longer dependent (using unRegisterTriple).
 addEffectToQuery :: forall e. NamedTripleGetter e -> QueryEffect e -> NamedTripleGetter e
 addEffectToQuery (NamedFunction tgName tg) (NamedFunction effectName effect) =
   NamedFunction effectName addEffectToQuery' where
@@ -19,9 +22,7 @@ addEffectToQuery (NamedFunction tgName tg) (NamedFunction effectName effect) =
       t@(Triple{subject, predicate, object}) <- tg id
       et <- effectFun t id
       liftEff $ registerTriple et
-      -- where
-      --   endResult :: TripleRef
-      --   endResult = TripleRef{subject: id, predicate: name}
+      -- To unsubscribe the effect, de-register the effect triple.
 
     -- propagateTheoryDeltas will use the tripleGetter to recompute,
     -- i.e. to sort the effect again and it will use the resulting triple to
