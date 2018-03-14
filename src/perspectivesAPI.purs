@@ -12,9 +12,11 @@ import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryEffect ((~>))
+import Perspectives.SystemQueries (binding)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleRef(..), unRegisterTriple)
-import Perspectives.TripleGetter (constructRolGetter, (##))
+import Perspectives.TripleGetter (NamedTripleGetter, constructRolGetter, (##))
 import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
@@ -23,14 +25,19 @@ import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), 
 data ApiRequest e =
   GetRol ContextID RolName (ReactStateSetter e)
   | ShutDown
+  | WrongRequest
 
 data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
   | Error
 
-type RequestRecord = forall r. {|r}
+type RequestRecord e =
+  { request :: String
+  , contextID :: String
+  , rolName :: String
+  , reactStateSetter :: ReactStateSetter e}
 
 type ApiChannel e =
-  { request :: AVar RequestRecord
+  { request :: AVar (RequestRecord e)
   , response :: AVar (ApiResponse e)
   , getter :: AVar (ApiRequest e) -> Eff (avar :: AVAR) (Promise.Promise (ApiRequest e))
   , setter :: (ApiRequest e) -> AVar (ApiRequest e) -> Eff (avar :: AVAR) Unit }
@@ -38,22 +45,25 @@ type ApiChannel e =
 -- | Create a source of ApiRequests and a sink for ApiResponses.
 setUpApi :: forall e. MonadPerspectives (ApiEffects e) Unit
 setUpApi = do
-  (request :: AVar RequestRecord) <- lift makeEmptyVar
+  (request :: AVar (RequestRecord e)) <- lift makeEmptyVar
   (response :: AVar (ApiResponse e)) <- lift makeEmptyVar
-  dispatch request response
   void $ liftEff $ connect
     { request: request
     , response: response
     , getter: Promise.fromAff <<< takeVar
     , setter: \val var -> launchAff_ $ putVar val var
     }
+  dispatch request response
 
 foreign import connect :: forall e1 e2. ApiChannel e1 -> Eff (react:: REACT | e2) (NullOrUndefined Unit)
 
 -- | The client of Perspectives sends a record of arbitrary form that we
 -- | try to fit into ApiRequest.
-marshallRequestRecord :: forall r e. {|r} -> ApiRequest e
-marshallRequestRecord r = ShutDown
+marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
+marshallRequestRecord r@{request} = case request of
+  "GetRol" -> GetRol r.contextID r.rolName r.reactStateSetter
+  "ShutDown" -> ShutDown
+  otherwise -> WrongRequest
 
 -----------------------------------------------------------
 -- REQUEST AND RESPONSE
@@ -61,7 +71,7 @@ marshallRequestRecord r = ShutDown
 -- | The dispatch function listens on the ApiRequest source and responds on the ApiResponse sink.
 -- | If a correct request has been sent, it will be responded to.
 -- | Otherwise, an error response will be given.
-dispatch :: forall e. AVar RequestRecord -> AVar (ApiResponse e) -> MonadPerspectives (ApiEffects e) Unit
+dispatch :: forall e. AVar (RequestRecord e) -> AVar (ApiResponse e) -> MonadPerspectives (ApiEffects e) Unit
 dispatch request response = do
   reqr <- lift $ takeVar request
   let req = marshallRequestRecord reqr
@@ -72,7 +82,8 @@ dispatch request response = do
         (GetRol cid rn setter) -> do
           unsubscriber <- getRol cid rn setter
           send (Unsubscriber unsubscriber)
-        otherwise -> send Error
+        WrongRequest -> send Error
+        ShutDown -> send Error -- this case will never occur!
       dispatch request response
   where
     send :: ApiResponse e -> MonadPerspectives (ApiEffects e) Unit
@@ -83,6 +94,7 @@ dispatch request response = do
       ShutDown -> true
       otherwise -> false
 
+
 -----------------------------------------------------------
 -- API FUNCTIONS
 -----------------------------------------------------------
@@ -90,9 +102,17 @@ type ReactStateSetter e = Array String -> Eff (AjaxAvarCache (ref :: REF, react 
 
 type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 
--- | Runs a query that retrieves the rol from the context. Adds the ReactStateSetter to the result.
--- | Returns a function of no arguments that the external program can use to unsubscribe.
-getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getRol cid rn setter = do
-  (Triple{subject, predicate}) <- cid ## constructRolGetter rn ~> NamedFunction (cid <> rn) (setter >=> pure <<< const unit)
+-- | Runs a the query and adds the ReactStateSetter to the result.
+-- | Returns a function of no arguments that the external program can use to unsubscribe the ReactStateSetter.
+getQuery :: forall e. ContextID -> NamedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getQuery cid query@(NamedFunction qn _) setter = do
+  (Triple{subject, predicate}) <- cid ## query ~> NamedFunction (cid <> qn) (setter >=> pure <<< const unit)
   pure $ unRegisterTriple $ TripleRef {subject, predicate}
+
+-- | Retrieve the binding of the rol from the context, subscribe to it.
+getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getRol cid rn setter = getQuery cid (constructRolGetter rn >-> binding) setter
+
+-- | Retrieve the rol from the context, subscribe to it.
+getRol_ :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getRol_ cid rn setter = getQuery cid (constructRolGetter rn) setter

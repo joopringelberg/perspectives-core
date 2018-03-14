@@ -14,7 +14,6 @@ import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Trans.Class (lift)
 import DOM (DOM)
 import Data.Array (dropEnd, cons, snoc, length) as AR
@@ -26,7 +25,7 @@ import Data.String (drop, splitAt, take, length)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Effects (AjaxAvarCache, REACT)
 import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError)
@@ -57,7 +56,7 @@ data AceQuery a
 data AceOutput = TextChanged String
 
 -- | Effects embedding the Ace editor requires.
-type AceEffects eff = AjaxAvarCache (ace :: ACE, dom :: DOM, console :: CONSOLE, ref :: REF | eff)
+type AceEffects eff = AjaxAvarCache (ace :: ACE, dom :: DOM, console :: CONSOLE, react :: REACT | eff)
 
 -- | The Ace component definition.
 aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (MonadPerspectives (AceEffects eff))

@@ -1,7 +1,1 @@
-exports.connect = function(apiChannel)
-{
-  return function()
-  {
-
-  };
-};
+exports.connect = require("../src/client/perspectivesApiProxy.js").connect

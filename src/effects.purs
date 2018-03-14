@@ -1,7 +1,7 @@
 module Perspectives.Effects where
 
-import Control.Monad.Eff (kind Effect)
 import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Eff (kind Effect)
 import Control.Monad.Eff.Now (NOW)
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
