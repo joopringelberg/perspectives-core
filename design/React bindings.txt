@@ -113,14 +113,15 @@ ONTWERP INTERFACE PERSPECTIVES - REACT GUI
 2. De eerste drie componenten hebben state. 
 	- ContextContainers hebben in hun state property (this.state) een property voor elke rol die in gui voor de context gebruikt wordt. De waarde daarvan is een RolID voor een functionele rol en een array van RolIDs voor relationele rollen.
 	- RolContainers hebben een property 'rolID' op hun state.
-	- ViewContainers hebben een property op hun state voor elke view in de property.
-	- ContextProxyContainers zijn als ViewContainers.
+	- ContextProxyContainers zijn als RolContainers.
+
+ViewContainers hebben een property op hun props voor elke view in de property. Geen state.
 	
 3. Context-, Rol- en ContextProxyContainer worden geïnitialiseerd met een Perspectives ID. De ViewContainer wordt geïnitialiseerd met een object met property-values. Dit wil zeggen dat de props deze properties bevatten.
 
 4. Een ContextContainer wordt specifiek voor een bepaalde gemodelleerde Context gegenereerd door Perspectives, als .js file. Een ContextContainer is een Class (want dit soort containers heeft state) en heeft een memberfunctie voor elke rol in die Context. De programmeur past die functie toe in de constructor van de ContextContainer als hij een RolContainer voor die rol wil opnemen. Toepassing van die functie
 	- zorgt ervoor dat in Perspectives een Query wordt uitgevoerd die de rol-instanties oplevert;
-	- zorgt ervoor dat bij het query resultaat een javascript callback wordt geregistreerd die bij verandering van het query resultaat de ReactJs setState functie aanroept op de gelijknamige state property van de ContextContainer
+	- zorgt ervoor dat bij het query resultaat een javascript callback wordt geregistreerd die bij verandering van het query resultaat de ReactJs setState functie aanroept op de gelijknamige state property van de ContextContainer. 
 In de render functie moet de programmeur de RolContainer expressie alleen onderdeel van het resultaat maken, als de Container state de rol (al) bevat. Dit is dus standaard boilerplate. Als we elke rolfunctie de property al laten aanmaken met de waarde null, kunnen we een standaard 'readyToRender' functie maken die true levert als alle rollen aanwezig zijn (die itereert over de own properties van state en levert true als ze allemaal niet null zijn). Op die manier kun je de render functie conditioneel maken op één functioneel resultaat.
 
 5. De ContextContainer heeft voor elke RolInContext die gebonden is aan een BuitenRol van een andere Context, twéé functies:
@@ -135,12 +136,13 @@ In de render functie moet de programmeur de RolContainer expressie alleen onderd
 6. Een RolContainer wordt voor een bepaalde gemodelleerde rol gegenereerd door Perspectives. Zo'n container heeft een functie voor elke view op de Rol die is gemodelleerd. De programmeur past één of meer van deze functies toe in de constructor:
 	- waardoor op de state van de RolContainer een property verschijnt met de naam van de view die gebonden is aan een object met alle properties die in de view voorkomen
 	- zodat in Perspectives een query wordt uitgevoerd op alle properties in de view en het resultaat wordt verzameld in een record dat middels een callback en de functie setState in de gelijknamige property van de state van de RolContainer wordt geschreven.
-Zoals bij de ContextContainer moet de render functie viewContainers alleen renderen als hun corresponderende functie gevuld is.
+Zoals bij de ContextContainer moet de render functie viewContainers alleen renderen als hun corresponderende state property gevuld is.
 
 7. Een ViewContainer heeft geen state. Alle property waarden zijn in de props van de component terug te vinden.
 
 8. Als een Container wordt opgeruimd, moet(en) de callback(s) bij de betreffende quer(y)(ies) worden uitgeschreven. Als de Container een rol-functie aanroept, krijgt hij van Perspectives een Promise van een functie terug waarmee dat kan. De Container bewaart deze functie. Hij levert een promise met een true/false waarde door aan de programmeur. Dus zo:
 	<rol-naam>().then( unsubscriber => contextContainer.state.unsubscribers.<rol-naam> = unsubscriber)
+De functie wordt gegenereerd met unRegisterTriple, toegepast op de referentie die wordt verkregen uit toepassing van addEffectToQuery.
 
 9. De aanroep naar Perspectives levert een promise, die ook kan eindigen in falen. Dus de aanroep van 'then' moet een rejectionHandler meenemen. De meegekregen foutmelding moet in het standaard foutkanaal van de Gui terechtkomen.
 
@@ -155,7 +157,7 @@ Een RolInContext kan gebonden zijn aan een andere RolInContext en dan moet de pr
 	- de ContextContainer: dan gebruikt hij de functie met de naam <rolnaam>_context.
 Welke container ingezet wordt, is aan de programmeur.
 
-11. De ContextProxyContainer geeft alleen toegang tot de properties van de buitenrol van de Context. Hij is functioneel gelijk aan een ViewContainer, maar heeft één extra property en dat is 'context'. Deze property kan worden gebruikt om een ContextContainer mee te initialiseren.
+11. De ContextProxyContainer geeft alleen toegang tot de buitenrol van de Context. Hij is functioneel gelijk aan een RolContainer. In een ContextProxyContainer kan de programmeur dus ViewContainers opnemen. De ContextProxyContainer heeft één extra property en dat is 'context'. Deze property kan worden gebruikt om een ContextContainer mee te initialiseren.
 NOTA BENE. Dit is waarschijnlijk alleen van belang voor de afhandeling van een interface waarin de eindgebruiker in staat wordt gesteld om, vanuit de weergave van de proxy, de context zelf te openen ('doorklikken').
 
 DE PERSPECTIVES API
