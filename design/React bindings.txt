@@ -161,9 +161,9 @@ Welke container ingezet wordt, is aan de programmeur.
 NOTA BENE. Dit is waarschijnlijk alleen van belang voor de afhandeling van een interface waarin de eindgebruiker in staat wordt gesteld om, vanuit de weergave van de proxy, de context zelf te openen ('doorklikken').
 
 DE PERSPECTIVES API
-Perspectives wordt een component. 
-1. Deze component wordt geïnitialiseerd vanuit de Javascript GUI.
-2. Deze component heeft een zeer smalle API.
+Perspectives is het hoofdprogramma.
+1. Perspectives roept een callback van de in javascript geschreven proxy voor Perspectives aan en zet zo een communicatiekanaal op.
+2. Over dit kanaal kan met een beperkt aantal functies gecommuniceerd worden.
 
 De rol- en view functies maken gebruik van deze API. 
 Een eerste benadering van het type van bijvoorbeeld de functie om een rol te verkrijgen, is:
@@ -185,7 +185,7 @@ Maar de ReactStateSetter moet kunnen worden gebonden aan de tweede parameter van
 
 	(Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit)
 
-Nemen we aan dat het verpakken als NamedFunction aan de Perspectives kant gebeurt, dan moet het type van ReactStateSetter dus zijn:
+Nemen we aan dat het verpakken als NamedFunction (tot een QueryEffect) aan de Perspectives kant gebeurt, dan moet het type van ReactStateSetter dus zijn:
 
 	ReactStateSetter :: forall e. (Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit)
 
@@ -224,7 +224,41 @@ QueryUnsubscriber zal een functie moeten zijn die gebruik maakt van functies die
 
 Aan de GUI kant moeten we deze functie dus toepassen op een lege argumentenlijst, want het is een thunk. Dus: unsubscribe()().
 
-QueryUnsubscriber moet door Perspectives gemaakt worden. Het is daar het resultaat van een functie die parameters neemt die aangeven wàt wáár uitgeschreven moet worden:
+QueryUnsubscriber moet door Perspectives gemaakt worden. Het is daar het resultaat van een functie die parameters neemt die aangeven wàt wáár uitgeschreven moet worden. Hij wordt gemaakt met:
+
+	unRegisterTriple :: forall e1. TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+
+QueryUnsubscriber heeft dan dus het type Eff (gm :: GLOBALMAP | e1) Unit, dus dat klopt.
+
+======================================================================================================
+1. Perspectives importeert een foreign function 'connect'. Dit is een functie die de class PerspectivesProxy instantieert, die in javascript geprogrammeerd is en in de browser moet worden geïmporteerd. Deze instantie wordt in een variabele van window, pproxy, gebonden.
+2. Connect krijgt aangeboden:
+	- twee avars
+	- een getter (gebaseerd op takeVar)
+	- een setter
+	Deze worden opgeslagen in de instantie van PerspectivesProxy.
+3. PerspectivesProxy biedt functies aan om met Perspectives te communiceren.
+4. Aan de Perspectives kant leest een dispatcher de avar uit. React stopt structuren in de AVar waarin een functienaam en de functieargumenten te lezen vallen.
+5. De dispatcher voert de (gesanctioneerde) functies uit. Het resultaat gaat terug in de AVar.
+6. De dispatcher werkt met een ADT waarin de mogelijke functies de onderscheiden constructoren zijn.
+7. Voor de dispatcher zit een functie die een record omzet naar waarden van de ADT op basis van de functienaam.
+8. De React kant kan dus gewone javascript objecten met functienaam en argumenten opsturen.
+
+STRATEGIE
+1. Vooralsnog laat ik Perspectives de authenticatie doen.
+2. Uiteindelijk stellen we functies vanuit React aan Perspectives beschikbaar om de GUI voor de authenticatie te maken.
+
+======================================================================================================
+
+
+
+
+
+
+
+
+
+
 
 
 

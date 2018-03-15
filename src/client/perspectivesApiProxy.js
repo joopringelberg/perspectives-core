@@ -17,37 +17,34 @@ class PerspectivesProxy {
         this.setter = setter;
     }
 
-    // callback moet de functie van een QueryEffect kunnen zijn: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-	getRol(contextID, rolName, callback)
+	getRolBinding(contextID, rolName, receiveValues, handleUnsubscriber)
 	{
 		const req = {
-			request: "GetRol",
+			request: "GetRolBinding",
 			contextID: contextID,
 			rolName: rolName,
-			reactStateSetter: function(arrString){ callback(arrString); return function(){}; }
+			// receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
+			reactStateSetter: function(arrString){ receiveValues(arrString); return function(){}; }
 		};
-		// Dit lijkt me kwetsbaar. De unsubscriber hoort bij het request. Maar de processen zijn asynchroon!
-		this.setter( req)(this.request )();
-		this.getter( this.response )().then(
-			function(unsubscriber)
-			{
-				// Save for later so you can unsubscribe.
-                console.log("Received an unsubscriber");
-			} );
+		this.setter( req )( this.request )();
+		this.getter( this.response )().then( handleUnsubscriber );
 	}
 }
 
-
-function test(contextID, rolName)
+window.test = function (contextID, rolName)
 {
-    pproxy.getRol(contextID, rolName,
-		   function(rolIds)
-		   {
-			   console.log( "Rol " + rolName + " van context " + contextID + " is: " + rolIds );
-		   });
-}
-
-window.test = test;
+	pproxy.getRolBinding(
+		contextID, rolName,
+		function(rolIds)
+		{
+			console.log( "The binding of " + rolName + " van context " + contextID + " is: " + rolIds );
+		},
+		function( unsubscriber )
+		{
+			// Save for later so you can unsubscribe.
+			console.log( "Received an unsubscriber" );
+		} );
+};
 
 // export {connect};
 exports.connect = connect;

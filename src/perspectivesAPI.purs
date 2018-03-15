@@ -23,7 +23,7 @@ import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), 
 -- REQUEST, RESPONSE AND CHANNEL
 -----------------------------------------------------------
 data ApiRequest e =
-  GetRol ContextID RolName (ReactStateSetter e)
+  GetRolBinding ContextID RolName (ReactStateSetter e)
   | ShutDown
   | WrongRequest
 
@@ -61,7 +61,7 @@ foreign import connect :: forall e1 e2. ApiChannel e1 -> Eff (react:: REACT | e2
 -- | try to fit into ApiRequest.
 marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
 marshallRequestRecord r@{request} = case request of
-  "GetRol" -> GetRol r.contextID r.rolName r.reactStateSetter
+  "GetRolBinding" -> GetRolBinding r.contextID r.rolName r.reactStateSetter
   "ShutDown" -> ShutDown
   otherwise -> WrongRequest
 
@@ -79,8 +79,8 @@ dispatch request response = do
     then pure unit
     else do
       case req of
-        (GetRol cid rn setter) -> do
-          unsubscriber <- getRol cid rn setter
+        (GetRolBinding cid rn setter) -> do
+          unsubscriber <- getRolBinding cid rn setter
           send (Unsubscriber unsubscriber)
         WrongRequest -> send Error
         ShutDown -> send Error -- this case will never occur!
@@ -110,9 +110,9 @@ getQuery cid query@(NamedFunction qn _) setter = do
   pure $ unRegisterTriple $ TripleRef {subject, predicate}
 
 -- | Retrieve the binding of the rol from the context, subscribe to it.
-getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getRol cid rn setter = getQuery cid (constructRolGetter rn >-> binding) setter
+getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getRolBinding cid rn setter = getQuery cid (constructRolGetter rn >-> binding) setter
 
 -- | Retrieve the rol from the context, subscribe to it.
-getRol_ :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getRol_ cid rn setter = getQuery cid (constructRolGetter rn) setter
+getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getRol cid rn setter = getQuery cid (constructRolGetter rn) setter

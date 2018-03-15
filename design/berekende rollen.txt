@@ -1,0 +1,52 @@
+BEREKENDE ROLLEN
+
+Een context kan gedefinieerd worden met een berekende rol. 
+Als je een instantie voor die rol maakt, mag je die rol niet invullen.
+De getter voor die rol moet de bijbehorende query evalueren.
+
+Hoe doen we dat?
+
+Maken we rolGetter slimmer door hem te laten analyseren of het om een berekende rol gaat of niet?
+Of moeten we een berekendeRolGetter functie maken?
+
+RolGetter is een functie die je in purescript code toepast. De programmeur kan ook wel weten dat hij berekendeRolGetter moet toepassen.
+
+Maar straks moeten we uit de query AST ook een queryfunctie kunnen genereren. De generator moet dus bij elke stap reflecteren of het om een berekende rol gaat of niet.
+
+psp:Context x:C
+	psp:rolInContext =>
+		q:compose $berekendeRol
+			$operand1 => binding
+			$operand2 => binding
+
+Hier kun je dus 'berekendeRol' opvragen van een context van type x:C.
+De rolGetter functie voor 'berekendeRol' moet dus de query evalueren.
+Dat kan hij weten omdat het type van de binding van rolInContext natuurlijk q:compose is.
+
+'rolGetter' krijgt een gekwalificeerde naam mee. Hier is dat x:C$berekendeRol. Het type daarvan is q:compose. Het type daarvan is q:Query. De test is dus: in de transitieve closure van type, vind je daar q:Query?
+Dat ga je niet vinden voor een rol die is gedefinieerd met psp:Rol.
+
+Dit pleit er dus voor om een slimme rolgetter te maken die in het mechanisme ingezet wordt dat straks uit de query-representatie de query-functie samenstelt.
+
+
+BEREKENDE PROPERTIES
+Hoe doe je dit voor een property? Een rol kan gedefinieerd worden met een berekende property.
+De getter voor die property moet de bijbehorende query evalueren.
+
+psp:Context x:C
+	psp:internalProperty =>
+		q:compose $leeftijdVanVerdachte
+			$operand (1) => $$verdachte
+			$operand (2) => 
+				q:rolPropertyGetter !gen
+					$property => $$verdachte$leeftijd
+	psp:rolInContext => 
+		psp:Rol $verdachte
+			psp:rolProperty =>
+				psp:Property $leeftijd
+
+ROLTELESCOOP
+Hoe refereren we aan een property uit de roltelescoop? Je wil de modelleur de illusie geven dat hij een property van de rol zelf opvraagt. Dus dat zou betekenen dat je, na een deel dat de rol identificeert, gewoon de lokale naam kunt gebruiken.
+Het systeem moet dan die lokale naam gebruiken om in de telescoop een property met die lokale naam te vinden, uiteraard beginnend bij de rol zelf en dan de binding ladder opklimmen.
+
+model:QueryAst$compose$resultaatType$resultaatType_buitenRol
