@@ -13,7 +13,7 @@ let mainWindow;
 
 function createWindow ()
 {
-  // and load the index.html of the app.
+  // In development, will be: `http://localhost:3000
   const startUrl =
           process.env.ELECTRON_START_URL ||
           url.format(
