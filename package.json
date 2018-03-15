@@ -1,13 +1,28 @@
 {
+  "name": "perspectives-electron-app",
+  "version": "0.1.0",
   "private": true,
+  "dependencies": {
+    "react": "^16.2.0",
+    "react-dom": "^16.2.0",
+    "react-scripts": "1.1.1"
+  },
+  "main": "src/perspectives-starter.js",
+  "homepage": "./",
   "scripts": {
-    "build": "pulp browserify --optimise --to dist/app.js",
-    "watch": "pulp -w build --to dist/app.js",
-    "watch-fast": "webpack --entry ./entry.js --output-filename dist/app.js --progress --watch"
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject",
+    "electron": "electron .",
+    "dev": "nf start"
   },
   "devDependencies": {
+    "electron": "^1.8.3",
+    "eslint": "^4.18.2",
+    "eslint-plugin-react": "^7.7.0",
+    "foreman": "^2.0.0",
     "bower": "^1.8.2",
     "webpack": "^3.6.0"
-  },
-  "dependencies": {}
+  }
 }
