@@ -25,7 +25,7 @@ function createWindow ()
               protocol: 'file:',
               slashes: true
             })
-  mainWindow.loadURL(startUrl)
+  mainWindow.loadURL(startUrl + "?user=cor&password=geheim");
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()

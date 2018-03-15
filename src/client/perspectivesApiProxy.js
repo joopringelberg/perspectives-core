@@ -33,7 +33,7 @@ class PerspectivesProxy {
 
 window.test = function (contextID, rolName)
 {
-	pproxy.getRolBinding(
+	window.pproxy.getRolBinding(
 		contextID, rolName,
 		function(rolIds)
 		{
