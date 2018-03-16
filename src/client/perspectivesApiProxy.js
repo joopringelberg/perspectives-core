@@ -1,5 +1,3 @@
-"use strict";
-
 function connect ({request, response, getter, setter})
 {
   return function ()

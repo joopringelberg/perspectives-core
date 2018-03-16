@@ -152,7 +152,7 @@ ui =
     ifM (lift partyMode)
       (lift setupCouchdb)
       (lift requestAuthentication)
-    lift setUpApi
+    -- lift setUpApi
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do
