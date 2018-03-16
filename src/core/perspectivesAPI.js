@@ -1,1 +1,1 @@
-exports.connect = require("client/perspectivesApiProxy.js").connect;
+module.exports.connect = require("client/perspectivesApiProxy.js").connect;
