@@ -1,26 +1,27 @@
-import React, { Component } from 'react';
-import logo from './logo.svg';
-import './App.css';
-import {main} from "./output/Main";
+import React, { Component } from "react";
+import "./App.css";
+import { main } from "./output/Main";
 
 main();
 
-class App extends Component {
-  render() {
+class App extends Component
+{
+  render ()
+  {
     return (
       <div className="App">
         <header className="App-header">
-          <img src={logo} className="App-logo" alt="logo" />
-          <h1 className="App-title">Welcome to React</h1>
+          <h1 className="App-title">Perspectives editor</h1>
         </header>
-        <p className="App-intro">
-          To get started, edit <code>src/App.js</code> and save to reload.
-          And we will!
-        </p>
-        <p>En nog een zinnetjes</p>
+        <div>
+          <p>
+            <button onClick={() => alert("clicked me")}>Clear</button>
+          </p>
+        </div>
       </div>
     );
   }
 }
+
 //bla
 export default App;

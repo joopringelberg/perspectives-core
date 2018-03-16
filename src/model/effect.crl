@@ -1,0 +1,110 @@
+Context model:Effect als eff:
+
+import model:Perspectives als psp:
+import model:QueryAst als q:
+
+Section psp:rolInContext
+
+psp:Rol eff:Constant
+	psp:externalProperty =>
+		psp:Property $value
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+
+psp:Context eff:SystemFunctions
+	psp:rolInContext =>
+		psp:Rol $function
+			extern psp:isFunctioneel = false
+	psp:rolInContext =>
+		psp:Rol $operator
+			extern psp:isFunctioneel = false
+
+psp:Context eff:Effect
+	-- The ordered list of statements in the effect.
+	psp:rolInContext =>
+		psp:Rol $statement
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding => eff:Assignment
+			psp:mogelijkeBinding => q:Query
+			psp:mogelijkeBinding => eff:FunctionApplication
+			psp:mogelijkeBinding => eff:InfixExpression
+			psp:mogelijkeBinding => $$variable
+			psp:mogelijkeBinding => eff:Constant
+	-- The variables used in the effect.
+	psp:rolInContext =>
+		psp:Rol $variable
+			extern psp:isFunctioneel = false
+
+psp:Context eff:Assignment
+	psp:externalProperty =>
+		-- Can be 'rol' or 'property'
+		psp:Property $entityType
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+	psp:externalProperty =>
+		-- Can be 'add', 'remove' or 'set'
+		psp:Property $assignmentType
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+	psp:rolInContext =>
+		-- The variable that will be assigned to.
+		psp:Rol $boundVariable
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => eff:Effect$variable
+	psp:rolInContext =>
+		-- The expression that delivers the value.
+		psp:Rol $value
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:Query
+			psp:mogelijkeBinding => eff:FunctionApplication
+			psp:mogelijkeBinding => eff:InfixExpression
+			psp:mogelijkeBinding => eff:Effect$variable
+			psp:mogelijkeBinding => eff:Constant
+			psp:mogelijkeBinding => eff:New
+
+psp:Context eff:FunctionApplication
+	psp:rolInContext =>
+		-- The function that will be applied
+		psp:Rol $function
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => eff:SystemFunctions$function
+	psp:rolInContext =>
+		-- The arguments that will be bound to the function's parameters.
+		psp:Rol $argument
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding => q:Query
+			psp:mogelijkeBinding => eff:FunctionApplication
+			psp:mogelijkeBinding => eff:InfixExpression
+			psp:mogelijkeBinding => eff:Effect$variable
+			psp:mogelijkeBinding => eff:Constant
+
+psp:Context eff:InfixExpression
+	psp:rolInContext =>
+		-- The operator
+		psp:Rol $operator
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => eff:SystemFunctions$operator
+	psp:rolInContext =>
+		-- The operands
+		psp:Rol $operand
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding => q:Query
+			psp:mogelijkeBinding => eff:FunctionApplication
+			psp:mogelijkeBinding => eff:InfixExpression
+			psp:mogelijkeBinding => eff:Effect$variable
+			psp:mogelijkeBinding => eff:Constant
+
+psp:Context eff:New
+	psp:rolInContext =>
+		-- The type we are creating.
+		psp:Rol $type
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Context
+	psp:rolInContext =>
+		-- Assignment on the roles or properties of the newly created entity.
+		psp:Rol $assignment
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding => eff:Assignment
