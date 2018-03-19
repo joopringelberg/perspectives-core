@@ -114,14 +114,6 @@ tryReadSessionCookieValue = getsGlobalState _.sessionCookie >>= lift <<< tryRead
 setSessionCookie :: forall e. String -> MonadPerspectives (avar :: AVAR | e) Unit
 setSessionCookie c = sessionCookie >>= (lift <<< putVar c)
 
--- | If memorizeQueryResults == true, we will look up a result in the triple cache
--- | before computing it.
-memorizeQueryResults :: forall e. MonadPerspectives e Boolean
-memorizeQueryResults = getsGlobalState _.memorizeQueryResults
-
-setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectives e Unit
-setMemorizeQueryResults b = modifyGlobalState \ps -> ps {memorizeQueryResults = b}
-
 contextDefinitions :: forall e. MonadPerspectives e ContextDefinitions
 contextDefinitions = getsGlobalState _.contextDefinitions
 

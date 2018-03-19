@@ -1,21 +1,24 @@
 module Perspectives.TripleAdministration where
 
 import Perspectives.EntiteitAndRDFAliases
+
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Array (catMaybes)
+import Control.Monad.State (StateT, lift)
 import Data.Maybe (Maybe(..))
 import Data.Show (class Show, show)
+import Data.StrMap (StrMap)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
-import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults)
-import Prelude (class Eq, Unit, bind, discard, flip, pure, unit, void, ($), (&&), (<$>), (<>), (==))
+import Perspectives.PerspectivesState (MonadPerspectives, getsGlobalState, modifyGlobalState)
+import Prelude (class Eq, Unit, bind, discard, pure, unit, void, ($), (&&), (<>), (==))
 
--- type TripleGetter e = Subject -> Aff (AjaxAvarCache e) (Triple e)
+-- | The QueryEnvironment is a set of bindings of variableNames (Strings) to either ID's or the string representation of simple values.
+type QueryEnvironment = StrMap (Array String)
 
-type FlexTriple e = MonadPerspectives (AjaxAvarCache e) (Triple e)
+type MonadPerspectivesQuery e =  StateT QueryEnvironment (MonadPerspectives e)
 
-type TripleGetter e = Subject -> FlexTriple e
+type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 
 data NamedFunction f = NamedFunction String f
 
@@ -29,6 +32,20 @@ newtype Triple e = Triple
 
 tripleObjects :: forall e. Triple e -> Array String
 tripleObjects (Triple{object}) = object
+
+type MonadPerspectivesObjects e = MonadPerspectives (AjaxAvarCache e) (Array ID)
+
+-- | If memorizeQueryResults == true, we will look up a result in the triple cache
+-- | before computing it.
+memorizeQueryResults :: forall e. MonadPerspectivesQuery e Boolean
+memorizeQueryResults = lift $ getsGlobalState _.memorizeQueryResults
+
+setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery e Unit
+setMemorizeQueryResults b = lift $ modifyGlobalState \ps -> ps {memorizeQueryResults = b}
+
+
+tripleObjects_  :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Array ID)
+tripleObjects_ (Triple{object}) = pure object
 
 instance showTriple :: Show (Triple e) where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
@@ -134,15 +151,15 @@ memorize getter name = NamedFunction name \id -> do
   remember <- memorizeQueryResults
   case remember of
     true -> do
-      mt <- liftEff (lookupInTripleIndex id name)
+      mt <- lift $ liftEff (lookupInTripleIndex id name)
       case mt of
         Nothing -> do
           t <- getter id
-          liftEff $ registerTriple t
+          lift $ liftEff $ registerTriple t
         (Just t) -> pure t
     false -> do
       t <- getter id
-      liftEff $ registerTriple t
+      lift $ liftEff $ registerTriple t
 
 -- | Add the reference to the triple.
 foreign import addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef

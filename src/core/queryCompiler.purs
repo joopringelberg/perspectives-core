@@ -1,5 +1,6 @@
 module Perspectives.QueryCompiler where
 
+import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc, head)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
@@ -7,28 +8,27 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolName, PropertyName)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
-import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (getContextType, getRolByLocalName)
 import Perspectives.PropertyComposition (compose)
 import Perspectives.QueryCombinators (closure, closure', concat, contains, filter, notEmpty, lastElement, rolesOf, toBoolean)
 import Perspectives.SystemQueries (identity)
-import Perspectives.TripleAdministration (NamedFunction, TripleGetter)
-import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleAdministration (NamedFunction, TripleGetter, MonadPerspectivesQuery)
+import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter)
 import Prelude (bind, pure, ($))
 
 -- | From a qualified name for a Rol, construct a function that computes the instances of that Rol for a given context.
 -- | The Rol may be defined as computed.
 rolQuery  :: forall e.
   RolName ->
-  MonadPerspectives (AjaxAvarCache e) (NamedFunction (TripleGetter e))
+  MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
 rolQuery rn = do
   -- Is the type of rolType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
   if isAQuery
-    then constructQueryFunction rn
+    then constructQueryFunction rn -- TODO: voeg de uitgangscontext toe als de variabele #context aan state.
     else pure $ constructRolLookup $ unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI rn)
   where
-   contextType = constructTripleGetterFromArbitraryFunction "model:Perspectives$type" getContextType
+   contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
    localName :: RolName -> LocalName
    localName qn = unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI qn)
 
@@ -36,9 +36,9 @@ rolQuery rn = do
 -- | query from the id of an entity.
 constructQueryFunction :: forall e.
   ContextID ->
-  MonadPerspectives (AjaxAvarCache e) (NamedFunction (TripleGetter e))
+  MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
 constructQueryFunction typeDescriptionID = do
-  (pspType :: Array ID) <- getContextType typeDescriptionID
+  (pspType :: Array ID) <- lift $ getContextType typeDescriptionID
   case head pspType of
     Nothing -> pure identity
     (Just "model:QueryAst$constructExternalPropertyGetter") ->
@@ -54,16 +54,16 @@ constructQueryFunction typeDescriptionID = do
     (Just "model:QueryAst$constructRolPropertyLookup") ->
       applyPropertyConstructor constructRolPropertyLookup
     (Just "model:QueryAst$constructRolGetter") -> do
-      ids <- getRolByLocalName "rol" typeDescriptionID
+      ids <- lift $ getRolByLocalName "rol" typeDescriptionID
       pure $ maybe identity constructRolGetter (head ids)
     (Just "model:QueryAst$constructRolLookup") -> do
-      ids <- getRolByLocalName "rol" typeDescriptionID
+      ids <- lift $ getRolByLocalName "rol" typeDescriptionID
       pure $ maybe identity constructRolLookup (head ids)
     (Just "model:QueryAst$constructInverseRolGetter") -> do
-      ids <- getRolByLocalName "rol" typeDescriptionID
+      ids <- lift $ getRolByLocalName "rol" typeDescriptionID
       pure $ maybe identity constructInverseRolGetter (head ids)
     (Just "model:QueryAst$rolesOf") -> do
-      ids <- getRolByLocalName "context" typeDescriptionID
+      ids <- lift $ getRolByLocalName "context" typeDescriptionID
       pure $ maybe identity rolesOf (head ids)
     (Just "model:QueryAst$notEmpty") -> applyUnaryCombinator notEmpty
     (Just "model:QueryAst$closure") -> applyUnaryCombinator closure
@@ -72,9 +72,9 @@ constructQueryFunction typeDescriptionID = do
     (Just "model:QueryAst$compose") -> applyBinaryCombinator compose
     (Just "model:QueryAst$concat") -> applyBinaryCombinator concat
     (Just "model:QueryAst$concat") -> do
-      criteriumId <- getRolByLocalName "criterium" typeDescriptionID
+      criteriumId <- lift $ getRolByLocalName "criterium" typeDescriptionID
       criterium <- traverse constructQueryFunction criteriumId
-      candidatesId <-  getRolByLocalName "candidates" typeDescriptionID
+      candidatesId <-  lift $ getRolByLocalName "candidates" typeDescriptionID
       candidates <- traverse constructQueryFunction candidatesId
       case head criterium of
         Nothing -> pure identity
@@ -84,22 +84,22 @@ constructQueryFunction typeDescriptionID = do
     (Just _) -> pure identity
   where
     applyPropertyConstructor :: (PropertyName -> NamedTripleGetter e)
-      -> MonadPerspectives (AjaxAvarCache e) (NamedTripleGetter e)
+      -> MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
     applyPropertyConstructor f = do
-      ids <- getRolByLocalName "property" typeDescriptionID
+      ids <- lift $ getRolByLocalName "property" typeDescriptionID
       pure $ maybe identity f (head ids)
 
     applyUnaryCombinator :: (NamedTripleGetter e -> NamedTripleGetter e )
-      -> MonadPerspectives (AjaxAvarCache e) (NamedTripleGetter e)
+      -> MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
     applyUnaryCombinator c = do
-      queryId <- getRolByLocalName "query" typeDescriptionID
+      queryId <- lift $ getRolByLocalName "query" typeDescriptionID
       query <- traverse constructQueryFunction queryId
       pure $ maybe identity c (head query)
 
     applyBinaryCombinator :: (NamedTripleGetter e -> NamedTripleGetter e -> NamedTripleGetter e)
-      -> MonadPerspectives (AjaxAvarCache e) (NamedTripleGetter e)
+      -> MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
     applyBinaryCombinator c = do
-      (operandIds :: Array ID) <- getRolByLocalName "operand" typeDescriptionID
+      (operandIds :: Array ID) <- lift $ getRolByLocalName "operand" typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
       case unsnoc operands of
         (Just {init, last}) -> pure $ foldl c last init

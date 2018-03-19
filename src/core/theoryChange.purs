@@ -13,7 +13,8 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Subject, Predicate)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesState (MonadPerspectives)
-import Perspectives.TripleAdministration (FlexTriple, Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency_, setSupports_)
+import Perspectives.TripleAdministration (Triple(..), TripleRef(..), getRef, getTriple, lookupInTripleIndex, removeDependency_, setSupports_)
+import Perspectives.TripleGetter (runTripleGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), (<<<), (>>=))
 
@@ -71,8 +72,8 @@ getDependencies (Triple{dependencies}) = do
     -- lookupRef :: TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple e))
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
-recompute :: forall e. Triple e -> FlexTriple e
-recompute (Triple{subject, tripleGetter}) = tripleGetter subject
+recompute :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Triple e)
+recompute (Triple{subject, tripleGetter}) = runTripleGetter subject tripleGetter
 
 -- Change the object of the triple to the array of IDs passed to the function.
 saveChangedObject :: forall e1 e2. Triple e2 -> Array String -> Aff e1 (Triple e2)

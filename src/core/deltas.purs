@@ -42,7 +42,7 @@ import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, lijdendVoorwerpBepaling, propertyReferentie, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
-import Perspectives.TripleGetter (NamedTripleGetter, constructInverseRolGetter, constructRolGetter, (##))
+import Perspectives.TripleGetter (NamedTripleGetter, constructInverseRolGetter, constructRolGetter, runTripleGetter, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
 import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<>), (==), (>>=), (||), (<<<))
@@ -92,6 +92,7 @@ transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
 
 type MonadTransactie e = StateT Transactie (MonadPerspectives (AjaxAvarCache e))
 
+-- TODO: kan het zo zijn dat er al een transactie loopt? En wat dan? Denk aan acties met effect.
 runInTransactie :: forall e.
   -- MonadTransactie (now :: NOW | e) Unit
   StateT Transactie (MonadPerspectives (TransactieEffects e)) Unit ->
@@ -117,24 +118,24 @@ distributeTransactie t = do
 
 addContextToTransactie :: forall e. PerspectContext ->
   -- MonadTransactie e Unit
-  StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+  MonadTransactie e Unit
 addContextToTransactie c = do
   (Transactie tf@{createdContexts}) <- get
   put $ Transactie tf {createdContexts = cons c createdContexts}
 
-addRolToTransactie :: forall e. PerspectRol -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+addRolToTransactie :: forall e. PerspectRol -> MonadTransactie e Unit
 addRolToTransactie c = do
   (Transactie tf@{createdRoles}) <- get
   put $ Transactie tf {createdRoles = cons c createdRoles}
 
-deleteContextFromTransactie :: forall e. PerspectContext -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+deleteContextFromTransactie :: forall e. PerspectContext -> MonadTransactie e Unit
 deleteContextFromTransactie c@(PerspectContext{_id}) = do
   (Transactie tf@{createdContexts, deletedContexts}) <- get
   case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
     Nothing -> put (Transactie tf{deletedContexts = cons _id deletedContexts})
     (Just i) -> put (Transactie tf{createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
-deleteRolFromTransactie :: forall e. PerspectRol -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+deleteRolFromTransactie :: forall e. PerspectRol -> MonadTransactie e Unit
 deleteRolFromTransactie c@(PerspectRol{_id}) = do
   (Transactie tf@{createdRoles, deletedRoles}) <- get
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
@@ -165,13 +166,13 @@ ZO NEE:
 	Indien gevonden: verwijder de oude.
 	Anders: voeg de nieuwe toe.
 -}
-addDelta :: forall e. Delta -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+addDelta :: forall e. Delta -> MonadTransactie e Unit
 addDelta newCD@(Delta{id: id', memberName, deltaType, value}) = do
   t@(Transactie tf@{deltas}) <- get
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      (isfunc :: Boolean) <- lift $ (toBoolean isFunctional) memberName
+      (isfunc :: Boolean) <- lift $ runTripleGetter memberName (toBoolean isFunctional)
       if isfunc
         then do
           x <- pure $ findIndex equalExceptRolID deltas
@@ -352,7 +353,7 @@ updatePerspectEntiteit' changeEntity cid value = do
   -- -- Set the new revision in the entity.
   -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
-setContextType :: forall e. ID -> ID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setContextType :: forall e. ID -> ID -> MonadTransactie e Unit
 setContextType = updatePerspectEntiteit
   changeContext_type
   (\cid theType -> Delta
@@ -363,7 +364,7 @@ setContextType = updatePerspectEntiteit
     , isContext: true
     })
 
-setRolType :: forall e. ID -> ID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setRolType :: forall e. ID -> ID -> MonadTransactie e Unit
 setRolType = updatePerspectEntiteit
   changeRol_type
   (\cid theType -> Delta
@@ -385,7 +386,7 @@ setContextDisplayName = updatePerspectEntiteit
     , isContext: true
     })
 
-setContext :: forall e. ID -> ID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setContext :: forall e. ID -> ID -> MonadTransactie e Unit
 setContext = updatePerspectEntiteit
   changeRol_context
   (\cid rol -> Delta
@@ -396,7 +397,7 @@ setContext = updatePerspectEntiteit
     , isContext: false
     })
 
-setBinding :: forall e. ID -> ID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setBinding :: forall e. ID -> ID -> MonadTransactie e Unit
 setBinding rid binding = do
   oldBinding <- lift $ getRolBinding rid
   updatePerspectEntiteit' changeRol_binding rid binding
@@ -418,14 +419,14 @@ setBinding rid binding = do
 updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
-  ID -> MemberName -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+  ID -> MemberName -> Value -> MonadTransactie e Unit
 updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
   addDelta $ createDelta cid memberName value
 
 updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
-  ID -> MemberName -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+  ID -> MemberName -> Value -> MonadTransactie e Unit
 updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
   (context) <- lift $ onNothing ("updateRoleProperty: cannot find this context: " <> cid) (getPerspectEntiteit cid)
   -- Change the entity in cache:
@@ -440,7 +441,7 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | In a functional rol, remove an old
-addRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+addRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
 addRol =
   updatePerspectEntiteitMember
     addContext_rolInContext
@@ -453,7 +454,7 @@ addRol =
         , isContext: true
         })
 
-removeRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+removeRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
 removeRol =
   updatePerspectEntiteitMember
     removeContext_rolInContext
@@ -466,7 +467,7 @@ removeRol =
         , isContext: true
         })
 
-setRol :: forall e. ContextID -> RolName -> RolID -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
 setRol =
   updatePerspectEntiteitMember
     setContext_rolInContext
@@ -479,7 +480,7 @@ setRol =
         , isContext: true
         })
 
-addProperty :: forall e. RolID -> PropertyName -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+addProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
 addProperty =
   updatePerspectEntiteitMember
     addRol_property
@@ -492,7 +493,7 @@ addProperty =
         , isContext: false
         })
 
-removeProperty :: forall e. RolID -> PropertyName -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+removeProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
 removeProperty =
   updatePerspectEntiteitMember
     removeRol_property
@@ -505,7 +506,7 @@ removeProperty =
         , isContext: false
         })
 
-setProperty :: forall e. RolID -> PropertyName -> Value -> StateT Transactie (MonadPerspectives (AjaxAvarCache e)) Unit
+setProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
 setProperty =
   updatePerspectEntiteitMember
     setRol_property

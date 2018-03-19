@@ -6,7 +6,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (notEmpty, closure', filter) as QC
-import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
 import Prelude (const, pure, (<>), (>=>))
 
 identity' :: forall e. ObjectsGetter e
@@ -19,34 +19,34 @@ identity' id = pure [id]
 -----------------------------------------------------------
 
 identity :: forall e. NamedTripleGetter e
-identity = constructTripleGetterFromArbitraryFunction "model:Perspectives$identity" identity'
+identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity'
 
 contextType :: forall e. NamedTripleGetter e
-contextType = constructTripleGetterFromArbitraryFunction "model:Perspectives$type" getContextType
+contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
 
 buitenRol :: forall e. NamedTripleGetter e
-buitenRol = constructTripleGetterFromArbitraryFunction "model:Perspectives$buitenRol" getBuitenRol
+buitenRol = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRol" getBuitenRol
 
 iedereRolInContext :: forall e. NamedTripleGetter e
-iedereRolInContext =  constructTripleGetterFromArbitraryFunction "model:Perspectives$iedereRolInContext" getRollen
+iedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives$iedereRolInContext" getRollen
 
 rolTypen :: forall e. NamedTripleGetter e
-rolTypen =  constructTripleGetterFromArbitraryFunction "model:Perspectives$rolTypen" getRolTypen
+rolTypen =  constructTripleGetterFromObjectsGetter "model:Perspectives$rolTypen" getRolTypen
 
 rolType :: forall e. NamedTripleGetter e
-rolType = constructTripleGetterFromArbitraryFunction "model:Perspectives$type" getRolType
+rolType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getRolType
 
 binding :: forall e. NamedTripleGetter e
-binding = constructTripleGetterFromArbitraryFunction "model:Perspectives$binding" getRolBinding
+binding = constructTripleGetterFromObjectsGetter "model:Perspectives$binding" getRolBinding
 
 rolContext :: forall e. NamedTripleGetter e
-rolContext = constructTripleGetterFromArbitraryFunction "model:Perspectives$context" getRolContext
+rolContext = constructTripleGetterFromObjectsGetter "model:Perspectives$context" getRolContext
 
 label :: forall e. NamedTripleGetter e
-label = constructTripleGetterFromArbitraryFunction "model:Perspectives$label" getDisplayName
+label = constructTripleGetterFromObjectsGetter "model:Perspectives$label" getDisplayName
 
 rolHasType :: forall e. ID -> NamedTripleGetter e
-rolHasType typeId = constructTripleGetterFromArbitraryFunction ("model:Perspectives$rolHasType" <> "_" <> typeId)
+rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$rolHasType" <> "_" <> typeId)
   (getRolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
 
 -----------------------------------------------------------

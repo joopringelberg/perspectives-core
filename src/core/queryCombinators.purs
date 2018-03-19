@@ -5,10 +5,9 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
-import Perspectives.PerspectivesState (MonadPerspectives, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.Property (ObjectsGetter, getRol)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize, tripleObjects)
-import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetter, constructTripleGetterFromArbitraryFunction)
+import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery, getRef, memorize, memorizeQueryResults, setMemorizeQueryResults, tripleObjects)
+import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetterFromObjectsGetter, constructTripleGetterFromObjectsGetter')
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
 
 closure :: forall e.
@@ -110,7 +109,7 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter nam
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
-isNothing :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Triple e)
+isNothing :: forall e. Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
 notEmpty :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
@@ -123,7 +122,7 @@ notEmpty (NamedFunction nameOfp p) = memorize getter name where
   name = "(notEmpty " <> nameOfp <> ")"
 
 -- | Construct a function that returns a bool in Aff, from a TripleGetter.
-toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> MonadPerspectives (AjaxAvarCache e) Boolean
+toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 toBoolean (NamedFunction nameOfp p) r = do
   result <- p r
   arrWithBool <- pure $ tripleObjects result
@@ -134,7 +133,7 @@ toBoolean (NamedFunction nameOfp p) r = do
 -- | This query constructor takes a context id as argument. The query step that results can be applied to a role id
 -- | and will result in all instances of that role for the given context.
 rolesOf :: forall e. ContextID -> NamedFunction (TripleGetter e)
-rolesOf cid = constructTripleGetterFromArbitraryFunction
+rolesOf cid = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$rolesOf" <> cid) f where
   f :: ObjectsGetter e
   f rolName = getRol rolName cid
@@ -143,8 +142,8 @@ rolesOf cid = constructTripleGetterFromArbitraryFunction
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.
 contains :: forall e. ID -> NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
-contains id' (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunction ("model:Perspectives$contains" <> id') f where
-  f :: ObjectsGetter e
+contains id' (NamedFunction nameOfp p) = constructTripleGetterFromObjectsGetter' ("model:Perspectives$contains" <> id') f where
+  f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
     case elemIndex id' object of
@@ -152,7 +151,7 @@ contains id' (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunct
       otherwise -> pure ["true"]
 
 lastElement :: forall e. NamedTripleGetter e -> NamedTripleGetter e
-lastElement (NamedFunction nameOfp p) = constructTripleGetterFromArbitraryFunction
+lastElement (NamedFunction nameOfp (p :: TripleGetter e)) = constructTripleGetterFromObjectsGetter'
   ("(lastElement " <> nameOfp <> ")")
   (p >=> pure <<< (maybe [] singleton) <<< last <<< tripleObjects)
 
