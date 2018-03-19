@@ -6,14 +6,14 @@ import Control.Monad (class Monad)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (evalStateT, lift, modify, gets)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (insert, lookup, singleton)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (ObjectsGetter, getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery, addToTripleIndex, lookupInTripleIndex, memorize, memorizeQueryResults)
-import Prelude (Unit, bind, ifM, pure, ($))
+import Prelude (Unit, bind, id, ifM, pure, ($))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
@@ -36,8 +36,8 @@ type VariableName = String
 putQueryVariable :: forall e. VariableName -> Array String -> MonadPerspectivesQuery e Unit
 putQueryVariable var valueArray = modify \env -> insert var valueArray env
 
-readQueryVariable :: forall e. VariableName -> MonadPerspectivesQuery e (Maybe (Array String))
-readQueryVariable var = gets \env -> lookup var env
+readQueryVariable :: forall e. VariableName -> MonadPerspectivesQuery e (Array String)
+readQueryVariable var = gets \env -> maybe [] id (lookup var env)
 
 type NamedTripleGetter e = NamedFunction (TripleGetter e)
 

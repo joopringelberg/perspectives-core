@@ -35,6 +35,11 @@ psp:Context eff:Effect
 	psp:rolInContext =>
 		psp:Rol $variable
 			extern psp:isFunctioneel = false
+			psp:externalProperty =>
+				psp:Property $name
+					extern psp:isFunctioneel = true
+					extern psp:isVerplicht = true
+					extern psp:range = String			
 
 psp:Context eff:Assignment
 	psp:externalProperty =>
