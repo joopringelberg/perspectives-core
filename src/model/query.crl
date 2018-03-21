@@ -199,7 +199,7 @@ q:Context q:contains
 --				$rol => pol:Aangifte$verdachte
 psp:Context q:addRol
 	psp:rolInContext =>
-		-- The rol we will add to (only the local name is used)
+		-- The rol we will add to. The qualified name is used!
 		psp:Rol $rol
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Rol
@@ -215,7 +215,7 @@ psp:Context q:addRol
 -- addProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
 -- Apply like this for the statement: 'voornaam van getuige += "Jan"':
 --	addProperty <gen>
---		$constantValue = "Jan"
+--		intern $constantValue = "Jan"
 --		$rol => pol:Aangifte$getuige
 --		$property => psp:Persoon$voornaam
 -- of zo:
