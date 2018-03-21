@@ -4,7 +4,7 @@ import Control.Monad.Aff (error, throwError)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, runPure)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (Error, catchException)
+import Control.Monad.Eff.Exception (catchException, Error)
 import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
@@ -45,7 +45,8 @@ import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter (NamedTripleGetter, constructInverseRolGetter, constructRolGetter, runTripleGetter, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
-import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<>), (==), (>>=), (||), (<<<))
+import Perspectives.Utilities (onNothing, onNothing') as Util
+import Prelude (class Show, type (~>), Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<<<), (<>), (==), (>>=), (||))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -519,15 +520,8 @@ setProperty =
         , isContext: false
         })
 
-onNothing :: forall a m. MonadThrow Error m => String -> m (Maybe a) -> m a
-onNothing message ma = do
-  a <- ma
-  case a of
-    Nothing -> throwError $ error message
-    (Just v) -> pure v
+onNothing :: forall m a. MonadThrow Error m => String -> m (Maybe a) -> m a
+onNothing = Util.onNothing <<< error
 
-onNothing' :: forall a m. MonadThrow Error m => String -> Maybe a -> m a
-onNothing' message ma = do
-  case ma of
-    Nothing -> throwError $ error message
-    (Just v) -> pure v
+onNothing' :: forall m. MonadThrow Error m => String -> Maybe ~> m
+onNothing' = Util.onNothing' <<< error

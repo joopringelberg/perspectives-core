@@ -6,7 +6,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Except (ExceptT, runExceptT)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Except.Trans (lift)
 import DOM (DOM)
 import DOM.Classy.Event (target)
@@ -18,10 +18,11 @@ import DOM.File.Types (FileList, fileToBlob)
 import DOM.HTML.HTMLInputElement (files)
 import DOM.HTML.Types (HTMLInputElement)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap)
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.Utilities (onNothing')
 
 type State = {}
 
@@ -69,7 +70,7 @@ readTextFile = H.component
               Nothing -> throwError "ReadTextFile component could not convert event target to input element"
               (Just inputElement) -> do
                 -- The attribute files of an HTMLInputElement gives us a typed (!) FileList.
-                onNothing "no file found" =<< (lift <<< H.liftEff <<< files $ inputElement)
+                onNothing' "no file found" =<< (lift <<< H.liftEff <<< files $ inputElement)
 
           -- item is here a function in the DOM.File.FileList module.
           case (item 0 fileList) of
@@ -81,6 +82,3 @@ readTextFile = H.component
           (Right (text :: String)) -> do
             H.raise $ TextFileRead text
             pure next
-      where
-        onNothing :: forall m. Monad m => String -> Maybe ~> ExceptT String m
-        onNothing s = maybe (throwError s) pure
