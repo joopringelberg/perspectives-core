@@ -59,6 +59,9 @@ rolNameInContext ln contextId = (maybe "" id (deconstructNamespace contextId)) <
 getRolByLocalName :: forall e. RolName -> ObjectsGetter e
 getRolByLocalName rn = getContextMember \context -> maybe [] id (lookup (rolNameInContext rn (context_id context)) (context_rolInContext context))
 
+-- | Given a local (unqualified) name of a Rol, return that rol from the context, or if it doesn't exist,
+-- | recursively from its type description. In analogy with the roltelescope, we might call the type hierarchy
+-- | the contexttelescope and than we look up the local rolname in the contexttelescope.
 getRolFromContextTypeHierarchy :: forall e. LocalName -> ObjectsGetter e
 getRolFromContextTypeHierarchy ln contextId = do
   maybeContext <- getPerspectEntiteit contextId

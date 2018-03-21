@@ -8,7 +8,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolName, PropertyName)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
-import Perspectives.Property (getContextType, getRolByLocalName)
+import Perspectives.Property (getContextType, getInternalProperty, getRolByLocalName)
 import Perspectives.PropertyComposition (compose)
 import Perspectives.QueryCombinators (closure, closure', concat, contains, filter, notEmpty, lastElement, rolesOf, toBoolean)
 import Perspectives.SystemQueries (identity)
@@ -44,21 +44,20 @@ constructQueryFunction typeDescriptionID = do
     (Just "model:QueryAst$constructExternalPropertyGetter") ->
       applyPropertyConstructor constructExternalPropertyGetter
     (Just "model:QueryAst$constructExternalPropertyLookup") ->
-      applyPropertyConstructor constructExternalPropertyLookup
+      pure $ maybe identity constructExternalPropertyLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
     (Just "model:QueryAst$constructInternalPropertyGetter") ->
       applyPropertyConstructor constructInternalPropertyGetter
     (Just "model:QueryAst$constructInternalPropertyLookup") ->
-      applyPropertyConstructor constructInternalPropertyLookup
+      pure $ maybe identity constructInternalPropertyLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
     (Just "model:QueryAst$constructRolPropertyGetter") ->
       applyPropertyConstructor constructRolPropertyGetter
     (Just "model:QueryAst$constructRolPropertyLookup") ->
-      applyPropertyConstructor constructRolPropertyLookup
+      pure $ maybe identity constructRolPropertyLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
     (Just "model:QueryAst$constructRolGetter") -> do
       ids <- lift $ getRolByLocalName "rol" typeDescriptionID
       pure $ maybe identity constructRolGetter (head ids)
     (Just "model:QueryAst$constructRolLookup") -> do
-      ids <- lift $ getRolByLocalName "rol" typeDescriptionID
-      pure $ maybe identity constructRolLookup (head ids)
+      pure $ maybe identity constructRolLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
     (Just "model:QueryAst$constructInverseRolGetter") -> do
       ids <- lift $ getRolByLocalName "rol" typeDescriptionID
       pure $ maybe identity constructInverseRolGetter (head ids)

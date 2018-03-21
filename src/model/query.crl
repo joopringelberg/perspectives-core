@@ -48,62 +48,50 @@ q:PropertyQuery q:label
 --------------------------------------------------------------------------------
 -- QUERY CONSTRUCTORS
 --------------------------------------------------------------------------------
-q:Context q:constructExternalPropertyGetter
+q:PropertyQuery q:constructExternalPropertyGetter
 	psp:rolInContext =>
 		psp:Rol $property
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Property
 
-q:Context q:constructExternalPropertyLookup
+-- Apply like this: q:constructExternalPropertyLookup $<propname>
+q:PropertyQuery q:constructExternalPropertyLookup
+
+q:PropertyQuery q:constructInternalPropertyGetter
 	psp:rolInContext =>
 		psp:Rol $property
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Property
 
-q:Context q:constructInternalPropertyGetter
+-- Apply like this: q:constructInternalPropertyLookup $<propname>
+q:PropertyQuery q:constructInternalPropertyLookup
+
+q:PropertyQuery q:constructRolPropertyGetter
 	psp:rolInContext =>
 		psp:Rol $property
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Property
 
-q:Context q:constructInternalPropertyLookup
-	psp:rolInContext =>
-		psp:Rol $property
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => psp:Property
+-- Apply like this: q:constructRolPropertyLookup $<propname>
+q:PropertyQuery q:constructRolPropertyLookup
 
-q:Context q:constructRolPropertyGetter
-	psp:rolInContext =>
-		psp:Rol $property
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => psp:Property
-
-q:Context q:constructRolPropertyLookup
-	psp:rolInContext =>
-		psp:Rol $property
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => psp:Property
-
-q:Context q:constructRolGetter
+q:RolQuery q:constructRolGetter
 	psp:rolInContext =>
 		psp:Rol $rol
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Rol
 
-q:Context q:constructRolLookup
-	psp:rolInContext =>
-		psp:Rol $rol
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => psp:Rol
+-- Apply like this: q:constructRolLookup $<rolname>
+q:RolQuery q:constructRolLookup
 
-q:Context q:constructInverseRolGetter
+q:RolQuery q:constructInverseRolGetter
 	psp:rolInContext =>
 		psp:Rol $rol
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Rol
 
 -- It is unlikely we will use this constructor in a model.
-q:Context q:rolesOf
+q:RolQuery q:rolesOf
 	psp:rolInContext =>
 		psp:Rol $context
 			extern psp:isFunctioneel = true
@@ -162,7 +150,7 @@ q:RolQuery q:closure'
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:RolQuery
 
-q:RolQuery q:filter
+q:Query q:filter
 	psp:rolInContext =>
 	 	psp:Rol $criterium
 			extern psp:isFunctioneel = true
@@ -170,7 +158,7 @@ q:RolQuery q:filter
 	psp:rolInContext =>
 		psp:Rol $candidates
 			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding q:RolQuery
+			psp:mogelijkeBinding q:Query
 
 q:Query q:concat
 	psp:internalProperty =>
@@ -197,3 +185,20 @@ q:Context q:contains
 		psp:Rol $query
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
+
+--------------------------------------------------------------------------------
+-- ASSIGNMENT
+--------------------------------------------------------------------------------
+-- We add to the context of the actie that this statement occurs in.
+-- Apply like this for the statement: "getuige += verdachte":
+--	addRol $getuige
+--		$value =>
+--			q:constructRolLookup $verdachte
+psp:Context q:addRol
+	psp:rolInContext =>
+		-- The rol instance we will add:
+		psp:Rol $value
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:RolQuery
+			psp:mogelijkeBinding => q:Variable
+			psp:mogelijkeBinding => q:New

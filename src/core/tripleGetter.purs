@@ -26,9 +26,10 @@ runQuery a (NamedFunction _ f)= evalStateT (f a) (singleton "#start" [a])
 
 infix 0 runQuery as ##
 
-runTripleGetter :: forall e a. Subject
-  -> (Subject -> MonadPerspectivesQuery (AjaxAvarCache e) a)
-  -> (MonadPerspectives (AjaxAvarCache e)) a
+runTripleGetter :: forall e a.
+  Subject
+  -> (Subject -> MonadPerspectivesQuery e a)
+  -> (MonadPerspectives e) a
 runTripleGetter a f = evalStateT (f a) (singleton "#start" [a])
 
 type VariableName = String
