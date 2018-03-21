@@ -190,11 +190,19 @@ q:Context q:contains
 -- ASSIGNMENT
 --------------------------------------------------------------------------------
 -- We add to the context of the actie that this statement occurs in.
+-- addRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
 -- Apply like this for the statement: "getuige += verdachte":
---	addRol $getuige
+--	addRol <gen>
+--		$rol => pol:Aangifte$getuige
 --		$value =>
---			q:constructRolLookup $verdachte
+--			q:constructRolLookup <gen>
+--				$rol => pol:Aangifte$verdachte
 psp:Context q:addRol
+	psp:rolInContext =>
+		-- The rol we will add to (only the local name is used)
+		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
 	psp:rolInContext =>
 		-- The rol instance we will add:
 		psp:Rol $value
@@ -202,3 +210,21 @@ psp:Context q:addRol
 			psp:mogelijkeBinding => q:RolQuery
 			psp:mogelijkeBinding => q:Variable
 			psp:mogelijkeBinding => q:New
+
+-- We add to the context of the actie that this statement occurs in.
+-- addProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
+-- Apply like this for the statement: 'voornaam van getuige += "Jan"':
+--	addProperty <gen>
+--		$constantValue = "Jan"
+--		$rol => pol:Aangifte$getuige
+--		$property => psp:Persoon$voornaam
+-- of zo:
+--	addProperty <gen>
+--		$rol => pol:Aangifte$getuige
+--		$property => psp:Persoon$voornaam
+--		$value =>
+--			q:compose $xxx
+--				$operand (1) =>
+--					q:constructRolLookup $verdachte
+--				$operand (2) =>
+--					q:constructExternalPropertyLookup $voornaam

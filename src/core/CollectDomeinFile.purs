@@ -1,6 +1,5 @@
 module Perspectives.CollectDomeinFile where
 
-import Prelude
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify, get)
 import Data.Foldable (for_)
@@ -18,6 +17,8 @@ import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 import Perspectives.SystemQueries (boundContexts, iedereRolInContext)
 import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter ((##))
+import Perspectives.Utilities (ifNothing)
+import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const)
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> MonadPerspectives (AjaxAvarCache e) DomeinFile
@@ -87,13 +88,3 @@ domeinFileFromContext enclosingContext = do
 
         savedToCouchdb :: PerspectContext -> Boolean
         savedToCouchdb ctxt = maybe false (const true) (context_rev ctxt)
-
-maybeM :: forall a b m. Monad m => m a -> (b -> m a) -> m (Maybe b) -> m a
-maybeM default fromJust monadicValue = do
-  mv <- monadicValue
-  case mv of
-    Nothing -> default
-    (Just v) -> fromJust v
-
-ifNothing :: forall a b m. Monad m => m (Maybe b) -> m a -> (b -> m a) -> m a
-ifNothing monadicValue default fromJust = maybeM default fromJust monadicValue

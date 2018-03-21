@@ -14,7 +14,8 @@ import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (getContextType, getExternalProperty, getProperty, getRolByLocalName)
 import Perspectives.TripleAdministration (MonadPerspectivesQuery)
 import Perspectives.TripleGetter (readQueryVariable, runTripleGetter)
-import Prelude (Unit, bind, const, pure, unit, ($), (<>))
+import Perspectives.Utilities (onNothing)
+import Prelude (Unit, bind, const, pure, unit, ($), (<<<), (<>), (>>=))
 
 type Statement e = ContextID -> MonadTransactie e Unit
 
@@ -42,17 +43,16 @@ constructEffectStatement :: forall e. ContextID -> MonadPerspectives (AjaxAvarCa
 constructEffectStatement typeDescriptionID = do
   (pspType :: Array ID) <- getContextType typeDescriptionID
   case head pspType of
-    Nothing -> throwError $ error $ "constructEffectExpressie: no type found for: " <> typeDescriptionID
+    Nothing -> throwError $ error $ "constructEffectStatement: no type found for: " <> typeDescriptionID
     (Just "model:Effect$addRol") -> do
-      valueDescriptionID <- getRolByLocalName "value" typeDescriptionID
-      (valueQuery) <- maybe (pure emptyResultExpression) constructEffectExpressie (head valueDescriptionID)
-      mRolName <- pure (deconstructLocalNameFromDomeinURI typeDescriptionID)
-      case mRolName of
-        Nothing -> throwError $ error $ "constructEffectExpressie: no local rolname provided in " <> typeDescriptionID
-        (Just rolName) ->
-          pure (\cid -> do
-                          (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
-                          for_ values \rolId -> addRol cid rolName rolId)
+      rolName <- onNothing (error "constructEffectStatement: no rol found")
+        ((getRolByLocalName "rol" typeDescriptionID) >>= pure <<< head)
+      valueDescriptionID <- onNothing (error "constructEffectStatement: no value found")
+        ((getRolByLocalName "value" typeDescriptionID) >>= pure <<< head)
+      valueQuery <- constructEffectExpressie valueDescriptionID
+      pure (\cid -> do
+                      (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
+                      for_ values \rolId -> addRol cid rolName rolId)
     (Just _) -> pure emptyStatement
   where
     emptyStatement :: (Statement e)
