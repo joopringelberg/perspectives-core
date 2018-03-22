@@ -27,15 +27,50 @@ rolQuery rn = do
   -- Is the type of rolType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
   if isAQuery
-    then constructQueryFunction rn -- TODO: voeg de uitgangscontext toe als de variabele #context aan state.
-    else pure $ constructRolLookup $ unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI rn)
+    then do
+      (NamedFunction nameOfq q) <- constructQueryFunction rn
+      pure $ NamedFunction "saveInitialContext"
+        \cid -> do
+          putQueryVariable "#context" [cid]
+          t@(Triple {object : values}) <- q cid
+          pure t
+    else pure $ constructRolLookup $ localName rn
+
   where
-   contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
-   localName :: RolName -> LocalName
-   localName qn = unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI qn)
+    contextType :: NamedTripleGetter e
+    contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
+
+    localName :: RolName -> LocalName
+    localName qn = unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI qn)
+
+-- | From a qualified name for a Property, construct a function that computes the values of that Property for a given rol.
+-- | The Property may be defined as computed.
+propertyQuery  :: forall e.
+  PropertyName ->
+  MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
+propertyQuery pn = do
+  -- Is the type of propertyType or one of its ancestors q:Query?
+  (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) pn)
+  if isAQuery
+    then do
+      (NamedFunction nameOfq q) <- constructQueryFunction pn
+      pure $ NamedFunction "saveInitialRol"
+        \rid -> do
+          putQueryVariable "#rol" [rid]
+          t@(Triple {object : values}) <- q rid
+          pure t
+    else pure $ constructRolPropertyLookup $ localName pn
+
+  where
+    contextType :: NamedTripleGetter e
+    contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
+
+    localName :: RolName -> LocalName
+    localName qn = unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI qn)
 
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
+-- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt.
 constructQueryFunction :: forall e.
   ContextID ->
   MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
