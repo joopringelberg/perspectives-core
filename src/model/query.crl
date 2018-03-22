@@ -42,7 +42,7 @@ q:PropertyQuery q:label
 --------------------------------------------------------------------------------
 -- QUERY CONSTRUCTORS
 --------------------------------------------------------------------------------
-q:PropertyQuery q:constructExternalPropertyGetter
+q:PropertyQuery q:externalPropertyQuery
 	psp:rolInContext =>
 		psp:Rol $property
 			extern psp:isFunctioneel = true
@@ -60,6 +60,13 @@ q:PropertyQuery q:constructInternalPropertyGetter
 -- Apply like this: q:constructInternalPropertyLookup $<propname>
 q:PropertyQuery q:constructInternalPropertyLookup
 
+-- Works for declared and calculated properties. Note case difference!
+q:PropertyQuery q:propertyQuery
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
 q:PropertyQuery q:constructRolPropertyGetter
 	psp:rolInContext =>
 		psp:Rol $property
@@ -70,13 +77,13 @@ q:PropertyQuery q:constructRolPropertyGetter
 q:PropertyQuery q:constructRolPropertyLookup
 
 -- Works for declared and calculated roles.
-q:RolQuery q:getRol
+q:RolQuery q:rolQuery
 	psp:rolInContext =>
 		psp:Rol $rol
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Rol
 
--- Works only for declared roles. Can be replaced by q:getRol.
+-- Works only for declared roles. Can be replaced by q:rolQuery.
 q:RolQuery q:constructRolGetter
 	psp:rolInContext =>
 		psp:Rol $rol

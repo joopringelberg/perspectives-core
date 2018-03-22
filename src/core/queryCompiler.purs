@@ -27,6 +27,7 @@ rolQuery rn = do
   -- Is the type of rolType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
   if isAQuery
+    -- TODO: memorize!
     then do
       (NamedFunction nameOfq q) <- constructQueryFunction rn
       pure $ NamedFunction "saveInitialContext"
@@ -78,25 +79,33 @@ constructQueryFunction typeDescriptionID = do
   pspType <- lift $ onNothing (errorMessage "no type found" "")
     (firstOnly getContextType typeDescriptionID)
   case pspType of
+    "model:QueryAst$externalPropertyQuery" -> do
+      propertyName <- lift $ onNothing (errorMessage "no propertyName" pspType) (firstOnly (getRolByLocalName "property") typeDescriptionID)
+      (NamedFunction name getter) <- propertyQuery propertyName
+      pure $ NamedFunction name \cid -> getter (cid <> "_buitenRol")
     "model:QueryAst$constructExternalPropertyGetter" ->
       applyPropertyConstructor constructExternalPropertyGetter pspType
     "model:QueryAst$constructExternalPropertyLookup" ->
       constructExternalPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+    -- TODO: "model:QueryAst$internalPropertyQuery"
     "model:QueryAst$constructInternalPropertyGetter" ->
       applyPropertyConstructor constructInternalPropertyGetter pspType
     "model:QueryAst$constructInternalPropertyLookup" ->
       constructInternalPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+    "model:QueryAst$propertyQuery" -> do
+      propertyName <- lift $ onNothing (errorMessage "no propertyName" pspType) (firstOnly (getRolByLocalName "property") typeDescriptionID)
+      propertyQuery propertyName
     "model:QueryAst$constructRolPropertyGetter" ->
       applyPropertyConstructor constructRolPropertyGetter pspType
     "model:QueryAst$constructRolPropertyLookup" ->
       constructRolPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
-    "model:QueryAst$getRol" -> do
+    "model:QueryAst$rolQuery" -> do
       rolName <- lift $ onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
       rolQuery rolName
-    -- Superfluous: can always be replaced by "model:QueryAst$getRol".
+    -- Superfluous: can always be replaced by "model:QueryAst$rolQuery".
     "model:QueryAst$constructRolLookup" ->
       constructRolLookup <$> (onNothing' (errorMessage "no rolName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID))
-    -- Superfluous: can always be replaced by "model:QueryAst$constructRolLookup" and by "model:QueryAst$getRol".
+    -- Superfluous: can always be replaced by "model:QueryAst$constructRolLookup" and by "model:QueryAst$rolQuery".
     "model:QueryAst$constructRolGetter" ->
       lift $ constructRolGetter <$> onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
     "model:QueryAst$constructInverseRolGetter" ->
