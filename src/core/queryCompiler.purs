@@ -3,7 +3,7 @@ module Perspectives.QueryCompiler where
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc, head)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe, fromJust)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Effects (AjaxAvarCache)
@@ -13,11 +13,10 @@ import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (ObjectsGetter, getContextType, getExternalProperty, getInternalProperty, getRolByLocalName)
 import Perspectives.PropertyComposition (compose)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, contains, filter, lastElement, notEmpty, rolesOf, toBoolean)
-import Perspectives.SystemQueries (identity)
 import Perspectives.TripleAdministration (MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter)
 import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter, constructTripleGetterFromObjectsGetter', putQueryVariable, readQueryVariable)
 import Perspectives.Utilities (onNothing, onNothing')
-import Prelude (bind, const, pure, ($), (<<<), (<>), (>=>), (>>=), discard)
+import Prelude (bind, const, discard, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
 -- | From a qualified name for a Rol, construct a function that computes the instances of that Rol for a given context.
 -- | The Rol may be defined as computed.
@@ -47,26 +46,23 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$constructExternalPropertyGetter" ->
       applyPropertyConstructor constructExternalPropertyGetter pspType
     "model:QueryAst$constructExternalPropertyLookup" ->
-      pure $ maybe identity constructExternalPropertyLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      constructExternalPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
     "model:QueryAst$constructInternalPropertyGetter" ->
       applyPropertyConstructor constructInternalPropertyGetter pspType
     "model:QueryAst$constructInternalPropertyLookup" ->
-      pure $ maybe identity constructInternalPropertyLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      constructInternalPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
     "model:QueryAst$constructRolPropertyGetter" ->
       applyPropertyConstructor constructRolPropertyGetter pspType
     "model:QueryAst$constructRolPropertyLookup" ->
-      pure $ maybe identity constructRolPropertyLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
-    "model:QueryAst$constructRolGetter" -> do
-      ids <- lift $ getRolByLocalName "rol" typeDescriptionID
-      pure $ maybe identity constructRolGetter (head ids)
-    "model:QueryAst$constructRolLookup" -> do
-      pure $ maybe identity constructRolLookup (deconstructLocalNameFromDomeinURI typeDescriptionID)
-    "model:QueryAst$constructInverseRolGetter" -> do
-      ids <- lift $ getRolByLocalName "rol" pspType
-      pure $ maybe identity constructInverseRolGetter (head ids)
-    "model:QueryAst$rolesOf" -> do
-      ids <- lift $ getRolByLocalName "context" pspType
-      pure $ maybe identity rolesOf (head ids)
+      constructRolPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+    "model:QueryAst$constructRolGetter" ->
+      lift $ constructRolGetter <$> onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
+    "model:QueryAst$constructRolLookup" ->
+      constructRolLookup <$> (onNothing' (errorMessage "no rolName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID))
+    "model:QueryAst$constructInverseRolGetter" ->
+      lift $ constructInverseRolGetter <$> (onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") pspType))
+    "model:QueryAst$rolesOf" ->
+      lift $ rolesOf <$> (onNothing (errorMessage "no context" pspType) (firstOnly (getRolByLocalName "context") pspType))
     "model:QueryAst$notEmpty" -> applyUnaryCombinator notEmpty pspType
     "model:QueryAst$closure" -> applyUnaryCombinator closure pspType
     "model:QueryAst$closure'" -> applyUnaryCombinator closure' pspType
@@ -74,18 +70,13 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$compose" -> applyBinaryCombinator compose pspType
     "model:QueryAst$concat" -> applyBinaryCombinator concat pspType
     "model:QueryAst$filter" -> do
-      criteriumId <- lift $ getRolByLocalName "criterium" typeDescriptionID
-      criterium <- traverse constructQueryFunction criteriumId
-      candidatesId <-  lift $ getRolByLocalName "candidates" typeDescriptionID
-      candidates <- traverse constructQueryFunction candidatesId
-      case head criterium of
-        Nothing -> pure identity
-        (Just cr) -> case head candidates of
-          Nothing -> pure identity
-          (Just ca) -> pure $ filter cr ca
+      criteriumId <- lift $ onNothing (errorMessage "no criterium" pspType)
+        (firstOnly (getRolByLocalName "criterium") typeDescriptionID)
+      candidateId <- lift $ onNothing (errorMessage "no candidates" pspType)
+        (firstOnly (getRolByLocalName "criterium") typeDescriptionID)
+      filter <$> constructQueryFunction criteriumId <*> constructQueryFunction candidateId
     "model:QueryAst$Constant" -> do
-      constId <- lift $ onNothing (errorMessage "no constant value provided" pspType) (firstOnly (getExternalProperty "model:QueryAst$Constant$value") typeDescriptionID)
-      pure $ constant constId
+      lift $ constant <$> onNothing (errorMessage "no constant value provided" pspType) (firstOnly (getExternalProperty "model:QueryAst$Constant$value") typeDescriptionID)
     "model:QueryAst$Variable" -> do
       variableName <- lift $ onNothing (errorMessage "no variable name found" pspType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)
