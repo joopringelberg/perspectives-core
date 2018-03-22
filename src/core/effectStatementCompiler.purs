@@ -1,21 +1,19 @@
 module Perspectives.EffectStatementCompiler where
 
 import Control.Monad.Eff.Exception (error, Error)
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
-import Perspectives.Deltas (MonadTransactie, addProperty, addRol)
+import Data.Maybe (Maybe(..))
+import Perspectives.Deltas (MonadTransactie, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Subject)
-import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (ObjectsGetter, getContextType, getExternalProperty, getInternalProperty, getProperty, getRol, getRolByLocalName)
 import Perspectives.TripleAdministration (MonadPerspectivesQuery)
 import Perspectives.TripleGetter (readQueryVariable, runTripleGetter)
 import Perspectives.Utilities (onNothing)
-import Prelude (Unit, bind, const, pure, unit, ($), (<<<), (<>), (>=>), (>>=))
+import Prelude (Unit, bind, const, pure, unit, ($), (<<<), (<>), (>=>))
 
 type Statement e = ContextID -> MonadTransactie e Unit
 
@@ -44,7 +42,13 @@ constructEffectStatement typeDescriptionID = do
   pspType <- onNothing (errorMessage "no type found" "")
     (firstOnly getContextType typeDescriptionID)
   case pspType of
-    "model:QueryAst$addRol" -> do
+    "model:QueryAst$assignToRol" -> do
+      operationType <- onNothing (errorMessage "no operation type found" pspType)
+        (firstOnly (getInternalProperty "model:QueryAst$assignToRol$operation") typeDescriptionID)
+      operation <- case operationType of
+        "add" -> pure addRol
+        "remove" -> pure removeRol
+        _ -> pure setRol
       rolName <- onNothing (errorMessage "no rol found" pspType)
         (firstOnly (getRolByLocalName "rol") typeDescriptionID)
       valueDescriptionID <- onNothing (errorMessage "no value found" pspType)
@@ -52,8 +56,14 @@ constructEffectStatement typeDescriptionID = do
       valueQuery <- constructEffectExpressie valueDescriptionID
       pure (\cid -> do
                       (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
-                      for_ values \rolId -> addRol cid rolName rolId)
-    "model:QueryAst$addProperty" -> do
+                      for_ values \rolId -> operation cid rolName rolId)
+    "model:QueryAst$assignToProperty" -> do
+      operationType <- onNothing (errorMessage "no operation type found" pspType)
+        (firstOnly (getInternalProperty "model:QueryAst$assignToProperty$operation") typeDescriptionID)
+      operation <- case operationType of
+        "add" -> pure addProperty
+        "remove" -> pure removeProperty
+        _ -> pure setProperty
       rolName <- onNothing (errorMessage "no rol found" pspType)
         (firstOnly (getRolByLocalName "rol") typeDescriptionID)
       propertyName <- onNothing (errorMessage "no property found" pspType)
@@ -66,14 +76,14 @@ constructEffectStatement typeDescriptionID = do
           pure \cid -> do
             rolId <- onNothing (error $ "Missing " <> rolName <> " in " <> cid)
                           (lift (firstOnly (getRol rolName) cid))
-            addProperty rolId propertyName constantValue
+            operation rolId propertyName constantValue
         (Just valueDescriptionID) -> do
           valueQuery <- constructEffectExpressie valueDescriptionID
           pure \cid -> do
             rolId <- onNothing (error $ "Missing " <> rolName <> " in " <> cid)
               (lift (firstOnly (getRol rolName) cid))
             (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
-            for_ values \val -> addProperty rolId propertyName val
+            for_ values \val -> operation rolId propertyName val
 
     _ -> pure emptyStatement
   where

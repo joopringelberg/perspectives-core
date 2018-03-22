@@ -1,11 +1,5 @@
-
-{-
-This model gives definitions for basic queries such as "binding", query constructors such as
-constructInternalPropertyGetter and combinators such as compose and filter.
-Any query can be described using these definitions.
--}
-
 Context model:QueryAst als q:
+
 import model:Perspectives als psp:
 
 Section psp:rolInContext
@@ -187,39 +181,72 @@ q:Context q:contains
 			psp:mogelijkeBinding => q:Query
 
 --------------------------------------------------------------------------------
+-- VARIABLE
+--------------------------------------------------------------------------------
+psp:Context q:Variable
+	psp:internalProperty =>
+		psp:Property $name
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+
+psp:Context q:setVariable
+	psp:internalProperty =>
+		psp:Property $name
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+	psp:rolInContext =>
+		psp:Rol $value
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:RolQuery
+			psp:mogelijkeBinding => q:PropertyQuery
+			psp:mogelijkeBinding => q:Variable
+			psp:mogelijkeBinding => psp:Context
+
+--------------------------------------------------------------------------------
 -- ASSIGNMENT
 --------------------------------------------------------------------------------
 -- We add to the context of the actie that this statement occurs in.
 -- addRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
 -- Apply like this for the statement: "getuige += verdachte":
---	addRol <gen>
+--	assignToRol <gen>
+--		intern $operation = "add"
 --		$rol => pol:Aangifte$getuige
 --		$value =>
 --			q:constructRolLookup <gen>
 --				$rol => pol:Aangifte$verdachte
-psp:Context q:addRol
+psp:Context q:assignToRol
+	psp:internalProperty =>
+		psp:Property $operation
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			-- possible values are: "add", "remove", "set"
+			extern psp:range = String
 	psp:rolInContext =>
-		-- The rol we will add to. The qualified name is used!
+		-- The rol we will assign to. The qualified name is used!
 		psp:Rol $rol
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Rol
 	psp:rolInContext =>
-		-- The rol instance we will add:
+		-- The rol instance we will add, delete or set:
 		psp:Rol $value
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:RolQuery
 			psp:mogelijkeBinding => q:Variable
-			psp:mogelijkeBinding => q:New
+			psp:mogelijkeBinding => psp:Context
 
 -- We add to the context of the actie that this statement occurs in.
--- addProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
+-- assignToProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
 -- Apply like this for the statement: 'voornaam van getuige += "Jan"':
---	addProperty <gen>
+--	assignToProperty <gen>
+--		intern $operation = "add"
 --		intern $constantValue = "Jan"
 --		$rol => pol:Aangifte$getuige
 --		$property => psp:Persoon$voornaam
--- of zo:
---	addProperty <gen>
+-- Apply like this for the statement: 'voornaam van getuige += verdachte voornaam':
+--	assignToProperty <gen>
+--		intern $operation = "add"
 --		$rol => pol:Aangifte$getuige
 --		$property => psp:Persoon$voornaam
 --		$value =>
@@ -228,3 +255,31 @@ psp:Context q:addRol
 --					q:constructRolLookup $verdachte
 --				$operand (2) =>
 --					q:constructExternalPropertyLookup $voornaam
+psp:Context q:assignToProperty
+	psp:internalProperty =>
+		psp:Property $operation
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			-- possible values are: "add", "remove", "set"
+			extern psp:range = String
+	psp:internalProperty =>
+		psp:Property $constantValue
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = false
+			extern psp:range = String
+	psp:rolInContext =>
+		-- The rol we will change a property of. The qualified name is used!
+		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
+	psp:rolInContext =>
+		-- The property we will change. The qualified name is used!
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+	psp:rolInContext =>
+		-- The property query that gives the value:
+		psp:Rol $value
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => q:PropertyQuery
+			psp:mogelijkeBinding => q:Variable
