@@ -7,7 +7,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.Property (ObjectsGetter, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery, getRef, memorize, memorizeQueryResults, setMemorizeQueryResults, tripleObjects)
-import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetterFromObjectsGetter, constructTripleGetterFromObjectsGetter')
+import Perspectives.TripleGetter (NamedTripleGetter, VariableName, constructTripleGetterFromObjectsGetter, constructTripleGetterFromObjectsGetter')
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
 
 closure :: forall e.
@@ -176,3 +176,8 @@ useCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
       result <- p r
       setMemorizeQueryResults remember
       pure result
+
+constant :: forall e. ID -> NamedTripleGetter e
+constant subject = constructTripleGetterFromObjectsGetter
+  ("model:Perspectives$constant$_" <> subject)
+  \_ -> pure [subject]

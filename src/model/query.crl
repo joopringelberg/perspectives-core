@@ -181,6 +181,16 @@ q:Context q:contains
 			psp:mogelijkeBinding => q:Query
 
 --------------------------------------------------------------------------------
+-- CONSTANT
+--------------------------------------------------------------------------------
+psp:Rol q:Constant
+	psp:externalProperty =>
+		psp:Property $value
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = true
+			extern psp:range = String
+
+--------------------------------------------------------------------------------
 -- VARIABLE
 --------------------------------------------------------------------------------
 psp:Context q:Variable
@@ -241,9 +251,10 @@ psp:Context q:assignToRol
 -- Apply like this for the statement: 'voornaam van getuige += "Jan"':
 --	assignToProperty <gen>
 --		intern $operation = "add"
---		intern $constantValue = "Jan"
 --		$rol => pol:Aangifte$getuige
 --		$property => psp:Persoon$voornaam
+--		$value =>
+--			q:Constant "Jan"
 -- Apply like this for the statement: 'voornaam van getuige += verdachte voornaam':
 --	assignToProperty <gen>
 --		intern $operation = "add"
