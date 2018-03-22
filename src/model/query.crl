@@ -69,6 +69,14 @@ q:PropertyQuery q:constructRolPropertyGetter
 -- Apply like this: q:constructRolPropertyLookup $<propname>
 q:PropertyQuery q:constructRolPropertyLookup
 
+-- Works for declared and calculated roles.
+q:RolQuery q:getRol
+	psp:rolInContext =>
+		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
+
+-- Works only for declared roles. Can be replaced by q:getRol.
 q:RolQuery q:constructRolGetter
 	psp:rolInContext =>
 		psp:Rol $rol
@@ -76,6 +84,7 @@ q:RolQuery q:constructRolGetter
 			psp:mogelijkeBinding => psp:Rol
 
 -- Apply like this: q:constructRolLookup $<rolname>
+-- Works only for declared roles. Can be replaced by q:constructRolGetter.
 q:RolQuery q:constructRolLookup
 
 q:RolQuery q:constructInverseRolGetter

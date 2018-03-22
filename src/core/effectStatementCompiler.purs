@@ -42,6 +42,8 @@ constructEffectExpressie typeDescriptionID = do
         putQueryVariable variableName values
         pure []
 
+    -- TODO: voeg alle gevallen van de queryCompiler toe!
+    
     -- Any other argument will be passed as is, thus implementing that we can create arbitrary contexts.
     _ -> pure $ const $ pure [typeDescriptionID]
   where

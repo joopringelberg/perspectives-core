@@ -90,10 +90,15 @@ constructQueryFunction typeDescriptionID = do
       applyPropertyConstructor constructRolPropertyGetter pspType
     "model:QueryAst$constructRolPropertyLookup" ->
       constructRolPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
-    "model:QueryAst$constructRolGetter" ->
-      lift $ constructRolGetter <$> onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
+    "model:QueryAst$getRol" -> do
+      rolName <- lift $ onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
+      rolQuery rolName
+    -- Superfluous: can always be replaced by "model:QueryAst$getRol".
     "model:QueryAst$constructRolLookup" ->
       constructRolLookup <$> (onNothing' (errorMessage "no rolName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID))
+    -- Superfluous: can always be replaced by "model:QueryAst$constructRolLookup" and by "model:QueryAst$getRol".
+    "model:QueryAst$constructRolGetter" ->
+      lift $ constructRolGetter <$> onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
     "model:QueryAst$constructInverseRolGetter" ->
       lift $ constructInverseRolGetter <$> (onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") pspType))
     "model:QueryAst$rolesOf" ->
