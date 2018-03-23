@@ -2,9 +2,9 @@ module Perspectives.SystemQueries where
 
 import Data.Array (elemIndex)
 import Data.Maybe (maybe)
-import Perspectives.CoreTypes (NamedTripleGetter)
+import Perspectives.CoreTypes (ObjectsGetter, NamedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Property (ObjectsGetter, getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
+import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (notEmpty, closure', filter) as QC
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)

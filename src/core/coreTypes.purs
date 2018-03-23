@@ -63,10 +63,6 @@ type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Tripl
 type Name = String
 data NamedFunction f = NamedFunction Name f
 
-type Domain = String
-type Range = String
-data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e) Domain Range
-
 newtype Triple e = Triple
   { subject :: Subject
   , predicate :: Predicate
@@ -82,6 +78,21 @@ instance eqTriple :: Eq (Triple e) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
 type NamedTripleGetter e = NamedFunction (TripleGetter e)
+
+-----------------------------------------------------------
+-- OBJECTSGETTER
+-----------------------------------------------------------
+type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+
+-----------------------------------------------------------
+-- TYPED GETTERS
+-----------------------------------------------------------
+type Domain = String
+type Range = String
+
+data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e) Domain Range
+
+data TypedObjectsGetter e = TypedObjectsGetter (ObjectsGetter e) Domain Range
 
 -----------------------------------------------------------
 -- TRIPLEREF
