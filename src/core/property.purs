@@ -7,7 +7,7 @@ import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ID, PropertyName, RolName, ContextID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, Value)
 import Perspectives.Identifiers (LocalName, deconstructNamespace)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -20,7 +20,7 @@ Property values are represented by Arrays.
 We need functions that give us an array of values for a given property for a given resource.
 -}
 
-type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array String)
+type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
 
 type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
 

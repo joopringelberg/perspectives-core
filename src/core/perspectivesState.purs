@@ -45,6 +45,12 @@ newPerspectivesState uinfo av =
   , memorizeQueryResults: true
   }
 
+-- type QueryFunction e =
+--   { function :: TripleGetter e
+--   , domain :: String
+--   , range :: String}
+
+
 -- | MonadPerspectives is an instance of MonadAff.
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
 type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e))

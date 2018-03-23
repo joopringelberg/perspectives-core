@@ -12,25 +12,30 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (ObjectsGetter, getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery, addToTripleIndex, lookupInTripleIndex, memorize, memorizeQueryResults)
+import Perspectives.TripleAdministration (MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, addToTripleIndex, lookupInTripleIndex, memorize, memorizeQueryResults)
 import Prelude (Unit, bind, id, ifM, pure, ($))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
 
 applyToNamedFunction :: forall a b m. Monad m => a -> NamedFunction (a -> m b) -> m b
-applyToNamedFunction a (NamedFunction _ f)= f a
+applyToNamedFunction a (NamedFunction _ f) = f a
 
-runQuery :: forall e. Subject -> NamedTripleGetter e -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
-runQuery a (NamedFunction _ f)= evalStateT (f a) (singleton "#start" [a])
+-- Run the NamedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
+runNamedTripleGetter :: forall e.
+  Subject
+  -> NamedTripleGetter e
+  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
+runNamedTripleGetter a (NamedFunction _ f) = runMonadPerspectives a f
 
-infix 0 runQuery as ##
+infix 0 runNamedTripleGetter as ##
 
-runTripleGetter :: forall e a.
+-- | Run the function in a QueryEnvironment that has Subject as the value of "#start".
+runMonadPerspectives :: forall e a.
   Subject
   -> (Subject -> MonadPerspectivesQuery e a)
   -> (MonadPerspectives e) a
-runTripleGetter a f = evalStateT (f a) (singleton "#start" [a])
+runMonadPerspectives a f = evalStateT (f a) (singleton "#start" [a])
 
 type VariableName = String
 
@@ -50,17 +55,19 @@ constructTripleGetterFromObjectsGetter :: forall e.
   PropertyName ->
   ObjectsGetter e ->
   NamedFunction (TripleGetter e)
-constructTripleGetterFromObjectsGetter pn objGetter = memorize getter pn
-  where
-  getter :: TripleGetter e
-  getter id = do
-    (object :: Array String) <- lift $ objGetter id
-    pure $ Triple { subject: id
-                  , predicate : pn
-                  , object : object
-                  , dependencies : []
-                  , supports : []
-                  , tripleGetter : getter}
+constructTripleGetterFromObjectsGetter pn objectsGetter = NamedFunction pn tripleGetter where
+  tripleGetter :: TripleGetter e
+  tripleGetter id = ifM memorizeQueryResults
+    do
+      mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
+      case mt of
+        Nothing -> do
+          (object :: Array String) <- lift $ objectsGetter id
+          lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+        (Just t) -> pure t
+    do
+      (object :: Array String) <- lift $ objectsGetter id
+      lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
 
 constructTripleGetterFromObjectsGetter' :: forall e.
   PropertyName ->
@@ -87,19 +94,7 @@ constructTripleGetter :: forall e.
   (String -> ObjectsGetter e) ->
   PropertyName ->
   NamedFunction (TripleGetter e)
-constructTripleGetter objectsGetter pn = NamedFunction pn tripleGetter where
-  tripleGetter :: TripleGetter e
-  tripleGetter id = ifM memorizeQueryResults
-    do
-      mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
-      case mt of
-        Nothing -> do
-          (object :: Array String) <- lift $ objectsGetter pn id
-          lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
-        (Just t) -> pure t
-    do
-      (object :: Array String) <- lift $ objectsGetter pn id
-      lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+constructTripleGetter objectsGetter pn = constructTripleGetterFromObjectsGetter pn $ objectsGetter pn
 
 constructExternalPropertyGetter :: forall e.
   PropertyName ->

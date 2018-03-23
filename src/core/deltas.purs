@@ -42,7 +42,7 @@ import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, lijdendVoorwerpBepaling, propertyReferentie, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
-import Perspectives.TripleGetter (NamedTripleGetter, constructInverseRolGetter, constructRolGetter, runTripleGetter, (##))
+import Perspectives.TripleGetter (NamedTripleGetter, constructInverseRolGetter, constructRolGetter, runMonadPerspectives, (##))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
 import Perspectives.Utilities (onNothing, onNothing') as Util
@@ -173,7 +173,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value}) = do
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      (isfunc :: Boolean) <- lift $ runTripleGetter memberName (toBoolean isFunctional)
+      (isfunc :: Boolean) <- lift $ runMonadPerspectives memberName (toBoolean isFunctional)
       if isfunc
         then do
           x <- pure $ findIndex equalExceptRolID deltas

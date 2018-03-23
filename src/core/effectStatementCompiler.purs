@@ -4,20 +4,20 @@ import Control.Monad.Eff.Exception (error, Error)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Perspectives.Deltas (MonadTransactie, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Subject)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Value)
 import Perspectives.PerspectivesState (MonadPerspectives)
-import Perspectives.Property (ObjectsGetter, getContextType, getExternalProperty, getInternalProperty, getProperty, getRol, getRolByLocalName)
+import Perspectives.Property (ObjectsGetter, getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
 import Perspectives.TripleAdministration (MonadPerspectivesQuery)
-import Perspectives.TripleGetter (putQueryVariable, readQueryVariable, runTripleGetter)
+import Perspectives.TripleGetter (putQueryVariable, readQueryVariable, runMonadPerspectives)
 import Perspectives.Utilities (onNothing)
 import Prelude (Unit, bind, const, pure, unit, ($), (<<<), (<>), (>=>), discard)
 
 type Statement e = ContextID -> MonadTransactie e Unit
 
-type EffectExpression e = Subject -> MonadPerspectivesQuery e (Array String)
+type EffectExpression e = ID -> MonadPerspectivesQuery e (Array Value)
 
 constructEffectExpressie :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) (EffectExpression (AjaxAvarCache e))
 constructEffectExpressie typeDescriptionID = do
@@ -38,12 +38,12 @@ constructEffectExpressie typeDescriptionID = do
         (firstOnly (getRolByLocalName "value") typeDescriptionID)
       valueQuery <- constructEffectExpressie valueDescriptionID
       pure \cid -> do
-        (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
+        (values :: Array ID) <- lift $ runMonadPerspectives cid valueQuery
         putQueryVariable variableName values
         pure []
 
     -- TODO: voeg alle gevallen van de queryCompiler toe!
-    
+
     -- Any other argument will be passed as is, thus implementing that we can create arbitrary contexts.
     _ -> pure $ const $ pure [typeDescriptionID]
   where
@@ -69,7 +69,7 @@ constructEffectStatement typeDescriptionID = do
         (firstOnly (getRolByLocalName "value") typeDescriptionID)
       valueQuery <- constructEffectExpressie valueDescriptionID
       pure (\cid -> do
-                      (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
+                      (values :: Array ID) <- lift $ runMonadPerspectives cid valueQuery
                       for_ values \rolId -> operation cid rolName rolId)
     "model:QueryAst$assignToProperty" -> do
       operationType <- onNothing (errorMessage "no operation type found" pspType)
@@ -88,7 +88,7 @@ constructEffectStatement typeDescriptionID = do
       pure \cid -> do
         rolId <- onNothing (error $ "Missing " <> rolName <> " in " <> cid)
           (lift (firstOnly (getRol rolName) cid))
-        (values :: Array ID) <- lift $ runTripleGetter cid valueQuery
+        (values :: Array ID) <- lift $ runMonadPerspectives cid valueQuery
         for_ values \val -> operation rolId propertyName val
 
     _ -> pure emptyStatement
