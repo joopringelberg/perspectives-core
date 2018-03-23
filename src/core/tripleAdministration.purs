@@ -1,11 +1,10 @@
 module Perspectives.TripleAdministration where
 
-import Perspectives.CoreTypes (Triple(..), MonadPerspectivesQuery, MonadPerspectives, TripleRef(..), TripleGetter, NamedFunction(..))
-
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TripleRef(..), NamedTripleGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID, Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
@@ -112,7 +111,7 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
-memorize :: forall e. TripleGetter e -> String -> NamedFunction (TripleGetter e)
+memorize :: forall e. TripleGetter e -> String -> NamedTripleGetter e
 memorize getter name = NamedFunction name \id -> do
   remember <- memorizeQueryResults
   case remember of

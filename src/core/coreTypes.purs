@@ -76,6 +76,7 @@ instance showTriple :: Show (Triple e) where
 instance eqTriple :: Eq (Triple e) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
+type NamedTripleGetter e = NamedFunction (TripleGetter e)
 
 -----------------------------------------------------------
 -- TRIPLEREF

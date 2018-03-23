@@ -6,14 +6,14 @@ import Data.Array (foldl, unsnoc, head)
 import Data.Maybe (Maybe, fromJust)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, MonadPerspectives)
+import Perspectives.CoreTypes (NamedTripleGetter, MonadPerspectivesQuery, NamedFunction(..), Triple(..), MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolName, PropertyName)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
 import Perspectives.Property (ObjectsGetter, getContextType, getExternalProperty, getInternalProperty, getRolByLocalName)
 import Perspectives.PropertyComposition (compose)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, contains, filter, lastElement, notEmpty, rolesOf, toBoolean)
-import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression, putQueryVariable, readQueryVariable)
+import Perspectives.TripleGetter (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression, putQueryVariable, readQueryVariable)
 import Perspectives.Utilities (onNothing, onNothing')
 import Prelude (bind, const, discard, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
@@ -21,7 +21,7 @@ import Prelude (bind, const, discard, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>
 -- | The Rol may be defined as computed.
 rolQuery  :: forall e.
   RolName ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
+  MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
 rolQuery rn = do
   -- Is the type of rolType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
@@ -47,7 +47,7 @@ rolQuery rn = do
 -- | The Property may be defined as computed.
 propertyQuery  :: forall e.
   PropertyName ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
+  MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
 propertyQuery pn = do
   -- Is the type of propertyType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) pn)
@@ -73,7 +73,7 @@ propertyQuery pn = do
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt.
 constructQueryFunction :: forall e.
   ContextID ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (NamedFunction (TripleGetter e))
+  MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
 constructQueryFunction typeDescriptionID = do
   pspType <- lift $ onNothing (errorMessage "no type found" "")
     (firstOnly getContextType typeDescriptionID)

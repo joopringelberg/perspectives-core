@@ -8,7 +8,7 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (evalStateT, lift, modify, gets)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (insert, lookup, singleton)
-import Perspectives.CoreTypes (NamedFunction(..), Triple, TripleGetter, MonadPerspectives, MonadPerspectivesQuery)
+import Perspectives.CoreTypes (NamedFunction(..), Triple, TripleGetter, MonadPerspectives, MonadPerspectivesQuery, NamedTripleGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Property (ObjectsGetter, getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
@@ -45,12 +45,10 @@ putQueryVariable var valueArray = modify \env -> insert var valueArray env
 readQueryVariable :: forall e. VariableName -> MonadPerspectivesQuery e (Array String)
 readQueryVariable var = gets \env -> maybe [] id (lookup var env)
 
-type NamedTripleGetter e = NamedFunction (TripleGetter e)
-
 constructTripleGetterFromEffectExpression :: forall e.
   PropertyName ->
   (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)) ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructTripleGetterFromEffectExpression pn objectsGetter = NamedFunction pn tripleGetter where
   tripleGetter :: TripleGetter e
   tripleGetter id = ifM memorizeQueryResults
@@ -72,7 +70,7 @@ constructTripleGetterFromEffectExpression pn objectsGetter = NamedFunction pn tr
 constructTripleGetterFromObjectsGetter :: forall e.
   PropertyName ->
   ObjectsGetter e ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromEffectExpression pn (lift <<< objGetter)
 
 -- | Use this function to construct property getters that memorize in the triple administration. Use with:
@@ -83,50 +81,50 @@ constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromE
 constructTripleGetter :: forall e.
   (String -> ObjectsGetter e) ->
   PropertyName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructTripleGetter objectsGetter pn = constructTripleGetterFromObjectsGetter pn $ objectsGetter pn
 
 constructExternalPropertyGetter :: forall e.
   PropertyName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructExternalPropertyGetter pn = constructTripleGetter getExternalProperty pn
 
 constructExternalPropertyLookup :: forall e.
   LocalName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructExternalPropertyLookup ln = constructTripleGetter lookupExternalProperty ln
 
 constructInternalPropertyGetter :: forall e.
   PropertyName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructInternalPropertyGetter pn = constructTripleGetter getInternalProperty pn
 
 constructInternalPropertyLookup :: forall e.
   LocalName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructInternalPropertyLookup ln = constructTripleGetter lookupInternalProperty ln
 
 constructRolPropertyGetter :: forall e.
   PropertyName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructRolPropertyGetter pn = constructTripleGetter getProperty pn
 
 constructRolPropertyLookup :: forall e.
   LocalName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructRolPropertyLookup ln = constructTripleGetter getPropertyFromRolTelescope ln
 
 constructRolGetter :: forall e.
   RolName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructRolGetter rn = constructTripleGetter getRol rn
 
 constructRolLookup :: forall e.
   LocalName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructRolLookup rn = constructTripleGetter getRolFromContextTypeHierarchy rn
 
 constructInverseRolGetter :: forall e.
   RolName ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e
 constructInverseRolGetter pn = constructTripleGetter getGebondenAls pn

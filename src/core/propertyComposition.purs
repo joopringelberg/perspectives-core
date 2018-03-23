@@ -3,14 +3,14 @@ module Perspectives.PropertyComposition where
 
 import Data.Array (cons, difference, nub)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (TripleGetter, Triple(..), NamedFunction(..))
+import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, NamedTripleGetter)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (bind, join, pure, ($), (<>), map)
 
 compose :: forall e.
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e ->
+  NamedTripleGetter e ->
+  NamedTripleGetter e
 compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
   memorize getter name
     where

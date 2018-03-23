@@ -3,17 +3,17 @@ module Perspectives.QueryCombinators where
 import Data.Array (cons, difference, elemIndex, foldr, head, last, null, singleton, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery)
+import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, NamedTripleGetter, MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.Property (ObjectsGetter, getRol)
 import Perspectives.TripleAdministration (getRef, memorize, memorizeQueryResults, setMemorizeQueryResults, tripleObjects)
-import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
+import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
 
 closure :: forall e.
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e ->
+  NamedTripleGetter e
 closure (NamedFunction nameOfp p) =
   memorize getter name
   where
@@ -34,8 +34,8 @@ closure (NamedFunction nameOfp p) =
 
 -- | Return the last element in the chain
 closure' :: forall e.
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e ->
+  NamedTripleGetter e
 closure' (NamedFunction nameOfp p) =
   memorize getter name
   where
@@ -63,9 +63,9 @@ mcons :: forall a. Maybe a -> Array a -> Array a
 mcons = maybe id cons
 
 filter :: forall e.
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e ->
+  NamedTripleGetter e ->
+  NamedTripleGetter e
 filter (NamedFunction nameOfc criterium) (NamedFunction nameOfp p) =
   memorize getter name where
     getter :: TripleGetter e
@@ -89,9 +89,9 @@ filter (NamedFunction nameOfc criterium) (NamedFunction nameOfp p) =
     name = "(closure " <>  nameOfp <> ")"
 
 concat :: forall e.
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e) ->
-  NamedFunction (TripleGetter e)
+  NamedTripleGetter e ->
+  NamedTripleGetter e ->
+  NamedTripleGetter e
 concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter name
   where
     getter :: TripleGetter e
@@ -113,7 +113,7 @@ concat (NamedFunction nameOfp p) (NamedFunction nameOfq q) = memorize getter nam
 isNothing :: forall e. Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
-notEmpty :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+notEmpty :: forall e. NamedTripleGetter e -> NamedTripleGetter e
 notEmpty (NamedFunction nameOfp p) = memorize getter name where
 
   getter :: TripleGetter e
@@ -123,7 +123,7 @@ notEmpty (NamedFunction nameOfp p) = memorize getter name where
   name = "(notEmpty " <> nameOfp <> ")"
 
 -- | Construct a function that returns a bool in Aff, from a TripleGetter.
-toBoolean :: forall e. NamedFunction (TripleGetter e) -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
+toBoolean :: forall e. NamedTripleGetter e -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 toBoolean (NamedFunction nameOfp p) r = do
   result <- p r
   arrWithBool <- pure $ tripleObjects result
@@ -133,7 +133,7 @@ toBoolean (NamedFunction nameOfp p) r = do
 
 -- | This query constructor takes a context id as argument. The query step that results can be applied to a role id
 -- | and will result in all instances of that role for the given context.
-rolesOf :: forall e. ContextID -> NamedFunction (TripleGetter e)
+rolesOf :: forall e. ContextID -> NamedTripleGetter e
 rolesOf cid = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$rolesOf" <> cid) f where
   f :: ObjectsGetter e
@@ -142,7 +142,7 @@ rolesOf cid = constructTripleGetterFromObjectsGetter
 
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.
-contains :: forall e. ID -> NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+contains :: forall e. ID -> NamedTripleGetter e -> NamedTripleGetter e
 contains id' (NamedFunction nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> id') f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
@@ -157,7 +157,7 @@ lastElement (NamedFunction nameOfp (p :: TripleGetter e)) = constructTripleGette
   (p >=> pure <<< (maybe [] singleton) <<< last <<< tripleObjects)
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
-ignoreCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+ignoreCache :: forall e. NamedTripleGetter e -> NamedTripleGetter e
 ignoreCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
   go r =
     do
@@ -168,7 +168,7 @@ ignoreCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
       pure result
 
 -- | Use the cache of query results for the given named function.
-useCache :: forall e. NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
+useCache :: forall e. NamedTripleGetter e -> NamedTripleGetter e
 useCache (NamedFunction nameOfp p) = NamedFunction nameOfp go where
   go r =
     do

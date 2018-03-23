@@ -8,7 +8,7 @@ import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
-import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
+import Perspectives.CoreTypes (NamedTripleGetter, NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
@@ -16,7 +16,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryEffect ((~>))
 import Perspectives.SystemQueries (binding)
 import Perspectives.TripleAdministration (unRegisterTriple)
-import Perspectives.TripleGetter (NamedTripleGetter, constructRolGetter, (##))
+import Perspectives.TripleGetter (constructRolGetter, (##))
 import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
