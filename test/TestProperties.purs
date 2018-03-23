@@ -3,7 +3,7 @@ module Test.Properties where
 import Control.Monad.Aff.Console (log) as AC
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Trans.Class (lift)
-import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.SystemQueries (binding, buitenRol, contextType, hasBinding, hasLabel, identity, isVerplicht, label, range, rolContext, iedereRolInContext, rolType, rolTypen)

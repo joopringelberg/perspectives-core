@@ -3,7 +3,7 @@ module Test.BoundContexts where
 import Control.Monad.Aff.Console (log) as AC
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Trans.Class (lift)
-import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache, filter)
 import Perspectives.SystemQueries (binding, boundContexts, buitenRol, contextType, hasBinding, hasLabel, identity, iedereRolInContext, isVerplicht, label, range, rolContext, rolHasType, rolType, rolTypen)
@@ -23,7 +23,7 @@ test = do
   l2 <- "model:Perspectives$mogelijkeBinding_buitenRol" ## (rolHasType "model:Perspectives$BuitenRol")
   log ("model:Perspectives$mogelijkeBinding_buitenRol ## (rolHasType model:Perspectives$BuitenRol) = " <> (show l2))
 
-  l3 <-  rolDef ## filter hasBinding iedereRolInContext 
+  l3 <-  rolDef ## filter hasBinding iedereRolInContext
   log ( "rolDef ## filter iedereRolInContext hasBinding = " <> (show l3))
 
 log :: forall e. String -> MonadPerspectives (console :: CONSOLE | e) Unit
