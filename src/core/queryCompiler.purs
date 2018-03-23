@@ -14,7 +14,7 @@ import Perspectives.Property (ObjectsGetter, getContextType, getExternalProperty
 import Perspectives.PropertyComposition (compose)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, contains, filter, lastElement, notEmpty, rolesOf, toBoolean)
 import Perspectives.TripleAdministration (MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter)
-import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter, constructTripleGetterFromObjectsGetter', putQueryVariable, readQueryVariable)
+import Perspectives.TripleGetter (NamedTripleGetter, constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression, putQueryVariable, readQueryVariable)
 import Perspectives.Utilities (onNothing, onNothing')
 import Prelude (bind, const, discard, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
 
@@ -129,7 +129,7 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$Variable" -> do
       variableName <- lift $ onNothing (errorMessage "no variable name found" pspType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)
-      pure $ constructTripleGetterFromObjectsGetter' ("model:QueryAst$Variable_" <> variableName) (const $ readQueryVariable variableName)
+      pure $ constructTripleGetterFromEffectExpression ("model:QueryAst$Variable_" <> variableName) (const $ readQueryVariable variableName)
     "model:QueryAst$setVariable" -> do
       variableName <- lift $ onNothing (errorMessage "no variable name found" pspType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)

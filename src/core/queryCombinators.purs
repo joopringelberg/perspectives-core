@@ -7,7 +7,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.Property (ObjectsGetter, getRol)
 import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery, getRef, memorize, memorizeQueryResults, setMemorizeQueryResults, tripleObjects)
-import Perspectives.TripleGetter (NamedTripleGetter, VariableName, constructTripleGetterFromObjectsGetter, constructTripleGetterFromObjectsGetter')
+import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
 
 closure :: forall e.
@@ -142,7 +142,7 @@ rolesOf cid = constructTripleGetterFromObjectsGetter
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.
 contains :: forall e. ID -> NamedFunction (TripleGetter e) -> NamedFunction (TripleGetter e)
-contains id' (NamedFunction nameOfp p) = constructTripleGetterFromObjectsGetter' ("model:Perspectives$contains" <> id') f where
+contains id' (NamedFunction nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> id') f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
@@ -151,7 +151,7 @@ contains id' (NamedFunction nameOfp p) = constructTripleGetterFromObjectsGetter'
       otherwise -> pure ["true"]
 
 lastElement :: forall e. NamedTripleGetter e -> NamedTripleGetter e
-lastElement (NamedFunction nameOfp (p :: TripleGetter e)) = constructTripleGetterFromObjectsGetter'
+lastElement (NamedFunction nameOfp (p :: TripleGetter e)) = constructTripleGetterFromEffectExpression
   ("(lastElement " <> nameOfp <> ")")
   (p >=> pure <<< (maybe [] singleton) <<< last <<< tripleObjects)
 
