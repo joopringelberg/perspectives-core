@@ -5,34 +5,15 @@ import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, readVar, takeVa
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF, Ref, newRef, readRef, writeRef)
-import Control.Monad.Reader (ReaderT, ask, runReaderT)
+import Control.Monad.Reader (ask, runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
+import Perspectives.CoreTypes
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, flip, pure, unit, ($), (<<<), (>>=))
-
-type ContextDefinitions = GLStrMap (AVar PerspectContext)
-type RolDefinitions = GLStrMap (AVar PerspectRol)
-type DomeinCache = GLStrMap (AVar DomeinFile)
-
-type PerspectivesState =
-  { rolDefinitions :: RolDefinitions
-  , contextDefinitions :: ContextDefinitions
-  , domeinCache :: DomeinCache
-  , userInfo :: UserInfo
-  , couchdbSessionStarted :: Boolean
-  , sessionCookie :: AVar String
-  , memorizeQueryResults :: Boolean
-  }
-
-type UserInfo =
-  { userName :: String
-  , couchdbPassword :: String
-  , couchdbBaseURL :: String
-  }
 
 newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
 newPerspectivesState uinfo av =
@@ -44,16 +25,6 @@ newPerspectivesState uinfo av =
   , sessionCookie: av
   , memorizeQueryResults: true
   }
-
--- type QueryFunction e =
---   { function :: TripleGetter e
---   , domain :: String
---   , range :: String}
-
-
--- | MonadPerspectives is an instance of MonadAff.
--- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
-type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e))
 
 -- | Run an action in MonadPerspectives, given a username and password.
 runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR | e) a

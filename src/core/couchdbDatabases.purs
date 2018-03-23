@@ -22,7 +22,8 @@ import Network.HTTP.ResponseHeader (ResponseHeader, responseHeaderName, response
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted', DBS)
 import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
-import Perspectives.PerspectivesState (MonadPerspectives, sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.PerspectivesState (sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
 import Prelude (Unit, bind, const, ifM, pure, unit, void, ($), (*>), (/=), (<<<), (<>), (==), (>>=))
 

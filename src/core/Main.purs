@@ -25,9 +25,10 @@ import Data.URI.Query (Query(..), parser) as URI
 import Halogen.Component.ChildPath (cp1, cp2, cp3)
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent) as ACE
-import Perspectives.Api (setUpApi)
+-- import Perspectives.Api (setUpApi)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (enclosingContext) as CRP
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (User, Password)
 import Perspectives.Couchdb.Databases (requestAuthentication)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
@@ -35,7 +36,7 @@ import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..),
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.Effects (AvarCache)
 import Perspectives.IndentParser (runIndentParser)
-import Perspectives.PerspectivesState (MonadPerspectives, newPerspectivesState)
+import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdb)

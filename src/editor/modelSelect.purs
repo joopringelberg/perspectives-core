@@ -10,7 +10,7 @@ import Data.Array (cons, head, index)
 import Data.Maybe (Maybe(..))
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.DomeinCache (documentNamesInDatabase)
-import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives)
 
 type State = { models :: Array String, index :: Maybe Int, selectedModel :: Maybe String }
 

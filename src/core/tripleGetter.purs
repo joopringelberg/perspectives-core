@@ -8,11 +8,11 @@ import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (evalStateT, lift, modify, gets)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (insert, lookup, singleton)
+import Perspectives.CoreTypes (NamedFunction(..), Triple, TripleGetter, MonadPerspectives, MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Property (ObjectsGetter, getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
-import Perspectives.TripleAdministration (MonadPerspectivesQuery, NamedFunction(..), Triple, TripleGetter, addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
+import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (Unit, bind, id, ifM, pure, ($), (<<<))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b

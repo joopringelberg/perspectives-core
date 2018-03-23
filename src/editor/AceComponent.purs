@@ -25,11 +25,11 @@ import Data.String (drop, splitAt, take, length)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache, REACT)
 import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError)
-import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.Syntax (ContextDeclaration(..))
 
 -- | As long as the user edits a contextname, we keep the original name here:

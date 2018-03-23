@@ -5,10 +5,10 @@ import Control.Monad.Aff.AVar (AVar, readVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (kind Effect)
 import Data.Maybe (Maybe(..))
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, retrieveInternally)
-import Perspectives.PerspectivesState (MonadPerspectives)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb)
 
 -- TODO: DE MAYBE KAN ERAF

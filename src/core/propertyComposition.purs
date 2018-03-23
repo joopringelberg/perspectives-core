@@ -3,7 +3,8 @@ module Perspectives.PropertyComposition where
 
 import Data.Array (cons, difference, nub)
 import Data.Traversable (traverse)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, getRef, memorize)
+import Perspectives.CoreTypes (TripleGetter, Triple(..), NamedFunction(..))
+import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (bind, join, pure, ($), (<>), map)
 
 compose :: forall e.

@@ -21,7 +21,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (wrap)
 import Network.HTTP.Affjax (AJAX)
-import Perspectives.PerspectivesState (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Utilities (onNothing')
 
 type State = {}

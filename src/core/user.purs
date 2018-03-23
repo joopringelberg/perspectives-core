@@ -1,8 +1,9 @@
 module Perspectives.User where
 
 import Control.Monad.Aff.AVar (AVar)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
-import Perspectives.PerspectivesState (MonadPerspectives, getsGlobalState, modifyGlobalState)
+import Perspectives.PerspectivesState (getsGlobalState, modifyGlobalState)
 import Prelude (Unit, bind, unit, ($), pure, (<>), (>>>))
 
 type UserCache = GLStrMap (AVar String)

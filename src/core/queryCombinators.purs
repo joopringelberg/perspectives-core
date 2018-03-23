@@ -3,10 +3,11 @@ module Perspectives.QueryCombinators where
 import Data.Array (cons, difference, elemIndex, foldr, head, last, null, singleton, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (traverse)
+import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.Property (ObjectsGetter, getRol)
-import Perspectives.TripleAdministration (NamedFunction(..), Triple(..), TripleGetter, MonadPerspectivesQuery, getRef, memorize, memorizeQueryResults, setMemorizeQueryResults, tripleObjects)
+import Perspectives.TripleAdministration (getRef, memorize, memorizeQueryResults, setMemorizeQueryResults, tripleObjects)
 import Perspectives.TripleGetter (NamedTripleGetter, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
 import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
 

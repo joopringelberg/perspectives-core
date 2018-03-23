@@ -1,39 +1,19 @@
 module Perspectives.TripleAdministration where
 
-import Perspectives.EntiteitAndRDFAliases
+import Perspectives.CoreTypes (Triple(..), MonadPerspectivesQuery, MonadPerspectives, TripleRef(..), TripleGetter, NamedFunction(..))
 
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State (StateT, lift)
+import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
-import Data.Show (class Show, show)
-import Data.StrMap (StrMap)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.EntiteitAndRDFAliases (ID, Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
-import Perspectives.PerspectivesState (MonadPerspectives, getsGlobalState, modifyGlobalState)
-import Prelude (class Eq, Unit, bind, discard, pure, unit, void, ($), (&&), (<>), (==))
-
--- | The QueryEnvironment is a set of bindings of variableNames (Strings) to either ID's or the string representation of simple values.
-type QueryEnvironment = StrMap (Array String)
-
-type MonadPerspectivesQuery e =  StateT QueryEnvironment (MonadPerspectives e)
-
-type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
-
-data NamedFunction f = NamedFunction String f
-
-newtype Triple e = Triple
-  { subject :: Subject
-  , predicate :: Predicate
-  , object :: Array Value
-  , dependencies :: Array TripleRef
-  , supports :: Array TripleRef
-  , tripleGetter :: TripleGetter e}
+import Perspectives.PerspectivesState (getsGlobalState, modifyGlobalState)
+import Prelude (Unit, bind, discard, pure, unit, void, ($))
 
 tripleObjects :: forall e. Triple e -> Array String
 tripleObjects (Triple{object}) = object
-
-type MonadPerspectivesObjects e = MonadPerspectives (AjaxAvarCache e) (Array ID)
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
@@ -43,23 +23,8 @@ memorizeQueryResults = lift $ getsGlobalState _.memorizeQueryResults
 setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery e Unit
 setMemorizeQueryResults b = lift $ modifyGlobalState \ps -> ps {memorizeQueryResults = b}
 
-
 tripleObjects_  :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Array ID)
 tripleObjects_ (Triple{object}) = pure object
-
-instance showTriple :: Show (Triple e) where
-  show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
-
-instance eqTriple :: Eq (Triple e) where
-  eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
-
-newtype TripleRef = TripleRef { subject :: Subject, predicate :: Predicate}
-
-instance eqTripleRef :: Eq TripleRef where
-  eq (TripleRef({subject: s1, predicate: p1})) (TripleRef({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
-
-instance showTripleRef :: Show TripleRef where
-  show (TripleRef {subject, predicate}) = "{" <> show subject <> ", " <> show predicate <> "}"
 
 getRef :: forall e. Triple e -> TripleRef
 getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}
@@ -71,6 +36,7 @@ type TripleIndex e = GLStrMap (PredicateIndex e)
 type PredicateIndex e = GLStrMap (Triple e)
 
 -- | A global store of triples, indexed by Subject and Predicate.
+-- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 tripleIndex :: forall e. TripleIndex e
 tripleIndex = new unit
 
