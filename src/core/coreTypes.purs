@@ -60,7 +60,12 @@ type MonadPerspectivesObjects e = MonadPerspectives (AjaxAvarCache e) (Array ID)
 -----------------------------------------------------------
 type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 
-data NamedFunction f = NamedFunction String f
+type Name = String
+data NamedFunction f = NamedFunction Name f
+
+type Domain = String
+type Range = String
+data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e) Domain Range
 
 newtype Triple e = Triple
   { subject :: Subject
