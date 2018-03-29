@@ -17,20 +17,24 @@ psp:Context psp:viewInRol
 psp:Context psp:interneView
 psp:Context psp:externeView
 
+psp:Context psp:Boolean
+psp:Context psp:String
+psp:Context psp:Number
+psp:Context psp:Date
+
 psp:Property psp:isFunctioneel
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
-	extern psp:range = Boolean
+	psp:range => psp:Boolean
 
 psp:Property psp:isVerplicht
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
-	extern psp:range = Boolean
+	psp:range => psp:Boolean
 
-psp:Property psp:range
+psp:Rol psp:range
 	extern psp:isFunctioneel = true
-	extern psp:isVerplicht = true
-	extern psp:range = SimpleValue
+	psp:mogelijkeBinding => psp:Context
 
 psp:Rol psp:mogelijkeBinding
 	extern psp:isFunctioneel = false
@@ -38,7 +42,7 @@ psp:Rol psp:mogelijkeBinding
 psp:Context psp:Property
 	psp:externalProperty => psp:isFunctioneel
 	psp:externalProperty => psp:isVerplicht
-	psp:externalProperty => psp:range
+	psp:rolInContext => psp:range
 
 psp:Rol psp:propertyReferentie
 	psp:rolProperty => psp:volgNummer
@@ -47,7 +51,7 @@ psp:Rol psp:propertyReferentie
 psp:Property psp:volgNummer
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
-	extern psp:range = Number
+	psp:range => psp:Number
 
 psp:Context psp:View
 	psp:rolInContext => psp:propertyReferentie
@@ -73,4 +77,4 @@ psp:Context psp:Rol
 psp:Property psp:label
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
-	extern psp:range = String
+	psp:range => psp:String

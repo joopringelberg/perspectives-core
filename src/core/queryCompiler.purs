@@ -1,45 +1,52 @@
 module Perspectives.QueryCompiler where
 
 import Control.Monad.Eff.Exception (Error, error)
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldl, unsnoc, head)
-import Data.Maybe (Maybe, fromJust)
+import Data.Array (elemIndex, foldl, head, unsnoc)
+import Data.Foldable (foldM)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (ObjectsGetter, NamedTripleGetter, MonadPerspectivesQuery, NamedFunction(..), Triple(..), MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolName, PropertyName)
+import Perspectives.CoreTypes (Domain, MonadPerspectives, MonadPerspectivesQuery, MonadPerspectivesQueryCompiler, ObjectsGetter, Range, Triple(..), TypedTripleGetter(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, runMonadPerspectivesQueryCompiler, withQueryCompilerEnvironment, (##))
+import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
-import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRolByLocalName)
-import Perspectives.PropertyComposition (compose)
+import Perspectives.Property (getContextType, getContextTypeF, getExternalProperty, getInternalProperty, getRol, getRolBinding, getRolByLocalName, makeFunction)
+import Perspectives.PropertyComposition (compose, (>->))
 import Perspectives.QueryCombinators (closure, closure', concat, constant, contains, filter, lastElement, notEmpty, rolesOf, toBoolean)
-import Perspectives.TripleGetter (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression, putQueryVariable, readQueryVariable)
+import Perspectives.SystemQueries (binding, contextRolTypes, contextType, rolPropertyTypes, mogelijkeBinding)
+import Perspectives.TripleAdministration (tripleObjects)
+import Perspectives.TripleGetter (constructExternalPropertyGetter, constructInternalPropertyGetter, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromEffectExpression, putQueryVariable, readQueryVariable)
 import Perspectives.Utilities (onNothing, onNothing')
-import Prelude (bind, const, discard, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
+import Prelude (Unit, bind, const, discard, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
--- | From a qualified name for a Rol, construct a function that computes the instances of that Rol for a given context.
+-- | From a qualified name for a Rol and its context, construct a function that computes the instances of that Rol for a given context.
 -- | The Rol may be defined as computed.
 rolQuery  :: forall e.
   RolName ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
-rolQuery rn = do
-  -- Is the type of rolType or one of its ancestors q:Query?
+  ContextID ->
+  MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
+rolQuery rn cid = do
+  -- Is the type of rolType rn or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
   if isAQuery
     -- TODO: memorize!
     then do
-      (NamedFunction nameOfq q) <- constructQueryFunction rn
-      pure $ NamedFunction "saveInitialContext"
-        \cid -> do
+      (TypedTripleGetter nameOfq q domain range) <- runMonadPerspectivesQueryCompiler cid (constructQueryFunction rn)
+      pure $ TypedTripleGetter
+        "saveInitialContext"
+        (\cid -> do
           putQueryVariable "#context" [cid]
           t@(Triple {object : values}) <- q cid
-          pure t
-    else pure $ constructRolLookup $ localName rn
+          pure t)
+        domain
+        range
+    else do
+      domain <- lift $ getContextTypeF rn
+      pure $ constructRolLookup (localName rn) domain rn
 
   where
-    contextType :: NamedTripleGetter e
-    contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
-
     localName :: RolName -> LocalName
     localName qn = unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI qn)
 
@@ -47,127 +54,157 @@ rolQuery rn = do
 -- | The Property may be defined as computed.
 propertyQuery  :: forall e.
   PropertyName ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
-propertyQuery pn = do
+  ContextID ->
+  MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
+propertyQuery pn cid = do
   -- Is the type of propertyType or one of its ancestors q:Query?
   (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) pn)
   if isAQuery
     then do
-      (NamedFunction nameOfq q) <- constructQueryFunction pn
-      pure $ NamedFunction "saveInitialRol"
-        \rid -> do
+      (TypedTripleGetter nameOfq q domain range) <- runMonadPerspectivesQueryCompiler pn (constructQueryFunction pn)
+      pure $ TypedTripleGetter "saveInitialRol"
+        (\rid -> do
           putQueryVariable "#rol" [rid]
           t@(Triple {object : values}) <- q rid
-          pure t
-    else pure $ constructRolPropertyLookup $ localName pn
+          pure t)
+        domain
+        range
+    else do
+      domain <- lift $ getContextTypeF pn
+      pure $ constructRolPropertyLookup (localName pn) domain pn
 
   where
-    contextType :: NamedTripleGetter e
-    contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
-
     localName :: RolName -> LocalName
     localName qn = unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI qn)
 
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
--- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt.
+-- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
 constructQueryFunction :: forall e.
   ContextID ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
+  MonadPerspectivesQueryCompiler (AjaxAvarCache e) (TypedTripleGetter e)
 constructQueryFunction typeDescriptionID = do
-  pspType <- lift $ onNothing (errorMessage "no type found" "")
+  queryStepType <- lift $ lift $ onNothing (errorMessage "no type found" "")
     (firstOnly getContextType typeDescriptionID)
-  case pspType of
-    "model:QueryAst$externalPropertyQuery" -> do
-      propertyName <- lift $ onNothing (errorMessage "no propertyName" pspType) (firstOnly (getRolByLocalName "property") typeDescriptionID)
-      (NamedFunction name getter) <- propertyQuery propertyName
-      pure $ NamedFunction name \cid -> getter (cid <> "_buitenRol")
+  domain <- getQueryStepDomain
+  case queryStepType of
     "model:QueryAst$constructExternalPropertyGetter" ->
-      applyPropertyConstructor constructExternalPropertyGetter pspType
-    "model:QueryAst$constructExternalPropertyLookup" ->
-      constructExternalPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
-    -- TODO: "model:QueryAst$internalPropertyQuery"
+      applyPropertyConstructor constructExternalPropertyGetter queryStepType
+    "model:QueryAst$constructExternalPropertyLookup" -> do
+      localName <- onNothing' (errorMessage "no propertyName" queryStepType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      qn <- lift $ lift $ onNothing (errorMessage ("no qualified name for " <> localName) queryStepType) (lookupQualifiedPropertyNameInRolTypeTelescope localName domain)
+      pure $ constructExternalPropertyGetter qn domain qn
     "model:QueryAst$constructInternalPropertyGetter" ->
-      applyPropertyConstructor constructInternalPropertyGetter pspType
-    "model:QueryAst$constructInternalPropertyLookup" ->
-      constructInternalPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      applyPropertyConstructor constructInternalPropertyGetter queryStepType
+    "model:QueryAst$constructInternalPropertyLookup" -> do
+      localName <- onNothing' (errorMessage "no propertyName" queryStepType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      qn <- lift $ lift $ onNothing (errorMessage ("no qualified name for " <> localName) queryStepType) (lookupQualifiedPropertyNameInRolTypeTelescope localName domain)
+      pure $ constructInternalPropertyGetter qn domain qn
     "model:QueryAst$propertyQuery" -> do
-      propertyName <- lift $ onNothing (errorMessage "no propertyName" pspType) (firstOnly (getRolByLocalName "property") typeDescriptionID)
-      propertyQuery propertyName
+      propertyName <- lift $ lift $ makeFunction "model:QueryAst$propertyQuery$property" (getRol "model:QueryAst$propertyQuery$property") typeDescriptionID
+      lift $ propertyQuery domain propertyName
     "model:QueryAst$constructRolPropertyGetter" ->
-      applyPropertyConstructor constructRolPropertyGetter pspType
-    "model:QueryAst$constructRolPropertyLookup" ->
-      constructRolPropertyLookup <$> onNothing' (errorMessage "no propertyName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      applyPropertyConstructor constructRolPropertyGetter queryStepType
+    "model:QueryAst$constructRolPropertyLookup" -> do
+      localName <- onNothing' (errorMessage "no propertyName" queryStepType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      qn <- lift $ lift $ onNothing (errorMessage ("no qualified name for " <> localName) queryStepType) (lookupQualifiedPropertyNameInRolTypeTelescope localName domain)
+      pure $ constructRolPropertyGetter qn domain qn
     "model:QueryAst$rolQuery" -> do
-      rolName <- lift $ onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
-      rolQuery rolName
+      rolName <- lift $ lift $ makeFunction "model:QueryAst$rolQuery$property" (getRol "model:QueryAst$rolQuery$property") typeDescriptionID
+      lift $ rolQuery domain rolName
     -- Superfluous: can always be replaced by "model:QueryAst$rolQuery".
-    "model:QueryAst$constructRolLookup" ->
-      constructRolLookup <$> (onNothing' (errorMessage "no rolName" pspType) (deconstructLocalNameFromDomeinURI typeDescriptionID))
+    "model:QueryAst$constructRolLookup" -> do
+      localName <- onNothing' (errorMessage "no rolName" queryStepType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
+      qn <- lift $ lift $ onNothing (errorMessage ("no qualified name for " <> localName) queryStepType) (lookupQualifiedRolNameInContextTypeHierarchy localName domain)
+      pure $ constructRolGetter qn domain qn
     -- Superfluous: can always be replaced by "model:QueryAst$constructRolLookup" and by "model:QueryAst$rolQuery".
-    "model:QueryAst$constructRolGetter" ->
-      lift $ constructRolGetter <$> onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") typeDescriptionID)
-    "model:QueryAst$constructInverseRolGetter" ->
-      lift $ constructInverseRolGetter <$> (onNothing (errorMessage "no rolName" pspType) (firstOnly (getRolByLocalName "rol") pspType))
+    "model:QueryAst$constructRolGetter" -> do
+      rolName <- lift $ lift $ onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
+      pure $ constructRolGetter rolName domain rolName
+    "model:QueryAst$constructInverseRolGetter" -> do
+      rolName <- lift $ lift $ onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
+      pure $ constructInverseRolGetter rolName domain rolName
     "model:QueryAst$rolesOf" ->
-      lift $ rolesOf <$> (onNothing (errorMessage "no context" pspType) (firstOnly (getRolByLocalName "context") pspType))
-    "model:QueryAst$notEmpty" -> applyUnaryCombinator notEmpty pspType
-    "model:QueryAst$closure" -> applyUnaryCombinator closure pspType
-    "model:QueryAst$closure'" -> applyUnaryCombinator closure' pspType
-    "model:QueryAst$lastElement'" -> applyUnaryCombinator lastElement pspType
-    "model:QueryAst$compose" -> applyBinaryCombinator compose pspType
-    "model:QueryAst$concat" -> applyBinaryCombinator concat pspType
+      lift $ lift $ rolesOf <$> (onNothing (errorMessage "no context" queryStepType) (firstOnly (getRol "model:QueryAst$rolesOf$context") queryStepType))
+    "model:QueryAst$notEmpty" -> applyUnaryCombinator notEmpty queryStepType
+    "model:QueryAst$closure" -> applyUnaryCombinator closure queryStepType
+    "model:QueryAst$closure'" -> applyUnaryCombinator closure' queryStepType
+    "model:QueryAst$lastElement'" -> applyUnaryCombinator lastElement queryStepType
+    "model:QueryAst$compose" -> applyBinaryCombinator compose queryStepType
+    "model:QueryAst$concat" -> do
+      (operandIds :: Array ID) <- lift $ lift $ getRolByLocalName "operand" typeDescriptionID
+      (operands :: Array (TypedTripleGetter e)) <- traverse (withQueryCompilerEnvironment <<< constructQueryFunction) operandIds
+      {init, last} <- onNothing' (errorMessage "too few operands" queryStepType) (unsnoc operands)
+      lift $ lift $ foldM concat last init
     "model:QueryAst$filter" -> do
-      criteriumId <- lift $ onNothing (errorMessage "no criterium" pspType)
+      criteriumId <- lift $ lift $ onNothing (errorMessage "no criterium" queryStepType)
         (firstOnly (getRolByLocalName "criterium") typeDescriptionID)
-      candidateId <- lift $ onNothing (errorMessage "no candidates" pspType)
+      candidateId <- lift $ lift $ onNothing (errorMessage "no candidates" queryStepType)
         (firstOnly (getRolByLocalName "criterium") typeDescriptionID)
-      filter <$> constructQueryFunction criteriumId <*> constructQueryFunction candidateId
+      filter <$> withQueryCompilerEnvironment (constructQueryFunction criteriumId) <*> withQueryCompilerEnvironment (constructQueryFunction candidateId)
     "model:QueryAst$Constant" -> do
-      lift $ constant <$> onNothing (errorMessage "no constant value provided" pspType) (firstOnly (getExternalProperty "model:QueryAst$Constant$value") typeDescriptionID)
+      lift $ lift $ constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$Constant$value") typeDescriptionID)
     "model:QueryAst$Variable" -> do
-      variableName <- lift $ onNothing (errorMessage "no variable name found" pspType)
+      variableName <- lift $ lift $ onNothing (errorMessage "no variable name found" queryStepType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)
-      pure $ constructTripleGetterFromEffectExpression ("model:QueryAst$Variable_" <> variableName) (const $ readQueryVariable variableName)
+      variableType <- onNothing (error $ "Variable " <> variableName <> " is either not declared or its declaration is invalid.") (getQueryVariableType variableName)
+      pure $ constructTripleGetterFromEffectExpression
+        ("model:QueryAst$Variable_" <> variableName)
+        (const $ readQueryVariable variableName)
+        domain
+        variableType
     "model:QueryAst$setVariable" -> do
-      variableName <- lift $ onNothing (errorMessage "no variable name found" pspType)
+      variableName <- lift $ lift $ onNothing (errorMessage "no variable name found" queryStepType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)
-      valueDescriptionID <- lift $ onNothing (errorMessage "no value found" pspType)
+      valueDescriptionID <- lift $ lift $ onNothing (errorMessage "no value found" queryStepType)
         (firstOnly (getRolByLocalName "value") typeDescriptionID)
-      valueQuery@(NamedFunction nameOfq q) <- constructQueryFunction valueDescriptionID
+      valueQuery@(TypedTripleGetter nameOfq q d r) <- withQueryCompilerEnvironment $ constructQueryFunction valueDescriptionID
       predicateName <- pure ("set_" <> variableName <> "_" <> nameOfq)
-      pure $ NamedFunction predicateName
-        \id -> do
+      pure $ TypedTripleGetter predicateName
+        (\id -> do
           (Triple tf@{object : values}) <- q id
           putQueryVariable variableName values
-          pure $ Triple tf {predicate = predicateName}
-
+          pure $ Triple tf {predicate = predicateName})
+        d
+        r
     -- Any other argument will be passed as is, thus implementing that we can create arbitrary contexts.
     _ -> pure $ constant typeDescriptionID
+
   where
-    applyPropertyConstructor :: (PropertyName -> NamedTripleGetter e)
+    applyPropertyConstructor :: (PropertyName -> Domain -> Range -> TypedTripleGetter e)
       -> ID
-      -> MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
-    applyPropertyConstructor f pspType = do
-      id <- lift $ onNothing (errorMessage "no property found" pspType)
+      -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) (TypedTripleGetter e)
+    applyPropertyConstructor f queryStepType = do
+      (domain :: Domain) <- getQueryStepDomain
+      propertyId <- lift $ lift $ onNothing (errorMessage "no property found" queryStepType)
         (firstOnly (getRolByLocalName "property") typeDescriptionID)
-      pure $ f id
+      -- Is this property type available on the type identified by domain?
+      lift $ lift $ guardRolHasProperty domain propertyId
+      putQueryStepDomain propertyId
+      pure $ f propertyId domain propertyId
 
-    applyUnaryCombinator :: (NamedTripleGetter e -> NamedTripleGetter e )
+    applyUnaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e )
       -> ID
-      -> MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
-    applyUnaryCombinator c pspType = do
-      queryId <- lift $ onNothing (errorMessage "no query found" pspType)
+      -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) (TypedTripleGetter e)
+    applyUnaryCombinator c queryStepType = do
+      (domain :: Domain) <- getQueryStepDomain
+      queryId <- lift $ lift $ onNothing (errorMessage "no query found" queryStepType)
         (firstOnly (getRolByLocalName "query") typeDescriptionID)
-      ((constructQueryFunction queryId) >>= pure <<< c)
+      tg@(TypedTripleGetter _ _ dom range) <- (withQueryCompilerEnvironment (constructQueryFunction queryId) >>= pure <<< c)
+      -- The domain dom of the triplegetter must be equal to or a specialisation of domain.
+      -- However, no unary combinators change the domain of the tripleGetter. Hence, the actual
+      -- check has been performed in the recursive call to constructQueryFunction.
+      -- guardSubsumes domain dom
+      putQueryStepDomain range
+      pure tg
 
-    applyBinaryCombinator :: (NamedTripleGetter e -> NamedTripleGetter e -> NamedTripleGetter e)
+    applyBinaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e -> TypedTripleGetter e)
       -> ID
-      -> MonadPerspectivesQuery (AjaxAvarCache e) (NamedTripleGetter e)
-    applyBinaryCombinator c pspType = do
-      (operandIds :: Array ID) <- lift $ getRolByLocalName "operand" typeDescriptionID
-      operands <- traverse constructQueryFunction operandIds
-      {init, last} <- onNothing' (errorMessage "too few operands" pspType) (unsnoc operands)
+      -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) (TypedTripleGetter e)
+    applyBinaryCombinator c queryStepType = do
+      (operandIds :: Array ID) <- lift $ lift $ getRolByLocalName "operand" typeDescriptionID
+      operands <- traverse (withQueryCompilerEnvironment <<< constructQueryFunction) operandIds
+      {init, last} <- onNothing' (errorMessage "too few operands" queryStepType) (unsnoc operands)
       pure $ foldl c last init
 
     errorMessage :: String -> String -> Error
@@ -175,3 +212,50 @@ constructQueryFunction typeDescriptionID = do
 
     firstOnly :: ObjectsGetter e -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String))
     firstOnly g = g >=> (pure <<< head)
+
+    guardRolHasProperty :: RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Unit
+    guardRolHasProperty rolId propertyId = do
+      ln <- onNothing' (error $ "Property identifier is not well formed: " <> propertyId) (deconstructLocalNameFromDomeinURI propertyId)
+      qn <- onNothing (error $ "Property " <> propertyId <> " is not defined for " <> rolId) (lookupQualifiedPropertyNameInRolTypeTelescope ln rolId)
+      if qn == propertyId then pure unit else throwError (error $ "The property " <> propertyId <> " was specified, but " <> qn <> " was found!")
+
+    -- | Throws an error if the second type is not a specialization of the first.
+    guardSubsumes :: ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
+    guardSubsumes superType subType = pure unit
+
+-- | Given a local propertyname and the typedescription of a rol, find the qualified version of that local name.
+-- | It can be found on any level in the hierarchy of types from which the rol type derives.
+lookupQualifiedPropertyNameInRolTypeHierarchy :: forall e. LocalName -> ContextID -> MonadPerspectives (AjaxAvarCache e) (Maybe ID)
+lookupQualifiedPropertyNameInRolTypeHierarchy ln rolTypeId = do
+  (definedProperties :: Triple e) <- rolTypeId ## rolPropertyTypes
+  qn <- pure $ rolTypeId <> "$" <> ln
+  case elemIndex qn (tripleObjects definedProperties) of
+    (Just p) -> pure $ Just qn
+    Nothing -> do
+      super <- getContextTypeF rolTypeId
+      if super == rolTypeId
+        then pure Nothing
+        else lookupQualifiedPropertyNameInRolTypeHierarchy ln super
+
+-- | Given a local rolname and the typedescription of a context, find the qualified version of that local name.
+-- | It can be found on any level in the hierarchy of types from which the context type derives.
+lookupQualifiedRolNameInContextTypeHierarchy :: forall e. LocalName -> ContextID -> MonadPerspectives (AjaxAvarCache e) (Maybe ID)
+lookupQualifiedRolNameInContextTypeHierarchy ln contextTypeId = do
+  (definedRollen :: Triple e) <- contextTypeId ## contextRolTypes
+  qn <- pure $ contextTypeId <> "$" <> ln
+  case elemIndex qn (tripleObjects definedRollen) of
+    (Just p) -> pure $ Just qn
+    Nothing -> do
+      super <- getContextTypeF contextTypeId
+      if super == contextTypeId
+        then pure Nothing
+        else lookupQualifiedRolNameInContextTypeHierarchy ln super
+    -- (getContextTypeF contextTypeId) >>= (lookupQualifiedRolNameInContextTypeHierarchy ln)
+
+-- | Given a local propertyname and the typedescription of a rol, find the qualified version of that local name in the type hierarchy of that typedescription. If not found, extend the search recursively to the mogelijkeBinding of the rol type.
+lookupQualifiedPropertyNameInRolTypeTelescope :: forall e. LocalName -> ContextID -> MonadPerspectives (AjaxAvarCache e) (Maybe ID)
+lookupQualifiedPropertyNameInRolTypeTelescope ln rolTypeId = do
+  qn <- lookupQualifiedPropertyNameInRolTypeHierarchy ln rolTypeId
+  case qn of
+    (Just n) -> pure $ Just n
+    Nothing -> (rolTypeId ## mogelijkeBinding >-> binding) >>= (pure <<< head <<< tripleObjects) >>= maybe (pure Nothing)  (lookupQualifiedPropertyNameInRolTypeTelescope ln)

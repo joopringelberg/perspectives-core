@@ -5,10 +5,10 @@ import Perspectives.EntiteitAndRDFAliases
 import Control.Monad (class Monad)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State (evalStateT, lift, modify, gets)
+import Control.Monad.State (lift, modify, gets)
 import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (insert, lookup, singleton)
-import Perspectives.CoreTypes (ObjectsGetter, Triple, NamedFunction(..), TripleGetter, MonadPerspectives, MonadPerspectivesQuery, NamedTripleGetter)
+import Data.StrMap (insert, lookup)
+import Perspectives.CoreTypes (Domain, MonadPerspectivesQuery, NamedFunction(..), ObjectsGetter, TripleGetter, TypedTripleGetter(..), Range, VariableName)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
@@ -21,24 +21,6 @@ applyNamedFunction (NamedFunction _ f) a = f a
 applyToNamedFunction :: forall a b m. Monad m => a -> NamedFunction (a -> m b) -> m b
 applyToNamedFunction a (NamedFunction _ f) = f a
 
--- Run the NamedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
-runNamedTripleGetter :: forall e.
-  Subject
-  -> NamedTripleGetter e
-  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
-runNamedTripleGetter a (NamedFunction _ f) = runMonadPerspectives a f
-
-infix 0 runNamedTripleGetter as ##
-
--- | Run the function in a QueryEnvironment that has Subject as the value of "#start".
-runMonadPerspectives :: forall e a.
-  Subject
-  -> (Subject -> MonadPerspectivesQuery e a)
-  -> (MonadPerspectives e) a
-runMonadPerspectives a f = evalStateT (f a) (singleton "#start" [a])
-
-type VariableName = String
-
 putQueryVariable :: forall e. VariableName -> Array String -> MonadPerspectivesQuery e Unit
 putQueryVariable var valueArray = modify \env -> insert var valueArray env
 
@@ -48,8 +30,10 @@ readQueryVariable var = gets \env -> maybe [] id (lookup var env)
 constructTripleGetterFromEffectExpression :: forall e.
   PropertyName ->
   (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)) ->
-  NamedTripleGetter e
-constructTripleGetterFromEffectExpression pn objectsGetter = NamedFunction pn tripleGetter where
+  Domain ->
+  Range ->
+  TypedTripleGetter e
+constructTripleGetterFromEffectExpression pn objectsGetter domain range = TypedTripleGetter pn tripleGetter domain range where
   tripleGetter :: TripleGetter e
   tripleGetter id = ifM memorizeQueryResults
     do
@@ -67,10 +51,12 @@ constructTripleGetterFromEffectExpression pn objectsGetter = NamedFunction pn tr
 -- | to construct getters for the properties of contexts and roles that are not roles or properties, such as
 -- | psp:type, psp:binding, psp:label and psp:context. Furthermore, for psp:identity, psp:buitenRol, psp:binnenRol,
 -- | psp:iedereRolInContext and psp:rolTypen.
-constructTripleGetterFromObjectsGetter :: forall e.
+constructTripleGetterFromObjectsGetter :: forall e a.
   PropertyName ->
   ObjectsGetter e ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromEffectExpression pn (lift <<< objGetter)
 
 -- | Use this function to construct property getters that memorize in the triple administration. Use with:
@@ -81,50 +67,70 @@ constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromE
 constructTripleGetter :: forall e.
   (String -> ObjectsGetter e) ->
   PropertyName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructTripleGetter objectsGetter pn = constructTripleGetterFromObjectsGetter pn $ objectsGetter pn
 
 constructExternalPropertyGetter :: forall e.
   PropertyName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructExternalPropertyGetter pn = constructTripleGetter getExternalProperty pn
 
 constructExternalPropertyLookup :: forall e.
   LocalName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructExternalPropertyLookup ln = constructTripleGetter lookupExternalProperty ln
 
 constructInternalPropertyGetter :: forall e.
   PropertyName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructInternalPropertyGetter pn = constructTripleGetter getInternalProperty pn
 
 constructInternalPropertyLookup :: forall e.
   LocalName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructInternalPropertyLookup ln = constructTripleGetter lookupInternalProperty ln
 
 constructRolPropertyGetter :: forall e.
   PropertyName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructRolPropertyGetter pn = constructTripleGetter getProperty pn
 
 constructRolPropertyLookup :: forall e.
   LocalName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructRolPropertyLookup ln = constructTripleGetter getPropertyFromRolTelescope ln
 
 constructRolGetter :: forall e.
   RolName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructRolGetter rn = constructTripleGetter getRol rn
 
 constructRolLookup :: forall e.
   LocalName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructRolLookup rn = constructTripleGetter getRolFromContextTypeHierarchy rn
 
 constructInverseRolGetter :: forall e.
   RolName ->
-  NamedTripleGetter e
+  Domain ->
+  Range ->
+  TypedTripleGetter e
 constructInverseRolGetter pn = constructTripleGetter getGebondenAls pn

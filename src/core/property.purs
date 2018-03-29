@@ -1,25 +1,25 @@
 module Perspectives.Property where
 
-import Data.Array (nub, singleton)
+import Control.Monad.Eff.Exception (error)
+import Data.Array (nub, singleton, head)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter)
+import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, Value)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (LocalName, deconstructNamespace)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Prelude (bind, id, join, pure, ($), (<>), (==))
+import Perspectives.Utilities (onNothing)
+import Prelude (bind, id, join, pure, ($), (<>), (==), (>=>))
 
 {-
 Property values are represented by Arrays.
 We need functions that give us an array of values for a given property for a given resource.
 -}
-
-type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
 
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
 getContextMember f c = do
@@ -38,6 +38,12 @@ getContextMember' f c = do
 
 getContextType :: forall e. ObjectsGetter e
 getContextType = getContextMember \context -> [context_pspType context]
+
+getContextTypeF :: forall e. ObjectGetter e
+getContextTypeF = makeFunction "getContextTypeF" getContextType
+
+makeFunction :: forall e. String -> ObjectsGetter e -> ObjectGetter e
+makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no value: " <> name) (pure (head ta)))
 
 -- Returns an empty array if the context does not exist.
 getBuitenRol :: forall e. ObjectsGetter e
@@ -131,6 +137,7 @@ getRolContext = getRolMember \rol -> [rol_context rol]
 getProperty :: forall e. PropertyName -> ObjectsGetter e
 getProperty pn = getRolMember \rol -> maybe [] propertyValue (lookup pn (rol_properties rol))
 
+-- | In the roltelescope, find a property with a given local name.
 getPropertyFromRolTelescope :: forall e. LocalName -> ObjectsGetter e
 getPropertyFromRolTelescope ln rolId = do
   maybeRol <- getPerspectEntiteit rolId

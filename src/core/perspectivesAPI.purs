@@ -8,7 +8,7 @@ import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
-import Perspectives.CoreTypes (NamedTripleGetter, NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
+import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives, (##))
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
@@ -16,7 +16,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryEffect ((~>))
 import Perspectives.SystemQueries (binding)
 import Perspectives.TripleAdministration (unRegisterTriple)
-import Perspectives.TripleGetter (constructRolGetter, (##))
+import Perspectives.TripleGetter (constructRolGetter)
 import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
@@ -94,7 +94,6 @@ dispatch request response = do
       ShutDown -> true
       otherwise -> false
 
-
 -----------------------------------------------------------
 -- API FUNCTIONS
 -----------------------------------------------------------
@@ -104,8 +103,8 @@ type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 
 -- | Runs a the query and adds the ReactStateSetter to the result.
 -- | Returns a function of no arguments that the external program can use to unsubscribe the ReactStateSetter.
-getQuery :: forall e. ContextID -> NamedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getQuery cid query@(NamedFunction qn _) setter = do
+getQuery :: forall e. ContextID -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getQuery cid query@(TypedTripleGetter qn _ _ _) setter = do
   (Triple{subject, predicate}) <- cid ## query ~> NamedFunction (cid <> qn) (setter >=> pure <<< const unit)
   pure $ unRegisterTriple $ TripleRef {subject, predicate}
 

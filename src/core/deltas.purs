@@ -28,7 +28,7 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
-import Perspectives.CoreTypes (NamedTripleGetter, MonadPerspectives)
+import Perspectives.CoreTypes (TypedTripleGetter, MonadPerspectives, runMonadPerspectivesQuery, (##))
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructNamespace, isUserEntiteitID)
@@ -42,7 +42,7 @@ import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, lijdendVoorwerpBepaling, propertyReferentie, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleAdministration (tripleObjects)
-import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, runMonadPerspectives, (##))
+import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
 import Perspectives.Utilities (onNothing, onNothing') as Util
@@ -173,7 +173,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value}) = do
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      (isfunc :: Boolean) <- lift $ runMonadPerspectives memberName (toBoolean isFunctional)
+      (isfunc :: Boolean) <- lift $ runMonadPerspectivesQuery memberName (toBoolean isFunctional)
       if isfunc
         then do
           x <- pure $ findIndex equalExceptRolID deltas
@@ -270,11 +270,12 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
       actiesWithThatLijdendVoorwerp = contextType >-> buitenRol >-> isLijdendVoorwerpIn >-> rolContext
 
   -- Roles that fill the syntactic role "LijdendVoorwerp".
-  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp")
+  isLijdendVoorwerpIn :: TypedTripleGetter e
+  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp" "model:Arc$Actie" "model:Arc$lijdendVoorwerp")
   -- Fillers of the syntactic role "Onderwerp".
-  onderwerpFillers = (constructRolGetter "model:Perspectives$onderwerp") >-> binding
+  onderwerpFillers = (constructRolGetter "model:Perspectives$onderwerp" "model:Arc$Actie" "model:Arc$onderwerp" ) >-> binding
   -- Tests an Actie for having memberName in the view that is its lijdendVoorwerpBepaling.
-  hasRelevantView :: ID -> NamedTripleGetter e
+  hasRelevantView :: ID -> TypedTripleGetter e
   hasRelevantView id = contains id (lijdendVoorwerpBepaling >-> propertyReferentie)
 
 {-

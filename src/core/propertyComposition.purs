@@ -3,16 +3,17 @@ module Perspectives.PropertyComposition where
 
 import Data.Array (cons, difference, nub)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (Triple(..), TripleGetter, NamedFunction(..), NamedTripleGetter)
+import Perspectives.CoreTypes (Triple(..), TripleGetter, NamedFunction(..), TypedTripleGetter(..))
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (bind, join, pure, ($), (<>), map)
 
 compose :: forall e.
-  NamedTripleGetter e ->
-  NamedTripleGetter e ->
-  NamedTripleGetter e
-compose (NamedFunction nameOfp p) (NamedFunction nameOfq q) =
-  memorize getter name
+  TypedTripleGetter e ->
+  TypedTripleGetter e ->
+  TypedTripleGetter e
+compose (TypedTripleGetter nameOfp p domain1 range1) (TypedTripleGetter nameOfq q domain2 range2) =
+  -- TODO: domain2 must subsume range1
+  memorize getter name domain1 range2
     where
     getter :: TripleGetter e
     getter id = do
@@ -41,4 +42,4 @@ infixl 9 compose as >->
 --   pure $ join x
 --   where
 --     magic' :: NamedFunction( TripleGetter e) -> Triple e -> Aff (AjaxAvarCache e) (Array (Triple e))
---     magic' (NamedFunction _ q) (Triple{subject, object}) = traverse q (difference object [subject])
+--     magic' (TypedTripleGetter _ q _ _) (Triple{subject, object}) = traverse q (difference object [subject])

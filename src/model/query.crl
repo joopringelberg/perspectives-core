@@ -9,7 +9,7 @@ psp:Context q:Query
 		psp:Property $resultaatType
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
-			extern psp:range = String
+			psp:range => psp:String
 
 q:Query q:RolQuery
 	intern $resultaatType = "entiteitID"
@@ -20,7 +20,7 @@ q:Query q:PropertyQuery
 		psp:Property $valueType
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
-			extern psp:range = String
+			psp:range => psp:String
 
 -- We need a query with the local name "resultaatType" that we can refer to from any position.
 q:PropertyQuery q:resultaatType
@@ -204,7 +204,7 @@ psp:Rol q:Constant
 		psp:Property $value
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
-			extern psp:range = String
+			psp:range => psp:String
 
 --------------------------------------------------------------------------------
 -- VARIABLE
@@ -214,14 +214,14 @@ psp:Context q:Variable
 		psp:Property $name
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
-			extern psp:range = String
+			psp:range => psp:String
 
 psp:Context q:setVariable
 	psp:internalProperty =>
 		psp:Property $name
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
-			extern psp:range = String
+			psp:range => psp:String
 	psp:rolInContext =>
 		psp:Rol $value
 			extern psp:isFunctioneel = true
@@ -248,7 +248,7 @@ psp:Context q:assignToRol
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
 			-- possible values are: "add", "remove", "set"
-			extern psp:range = String
+			psp:range => psp:String
 	psp:rolInContext =>
 		-- The rol we will assign to. The qualified name is used!
 		psp:Rol $rol
@@ -288,12 +288,12 @@ psp:Context q:assignToProperty
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
 			-- possible values are: "add", "remove", "set"
-			extern psp:range = String
+			psp:range => psp:String
 	psp:internalProperty =>
 		psp:Property $constantValue
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = false
-			extern psp:range = String
+			psp:range => psp:String
 	psp:rolInContext =>
 		-- The rol we will change a property of. The qualified name is used!
 		psp:Rol $rol

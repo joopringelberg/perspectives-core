@@ -30,7 +30,8 @@
     "purescript-js-date": "^5.1.0",
     "purescript-datetime": "^3.4.1",
     "purescript-uri": "^4.2.4",
-    "purescript-aff-promise": "^1.0.0"
+    "purescript-aff-promise": "^1.0.0",
+    "purescript-monad-loops": "^0.4.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

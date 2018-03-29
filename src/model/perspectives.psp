@@ -17,12 +17,12 @@ psp:Context $Aangifte -- Commentaar op de regel.
 			extern psp:isFunctioneel = true
 			-- Commentaar boven psp:isVerplicht
 			extern psp:isVerplicht = false
-			extern psp:range = Number
+			psp:range => psp:Number
 	psp:internalProperty =>
 		psp:Property $Aantekening
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = false
-			extern psp:range = String
+			psp:range => psp:String
 	psp:rolInContext =>
 		psp:Rol $Aangever
 			extern psp:isVerplicht = true
@@ -31,14 +31,15 @@ psp:Context $Aangifte -- Commentaar op de regel.
 				psp:Property $Betrouwbaarheid
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = false
-					extern psp:range = Number
+					psp:range => psp:Number
 			psp:mogelijkeBinding => psp:Persoon
 			psp:viewinRol =>
 				psp:View $AangeverBetrouwbaarheidPerspectief
 					psp:propertyReferentie => $$Betrouwbaarheid
 	psp:rolInContext =>
-		psp:Rol $MijnBerekendeRol
-			--query $aangever binding
+		q:constructRolGetter $DitIsGewoonAangever
+			$rol => $$Aangever
+
 
 psp:Context $Jansen
 

@@ -15,7 +15,7 @@ arc:Zaak sys:TrustedCluster
 		psp:Property $aantekening
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = false
-			extern psp:range = String
+			psp:range => psp:String
 	psp:rolInContext =>
 		psp:Rol $clusterGenoot
 			psp:mogelijkeBinding => sys:Systeem$gebruiker
@@ -23,7 +23,7 @@ arc:Zaak sys:TrustedCluster
 				psp:Property $url
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = true
-					extern psp:range = String
+					psp:range => psp:String
 			psp:viewInRol =>
 				psp:View $Adressering
 					psp:propertyReferentie => $$url
@@ -47,5 +47,5 @@ arc:Zaak sys:TrustedCluster
 -- We hebbeb geen syntax voor een rol zonder binding?
 
 --sys:TrustedCluster usr:TrustedCluster
---	sys:TrustedCluster$clusterGenoot => usr:Systeem$gebruiker 
+--	sys:TrustedCluster$clusterGenoot => usr:Systeem$gebruiker
 -- LET OP: hier zou je moeten verwijzen naar de rol van usr:Systeem. Maar die identifier is verborgen.

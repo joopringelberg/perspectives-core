@@ -6,13 +6,14 @@ import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar)
 import Control.Monad.Eff.Ref (REF, Ref)
 import Control.Monad.Reader (ReaderT)
-import Control.Monad.State (StateT)
-import Data.StrMap (StrMap)
+import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
+import Data.Maybe (Maybe)
+import Data.StrMap (StrMap, empty, insert, lookup, singleton)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (class Eq, class Show, show, (&&), (<>), (==))
+import Prelude (class Eq, class Show, Unit, show, (&&), (<>), (==), bind, discard, pure)
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -42,18 +43,76 @@ type UserInfo =
   }
 
 -----------------------------------------------------------
--- MONADPERSPECTIVES, MONADPERSPECTIVESQUERY
+-- MONADPERSPECTIVES
 -----------------------------------------------------------
 -- | MonadPerspectives is an instance of MonadAff.
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
 type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e))
 
+-----------------------------------------------------------
+-- MONADPERSPECTIVESQUERY
+-----------------------------------------------------------
 -- | The QueryEnvironment is a set of bindings of variableNames (Strings) to either ID's or the string representation of simple values.
 type QueryEnvironment = StrMap (Array String)
 
 type MonadPerspectivesQuery e =  StateT QueryEnvironment (MonadPerspectives e)
 
 type MonadPerspectivesObjects e = MonadPerspectives (AjaxAvarCache e) (Array ID)
+
+-- | Run the function in a QueryEnvironment that has Subject as the value of "#start".
+runMonadPerspectivesQuery :: forall e a.
+  Subject
+  -> (Subject -> MonadPerspectivesQuery e a)
+  -> (MonadPerspectives e a)
+runMonadPerspectivesQuery a f = evalStateT (f a) (singleton "#start" [a])
+
+-----------------------------------------------------------
+-- MONADPERSPECTIVESQUERYCOMPILER
+-----------------------------------------------------------
+-- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
+-- | an array of variables that have been declared.
+type Domain = String
+type Range = String
+type VariableName = String
+
+type QueryCompilerEnvironment =
+  { domain :: Domain
+  , declaredVariables :: StrMap ContextID
+  }
+
+type MonadPerspectivesQueryCompiler e = StateT QueryCompilerEnvironment (MonadPerspectivesQuery e)
+
+runMonadPerspectivesQueryCompiler :: forall e a.
+  ContextID
+  -> (MonadPerspectivesQueryCompiler e a)
+  -> MonadPerspectivesQuery e a
+runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: empty}
+
+putQueryStepDomain :: forall e. Domain -> MonadPerspectivesQueryCompiler e Unit
+putQueryStepDomain d = modify \env -> env { domain = d}
+
+getQueryStepDomain :: forall e. MonadPerspectivesQueryCompiler e Domain
+getQueryStepDomain = gets \{domain} -> domain
+
+putQueryVariableType :: forall e. VariableName -> ContextID -> MonadPerspectivesQueryCompiler e Unit
+putQueryVariableType var typeId = modify \s@{declaredVariables} -> s { declaredVariables = insert var typeId declaredVariables }
+
+getQueryVariableType :: forall e. VariableName -> MonadPerspectivesQueryCompiler e (Maybe String)
+getQueryVariableType var = gets \{declaredVariables} -> lookup var declaredVariables
+
+withQueryCompilerEnvironment :: forall e a. MonadPerspectivesQueryCompiler e a -> MonadPerspectivesQueryCompiler e a
+withQueryCompilerEnvironment a = do
+  env <- get
+  result <- a
+  put env
+  pure result
+
+-----------------------------------------------------------
+-- OBJECT(S)GETTER
+-----------------------------------------------------------
+type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+
+type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
 
 -----------------------------------------------------------
 -- TRIPLEGETTER
@@ -79,16 +138,18 @@ instance eqTriple :: Eq (Triple e) where
 
 type NamedTripleGetter e = NamedFunction (TripleGetter e)
 
------------------------------------------------------------
--- OBJECTSGETTER
------------------------------------------------------------
-type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+-- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
+runTypedTripleGetter :: forall e.
+  Subject
+  -> TypedTripleGetter e
+  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
+runTypedTripleGetter a (TypedTripleGetter _ f _ _) = runMonadPerspectivesQuery a f
+
+infix 0 runTypedTripleGetter as ##
 
 -----------------------------------------------------------
 -- TYPED GETTERS
 -----------------------------------------------------------
-type Domain = String
-type Range = String
 
 data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e) Domain Range
 

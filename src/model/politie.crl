@@ -14,12 +14,12 @@ arc:Zaak $Aangifte
 		psp:Property $urgentie
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = false
-			extern psp:range = Number
+			psp:range => psp:Number
 	psp:internalProperty =>
 		psp:Property $aantekening
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = false
-			extern psp:range = String
+			psp:range => psp:String
 	psp:rolInContext =>
 		psp:Rol $UserRol
 			extern psp:isFunctioneel = true
@@ -28,7 +28,7 @@ arc:Zaak $Aangifte
 				psp:Property $betrouwbaarheid
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = true
-					extern psp:range = Number
+					psp:range => psp:Number
 			psp:viewInRol =>
 				psp:View $Adres
 					psp:propertyReferentie => $$betrouwbaarheid
@@ -50,7 +50,7 @@ arc:Zaak $Aangifte
 				psp:Property $toegewezen
 					extern psp:isFunctioneel = true
 					extern psp:isVerplicht = true
-					extern psp:range = Boolean
+					psp:range => Boolean
 	arc:actieInContext =>
 		arc:Actie $Actie_1
 			arc:onderwerp => $$Verbalisant
