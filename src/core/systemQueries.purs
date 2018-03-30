@@ -39,6 +39,7 @@ iedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives
   "model:Perspectives$Context"
   "model:Perspectives$Rol"
 
+-- | The names of every rol given to this context.
 rolTypen :: forall e. TypedTripleGetter e
 rolTypen =  constructTripleGetterFromObjectsGetter "model:Perspectives$rolTypen" getRolTypen
   "model:Perspectives$Rol"
@@ -103,14 +104,12 @@ rolUser :: forall e. TypedTripleGetter e
 rolUser = QC.closure' binding
 
 lijdendVoorwerpBepaling :: forall e. TypedTripleGetter e
-lijdendVoorwerpBepaling = constructRolGetter "model:Perspectives$lijdendVoorwerpBepaling"
-  "model:Perspectives$Actie"
-  "model:Perspectives$Context"
+lijdendVoorwerpBepaling = (constructRolGetter "model:Perspectives$lijdendVoorwerpBepaling"
+  "model:Perspectives$Actie") >-> binding
 
 propertyReferentie :: forall e. TypedTripleGetter e
 propertyReferentie = constructRolGetter "model:Perspectives$propertyReferentie"
   "model:Perspectives$View"
-  "model:Perspectives$propertyReferentie"
 
 isContext :: forall e. TypedTripleGetter e
 isContext = QC.notEmpty rolContext
@@ -121,14 +120,15 @@ boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRo
 rolPropertyTypes :: forall e. TypedTripleGetter e
 rolPropertyTypes = constructRolGetter "model:Perspectives$rolProperty"
   "model:Perspectives$Rol"
-  "model:Perspectives$Property"
 
 contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = constructRolGetter "model:Perspectives$rolInContext"
   "model:Perspectives$Context"
-  "model:Perspectives$Rol"
 
 mogelijkeBinding :: forall e. TypedTripleGetter e
-mogelijkeBinding = constructRolGetter "model:Perspectives$mogelijkeBinding"
-  "model:Perspectives$Rol"
-  "model:Perspectives$Rol"
+mogelijkeBinding = (constructRolGetter "model:Perspectives$mogelijkeBinding"
+  "model:Perspectives$Rol") >-> binding
+
+rolInContext :: forall e. TypedTripleGetter e
+rolInContext = constructRolGetter "model:Perspectives$rolInContext"
+  "model:Perspectives$Context"

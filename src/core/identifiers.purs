@@ -3,6 +3,7 @@ module Perspectives.Identifiers
 , deconstructLocalNameFromCurie
 , deconstructLocalNameFromDomeinURI
 , deconstructNamespace
+, guardWellFormedNess
 , getFirstMatch
 , getSecondMatch
 , Namespace
@@ -24,6 +25,8 @@ module Perspectives.Identifiers
   )
 
 where
+import Control.Monad.Eff.Exception (Error, error)
+import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (index, unsafeIndex)
 import Data.Maybe (Maybe(..), maybe)
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
@@ -31,6 +34,7 @@ import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Utilities (onNothing')
 import Prelude (class Show, id, not, ($), (<>), (==), (||))
 
 -- | A Namespace has the form "model:Name"
@@ -68,6 +72,12 @@ instance peIdentifierModelName :: PerspectEntiteitIdentifier ModelName where
 instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName where
   pe_namespace (QualifiedName ns _) = ns
   pe_localName (QualifiedName _ ln) = Just ln
+
+-----------------------------------------------------------
+-- THROW ERROR WHEN RESULT IS NOTHING
+-----------------------------------------------------------
+guardWellFormedNess :: forall m. MonadThrow Error m => (String -> Maybe String) -> String -> m String
+guardWellFormedNess f a = onNothing' (error $ "This identifier is not well formed: " <> a ) (f a)
 
 -----------------------------------------------------------
 -- DECONSTRUCTING NAMESPACES

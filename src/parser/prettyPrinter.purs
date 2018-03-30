@@ -29,7 +29,9 @@ import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), 
 
 type IndentLevel = Int
 
-type PerspectText' e = StateT IndentLevel (WriterT String (MonadPerspectives (AjaxAvarCache e)))
+type PerspectTextM m = StateT IndentLevel (WriterT String m)
+
+type PerspectText' e = PerspectTextM (MonadPerspectives (AjaxAvarCache e))
 
 type PerspectText e = PerspectText' e Unit
 
@@ -69,10 +71,10 @@ comment' c = identifier' ( "--" <> c)
 -- prettyPrintContext c = snd (unwrap (runWriterT $ evalStateT (context c) 0))
 
 prettyPrint :: forall a e. a -> PrettyPrinter a e -> MonadPerspectives (AjaxAvarCache e) String
-prettyPrint t pp = prettyPrint' $ pp t
+prettyPrint t pp = runPerspectText $ pp t
 
-prettyPrint' :: forall e. PerspectText e -> MonadPerspectives (AjaxAvarCache e) String
-prettyPrint' t = do
+runPerspectText :: forall e. PerspectText e -> MonadPerspectives (AjaxAvarCache e) String
+runPerspectText t = do
   x <- runWriterT (evalStateT t 0)
   pure $ snd x
 
@@ -200,7 +202,7 @@ strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 enclosingContext :: forall e. PrettyPrinter PerspectContext e
 enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
-  withComments' (context_comments theText) (identifier( "Context " <> (context_displayName theText)))
+  withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
   newline
   sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache rolTypen))
   traverse_ section (tripleObjects sectionIds)
@@ -212,8 +214,8 @@ enclosingContext theText = do
       identifier sectionId
       newline
       newline
-      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId "model:Perspectives$Context") >-> binding)) -- These are all a buitenRol.
+      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId "model:Perspectives$Context") >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     ppContext :: Array ID -> ID -> PerspectText e

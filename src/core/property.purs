@@ -82,6 +82,7 @@ getRolFromContextTypeHierarchy ln contextId = do
 getRollen :: forall e. ObjectsGetter e
 getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)
 
+-- | The names of every rol given to this context.
 getRolTypen :: forall e. ObjectsGetter e
 getRolTypen = getContextMember \context -> keys (context_rolInContext context)
 

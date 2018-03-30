@@ -117,9 +117,8 @@ constructRolPropertyLookup ln = constructTripleGetter getPropertyFromRolTelescop
 constructRolGetter :: forall e.
   RolName ->
   Domain ->
-  Range ->
   TypedTripleGetter e
-constructRolGetter rn = constructTripleGetter getRol rn
+constructRolGetter rn d = constructTripleGetter getRol rn d rn
 
 constructRolLookup :: forall e.
   LocalName ->

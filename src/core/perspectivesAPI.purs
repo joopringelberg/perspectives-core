@@ -12,6 +12,7 @@ import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.Property (getContextTypeF)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryEffect ((~>))
 import Perspectives.SystemQueries (binding)
@@ -110,8 +111,12 @@ getQuery cid query@(TypedTripleGetter qn _ _ _) setter = do
 
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getRolBinding cid rn setter = getQuery cid (constructRolGetter rn >-> binding) setter
+getRolBinding cid rn setter = do
+  contextType <- getContextTypeF cid
+  getQuery cid (constructRolGetter rn contextType >-> binding) setter
 
 -- | Retrieve the rol from the context, subscribe to it.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getRol cid rn setter = getQuery cid (constructRolGetter rn) setter
+getRol cid rn setter = do
+  contextType <- getContextTypeF cid
+  getQuery cid (constructRolGetter rn contextType) setter

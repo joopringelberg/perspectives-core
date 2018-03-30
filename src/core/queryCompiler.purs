@@ -116,11 +116,11 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$constructRolLookup" -> do
       localName <- onNothing' (errorMessage "no rolName" queryStepType) (deconstructLocalNameFromDomeinURI typeDescriptionID)
       qn <- lift $ lift $ onNothing (errorMessage ("no qualified name for " <> localName) queryStepType) (lookupQualifiedRolNameInContextTypeHierarchy localName domain)
-      pure $ constructRolGetter qn domain qn
+      pure $ constructRolGetter qn domain
     -- Superfluous: can always be replaced by "model:QueryAst$constructRolLookup" and by "model:QueryAst$rolQuery".
     "model:QueryAst$constructRolGetter" -> do
       rolName <- lift $ lift $ onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
-      pure $ constructRolGetter rolName domain rolName
+      pure $ constructRolGetter rolName domain
     "model:QueryAst$constructInverseRolGetter" -> do
       rolName <- lift $ lift $ onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
       pure $ constructInverseRolGetter rolName domain rolName
@@ -258,4 +258,4 @@ lookupQualifiedPropertyNameInRolTypeTelescope ln rolTypeId = do
   qn <- lookupQualifiedPropertyNameInRolTypeHierarchy ln rolTypeId
   case qn of
     (Just n) -> pure $ Just n
-    Nothing -> (rolTypeId ## mogelijkeBinding >-> binding) >>= (pure <<< head <<< tripleObjects) >>= maybe (pure Nothing)  (lookupQualifiedPropertyNameInRolTypeTelescope ln)
+    Nothing -> (rolTypeId ## mogelijkeBinding) >>= (pure <<< head <<< tripleObjects) >>= maybe (pure Nothing)  (lookupQualifiedPropertyNameInRolTypeTelescope ln)

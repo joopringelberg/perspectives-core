@@ -37,12 +37,14 @@ q:RolQuery q:rolTypen
 q:RolQuery q:rolType
 q:RolQuery q:binding
 q:Query q:context -- Should be a ContextQuery but we do not have that.
+q:Query q:useCache
+q:Query q:ignoreCache
 q:PropertyQuery q:label
 
 --------------------------------------------------------------------------------
 -- QUERY CONSTRUCTORS
 --------------------------------------------------------------------------------
-q:PropertyQuery q:externalPropertyQuery
+q:PropertyQuery q:constructExternalPropertyGetter
 	psp:rolInContext =>
 		psp:Rol $property
 			extern psp:isFunctioneel = true
@@ -200,7 +202,7 @@ q:Context q:contains
 -- CONSTANT
 --------------------------------------------------------------------------------
 psp:Rol q:Constant
-	psp:externalProperty =>
+	psp:internalProperty =>
 		psp:Property $value
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = true
