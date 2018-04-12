@@ -1,0 +1,200 @@
+ACTIE-EFFECTEN
+
+Hoe beschrijf je het effect van een actie? We hebben nodig:
+	- variabelen
+	- een serie statements die al dan niet een variabele binden
+	- expressies om waarden te berekenen
+	- de mogelijkheid om systeemfuncties of -statements aan te roepen met argumenten.
+
+Een syntax:
+effect = statement+
+statement = voidStatement | assignment
+voidStatement = expression
+assignment = variable "=" expression
+expression = functionCall | infixExpression | constant | variable | query
+functionCall = systemFunctionName "(" expression* ")"
+infixExpression = "(" expression operator expression ")"
+operator = + | * ...
+systemFunctionName = ...
+constant = rolNameOfContext | value
+value = Boolean | String | Date | Number
+
+
+Dit is rechttoe-rechtaan. Referentie kan alleen naar variabelen die in eerdere statements zijn vastgelegd.
+
+Maar hier moeten we aan toevoegen: crud op rollen en properties en aanmaak van rollen en contexten.
+
+En wat doen we ermee? 
+	- vertalen naar contexten en rollen
+	- omzetten naar een purescript functie in Eff of Aff.
+
+Een query zetten we om naar contexten en rollen. Dit doen we omdat we reflectie nodig hebben om te bepalen of een gebruiker over een bepaalde context, rol of property moet beschikken. Zodra we queries opnemen in effecten, moeten we ook op deze queries kunnen reflecteren. Simpelweg aan een rol refereren in een property is al een query. Een gebruiker met een actie waarin een nieuwe instantie van een rol wordt gemaakt, heeft dus die rol nodig.
+
+Kortom: het lijkt erop dat we óók op statements moeten kunnen reflecteren.
+
+Ik heb voor queries nog geen syntax, wel een AST. Dat zou ik voor effecten ook kunnen proberen. 
+
+Een probeersel, AST voor effecten:
+1. Een Effect is een context met de geordende rol "statement" en een ongeordende rol "variable". Deze rol wordt gevuld door een rolInContext of een buitenrol, al naar gelang of het gaat om een voidStatement (Expression, b.v. een functionCall of een constant) of assignment.
+2. Een functionCall is een context met een rol voor elke parameter en een String property op de buitenRol voor de systemFunctionName. Of een rol voor de systemFunctionName, die dan een Context is. Of een rol van een context die alle systemFunctions bevat.
+3. Een infixExpression is een context met twee rollen en een String property 'operator' op de buitenRol. Of een rol operator, analoog aan functionCall.
+4. Een constant moet een rol zijn, met één property 'value'.
+5. Een assignment is een context met twee rollen. De variabele waar een waarde aan toegekend wordt is een rol die gevuld wordt met een rol van de effect context rol "variabele". De expressie is een rol die we vullen met de rol die de expressie representeert.
+6. Als een variabele in een expressie voorkomt, binden we een rol aan de rol die variabele representeert in de effect context, zoals b.v. in een infixExpression.
+7. Je ziet dus dat een expressie een buitenRol kan zijn (functionCall, infixExpression, query) of een rolInContext (constant, variable).
+
+Resteert de crud op rollen en properties en aanmaak van rollen en contexten.
+Allereerst is er het mogelijk relationele karakter van rollen en properties. Dat maakt minimaal de volgende operatoren noodzakelijk:
+- voeg toe aan
+- verwijder uit
+- maak gelijk aan
+Luxe zou 'vervang door' zijn, die laten we weg.
+Dit moeten we kunnen uitvoeren op contexten en rollen. Een ad hoc syntax:
+rol += X
+rol -= X
+rol = X
+Een effect hoort bij een actie en heeft direct toegang tot alle rollen van de context waar die actie in valt.
+property van rol += Y
+property van rol -= Y
+property van rol = Y
+Dat geldt niet voor een property, dus we moeten aangeven om welke rol het gaat.
+Deze expressies zijn variaties van assignment.
+
+Dan nog een create. Je moet natuurlijk zowel het type noemen, als (in het geval van een context) de instanties van rollen en eventueel hun binding.
+new Rol 
+new Rol = expression
+
+Dit zou een geschikte syntax kunnen zijn voor rollen.
+
+new Context
+	new RolX
+	new RolY = expression
+
+Dit zijn allemaal instanties van expression-s.
+
+Hoe representeer je dit in contexten en rollen? 
+Beschouw new als een functionCall. Representeer hem met een context, met een speciale functionele rol 'type' en een geordende relationele rol 'rolAssignment'. Deze rollen worden gevuld met contexten die elk een rol-assignment representeren. Er is een  contexttype voor elk type assignment. 
+
+HOE BESCHRIJVEN WE HET TYPE VAN STATEMENTS EN EXPRESSIES?
+1. Een query levert triples.
+2. Ik leid daaruit af dat een Expression ook zo'n waarde heeft. NEEN!
+3. Een Assignment van een rol of property heeft daarentegen het type: MonadTransactie e Unit
+4. Een variabele heeft natuurlijk hetzelfde type als een Expression.
+5. Een actie moet in een transactie uitgevoerd worden. Dit moet op het hoogste niveau gebeuren, d.w.z. bij de instantiatie een CUD-actie (zodat het effect wordt geëxecuteerd) die wordt geïnitialiseerd door de gebruiker.
+
+Oftewel:
+	- een expressie heeft als type MonadPerspectives e (Array String), 
+	- maar een Effect (van een actie) heeft als type MonadTransactie e Unit.
+
+6. Queries leveren triples
+7. De functies die we in een effect gebruiken, daar reken ik niet toe de functies die we in een query gebruiken, zoals filter, of laatste. Want dat zijn juist queries en die hadden we al.
+8. Maar functies die bijvoorbeeld bewerkingen doen van getallen, kunnen we net zo goed rekenen tot de queries.
+9. Er is nog een onopgelost probleem: meerdere query beginpunten.
+	- Staan we dat toe?
+	- Wat zijn use cases?
+	- Wat zijn dan die beginpunten?
+		- Constanten (individuen uit de theorie (bestaan die?), of typen)
+		- rollen in de context waarin de query wordt uitgevoerd.
+10. Wat zijn de beginpunten van queries?
+	- voor een propertyquery: de rol
+	- voor een rolquery: de context. Maar dan zijn alle rollen dus potentiele beginpunten.
+11. Met variabelen in effect functies heb je dus een alternatief voor berekende rollen. Het zijn, zoals al eerder opgemerkt, rollen in een tijdelijke context: de executiecontext.
+12. Gaan we effecten herberekenen als de inputs veranderen???? Het moet wel. Een berekende
+rol wordt immers ook herberekend!
+13. Is het verschil tussen een berekende rol en een in een effect berekende rol hetzelfde als het verschil pull-push? Backward-forward chaining?
+14. Een berekende rol 'is' er altijd (als je er maar om vraagt). Maar een in een actie-effect berekende rol is er alleen als de gebruiker die actie heeft geïnstantieerd.
+15. Het verschil is natuurlijk vooral: een berekende rol is impliciet in de theorie. Een rol die in een effect wordt gemaakt, is een theorie-verandering!
+16. Een rol die wordt toegevoegd in een effect, volgt uit de theorie op dat moment en de wil van de gebruiker. Ik vind het geenszins vanzelfsprekend dat als de theorie verandert, dat dat betekent dat de gebruiker met terugwerkende kracht iets anders wilde toevoegen!
+Dus NIET HERBEREKENEN.
+
+Als we niet hoeven te herberekenen, dan hoeven we ook niet in triples te rekenen maar kunnen we volstaan met objecten.
+
+Dat zou betekenen dat we van een query altijd eerst de objecten moeten nemen.
+Of moeten we query expressies in een effect statement sowieso anders compileren, namelijk in termen van objectgetters? Er hoeft immers niet te worden gememoriseerd. Maar ja, als je een query al hàd berekend zou het resultaat kunnen hergebruiken. OPLOSSING: dan moet je daar maar een rol voor aanmaken, dan kun je daar naar verwijzen.
+
+
+==========================================================================================
+SAMENVATTING
+==========================================================================================
+1. Het Effect van een Actie is een theorieverandering die de gebruiker aanbrengt gegeven een bepaalde stand van informatie. Een theorieverandering onttrekt zich aan de logische semantiek van de theorie zelf. Het mechanisme dat we hebben om de *gevolgen* van een theorieverandering door te voeren in de theorie, dient louter en alleen om de logische semantische relatie tussen statements en betekenis in stand te houden. We moeten dus niet proberen om een Effect opnieuw te berekenen als de theorie waar de gebruiker destijds vanuit ging, verandert. Want dat zou zoiets betekenen als: "als de gebruiker tóen wist wat hij nú weet, zou hij de theorie zó veranderd hebben". En dat is een counterfactual, geen historische opeenvolging van theorieveranderingen.
+
+2. Het gevolg is dat we de queries die we in een Effect statement gebruiken, niet hoeven te memoriseren. Concreet betekent dat dat we een query niet compileren naar triplegetters, maar naar objectgetters.
+
+3. De query *syntax* is echter voor queries en Effecten precies hetzelfde.
+
+4. Ik vermoed dat variabelen in queries net zo verhelderend kunnen werken als in statements. 
+
+5. Maar omdat queries gememoriseerd worden, voegt een variabele in een query géén efficiency toe. In statements wel.
+
+6. Hèt verschil tussen een query en een statement is dat de laatste assignment operatoren heeft die de theorie veranderen. Een afgeleid verschil is dat - afgezien van variabele binding - een query slechts uit één expressie bestaat, terwijl een statement uit een geordende lijst van statements kan bestaan.
+
+7. Het lijkt me dat we zowel queries als statements kunnen bedienen met een let* constructie. In zo'n expressie heeft elke binding als scope de eropvolgende bindingen en de body van de let*.
+
+8. Value types. We onderscheiden rollen van simpele waarden (die gebonden kunnen worden aan een property). Syntactisch maken we geen onderscheid. De tooling (waaronder de query/statement compiler) moet dat wel doen. Dit kan grammaticaal vreemd lijken, als we zien dat "+" een operator is en een rol een operand kan zijn - terwijl we weten dat er geen semantiek bestaat voor het optellen van rollen.
+
+9. Ik geef hier een grammatica die alleen bedoeld is als volledig startpunt voor een abstract syntax tree. De feitelijke grammatica die we gebruiken in Arc kunnen we later opstellen. Daarin willen we vast af van haakjes om infix-expressies ten gunste van operator associativiteit en precedentie. Met de AST kunnen we in CRL al aan de slag.
+Ik onderscheid unaire, binaire en n-aire functies zodat ik uit de AST een functie kan samenstellen die het effect berekend. Mocht het nodig zijn, dan maak ik ternaire, quaternaire, ect. functies bij.
+
+GRAMMATICA
+query = "let*" binding+ expression | expression
+binding = variable "=" expression
+expression = singularExpression | functionApplication
+singularExpression = constant | variable | rol | property
+functionApplication = unaryFunctionApplication | binaryFunctionApplication | naryFunctionApplication
+unaryFunctionApplication = "(" systemFunctionName expression ")"
+binaryFunctionApplication = "(" systemFunctionName expression expression ")"
+naryFunctionApplication = "(" systemFunctionName expression expression expression+ ")"
+systemFunctionName = sum | product | compose | filter
+constant = Boolean | String | Date | Number
+
+effect = "let*" binding+ statement+ | statement
+statement = 
+	rol += effectExpression
+	rol -= effectExpression
+	rol = effectExpression
+	property van rol += expression
+	property van rol -= expression
+	property van rol = expression
+effectExpression = singularExpression | functionApplication | createExpression
+
+createExpression = createRol | createContext
+createRol = "new" rol | "new" rol "=" expression
+createContext = "new" context "{" createRol* "}"
+
+PURESCRIPT TYPERING
+Merk op dat een query een functie is die triples oplevert. Maar als we denken in termen van Arc, zijn er geen triples, alleen rollen en properties - de objecten van de triples.
+We moeten dus goed opletten of we het over de implementatie hebben, of over de modellering.
+
+Bij een Effect hebben we dat verschil niet.
+
+Berekende rollen en properties hebben een default variabele, die gebonden is aan respectievelijk hun context of rol. Dit betekent dat de berekening state heeft waarin die variabele is vastgelegd. Er is dan ook een functie (readQueryVariable "#start") waarmee je die variabele uit de state kunt lezen. Dit betekent *niet* dat elke query die een rol oplevert, zo'n state zet!
+
+De typering van een query - in de modellering - hangt ervan af van waar we hem toepassen:
+1. Een berekende property is een functie van Rol naar een Array String in MonadPerspectives (AjaxAvarCache e), waarbij de strings simpele waarden representeren. De rol hoeft niet te worden genoemd in de query, maar is beschikbaar als de variabele #start.
+Deze variabele moet in State van de berekening meegenomen worden. Hij wordt gezet als je een property opvraagt en het blijkt een berekende property te zijn.
+
+2. Een berekende rol is een functie van Context naar een Array ID in MonadPerspectives (AjaxAvarCache e). De strings representeren rollen. De context hoeft niet te worden genoemd in de query, maar is beschikbaar als de variabele #start.
+Deze variabele moet in State van de berekening meegenomen worden. Hij wordt gezet als je een rol opvraagt en het blijkt een berekende rol te zijn.
+
+3. Een Effect Statement wordt altijd geëvalueerd in een context. Aan de executiecontext kunnen we de grammaticale rollen van de Actie toevoegen. Dat betekent dat de scope van een Effect de rollen van de context en van de actie omvat. De context is beschikbaar als de variabele #start.
+
+Een Query functie is een TripleGetter:
+
+	type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+
+Een Statement heeft als type:
+
+	type Statement e = MonadPerspectivesQuery (AjaxAvarCache e) Unit
+
+Een StatementFunctie heeft als type: 
+
+	type Statement e = ContextID -> MonadPerspectivesQuery (AjaxAvarCache e) Unit
+ 
+Een expression in een statement heeft als type:
+
+	MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
+
+	type EffectExpression e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
+
+AST VAN QUERY EN STATEMENT
+De beide bestanden effect.crl en query.crl kunnen nu ineen gerold worden, of op zijn minst geharmonieerd. 

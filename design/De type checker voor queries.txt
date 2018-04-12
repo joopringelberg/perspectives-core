@@ -1,0 +1,132 @@
+DE TYPE CHECKER VOOR QUERIES
+Een stap in een query beschouwen we als een functie met een Domain en een Range.
+We kunnen een stap alleen toepassen op een expressie die een type heeft dat overeenkomst met zijn Domain. Een stap vereist dus zijn Domain.
+Een query levert een resultaat van een bepaald type, dat we het QueryType noemen.
+Bij elke stap die we zouden willen toevoegen aan een query, moeten dus we nagaan of gevraagde Domain wel klopt met het QueryType.
+
+Maar types kunnen worden samengesteld uit Aspecten. Een type 'is' ook elk Aspect waaruit hij, recursief, is opgebouwd. 
+Dat betekent voor Rollen:
+	- een type draagt elke property die het Aspect draagt of vereist (als een vereiste property niet door het type werd gedragen, klopt het type per definitie niet)
+	- een type heeft (potentieel) alle Acties die het Aspect heeft (een ActorRolType zou een Perspectief kunnen hebben met maar een deel van de beschikbare Acties, maar dat is een modelleringskeuze).
+Het betekent voor Contexten:
+...
+
+Het type dat een stap vereist hoeft dus niet letterlijk het QueryType te zijn. Het kan ook één van de Aspecten van het QueryType zijn. We zeggen dat een Type A ''matcht'' met een type B als A gelijk is aan B of één van zijn Aspecten.
+
+PROPERTIES EN MULTIPLICITEIT
+Er zijn twee querystappen waarvan de range méér dan één type kan bevatten als het domain er maar één heeft:
+	- binding
+	- binders
+Binding vertaalt in type-time naar mogelijkeBindingen. 
+Binders vertaalt in type-time naar alle rollen die het uitgangstype als mogelijkeBinding hebben genoemd.
+
+Deze multipliciteit van Rollen speelt een rol bij twee soorten querystappen die een facet van een Rol opvragen:
+	- Property
+	- View
+Voor het opvragen van een Property geldt dat elk RolType in het QueryType de property moet dragen (rekening houdend met de eventuele Aspecten van de rollen, en de mogelijke bindingen van de rollen!)
+Voor het opvragen van een View geldt hetzelfde.
+
+Voor de andere querystappen met Rol als domain geldt dat de stap op elke waarde in het domain wordt toegepast om de range te verkrijgen:
+	- context
+	- type
+	- binding
+
+WAAR IS EEN PROPERTY GEDEFINIEERD?
+Een Property wordt direct gedefinieerd bij een Rol (eigenProperty), of indirect, via een Aspect (aspectProperty). De gekwalificeerde naam van een Property hoeft daarom niet in de namespace van de Rol te vallen waarbij hij hoort. Merk op dat een Aspect óók Aspecten kan hebben!
+
+ROLASPECTEN VAN EEN ROL
+[[NB. Dit stuk is niet helder genoeg. Wat er aan mist is dat mogelijkeBindingen een Sum Type toevoegen.]]
+Een Rol kan uit RolAspecten samengesteld worden. Een RolAspect voegt properties en views toe (of vereist properties). 
+Een mogelijkeBinding voegt óók properties toe. We kunnen die daarom beschouwen als een RolAspect van de rol.
+Dat geldt recursief.
+Maar er kunnen meerdere mogelijkeBindingen zijn. Die zijn geen RolAspecten van de Rol. Maar de doorsnede van hun RolAspecten zijn wel weer RolAspecten van de Rol.
+Kortom: de RolAspecten van een rol zijn de directe RolAspecten van die Rol, verenigd met de RolAspecten van de mogelijkeBindingen.
+Vindt de RolAspecten van de MogelijkeBindingen van een Rol r:
+1. De verzameling RolAspecten van de MogelijkeBindingen noemen we A en maken we gelijk aan de lege verzameling.
+2. Als r één mogelijkeBinding mb heeft, voeg mb dan toe aan A. Herhaal deze stap met mb.
+3. Als r meerdere mogelijkeBindingen heeft, bepaal dan de RolAspecten van de mogelijkeBindingen voor elk van hen.
+4. Neem de doorsnede van de aldus verkregen resultaten en verenig die met A.
+
+IN TYPE TIME VASTSTELLEN OF EEN ROL EEN GEKWALIFICEERDE PROPERTY DRAAGT
+Uit de gekwalificeerde naam stellen we de gekwalificeerde rolnaam vast. Deze rolnaam moet de Rol zelf zijn of één van zijn RolAspecten.
+We kunnen dit ook zo formuleren: een functie die deze gekwalificeerde property afleest, heeft deze gekwalificeerde rolnaam als Domain.
+Willen we die functie toevoegen aan een query, dan moet het QueryType matchen met het Domain van de functie.
+
+IN TYPE-TIME VASTSTELLEN OF EEN ROL EEN ONGEKWALIFICEERDE PROPERTY DRAAGT
+Stel vast of langs elk pad van de RolDAG de property voorkomt. D.w.z. dat elk pad een Rol moet bevatten waar een property met die lokale naam voor is gedefinieerd.
+NB. Dit is *niet* hetzelfde als eerst de gekwalificeerde naam proberen te vinden en dan kijken of die gekwalificeerde naam door de rol gedragen wordt. Immers, als de Rol twee mogelijkeBindingen heeft die beiden een property met die lokale naam dragen, draagt de Rol die lokale naam óók. Maar er is niet één gekwalificeerde naam voor die property!
+
+WAAR BEVINDEN PROPERTY-WAARDEN ZICH IN RUN-TIME?
+De waarde van een Property wordt altijd bij de instantie van de rol opgeslagen, waar hij een eigen- of aspectProperty is. Daarbij gebruiken we de gekwalificeerde naam, omdat verschillende Aspecten properties met dezelfde lokale naam kunnen en mogen bijdragen.
+
+IN RUN-TIME DE WAARDE VAN EEN GEKWALIFICEERDE PROPERTY OPVRAGEN BIJ EEN ROL
+1. Leid uit de gekwalificeerde naam p de gekwalificeerde RolNaam af. Dit is het type RT.
+2. Doorloop de roltelescoop tot de rol r gevonden is met type RT.
+3. Lees de property p af op r.
+ALTERNATIEF:
+Construeer een query door de functie 'binding' te componeren totdat de gekwalificeerde RolNaam is gevonden. Componeer dan de propertyGetter.
+Merk op dat als de property gedragen wordt door een sum type, een getter met case analyse moet worden gemaakt!
+
+IN RUN-TIME DE WAARDE VAN EEN ONGEKWALIFICEERDE PROPERTY OPVRAGEN BIJ EEN ROL
+1. Kwalificeer de lokale naam met de naam van het type van de rol r.
+2. Lees de property met die naam af bij r.
+3. Indien niet gevonden: herhaal vanaf stap 1 met de binding van de rol r.
+ALTERNATIEF:
+Construeer een query door de functie 'binding' te componeren totdat een niveau in de DAG gevonden is waarvoor een getter gemaakt kan worden die de property teruggeeft.
+
+IN RUN-TIME EEEN PROPERTY ZETTEN VOOR EEN ROL
+Om een property-zetter te maken moeten we in type time het volgende algoritme volgen.
+Bepaal voor elk pad in de RolDAG een combinatie van gekwalificeerde Rolnaam en gekwalificeerde Propertynaam (op basis van de lokale naam). 
+Construeer een functie die de roltelescoop afloopt op zoek naar een rol met één van de gevonden Rolnamen. Indien gevonden, zet daar de gekwalificeerde Propertynaam.
+
+ROLLEN
+Voor een RolGetter moeten we vaststellen of het QueryType de rol draagt. Uiteraard dragen alleen Contexten rollen. Een rol is direct bij een context gedefinieerd, of bij één van zijn Aspecten.
+
+Als je een gekwalificeerde rolnaam gebruikt, is de (eveneens gekwalificeerde) naam van de context waar die rol op is gedefinieerd, bekend. Dan kunnen we de test als volgt opvatten: is de context één van de (transitieve) Aspecten van het QueryType (waarbij we het QueryType als zijn eigen Aspect meenemen)?
+
+Als je de ongekwalificeerde rolnaam gebruikt, moeten we bij alle Aspecten nagaan of dat Aspect een rol met die lokale naam draagt. Dit moet met een breadth-first test gebeuren om ties te breken. Of we moeten alternatieven aan de gebruiker voorleggen.
+
+==============================================================================================================
+TYPES REVISITED
+Door Aspecten in een Type op te nemen, produceren we een Product-type. Of eigenlijk maken we een compositie van Product types. Immers, een Context is een Product van Rollen en een Rol is een Product van Properties. Een Aspect opnemen is niets anders dan de rij van Rollen of Properties uitbreiden.
+Maar met mogelijkeBindingen produceren we een Sum-type!
+Ga maar na: Als de mogelijkeBindingen van een Rol R respectievelijk X en Y zijn, dan is het type van de binding van R natuurlijk precies dat: X, of Y!. 
+Sommige functies zijn inherent polymorf ten aanzien van deze Sum-types. Bijvoorbeeld de functie 'type', want alles heeft een type.
+Maar voor een Sum van RolTypen is bijvoorbeeld de functie 'context' polymorf, omdat alle rollen een context hebben.
+
+Stel dat X en Y RolTypen zijn en dat beide een eigen property p hebben: X$p en Y$p. We kunnen nu een functie maken die van X of Y de lokale p teruggeeft. Gewoon een kwestie van case analyse! Oftewel, we kunnen voor het type (X of Y) een polymorfe functie maken die p teruggeeft.
+
+Het begint erop te lijken dat we Context en Rol in het Perspectives type systeem uit elkaar moeten kunnen houden (en Properties waarschijnlijk ook). Dat betekent dat we de Aspecten Context, Rol en Property moeten maken en moeten gebruiken bij onze types.
+
+Het type van de functie 'context' is immers: Rol -> Context.
+En zo zijn er meer. De functie 'view' is: Rol -> View.???
+
+Hoe noteren we Sum en Product?
+Wáár noteren we het?
+Ik vermoed dat redeneren met types beperkt blijft tot Purescript code. Betekent dat dat we types niet als Contexten en Rollen hoeven te representeren? Alleen als we de types tijdens de executie van de functies opbouwen en niet hoeven te bewaren tussen deze executiemomenten.
+
+We hebben nu (al) een CR representatie van Functie, met Domain en Range. We kunnen daar eenvoudig Sum en Product aan toevoegen. Een Functie kan dan een Sum als Domain hebben, of een Product.
+
+==============================================================================================================
+IN ÉÉN KEER EEN ROLGETTER MAKEN (OF FALEN)
+Het is mogelijk om in één traversal een getter te beschrijven om een property te verkrijgen.
+Construeer deze functie in een Monad waarin je tijdelijk contexten en rollen kunt bewaren!
+Laat r het RolType zijn en p de lokale naam van de Property.
+1. Bepaal de gewkalificeerde naam van p voor r. Is die er, maak dan een getter met die naam.
+2. Anders, als er 0 mogelijkeBindingen zijn, faalt deze procedure. De rol draagt de property niet.
+3. Anders, als er 1 mogelijkeBinding is, componeer een functie uit 'binding' en de recursieve aanroep van deze procedure op die binding, met p.
+4. Anders, als er meerdere mogelijkeBindingen zijn, componeer dan een case-analyse functie uit de resultaten van de aanroep van deze procedure op elk van die mogelijkeBindingen.
+
+DE GEKWALIFICEERDE NAAM VAN EEN PROPERTY BEPALEN VOOR EEN ROL
+Deze procedure kan op drie manieren eindigen:
+	- met Nothing
+	- met Just <gekwalificeerdeNaam>
+	- met een Array van gekwalificeerde namen, hetgeen betekent dat een nadere keuze gemaakt moet worden.
+Laat r het RolType zijn en p de lokale naam van de Property.
+1. Kwalificeer de lokale naam met de rolnaam: r$p.
+2. Als r$p een eigen property is van r, geef dan r$p terug.
+3. Als r geen aspecten heeft, geef dan Nothing terug.
+3. Anders, voor elk aspect van r: laat het aspect r zijn en pas deze procedure erop toe met p.
+	- Als precies één der recursieve aanroepen een Just resultaat teruggeeft: geef het terug.
+	- Als er meerdere resultaten zijn: rapporteer een keuze-situatie.
+	- Als er geen resultaten zijn: geef Nothing terug.

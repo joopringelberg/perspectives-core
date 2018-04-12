@@ -6,7 +6,7 @@ import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (notEmpty, closure', filter) as QC
+import Perspectives.QueryCombinators (closure, closure', filter, notEmpty) as QC
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
 import Prelude (const, pure, (<>), (>=>))
 
@@ -132,3 +132,10 @@ mogelijkeBinding = (constructRolGetter "model:Perspectives$mogelijkeBinding"
 rolInContext :: forall e. TypedTripleGetter e
 rolInContext = constructRolGetter "model:Perspectives$rolInContext"
   "model:Perspectives$Context"
+
+aspect :: forall e. TypedTripleGetter e
+aspect = constructRolGetter "model:Perspectives$rolInContext" "model:Perspectives$aspect" >-> binding >-> rolContext
+
+-- | All aspects but excluding the subject itself.
+aspecten :: forall e. TypedTripleGetter e
+aspecten = QC.closure aspect

@@ -10,7 +10,7 @@ arc:Partij pol:Persoon
 arc:Partij pol:Medewerker
 
 arc:Zaak $Aangifte
-	psp:internalProperty =>
+	psp:externalProperty =>
 		psp:Property $urgentie
 			extern psp:isFunctioneel = true
 			extern psp:isVerplicht = false
@@ -36,7 +36,7 @@ arc:Zaak $Aangifte
 		psp:Rol $Verbalisant
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => pol:Medewerker
-	psp:activiteitInContext =>
+	arc:activiteitInContext =>
 			psp:Activiteit $Intake
 				psp:rolInContext =>
 					psp:Rol $Uitvoerder
@@ -57,3 +57,6 @@ arc:Zaak $Aangifte
 			arc:werkwoord => arc:beheert
 			arc:lijdendVoorwerp => $$UserRol
 			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$UserRol$Adres
+
+arc:Aangifte arc:UrgenteAangiftePrototype
+	$urgentie = 10

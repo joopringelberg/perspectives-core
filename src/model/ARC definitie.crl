@@ -6,10 +6,14 @@ import model:Perspectives als psp:
 
 Section psp:rolInContext
 
-psp:Context arc:zaakInContext
+psp:Rol arc:zaakInContext
+	extern psp:isFunctioneel = false
 psp:Context arc:actieInContext
+	extern psp:isFunctioneel = false
 psp:Context arc:activiteitInContext
+	extern psp:isFunctioneel = false
 psp:Context arc:toestandInContext
+	extern psp:isFunctioneel = false
 
 psp:Context arc:Domein
 	psp:rolInContext => psp:externalProperty
@@ -44,10 +48,15 @@ psp:Context arc:Activiteit
 	psp:rolInContext => psp:rolInContext
 	psp:rolInContext => arc:actieInContext
 
-psp:Rol arc:onderwerp
+psp:Rol arc:onderwerpView
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
-	psp:mogelijkeBinding => psp:Rol
+	psp:mogelijkeBinding => psp:View
+
+psp:Rol arc:onderwerpConstraint
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = true
+	psp:mogelijkeBinding => psp:Context
 
 psp:Rol arc:werkwoord
 	extern psp:isFunctioneel = true

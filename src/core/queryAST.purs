@@ -2,13 +2,13 @@ module Perspectives.QueryAST where
 
 data QueryStep
   = Filter QueryStep QueryStep
-  | Concat QueryStep QueryStep
-  | Compose ElementaryQueryStep QueryStep
+  | Concat (Array QueryStep)
+  | Compose (Array QueryStep)
   | NotEmpty QueryStep
   | Closure QueryStep
   | Closure' QueryStep
   | LastElement QueryStep
-  | Contains String QueryStep
+  | Contains QueryStep QueryStep
   | SetVariable String QueryStep
   | Terminal ElementaryQueryStep
 

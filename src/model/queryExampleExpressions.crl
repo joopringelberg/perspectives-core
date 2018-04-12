@@ -1,0 +1,22 @@
+q:Constant $Constant_4
+  extern $value = "4"
+
+q:rolesOf $rolesOf_X
+  $context => usr:Aangifte_1
+
+q:Variable $variable_myVar
+  intern $name = "myVar"
+
+q:binding
+
+q:context
+
+q:filter $xxx
+  $criterium =>
+    q:notEmpty $yyy
+      $query =>
+        q:constructInternalPropertyGetter $zzz
+          $property => pol:Aangifte$Aangever$betrouwbaarheid
+  $candidates =>
+    q:constructRolGetter $zzz
+      $rol => pol:Aangifte$Aangever

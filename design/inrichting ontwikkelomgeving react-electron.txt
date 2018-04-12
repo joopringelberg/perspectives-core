@@ -1,0 +1,203 @@
+OPGESCHOOND OVERZICHT INRICHTING ONTWIKKELOMGEVING
+
+1. Het project "perspectives-electron-app" is gemaakt als react project mbv create-react-app in Webstorm conform: 
+	https://www.jetbrains.com/help/webstorm/react.html.
+
+2. ESLint is de linter. De react specialisatie is al aangebracht door create-react-app.
+
+3. Electron is bij-geïnstalleerd conform: 
+	https://medium.freecodecamp.org/building-an-electron-application-with-create-react-app-97945861647c.
+
+4. Een debug-configuratie voor het main proces van electron gemaakt conform de aanwijzingen in:
+	https://blog.jetbrains.com/webstorm/2016/05/getting-started-with-electron-in-webstorm/
+
+5. Git integratie is opgezet. In het nieuwe project heb ik Git geïnitialiseerd en ik heb een fetch gedaan op de origin op Github. Ik heb een nieuwe branch aangemaakt (en ook een tag om de ontwikkeling tot op heden te markeren).
+
+7. App.js importeert Main zoals gecompileerd door Purs en opgeslaten in /output.
+
+8. /public/index.html importeert ace.js. 
+
+9. /public bevat:
+	ace.js
+	mode-perspectives.js
+	theme-perspectives.js
+
+10. Maak twee symbolische links:
+	- in /src naar /output;
+	- in /node_modules naar /src/client.
+	De eerste is nodig omdat alle code in /src moet staan (voor WebPack) en omdat ik niet kan bepalen waar Atom-ide-purescript de output van purs wegschrijft. 
+	Waarom de tweede nodig is, begrijp ik niet echt.
+
+
+
+==========================================================================================
+VERSLAG VAN DE INRICHTING HIERONDER
+==========================================================================================
+DE ONTWIKKELOMGEVING OPZETTEN
+
+1. Maak een react project in webstorm conform: 
+	https://www.jetbrains.com/help/webstorm/react.html
+
+	NAAM: perspectives-electron-app
+	
+	EXTRA: ESLint gekozen. ESLint geïnitialiseerd. Ik kan runnen!
+
+2. Volg de aanwijzingen om een electron app te combineren met react: 
+	https://medium.freecodecamp.org/building-an-electron-application-with-create-react-app-97945861647c
+	
+	WAT IK HEB GEDAAN
+	npm install --save-dev electron
+	stappen 1 t/m 6 uitgevoerd.
+	
+	Electron code completion werkt!
+	
+	npm install --save-dev foreman
+	
+	Maar, een aanwijzing volgend op:
+		https://medium.com/@poksme/you-can-simplify-this-process-by-using-concurrently-and-wait-on-command-line-tools-502a7d3b3419
+	
+	npm install concurrently --save-dev
+	
+	npm install wait-on --save-dev
+	
+	Maar dit ging niet goed. Uiteindelijk toch de oplossing in het artikel gevolgd en dat gaat wel goed.
+	
+	Opruimen:
+	npm uninstall concurrently --save-dev
+	npm uninstall wait-on --save-dev
+
+3. Volg de aanwijzingen voor de combinatie webstorm-electron in:
+	https://blog.jetbrains.com/webstorm/2016/05/getting-started-with-electron-in-webstorm/
+	
+	Ik heb een debug configuratie gemaakt voor het main process.
+
+4. Voeg de loader voor Purescript toe:
+	https://github.com/ethul/purs-loader
+	
+	HELAAS, het lijkt erop dat we moeten ejecten voor dat gaat werken.
+	
+	ANDER PLAN.
+	Atom, of liever de puresript ide, compileert on the fly. Het is niet handig, overbodig en wellicht problematisch als WebPack dat ook nog eens gaat doen! Dus:
+		- maak een directory voor de purs sources
+		- maak een directory voor de gecompileerde files op zodanige plek dat webpack ze meeneemt.
+
+5. Check out Perspectives naar het nieuwe project.
+
+6. Deel het project opnieuw in, zodat een duidelijke scheiding ontstaat in:
+	- de Perspectives kern
+	- de grafische user interface
+	- de Perspectives API
+	- de editor
+	- de modellen
+	- de parsers
+
+7. Maak een nieuw markeringspunt in git.
+
+PROJECTDIRECTORIES INTEGREREN
+Het gaat aan de Purescript kant om bestanden en directories die in Git bewaard zijn, aan de electron kant om alles.
+Dubbele directories in de project root:
+	src
+Dubbele files in de project root:
+	package.json
+
+Geen dubbele files in src.
+
+Files die belangrijk zijn in Purescript en niet in Git zitten:
+	- .gitignore
+	- .psc-ide-port (misschien)
+	
+
+Dus: 
+1. kopieer package.json van Electron naar een veilige plek;
+2. Zoek uit of het mogelijk is dat git een checkout doet naar bestaande directory en daarin files toevoegt aan subdirectories.
+
+WAT IK HEB GEDAAN
+
+	cp -r perspectives-electron-app/ perspectives-electron-app-copy
+	cd perspectives-electron-app
+	git init
+	git remote add origin https://github.com/joopringelberg/perspectives.git
+	
+	Commit in perspectivesInPurescript
+	git push --all origin --force
+	
+	Ik gebruikte --force omdat de lokale repo out of date was ten opzichte van de remote. Dat kwam omdat ik daar een remote aan had toegevoegd, denk ik? Ik had het beter omgekeerd kunnen doen. Maar ik kon niet opnieuw een remote toevoegen.
+	
+	git fetch origin
+	
+	git checkout spo_administration
+
+
+==========================================================================================
+PROJECT HERINDELING
+
+1. index.html uit de project root moet naar public en daar de bestaande index.html vervangen.
+Neen. Deze file wordt niet gebruikt, maar wel de index.html uit dist.
+	- root/index.html kan weg.
+Het lijkt erop dat de code die wordt gebuild, als een script tag in de public/index.html wordt ingevoegd.
+	-  <script src="ace.js" type="text/javascript" charset="utf-8"></script> moet daar ook in terechtkomen.
+	Of: hoe maken we een dependency voor ace?
+	
+2. Alle purs files in de root van src gaan naar de nieuwe directory core.
+
+3. De output van pulp build gaat naar de directory "output" en ik zie geen manier om dat te veranderen. We hebben alleen nodig dat de modules gecompileerd worden. Het standaard build commando in Atom voorziet daar in.
+
+4. In de root file moeten we 
+	require("./output/main")
+	doen. Of zoiets. Let op het pad!
+
+5. Tevens moeten we de functie main aanroepen.
+
+SAMENVATTING
+0. .gitignore aangepast
+00. branch perspectives-electron gemaakt en uitgecheckt.
+000. Alle nieuwe files ingecheckt.
+1. Maak een directory output in de project root.
+3. Verwijder /index.html
+4. Zet de ace script tag in public/index.html. Als dat niet werkt, probeer dan te requiren.
+4a. ace.js gekopieerd naar /public
+5a. bower install
+5b. Doe een build vanuit atom.
+6. In App.js, doe een import voor main.
+7. In App.js, roep main aan.
+8. symbolische link naar output gemaakt in src.
+9. symbolische link in /output gemaakt naar client. De verwijzing vanuit perspectivesApiProxy.js faalde.
+10. de /dist directory kan weg.
+
+==========================================================================================
+OVERZICHT VAN DE HACKS
+1. symbolische link naar /output in /src.
+2. symbolische link in /output naar /src/client.
+3. perspectivesAPI.js. Dit bestand verbindt een foreign javascript file (een .js file die dezelfde naam moet dragen als de .purs file èn in dezelfde directory moet staan) met de implementatie in een andere directory. Dit is het probleem:
+	Gegeven de volgende directory structuur:
+		projectroot	/src/core
+					/src/App.js
+					/client/perspectivesApiProxy.js
+					/output	/Perspectives.Api/foreign.js
+							/Main.js
+					
+		moet perspectivesAPI.js (hernoemd naar foreign.js) het volgende pad gebruiken voor de import van perspectivesApiProxy.js:
+		"../../client/perspectivesApiProxy.js"
+		Helaas protesteert Webpack daartegen. Waarom is dat? Een verklaring zou zijn dat imports nooit een directory omhoog zouden kunnen reiken. Maar dat is niet zo, volgens https://webpack.js.org/concepts/module-resolution/.
+		Wat me opvalt is dat in App.js main geimporteerd kan worden met: ./output/Main. Immers, App.js zit in projectroot/src en Main zit in projectroot/output. Je zou verwachten dat de import moet zijn: "../output/Main". Als ik het daarin verander, krijg ik de volgende melding:
+		"Module not found: You attempted to import ../output/Main which falls outside of the project src/ directory. Relative imports outside of src/ are not supported. You can either move it inside src/, or add a symlink to it from project's node_modules/." Maar: "./output/Main" valt toch óók buiten "src"?
+		Helaas werkt "./client/perspectivesApiProxy.js" evenmin.
+		Kennelijk is het óók mogelijk om te importeren vanuit node_modules. Ik begrijp dat als volgt: zo'n directory kun je beschouwen als een externe module. En als ik dan de import verander in: "client/perspectivesApiProxy.js", werkt het.
+
+WAT WE OVERHOUDEN:
+1. symbolische link naar /output in /src.
+2. symbolische link in /node_modules naar /src/client.
+
+=====================perspectivesAPI.js===================================================
+// referred to from ./output/Perspectives.Api/foreign.js
+
+// This is what purs can handle.
+exports.connect = require("../client/perspectivesApiProxy.js").connect;
+
+// This is what Webpack needs:
+// import connect from "../client/perspectivesApiProxy.js";
+// export {connect};
+==========================================================================================
+
+
+

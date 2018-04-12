@@ -97,3 +97,43 @@ De laatste expressie levert de rol of property X van de context van de binding v
 
 ~~> == ~> binding
 ~~~> == ~> binding ~> context
+
+
+TYPE, DISPLAYNAME, CONTEXT, BINDING
+Deze gegevens zijn niet als rollen of properties van contexten of rollen gerepresenteerd, maar als directe members van de basisrepresentatie. Hoe kun je queries opstellen die deze gegevens opvragen?
+
+Eén antwoord is: er zijn specifieke operatoren voor:
+	* contextType (PerspectContext.pspType)
+	* label (PerspectContext.displayName)
+	* rolType (PerspectRol.pspType)
+	* rolContext (PerspectRol.context)
+	* binding (PerspectRol.binding)
+
+Kunnen deze gegevens voorkomen in een View? Alleen label, want die heeft een SimpleValue. De anderen hebben een Rol- of Context waarde.
+
+Wat doe je met een view? Op enig moment haal je de properties die genoemd zijn in de view, op bij een rol.
+Haal je dan psp:label op, dan moet je de operator label gebruiken. Bij alle andere properties genereer je een getter.
+
+BASISACTIE
+Een BasisActie waarmee je een property verandert, heeft nodig:
+	- de rol
+	- de naam van de property
+	- de waarde van de property (als het werkwoord vervang of voegtoe is)
+	- het werkwoord: vervang, voegtoe, verwijder
+
+Als de propertynaam psp:label is, dan moet je een andere wijziging uitvoeren dan bij alle andere property namen.
+
+GELIJKTIJDIGE WIJZIGING VAN PROPERTIES EN ROLLEN
+Als de gebruiker de tekst van een commentaar aanpast, kan het aantalRegels daarvan heel wel tegelijk veranderen. 
+Als de gebruiker een diagram object verplaatst, zal hij meestal de x- en y-coordinaat tegelijk veranderen.
+Dit gaat om de properties van één rol.
+
+Maar als de gebruiker een commentaar (of ander tekstelement) verplaatst naar een andere positie tussen zijn siblings, verandert de positie van meerdere (minstens twee) siblings tegelijk.
+
+Representeren we dat met aparte delta's/basisacties? Minstens wil je dat ze in één transactie doorgevoerd worden.
+
+Hoe beschrijf je zulke acties, in ARC? 
+
+TRANSACTIES
+Een transactie bestaat uit auteur en timeStamp en een collectie deltas. 
+Een Delta identificeert een context of rol, een rolnaam of een propertynaam, een operatie en optioneel een waarde.

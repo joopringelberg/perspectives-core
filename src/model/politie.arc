@@ -1,5 +1,5 @@
 Tekst "representatief voorbeeld van ARC" -- Deze regel geeft de instantie van GepresenteerdContextType van de omhullende context zijn naam
-{- 
+{-
 Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
 -}
 Omhullende Context is Domein model:Politie$ --Commentaar achter de context declaratie.
@@ -19,7 +19,7 @@ Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
 	rollen
 		UserRol (Functioneel) gevuld door per:Persoon heeft
 			properties
-				betrouwbaarheid (Number, Verplicht, Functioneel)
+				x§
 			views
 				adres met properties
 					-- hieronder alle properties van de view.
