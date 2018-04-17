@@ -33,7 +33,7 @@ psp:Context $Aangifte -- Commentaar op de regel.
 					extern psp:isVerplicht = false
 					psp:range => psp:Number
 			psp:mogelijkeBinding => psp:Persoon
-			psp:viewinRol =>
+			psp:viewInRol =>
 				psp:View $AangeverBetrouwbaarheidPerspectief
 					psp:propertyReferentie => $$Betrouwbaarheid
 	psp:rolInContext =>

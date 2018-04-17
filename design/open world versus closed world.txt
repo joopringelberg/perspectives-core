@@ -1,0 +1,212 @@
+We registreren queryresultaten in de triple administratie. Elke query wordt opgeslagen als een tripleset van subject, predicaat en objecten. Het predicaat is de gekwalificeerde *naam* van de query.
+Een query is een compositie van queries. De kleinste query is een functie van context naar rol of een context-kenmerk, of een functie van rol naar rol of context of rol-kenmerk of -attribuut (kenmerken zijn de als purescript record-veld vastgelegde eigenschappen van een rol of context, itt rollen of attributen).
+
+Wat voor query syntax we ook kiezen voor Arc, de terminals dragen deze gekwalificeerde namen.
+
+Om te kunnen bepalen welke contexten en rollen een client moet delen met andere clients, moeten we ook kunnen nagaan welke queries zo'n andere client moet kunnen uitvoeren. Alle contexten en rollen die hij bij query-executie tegenkomt, moeten naar hem opgestuurd worden.
+(dit kan ik beter omschrijven: hij moet beschikken over alle contexten en rollen die nodig zijn om de query-uitkomst te berekenen die de client zelf berekenen kan)
+
+GEDACHTEN-EXPERIMENT
+Drie clients A, B en C. A en B beschikken elk respectievelijk over rollen p en q in context X. Nu wordt C betrokken bij X. C voert een query uit die zowel p als q bezoekt. Nu moet A rol p naar C sturen en B rol q.
+Om het concreet te maken: p en q zijn voorwerpen met een gewicht. C voert een query uit om het hoogste gewicht te bepalen. Dat is een query met een 'join'.
+1. Noch A, noch B kunnen de query uitvoeren om zo alle rollen voor C te verzamelen.
+2. Maar A kan wel de query gedeeltelijk uitvoeren en zo rol p vinden. Hetzelfde geldt voor B.
+
+
+OVER QUERYPADEN
+1. Als een client over een rol beschikt, beschikt hij over alle vullers van die rol (althans alle vullers die properties dragen die hij op kan vragen of die onderdeel van een context zijn die hij in een query kan bezoeken)
+2. Als een client over een context beschikt, heeft hij toegang tot minstens één rol van die context (namelijk de rol die hij zelf speelt).
+3. Een client kan over een rol beschikken zonder de context van die rol te hebben.
+4. Een querypad eindigt met een stap die een rolproperty opvraagt.
+
+
+EEN EDGE CASE
+A beschikt over een context met rollen. De rollen hebben een property p maar A kan die property niet zien. Nu wordt B bij die context betrokken. B kan p wel zien en gebruikt hem om een query met een filter uit te voeren. 
+A kan niet bepalen welke rollen B mag zien. Derhalve kan A geen rollen aan B sturen.
+Wat is dit voor een situatie?
+Ofwel er is nog een andere betrokkene, die de property p wel kan zien - en dus deze rollen aan B kan sturen; ofwel B zal zelf de property p moeten invullen.
+Merk op dat de closed world assumption hier een rol speelt. Stel, de property is boolean en moet false zijn om een rol in het queryresultaat op te nemen. Onder de CWA is afwezig gelijk aan false, dus A zou alle rollen opnemen, terwijl B sommige rollen zou afwijzen omdat hij kan zien dat p true is. 
+Overigens hoeven we de CWA niet te implementeren.
+
+VARIANT WAARIN HET CRITERIUM TWEE ROLLEN IS
+De nieuw te betrekken B heeft een actie met een query die kinderen oplevert die twee nog levende ouders hebben. A heeft systematisch informatie over de vaders, A' over de moeders. A noch A' krijgt uit de query een resultaat. B zou geen enkele informatie ontvangen.
+Onder de CWA zouden A en A' kunnen concluderen dat het query resultaat leeg is (niet weten of er een vader is is weten dat er geen vader is).
+Onder de OWA zouden A en A' dat niet concluderen en dus impliciet rekening houden met query resultaten.
+
+WAAR IK NAAR ZOEK
+De triple administratie bevat de resultaten van elke deelcompositie van elke query.
+In de triple administratie kun je dus terugvinden welke contexten en rollen je 'bezoekt' bij het uitvoeren van een query.
+Je zou die administratie kunnen gebruiken om te bepalen wat je aan een andere client moet sturen.
+Je doet dat door de queries uit te voeren die die andere client mag uitvoeren.
+Preciezer: als een ander betrokken wordt bij een rol in een context, bepaal je alle acties die bij die rol horen. Vervolgens voer je de queries (voor lijdend voorwerp en meewerkend voorwerp) van die acties uit. In de triple administratie lees je vervolgens welke contexten en rollen je daarvoor hebt bezocht. Die verstuur je aan de andere client.
+
+NOG EEN EDGE CASE
+Bij een context zijn in een rol 'bezoeker' diverse personen betrokken. Er is een rol X met een actie waarvan het lijdend voorwerp de lijst van de volwassen betrokkenen is (misschien moet X die aanschrijven om te betalen, terwijl kinderen niet hoeven te betalen). De query voor die actie is simpel: die rol, gefilterd met het leeftijdscriterium.
+Een andere rol, die toegang heeft tot alle bezoekers, betrekt iemand in de rol X. Het is duidelijk dat X alleen het resultaat van de query moet ontvangen; niet de ongefilterde lijst.
+Alle tussenresultaten is dus teveel informatie. Je moet alleen de supports van de eindresultaten opsturen.
+
+FILTER EN SUPPORTS
+Voor een gefilterde lijst moet je alleen het gefilterde resultaat opsturen.
+Dat is namelijk voldoende om het resultaat op de andere client te herscheppen.
+En natuurlijk informatie die gebruikt is in het filter criterium.
+Verander het voorbeeld hierboven als volgt: X moet bezoekers aanschrijven die een dochter hebben. Neem aan dat er een context 'gezin' is waarin ouder en kind een rol spelen. 
+Nu moet X niet alleen de ouders ontvangen, maar ook de gezinscontexten en de bijbehorende dochters, van de ouders die de query oplevert. 
+De bezoekers die geen rol spelen in een gezin, of bezoekers die wel een zoon maar geen dochter hebben, hoeven niet te worden opgestuurd.
+
+Merk op dat als het criterium is 'minstens één dochter' je zou kunnen volstaan met het opsturen van één willekeurige dochter. Maar is dat verstandig?
+
+EDGE CASE
+In het voorbeeld met de dochters: later krijgt een bezoeker een eerste dochter. Nu moet X die bezoeker ook ontvangen.
+Dit betekent dat een client bij een mutatie de consequenties voor andere betrokkenen moet bepalen en eventueel informatie moet doorsturen!
+Overigens: het omgekeerde kan ook gebeuren, iemand kan een dochter verliezen. Maar we hebben geen protocol voor het onttrekken van een entiteit aan een andere betrokkene. Het is ook de vraag of dat wenselijk is.
+
+OPEN VRAAG
+Kunnen we volstaan met het opsturen van het queryresultaat?
+
+VOLLEDIG VERSUS CORRECT
+Alleen de vereniging van alle betrokkenen bij een context beschikt over alle informatie van die context. Eén enkele betrokkene beschikt over een deelverzameling daarvan. Als het redeneren dat we toepassen monotoon is, zijn de queryresultaten die een willekeurige client bereikt, altijd correct. Maar de vereniging van alle query resultaten is niet gelijk aan het resultaat dat bereikt zou worden als alle informatie in één client verenigd was.
+Denk aan een pad p-q tussen X, Y en Z. Client A beschikt over alle X en Y instanties; client B over alle Y en Z instanties. A noch B berekenen ook maar een enkel queryresultaat!
+
+Kortom, het query resultaat bereikt door één enkele client kan alleen volledig zijn, als hij ook over alle informatie beschikt (die nodig is voor het volledige resultaat).
+
+Oftewel: alleen als we zouden weten dat een client over alle informatie beschikt om een queryresultaat volledig te berekenen, konden we die berekening aan hem overlaten en de andere clients informeren met slechts het eindresultaat.
+
+Een veilige strategie is dus dat elke client alle informatie waarvan hij weet dat een ander hem nodig heeft om tot een volledig queryresultaat te komen, aan die ander toestuurt.
+
+WAT IS NODIG VOOR EEN VOLLEDIG RESULTAAT?
+Is het uberhaupt mogelijk om informatie achter te houden? Hier speelt CWA/OWA een rol. 
+
+OWA
+Onder OWA weten we dat alle queryresultaten correct zijn. We hoeven dus bijvoorbeeld van een gefilterde lijst alleen de resultaten op te sturen (en de informatie die nodig is voor de filtering) en nooit een weggefilterde entiteit. Immers een resultaat wordt nimmer bereikt op basis van onvolledige informatie.
+
+CWA
+Onder de CWA kunnen we geen enkel element uit de ongefilterde lijst achterhouden. Immers, misschien beschikt een andere client wel over informatie waaruit valt af te leiden dat dat element in het eindresultaat thuis hoort. 
+
+Voorbeeld: onder de CWA zouden we aannemen dat iemand geen ouder is als we geen informatie hebben over eventuele kinderen. Onder de OWA zouden we dat niet doen (alleen als we beschikken over het feit dat iemand geen kinderen heeft, kunnen we concluderen dat hij geen ouder is).
+
+Anderzijds: *iemand* moet weten dat iemand een kind heeft. D.w.z. iemand moet zowel de ouder als het kind in dezelfde context hebben (in de juiste rollen) om het waar te laten zijn dat de groep betrokkenen over die informatie beschikt. Oftewel, het kan niet zo zijn dat de ene betrokkene weet van het kind heeft en de andere weet van de ouder en dat we dan zeggen dat de groep betrokkenen weet dat de een de ouder van de ander is.
+En die ander zou dus een aanvulling geven.
+
+PRECIES BEPALEN WELKE CONTEXTEN EN ROLLEN NODIG ZIJN
+Gegeven de eindresultaten van een query, kun je op de volgende manier bepalen welke contexten en rollen nodig zijn om die resultaten te berekenen:
+1. Bepaal de laatste stap Sn van de query en noem die S.
+2. Noem het eindresultaat van de query V
+2. Pas S omgekeerd toe op elke entiteit in V.
+2. Verenig de resultaten van die omgekeerde stappen in V'. Al deze entiteiten zijn nodig.
+3. Herhaal dit proces vanaf (3) waarbij S Sn-1 is en V V'.
+
+
+Voor een filter stap doe je dat zo:
+1. Pas het bovenstaande algoritme toe op de berekening van het criterium voor elk element uit de gefilterde lijst.
+2. Pas het bovenstaande algoritme toe op de gefilterde lijst, met de query voorafgaand aan het filter.
+
+PARTITIONERING
+Soms kan een logische theorie zo gepartitioneerd worden dat de som van resultaten van query Q op elke partitie gelijk is aan de resultaten van Q op de ongepartitioneerde theorie.
+Bijvoorbeeld: Q = alle aangevers van de aangiftes waarbij de verbalisant gevuld is door X
+LET OP: DIT IS NAIEF.
+Het geldt alleen als alle aangiftes voor minstens één client gesloten zijn ten opzicht van deze query voor zowel aangever als verbalisant.
+
+Soms is dat niet zo. Bijvoorbeeld: alle kinderen met twee nog levende ouders. Elke partitionering waarbij kinderen en ouders over partities gescheiden zijn, faalt.
+D.w.z. dat hier het criterium is dat elke gezinscontext ten opzichte van minstens één client gesloten moet zijn ten opzichte van de query voor de rollen ouder en kind.
+
+Ik noem een partitie *adequaat* ten opzichte van een query als de resultaten van die query op die partitie volledig is. DIT IS GEEN GOEDE DEFINITIE.
+
+WETEN WAT JE WEET EN NIET WEET
+In het voorbeeld van de ouders, als een client weet dat hij alle informatie heeft over de ouders van een kind k, kan hij concluderen of k wel of niet in het resultaat van Q zit.
+Als de client informatie over beide ouders heeft, is hij volledig geïnformeerd (we nemen maximaal twee ouders aan).
+Als hij maar over informatie van één ouder beschikt, kan hij dat op die basis niet concluderen. Maar hij kan wel onafhankelijke informatie hebben die hem dat vertelt ('je weet alles dat er te weten valt').
+Ik noem dat het *gesloten zijn* van een rol. Als een rol gesloten is, weet de client dat hij volledige informatie heeft over die rol (en ik bedoel hier de minimale versie, namelijk dat er niet meer instanties van die rol zullen komen - niet dat alle properties van elke rol bekend zijn, dat is een andere vorm van geslotenheid).
+
+Alleen een query die uitgevoerd wordt op gesloten entiteiten, levert een volledig resultaat.
+
+GESLOTENHEID
+1. Een rol is gesloten als alle instanties bekend zijn.
+2. Een context is gesloten als al zijn rollen gesloten zijn.
+3. Een property is gesloten als alle waarden bekend zijn.
+4. Een rolinstantie is gesloten als alle properties en de binding gesloten zijn. Een rolinstantie kan alleen gesloten zijn als hij een binding heeft of als hij alleen vullers kan hebben die geen properties kunnen hebben (wat onwaarschijnlijk is).
+
+RELATIEVE GESLOTENHEID: VOLDOENDE GESLOTEN
+1. Een rolinstantie is voldoende gesloten ten opzichte van een query als alle properties van de rol die in de query gebruikt worden, gesloten zijn, of als de binding bekend is, als die gevraagd wordt.
+2. Een context is voldoende gesloten ten opzichte van een query als alle rollen van de context die in de query gebruikt worden, gesloten zijn.
+
+GEFILTERDE LIJST EN VOLDOENDE GESLOTENHEID
+Query Q levert alle instanties van rol R waarvoor geldt dat property p true is. 
+Als client C weet dat de hem bekende instanties van R voldoende gesloten zijn ten opzichte van Q, kan hij volstaan met het versturen van de rollen (en hun property p) die hij als resultaat verkrijgt door Q uit te voeren.
+Anders moet hij alle instanties van R versturen.
+
+NOG EEN VOORBEELD
+Q is een query over drie entiteiten: alle aangevers waarbij medewerker X de verbalisant was. De stappen zijn:
+	- X vult de rol Verbalisant;
+	- Verbalisant hoort bij context Y
+	- Y heeft Aangever Z.
+
+De query:
+	(bindingVan Verbalisant) >-> Context >-> Aangever
+
+Als op een client aan deze condities is voldaan:
+1. (bindingVan Verbalisant) is gesloten;
+2. Context is gesloten (de context van de verbalisant is beschikbaar);
+3. Aangever is gesloten (alle aangevers van een Aangifte zijn beschikbaar)
+dan kan de client volstaan met het opsturen van:
+	- de Verbalisant
+	- de contexten die aangevers hebben
+	- de aangevers
+Anders moet de client meer versturen:
+	- als (bindingVan Verbalisant) niet is gesloten, moet hij ook alle Aangiftes versturen waarin de Verbalisant open is (d.w.z. onbekend). Immers, misschien is X wel de Verbalisant!
+	- als context open is, moet hij ook alle verbalisanten versturen waarvoor de context onbekend is. Immers, die kunnen een Aangever hebben.
+	- als Aangever open is, moet hij ook alle Aangiftes versturen. Immers, die kunnen een Aangever hebben.
+	
+Samengevat: hij moet óók alle entiteiten versturen waarvoor de querystep open is.
+
+DE VEILIGE STRATEGIE
+Als je niet weet of een entiteit gesloten is ten opzichte van een query, moet je ervan uitgaan dat hij dat niet is.
+
+HOE ZOUDEN WE GESLOTENHEID KUNNEN CONCLUDEREN? EN HOE NOTEREN?
+1. Als de cardinaliteit van een Rol 1 is en er is een instantie, is die Rol gesloten.
+2. Hetzelfde geldt voor een Property met cardinaliteit 1.
+3. De geslotenheid van een Context is berekenbaar uit die van zijn rollen.
+4. De geslotenheid van een Rolinstantie is berekenbaar uit die van zijn properties en zijn binding.
+
+Als de cardinaliteit van een Rol groter is dan 1, zouden we met een speciaal kenmerk van die Rol kunnen aangeven dat hij gesloten is.
+Hetzelfde kan voor een Property, zolang we daar nog PropertyValueWithComments voor gebruiken (dus een record in plaats van een simpele waarde).
+
+WANNEER GEEFT DE GEBRUIKER GESLOTENHEID AAN?
+Er zijn omstandigheden waaronder de gebruiker dat weet. Als iemand zijn gezin beschrijft, weet hij dat hij al zijn kinderen heeft beschreven.
+
+VERWARRING OPEN-GESLOTEN EN VOLLEDIGE INFORMATIE
+Een betrokkene is al dan niet volledig geïnformeerd over een rol. Hij is onvolledig geïnformeerd als de rol alleen in een query met filter voorkomt en hij is volledig geïnformeerd als de rol direct als lijdend- of meewerkend voorwerp voorkomt. 
+Dit kenmerk is van belang voor het informeren van andere betrokkenen, in combinatie met filters.
+Bij wijze van voorbeeld nemen we het criterium dat een rol een instantie moet hebben, zoals in de query die ouders oplevert (mensen met minstens één instantie in de kind-rol van een gezin waar ze zelf de vader- of moederrol vullen).
+						waarde	volledig	onvolledig
+kindrol is leeg			false	zeker		onzeker
+kindrol is niet leeg	true	zeker		zeker
+
+de waarheidswaarde voor de expressie "minstens één kind" wordt natuurlijk bepaald door de instanties van de kindrol. Maar de zekerheid van die waarde wordt bepaald door de volledigheid van informatie. Bij onvolledige kennis van die rol is de waarde false onzeker.
+
+Als we het criterium negeren, dus in effect "geen kind" maken, draait alleen de waarheidswaarde maar niet de zekerheid over die waarde:
+
+						waarde	volledig	onvolledig
+kindrol is leeg			true	zeker		onzeker
+kindrol is niet leeg	false	zeker		zeker
+
+De zekerheid van een conjunctie is de conjunctie van de logische zekerheid van zijn conjuncten. Dus, als minstens één conjunct onzeker is, is de conjunctie dat ook.
+
+A		B		A && B
+zeker	zeker	zeker
+zeker	onzeker	onzeker
+onzeker	zeker	onzeker
+onzeker	onzeker	onzeker
+
+Maar bij een disjunctie is dat anders.
+Als minstens één disjunct true en zeker is, is de hele disjunctie dat ook (true en zeker).
+Alleen als beide disjuncten false en zeker zijn, is de hele disjunctie dat ook (false en zeker).
+In alle andere gevallen is de disjunctie true of false al naar gelang de normale waarheidstabel van disjunctie, maar die waarde is onzeker.
+
+Het belang van zekerheid is als volgt.
+Alleen als een waarde met zekerheid wordt uitgefilterd, hoeft hij niet naar de nieuwe betrokkene te worden gestuurd.
+
+
+===================
+IMPLEMENTATIE VAN TERUGREDENEREN
+
+In de triple administratie vinden we de tussenresultaten. Er zijn querystappen die uit één voorafgaand resultaat worden berekend en er zijn querystappen die uit 

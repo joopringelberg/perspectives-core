@@ -9,6 +9,7 @@ Section psp:zaakInContext
 arc:Zaak sys:Systeem
 	psp:rolInContext =>
 		psp:Rol $gebruiker
+			extern isFunctioneel = true
 
 arc:Zaak sys:TrustedCluster
 	psp:internalProperty =>
@@ -42,10 +43,14 @@ arc:Zaak sys:TrustedCluster
 		psp:View $viewInterneAantekening
 			psp:propertyReferentie => $$aantekening
 
+-- Experimentele syntax om een rol zonder binding te maken. Zulke rollen vormen
+-- de bodem van de roltelescoop.
 --sys:Systeem usr:Systeem
---	sys:Systeem$gebruiker => ??
--- We hebbeb geen syntax voor een rol zonder binding?
+--	$gebruiker => ()
 
+-- Experimentele syntax om een query uit te voeren op een beginpunt. Zoiets is noodzakelijk
+-- om een rol te kunnen binden aan een bestaande, andere rol. Zo'n rol kunnen we niet
+-- met een naam bereiken.
 --sys:TrustedCluster usr:TrustedCluster
---	sys:TrustedCluster$clusterGenoot => usr:Systeem$gebruiker
--- LET OP: hier zou je moeten verwijzen naar de rol van usr:Systeem. Maar die identifier is verborgen.
+--	$clusterGenoot =>
+--		usr:Systeem ~> gebruiker

@@ -5,9 +5,22 @@ Context model:Perspectives als psp:
 Section psp:rolInContext
 
 --------------------------------------------------------------------------------
+-- SIMPLE VALUES
+--------------------------------------------------------------------------------
+psp:Context psp:SimpleValue
+
+psp:Context psp:Boolean
+	psp:aspect => psp:SimpleValue
+psp:Context psp:String
+	psp:aspect => psp:SimpleValue
+psp:Context psp:Number
+	psp:aspect => psp:SimpleValue
+psp:Context psp:Date
+	psp:aspect => psp:SimpleValue
+
+--------------------------------------------------------------------------------
 -- SYSTEM BASE
 --------------------------------------------------------------------------------
-
 psp:Rol psp:internalProperty
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Property
@@ -44,17 +57,6 @@ psp:Rol psp:aspectRol
 psp:Rol psp:constraint
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Constraint
-
-psp:Context psp:SimpleValue
-
-psp:Context psp:Boolean
-	psp:aspect => psp:SimpleValue
-psp:Context psp:String
-	psp:aspect => psp:SimpleValue
-psp:Context psp:Number
-	psp:aspect => psp:SimpleValue
-psp:Context psp:Date
-	psp:aspect => psp:SimpleValue
 
 psp:Property psp:isFunctioneel
 	extern psp:isFunctioneel = true
@@ -113,11 +115,11 @@ psp:Context psp:Rol
 -- ACTIES
 --------------------------------------------------------------------------------
 psp:Context psp:Actie
-	psp:rolInContext => psp:actorView
+	psp:rolInContext => psp:subjectView
 	psp:rolInContext => psp:werkwoord
 	psp:rolInContext => psp:objectView
 
-psp:Rol psp:actorView
+psp:Rol psp:subjectView
 	extern psp:isFunctioneel = true
 	psp:mogelijkeBinding => psp:View
 
@@ -128,6 +130,16 @@ psp:Rol psp:werkwoord
 psp:Rol psp:objectView
 	extern psp:isFunctioneel = true
 	psp:mogelijkeBinding => psp:View
+
+psp:Rol arc:objectConstraint
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	psp:mogelijkeBinding => psp:Constraint
+
+psp:Rol arc:subjectConstraint
+	extern psp:isFunctioneel = true
+	extern psp:isVerplicht = false
+	psp:mogelijkeBinding => psp:Constraint
 
 psp:Context psp:Werkwoord
 
@@ -156,6 +168,12 @@ psp:Context psp:Function
 			extern psp:isFunctioneel = false
 			psp:mogelijkeBinding => psp:ElkType
 
+psp:Context psp:SingularFunction
+	psp:aspect => psp:Function
+	psp:rolInContext =>
+		psp:Rol $range
+			extern psp:isFunctioneel = true
+
 psp:Context psp:ElkType
 
 psp:Context psp:Constraint
@@ -165,6 +183,15 @@ psp:Context psp:Constraint
 			extern psp:isFunctioneel = true
 			psp:aspectRol => psp:Function$range
 			psp:mogelijkeBinding => psp:Boolean
+
+--------------------------------------------------------------------------------
+-- SUM TYPES
+--------------------------------------------------------------------------------
+psp:Context psp:Sum
+	psp:rolInContext =>
+		psp:Rol $alternative
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding => psp:ElkType
 
 --------------------------------------------------------------------------------
 -- SYSTEM ENTITIES

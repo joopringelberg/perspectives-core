@@ -24,6 +24,13 @@ psp:Context q:PropertyFunction
 			psp:aspectRol => psp:Function$range
 			psp:mogelijkeBinding => psp:SimpleValue
 
+psp:Context q:SingularPropertyFunction
+	psp:aspect => q:PropertyFunction
+	psp:rolInContext =>
+		psp:Rol $range
+			extern psp:isFunctioneel = true
+			psp:aspectRol => psp:PropertyFunction$range
+
 psp:Context q:RolFunction
 	psp:aspect => psp:Function
 	psp:rolInContext =>
@@ -33,37 +40,71 @@ psp:Context q:RolFunction
 	psp:rolInContext =>
 		psp:Rol $range
 			psp:aspectRol => psp:Function$range
-			psp:mogelijkeBinding => psp:Rol
+			psp:mogelijkeBinding =>
+				psp:Sum
+					psp:alternative => psp:Context
+					psp:alternative => psp:Rol
 
 --------------------------------------------------------------------------------
 -- SYSTEM GETTERS
 --------------------------------------------------------------------------------
-q:query q:identity
+-- Identity is like Function (takes and returns any type) but yields a single result.
+psp:Context q:identity
 	psp:aspect => psp:Function
 	psp:rolInContext =>
 		psp:Rol $range
 			extern psp:isFunctioneel = true
 			psp:aspectRol => psp:Function$range
 
-q:RolQuery q:contextType
-q:RolQuery q:buitenRol
-	psp:aspect => q:RolFunction
+psp:SingularFunction q:contextType
+	$domain => psp:Context
+	$range => psp:Context
 
-q:RolQuery q:iedereRolInContext
-q:RolQuery q:rolTypen
-q:RolQuery q:rolType
-q:RolQuery q:binding
-	psp:aspect => q:RolFunction
+psp:SingularFunction q:buitenRol
+	$domain => psp:Context
+	$range => psp:Rol
 
-q:Query q:context -- Should be a ContextQuery but we do not have that.
-q:Query q:useCache
-q:Query q:ignoreCache
-q:PropertyQuery q:label
+psp:SingularFunction q:binnenRol
+	$domain => psp:Context
+	$range => psp:Rol
+
+-- Returns the values of the rolInContext field of a PerspectContext. These are ids of
+-- role instances.
+psp:Function q:iedereRolInContext
+	$domain => psp:Context
+	$range => psp:Rol
+
+-- Returns the keys of the rolInContext field of a PerspectContext. These are ids of Contexts
+-- that describe RolTypes.
+psp:Function q:rolTypen
+	$domain => psp:Context
+	$range => psp:Context
+
+psp:SingularFunction q:rolType
+	$domain => psp:Context
+	$range => psp:Context
+
+psp:SingularFunction q:binding
+	$domain => psp:Rol
+	$range => psp:Rol
+
+psp:SingularFunction q:context
+	$domain => psp:Rol
+	$range => psp:Context
+
+psp:SingularPropertyFunction q:label
+	psp:rolInContext =>
+		psp:Rol $range
+			psp:aspectRol => psp:SingularPropertyFunction$range
+			psp:mogelijkeBinding => psp:String
 
 --------------------------------------------------------------------------------
 -- QUERY CONSTRUCTORS
 --------------------------------------------------------------------------------
-q:PropertyQuery q:constructExternalPropertyGetter
+--q:Query q:useCache
+--q:Query q:ignoreCache
+
+psp:Context q:constructExternalPropertyGetter
 	psp:aspect => q:PropertyFunction
 	psp:rolInContext =>
 		psp:Rol $property
@@ -71,10 +112,14 @@ q:PropertyQuery q:constructExternalPropertyGetter
 			psp:mogelijkeBinding => psp:Property
 
 -- Apply like this: q:constructExternalPropertyLookup $<propname>
-q:PropertyQuery q:constructExternalPropertyLookup
+psp:Context q:constructExternalPropertyLookup
 	psp:aspect => q:PropertyFunction
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
 
-q:PropertyQuery q:constructInternalPropertyGetter
+psp:Context q:constructInternalPropertyGetter
 	psp:aspect => q:PropertyFunction
 	psp:rolInContext =>
 		psp:Rol $property
@@ -82,18 +127,23 @@ q:PropertyQuery q:constructInternalPropertyGetter
 			psp:mogelijkeBinding => psp:Property
 
 -- Apply like this: q:constructInternalPropertyLookup $<propname>
-q:PropertyQuery q:constructInternalPropertyLookup
-	psp:aspect => q:PropertyFunction
-
--- Works for declared and calculated properties. Note case difference!
-q:PropertyQuery q:propertyQuery
+psp:Context q:constructInternalPropertyLookup
 	psp:aspect => q:PropertyFunction
 	psp:rolInContext =>
 		psp:Rol $property
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Property
 
-q:PropertyQuery q:constructRolPropertyGetter
+-- Works for declared and calculated properties. Note case difference!
+-- TODO. Dit is misschien overbodig.
+psp:Context q:propertyQuery
+	psp:aspect => q:PropertyFunction
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
+
+psp:Context q:constructRolPropertyGetter
 	psp:aspect => q:PropertyFunction
 	psp:rolInContext =>
 		psp:Rol $property
@@ -101,11 +151,16 @@ q:PropertyQuery q:constructRolPropertyGetter
 			psp:mogelijkeBinding => psp:Property
 
 -- Apply like this: q:constructRolPropertyLookup $<propname>
-q:PropertyQuery q:constructRolPropertyLookup
+psp:Context q:constructRolPropertyLookup
 	psp:aspect => q:PropertyFunction
+	psp:rolInContext =>
+		psp:Rol $property
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Property
 
 -- Works for declared and calculated roles.
-q:RolQuery q:rolQuery
+-- TODO. Dit is misschien overbodig.
+psp:Context q:rolQuery
 	psp:aspect => q:RolFunction
 	psp:rolInContext =>
 		psp:Rol $rol
@@ -113,7 +168,7 @@ q:RolQuery q:rolQuery
 			psp:mogelijkeBinding => psp:Rol
 
 -- Works only for declared roles. Can be replaced by q:rolQuery.
-q:RolQuery q:constructRolGetter
+psp:Context q:constructRolGetter
 	psp:aspect => q:RolFunction
 	psp:rolInContext =>
 		psp:Rol $rol
@@ -122,17 +177,22 @@ q:RolQuery q:constructRolGetter
 
 -- Apply like this: q:constructRolLookup $<rolname>
 -- Works only for declared roles. Can be replaced by q:constructRolGetter.
-q:RolQuery q:constructRolLookup
-
-q:RolQuery q:constructInverseRolGetter
+psp:Context q:constructRolLookup
 	psp:aspect => q:RolFunction
 	psp:rolInContext =>
 		psp:Rol $rol
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => psp:Rol
 
--- It is unlikely we will use this constructor in a model.
-q:RolQuery q:rolesOf
+psp:Context q:constructInverseRolGetter
+	psp:aspect => q:RolFunction
+	psp:rolInContext =>
+		psp:Rol $rol
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding => psp:Rol
+
+-- It is unlikely we will use this constructor in a model (but maybe in a query or statement?)
+psp:Context q:iedereRolInContext
 	psp:aspect => q:RolFunction
 	psp:rolInContext =>
 		psp:Rol $context
@@ -142,56 +202,48 @@ q:RolQuery q:rolesOf
 --------------------------------------------------------------------------------
 -- COMBINATORS
 --------------------------------------------------------------------------------
-q:Query q:laatste
+psp:Context q:laatste
 	psp:rolInContext =>
 		psp:Rol $query
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
 
-q:Query q:compose
+psp:Context q:compose
 	psp:rolInContext =>
 		psp:Rol $operand
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
 
-q:PropertyQuery q:Criterium
-
 -- notEmpty is itself not a Criterium, but the application of notEmpty to a Query is.
-q:Criterium q:notEmpty
+psp:Context q:notEmpty
 	psp:rolInContext =>
 		psp:Rol $query
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:Query
 
-q:RolQuery q:closure
+psp:Context q:closure
 	psp:rolInContext =>
 		psp:Rol $query
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:RolQuery
 
-q:RolQuery q:closure'
+psp:Context q:closure'
 	psp:rolInContext =>
 	 	psp:Rol $query
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding => q:RolQuery
 
-q:RolQuery q:lastElement
-	psp:rolInContext =>
-	 	psp:Rol $query
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => q:RolQuery
-
-q:Query q:filter
+psp:Context q:filter
 	psp:rolInContext =>
 	 	psp:Rol $criterium
 			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => q:Criterium
+			psp:mogelijkeBinding => psp:Constraint
 	psp:rolInContext =>
 		psp:Rol $candidates
 			extern psp:isFunctioneel = true
 			psp:mogelijkeBinding q:Query
 
-q:Query q:concat
+psp:Context q:concat
 	psp:rolInContext =>
 		psp:Rol $operand
 			extern psp:isFunctioneel = false

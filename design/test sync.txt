@@ -1,0 +1,65 @@
+TEST SYNC
+Wat hebben we nodig?
+1. Modellering van TrustedCluster:
+	- rol clusterGenoot
+	- een actie met clusterGenoot als onderwerp en clusterGenoot als lijdend voorwerp, met als perspectief:
+	- een property van de clusterGenoot rol, namelijk URL.
+	- een actie met clusterGenoot als onderwerp en TrustedCluster als lijdend voorwerp, met de displayname als perspectief.
+
+2. Modellering van Systeem:
+	- rol user
+3. Instanties:
+	- Systeem, met user. Dit moet tweemaal gebeuren: ééns in elke installatie.
+	- TrustedCluster, met twee clusterGenoten.
+
+Ik vermijd:
+	- het verspreiden van de zaak TrustedCluster
+	- properties opvragen in de roltelescoop
+
+AANPAK
+1. Er moet een module setup komen, waarin ik een instantie van Systeem en van TrustedCluster maak, met de gebruiker als rol van Systeem en clusterGenoot gevuld door die gebruiker.
+2. Tijdelijk voeg ik daaraan toe dat de 'andere gebruiker' óók een clusterGenoot wordt gemaakt.
+3. Dan maak ik een functie die de displayname van het TrustedCluster verandert.
+4. De test is dan of er in de postdb van de andere gebruiker een bericht dienaangaande staat.
+
+
+-- MODELLERING VAN TRUSTEDCLUSTER
+Context model:Systeem als sys:
+import model:Arc als arc:
+import model:Perspectives als psp:
+
+Section psp:zaakInContext
+
+arc:Zaak sys:Systeem
+	psp:rolInContext =>
+		psp:Rol $gebruiker
+
+arc:Zaak sys:TrustedCluster
+	psp:internalProperty =>
+		psp:Property $aantekening
+			extern psp:isFunctioneel = true
+			extern psp:isVerplicht = false
+			extern psp:range = String
+	psp:rolInContext =>
+		psp:Rol $clusterGenoot
+			psp:mogelijkeBinding => sys:Systeem$gebruiker
+			psp:rolProperty =>
+				psp:Property $url
+					extern psp:isFunctioneel = true
+					extern psp:isVerplicht = true
+					extern psp:range = String
+			psp:viewInRol =>
+				psp:View $Adressering
+					psp:propertyReferentie => $$url
+	psp:actieInContext =>
+		psp:Actie $RaadpleegtClusterGenoot
+			arc:onderwerp => $$clusterGenoot
+			arc:werkwoord => arc:raadpleegt
+			arc:lijdendVoorwerp => $$clusterGenoot
+			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$clusterGenoot$Adressering
+	psp:actieInContext =>
+		psp:Actie $RaadpleegtTrustedCluster
+			arc:onderwerp => $$clusterGenoot
+			arc:werkwoord => arc:raadpleegt
+			arc:lijdendVoorwerp => sys:TrustedCluster
+			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => ?? Een view op de binnenRol.

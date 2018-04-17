@@ -11,7 +11,7 @@ import Perspectives.TripleGetter (constructExternalPropertyGetter, constructRolG
 import Prelude (const, pure, (<>), (>=>))
 
 identity' :: forall e. ObjectsGetter e
-identity' id = pure [id]
+identity' x = pure [x]
 
 -----------------------------------------------------------
 -- SYSTEM GETTERS
