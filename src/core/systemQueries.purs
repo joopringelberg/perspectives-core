@@ -119,11 +119,11 @@ boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRo
 
 rolPropertyTypes :: forall e. TypedTripleGetter e
 rolPropertyTypes = constructRolGetter "model:Perspectives$rolProperty"
-  "model:Perspectives$Rol"
+  "model:Perspectives$Rol" >-> binding
 
 contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = constructRolGetter "model:Perspectives$rolInContext"
-  "model:Perspectives$Context"
+  "model:Perspectives$Context" >-> binding
 
 mogelijkeBinding :: forall e. TypedTripleGetter e
 mogelijkeBinding = (constructRolGetter "model:Perspectives$mogelijkeBinding"
