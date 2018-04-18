@@ -8,6 +8,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkRolForQualifiedProperty)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQueryCompiler, getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, withQueryCompilerEnvironment)
 import Perspectives.Effects (AjaxAvarCache)
@@ -21,7 +22,7 @@ import Perspectives.QueryCompiler (lookupQualifiedPropertyNameInRolTypeTelescope
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.SystemQueries (isContext)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (Unit, bind, discard, flip, ifM, otherwise, pure, show, unit, ($), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>>>))
+import Prelude (Unit, bind, discard, flip, ifM, pure, show, unit, ($), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>>>))
 
 -- This function creates a context that describes a query and is identified by contextId.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
@@ -37,9 +38,10 @@ compileElementaryQueryStep s contextId = case s of
   UseCache -> createUndecoratedContext contextId (q "useCache")
   IgnoreCache -> createUndecoratedContext contextId (q "ignoreCache")
   Identity -> createUndecoratedContext contextId (q "identity")
+  -- TODO: moeten we dit niet vervangen door contextType en rolType?
   Type -> putQueryStepDomain (p "Context") *>
     ifM (getQueryStepDomain >>= (lift <<< toBoolean isContext))
-      (createUndecoratedContext contextId (q "contextType"))
+      (createUndecoratedContext contextId (q "contextType")) -- TODO: dit is het enige alternatief dat ooit geevalueerd wordt!
       (createUndecoratedContext contextId (q "rolType"))
   BuitenRol -> putQueryStepDomain (p "Rol") *> createUndecoratedContext contextId (q "buitenRol")
   IedereRolInContext -> putQueryStepDomain (p "Rol") *> createUndecoratedContext contextId (q "iedereRolInContext")
@@ -211,14 +213,13 @@ createContext name typeId roles properties = do
   createProperty :: Tuple PropertyName (Array String) -> (Tuple PropertyName PropertyValueWithComments)
   createProperty (Tuple pn values) = Tuple pn (PropertyValueWithComments {commentBefore: [], commentAfter: [], value: values})
 
+-- | This function tests whether the Rol type (identified by rolId) has the Aspect of having the property (identified by propertyId).
 guardRolHasProperty :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Unit
 guardRolHasProperty rolId propertyId = do
-  ln <- onNothing' (error $ "Property identifier is not well formed: " <> propertyId) (deconstructLocalNameFromDomeinURI propertyId)
-  qn <- onNothing (error $ "Property " <> propertyId <> " is not defined for " <> rolId) (lookupQualifiedPropertyNameInRolTypeTelescope ln rolId)
-  if qn == propertyId then pure unit else throwError (error $ "The property " <> propertyId <> " was specified, but " <> qn <> " was found!")
+  hasProperty <- checkRolForQualifiedProperty propertyId rolId
+  if hasProperty then pure unit else throwError (error $ "The property " <> propertyId <> " cannot be found!")
 
 guardContextHasRol :: forall e. ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e) Unit
 guardContextHasRol contextId rolId = do
-  ln <- onNothing' (error $ "Rol identifier is not well formed: " <> rolId) (deconstructLocalNameFromDomeinURI rolId)
-  qn <- onNothing (error $ "Rol " <> rolId <> " is not defined for " <> contextId) (lookupQualifiedRolNameInContextTypeHierarchy ln contextId)
-  if qn == rolId then pure unit else throwError (error $ "The rol " <> rolId <> " was specified, but " <> qn <> " was found!")
+  hasRol <- checkContextForQualifiedRol rolId contextId
+  if hasRol then pure unit else throwError (error $ "The rol " <> rolId <> " cannot be found!")
