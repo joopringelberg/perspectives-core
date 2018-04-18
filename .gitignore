@@ -33,3 +33,5 @@ yarn-error.log*
 /src/output
 /public/Apache-CouchDB-2.1.1-1.zip
 README.md
+
+/**/~*
