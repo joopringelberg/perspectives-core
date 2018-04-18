@@ -8,7 +8,7 @@ import Data.Foldable (foldM)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (Domain, MonadPerspectives, MonadPerspectivesQuery, MonadPerspectivesQueryCompiler, ObjectsGetter, Range, Triple(..), TypedTripleGetter(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, runMonadPerspectivesQueryCompiler, withQueryCompilerEnvironment, (##))
+import Perspectives.CoreTypes (Domain, MonadPerspectives, MonadPerspectivesQuery, MonadPerspectivesQueryCompiler, ObjectsGetter, Range, Triple(..), TypedTripleGetter(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, runMonadPerspectivesQueryCompiler, withQueryCompilerEnvironment, (##), tripleObjects)
 import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
@@ -16,7 +16,6 @@ import Perspectives.Property (getContextType, getContextTypeF, getExternalProper
 import Perspectives.PropertyComposition (compose, (>->))
 import Perspectives.QueryCombinators (closure, closure', concat, constant, contains, filter, lastElement, notEmpty, rolesOf, toBoolean)
 import Perspectives.SystemQueries (binding, contextRolTypes, contextType, rolPropertyTypes, mogelijkeBinding)
-import Perspectives.TripleAdministration (tripleObjects)
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructInternalPropertyGetter, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup, constructTripleGetterFromEffectExpression, putQueryVariable, readQueryVariable)
 import Perspectives.Utilities (onNothing, onNothing')
 import Prelude (Unit, bind, const, discard, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
@@ -225,6 +224,7 @@ constructQueryFunction typeDescriptionID = do
 
 -- | Given a local propertyname and the typedescription of a rol, find the qualified version of that local name.
 -- | It can be found on any level in the hierarchy of types from which the rol type derives.
+-- TODO: verander dit naar Aspecten!
 lookupQualifiedPropertyNameInRolTypeHierarchy :: forall e. LocalName -> ContextID -> MonadPerspectives (AjaxAvarCache e) (Maybe ID)
 lookupQualifiedPropertyNameInRolTypeHierarchy ln rolTypeId = do
   (definedProperties :: Triple e) <- rolTypeId ## rolPropertyTypes

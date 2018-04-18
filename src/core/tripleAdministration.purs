@@ -11,9 +11,6 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, 
 import Perspectives.PerspectivesState (getsGlobalState, modifyGlobalState)
 import Prelude (Unit, bind, discard, pure, unit, void, ($))
 
-tripleObjects :: forall e. Triple e -> Array String
-tripleObjects (Triple{object}) = object
-
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
 memorizeQueryResults :: forall e. MonadPerspectivesQuery e Boolean
@@ -21,9 +18,6 @@ memorizeQueryResults = lift $ getsGlobalState _.memorizeQueryResults
 
 setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery e Unit
 setMemorizeQueryResults b = lift $ modifyGlobalState \ps -> ps {memorizeQueryResults = b}
-
-tripleObjects_  :: forall e. Triple e -> MonadPerspectives (AjaxAvarCache e) (Array ID)
-tripleObjects_ (Triple{object}) = pure object
 
 getRef :: forall e. Triple e -> TripleRef
 getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}

@@ -2,18 +2,20 @@ module Perspectives.CoreTypes where
 
 import Perspectives.EntiteitAndRDFAliases
 
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (Aff, error)
 import Control.Monad.Aff.AVar (AVar)
 import Control.Monad.Eff.Ref (REF, Ref)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
+import Data.Array (head)
 import Data.Maybe (Maybe)
 import Data.StrMap (StrMap, empty, insert, lookup, singleton)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (class Eq, class Show, Unit, show, (&&), (<>), (==), bind, discard, pure)
+import Perspectives.Utilities (onNothing')
+import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -136,6 +138,12 @@ instance showTriple :: Show (Triple e) where
 instance eqTriple :: Eq (Triple e) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
+tripleObjects :: forall e. Triple e -> Array String
+tripleObjects (Triple{object}) = object
+
+tripleObjects_  :: forall e m. Monad m => (Triple e) -> m (Array ID)
+tripleObjects_ (Triple{object}) = pure object
+
 type NamedTripleGetter e = NamedFunction (TripleGetter e)
 
 -- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
@@ -146,6 +154,12 @@ runTypedTripleGetter :: forall e.
 runTypedTripleGetter a (TypedTripleGetter _ f _ _) = runMonadPerspectivesQuery a f
 
 infix 0 runTypedTripleGetter as ##
+
+tripleGetter2function :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Maybe String)
+tripleGetter2function (TypedTripleGetter name tg _ _)= tg >=> tripleObjects_ >=> (pure <<< head)
+
+tripleGetter2function' :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) String
+tripleGetter2function' (TypedTripleGetter name tg _ _)= tg >=> tripleObjects_ >=> (pure <<< head) >=> (onNothing' (error ("No result for " <> name)))
 
 -----------------------------------------------------------
 -- TYPED GETTERS
