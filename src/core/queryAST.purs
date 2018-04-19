@@ -2,6 +2,10 @@ module Perspectives.QueryAST where
 
 -- TODO: positie in de oorspronkelijke tekst toevoegen.
 
+import Perspectives.EntiteitAndRDFAliases (ContextID)
+
+-- TODO: positie in de oorspronkelijke tekst toevoegen.
+
 data QueryStep
   = Filter QueryStep QueryStep
   | Concat (Array QueryStep)
@@ -23,7 +27,7 @@ data ElementaryQueryStep
   | QualifiedExternalProperty String
   | UnqualifiedInternalProperty String
   | QualifiedInternalProperty String
-  | Constant String
+  | Constant ContextID String -- ContextID identifies the type of the constant.
   | RolesOf String
   | Variable String
   | Binding

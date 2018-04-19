@@ -3,16 +3,17 @@ module Perspectives.QueryFunctionDescriptionCompiler where
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (find, head)
+import Data.Array (find, head, singleton)
 import Data.Either (Either(..), either, fromLeft, fromRight, isLeft)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable)
+import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
-import Perpectives.TypeChecker (checkContextForQualifiedRol, checkRolForQualifiedProperty)
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkRolForQualifiedProperty, hasAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQueryCompiler, getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, withQueryCompilerEnvironment)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQueryCompiler, getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleObjects, withQueryCompilerEnvironment, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
@@ -22,24 +23,45 @@ import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (lookupQualifiedPropertyNameInRolTypeTelescope)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
-import Perspectives.SystemQueries (isContext)
+import Perspectives.SystemQueries (contextRolTypes, isContext)
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, Unit, bind, discard, flip, ifM, pure, show, unit, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=), (>>>))
 
+type Aspect = String
+type Type = String
+
 data UserMessage =
-  MissingVariableDeclaration String
+    MissingVariableDeclaration String
+  | MissingAspect Type Aspect
 
 type FD = Either UserMessage ID
 
 -- This function creates a context that describes a query and is identified by contextId.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 compileElementaryQueryStep s contextId = case s of
-  Constant v -> createContextWithInternalProperty contextId (q "constant") v
-  Variable v -> do
-    tp <- onNothing (error $ "Variable " <> v <> " has not been declared!") (getQueryVariableType v)
-    putQueryStepDomain tp
-    createContextWithInternalProperty contextId (q "variable") v
-  RolesOf cid -> putQueryStepDomain (p "Rol") *> (createContextWithSingleRole contextId (q "iedereRolInContext") cid)
+  Constant tp v -> putQueryStepDomain tp *> createContextWithInternalProperty contextId (q "constant") v
+  Variable v -> ifNothing (getQueryVariableType v)
+    (pure $ Left $ MissingVariableDeclaration v)
+    \tp -> do
+      putQueryStepDomain tp
+      createContextWithInternalProperty contextId (q "variable") v
+  RolesOf cid -> do
+    dom <- getQueryStepDomain
+    ifM (lift $ lift $ hasAspect "model:Perspectives$Context" dom)
+      do
+        tps <- lift $ lift (cid ## contextRolTypes)
+        sumtype <- createSumType $ tripleObjects tps
+        putQueryStepDomain sumtype
+        createContextWithSingleRole contextId (q "iedereRolInContext") cid
+      (pure $ Left $ MissingAspect dom "model:Perspectives$Context")
+    -- isContext <- lift $ lift $ hasAspect "model:Perspectives$Context" dom
+    -- if isContext
+    --   then do
+    --     tps <- lift $ lift (cid ## contextRolTypes)
+    --     sumtype <- createSumType $ tripleObjects tps
+    --     putQueryStepDomain sumtype
+    --     createContextWithSingleRole contextId (q "iedereRolInContext") cid
+    --   else pure $ Left $ MissingAspect dom "model:Perspectives$Context"
   Binding -> putQueryStepDomain (p "Rol") *> createUndecoratedContext contextId (q "binding")
   Context -> putQueryStepDomain (p "Context") *> createUndecoratedContext contextId (q "context")
   UseCache -> createUndecoratedContext contextId (q "useCache")
@@ -179,8 +201,18 @@ createUndecoratedContext name typeId = createContext name typeId [] []
 createContextWithSingleRole :: forall e. String -> ContextID -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithSingleRole contextId contextType bindingValue = do
   rolType <- lift $ onNothing (error $ "No rolType found for " <> contextType) (lift ((getRol "model:Perspectives$rolInContext" contextType) >>= pure <<< head)) -- qualified name of rolType
-  rolInstanceId <- createRol rolType contextId bindingValue
+  rolInstanceId <- createRol rolType contextId bindingValue 0
   createContext contextId contextType [Tuple rolType [rolInstanceId]] []
+
+createContextWithMultipleRoleInstances :: forall e. String -> ContextID -> RolID -> Array ContextID ->  MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+createContextWithMultipleRoleInstances contextId contextType rolName bindings = do
+  roles <- traverseWithIndex (\i b -> createRol rolName contextId b i) bindings
+  createContext contextId contextType (Tuple rolName <<< singleton <$> roles) []
+
+createSumType :: forall e. Array ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+createSumType types = do
+  sumtype <- (createContextWithMultipleRoleInstances "" "model:Perspectives$Sum" "model:Perspectives$Sum$alternative" types)
+  pure (unsafePartial (fromRight sumtype))
 
 -- | Constructs a context with a single property that is bound to the value identified by 'propVal'.
 -- | Uses the type description provided by parameter 'contextType'.
@@ -193,10 +225,10 @@ createContextWithInternalProperty contextId contextType propVal = do
 -- rolName gives the type of the Rol to create.
 -- contextId gives the identifier of the context that the Rol belongs to.
 -- bindingValue is the identifier of a Rol that will be the value of the field binding.
-createRol :: forall e. RolName -> ContextID -> ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
-createRol rolName contextId bindingValue = do
+createRol :: forall e. RolName -> ContextID -> ID -> Int -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+createRol rolName contextId bindingValue i = do
   rolLn <- guardWellFormedNess deconstructLocalNameFromDomeinURI rolName
-  rolInstanceName <- pure (contextId <> "$" <> rolLn) -- qualified name of rol instance
+  rolInstanceName <- pure (contextId <> "$" <> rolLn <> (show i)) -- qualified name of rol instance
   lift $ lift $ cacheEntiteitPreservingVersion rolInstanceName
     (PerspectRol defaultRolRecord
       { _id = rolInstanceName

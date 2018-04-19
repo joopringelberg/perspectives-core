@@ -10,7 +10,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.SystemQueries (aspecten, binding, contextRolTypes, mogelijkeBinding, rolPropertyTypes)
 import Perspectives.TripleGetter (constructRolGetter)
-import Prelude (bind, pure, (&&), (<$>), (<*>), (<<<), (<>), (>>=), (||), (==))
+import Prelude (bind, flip, pure, (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 checkRolForQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkRolForQualifiedProperty pn rn = do
@@ -56,7 +56,7 @@ checkRolForUnQualifiedProperty ln rn = do
     1 -> pure true
     otherwise -> pure false -- The modeller should choose one.
   where
-  
+
     aspectsWithUnqualifiedProperty :: PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (Array ID)
     aspectsWithUnqualifiedProperty ln rn = union <$> importedAspectsWithUnqualifiedProperty <*> aspectsFromMogelijkeBindingWithUnqualifiedProperty
       where
@@ -80,3 +80,11 @@ checkRolForUnQualifiedProperty ln rn = do
       (\rolName propertyName -> (rolName <> "$" <> ln) == propertyName)
       ("UnqualifiedProperty" <> ln)
       rolPropertyTypes
+
+hasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
+hasAspect aspect subtype = if aspect == subtype
+  then pure true
+  else importsAspect aspect subtype
+
+importsAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
+importsAspect aspect = (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten))
