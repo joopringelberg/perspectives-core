@@ -3,11 +3,13 @@ module Perspectives.QueryFunctionDescriptionCompiler where
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (head)
+import Data.Array (find, head)
+import Data.Either (Either(..), either, fromLeft, fromRight, isLeft)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (checkContextForQualifiedRol, checkRolForQualifiedProperty)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQueryCompiler, getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, withQueryCompilerEnvironment)
@@ -18,14 +20,19 @@ import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
-import Perspectives.QueryCompiler (lookupQualifiedPropertyNameInRolTypeTelescope, lookupQualifiedRolNameInContextTypeHierarchy)
+import Perspectives.QueryCompiler (lookupQualifiedPropertyNameInRolTypeTelescope)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.SystemQueries (isContext)
-import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (Unit, bind, discard, flip, ifM, pure, show, unit, ($), (*>), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>>>))
+import Perspectives.Utilities (ifNothing, onNothing)
+import Prelude (class Monad, Unit, bind, discard, flip, ifM, pure, show, unit, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=), (>>>))
+
+data UserMessage =
+  MissingVariableDeclaration String
+
+type FD = Either UserMessage ID
 
 -- This function creates a context that describes a query and is identified by contextId.
-compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 compileElementaryQueryStep s contextId = case s of
   Constant v -> createContextWithInternalProperty contextId (q "constant") v
   Variable v -> do
@@ -88,33 +95,38 @@ compileElementaryQueryStep s contextId = case s of
 
 -- This function creates a context that describes a query that is identified by contextId and that results from
 -- applying a combinator to another query.
-compileCombinatorQueryStep :: forall e. QueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+compileCombinatorQueryStep :: forall e. QueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 compileCombinatorQueryStep s contextId = case s of
-  Filter cr ca -> do
-    criterium <- compileCombinatorQueryStep cr (contextId <> "$criterium")
-    candidates <- compileCombinatorQueryStep ca (contextId <> "$candidates")
-    createContext contextId (q "filter") [Tuple (q "filter$criterium") [criterium], Tuple (q "filter$candidates") [candidates]] []
+  Filter cr ca -> compileCombinatorQueryStep cr (contextId <> "$criterium") `whenRight`
+    \criterium -> compileCombinatorQueryStep ca (contextId <> "$candidates") `whenRight`
+      \candidates -> createContext contextId (q "filter") [Tuple (q "filter$criterium") [criterium], Tuple (q "filter$candidates") [candidates]] []
   Concat oprnds -> do
-    operands <- traverseWithIndex (f "$concat") oprnds
-    createContext contextId (q "concat") operands []
+    (operands :: Array (Either UserMessage (Tuple RolName (Array ID)))) <- traverseWithIndex (f "$concat") oprnds
+    case find isLeft operands of
+      Nothing -> createContext contextId (q "concat") (unsafePartial (fromRight <$> operands)) []
+      (Just a) -> pure $ unsafePartial $ Left $ fromLeft a
   Compose oprnds -> do
     operands <- traverseWithIndex (f "$compose") oprnds
-    createContext contextId (q "compose") operands []
+    case find isLeft operands of
+      Nothing -> createContext contextId (q "compose") (unsafePartial (fromRight <$> operands)) []
+      (Just a) -> pure $ unsafePartial $ Left $ fromLeft a
   NotEmpty qs -> compileUnaryStep qs "notEmpty"
   Closure qs -> compileUnaryStep qs "closure"
   Closure' qs -> compileUnaryStep qs "closure'"
   LastElement qs -> compileUnaryStep qs "laatste"
-  Contains vqs qs -> do
-    value <- compileCombinatorQueryStep vqs (contextId <> "$valueOrId")
-    query <- compileCombinatorQueryStep qs (contextId <> "$query")
-    createContext contextId (q "contains") [Tuple (q "contains$valueOrId") [value], Tuple (q "contains$query") [query]] []
+  Contains vqs qs -> compileCombinatorQueryStep vqs (contextId <> "$valueOrId") `whenRight`
+    \value -> compileCombinatorQueryStep qs (contextId <> "$query") `whenRight`
+      \query -> createContext contextId (q "contains") [Tuple (q "contains$valueOrId") [value], Tuple (q "contains$query") [query]] []
   SetVariable var qs -> ifNothing (getQueryVariableType var)
     do
-      (Tuple v tp) <- withQueryCompilerEnvironment
+      (Tuple v' tp) <- withQueryCompilerEnvironment
         (Tuple <$> compileCombinatorQueryStep qs (contextId <> "$value") <*> getQueryStepDomain)
-      putQueryVariableType contextId tp
-      createContext contextId (q "setVariable") [Tuple (q "setVariable$value") [v]]
-        [Tuple (q "setVariable$name") [var]]
+      case v' of
+        (Left um) -> pure $ Left um
+        (Right v) -> do
+          putQueryVariableType contextId tp
+          createContext contextId (q "setVariable") [Tuple (q "setVariable$value") [v]]
+            [Tuple (q "setVariable$name") [var]]
     \t -> (throwError (error $ "Variable '" <> var <> "' cannot be given a value, as it already has a value of type " <> t))
 
   Terminal es -> compileElementaryQueryStep es contextId
@@ -122,14 +134,32 @@ compileCombinatorQueryStep s contextId = case s of
   where
     -- Compiles the description of the query represented by qs and then creates the description of a query
     -- that results from applying the combinator to it.
-    compileUnaryStep :: QueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
-    compileUnaryStep qs combinatorLocalName = compileCombinatorQueryStep qs (contextId <> "$" <> combinatorLocalName) >>= createContextWithSingleRole contextId (q combinatorLocalName)
+    compileUnaryStep :: QueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+    compileUnaryStep qs combinatorLocalName = compileCombinatorQueryStep qs (contextId <> "$" <> combinatorLocalName) >>=
+      either
+        (pure <<< Left)
+        (createContextWithSingleRole contextId (q combinatorLocalName))
 
-    f :: String -> Int -> QueryStep -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) (Tuple RolName (Array ID))
+    f :: String
+      -> Int
+      -> QueryStep
+      -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) (Either UserMessage (Tuple RolName (Array ID)))
     f localName i qs = do
-      nm <- pure (contextId <> localName <> (show i))
-      result <- compileCombinatorQueryStep qs nm
-      pure $ Tuple nm [result]
+        nm <- pure (contextId <> localName <> (show i))
+        (result :: Either UserMessage ID) <- compileCombinatorQueryStep qs nm
+        case result of
+          (Left um) -> pure $ Left um
+          (Right id) -> pure $ Right (Tuple nm [id])
+
+    whenRight :: forall a b c m. Monad m =>
+      m (Either a b) ->
+      (b -> m (Either a c)) ->
+      m (Either a c)
+    whenRight m f = do
+      eab <- m
+      case eab of
+        (Left a) -> pure $ Left a
+        (Right b) -> f b
 
 q :: String -> String
 q ln = "model:QueryAst$" <> ln
@@ -137,7 +167,7 @@ q ln = "model:QueryAst$" <> ln
 p :: String -> String
 p ln = "model:Perspectives$" <> ln
 
-createUndecoratedContext :: forall e. String -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+createUndecoratedContext :: forall e. String -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createUndecoratedContext name typeId = createContext name typeId [] []
 
 -- | Constructs a context with a single role that is bound to the role identified by 'bindingValue'
@@ -146,7 +176,7 @@ createUndecoratedContext name typeId = createContext name typeId [] []
 -- Example of a corresponding CRL expression:
 -- q:constructRolPropertyGetter name
 --   $property => pol:Aangifte$Aangever$betrouwbaarheid
-createContextWithSingleRole :: forall e. String -> ContextID -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+createContextWithSingleRole :: forall e. String -> ContextID -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithSingleRole contextId contextType bindingValue = do
   rolType <- lift $ onNothing (error $ "No rolType found for " <> contextType) (lift ((getRol "model:Perspectives$rolInContext" contextType) >>= pure <<< head)) -- qualified name of rolType
   rolInstanceId <- createRol rolType contextId bindingValue
@@ -155,7 +185,7 @@ createContextWithSingleRole contextId contextType bindingValue = do
 -- | Constructs a context with a single property that is bound to the value identified by 'propVal'.
 -- | Uses the type description provided by parameter 'contextType'.
 -- | The property (type) name is retrieved as the value of the internalProperty role of that contextType.
-createContextWithInternalProperty :: forall e. String -> ContextID -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+createContextWithInternalProperty :: forall e. String -> ContextID -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithInternalProperty contextId contextType propVal = do
   propertyName <- lift $ onNothing (error $ "No parameter found for " <> contextType) (lift ((getRol "model:Perspectives$internalProperty" contextType) >>= pure <<< head)) -- qualified name of property
   createContext contextId contextType [] [Tuple propertyName [propVal]]
@@ -181,7 +211,7 @@ createContext :: forall e.
   ContextID ->
   Array (Tuple RolName (Array ID)) ->
   Array (Tuple PropertyName (Array String)) ->
-  MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
+  MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 -- TODO: voeg interne properties toe.
 createContext name typeId roles properties = do
   ln <- guardWellFormedNess deconstructLocalNameFromDomeinURI name
@@ -207,7 +237,7 @@ createContext name typeId roles properties = do
       , context = name
       , binding = binding $ typeId <> "_buitenRol"
       })
-  pure $ name <> "_buitenRol"
+  pure $ Right $ name <> "_buitenRol"
 
   where
   createProperty :: Tuple PropertyName (Array String) -> (Tuple PropertyName PropertyValueWithComments)

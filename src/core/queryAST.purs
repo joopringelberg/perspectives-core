@@ -1,5 +1,7 @@
 module Perspectives.QueryAST where
 
+-- TODO: positie in de oorspronkelijke tekst toevoegen.
+
 data QueryStep
   = Filter QueryStep QueryStep
   | Concat (Array QueryStep)
