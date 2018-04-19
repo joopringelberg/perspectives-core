@@ -1,19 +1,20 @@
 module Perspectives.QueryCombinators where
 
 import Control.Monad.Loops (iterateUntilM)
-import Data.Array (cons, difference, elemIndex, foldr, head, last, null, singleton, union, nub)
+import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, last, nub, null, singleton, union)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, Subject)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, Subject, Object)
 import Perspectives.PerspectEntiteit (getType)
 import Perspectives.Property (getRol)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 import Perspectives.TripleAdministration (getRef, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
-import Prelude (bind, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
+import Prelude (bind, const, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>=>))
+import Type.Data.Boolean (kind Boolean)
 
 closure :: forall e.
   TypedTripleGetter e ->
@@ -187,6 +188,13 @@ contains id' (TypedTripleGetter nameOfp p _ _) = constructTripleGetterFromEffect
     case elemIndex id' object of
       Nothing -> pure ["false"]
       otherwise -> pure ["true"]
+
+containsMatching :: forall e. (Subject -> Object -> Boolean) -> String -> TypedTripleGetter e -> TypedTripleGetter e
+containsMatching criterium criteriumName (TypedTripleGetter nameOfp p domain range) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> criteriumName) f domain range where
+  f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
+  f subject = do
+    (Triple{object}) <- p subject
+    pure $ maybe ["true"] (const ["false"]) (findIndex (criterium subject) object)
 
 lastElement :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 lastElement (TypedTripleGetter nameOfp (p :: TripleGetter e) domain range) = constructTripleGetterFromEffectExpression

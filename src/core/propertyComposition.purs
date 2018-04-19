@@ -3,7 +3,7 @@ module Perspectives.PropertyComposition where
 
 import Data.Array (cons, difference, nub)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (Triple(..), TripleGetter, NamedFunction(..), TypedTripleGetter(..))
+import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (bind, join, pure, ($), (<>), map)
 
