@@ -8,11 +8,13 @@ import Control.Monad.Eff.Ref (REF, Ref)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
 import Data.Array (head)
+import Data.Either (Either)
 import Data.Maybe (Maybe)
 import Data.StrMap (StrMap, empty, insert, lookup, singleton)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
+import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.Utilities (onNothing')
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
@@ -187,3 +189,21 @@ type QueryFunction =
   { function :: TripleGetter ()
   , domain :: String
   , range :: String}
+
+-----------------------------------------------------------
+-- TYPE CHECKING
+-----------------------------------------------------------
+type Aspect = String
+type TypeID = String
+
+data UserMessage =
+    MissingVariableDeclaration String
+  | MissingAspect TypeID Aspect
+  | MissingMogelijkeBinding TypeID
+  | MultipleDefinitions (Array TypeID)
+  | MissingUnqualifiedProperty LocalName RolName
+  | MissingQualifiedProperty PropertyName RolName
+  | MissingQualifiedRol RolName ContextID
+  | MissingUnqualifiedRol RolName ContextID
+
+type FD = Either UserMessage ID

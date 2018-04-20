@@ -10,30 +10,19 @@ import Data.StrMap (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
-import Perpectives.TypeChecker (checkContextForQualifiedRol, checkRolForQualifiedProperty, hasAspect)
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQueryCompiler, getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment, (##))
+import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.QueryCompiler (lookupQualifiedPropertyNameInRolTypeTelescope)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.SystemQueries (contextRolTypes, contextType, mogelijkeBinding, rolType)
 import Perspectives.Utilities (ifNothing, onNothing)
-import Prelude (class Monad, Unit, bind, discard, flip, ifM, pure, show, unit, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=), (>>>))
-
-type Aspect = String
-type Type = String
-
-data UserMessage =
-    MissingVariableDeclaration String
-  | MissingAspect Type Aspect
-  | MissingMogelijkeBinding Type
-
-type FD = Either UserMessage ID
+import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
 -- This function creates a context that describes a query and is identified by contextId.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
@@ -84,50 +73,87 @@ compileElementaryQueryStep s contextId = case s of
       sumtype <- createSumType $ tripleObjects tps
       putQueryStepDomain sumtype
       createContextWithSingleRole contextId (q "iedereRolInContext") dom
-
-  
-  RolTypen -> putQueryStepDomain (p "Context") *> parameterlessQueryFunction contextId (q "rolTypen")
-  Label -> parameterlessQueryFunction contextId (q "label")
+  -- TODO. Dit geeft een opsomming van (maximaal) de bij dit contexttype gedefinieerde rolnamen,
+  -- typen dus. Maar dat kan ik niet representeren met een sum type van die rollen.
+  -- Ik volsta hier tijdelijk met vast te leggen dat het resultaat een Context is.
+  RolTypen -> ensureAspect (p "Context")
+    (putQueryStepDomain (p "Context") *> parameterlessQueryFunction contextId (q "rolTypen"))
+  Label -> ensureAspect (p "Context")
+    (putQueryStepDomain (p "String") *> parameterlessQueryFunction contextId (q "label"))
   QualifiedProperty p -> do
-    getQueryStepDomain >>= (lift <<< lift <<< (flip guardRolHasProperty p))
-    ifM (isInNamespace' p)
-      (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
-      (createContextWithSingleRole contextId (q "constructRolPropertyLookup") p)
+    dom <- getQueryStepDomain
+    ensureRolHasProperty dom p
+      (putQueryStepDomain p *>
+        (ifM (isInNamespace' p)
+          (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
+          (createContextWithSingleRole contextId (q "constructRolPropertyLookup") p)))
   QualifiedInternalProperty p -> do
-    getQueryStepDomain >>= (lift <<< lift <<< (flip guardRolHasProperty p))
-    ifM (isInNamespace' p)
-      (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
-      (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") p)
+    dom <- getQueryStepDomain
+    ensureRolHasProperty dom p
+      (putQueryStepDomain p *>
+        (ifM (isInNamespace' p)
+          (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
+          (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") p)))
   QualifiedExternalProperty p -> do
-    getQueryStepDomain >>= (lift <<< lift <<< (flip guardRolHasProperty p))
-    ifM (isInNamespace' p)
-      (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
-      (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") p)
-  UnqualifiedProperty ln ->
-    (qualify ln) >>= QualifiedProperty >>> (flip compileElementaryQueryStep contextId)
-  UnqualifiedInternalProperty ln ->
-    (qualify ln) >>= QualifiedInternalProperty >>> (flip compileElementaryQueryStep contextId)
-  UnqualifiedExternalProperty ln ->
-    (qualify ln) >>= QualifiedExternalProperty >>> (flip compileElementaryQueryStep contextId)
+    dom <- getQueryStepDomain
+    ensureRolHasProperty dom p
+      (putQueryStepDomain p *>
+        (ifM (isInNamespace' p)
+          (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
+          (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") p)))
+  UnqualifiedProperty ln -> ensureAspect (p "Rol")
+    do
+      rolType <- getQueryStepDomain
+      x <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      case x of
+        (Left um) -> pure $ Left um
+        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
+          (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
+          (createContextWithSingleRole contextId (q "constructRolPropertyLookup") qn)
+  UnqualifiedInternalProperty ln -> ensureAspect (p "Rol")
+    do
+      rolType <- getQueryStepDomain
+      x <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      case x of
+        (Left um) -> pure $ Left um
+        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
+          (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
+          (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") qn)
+  UnqualifiedExternalProperty ln -> ensureAspect (p "Rol")
+    do
+      rolType <- getQueryStepDomain
+      x <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      case x of
+        (Left um) -> pure $ Left um
+        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
+          (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
+          (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") qn)
   QualifiedRol rn -> do
-    getQueryStepDomain >>= (lift <<< lift <<< (flip guardContextHasRol rn))
-    ifM (isInNamespace' rn)
-      (createContextWithSingleRole contextId (q "constructRolGetter") rn)
-      (createContextWithSingleRole contextId (q "constructRolLookup") rn)
-  UnqualifiedRol ln ->
-    (qualify ln) >>= QualifiedRol >>> (flip compileElementaryQueryStep contextId)
+    dom <- getQueryStepDomain
+    ensureContextHasRol dom rn
+      (putQueryStepDomain rn *>
+        ifM (isInNamespace' rn)
+          (createContextWithSingleRole contextId (q "constructRolGetter") rn)
+          (createContextWithSingleRole contextId (q "constructRolLookup") rn))
+  UnqualifiedRol ln -> ensureAspect (p "Context")
+    do
+      contextType <- getQueryStepDomain
+      x <- lift $ lift $ checkContextForUnQualifiedRol ln contextType
+      case x of
+        (Left um) -> pure $ Left um
+        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
+          (createContextWithSingleRole contextId (q "constructRolGetter") qn)
+          (createContextWithSingleRole contextId (q "constructRolLookup") qn)
 
   where
-  qualify :: String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) String
-  qualify ln = onNothing (error $ "There is no property " <> ln <> " defined for role " <> ln)
-        (getQueryStepDomain >>= lift <<< lift <<< (lookupQualifiedPropertyNameInRolTypeTelescope ln))
 
   isInNamespace' :: ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) Boolean
   isInNamespace' id = do
     ns <- getQueryStepDomain
     pure $ isInNamespace id ns
 
-  ensureAspect :: Type
+  ensureAspect ::
+    TypeID
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   ensureAspect aspect mv = do
@@ -135,6 +161,26 @@ compileElementaryQueryStep s contextId = case s of
     ifM (lift $ lift $ hasAspect aspect dom)
       mv
       (pure $ Left $ MissingAspect dom aspect)
+
+  ensureRolHasProperty ::
+    RolID
+    -> PropertyName
+    -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+    -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+  ensureRolHasProperty rolId propertyId mv =
+    ifM (lift $ lift $ checkRolForQualifiedProperty propertyId rolId)
+      mv
+      (pure $ Left $ MissingQualifiedProperty propertyId rolId)
+
+  ensureContextHasRol ::
+    ContextID
+    -> RolName
+    -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+    -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+  ensureContextHasRol contextId rolId mv =
+    ifM (lift $ lift $ checkContextForQualifiedRol rolId contextId)
+      mv
+      (pure $ Left $ MissingQualifiedRol rolId contextId)
 
 -- This function creates a context that describes a query that is identified by contextId and that results from
 -- applying a combinator to another query.
@@ -295,14 +341,3 @@ createContext name typeId roles properties = do
   where
   createProperty :: Tuple PropertyName (Array String) -> (Tuple PropertyName PropertyValueWithComments)
   createProperty (Tuple pn values) = Tuple pn (PropertyValueWithComments {commentBefore: [], commentAfter: [], value: values})
-
--- | This function tests whether the Rol type (identified by rolId) has the Aspect of having the property (identified by propertyId).
-guardRolHasProperty :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Unit
-guardRolHasProperty rolId propertyId = do
-  hasProperty <- checkRolForQualifiedProperty propertyId rolId
-  if hasProperty then pure unit else throwError (error $ "The property " <> propertyId <> " cannot be found!")
-
-guardContextHasRol :: forall e. ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e) Unit
-guardContextHasRol contextId rolId = do
-  hasRol <- checkContextForQualifiedRol rolId contextId
-  if hasRol then pure unit else throwError (error $ "The rol " <> rolId <> " cannot be found!")

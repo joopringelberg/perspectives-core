@@ -1,8 +1,10 @@
 module Perpectives.TypeChecker where
 
 import Data.Array (foldM, head, intersect, length, union)
-import Data.Maybe (Maybe(..))
-import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, runMonadPerspectivesQuery, tripleGetter2function, tripleObjects_, (##))
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..), fromJust)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, tripleGetter2function, tripleObjects_, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolName, ID)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
@@ -10,7 +12,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.SystemQueries (aspecten, binding, contextRolTypes, mogelijkeBinding, rolPropertyTypes)
 import Perspectives.TripleGetter (constructRolGetter)
-import Prelude (bind, flip, pure, (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (bind, flip, pure, (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||), ($))
 
 checkRolForQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkRolForQualifiedProperty pn rn = do
@@ -48,13 +50,13 @@ checkContextForQualifiedRol rn cn = do
     checkContextHasRol :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
     checkContextHasRol cn rn = runMonadPerspectivesQuery cn (toBoolean (contains rn contextRolTypes))
 
-checkRolForUnQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
+checkRolForUnQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) FD
 checkRolForUnQualifiedProperty ln rn = do
   aspects <- aspectsWithUnqualifiedProperty ln rn
   case length aspects of
-    0 -> pure false
-    1 -> pure true
-    otherwise -> pure false -- The modeller should choose one.
+    0 -> pure $ Left $ MissingUnqualifiedProperty ln rn
+    1 -> pure $ Right $ unsafePartial $ fromJust $ head aspects
+    otherwise -> pure $ Left $ MultipleDefinitions aspects
   where
 
     aspectsWithUnqualifiedProperty :: PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (Array ID)
@@ -80,6 +82,19 @@ checkRolForUnQualifiedProperty ln rn = do
       (\rolName propertyName -> (rolName <> "$" <> ln) == propertyName)
       ("UnqualifiedProperty" <> ln)
       rolPropertyTypes
+
+checkContextForUnQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) FD
+checkContextForUnQualifiedRol ln cn = do
+  aspects <- aspectsWithUnqualifiedRol ln cn
+  case length aspects of
+    0 -> pure $ Left $ MissingUnqualifiedRol ln cn
+    1 -> pure $ Right $ unsafePartial $ fromJust $ head aspects
+    otherwise -> pure $ Left $ MultipleDefinitions aspects
+  where
+
+    aspectsWithUnqualifiedRol :: RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) (Array ID)
+    aspectsWithUnqualifiedRol ln rn = pure []
+    -- TODO!!!
 
 hasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 hasAspect aspect subtype = if aspect == subtype
