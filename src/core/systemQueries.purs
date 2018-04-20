@@ -127,7 +127,7 @@ contextRolTypes = constructRolGetter "model:Perspectives$rolInContext"
 
 mogelijkeBinding :: forall e. TypedTripleGetter e
 mogelijkeBinding = (constructRolGetter "model:Perspectives$mogelijkeBinding"
-  "model:Perspectives$Rol") >-> binding
+  "model:Perspectives$Rol") >-> binding >-> rolContext
 
 rolInContext :: forall e. TypedTripleGetter e
 rolInContext = constructRolGetter "model:Perspectives$rolInContext"
