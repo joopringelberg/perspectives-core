@@ -85,16 +85,21 @@ checkRolForUnQualifiedProperty ln rn = do
 
 checkContextForUnQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) FD
 checkContextForUnQualifiedRol ln cn = do
-  aspects <- aspectsWithUnqualifiedRol ln cn
+  aspects <- aspectsWithUnqualifiedRol
   case length aspects of
     0 -> pure $ Left $ MissingUnqualifiedRol ln cn
     1 -> pure $ Right $ unsafePartial $ fromJust $ head aspects
     otherwise -> pure $ Left $ MultipleDefinitions aspects
   where
 
-    aspectsWithUnqualifiedRol :: RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) (Array ID)
-    aspectsWithUnqualifiedRol ln rn = pure []
-    -- TODO!!!
+    aspectsWithUnqualifiedRol :: MonadPerspectives (AjaxAvarCache e) (Array ID)
+    aspectsWithUnqualifiedRol = (cn ## filter (hasUnqualifiedRol ln) aspecten) >>= tripleObjects_
+
+    hasUnqualifiedRol :: PropertyName -> TypedTripleGetter e
+    hasUnqualifiedRol ln = containsMatching
+      (\contextName rolName -> (contextName <> "$" <> ln) == rolName)
+      ("UnqualifiedRol" <> ln)
+      contextRolTypes
 
 hasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 hasAspect aspect subtype = if aspect == subtype
