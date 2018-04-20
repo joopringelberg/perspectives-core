@@ -46,10 +46,8 @@ compileElementaryQueryStep s contextId = case s of
       createContextWithInternalProperty contextId (q "variable") v
   RolesOf cid -> ensureAspect (p "Context")
     do
-      tps <- lift $ lift (cid ## contextRolTypes)
-      sumtype <- createSumType $ tripleObjects tps
-      putQueryStepDomain sumtype
-      createContextWithSingleRole contextId (q "iedereRolInContext") cid
+      putQueryStepDomain (p "Rol")
+      createContextWithSingleRole contextId (q "rolesOf") cid
   Binding -> ensureAspect (p "Rol")
     do
       dom <- getQueryStepDomain
@@ -77,10 +75,17 @@ compileElementaryQueryStep s contextId = case s of
         tp <- lift $ tripleGetter2function rolType dom
         putQueryStepDomain $ unsafePartial $ fromJust tp
         (parameterlessQueryFunction contextId (q "rolType"))
+  BuitenRol -> ensureAspect (p "Context")
+    (putQueryStepDomain (p "Rol") *> parameterlessQueryFunction contextId (q "buitenRol"))
+  IedereRolInContext -> ensureAspect (p "Context")
+    do
+      dom <- getQueryStepDomain
+      tps <- lift $ lift (dom ## contextRolTypes)
+      sumtype <- createSumType $ tripleObjects tps
+      putQueryStepDomain sumtype
+      createContextWithSingleRole contextId (q "iedereRolInContext") dom
 
-
-  BuitenRol -> putQueryStepDomain (p "Rol") *> parameterlessQueryFunction contextId (q "buitenRol")
-  IedereRolInContext -> putQueryStepDomain (p "Rol") *> parameterlessQueryFunction contextId (q "iedereRolInContext")
+  
   RolTypen -> putQueryStepDomain (p "Context") *> parameterlessQueryFunction contextId (q "rolTypen")
   Label -> parameterlessQueryFunction contextId (q "label")
   QualifiedProperty p -> do

@@ -249,6 +249,11 @@ psp:Context q:concat
 			extern psp:isFunctioneel = false
 			psp:mogelijkeBinding q:Query
 
+psp:Context q:rolesOf
+	psp:rolInContext =>
+		psp:Rol $context
+			extern psp:isFunctioneel = true
+			psp:mogelijkeBinding psp:Context
 --------------------------------------------------------------------------------
 -- COMBINATOR CONSTRUCTORS
 --------------------------------------------------------------------------------
