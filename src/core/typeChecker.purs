@@ -3,8 +3,9 @@ module Perpectives.TypeChecker where
 import Data.Array (foldM, head, intersect, length, union)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust)
+import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, tripleGetter2function, tripleObjects_, (##))
+import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, runTypedTripleGetter, tripleGetter2function, tripleObjects, tripleObjects_, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolName, ID)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
@@ -12,7 +13,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.SystemQueries (aspecten, binding, contextRolTypes, mogelijkeBinding, rolPropertyTypes)
 import Perspectives.TripleGetter (constructRolGetter)
-import Prelude (bind, flip, pure, (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||), ($))
+import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 checkRolForQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkRolForQualifiedProperty pn rn = do
@@ -108,3 +109,9 @@ hasAspect aspect subtype = if aspect == subtype
 
 importsAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 importsAspect aspect = (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten))
+
+mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID
+mostSpecificCommonAspect types = do
+  x <- traverse (runTypedTripleGetter aspecten) types
+  aspects <- pure $ join (tripleObjects <$> x)
+  foldM (\msca t -> ifM (hasAspect msca t) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects

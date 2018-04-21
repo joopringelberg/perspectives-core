@@ -17,7 +17,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
+import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -150,12 +150,18 @@ type NamedTripleGetter e = NamedFunction (TripleGetter e)
 
 -- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
 runTypedTripleGetter :: forall e.
+  TypedTripleGetter e
+  -> Subject
+  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
+runTypedTripleGetter (TypedTripleGetter _ f _ _) a = runMonadPerspectivesQuery a f
+
+runQuery :: forall e.
   Subject
   -> TypedTripleGetter e
   -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
-runTypedTripleGetter a (TypedTripleGetter _ f _ _) = runMonadPerspectivesQuery a f
+runQuery = (flip runTypedTripleGetter)
 
-infix 0 runTypedTripleGetter as ##
+infix 0 runQuery as ##
 
 tripleGetter2function :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Maybe String)
 tripleGetter2function (TypedTripleGetter name tg _ _)= tg >=> tripleObjects_ >=> (pure <<< head)
@@ -198,6 +204,7 @@ type TypeID = String
 
 data UserMessage =
     MissingVariableDeclaration String
+  | VariableAlreadyDeclaredAs VariableName TypeID
   | MissingAspect TypeID Aspect
   | MissingMogelijkeBinding TypeID
   | MultipleDefinitions (Array TypeID)

@@ -1,18 +1,17 @@
 module Perspectives.QueryFunctionDescriptionCompiler where
 
 import Control.Monad.Eff.Exception (error)
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (find, head, singleton)
 import Data.Either (Either(..), either, fromLeft, fromRight, isLeft)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.StrMap (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Partial.Unsafe (unsafePartial)
-import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasAspect)
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment, (##))
+import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, runTypedTripleGetter, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
@@ -73,11 +72,10 @@ compileElementaryQueryStep s contextId = case s of
       sumtype <- createSumType $ tripleObjects tps
       putQueryStepDomain sumtype
       createContextWithSingleRole contextId (q "iedereRolInContext") dom
-  -- TODO. Dit geeft een opsomming van (maximaal) de bij dit contexttype gedefinieerde rolnamen,
-  -- typen dus. Maar dat kan ik niet representeren met een sum type van die rollen.
-  -- Ik volsta hier tijdelijk met vast te leggen dat het resultaat een Context is.
   RolTypen -> ensureAspect (p "Context")
-    (putQueryStepDomain (p "Context") *> parameterlessQueryFunction contextId (q "rolTypen"))
+    do
+      getQueryStepDomain >>= lift <<< lift <<< runTypedTripleGetter contextRolTypes >>= pure <<< tripleObjects >>= lift <<< lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
+      parameterlessQueryFunction contextId (q "rolTypen")
   Label -> ensureAspect (p "Context")
     (putQueryStepDomain (p "String") *> parameterlessQueryFunction contextId (q "label"))
   QualifiedProperty p -> do
@@ -190,22 +188,26 @@ compileCombinatorQueryStep s contextId = case s of
     \criterium -> compileCombinatorQueryStep ca (contextId <> "$candidates") `whenRight`
       \candidates -> createContext contextId (q "filter") [Tuple (q "filter$criterium") [criterium], Tuple (q "filter$candidates") [candidates]] []
   Concat oprnds -> do
-    (operands :: Array (Either UserMessage (Tuple RolName (Array ID)))) <- traverseWithIndex (f "$concat") oprnds
+    (operands :: Array (Either UserMessage (Tuple RolName (Array ID)))) <- traverseWithIndex (compileOperand "$concat") oprnds
     case find isLeft operands of
-      Nothing -> createContext contextId (q "concat") (unsafePartial (fromRight <$> operands)) []
+      Nothing -> do
+        (operands' :: Array (Tuple RolName (Array ID))) <- pure (unsafePartial (fromRight <$> operands))
+        operandIds <- pure $ unsafePartial $ fromJust <<< head <<< snd <$> operands'
+        (lift $ lift $ mostSpecificCommonAspect operandIds) >>= putQueryStepDomain
+        createContext contextId (q "concat") operands' []
       (Just a) -> pure $ unsafePartial $ Left $ fromLeft a
   Compose oprnds -> do
-    operands <- traverseWithIndex (f "$compose") oprnds
+    operands <- traverseWithIndex (compileOperand "$compose") oprnds
     case find isLeft operands of
       Nothing -> createContext contextId (q "compose") (unsafePartial (fromRight <$> operands)) []
       (Just a) -> pure $ unsafePartial $ Left $ fromLeft a
-  NotEmpty qs -> compileUnaryStep qs "notEmpty"
+  NotEmpty qs -> putQueryStepDomain (p "Boolean") *> compileUnaryStep qs "notEmpty"
   Closure qs -> compileUnaryStep qs "closure"
   Closure' qs -> compileUnaryStep qs "closure'"
   LastElement qs -> compileUnaryStep qs "laatste"
   Contains vqs qs -> compileCombinatorQueryStep vqs (contextId <> "$valueOrId") `whenRight`
     \value -> compileCombinatorQueryStep qs (contextId <> "$query") `whenRight`
-      \query -> createContext contextId (q "contains") [Tuple (q "contains$valueOrId") [value], Tuple (q "contains$query") [query]] []
+      \query -> putQueryStepDomain (p "Boolean") *> createContext contextId (q "contains") [Tuple (q "contains$valueOrId") [value], Tuple (q "contains$query") [query]] []
   SetVariable var qs -> ifNothing (getQueryVariableType var)
     do
       (Tuple v' tp) <- withQueryCompilerEnvironment
@@ -216,7 +218,7 @@ compileCombinatorQueryStep s contextId = case s of
           putQueryVariableType contextId tp
           createContext contextId (q "setVariable") [Tuple (q "setVariable$value") [v]]
             [Tuple (q "setVariable$name") [var]]
-    \t -> (throwError (error $ "Variable '" <> var <> "' cannot be given a value, as it already has a value of type " <> t))
+    \t -> pure $ Left $ VariableAlreadyDeclaredAs var t
 
   Terminal es -> compileElementaryQueryStep es contextId
 
@@ -229,11 +231,11 @@ compileCombinatorQueryStep s contextId = case s of
         (pure <<< Left)
         (createContextWithSingleRole contextId (q combinatorLocalName))
 
-    f :: String
+    compileOperand :: String
       -> Int
       -> QueryStep
       -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) (Either UserMessage (Tuple RolName (Array ID)))
-    f localName i qs = do
+    compileOperand localName i qs = do
         nm <- pure (contextId <> localName <> (show i))
         (result :: Either UserMessage ID) <- compileCombinatorQueryStep qs nm
         case result of
@@ -311,7 +313,6 @@ createContext :: forall e.
   Array (Tuple RolName (Array ID)) ->
   Array (Tuple PropertyName (Array String)) ->
   MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
--- TODO: voeg interne properties toe.
 createContext name typeId roles properties = do
   ln <- guardWellFormedNess deconstructLocalNameFromDomeinURI name
   lift $ lift $ cacheEntiteitPreservingVersion name
