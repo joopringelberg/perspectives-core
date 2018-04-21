@@ -53,6 +53,7 @@ type UserInfo =
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
 type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e))
 
+type MP e = MonadPerspectives (AjaxAvarCache e)
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERY
 -----------------------------------------------------------
@@ -212,5 +213,6 @@ data UserMessage =
   | MissingQualifiedProperty PropertyName RolName
   | MissingQualifiedRol RolName ContextID
   | MissingUnqualifiedRol RolName ContextID
+  | MissingType ContextID
 
 type FD = Either UserMessage ID

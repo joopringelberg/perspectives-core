@@ -125,6 +125,14 @@ contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = constructRolGetter "model:Perspectives$rolInContext"
   "model:Perspectives$Context" >-> binding >-> rolContext
 
+contextInternePropertyTypes :: forall e. TypedTripleGetter e
+contextInternePropertyTypes = constructRolGetter "model:Perspectives$internalProperty"
+  "model:Perspectives$Context" >-> binding >-> rolContext
+
+contextExternePropertyTypes :: forall e. TypedTripleGetter e
+contextExternePropertyTypes = constructRolGetter "model:Perspectives$externalProperty"
+  "model:Perspectives$Context" >-> binding >-> rolContext
+
 mogelijkeBinding :: forall e. TypedTripleGetter e
 mogelijkeBinding = (constructRolGetter "model:Perspectives$mogelijkeBinding"
   "model:Perspectives$Rol") >-> binding >-> rolContext
