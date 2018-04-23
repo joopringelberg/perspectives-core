@@ -24,36 +24,63 @@ psp:Context psp:Date
 psp:Rol psp:internalProperty
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Property
+
 psp:Rol psp:externalProperty
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Property
+
 psp:Rol psp:rolProperty
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Property
+
 psp:Rol psp:rolInContext
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Rol
+
 psp:Rol psp:viewInRol
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:View
+
 psp:Rol psp:interneView
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:View
+
 psp:Rol psp:externeView
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:View
+
 psp:Rol psp:prototype
 	extern psp:isFunctioneel = true
 	psp:mogelijkeBinding => psp:Context
+
 psp:Rol psp:aspect
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Context
+
+psp:Rol psp:vereisteRolInContext
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => psp:Rol
+
+psp:Rol psp:vereisteRolProperty
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => psp:Property
+
 psp:Rol psp:actie
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Actie
+
 psp:Rol psp:aspectRol
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Rol
+
+psp:Rol psp:aspectProperty
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => psp:Property
+
+psp:Rol psp:bindingProperty
+	extern psp:isFunctioneel = true
+	psp:mogelijkeBinding => psp:Property
+
 psp:Rol psp:constraint
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Constraint
@@ -62,6 +89,8 @@ psp:Property psp:isFunctioneel
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = true
 	psp:range => psp:Boolean
+	psp:aspectProperty => psp:Property
+	psp:bindingProperty => psp:Property
 
 psp:Property psp:isVerplicht
 	extern psp:isFunctioneel = true
@@ -83,6 +112,14 @@ psp:Context psp:Property
 psp:Rol psp:propertyReferentie
 	psp:rolProperty => psp:volgNummer
 	psp:mogelijkeBinding => psp:Property
+
+psp:Rol psp:objectRol
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => psp:Actie
+
+psp:Rol psp:subjectRol
+	extern psp:isFunctioneel = false
+	psp:mogelijkeBinding => psp:Actie
 
 psp:Property psp:volgNummer
 	extern psp:isFunctioneel = true
@@ -110,6 +147,8 @@ psp:Context psp:Rol
 	psp:rolInContext => psp:actie
 	psp:rolInContext => psp:aspectRol
 	psp:rolInContext => psp:constraint
+	psp:rolInContext => psp:objectRol
+	psp:rolInContext => psp:subjectRol
 
 --------------------------------------------------------------------------------
 -- ACTIES

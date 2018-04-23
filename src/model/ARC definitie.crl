@@ -9,12 +9,15 @@ Section psp:rolInContext
 psp:Rol arc:zaakInContext
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => arc:Zaak
+
 psp:Context arc:actieInContext
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Actie
+
 psp:Context arc:activiteitInContext
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => arc:Activiteit
+	
 psp:Context arc:toestandInContext
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => arc:Toestand
