@@ -16,7 +16,8 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
-import Prelude (bind, const, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
+import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
+import Data.HeytingAlgebra (not) as HA
 import Type.Data.Boolean (kind Boolean)
 
 closure :: forall e.
@@ -110,9 +111,9 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
 concat :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
-  MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+  (TypedTripleGetter e)
 concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
-  pure $ memorize getter name
+  memorize getter name
   where
     getter :: TripleGetter e
     getter id = do
@@ -146,7 +147,7 @@ leastCommonAncestor t1 t2 = do
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
 isNothing :: forall e. Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
-isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
+isNothing (Triple r@{object}) = pure (Triple(r {object = [show (HA.not $ null object)]}))
 
 notEmpty :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
@@ -197,13 +198,22 @@ containsMatching criterium criteriumName (TypedTripleGetter nameOfp p) = constru
 -- | Apply to a query and retrieve a boolean query that returns true iff its subject is a member of the result of
 -- | the argument query.
 containedIn :: forall e. TypedTripleGetter e -> TypedTripleGetter e
-containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn" <> nameOfp) f where
+containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn_" <> nameOfp) f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
     case elemIndex id object of
       Nothing -> pure ["false"]
       otherwise -> pure ["true"]
+
+not :: forall e. TypedTripleGetter e -> TypedTripleGetter e
+not (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
+  f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
+  f id = do
+    (Triple{object}) <- p id
+    case head object of
+      (Just "true") -> pure ["false"]
+      otherwise -> pure ["true"] -- NOTE: type checking guarantees we only have two values.
 
 lastElement :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 lastElement (TypedTripleGetter nameOfp (p :: TripleGetter e)) = constructTripleGetterFromEffectExpression
