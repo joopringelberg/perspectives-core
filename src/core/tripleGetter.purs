@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, TripleGetter, TypedTripleGetter(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
+import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (bind, ifM, pure, ($), (<<<))
 
@@ -90,7 +90,7 @@ constructRolGetter rn = constructTripleGetter getRol rn
 constructRolLookup :: forall e.
   LocalName ->
   TypedTripleGetter e
-constructRolLookup rn = constructTripleGetter getRolFromContextTypeHierarchy rn
+constructRolLookup rn = constructTripleGetter getRolFromPrototypeHierarchy rn
 
 constructInverseRolGetter :: forall e.
   RolName ->

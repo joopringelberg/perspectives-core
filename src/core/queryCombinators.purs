@@ -255,3 +255,11 @@ ref' name = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
     do
       mref <- lift $ liftEff $ lookupInTripleIndex subject predicate
       unsafePartial $ pure $ fromJust $ mref
+
+saveVar :: forall e. String -> TypedTripleGetter e -> TypedTripleGetter e
+saveVar name (TypedTripleGetter nameOfp p) = TypedTripleGetter ("saveVar_" <> name <> nameOfp) go where
+  go subject = do
+    variableValue <- readQueryVariable name
+    r <- p subject
+    putQueryVariable name variableValue
+    pure r

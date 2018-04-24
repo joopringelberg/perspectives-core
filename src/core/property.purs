@@ -3,7 +3,7 @@ module Perspectives.Property where
 import Control.Monad.Eff.Exception (error)
 import Data.Array (nub, singleton, head)
 import Data.Array.Partial (head) as ArrayPartial
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
@@ -62,22 +62,20 @@ rolNameInContext ln contextId = (maybe "" id (deconstructNamespace contextId)) <
 getRolByLocalName :: forall e. RolName -> ObjectsGetter e
 getRolByLocalName rn = getContextMember \context -> maybe [] id (lookup (rolNameInContext rn (context_id context)) (context_rolInContext context))
 
--- | Given a local (unqualified) name of a Rol, return that rol from the context, or if it doesn't exist,
--- | recursively from its type description. In analogy with the roltelescope, we might call the type hierarchy
--- | the contexttelescope and than we look up the local rolname in the contexttelescope.
-getRolFromContextTypeHierarchy :: forall e. LocalName -> ObjectsGetter e
-getRolFromContextTypeHierarchy ln contextId = do
+-- | Given a qualified name of a Rol, return that Rol from the context or recursively from its prototype.
+getRolFromPrototypeHierarchy :: forall e. RolName -> ObjectsGetter e
+getRolFromPrototypeHierarchy rn contextId = do
   maybeContext <- getPerspectEntiteit contextId
   case maybeContext of
-    (Just perspectContext) -> case lookup localNameInContextNamespace (context_rolInContext perspectContext) of
-      Nothing -> if (contextId == context_pspType perspectContext)
-        then pure []
-        else getRolFromContextTypeHierarchy ln (context_pspType perspectContext)
+    (Just perspectContext) -> case lookup rn (context_rolInContext perspectContext) of
+      Nothing -> do
+        br <- getBuitenRol contextId
+        bnd <- getRolBinding $ unsafePartial $ fromJust $ head br
+        case head bnd of
+          Nothing -> pure []
+          (Just b) -> getRolFromPrototypeHierarchy rn b
       (Just value) -> pure value
     otherwise -> pure []
-  where
-    localNameInContextNamespace :: ID
-    localNameInContextNamespace = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
 
 getRollen :: forall e. ObjectsGetter e
 getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)

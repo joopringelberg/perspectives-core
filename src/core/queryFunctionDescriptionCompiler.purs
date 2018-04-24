@@ -84,6 +84,8 @@ compileElementaryQueryStep s contextId = case s of
       (putQueryStepDomain p *>
         (ifM (isInNamespace' p)
           (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
+          -- TODO. Als de property bijgedragen wordt door een Aspect en niet afgebeeld is op een bindingProperty,
+          -- is hij óók lokaal gerepresenteerd en moet dan dus door constructRolPropertyGetter gevonden worden.
           (createContextWithSingleRole contextId (q "constructRolPropertyLookup") p)))
   QualifiedInternalProperty p -> do
     dom <- getQueryStepDomain
