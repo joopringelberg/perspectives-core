@@ -5,9 +5,8 @@ import Data.Maybe (maybe)
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
-import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn) as QC
-import Perspectives.QueryCombinators (ref)
+import Perspectives.PropertyComposition ((>->), (>->>))
+import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
 import Prelude (const, pure, (<>), (>=>))
 
@@ -95,14 +94,12 @@ rolOwnPropertyTypes = constructRolGetter "model:Perspectives$rolProperty" >-> bi
 rolAspectProperties :: forall e. TypedTripleGetter e
 rolAspectProperties = aspectRollen >-> rolOwnPropertyTypes
 
--- rolPropertyTypes :: forall e. TypedTripleGetter e
--- rolPropertyTypes = QC.concat
---   rolOwnPropertyTypes
---   (QC.filter (QC.containedIn ((ref "#start") >-> rolOwnPropertyTypes))
---     (aspectRol >-> rolOwnPropertyTypes))
-
+-- TODO: beschrijf in CRL.
 rolPropertyTypes :: forall e. TypedTripleGetter e
-rolPropertyTypes = constructRolGetter "model:Perspectives$rolProperty" >-> binding >-> rolContext
+rolPropertyTypes = QC.concat
+  rolOwnPropertyTypes
+  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> rolOwnPropertyTypes)))
+    (aspectRol >->> \_ -> rolPropertyTypes))
 
 contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = constructRolGetter "model:Perspectives$rolInContext" >-> binding >-> rolContext

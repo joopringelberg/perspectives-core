@@ -159,8 +159,6 @@ tripleObjects (Triple{object}) = object
 tripleObjects_  :: forall e m. Monad m => (Triple e) -> m (Array ID)
 tripleObjects_ (Triple{object}) = pure object
 
-type NamedTripleGetter e = NamedFunction (TripleGetter e)
-
 -- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
 runTypedTripleGetter :: forall e.
   TypedTripleGetter e
@@ -187,6 +185,9 @@ tripleGetter2function' (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (p
 -----------------------------------------------------------
 
 data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e)
+
+typedTripleGetterName :: forall e. TypedTripleGetter e -> String
+typedTripleGetterName (TypedTripleGetter n _) = n
 
 -----------------------------------------------------------
 -- TRIPLEREF
