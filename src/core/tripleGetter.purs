@@ -5,27 +5,20 @@ import Perspectives.EntiteitAndRDFAliases
 import Control.Monad (class Monad)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.State (lift, modify, gets)
-import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (insert, lookup)
-import Perspectives.CoreTypes (Domain, MonadPerspectivesQuery, NamedFunction(..), ObjectsGetter, TripleGetter, TypedTripleGetter(..), Range, VariableName)
+import Control.Monad.State (lift)
+import Data.Maybe (Maybe(..))
+import Perspectives.CoreTypes (Domain, MonadPerspectivesQuery, NamedFunction(..), ObjectsGetter, TripleGetter, TypedTripleGetter(..), Range)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromContextTypeHierarchy, lookupExternalProperty, lookupInternalProperty)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
-import Prelude (Unit, bind, id, ifM, pure, ($), (<<<))
+import Prelude (bind, ifM, pure, ($), (<<<))
 
 applyNamedFunction :: forall a b. NamedFunction (a -> b) -> a -> b
 applyNamedFunction (NamedFunction _ f) a = f a
 
 applyToNamedFunction :: forall a b m. Monad m => a -> NamedFunction (a -> m b) -> m b
 applyToNamedFunction a (NamedFunction _ f) = f a
-
-putQueryVariable :: forall e. VariableName -> Array String -> MonadPerspectivesQuery e Unit
-putQueryVariable var valueArray = modify \env -> insert var valueArray env
-
-readQueryVariable :: forall e. VariableName -> MonadPerspectivesQuery e (Array String)
-readQueryVariable var = gets \env -> maybe [] id (lookup var env)
 
 constructTripleGetterFromEffectExpression :: forall e.
   PropertyName ->

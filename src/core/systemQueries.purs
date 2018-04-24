@@ -6,18 +6,19 @@ import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (closure, closure', filter, notEmpty) as QC
+import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn) as QC
+import Perspectives.QueryCombinators (ref)
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
 import Prelude (const, pure, (<>), (>=>))
-
-identity' :: forall e. ObjectsGetter e
-identity' x = pure [x]
 
 -----------------------------------------------------------
 -- SYSTEM GETTERS
 -- These getters are defined on other members of PerspectRol and PerspectContext than
 -- rolInContext (PerspectContext) or properties (PerspectRol). All are memorizing.
 -----------------------------------------------------------
+
+identity' :: forall e. ObjectsGetter e
+identity' x = pure [x]
 
 identity :: forall e. TypedTripleGetter e
 identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity'
@@ -117,9 +118,22 @@ isContext = QC.notEmpty rolContext
 boundContexts :: forall e. TypedTripleGetter e
 boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRolInContext >-> binding)) >-> rolContext
 
+rolOwnPropertyTypes :: forall e. TypedTripleGetter e
+rolOwnPropertyTypes = constructRolGetter "model:Perspectives$rolProperty"
+  "model:Perspectives$Rol" >-> binding >-> rolContext
+
+rolAspectProperties :: forall e. TypedTripleGetter e
+rolAspectProperties = aspectRollen >-> rolOwnPropertyTypes
+
+-- rolPropertyTypes :: forall e. TypedTripleGetter e
+-- rolPropertyTypes = QC.concat
+--   rolOwnPropertyTypes
+--   (QC.filter (QC.containedIn ((ref "#start") >-> rolOwnPropertyTypes))
+--     (aspectRol >-> rolOwnPropertyTypes))
+
 rolPropertyTypes :: forall e. TypedTripleGetter e
 rolPropertyTypes = constructRolGetter "model:Perspectives$rolProperty"
-  "model:Perspectives$Rol" >-> binding
+  "model:Perspectives$Rol" >-> binding >-> rolContext
 
 contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = constructRolGetter "model:Perspectives$rolInContext"
@@ -143,6 +157,12 @@ rolInContext = constructRolGetter "model:Perspectives$rolInContext"
 
 aspect :: forall e. TypedTripleGetter e
 aspect = constructRolGetter "model:Perspectives$rolInContext" "model:Perspectives$aspect" >-> binding >-> rolContext
+
+aspectRol :: forall e. TypedTripleGetter e
+aspectRol = constructRolGetter "model:Perspectives$rolInContext" "model:Perspectives$aspectRol" >-> binding >-> rolContext
+
+aspectRollen :: forall e. TypedTripleGetter e
+aspectRollen = QC.closure aspectRol
 
 -- | All aspects but excluding the subject itself.
 aspecten :: forall e. TypedTripleGetter e
