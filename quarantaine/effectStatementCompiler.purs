@@ -5,13 +5,14 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe)
-import Perspectives.CoreTypes (ObjectsGetter, MonadPerspectives, MonadPerspectivesQuery, runMonadPerspectivesQuery, putQueryVariable, readQueryVariable)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, putQueryVariable, readQueryVariable, runMonadPerspectivesQuery, tripleObjects)
 import Perspectives.Deltas (MonadTransactie, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Value)
 import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
+import Perspectives.QueryCombinators (ref')
 import Perspectives.Utilities (onNothing)
-import Prelude (Unit, bind, const, pure, unit, ($), (<<<), (<>), (>=>), discard)
+import Prelude (Unit, bind, const, pure, unit, ($), (<<<), (<>), (>=>), discard, (>>=))
 
 type Statement e = ContextID -> MonadTransactie e Unit
 
@@ -28,7 +29,7 @@ constructEffectExpressie typeDescriptionID = do
     "model:QueryAst$Variable" -> do
       variableName <- onNothing (errorMessage "no variable name found" pspType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)
-      pure \cid -> readQueryVariable variableName
+      pure \_ -> ref' variableName >>= pure <<< tripleObjects
     "model:QueryAst$setVariable" -> do
       variableName <- onNothing (errorMessage "no variable name found" pspType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)

@@ -11,9 +11,9 @@ compose :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
   TypedTripleGetter e
-compose (TypedTripleGetter nameOfp p domain1 range1) (TypedTripleGetter nameOfq q domain2 range2) =
+compose (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   -- TODO: domain2 must subsume range1
-  memorize getter name domain1 range2
+  memorize getter name
     where
     getter :: TripleGetter e
     getter id = do
@@ -33,13 +33,3 @@ compose (TypedTripleGetter nameOfp p domain1 range1) (TypedTripleGetter nameOfq 
     name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 infixl 9 compose as >->
-
--- type MagicProperty e = Array (Triple e) -> Aff (AjaxAvarCache e) (Array (Triple e))
---
--- magic :: forall e. NamedFunction( TripleGetter e) ->  MagicProperty e
--- magic ntg tripleArr = do
---   x <- traverse (magic' ntg) tripleArr
---   pure $ join x
---   where
---     magic' :: NamedFunction( TripleGetter e) -> Triple e -> Aff (AjaxAvarCache e) (Array (Triple e))
---     magic' (TypedTripleGetter _ q _ _) (Triple{subject, object}) = traverse q (difference object [subject])

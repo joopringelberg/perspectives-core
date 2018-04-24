@@ -41,7 +41,7 @@ checkTypeImportsAspect :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache
 checkTypeImportsAspect typeId an = runMonadPerspectivesQuery typeId (toBoolean (contains an aspecten))
 
 alternatives :: forall e. TypedTripleGetter e
-alternatives = (constructRolGetter "model:Perspectives$alternative" "model:Perspectives$Sum$alternative") >-> binding
+alternatives = (constructRolGetter "model:Perspectives$alternative") >-> binding
 
 checkContextForQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkContextForQualifiedRol rn cn = do

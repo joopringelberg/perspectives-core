@@ -213,8 +213,8 @@ enclosingContext theText = do
       identifier sectionId
       newline
       newline
-      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId "model:Perspectives$Context") >-> binding)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId "model:Perspectives$Context") >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
+      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     ppContext :: Array ID -> ID -> PerspectText e

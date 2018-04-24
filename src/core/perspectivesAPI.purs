@@ -105,7 +105,7 @@ type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 -- | Runs a the query and adds the ReactStateSetter to the result.
 -- | Returns a function of no arguments that the external program can use to unsubscribe the ReactStateSetter.
 getQuery :: forall e. ContextID -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getQuery cid query@(TypedTripleGetter qn _ _ _) setter = do
+getQuery cid query@(TypedTripleGetter qn _) setter = do
   (Triple{subject, predicate}) <- cid ## query ~> NamedFunction (cid <> qn) (setter >=> pure <<< const unit)
   pure $ unRegisterTriple $ TripleRef {subject, predicate}
 
@@ -113,10 +113,10 @@ getQuery cid query@(TypedTripleGetter qn _ _ _) setter = do
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRolBinding cid rn setter = do
   contextType <- getContextTypeF cid
-  getQuery cid (constructRolGetter rn contextType >-> binding) setter
+  getQuery cid (constructRolGetter rn >-> binding) setter
 
 -- | Retrieve the rol from the context, subscribe to it.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRol cid rn setter = do
   contextType <- getContextTypeF cid
-  getQuery cid (constructRolGetter rn contextType) setter
+  getQuery cid (constructRolGetter rn) setter

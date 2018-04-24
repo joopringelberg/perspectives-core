@@ -1,6 +1,5 @@
 module Perspectives.QueryCombinators where
 
-import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Loops (iterateUntilM)
 import Control.Monad.Trans.Class (lift)
@@ -8,7 +7,7 @@ import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, last, nu
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), getQueryVariableType, putQueryVariable, readQueryVariable, tripleObjects)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), putQueryVariable, readQueryVariable, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, Subject, Object)
 import Perspectives.PerspectEntiteit (getType)
@@ -17,14 +16,14 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
-import Prelude (bind, const, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>>=), (*>), (>=>))
+import Prelude (bind, const, discard, id, join, map, not, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
 import Type.Data.Boolean (kind Boolean)
 
 closure :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e
-closure (TypedTripleGetter nameOfp p domain range) =
-  memorize getter name domain range
+closure (TypedTripleGetter nameOfp p) =
+  memorize getter name
   where
     getter :: TripleGetter e
     getter id' = do
@@ -56,8 +55,8 @@ closure_ p = getter where
 closure' :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e
-closure' (TypedTripleGetter nameOfp p domain range) =
-  memorize getter name domain range
+closure' (TypedTripleGetter nameOfp p) =
+  memorize getter name
   where
     getter :: TripleGetter e
     getter id = do
@@ -86,8 +85,8 @@ filter :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
   TypedTripleGetter e
-filter (TypedTripleGetter nameOfc criterium _ _) (TypedTripleGetter nameOfp p d r) =
-  memorize getter name d r where
+filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
+  memorize getter name where
     getter :: TripleGetter e
     getter id = do
       t@(Triple{object}) <- p id
@@ -112,10 +111,8 @@ concat :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
   MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
-concat (TypedTripleGetter nameOfp p d1 r1) (TypedTripleGetter nameOfq q d2 r2) = do
-  domain <- leastCommonAncestor d1 d2
-  range <- leastCommonAncestor r1 r2
-  pure $ memorize getter name domain range
+concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
+  pure $ memorize getter name
   where
     getter :: TripleGetter e
     getter id = do
@@ -152,7 +149,7 @@ isNothing :: forall e. Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Tri
 isNothing (Triple r@{object}) = pure (Triple(r {object = [show (not $ null object)]}))
 
 notEmpty :: forall e. TypedTripleGetter e -> TypedTripleGetter e
-notEmpty (TypedTripleGetter nameOfp p domain range) = memorize getter name domain "model:Perspectives$Boolean" where
+notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
 
   getter :: TripleGetter e
   getter = p >=> isNothing >=> \(Triple t) -> pure (Triple(t {predicate = name, tripleGetter = getter}))
@@ -162,7 +159,7 @@ notEmpty (TypedTripleGetter nameOfp p domain range) = memorize getter name domai
 
 -- | Construct a function that returns a bool in Aff, from a TripleGetter.
 toBoolean :: forall e. TypedTripleGetter e -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
-toBoolean (TypedTripleGetter nameOfp p _ _) r = do
+toBoolean (TypedTripleGetter nameOfp p) r = do
   result <- p r
   arrWithBool <- pure $ tripleObjects result
   case head arrWithBool of
@@ -175,15 +172,14 @@ toBoolean (TypedTripleGetter nameOfp p _ _) r = do
 -- | other knowledge on it.
 rolesOf :: forall e. ContextID -> TypedTripleGetter e
 rolesOf cid = constructTripleGetterFromObjectsGetter
-  ("model:Perspectives$rolesOf" <> cid) f "model:Perspectives$Context" "model:Perspectives:Rol" where
+  ("model:Perspectives$rolesOf" <> cid) f where
   f :: ObjectsGetter e
   f rolName = getRol rolName cid
--- rolesOf cid = NamedFunction ("rolesOf_" <> cid) \rolname -> applyNamedFunction (constructRolGetter rolname) cid
 
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.
 contains :: forall e. ID -> TypedTripleGetter e -> TypedTripleGetter e
-contains id' (TypedTripleGetter nameOfp p domain _) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> id') f domain "model:Perspectives$Boolean" where
+contains id' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> id') f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
@@ -192,8 +188,7 @@ contains id' (TypedTripleGetter nameOfp p domain _) = constructTripleGetterFromE
       otherwise -> pure ["true"]
 
 containsMatching :: forall e. (Subject -> Object -> Boolean) -> String -> TypedTripleGetter e -> TypedTripleGetter e
-containsMatching criterium criteriumName (TypedTripleGetter nameOfp p domain _) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> criteriumName) f domain
-  "model:Perspectives$Boolean" where
+containsMatching criterium criteriumName (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> criteriumName) f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f subject = do
     (Triple{object}) <- p subject
@@ -202,7 +197,7 @@ containsMatching criterium criteriumName (TypedTripleGetter nameOfp p domain _) 
 -- | Apply to a query and retrieve a boolean query that returns true iff its subject is a member of the result of
 -- | the argument query.
 containedIn :: forall e. TypedTripleGetter e -> TypedTripleGetter e
-containedIn (TypedTripleGetter nameOfp p domain range) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn" <> nameOfp) f range "model:Perspectives$Boolean" where
+containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn" <> nameOfp) f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
@@ -211,15 +206,13 @@ containedIn (TypedTripleGetter nameOfp p domain range) = constructTripleGetterFr
       otherwise -> pure ["true"]
 
 lastElement :: forall e. TypedTripleGetter e -> TypedTripleGetter e
-lastElement (TypedTripleGetter nameOfp (p :: TripleGetter e) domain range) = constructTripleGetterFromEffectExpression
+lastElement (TypedTripleGetter nameOfp (p :: TripleGetter e)) = constructTripleGetterFromEffectExpression
   ("(lastElement " <> nameOfp <> ")")
   (p >=> pure <<< (maybe [] singleton) <<< last <<< tripleObjects)
-  domain
-  range
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
 ignoreCache :: forall e. TypedTripleGetter e -> TypedTripleGetter e
-ignoreCache (TypedTripleGetter nameOfp p _ _) = TypedTripleGetter nameOfp go "" "" where
+ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go r =
     do
       remember <- memorizeQueryResults
@@ -230,7 +223,7 @@ ignoreCache (TypedTripleGetter nameOfp p _ _) = TypedTripleGetter nameOfp go "" 
 
 -- | Use the cache of query results for the given named function.
 useCache :: forall e a. TypedTripleGetter e -> TypedTripleGetter e
-useCache (TypedTripleGetter nameOfp p _ _) = TypedTripleGetter nameOfp go "" "" where
+useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go r =
     do
       remember <- memorizeQueryResults
@@ -243,22 +236,22 @@ constant :: forall e. ID -> TypedTripleGetter e
 constant subject = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$constant$_" <> subject)
   (\_ -> pure [subject])
-  "model:Perspectives$Context"
-  "model:Perspectives$Context"
 
 -----------------------------------------------------------
 -- VARIABLES
 -----------------------------------------------------------
 var :: forall e. String -> TypedTripleGetter e -> TypedTripleGetter e
-var name (TypedTripleGetter nameOfp p domain range) = TypedTripleGetter nameOfp go domain range where
+var name (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go subject = do
     r <- p subject
     putQueryVariable name (TripleRef{subject: subject, predicate: nameOfp})
     pure r
 
 ref :: forall e. String -> TypedTripleGetter e
-ref name = TypedTripleGetter name go "domain" "range" where
-  go _ = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
+ref name = TypedTripleGetter name ref'
+
+ref' :: forall e. String -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+ref' name = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
     do
       mref <- lift $ liftEff $ lookupInTripleIndex subject predicate
       unsafePartial $ pure $ fromJust $ mref

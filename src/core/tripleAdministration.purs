@@ -4,7 +4,7 @@ import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
-import Perspectives.CoreTypes (Domain, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), Range)
+import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
 import Perspectives.PerspectivesState (getsGlobalState, modifyGlobalState)
@@ -104,8 +104,8 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
-memorize :: forall e. TripleGetter e -> String -> Domain -> Range -> TypedTripleGetter e
-memorize getter name domain range = TypedTripleGetter name (\id -> do
+memorize :: forall e. TripleGetter e -> String -> TypedTripleGetter e
+memorize getter name = TypedTripleGetter name (\id -> do
   remember <- memorizeQueryResults
   case remember of
     true -> do
@@ -118,8 +118,6 @@ memorize getter name domain range = TypedTripleGetter name (\id -> do
     false -> do
       t <- getter id
       lift $ liftEff $ registerTriple t)
-  domain
-  range
 
 -- | Add the reference to the triple.
 foreign import addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef

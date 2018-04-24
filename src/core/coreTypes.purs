@@ -166,7 +166,7 @@ runTypedTripleGetter :: forall e.
   TypedTripleGetter e
   -> Subject
   -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
-runTypedTripleGetter (TypedTripleGetter _ f _ _) a = runMonadPerspectivesQuery a f
+runTypedTripleGetter (TypedTripleGetter _ f) a = runMonadPerspectivesQuery a f
 
 runQuery :: forall e.
   Subject
@@ -177,18 +177,16 @@ runQuery = (flip runTypedTripleGetter)
 infix 0 runQuery as ##
 
 tripleGetter2function :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Maybe String)
-tripleGetter2function (TypedTripleGetter name tg _ _)= tg >=> tripleObjects_ >=> (pure <<< head)
+tripleGetter2function (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head)
 
 tripleGetter2function' :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) String
-tripleGetter2function' (TypedTripleGetter name tg _ _)= tg >=> tripleObjects_ >=> (pure <<< head) >=> (onNothing' (error ("No result for " <> name)))
+tripleGetter2function' (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head) >=> (onNothing' (error ("No result for " <> name)))
 
 -----------------------------------------------------------
 -- TYPED GETTERS
 -----------------------------------------------------------
 
-data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e) Domain Range
-
-data TypedObjectsGetter e = TypedObjectsGetter (ObjectsGetter e) Domain Range
+data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e)
 
 -----------------------------------------------------------
 -- TRIPLEREF

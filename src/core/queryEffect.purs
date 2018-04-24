@@ -14,8 +14,8 @@ type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache (ref :: R
 -- | The result of the function (a Triple) should be unsubscribed from the triple index in order to
 -- | make the effect function no longer dependent (using unRegisterTriple).
 addEffectToQuery :: forall e. TypedTripleGetter e -> QueryEffect e -> TypedTripleGetter e
-addEffectToQuery (TypedTripleGetter tgName tg domain range) (NamedFunction effectName effect) =
-  TypedTripleGetter effectName addEffectToQuery' domain range where
+addEffectToQuery (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
+  TypedTripleGetter effectName addEffectToQuery' where
 
     addEffectToQuery' :: TripleGetter e
     addEffectToQuery' id = do

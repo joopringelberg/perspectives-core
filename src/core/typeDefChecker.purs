@@ -4,7 +4,7 @@ import Control.Monad.Writer (WriterT, lift, tell)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MP, TypeID, TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, tripleGetter2function, tripleObjects, (##))
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.SystemQueries (contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, mogelijkeBinding)
+import Perspectives.SystemQueries (contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, pure, unit, ($), (*>), (>>=), (<<<), (<>), discard, void)
 

@@ -270,9 +270,9 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
 
   -- Roles that fill the syntactic role "LijdendVoorwerp".
   isLijdendVoorwerpIn :: TypedTripleGetter e
-  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp" "model:Arc$Actie" "model:Arc$lijdendVoorwerp")
+  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp")
   -- Fillers of the syntactic role "Onderwerp".
-  onderwerpFillers = (constructRolGetter "model:Arc$onderwerp" "model:Arc$Actie") >-> binding
+  onderwerpFillers = (constructRolGetter "model:Arc$onderwerp") >-> binding
   -- Tests an Actie for having memberName in the view that is its lijdendVoorwerpBepaling.
   hasRelevantView :: ID -> TypedTripleGetter e
   hasRelevantView id = contains id (lijdendVoorwerpBepaling >-> propertyReferentie)
