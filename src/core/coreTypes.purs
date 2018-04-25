@@ -18,7 +18,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
+import Prelude (class Eq, class Functor, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -26,7 +26,7 @@ import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pu
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
-type QueryCache = GLStrMap (TypedTripleGetter ())
+type QueryCache e = GLStrMap (TypedTripleGetter e)
 
 type PerspectivesState =
   { rolDefinitions :: RolDefinitions
@@ -36,7 +36,7 @@ type PerspectivesState =
   , couchdbSessionStarted :: Boolean
   , sessionCookie :: AVar String
   , memorizeQueryResults :: Boolean
-  , queryCache :: QueryCache
+  -- , queryCache :: QueryCache
   }
 
 -----------------------------------------------------------
@@ -189,6 +189,14 @@ data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e)
 
 typedTripleGetterName :: forall e. TypedTripleGetter e -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
+
+applyTypedTripleGetter :: forall e.
+  Subject
+  -> TypedTripleGetter e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Triple e)
+applyTypedTripleGetter a (TypedTripleGetter _ f) = f a
+
+infix 0 applyTypedTripleGetter as @@
 
 -----------------------------------------------------------
 -- TRIPLEREF

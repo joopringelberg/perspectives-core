@@ -15,7 +15,7 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, flip, pure, unit, ($), (<<<), (>>=))
 
-newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
+newPerspectivesState :: forall e. UserInfo -> AVar String -> PerspectivesState
 newPerspectivesState uinfo av =
   { rolDefinitions: new unit
   , contextDefinitions: new unit
@@ -24,7 +24,7 @@ newPerspectivesState uinfo av =
   , couchdbSessionStarted: false
   , sessionCookie: av
   , memorizeQueryResults: true
-  , queryCache: new unit
+  -- , queryCache: new unit
   }
 
 -- | Run an action in MonadPerspectives, given a username and password.
@@ -119,11 +119,14 @@ domeinCacheLookup = lookup domeinCache
 domeinCacheInsert :: forall e. String -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
 domeinCacheInsert = insert domeinCache
 
-queryCache :: forall e. MonadPerspectives e QueryCache
-queryCache = getsGlobalState _.queryCache
-
-queryCacheInsert :: forall e. String -> TypedTripleGetter() -> MonadPerspectives (AvarCache e) (TypedTripleGetter())
-queryCacheInsert = insert queryCache
+-- queryCache :: forall e. MonadPerspectives e QueryCache
+-- queryCache = getsGlobalState _.queryCache
+--
+-- queryCacheInsert :: forall e. String -> TypedTripleGetter() -> MonadPerspectives (AvarCache e) (TypedTripleGetter())
+-- queryCacheInsert = insert queryCache
+--
+-- queryCacheLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP | e) (Maybe (TypedTripleGetter()))
+-- queryCacheLookup = lookup queryCache
 
 insert :: forall eff a.
   MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
@@ -136,9 +139,9 @@ insert g ns av = do
   pure av
 
 lookup :: forall e a.
-  MonadPerspectives (gm :: GLOBALMAP | e) (GLStrMap (AVar a)) ->
+  MonadPerspectives (gm :: GLOBALMAP | e) (GLStrMap a) ->
   String ->
-  MonadPerspectives (gm :: GLOBALMAP | e) (Maybe (AVar a))
+  MonadPerspectives (gm :: GLOBALMAP | e) (Maybe a)
 lookup g k = do
   dc <- g
   liftAff $ liftEff $ peek dc k

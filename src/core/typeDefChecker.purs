@@ -1,32 +1,31 @@
 module Perspectives.TypeDefChecker where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
+import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (MP, TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectivesQuery, runMonadPerspectivesQuery, tripleGetter2function, tripleObjects, (##))
+import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQuery, tripleGetter2function, tripleObjects, (@@))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID)
-import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryAST (ElementaryQueryStep(..))
+import Perspectives.QueryCache (queryCacheLookup)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (constructQueryFunction)
-import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.SystemQueries (contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, isVerplicht, rolPropertyTypes)
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, discard, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (>>=), id)
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery e)
 
-checkContext :: forall e. ContextID -> MP e (Array UserMessage)
-checkContext cid = execWriterT $ checkContext' cid
+checkContext :: forall e. ContextID -> MP (AjaxAvarCache e) (Array UserMessage)
+checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContext' x
 
-checkContext' :: forall e. ContextID -> TDChecker e Unit
+checkContext' :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkContext' cid = do
-  ifNothing (lift $ runMonadPerspectivesQuery cid (tripleGetter2function contextType))
+  ifNothing (lift $ tripleGetter2function contextType cid)
     (tell [MissingType cid])
     \tp -> checkProperties tp cid *> checkRoles tp cid
 
-checkProperties :: forall e. TypeID -> ContextID -> TDChecker e Unit
+checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkProperties typeId cid = do
   -- TODO. Neem ook properties uit Aspecten mee! De mogelijkeBinding valt buiten deze check, dat komt als de binding zelf gecheckt wordt.
   void $ (get typeId contextInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
@@ -35,12 +34,12 @@ checkProperties typeId cid = do
   void $ (get typeId contextExternePropertyTypes) >>= (traverse (checkProperty (cid <> "_buitenRol")))
   -- TODO: Each external property must be defined.
 
-get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker e (Array ID)
-get typeId tg = lift $ (typeId ## tg) >>= pure <<< tripleObjects
+get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
+get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
 
 -- TODO: each role must be defined. This involves a check the other way round.
 -- TODO: neem rollen uit aspecten mee.
-checkRoles :: forall e. TypeID -> ContextID -> TDChecker e Unit
+checkRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkRoles typeId cid = void $ (get typeId contextRolTypes) >>= (traverse (checkRol cid))
 
 -- To check:
@@ -58,20 +57,23 @@ checkProperty rid propertyType = pure unit
 -- To check:
 --  * the properties of the role
 --  * the binding of the role.
-checkRol :: forall e. ContextID -> TypeID -> TDChecker e Unit
+checkRol :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 checkRol cid rolType = do
-  -- retrieve this type of rol from the context.
-  -- TODO: haal de getter op via de cache.
-  rolGetter <- lift $ (constructQueryFunction rolType)
-  mrolId <- lift $ (runMonadPerspectivesQuery cid (tripleGetter2function rolGetter))
-  case mrolId of
-    Nothing -> ifM (lift (runMonadPerspectivesQuery rolType rolIsMandatory) )
+  rolGetter <- lift $ lift $ getQueryFunction rolType
+  (Triple {object}) <- lift (cid @@ rolGetter)
+  case head object of
+    Nothing -> ifM (lift (rolIsMandatory rolType))
       (tell [MissingRolInstance rolType cid])
       (pure unit)
     (Just rolId) -> do
-      rolPropertyTypes <- lift $ (rolType ## rolPropertyTypes) >>= pure <<< tripleObjects
+      rolPropertyTypes <- lift $ (rolType @@ rolPropertyTypes) >>= pure <<< tripleObjects
       void $ (traverse (checkProperty rolId)) rolPropertyTypes
       pure unit
+
+getQueryFunction :: forall e. TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+getQueryFunction tp = ifNothing (queryCacheLookup tp)
+  (constructQueryFunction tp)
+  (pure <<< id)
 
 rolIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 rolIsMandatory = toBoolean isVerplicht
