@@ -23,7 +23,7 @@ import Perspectives.SystemQueries (contextRolTypes, contextType, mogelijkeBindin
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
--- This function creates a context that describes a query and is identified by contextId.
+-- This function creates a context that describes a query. This context will be identified by contextId.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 compileElementaryQueryStep s contextId = case s of
   Constant tp v -> putQueryStepDomain tp *> createContextWithInternalProperty contextId (q "constant") v

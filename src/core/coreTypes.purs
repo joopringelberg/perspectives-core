@@ -26,6 +26,7 @@ import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pu
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
+type QueryCache = GLStrMap (TypedTripleGetter ())
 
 type PerspectivesState =
   { rolDefinitions :: RolDefinitions
@@ -35,7 +36,7 @@ type PerspectivesState =
   , couchdbSessionStarted :: Boolean
   , sessionCookie :: AVar String
   , memorizeQueryResults :: Boolean
-  -- , queryFunctions :: StrMap QueryFunction
+  , queryCache :: QueryCache
   }
 
 -----------------------------------------------------------
@@ -201,14 +202,6 @@ instance showTripleRef :: Show TripleRef where
   show (TripleRef {subject, predicate}) = "{" <> show subject <> ", " <> show predicate <> "}"
 
 -----------------------------------------------------------
--- QUERYFUNCTION
------------------------------------------------------------
-type QueryFunction =
-  { function :: TripleGetter ()
-  , domain :: String
-  , range :: String}
-
------------------------------------------------------------
 -- TYPE CHECKING
 -----------------------------------------------------------
 type Aspect = String
@@ -225,5 +218,6 @@ data UserMessage =
   | MissingQualifiedRol RolName ContextID
   | MissingUnqualifiedRol RolName ContextID
   | MissingType ContextID
+  | MissingRolInstance RolName ContextID
 
 type FD = Either UserMessage ID

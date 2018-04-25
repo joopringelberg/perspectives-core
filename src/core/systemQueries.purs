@@ -94,7 +94,6 @@ rolOwnPropertyTypes = constructRolGetter "model:Perspectives$rolProperty" >-> bi
 rolAspectProperties :: forall e. TypedTripleGetter e
 rolAspectProperties = aspectRollen >-> rolOwnPropertyTypes
 
--- TODO: beschrijf in CRL.
 rolPropertyTypes :: forall e. TypedTripleGetter e
 rolPropertyTypes = QC.concat
   rolOwnPropertyTypes

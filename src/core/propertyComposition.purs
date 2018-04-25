@@ -6,7 +6,7 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), typedTripleGetterName)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), (>>>))
+import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
 
 compose :: forall e.
   TypedTripleGetter e ->

@@ -24,6 +24,7 @@ newPerspectivesState uinfo av =
   , couchdbSessionStarted: false
   , sessionCookie: av
   , memorizeQueryResults: true
+  , queryCache: new unit
   }
 
 -- | Run an action in MonadPerspectives, given a username and password.
@@ -118,13 +119,19 @@ domeinCacheLookup = lookup domeinCache
 domeinCacheInsert :: forall e. String -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
 domeinCacheInsert = insert domeinCache
 
+queryCache :: forall e. MonadPerspectives e QueryCache
+queryCache = getsGlobalState _.queryCache
+
+queryCacheInsert :: forall e. String -> TypedTripleGetter() -> MonadPerspectives (AvarCache e) (TypedTripleGetter())
+queryCacheInsert = insert queryCache
+
 insert :: forall eff a.
-  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap (AVar a)) ->
+  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
   String ->
-  AVar a ->
-  MonadPerspectives (gm :: GLOBALMAP | eff) (AVar a)
+  a ->
+  MonadPerspectives (gm :: GLOBALMAP | eff) a
 insert g ns av = do
-  (dc :: (GLStrMap (AVar a))) <- g
+  (dc :: (GLStrMap a)) <- g
   _ <- liftAff $ liftEff $ (poke dc ns av)
   pure av
 
