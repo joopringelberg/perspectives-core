@@ -129,6 +129,7 @@ constructQueryFunction typeDescriptionID = do
         (firstOnly (getRolByLocalName "value") typeDescriptionID)
       valueQuery <- constructQueryFunction valueDescriptionID
       pure $ var variableName valueQuery
+    -- TODO: binding etc.
 
     -- Any other argument will be passed as is, thus implementing that we can create arbitrary contexts.
     _ -> pure $ constant typeDescriptionID

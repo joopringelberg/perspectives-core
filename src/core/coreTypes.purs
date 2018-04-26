@@ -18,7 +18,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Functor, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
+import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -227,5 +227,6 @@ data UserMessage =
   | MissingUnqualifiedRol RolName ContextID
   | MissingType ContextID
   | MissingRolInstance RolName ContextID
+  | IncorrectBinding RolName TypeID
 
 type FD = Either UserMessage ID

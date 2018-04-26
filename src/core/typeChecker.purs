@@ -7,8 +7,9 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, runTypedTripleGetter, tripleGetter2function, tripleObjects, tripleObjects_, (##))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolName, ID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
+import Perspectives.Property (getRolType)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.SystemQueries (aspecten, binding, contextRolTypes, mogelijkeBinding, rolPropertyTypes)
@@ -115,3 +116,9 @@ mostSpecificCommonAspect types = do
   x <- traverse (runTypedTripleGetter aspecten) types
   aspects <- pure $ join (tripleObjects <$> x)
   foldM (\msca t -> ifM (hasAspect msca t) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects
+
+-- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect.
+rolIsInstanceOfType :: forall e. RolID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
+rolIsInstanceOfType rolId typeId = do
+  tp <- getRolType rolId >>= \x -> unsafePartial $ pure $ fromJust $ head x
+  if typeId == tp then (pure true) else hasAspect typeId tp

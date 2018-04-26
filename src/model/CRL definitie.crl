@@ -36,6 +36,7 @@ psp:Rol psp:rolProperty
 psp:Rol psp:rolInContext
 	extern psp:isFunctioneel = false
 	psp:mogelijkeBinding => psp:Rol
+	psp:mogelijkeBinding => psp:Function
 
 psp:Rol psp:viewInRol
 	extern psp:isFunctioneel = false
