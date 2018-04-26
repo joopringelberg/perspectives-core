@@ -98,7 +98,7 @@ rolPropertyTypes :: forall e. TypedTripleGetter e
 rolPropertyTypes = QC.concat
   rolOwnPropertyTypes
   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> rolOwnPropertyTypes)))
-    (aspectRol >->> \_ -> rolPropertyTypes))
+    ((aspectRol >->> (\_ -> rolPropertyTypes)) "rolPropertyTypes"))
 
 contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = constructRolGetter "model:Perspectives$rolInContext" >-> binding >-> rolContext

@@ -37,8 +37,9 @@ infixl 9 compose as >->
 composeLazy :: forall e.
   TypedTripleGetter e ->
   (Unit -> TypedTripleGetter e) ->
+  String ->
   TypedTripleGetter e
-composeLazy (TypedTripleGetter nameOfp p) g =
+composeLazy (TypedTripleGetter nameOfp p) g nameOfg =
   memorize getter name
     where
     getter :: TripleGetter e
@@ -60,6 +61,6 @@ composeLazy (TypedTripleGetter nameOfp p) g =
                         , tripleGetter : getter}
 
     name :: String
-    name = "(" <>  nameOfp <> " >-> " <> (typedTripleGetterName (g unit)) <> ")"
+    name = "(" <>  nameOfp <> " >-> " <> nameOfg <> ")"
 
 infixl 9 composeLazy as >->>
