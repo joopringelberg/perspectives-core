@@ -3,11 +3,11 @@ module Test.BoundContexts where
 import Control.Monad.Aff.Console (log) as AC
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Trans.Class (lift)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, (##))
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache, filter)
 import Perspectives.SystemQueries (binding, boundContexts, buitenRol, contextType, hasBinding, hasLabel, identity, iedereRolInContext, isVerplicht, label, range, rolContext, rolHasType, rolType, rolTypen)
-import Perspectives.TripleGetter (constructRolGetter, (##))
+import Perspectives.TripleGetter (constructRolGetter)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 import Test.TestEffects (CancelerEffects)
 

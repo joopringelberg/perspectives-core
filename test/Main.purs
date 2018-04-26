@@ -1,6 +1,6 @@
 module Test.Main where
 
-import Test.QueryEffects (test)
+import Test.TypeDefChecker (test)
 import Test.TestEffects as TE
 import Control.Monad.Aff (Aff, Fiber, runAff, runAff_)
 import Control.Monad.Aff.Console (CONSOLE, log) as AC
