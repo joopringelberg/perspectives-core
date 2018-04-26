@@ -18,7 +18,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
+import Prelude (class Apply, class Eq, class Functor, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>), ($), map, apply)
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -133,32 +133,78 @@ type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
 type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
 
 -----------------------------------------------------------
--- TRIPLEGETTER
+-- MPOBJECTS
 -----------------------------------------------------------
-type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+newtype MPObjects e a = MPObjects (MonadPerspectivesQuery (AjaxAvarCache e) (Array a))
 
+instance functorMPObjects :: Functor (MPObjects e) where
+  map f (MPObjects mpo) = MPObjects do
+    arr <- mpo
+    pure $ map f arr
+
+instance applyMPObjects :: Apply (MPObjects e) where
+  apply (MPObjects mpf) (MPObjects mpo) = MPObjects do
+    f <- mpf
+    o <- mpo
+    pure $ apply f o
+
+-----------------------------------------------------------
+-- NAMEDFUNCTION
+-----------------------------------------------------------
 type Name = String
 data NamedFunction f = NamedFunction Name f
 
-newtype Triple e = Triple
+-----------------------------------------------------------
+-- TRIPLE
+-----------------------------------------------------------
+newtype Triple' e a = Triple'
   { subject :: Subject
   , predicate :: Predicate
-  , object :: Array Value
+  , object :: Array a
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
   , tripleGetter :: TripleGetter e}
 
-instance showTriple :: Show (Triple e) where
-  show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
+type Triple e = Triple' e String
 
-instance eqTriple :: Eq (Triple e) where
-  eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
+instance showTriple :: Show a => Show (Triple' e a) where
+  show (Triple'{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
+
+instance eqTriple :: Eq a => Eq (Triple' e a) where
+  eq (Triple'({subject: s1, predicate: p1})) (Triple'({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
+
+instance functorTriple :: Functor (Triple' e) where
+  map f (Triple' tf@{object}) = Triple' $ tf {object = map f object}
+
+instance applyTriple :: Apply (Triple' e) where
+  apply (Triple'{object: f}) (Triple' tf@{object}) = Triple' $ tf {object = apply f object}
 
 tripleObjects :: forall e. Triple e -> Array String
-tripleObjects (Triple{object}) = object
+tripleObjects (Triple'{object}) = object
 
 tripleObjects_  :: forall e m. Monad m => (Triple e) -> m (Array ID)
-tripleObjects_ (Triple{object}) = pure object
+tripleObjects_ (Triple'{object}) = pure object
+
+-----------------------------------------------------------
+-- MPTRIPLE
+-----------------------------------------------------------
+newtype MPTriple e a = MPTriple (MonadPerspectivesQuery (AjaxAvarCache e) (Triple' e a))
+
+instance functorMPTriple :: Functor (MPTriple e) where
+  map f (MPTriple mpt) = MPTriple do
+    t <- mpt
+    pure $ map f t
+
+instance applyMPTriple :: Apply (MPTriple e) where
+  apply (MPTriple mpf) (MPTriple mpo) = MPTriple do
+    f <- mpf
+    o <- mpo
+    pure $ apply f o
+
+-----------------------------------------------------------
+-- TRIPLEGETTER
+-----------------------------------------------------------
+type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 
 -- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
 runTypedTripleGetter :: forall e.
