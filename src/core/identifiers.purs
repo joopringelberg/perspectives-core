@@ -11,7 +11,8 @@ module Perspectives.Identifiers
 , roleIndexNr
 , escapeCouchdbDocumentName
 , isInNamespace
-, isSubNamespace
+, isInNamespace'
+, isContainingNamespace
 , isQualifiedWithDomein
 , ModelName(..)
 , QualifiedName(..)
@@ -35,7 +36,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, id, not, ($), (<>), (==), (||))
+import Prelude (class Show, id, not, ($), (<<<), (<>), (==), (||))
 
 -- | A Namespace has the form "model:Name"
 type Namespace = String
@@ -158,16 +159,27 @@ roleIndexNr s = case match roleIndexNrRegex s of
 escapeCouchdbDocumentName :: String -> String
 escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
 
--- | ident is in ns iff the namespace part of ident equals ns.
--- | E.g. model:Perspectives$Aangifte$Aangever is in the namespace model:Perspectives$Aangifte$.
+-- | True, if the first argument is part of the second.
+-- | Hence: "model:Perspectives$Aangifte" `isInNamespace` "model:Perspectives$Aangifte$Aangever".
+-- TODO. Dit moet andersom.
 isInNamespace :: String -> String -> Boolean
 isInNamespace ns ident =
   -- A quick test: strip ns from ident. What remains may not hold a "$".
   ns == ident ||
     (not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern (ns <> "$")) ident)))
 
-isSubNamespace :: String -> String -> Boolean
-isSubNamespace ns ident = contains (Pattern ns) ident
+
+-- | True iff the first argument contains the second (as its first part). E.g.:
+-- | "model:Perspectives$Aangifte$Aangever" `isInNamespace` "model:Perspectives$Aangifte".
+-- | "a" `isInNamespace` "a" is true, too.
+isInNamespace' :: String -> String -> Boolean
+isInNamespace' a b = a == b || not (isContainingNamespace a b)
+
+-- | True iff the first argument is the first part of the second. E.g.:
+-- | "model:Perspectives$Aangifte" `isContainingNamespace` "model:Perspectives$Aangifte$Aangever".
+-- | Hence, a SubNamespace is more specialized, thus longer.
+isContainingNamespace :: String -> String -> Boolean
+isContainingNamespace ns ident = contains (Pattern ns) ident
 
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS

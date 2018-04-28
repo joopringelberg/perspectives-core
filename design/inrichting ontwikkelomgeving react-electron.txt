@@ -29,6 +29,10 @@ OPGESCHOOND OVERZICHT INRICHTING ONTWIKKELOMGEVING
 	Waarom de tweede nodig is, begrijp ik niet echt.
 
 
+Start het proces met:
+
+	npm run dev
+
 
 ==========================================================================================
 VERSLAG VAN DE INRICHTING HIERONDER

@@ -171,12 +171,12 @@ psp:Rol psp:objectView
 	extern psp:isFunctioneel = true
 	psp:mogelijkeBinding => psp:View
 
-psp:Rol arc:objectConstraint
+psp:Rol psp:objectConstraint
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = false
 	psp:mogelijkeBinding => psp:Constraint
 
-psp:Rol arc:subjectConstraint
+psp:Rol psp:subjectConstraint
 	extern psp:isFunctioneel = true
 	extern psp:isVerplicht = false
 	psp:mogelijkeBinding => psp:Constraint

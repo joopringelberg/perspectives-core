@@ -77,7 +77,7 @@ closure' (TypedTripleGetter nameOfp p) =
                             , tripleGetter : getter}
 
     name :: String
-    name = "(closure " <>  nameOfp <> ")"
+    name = "(closure' " <>  nameOfp <> ")"
 
 mcons :: forall a. Maybe a -> Array a -> Array a
 mcons = maybe id cons
@@ -106,7 +106,7 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
       _ -> cons subject arr
 
     name :: String
-    name = "(closure " <>  nameOfp <> ")"
+    name = "(filter " <> nameOfc <> " " <> nameOfp <> ")"
 
 concat :: forall e.
   TypedTripleGetter e ->

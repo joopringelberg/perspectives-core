@@ -10,11 +10,12 @@ import Perspectives.CoreTypes (MonadPerspectives, (##), tripleObjects)
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.Identifiers (isInNamespace, isSubNamespace)
+import Perspectives.Identifiers (isInNamespace')
+import Perspectives.PropertyComposition ((>->))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
-import Perspectives.SystemQueries (boundContexts, iedereRolInContext)
+import Perspectives.SystemQueries (binding, boundContexts, iedereRolInContext, rolContext)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const)
 
@@ -29,7 +30,6 @@ domeinFileFromContext enclosingContext = do
       ifM (saveContext c definedAtToplevel)
         do
           boundContexts <- lift $ ((context_id c) ## boundContexts)
-          -- boundContexts <- lift $ ((context_id c) ## (iedereRolInContext >-> binding))
           for_ (tripleObjects boundContexts) recursiveCollect
         (pure unit)
       where
@@ -39,7 +39,7 @@ domeinFileFromContext enclosingContext = do
             (pure unit)
             (flip collect ((context_id c) == (context_id enclosingContext)))
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
-        saveContext ctxt definedAtToplevel' = if isSubNamespace (context_id enclosingContext) (context_id ctxt)
+        saveContext ctxt definedAtToplevel' = if (context_id ctxt) `isInNamespace'` (context_id enclosingContext)
           then
             ifM (inDomeinFile (context_id ctxt))
               (pure false)
@@ -55,7 +55,7 @@ domeinFileFromContext enclosingContext = do
                       (pure unit)
                       (modify <<< insertRolInDomeinFile)
                 pure true
-          else if definedAtToplevel' && isInNamespace "model:User" (context_id ctxt)
+          else if definedAtToplevel' && (context_id ctxt) `isInNamespace'` "model:User"
             then if (savedToCouchdb ctxt)
               then pure false
               else
