@@ -1,0 +1,3910 @@
+{
+  "_id": "model:Perspectives",
+  "_rev": "56-b9a2fec9e1bf82c43cc3782b69abb690",
+  "roles": {
+    "model:Perspectives_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "_id": "model:Perspectives_buitenRol"
+    },
+    "model:Perspectives$rolInContext1": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SimpleValue_buitenRol",
+      "_id": "model:Perspectives$rolInContext1"
+    },
+    "model:Perspectives$rolInContext2": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Boolean_buitenRol",
+      "_id": "model:Perspectives$rolInContext2"
+    },
+    "model:Perspectives$rolInContext3": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 3,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$String_buitenRol",
+      "_id": "model:Perspectives$rolInContext3"
+    },
+    "model:Perspectives$rolInContext4": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 4,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Number_buitenRol",
+      "_id": "model:Perspectives$rolInContext4"
+    },
+    "model:Perspectives$rolInContext5": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 5,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Date_buitenRol",
+      "_id": "model:Perspectives$rolInContext5"
+    },
+    "model:Perspectives$rolInContext6": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 6,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$rolInContext6"
+    },
+    "model:Perspectives$rolInContext7": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 7,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$rolInContext7"
+    },
+    "model:Perspectives$rolInContext8": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 8,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$rolInContext8"
+    },
+    "model:Perspectives$rolInContext9": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 9,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View_buitenRol",
+      "_id": "model:Perspectives$rolInContext9"
+    },
+    "model:Perspectives$rolInContext10": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 10,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie_buitenRol",
+      "_id": "model:Perspectives$rolInContext10"
+    },
+    "model:Perspectives$rolInContext11": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 11,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Werkwoord_buitenRol",
+      "_id": "model:Perspectives$rolInContext11"
+    },
+    "model:Perspectives$rolInContext12": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 12,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Beheert_buitenRol",
+      "_id": "model:Perspectives$rolInContext12"
+    },
+    "model:Perspectives$rolInContext13": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 13,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Raadpleegt_buitenRol",
+      "_id": "model:Perspectives$rolInContext13"
+    },
+    "model:Perspectives$rolInContext14": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 14,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Creëert_buitenRol",
+      "_id": "model:Perspectives$rolInContext14"
+    },
+    "model:Perspectives$rolInContext15": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 15,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Verwijdert_buitenRol",
+      "_id": "model:Perspectives$rolInContext15"
+    },
+    "model:Perspectives$rolInContext16": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 16,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function_buitenRol",
+      "_id": "model:Perspectives$rolInContext16"
+    },
+    "model:Perspectives$rolInContext17": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 17,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SingularFunction_buitenRol",
+      "_id": "model:Perspectives$rolInContext17"
+    },
+    "model:Perspectives$rolInContext18": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 18,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$ElkType_buitenRol",
+      "_id": "model:Perspectives$rolInContext18"
+    },
+    "model:Perspectives$rolInContext19": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 19,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Constraint_buitenRol",
+      "_id": "model:Perspectives$rolInContext19"
+    },
+    "model:Perspectives$rolInContext20": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 20,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Sum_buitenRol",
+      "_id": "model:Perspectives$rolInContext20"
+    },
+    "model:Perspectives$rolInContext21": {
+      "pspType": "model:Perspectives$rolInContext",
+      "properties": {},
+      "occurrence": 21,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$label_buitenRol",
+      "_id": "model:Perspectives$rolInContext21"
+    },
+    "model:Perspectives$SimpleValue_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$SimpleValue",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$SimpleValue_buitenRol"
+    },
+    "model:Perspectives$Boolean_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Boolean",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Boolean_buitenRol"
+    },
+    "model:Perspectives$Boolean$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Boolean",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SimpleValue_buitenRol",
+      "_id": "model:Perspectives$Boolean$aspect_1"
+    },
+    "model:Perspectives$String_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$String",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$String_buitenRol"
+    },
+    "model:Perspectives$String$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$String",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SimpleValue_buitenRol",
+      "_id": "model:Perspectives$String$aspect_1"
+    },
+    "model:Perspectives$Number_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Number",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Number_buitenRol"
+    },
+    "model:Perspectives$Number$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Number",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SimpleValue_buitenRol",
+      "_id": "model:Perspectives$Number$aspect_1"
+    },
+    "model:Perspectives$Date_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Date",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Date_buitenRol"
+    },
+    "model:Perspectives$Date$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Date",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SimpleValue_buitenRol",
+      "_id": "model:Perspectives$Date$aspect_1"
+    },
+    "model:Perspectives$Property_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Property_buitenRol"
+    },
+    "model:Perspectives$Property$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property$range_buitenRol",
+      "_id": "model:Perspectives$Property$rolInContext_1"
+    },
+    "model:Perspectives$Property$externalProperty_1": {
+      "pspType": "model:Perspectives$Context$externalProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property$isFunctioneel_buitenRol",
+      "_id": "model:Perspectives$Property$externalProperty_1"
+    },
+    "model:Perspectives$Property$externalProperty_2": {
+      "pspType": "model:Perspectives$Context$externalProperty",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property$isVerplicht_buitenRol",
+      "_id": "model:Perspectives$Property$externalProperty_2"
+    },
+    "model:Perspectives$Property$range_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Property$range_buitenRol"
+    },
+    "model:Perspectives$Property$range$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Property$range$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Context_buitenRol"
+    },
+    "model:Perspectives$Context$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$externalProperty_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_1"
+    },
+    "model:Perspectives$Context$rolInContext_2": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$internalProperty_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_2"
+    },
+    "model:Perspectives$Context$rolInContext_3": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 3,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$rolInContext_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_3"
+    },
+    "model:Perspectives$Context$rolInContext_4": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 4,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$interneView_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_4"
+    },
+    "model:Perspectives$Context$rolInContext_5": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 5,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$externeView_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_5"
+    },
+    "model:Perspectives$Context$rolInContext_6": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 6,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$prototype_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_6"
+    },
+    "model:Perspectives$Context$rolInContext_7": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 7,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context$aspect_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_7"
+    },
+    "model:Perspectives$Context$externalProperty_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$externalProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$externalProperty_buitenRol"
+    },
+    "model:Perspectives$Context$externalProperty$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$externalProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Context$externalProperty$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context$internalProperty_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$internalProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$internalProperty_buitenRol"
+    },
+    "model:Perspectives$Context$internalProperty$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$internalProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Context$internalProperty$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context$rolInContext_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$rolInContext",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext_buitenRol"
+    },
+    "model:Perspectives$Context$rolInContext$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$rolInContext",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context$rolInContext$mogelijkeBinding_2": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$rolInContext",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function_buitenRol",
+      "_id": "model:Perspectives$Context$rolInContext$mogelijkeBinding_2"
+    },
+    "model:Perspectives$Rol_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Rol_buitenRol"
+    },
+    "model:Perspectives$Rol$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$rolProperty_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_1"
+    },
+    "model:Perspectives$Rol$rolInContext_2": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$mogelijkeBinding_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_2"
+    },
+    "model:Perspectives$Rol$rolInContext_3": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 3,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$viewInRol_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_3"
+    },
+    "model:Perspectives$Rol$rolInContext_4": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 4,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$actie_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_4"
+    },
+    "model:Perspectives$Rol$rolInContext_5": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 5,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$aspectRol_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_5"
+    },
+    "model:Perspectives$Rol$rolInContext_6": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 6,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$constraint_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_6"
+    },
+    "model:Perspectives$Rol$rolInContext_7": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 7,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$objectRol_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_7"
+    },
+    "model:Perspectives$Rol$rolInContext_8": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 8,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$subjectRol_buitenRol",
+      "_id": "model:Perspectives$Rol$rolInContext_8"
+    },
+    "model:Perspectives$Rol$externalProperty_1": {
+      "pspType": "model:Perspectives$Context$externalProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$isVerplicht_buitenRol",
+      "_id": "model:Perspectives$Rol$externalProperty_1"
+    },
+    "model:Perspectives$Rol$externalProperty_2": {
+      "pspType": "model:Perspectives$Context$externalProperty",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol$isFunctioneel_buitenRol",
+      "_id": "model:Perspectives$Rol$externalProperty_2"
+    },
+    "model:Perspectives$Rol$rolProperty_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$rolProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$rolProperty_buitenRol"
+    },
+    "model:Perspectives$Rol$rolProperty$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$rolProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Rol$rolProperty$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Rol$mogelijkeBinding_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$mogelijkeBinding",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$mogelijkeBinding_buitenRol"
+    },
+    "model:Perspectives$Rol$viewInRol_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$viewInRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$viewInRol_buitenRol"
+    },
+    "model:Perspectives$Rol$viewInRol$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$viewInRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View_buitenRol",
+      "_id": "model:Perspectives$Rol$viewInRol$mogelijkeBinding_1"
+    },
+    "model:Perspectives$View_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$View_buitenRol"
+    },
+    "model:Perspectives$View$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View$propertyReferentie_buitenRol",
+      "_id": "model:Perspectives$View$rolInContext_1"
+    },
+    "model:Perspectives$View$propertyReferentie_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View$propertyReferentie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$View$propertyReferentie_buitenRol"
+    },
+    "model:Perspectives$View$propertyReferentie$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View$propertyReferentie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$View$propertyReferentie$mogelijkeBinding_1"
+    },
+    "model:Perspectives$View$propertyReferentie$rolProperty_1": {
+      "pspType": "model:Perspectives$Rol$rolProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View$propertyReferentie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View$propertyReferentie$volgNummer_buitenRol",
+      "_id": "model:Perspectives$View$propertyReferentie$rolProperty_1"
+    },
+    "model:Perspectives$View$propertyReferentie$volgNummer_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Property$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Property$isVerplicht": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View$propertyReferentie$volgNummer",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$View$propertyReferentie$volgNummer_buitenRol"
+    },
+    "model:Perspectives$View$propertyReferentie$volgNummer$range_1": {
+      "pspType": "model:Perspectives$Property$range",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$View$propertyReferentie$volgNummer",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Number_buitenRol",
+      "_id": "model:Perspectives$View$propertyReferentie$volgNummer$range_1"
+    },
+    "model:Perspectives$Rol$actie_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$actie_buitenRol"
+    },
+    "model:Perspectives$Rol$actie$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie_buitenRol",
+      "_id": "model:Perspectives$Rol$actie$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Actie_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Actie_buitenRol"
+    },
+    "model:Perspectives$Actie$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie$subjectView_buitenRol",
+      "_id": "model:Perspectives$Actie$rolInContext_1"
+    },
+    "model:Perspectives$Actie$rolInContext_2": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie$werkwoord_buitenRol",
+      "_id": "model:Perspectives$Actie$rolInContext_2"
+    },
+    "model:Perspectives$Actie$rolInContext_3": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 3,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie$objectView_buitenRol",
+      "_id": "model:Perspectives$Actie$rolInContext_3"
+    },
+    "model:Perspectives$Actie$rolInContext_4": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 4,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie$objectConstraint_buitenRol",
+      "_id": "model:Perspectives$Actie$rolInContext_4"
+    },
+    "model:Perspectives$Actie$rolInContext_5": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 5,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie$subjectConstraint_buitenRol",
+      "_id": "model:Perspectives$Actie$rolInContext_5"
+    },
+    "model:Perspectives$Actie$subjectView_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$subjectView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Actie$subjectView_buitenRol"
+    },
+    "model:Perspectives$Actie$subjectView$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$subjectView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View_buitenRol",
+      "_id": "model:Perspectives$Actie$subjectView$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Actie$werkwoord_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$werkwoord",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Actie$werkwoord_buitenRol"
+    },
+    "model:Perspectives$Actie$werkwoord$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$werkwoord",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Werkwoord_buitenRol",
+      "_id": "model:Perspectives$Actie$werkwoord$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Werkwoord_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Werkwoord",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Werkwoord_buitenRol"
+    },
+    "model:Perspectives$Actie$objectView_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$objectView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Actie$objectView_buitenRol"
+    },
+    "model:Perspectives$Actie$objectView$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$objectView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View_buitenRol",
+      "_id": "model:Perspectives$Actie$objectView$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Actie$objectConstraint_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Rol$isVerplicht": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$objectConstraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Actie$objectConstraint_buitenRol"
+    },
+    "model:Perspectives$Actie$objectConstraint$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$objectConstraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Constraint_buitenRol",
+      "_id": "model:Perspectives$Actie$objectConstraint$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Constraint_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Constraint_buitenRol"
+    },
+    "model:Perspectives$Constraint$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Constraint$range_buitenRol",
+      "_id": "model:Perspectives$Constraint$rolInContext_1"
+    },
+    "model:Perspectives$Constraint$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function_buitenRol",
+      "_id": "model:Perspectives$Constraint$aspect_1"
+    },
+    "model:Perspectives$Constraint$range_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Constraint$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Constraint$range_buitenRol"
+    },
+    "model:Perspectives$Constraint$range$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Constraint$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Boolean_buitenRol",
+      "_id": "model:Perspectives$Constraint$range$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Constraint$range$aspectRol_1": {
+      "pspType": "model:Perspectives$Rol$aspectRol",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Constraint$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function$range_buitenRol",
+      "_id": "model:Perspectives$Constraint$range$aspectRol_1"
+    },
+    "model:Perspectives$Function$range_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Function$range_buitenRol"
+    },
+    "model:Perspectives$Function$range$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$ElkType_buitenRol",
+      "_id": "model:Perspectives$Function$range$mogelijkeBinding_1"
+    },
+    "model:Perspectives$ElkType_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$ElkType",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$ElkType_buitenRol"
+    },
+    "model:Perspectives$Function_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Function_buitenRol"
+    },
+    "model:Perspectives$Function$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function$domain_buitenRol",
+      "_id": "model:Perspectives$Function$rolInContext_1"
+    },
+    "model:Perspectives$Function$rolInContext_2": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 2,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function$range_buitenRol",
+      "_id": "model:Perspectives$Function$rolInContext_2"
+    },
+    "model:Perspectives$Function$domain_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function$domain",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Function$domain_buitenRol"
+    },
+    "model:Perspectives$Function$domain$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Function$domain",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$ElkType_buitenRol",
+      "_id": "model:Perspectives$Function$domain$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Actie$subjectConstraint_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Rol$isVerplicht": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$subjectConstraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Actie$subjectConstraint_buitenRol"
+    },
+    "model:Perspectives$Actie$subjectConstraint$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Actie$subjectConstraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Constraint_buitenRol",
+      "_id": "model:Perspectives$Actie$subjectConstraint$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Rol$aspectRol_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$aspectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$aspectRol_buitenRol"
+    },
+    "model:Perspectives$Rol$aspectRol$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$aspectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$aspectRol$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Rol$constraint_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$constraint_buitenRol"
+    },
+    "model:Perspectives$Rol$constraint$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Constraint_buitenRol",
+      "_id": "model:Perspectives$Rol$constraint$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Rol$objectRol_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$objectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$objectRol_buitenRol"
+    },
+    "model:Perspectives$Rol$objectRol$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$objectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie_buitenRol",
+      "_id": "model:Perspectives$Rol$objectRol$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Rol$subjectRol_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$subjectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Rol$subjectRol_buitenRol"
+    },
+    "model:Perspectives$Rol$subjectRol$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$subjectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Actie_buitenRol",
+      "_id": "model:Perspectives$Rol$subjectRol$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Rol$isVerplicht_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Property$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Property$isVerplicht": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$isVerplicht",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Rol$isVerplicht_buitenRol"
+    },
+    "model:Perspectives$Rol$isVerplicht$range_1": {
+      "pspType": "model:Perspectives$Property$range",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$isVerplicht",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Boolean_buitenRol",
+      "_id": "model:Perspectives$Rol$isVerplicht$range_1"
+    },
+    "model:Perspectives$Rol$isFunctioneel_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Property$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Property$isVerplicht": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Rol$isFunctioneel_buitenRol"
+    },
+    "model:Perspectives$Rol$isFunctioneel$bindingProperty_1": {
+      "pspType": "model:Perspectives$Property$bindingProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Rol$isFunctioneel$bindingProperty_1"
+    },
+    "model:Perspectives$Rol$isFunctioneel$aspectProperty_1": {
+      "pspType": "model:Perspectives$Property$aspectProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Rol$isFunctioneel$aspectProperty_1"
+    },
+    "model:Perspectives$Rol$isFunctioneel$range_1": {
+      "pspType": "model:Perspectives$Property$range",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Rol$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Boolean_buitenRol",
+      "_id": "model:Perspectives$Rol$isFunctioneel$range_1"
+    },
+    "model:Perspectives$Context$interneView_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$interneView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$interneView_buitenRol"
+    },
+    "model:Perspectives$Context$interneView$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$interneView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View_buitenRol",
+      "_id": "model:Perspectives$Context$interneView$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context$externeView_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$externeView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$externeView_buitenRol"
+    },
+    "model:Perspectives$Context$externeView$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$externeView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$View_buitenRol",
+      "_id": "model:Perspectives$Context$externeView$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context$prototype_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$prototype",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$prototype_buitenRol"
+    },
+    "model:Perspectives$Context$prototype$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$prototype",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Context$prototype$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Context$aspect_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$aspect",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Context$aspect_buitenRol"
+    },
+    "model:Perspectives$Context$aspect$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Context$aspect",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Context$aspect$mogelijkeBinding_1"
+    },
+    "model:Perspectives$Property$isFunctioneel_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Property$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Property$isVerplicht": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Property$isFunctioneel_buitenRol"
+    },
+    "model:Perspectives$Property$isFunctioneel$bindingProperty_1": {
+      "pspType": "model:Perspectives$Property$bindingProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Property$isFunctioneel$bindingProperty_1"
+    },
+    "model:Perspectives$Property$isFunctioneel$aspectProperty_1": {
+      "pspType": "model:Perspectives$Property$aspectProperty",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Property$isFunctioneel$aspectProperty_1"
+    },
+    "model:Perspectives$Property$isFunctioneel$range_1": {
+      "pspType": "model:Perspectives$Property$range",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Boolean_buitenRol",
+      "_id": "model:Perspectives$Property$isFunctioneel$range_1"
+    },
+    "model:Perspectives$Property$isVerplicht_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Property$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Property$isVerplicht": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$isVerplicht",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$Property$isVerplicht_buitenRol"
+    },
+    "model:Perspectives$Property$isVerplicht$range_1": {
+      "pspType": "model:Perspectives$range",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Property$isVerplicht",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Boolean_buitenRol",
+      "_id": "model:Perspectives$Property$isVerplicht$range_1"
+    },
+    "model:Perspectives$Beheert_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Beheert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Beheert_buitenRol"
+    },
+    "model:Perspectives$Beheert$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Beheert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Werkwoord_buitenRol",
+      "_id": "model:Perspectives$Beheert$aspect_1"
+    },
+    "model:Perspectives$Raadpleegt_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Raadpleegt",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Raadpleegt_buitenRol"
+    },
+    "model:Perspectives$Raadpleegt$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Raadpleegt",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Werkwoord_buitenRol",
+      "_id": "model:Perspectives$Raadpleegt$aspect_1"
+    },
+    "model:Perspectives$Creëert_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Creëert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Creëert_buitenRol"
+    },
+    "model:Perspectives$Creëert$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Creëert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Werkwoord_buitenRol",
+      "_id": "model:Perspectives$Creëert$aspect_1"
+    },
+    "model:Perspectives$Verwijdert_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Verwijdert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Verwijdert_buitenRol"
+    },
+    "model:Perspectives$Verwijdert$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Verwijdert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Werkwoord_buitenRol",
+      "_id": "model:Perspectives$Verwijdert$aspect_1"
+    },
+    "model:Perspectives$SingularFunction_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$SingularFunction",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$SingularFunction_buitenRol"
+    },
+    "model:Perspectives$SingularFunction$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$SingularFunction",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$SingularFunction$range_buitenRol",
+      "_id": "model:Perspectives$SingularFunction$rolInContext_1"
+    },
+    "model:Perspectives$SingularFunction$aspect_1": {
+      "pspType": "model:Perspectives$Context$aspect",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$SingularFunction",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Function_buitenRol",
+      "_id": "model:Perspectives$SingularFunction$aspect_1"
+    },
+    "model:Perspectives$SingularFunction$range_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$SingularFunction$range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$SingularFunction$range_buitenRol"
+    },
+    "model:Perspectives$Sum_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {},
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Sum",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Context_buitenRol",
+      "_id": "model:Perspectives$Sum_buitenRol"
+    },
+    "model:Perspectives$Sum$rolInContext_1": {
+      "pspType": "model:Perspectives$Context$rolInContext",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Sum",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Sum$alternative_buitenRol",
+      "_id": "model:Perspectives$Sum$rolInContext_1"
+    },
+    "model:Perspectives$Sum$alternative_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Rol$isFunctioneel": {
+          "value": [
+            "false"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Sum$alternative",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Rol_buitenRol",
+      "_id": "model:Perspectives$Sum$alternative_buitenRol"
+    },
+    "model:Perspectives$Sum$alternative$mogelijkeBinding_1": {
+      "pspType": "model:Perspectives$Rol$mogelijkeBinding",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$Sum$alternative",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$ElkType_buitenRol",
+      "_id": "model:Perspectives$Sum$alternative$mogelijkeBinding_1"
+    },
+    "model:Perspectives$label_buitenRol": {
+      "pspType": "model:Perspectives$BuitenRol",
+      "properties": {
+        "model:Perspectives$Property$isFunctioneel": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "model:Perspectives$Property$isVerplicht": {
+          "value": [
+            "true"
+          ],
+          "commentBefore": [],
+          "commentAfter": []
+        }
+      },
+      "occurrence": 0,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$label",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$Property_buitenRol",
+      "_id": "model:Perspectives$label_buitenRol"
+    },
+    "model:Perspectives$label$range_1": {
+      "pspType": "model:Perspectives$Property$range",
+      "properties": {},
+      "occurrence": 1,
+      "gevuldeRollen": {},
+      "context": "model:Perspectives$label",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "binding": "model:Perspectives$String_buitenRol",
+      "_id": "model:Perspectives$label$range_1"
+    }
+  },
+  "contexts": {
+    "model:Perspectives": {
+      "rolInContext": {
+        "model:Perspectives$rolInContext": [
+          "model:Perspectives$rolInContext1",
+          "model:Perspectives$rolInContext2",
+          "model:Perspectives$rolInContext3",
+          "model:Perspectives$rolInContext4",
+          "model:Perspectives$rolInContext5",
+          "model:Perspectives$rolInContext6",
+          "model:Perspectives$rolInContext7",
+          "model:Perspectives$rolInContext8",
+          "model:Perspectives$rolInContext9",
+          "model:Perspectives$rolInContext10",
+          "model:Perspectives$rolInContext11",
+          "model:Perspectives$rolInContext12",
+          "model:Perspectives$rolInContext13",
+          "model:Perspectives$rolInContext14",
+          "model:Perspectives$rolInContext15",
+          "model:Perspectives$rolInContext16",
+          "model:Perspectives$rolInContext17",
+          "model:Perspectives$rolInContext18",
+          "model:Perspectives$rolInContext19",
+          "model:Perspectives$rolInContext20",
+          "model:Perspectives$rolInContext21"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "model:Perspectives",
+      "comments": {
+        "commentBefore": [
+          " CRL DEFINITIE"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives_buitenRol",
+        "_id": "model:Perspectives_binnenRol"
+      },
+      "_id": "model:Perspectives"
+    },
+    "model:Perspectives$SimpleValue": {
+      "rolInContext": {},
+      "pspType": "model:Perspectives$Context",
+      "displayName": "SimpleValue",
+      "comments": {
+        "commentBefore": [
+          "------------------------------------------------------------------------------",
+          " SIMPLE VALUES",
+          "------------------------------------------------------------------------------"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$SimpleValue_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$SimpleValue_buitenRol",
+        "_id": "model:Perspectives$SimpleValue_binnenRol"
+      },
+      "_id": "model:Perspectives$SimpleValue"
+    },
+    "model:Perspectives$Boolean": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Boolean$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Boolean",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Boolean_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Boolean_buitenRol",
+        "_id": "model:Perspectives$Boolean_binnenRol"
+      },
+      "_id": "model:Perspectives$Boolean"
+    },
+    "model:Perspectives$String": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$String$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "String",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$String_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$String_buitenRol",
+        "_id": "model:Perspectives$String_binnenRol"
+      },
+      "_id": "model:Perspectives$String"
+    },
+    "model:Perspectives$Number": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Number$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Number",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Number_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Number_buitenRol",
+        "_id": "model:Perspectives$Number_binnenRol"
+      },
+      "_id": "model:Perspectives$Number"
+    },
+    "model:Perspectives$Date": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Date$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Date",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Date_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Date_buitenRol",
+        "_id": "model:Perspectives$Date_binnenRol"
+      },
+      "_id": "model:Perspectives$Date"
+    },
+    "model:Perspectives$Property": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Property$rolInContext_1"
+        ],
+        "model:Perspectives$Context$externalProperty": [
+          "model:Perspectives$Property$externalProperty_1",
+          "model:Perspectives$Property$externalProperty_2"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Property",
+      "comments": {
+        "commentBefore": [
+          "------------------------------------------------------------------------------",
+          " SYSTEM BASE",
+          "------------------------------------------------------------------------------"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Property_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Property_buitenRol",
+        "_id": "model:Perspectives$Property_binnenRol"
+      },
+      "_id": "model:Perspectives$Property"
+    },
+    "model:Perspectives$Property$range": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Property$range$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Property$range_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Property$range_buitenRol",
+        "_id": "model:Perspectives$Property$range_binnenRol"
+      },
+      "_id": "model:Perspectives$Property$range"
+    },
+    "model:Perspectives$Context": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Context$rolInContext_1",
+          "model:Perspectives$Context$rolInContext_2",
+          "model:Perspectives$Context$rolInContext_3",
+          "model:Perspectives$Context$rolInContext_4",
+          "model:Perspectives$Context$rolInContext_5",
+          "model:Perspectives$Context$rolInContext_6",
+          "model:Perspectives$Context$rolInContext_7"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Context",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context_buitenRol",
+        "_id": "model:Perspectives$Context_binnenRol"
+      },
+      "_id": "model:Perspectives$Context"
+    },
+    "model:Perspectives$Context$externalProperty": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$externalProperty$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "externalProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$externalProperty_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$externalProperty_buitenRol",
+        "_id": "model:Perspectives$Context$externalProperty_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$externalProperty"
+    },
+    "model:Perspectives$Context$internalProperty": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$internalProperty$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "internalProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$internalProperty_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$internalProperty_buitenRol",
+        "_id": "model:Perspectives$Context$internalProperty_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$internalProperty"
+    },
+    "model:Perspectives$Context$rolInContext": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$rolInContext$mogelijkeBinding_1",
+          "model:Perspectives$Context$rolInContext$mogelijkeBinding_2"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "rolInContext",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$rolInContext_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$rolInContext_buitenRol",
+        "_id": "model:Perspectives$Context$rolInContext_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$rolInContext"
+    },
+    "model:Perspectives$Rol": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Rol$rolInContext_1",
+          "model:Perspectives$Rol$rolInContext_2",
+          "model:Perspectives$Rol$rolInContext_3",
+          "model:Perspectives$Rol$rolInContext_4",
+          "model:Perspectives$Rol$rolInContext_5",
+          "model:Perspectives$Rol$rolInContext_6",
+          "model:Perspectives$Rol$rolInContext_7",
+          "model:Perspectives$Rol$rolInContext_8"
+        ],
+        "model:Perspectives$Context$externalProperty": [
+          "model:Perspectives$Rol$externalProperty_1",
+          "model:Perspectives$Rol$externalProperty_2"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Rol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol_buitenRol",
+        "_id": "model:Perspectives$Rol_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol"
+    },
+    "model:Perspectives$Rol$rolProperty": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$rolProperty$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "rolProperty",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$rolProperty_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$rolProperty_buitenRol",
+        "_id": "model:Perspectives$Rol$rolProperty_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$rolProperty"
+    },
+    "model:Perspectives$Rol$mogelijkeBinding": {
+      "rolInContext": {},
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "mogelijkeBinding",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$mogelijkeBinding_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$mogelijkeBinding_buitenRol",
+        "_id": "model:Perspectives$Rol$mogelijkeBinding_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$mogelijkeBinding"
+    },
+    "model:Perspectives$Rol$viewInRol": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$viewInRol$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "viewInRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$viewInRol_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$viewInRol_buitenRol",
+        "_id": "model:Perspectives$Rol$viewInRol_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$viewInRol"
+    },
+    "model:Perspectives$View": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$View$rolInContext_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "View",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$View_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$View_buitenRol",
+        "_id": "model:Perspectives$View_binnenRol"
+      },
+      "_id": "model:Perspectives$View"
+    },
+    "model:Perspectives$View$propertyReferentie": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$View$propertyReferentie$mogelijkeBinding_1"
+        ],
+        "model:Perspectives$Rol$rolProperty": [
+          "model:Perspectives$View$propertyReferentie$rolProperty_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "propertyReferentie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$View$propertyReferentie_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$View$propertyReferentie_buitenRol",
+        "_id": "model:Perspectives$View$propertyReferentie_binnenRol"
+      },
+      "_id": "model:Perspectives$View$propertyReferentie"
+    },
+    "model:Perspectives$View$propertyReferentie$volgNummer": {
+      "rolInContext": {
+        "model:Perspectives$Property$range": [
+          "model:Perspectives$View$propertyReferentie$volgNummer$range_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Property",
+      "displayName": "volgNummer",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$View$propertyReferentie$volgNummer_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$View$propertyReferentie$volgNummer_buitenRol",
+        "_id": "model:Perspectives$View$propertyReferentie$volgNummer_binnenRol"
+      },
+      "_id": "model:Perspectives$View$propertyReferentie$volgNummer"
+    },
+    "model:Perspectives$Rol$actie": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$actie$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "actie",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$actie_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$actie_buitenRol",
+        "_id": "model:Perspectives$Rol$actie_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$actie"
+    },
+    "model:Perspectives$Actie": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Actie$rolInContext_1",
+          "model:Perspectives$Actie$rolInContext_2",
+          "model:Perspectives$Actie$rolInContext_3",
+          "model:Perspectives$Actie$rolInContext_4",
+          "model:Perspectives$Actie$rolInContext_5"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Actie",
+      "comments": {
+        "commentBefore": [
+          "------------------------------------------------------------------------------",
+          " ACTIES",
+          "------------------------------------------------------------------------------"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Actie_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Actie_buitenRol",
+        "_id": "model:Perspectives$Actie_binnenRol"
+      },
+      "_id": "model:Perspectives$Actie"
+    },
+    "model:Perspectives$Actie$subjectView": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Actie$subjectView$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "subjectView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Actie$subjectView_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Actie$subjectView_buitenRol",
+        "_id": "model:Perspectives$Actie$subjectView_binnenRol"
+      },
+      "_id": "model:Perspectives$Actie$subjectView"
+    },
+    "model:Perspectives$Actie$werkwoord": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Actie$werkwoord$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "werkwoord",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Actie$werkwoord_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Actie$werkwoord_buitenRol",
+        "_id": "model:Perspectives$Actie$werkwoord_binnenRol"
+      },
+      "_id": "model:Perspectives$Actie$werkwoord"
+    },
+    "model:Perspectives$Werkwoord": {
+      "rolInContext": {},
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Werkwoord",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Werkwoord_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Werkwoord_buitenRol",
+        "_id": "model:Perspectives$Werkwoord_binnenRol"
+      },
+      "_id": "model:Perspectives$Werkwoord"
+    },
+    "model:Perspectives$Actie$objectView": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Actie$objectView$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "objectView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Actie$objectView_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Actie$objectView_buitenRol",
+        "_id": "model:Perspectives$Actie$objectView_binnenRol"
+      },
+      "_id": "model:Perspectives$Actie$objectView"
+    },
+    "model:Perspectives$Actie$objectConstraint": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Actie$objectConstraint$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "objectConstraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Actie$objectConstraint_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Actie$objectConstraint_buitenRol",
+        "_id": "model:Perspectives$Actie$objectConstraint_binnenRol"
+      },
+      "_id": "model:Perspectives$Actie$objectConstraint"
+    },
+    "model:Perspectives$Constraint": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Constraint$rolInContext_1"
+        ],
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Constraint$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Constraint_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Constraint_buitenRol",
+        "_id": "model:Perspectives$Constraint_binnenRol"
+      },
+      "_id": "model:Perspectives$Constraint"
+    },
+    "model:Perspectives$Constraint$range": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Constraint$range$mogelijkeBinding_1"
+        ],
+        "model:Perspectives$Rol$aspectRol": [
+          "model:Perspectives$Constraint$range$aspectRol_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Constraint$range_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Constraint$range_buitenRol",
+        "_id": "model:Perspectives$Constraint$range_binnenRol"
+      },
+      "_id": "model:Perspectives$Constraint$range"
+    },
+    "model:Perspectives$Function$range": {
+      "rolInContext": {
+        "model:Perspectives$mogelijkeBinding": [
+          "model:Perspectives$Function$range$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Function$range_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Function$range_buitenRol",
+        "_id": "model:Perspectives$Function$range_binnenRol"
+      },
+      "_id": "model:Perspectives$Function$range"
+    },
+    "model:Perspectives$ElkType": {
+      "rolInContext": {},
+      "pspType": "model:Perspectives$Context",
+      "displayName": "ElkType",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$ElkType_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$ElkType_buitenRol",
+        "_id": "model:Perspectives$ElkType_binnenRol"
+      },
+      "_id": "model:Perspectives$ElkType"
+    },
+    "model:Perspectives$Function": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Function$rolInContext_1",
+          "model:Perspectives$Function$rolInContext_2"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Function",
+      "comments": {
+        "commentBefore": [
+          "------------------------------------------------------------------------------",
+          " FUNCTION",
+          "------------------------------------------------------------------------------"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Function_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Function_buitenRol",
+        "_id": "model:Perspectives$Function_binnenRol"
+      },
+      "_id": "model:Perspectives$Function"
+    },
+    "model:Perspectives$Function$domain": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Function$domain$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "domain",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Function$domain_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Function$domain_buitenRol",
+        "_id": "model:Perspectives$Function$domain_binnenRol"
+      },
+      "_id": "model:Perspectives$Function$domain"
+    },
+    "model:Perspectives$Actie$subjectConstraint": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Actie$subjectConstraint$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "subjectConstraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Actie$subjectConstraint_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Actie$subjectConstraint_buitenRol",
+        "_id": "model:Perspectives$Actie$subjectConstraint_binnenRol"
+      },
+      "_id": "model:Perspectives$Actie$subjectConstraint"
+    },
+    "model:Perspectives$Rol$aspectRol": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$aspectRol$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "aspectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$aspectRol_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$aspectRol_buitenRol",
+        "_id": "model:Perspectives$Rol$aspectRol_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$aspectRol"
+    },
+    "model:Perspectives$Rol$constraint": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$constraint$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "constraint",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$constraint_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$constraint_buitenRol",
+        "_id": "model:Perspectives$Rol$constraint_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$constraint"
+    },
+    "model:Perspectives$Rol$objectRol": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$objectRol$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "objectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$objectRol_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$objectRol_buitenRol",
+        "_id": "model:Perspectives$Rol$objectRol_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$objectRol"
+    },
+    "model:Perspectives$Rol$subjectRol": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Rol$subjectRol$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "subjectRol",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$subjectRol_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$subjectRol_buitenRol",
+        "_id": "model:Perspectives$Rol$subjectRol_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$subjectRol"
+    },
+    "model:Perspectives$Rol$isVerplicht": {
+      "rolInContext": {
+        "model:Perspectives$Property$range": [
+          "model:Perspectives$Rol$isVerplicht$range_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Property",
+      "displayName": "isVerplicht",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$isVerplicht_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$isVerplicht_buitenRol",
+        "_id": "model:Perspectives$Rol$isVerplicht_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$isVerplicht"
+    },
+    "model:Perspectives$Rol$isFunctioneel": {
+      "rolInContext": {
+        "model:Perspectives$Property$bindingProperty": [
+          "model:Perspectives$Rol$isFunctioneel$bindingProperty_1"
+        ],
+        "model:Perspectives$Property$aspectProperty": [
+          "model:Perspectives$Rol$isFunctioneel$aspectProperty_1"
+        ],
+        "model:Perspectives$Property$range": [
+          "model:Perspectives$Rol$isFunctioneel$range_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Property",
+      "displayName": "isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Rol$isFunctioneel_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Rol$isFunctioneel_buitenRol",
+        "_id": "model:Perspectives$Rol$isFunctioneel_binnenRol"
+      },
+      "_id": "model:Perspectives$Rol$isFunctioneel"
+    },
+    "model:Perspectives$Context$interneView": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$interneView$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "interneView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$interneView_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$interneView_buitenRol",
+        "_id": "model:Perspectives$Context$interneView_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$interneView"
+    },
+    "model:Perspectives$Context$externeView": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$externeView$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "externeView",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$externeView_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$externeView_buitenRol",
+        "_id": "model:Perspectives$Context$externeView_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$externeView"
+    },
+    "model:Perspectives$Context$prototype": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$prototype$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "prototype",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$prototype_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$prototype_buitenRol",
+        "_id": "model:Perspectives$Context$prototype_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$prototype"
+    },
+    "model:Perspectives$Context$aspect": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Context$aspect$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "aspect",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Context$aspect_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Context$aspect_buitenRol",
+        "_id": "model:Perspectives$Context$aspect_binnenRol"
+      },
+      "_id": "model:Perspectives$Context$aspect"
+    },
+    "model:Perspectives$Property$isFunctioneel": {
+      "rolInContext": {
+        "model:Perspectives$Property$bindingProperty": [
+          "model:Perspectives$Property$isFunctioneel$bindingProperty_1"
+        ],
+        "model:Perspectives$Property$aspectProperty": [
+          "model:Perspectives$Property$isFunctioneel$aspectProperty_1"
+        ],
+        "model:Perspectives$Property$range": [
+          "model:Perspectives$Property$isFunctioneel$range_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Property",
+      "displayName": "isFunctioneel",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Property$isFunctioneel_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Property$isFunctioneel_buitenRol",
+        "_id": "model:Perspectives$Property$isFunctioneel_binnenRol"
+      },
+      "_id": "model:Perspectives$Property$isFunctioneel"
+    },
+    "model:Perspectives$Property$isVerplicht": {
+      "rolInContext": {
+        "model:Perspectives$range": [
+          "model:Perspectives$Property$isVerplicht$range_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Property",
+      "displayName": "isVerplicht",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Property$isVerplicht_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Property$isVerplicht_buitenRol",
+        "_id": "model:Perspectives$Property$isVerplicht_binnenRol"
+      },
+      "_id": "model:Perspectives$Property$isVerplicht"
+    },
+    "model:Perspectives$Beheert": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Beheert$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Beheert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Beheert_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Beheert_buitenRol",
+        "_id": "model:Perspectives$Beheert_binnenRol"
+      },
+      "_id": "model:Perspectives$Beheert"
+    },
+    "model:Perspectives$Raadpleegt": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Raadpleegt$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Raadpleegt",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Raadpleegt_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Raadpleegt_buitenRol",
+        "_id": "model:Perspectives$Raadpleegt_binnenRol"
+      },
+      "_id": "model:Perspectives$Raadpleegt"
+    },
+    "model:Perspectives$Creëert": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Creëert$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Creëert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Creëert_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Creëert_buitenRol",
+        "_id": "model:Perspectives$Creëert_binnenRol"
+      },
+      "_id": "model:Perspectives$Creëert"
+    },
+    "model:Perspectives$Verwijdert": {
+      "rolInContext": {
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$Verwijdert$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Verwijdert",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Verwijdert_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Verwijdert_buitenRol",
+        "_id": "model:Perspectives$Verwijdert_binnenRol"
+      },
+      "_id": "model:Perspectives$Verwijdert"
+    },
+    "model:Perspectives$SingularFunction": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$SingularFunction$rolInContext_1"
+        ],
+        "model:Perspectives$Context$aspect": [
+          "model:Perspectives$SingularFunction$aspect_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "SingularFunction",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$SingularFunction_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$SingularFunction_buitenRol",
+        "_id": "model:Perspectives$SingularFunction_binnenRol"
+      },
+      "_id": "model:Perspectives$SingularFunction"
+    },
+    "model:Perspectives$SingularFunction$range": {
+      "rolInContext": {},
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "range",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$SingularFunction$range_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$SingularFunction$range_buitenRol",
+        "_id": "model:Perspectives$SingularFunction$range_binnenRol"
+      },
+      "_id": "model:Perspectives$SingularFunction$range"
+    },
+    "model:Perspectives$Sum": {
+      "rolInContext": {
+        "model:Perspectives$Context$rolInContext": [
+          "model:Perspectives$Sum$rolInContext_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Context",
+      "displayName": "Sum",
+      "comments": {
+        "commentBefore": [
+          "------------------------------------------------------------------------------",
+          " SUM TYPES",
+          "------------------------------------------------------------------------------"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Sum_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Sum_buitenRol",
+        "_id": "model:Perspectives$Sum_binnenRol"
+      },
+      "_id": "model:Perspectives$Sum"
+    },
+    "model:Perspectives$Sum$alternative": {
+      "rolInContext": {
+        "model:Perspectives$Rol$mogelijkeBinding": [
+          "model:Perspectives$Sum$alternative$mogelijkeBinding_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Rol",
+      "displayName": "alternative",
+      "comments": {
+        "commentBefore": [],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$Sum$alternative_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$Sum$alternative_buitenRol",
+        "_id": "model:Perspectives$Sum$alternative_binnenRol"
+      },
+      "_id": "model:Perspectives$Sum$alternative"
+    },
+    "model:Perspectives$label": {
+      "rolInContext": {
+        "model:Perspectives$Property$range": [
+          "model:Perspectives$label$range_1"
+        ]
+      },
+      "pspType": "model:Perspectives$Property",
+      "displayName": "label",
+      "comments": {
+        "commentBefore": [
+          "------------------------------------------------------------------------------",
+          " SYSTEM ENTITIES",
+          "------------------------------------------------------------------------------"
+        ],
+        "commentAfter": []
+      },
+      "buitenRol": "model:Perspectives$label_buitenRol",
+      "binnenRol": {
+        "pspType": "model:Perspectives$BinnenRol",
+        "properties": {},
+        "occurrence": 0,
+        "gevuldeRollen": {},
+        "context": "",
+        "comments": {
+          "commentBefore": [],
+          "commentAfter": []
+        },
+        "binding": "model:Perspectives$label_buitenRol",
+        "_id": "model:Perspectives$label_binnenRol"
+      },
+      "_id": "model:Perspectives$label"
+    }
+  }
+}

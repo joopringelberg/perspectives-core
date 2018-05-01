@@ -27,8 +27,8 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.CoreTypes (TypedTripleGetter, MonadPerspectives, runMonadPerspectivesQuery, (##), tripleObjects)
+import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructNamespace, isUserEntiteitID)
@@ -39,7 +39,7 @@ import Perspectives.QueryCombinators (contains, rolesOf, toBoolean, filter)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctional, lijdendVoorwerpBepaling, propertyReferentie, rolContext, rolUser)
+import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctionalProperty, isFunctionalRol, objectView, propertyReferentie, rolContext, rolUser)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
@@ -167,12 +167,12 @@ ZO NEE:
 	Anders: voeg de nieuwe toe.
 -}
 addDelta :: forall e. Delta -> MonadTransactie e Unit
-addDelta newCD@(Delta{id: id', memberName, deltaType, value}) = do
+addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   t@(Transactie tf@{deltas}) <- get
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      (isfunc :: Boolean) <- lift $ runMonadPerspectivesQuery memberName (toBoolean isFunctional)
+      (isfunc :: Boolean) <- lift $ runMonadPerspectivesQuery memberName (toBoolean (if isContext then isFunctionalRol else isFunctionalProperty ))
       if isfunc
         then do
           x <- pure $ findIndex equalExceptRolID deltas
@@ -234,6 +234,8 @@ sendTransactieToUser userId t = do
     false -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
   pure unit
 
+-- TODO. De verbinding tussen Actie en Rol is omgekeerd en is niet
+-- langer geregistreerd als een rol van de Actie, maar als rol van de Rol (objectRol en subjectRol).
 -- | The (IDs of the) users that play a role in, and have a relevant perspective on, the Context that is modified;
 -- | or the users that play a role in the context of the Role that is modified and have a relevant perspective on that Role.
 usersInvolvedInDelta :: forall e. Delta -> MonadPerspectives (AjaxAvarCache e) (Array ID)
@@ -270,12 +272,14 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
 
   -- Roles that fill the syntactic role "LijdendVoorwerp".
   isLijdendVoorwerpIn :: TypedTripleGetter e
-  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$:lijdendVoorwerp")
+  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$Rol$objectRol")
+
   -- Fillers of the syntactic role "Onderwerp".
   onderwerpFillers = (constructRolGetter "model:Arc$onderwerp") >-> binding
-  -- Tests an Actie for having memberName in the view that is its lijdendVoorwerpBepaling.
+
+  -- Tests an Actie for having memberName in the view that is its objectView.
   hasRelevantView :: ID -> TypedTripleGetter e
-  hasRelevantView id = contains id (lijdendVoorwerpBepaling >-> propertyReferentie)
+  hasRelevantView id = contains id (objectView >-> propertyReferentie)
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.

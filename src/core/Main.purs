@@ -1,3 +1,24 @@
+--
+-- module Main where
+--
+-- import Test.TypeDefChecker (test)
+-- import Test.TestEffects as TE
+-- import Control.Monad.Aff (Aff, Fiber, runAff, runAff_)
+-- import Control.Monad.Aff.Console (CONSOLE, log) as AC
+-- import Control.Monad.Eff (Eff)
+-- import Perspectives.PerspectivesState (runPerspectives)
+-- import Prelude (class Show, Unit, pure, unit, (>>=), show)
+--
+-- -- import Test.BoundContexts
+--
+-- main :: forall e. Eff (TE.CancelerEffects e) (Fiber (TE.CancelerEffects e) Unit)
+-- main = runAff TE.handleError (runPerspectives "cor" "geheim" test)
+
+
+
+
+
+
 module Main where
 
 import Prelude

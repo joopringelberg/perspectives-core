@@ -6,7 +6,7 @@ import Control.Monad.Trans.Class (lift)
 import Perspectives.CoreTypes (MonadPerspectives, (##))
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
-import Perspectives.SystemQueries (binding, buitenRol, contextType, hasBinding, hasLabel, identity, isVerplicht, label, range, rolContext, iedereRolInContext, rolType, rolTypen)
+import Perspectives.SystemQueries (binding, buitenRol, contextType, hasBinding, hasLabel, identity, rolIsVerplicht, label, range, rolContext, iedereRolInContext, rolType, rolTypen)
 import Perspectives.TripleGetter (constructRolGetter)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 import Test.TestEffects (CancelerEffects)
@@ -14,8 +14,8 @@ import Test.TestEffects (CancelerEffects)
 rolDef :: String
 rolDef = "model:Perspectives$Rol"
 
-isVerplichtDef :: String
-isVerplichtDef = "model:Perspectives$isVerplicht"
+rolIsVerplichtDef :: String
+rolIsVerplichtDef = "model:Perspectives$Rol$isVerplicht"
 
 viewDef :: String
 viewDef = "model:Perspectives$view"
@@ -50,14 +50,14 @@ test = do
   l8 <-  rolDef ## iedereRolInContext >-> rolType
   log ( " rolDef ## iedereRolInContext >-> rolType = " <> (show l8))
 
-  l9 <-  isVerplichtDef ## isVerplicht
-  log ( " isVerplichtDef ## isVerplicht = " <> (show l9))
+  l9 <-  rolIsVerplichtDef ## rolIsVerplicht
+  log ( " rolIsVerplichtDef ## rolIsVerplicht = " <> (show l9))
 
   l10 <-  rolDef ## label
   log ( " rolDef ## label = " <> (show l10))
 
-  l11 <-  isVerplichtDef ## range
-  log ( " isVerplichtDef ## range = " <> (show l11))
+  l11 <-  rolIsVerplichtDef ## range
+  log ( " rolIsVerplichtDef ## range = " <> (show l11))
 
   l12 <-  rolDef ## hasLabel
   log ( " rolDef ## hasLabel = " <> (show l12))

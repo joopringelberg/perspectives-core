@@ -93,7 +93,7 @@ aceComponent mode theme =
           session <- H.liftEff $ Editor.getSession editor
           _ <- H.liftEff $ Session.setMode mod session
           _ <- H.liftEff $ Editor.setTheme them editor
-          _ <- H.liftEff $ setUseSoftTabs false session
+          _ <- H.liftEff $ setUseSoftTabs true session
           H.modify (_ { editor = Just editor })
           document <- H.liftEff $ getDocument session
           -- (Document.onChange document) has the signature:

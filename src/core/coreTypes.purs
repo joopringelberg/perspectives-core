@@ -241,3 +241,6 @@ data UserMessage =
   | IncorrectBinding RolName TypeID
 
 type FD = Either UserMessage ID
+
+instance showUserMessage :: Show UserMessage where
+  show _ = "This is a usermessage"

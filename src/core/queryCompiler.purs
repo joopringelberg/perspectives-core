@@ -6,41 +6,52 @@ import Data.Array (foldl, head, unsnoc)
 import Data.Maybe (Maybe, fromJust)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
+import Perpectives.TypeChecker (rolIsInstanceOfType)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, TypedTripleGetter, MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
-import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
+import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI, isInNamespace)
 import Perspectives.Property (getContextType, getContextTypeF, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
 import Perspectives.PropertyComposition ((>->), compose)
+import Perspectives.QueryCache (queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, contains, filter, lastElement, notEmpty, ref, rolesOf, saveVar, toBoolean, var)
 import Perspectives.SystemQueries (contextType, identity)
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
-import Perspectives.Utilities (onNothing, onNothing')
-import Prelude (bind, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=))
+import Perspectives.Utilities (ifNothing, onNothing, onNothing')
+import Prelude (bind, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), id)
 
 -- | From a qualified name for a Rol and the context that it is defined in (hence, the domain of the rol-getter), construct a function that computes the instances of that Rol for a given context.
--- | The Rol may be defined as computed.
+-- | The Rol may be defined as computed. It may be in the same namespace as the context,
+-- | that is, locally defined, or it may come from some Aspect (and so be in another namespace)
 rolQuery  :: forall e.
   RolName ->
   ContextID ->
   MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
-rolQuery rn cid = do
-  -- If the type of the role is Property, start with
+rolQuery rn cid = ifNothing (lift $ queryCacheLookup rn)
+  do
+    ifM (lift $ rolIsInstanceOfType rn "model:Perspectives$Function")
+      do
+        tg <- lift $ constructQueryFunction rn
+        -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
+        -- and can be found with TripleRef <subject> "model:Perspectives$identity". This TripleRef is stored in the query variable "#context".
+        pure $ (saveVar "#context" (identity >-> tg))
+      do
+        if rn `isInNamespace` cid
+          then pure $ constructRolGetter rn
+          else pure $ constructRolLookup (localName rn)
+  (pure <<< id)
 
-  -- Is the type of rolType rn or one of its ancestors q:Query?
-  (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
-  if isAQuery
-    -- TODO: memorize!
-    then do
-      tg <- lift $ constructQueryFunction rn
-      -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
-      -- and can be found with TripleRef <subject> "model:Perspectives$identity". This TripleRef is stored in
-      -- the query variable "#context".
-      -- pure $ (var "#context" identity) >-> tg
-      pure $ (saveVar "#context" (identity >-> tg))
-    else do
-      domain <- lift $ getContextTypeF rn
-      pure $ constructRolLookup (localName rn)
+  -- (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
+  -- if isAQuery
+  --   -- TODO: memorize!
+  --   then do
+  --     tg <- lift $ constructQueryFunction rn
+  --     -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
+  --     -- and can be found with TripleRef <subject> "model:Perspectives$identity". This TripleRef is stored in the query variable "#context".
+  --     pure $ (saveVar "#context" (identity >-> tg))
+  --   else do
+  --     -- TODO. Als de rol de namespace van de context heeft, maak dan een getter.
+  --     pure $ constructRolLookup (localName rn)
 
   where
     localName :: RolName -> LocalName

@@ -8,13 +8,14 @@ import Perspectives.CoreTypes (MonadPerspectives, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache, filter)
-import Perspectives.SystemQueries (binding, boundContexts, buitenRol, contextType, hasBinding, hasLabel, identity, iedereRolInContext, isVerplicht, label, range, rolContext, rolHasType, rolType, rolTypen)
+import Perspectives.SystemQueries (binding, boundContexts, buitenRol, contextType, hasBinding, hasLabel, identity, iedereRolInContext, label, range, rolContext, rolHasType, rolType, rolTypen)
 import Perspectives.TripleGetter (constructRolGetter)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 import Test.TestEffects (CancelerEffects)
 
 rolDef :: String
-rolDef = "model:Perspectives"
+-- rolDef = "model:Perspectives$externalProperty"
+rolDef = "model:Perspectives$Property"
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
@@ -25,8 +26,8 @@ test = do
   l1 <-  rolDef ## iedereRolInContext >-> binding
   log ( "rolDef ## iedereRolInContext >-> binding = " <> (show l1))
   --
-  -- l2 <- "model:Effect$Assignment_buitenRol" ## (rolHasType "model:Perspectives$BuitenRol")
-  -- log ("model:Effect$Assignment_buitenRol ## (rolHasType model:Perspectives$BuitenRol) = " <> (show l2))
+  l2 <- "model:Perspectives$externalProperty" ## iedereRolInContext
+  log ("model:Perspectives$externalProperty ## iedereRolInContext) = " <> (show l2))
   --
   l3 <-  rolDef ## filter hasBinding iedereRolInContext
   log ( "rolDef ## filter iedereRolInContext hasBinding = " <> (show l3))

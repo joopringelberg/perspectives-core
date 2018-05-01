@@ -13,7 +13,7 @@ OPGESCHOOND OVERZICHT INRICHTING ONTWIKKELOMGEVING
 
 5. Git integratie is opgezet. In het nieuwe project heb ik Git geïnitialiseerd en ik heb een fetch gedaan op de origin op Github. Ik heb een nieuwe branch aangemaakt (en ook een tag om de ontwikkeling tot op heden te markeren).
 
-7. App.js importeert Main zoals gecompileerd door Purs en opgeslaten in /output.
+7. App.js importeert Main zoals gecompileerd door Purs en opgeslagen in /output.
 
 8. /public/index.html importeert ace.js. 
 

@@ -1,0 +1,217 @@
+-- CRL DEFINITIE
+
+Context model:Perspectives als psp:
+
+Section psp:rolInContext
+
+--------------------------------------------------------------------------------
+-- SIMPLE VALUES
+--------------------------------------------------------------------------------
+psp:Context psp:SimpleValue
+
+psp:Context psp:Boolean
+	$aspect => psp:SimpleValue
+
+psp:Context psp:String
+	$aspect => psp:SimpleValue
+
+psp:Context psp:Number
+	$aspect => psp:SimpleValue
+
+psp:Context psp:Date
+	$aspect => psp:SimpleValue
+
+--------------------------------------------------------------------------------
+-- SYSTEM BASE
+--------------------------------------------------------------------------------
+psp:Context psp:Property
+	$externalProperty =>
+		psp:Property $isFunctioneel
+				extern $isFunctioneel = true
+				extern $isVerplicht = true
+				$range => psp:Boolean
+				$aspectProperty => psp:Property
+				$bindingProperty => psp:Property
+	$externalProperty =>
+		psp:Property $isVerplicht
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			psp:range => psp:Boolean
+	$rolInContext =>
+		psp:Rol $range
+			extern $isFunctioneel = true
+			--$mogelijkeBinding => psp:Context
+
+psp:Context psp:Context
+	$rolInContext =>
+		psp:Rol $externalProperty
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Property
+	$rolInContext =>
+		psp:Rol $internalProperty
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Property
+	$rolInContext =>
+		psp:Rol $rolInContext
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Rol
+			$mogelijkeBinding => psp:Function
+	$rolInContext =>
+		psp:Rol $interneView
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:View
+	$rolInContext =>
+		psp:Rol $externeView
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:View
+	$rolInContext =>
+		psp:Rol $prototype
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Context
+	$rolInContext =>
+		psp:Rol $aspect
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Context
+
+psp:Context psp:Rol
+	$rolInContext =>
+		psp:Rol $rolProperty
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Property
+	$rolInContext =>
+		psp:Rol $mogelijkeBinding
+			extern $isFunctioneel = false
+			extern $isVerplicht = true
+	$rolInContext =>
+		psp:Rol $viewInRol
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:View
+	$externalProperty =>
+		psp:Property $isVerplicht
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$range => psp:Boolean
+	$externalProperty =>
+		psp:Property $isFunctioneel
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			$range => psp:Boolean
+			$aspectProperty => psp:Property
+			$bindingProperty => psp:Property
+	$rolInContext =>
+		psp:Rol $actie
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
+	$rolInContext =>
+		psp:Rol $aspectRol
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Rol
+	$rolInContext =>
+		psp:Rol $constraint
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Constraint
+	$rolInContext =>
+		psp:Rol $objectRol
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
+	$rolInContext =>
+		psp:Rol $subjectRol
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
+
+psp:Context psp:View
+	$rolInContext =>
+		psp:Rol $propertyReferentie
+			$rolProperty =>
+				psp:Property $volgNummer
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Number
+			$mogelijkeBinding => psp:Property
+
+--------------------------------------------------------------------------------
+-- ACTIES
+--------------------------------------------------------------------------------
+psp:Context psp:Actie
+	$rolInContext =>
+		psp:Rol $subjectView
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:View
+	$rolInContext =>
+		psp:Rol $werkwoord
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Werkwoord
+	$rolInContext =>
+		psp:Rol $objectView
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:View
+	$rolInContext =>
+		psp:Rol $objectConstraint
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$mogelijkeBinding => psp:Constraint
+	$rolInContext =>
+		psp:Rol $subjectConstraint
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$mogelijkeBinding => psp:Constraint
+
+psp:Context psp:Werkwoord
+
+psp:Context psp:Beheert
+	$aspect => psp:Werkwoord
+
+psp:Context psp:Raadpleegt
+	$aspect => psp:Werkwoord
+
+psp:Context psp:Creëert
+	$aspect => psp:Werkwoord
+
+psp:Context psp:Verwijdert
+	$aspect => psp:Werkwoord
+
+--------------------------------------------------------------------------------
+-- FUNCTION
+--------------------------------------------------------------------------------
+psp:Context psp:Function
+	$rolInContext =>
+		psp:Rol $domain
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:ElkType
+	$rolInContext =>
+		psp:Rol $range
+			extern psp:isFunctioneel = false
+			psp:mogelijkeBinding => psp:ElkType
+
+psp:Context psp:SingularFunction
+	$aspect => psp:Function
+	$rolInContext =>
+		psp:Rol $range
+			extern $isFunctioneel = true
+
+psp:Context psp:ElkType
+
+psp:Context psp:Constraint
+	$aspect => psp:Function
+	$rolInContext =>
+		psp:Rol $range
+			extern $isFunctioneel = true
+			$aspectRol => psp:Function$range
+			$mogelijkeBinding => psp:Boolean
+
+--------------------------------------------------------------------------------
+-- SUM TYPES
+--------------------------------------------------------------------------------
+psp:Context psp:Sum
+	$rolInContext =>
+		psp:Rol $alternative
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:ElkType
+
+--------------------------------------------------------------------------------
+-- SYSTEM ENTITIES
+--------------------------------------------------------------------------------
+psp:Property psp:label
+	extern $isFunctioneel = true
+	extern $isVerplicht = true
+	$range => psp:String

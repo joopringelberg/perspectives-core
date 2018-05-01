@@ -271,7 +271,7 @@ parameterlessQueryFunction name typeId = createContext name typeId [] []
 --   $property => pol:Aangifte$Aangever$betrouwbaarheid
 createContextWithSingleRole :: forall e. String -> ContextID -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithSingleRole contextId contextType bindingValue = do
-  rolType <- lift $ onNothing (error $ "No rolType found for " <> contextType) (lift ((getRol "model:Perspectives$rolInContext" contextType) >>= pure <<< head)) -- qualified name of rolType
+  rolType <- lift $ onNothing (error $ "No rolType found for " <> contextType) (lift ((getRol "model:Perspectives$Context$rolInContext" contextType) >>= pure <<< head)) -- qualified name of rolType
   rolInstanceId <- createRol rolType contextId bindingValue 0
   createContext contextId contextType [Tuple rolType [rolInstanceId]] []
 
@@ -290,7 +290,7 @@ createSumType types = do
 -- | The property (type) name is retrieved as the value of the internalProperty role of that contextType.
 createContextWithInternalProperty :: forall e. String -> ContextID -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithInternalProperty contextId contextType propVal = do
-  propertyName <- lift $ onNothing (error $ "No parameter found for " <> contextType) (lift ((getRol "model:Perspectives$internalProperty" contextType) >>= pure <<< head)) -- qualified name of property
+  propertyName <- lift $ onNothing (error $ "No parameter found for " <> contextType) (lift ((getRol "model:Perspectives$Context$internalProperty" contextType) >>= pure <<< head)) -- qualified name of property
   createContext contextId contextType [] [Tuple propertyName [propVal]]
 
 -- rolName gives the type of the Rol to create.

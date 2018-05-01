@@ -9,7 +9,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypeID, TypedT
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
-import Perspectives.Property (getRolType)
+import Perspectives.Property (getContextType)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.SystemQueries (aspecten, binding, contextRolTypes, mogelijkeBinding, rolPropertyTypes)
@@ -42,7 +42,7 @@ checkTypeImportsAspect :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache
 checkTypeImportsAspect typeId an = runMonadPerspectivesQuery typeId (toBoolean (contains an aspecten))
 
 alternatives :: forall e. TypedTripleGetter e
-alternatives = (constructRolGetter "model:Perspectives$alternative") >-> binding
+alternatives = (constructRolGetter "model:Perspectives$Sum$alternative") >-> binding
 
 checkContextForQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkContextForQualifiedRol rn cn = do
@@ -120,5 +120,5 @@ mostSpecificCommonAspect types = do
 -- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect.
 rolIsInstanceOfType :: forall e. RolID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
 rolIsInstanceOfType rolId typeId = do
-  tp <- getRolType rolId >>= \x -> unsafePartial $ pure $ fromJust $ head x
+  tp <- getContextType rolId >>= \x -> unsafePartial $ pure $ fromJust $ head x
   if typeId == tp then (pure true) else hasAspect typeId tp

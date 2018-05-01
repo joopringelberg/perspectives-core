@@ -56,16 +56,20 @@ rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$
 -- These getters are based on properties (defined for roles) and roles (defined for contexts)
 -- as modelled in the definitions of CRL and ARC.
 -----------------------------------------------------------
--- | Both Roles and Properties have the property psp:isFunctional. Hence we model the
--- | domain as psp:Context.
-isFunctional :: forall e. TypedTripleGetter e
-isFunctional = constructExternalPropertyGetter "model:Perspectives$isFunctional"
+isFunctionalRol :: forall e. TypedTripleGetter e
+isFunctionalRol = constructExternalPropertyGetter "model:Perspectives$Rol$isFunctional"
 
-isVerplicht :: forall e. TypedTripleGetter e
-isVerplicht = constructExternalPropertyGetter "model:Perspectives$isVerplicht"
+isFunctionalProperty :: forall e. TypedTripleGetter e
+isFunctionalProperty = constructExternalPropertyGetter "model:Perspectives$Property$isFunctional"
+
+rolIsVerplicht :: forall e. TypedTripleGetter e
+rolIsVerplicht = constructExternalPropertyGetter "model:Perspectives$Rol$isVerplicht"
+
+propertyIsVerplicht :: forall e. TypedTripleGetter e
+propertyIsVerplicht = constructExternalPropertyGetter "model:Perspectives$Property$isVerplicht"
 
 range :: forall e. TypedTripleGetter e
-range = constructExternalPropertyGetter "model:Perspectives$range"
+range = constructExternalPropertyGetter "model:Perspectives$Property$range"
 
 hasLabel :: forall e. TypedTripleGetter e
 hasLabel = QC.notEmpty label
@@ -76,11 +80,11 @@ hasBinding = QC.notEmpty binding
 rolUser :: forall e. TypedTripleGetter e
 rolUser = QC.closure' binding
 
-lijdendVoorwerpBepaling :: forall e. TypedTripleGetter e
-lijdendVoorwerpBepaling = (constructRolGetter "model:Perspectives$lijdendVoorwerpBepaling") >-> binding
+objectView :: forall e. TypedTripleGetter e
+objectView = (constructRolGetter "model:Perspectives$Actie$objectView") >-> binding
 
 propertyReferentie :: forall e. TypedTripleGetter e
-propertyReferentie = constructRolGetter "model:Perspectives$propertyReferentie"
+propertyReferentie = constructRolGetter "model:Perspectives$View$propertyReferentie"
 
 isContext :: forall e. TypedTripleGetter e
 isContext = QC.notEmpty rolContext
@@ -89,7 +93,7 @@ boundContexts :: forall e. TypedTripleGetter e
 boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRolInContext >-> binding)) >-> rolContext
 
 rolOwnPropertyTypes :: forall e. TypedTripleGetter e
-rolOwnPropertyTypes = constructRolGetter "model:Perspectives$rolProperty" >-> binding >-> rolContext
+rolOwnPropertyTypes = constructRolGetter "model:Perspectives$Rol$rolProperty" >-> binding >-> rolContext
 
 rolAspectProperties :: forall e. TypedTripleGetter e
 rolAspectProperties = aspectRollen >-> rolOwnPropertyTypes
@@ -101,25 +105,25 @@ rolPropertyTypes = QC.concat
     ((aspectRol >->> (\_ -> rolPropertyTypes)) "rolPropertyTypes"))
 
 contextRolTypes :: forall e. TypedTripleGetter e
-contextRolTypes = constructRolGetter "model:Perspectives$rolInContext" >-> binding >-> rolContext
+contextRolTypes = constructRolGetter "model:Perspectives$Context$rolInContext" >-> binding >-> rolContext
 
 contextInternePropertyTypes :: forall e. TypedTripleGetter e
-contextInternePropertyTypes = constructRolGetter "model:Perspectives$internalProperty" >-> binding >-> rolContext
+contextInternePropertyTypes = constructRolGetter "model:Perspectives$Context$internalProperty" >-> binding >-> rolContext
 
 contextExternePropertyTypes :: forall e. TypedTripleGetter e
-contextExternePropertyTypes = constructRolGetter "model:Perspectives$externalProperty" >-> binding >-> rolContext
+contextExternePropertyTypes = constructRolGetter "model:Perspectives$Context$externalProperty" >-> binding >-> rolContext
 
 mogelijkeBinding :: forall e. TypedTripleGetter e
-mogelijkeBinding = constructRolGetter "model:Perspectives$mogelijkeBinding"  >-> binding >-> rolContext
+mogelijkeBinding = constructRolGetter "model:Perspectives$Rol$mogelijkeBinding"  >-> binding >-> rolContext
 
 rolInContext :: forall e. TypedTripleGetter e
-rolInContext = constructRolGetter "model:Perspectives$rolInContext"
+rolInContext = constructRolGetter "model:Perspectives$Context$rolInContext"
 
 aspect :: forall e. TypedTripleGetter e
-aspect = constructRolGetter "model:Perspectives$rolInContext" >-> binding >-> rolContext
+aspect = constructRolGetter "model:Perspectives$Context$aspect" >-> binding >-> rolContext
 
 aspectRol :: forall e. TypedTripleGetter e
-aspectRol = constructRolGetter "model:Perspectives$rolInContext" >-> binding >-> rolContext
+aspectRol = constructRolGetter "model:Perspectives$Rol$aspectRol" >-> binding >-> rolContext
 
 aspectRollen :: forall e. TypedTripleGetter e
 aspectRollen = QC.closure aspectRol

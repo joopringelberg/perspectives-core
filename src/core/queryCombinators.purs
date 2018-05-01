@@ -129,18 +129,18 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
 
 -- TODO. Waarom niet memoriseren?
-leastCommonAncestor :: forall e. Subject -> Subject -> MonadPerspectives (AjaxAvarCache e) Subject
-leastCommonAncestor t1 t2 = do
-  (ancestorsOfT1 :: Array ID) <- closure_ (type_ >=> (pure <<< singleton)) t1
-  iterateUntilM (isTypeOfT1 ancestorsOfT1) type_ t2
-  where
-    -- TODO. getPerspectEntiteit moet geen maybe teruggeven, maar een error gooien als
-    -- er niets gevonden wordt. Dan kan de maybe hieronder weg.
-    type_ :: Subject -> MonadPerspectives (AjaxAvarCache e) Subject
-    type_ = ((getPerspectEntiteit :: Subject -> MonadPerspectives (AjaxAvarCache e) (Maybe PerspectContext)) >=> (pure <<< maybe "" (getType :: PerspectContext -> String)))
-
-    isTypeOfT1 :: Array Subject -> Subject -> Boolean
-    isTypeOfT1 ancestors superOfT2 = isJust $ elemIndex superOfT2 ancestors
+-- leastCommonAncestor :: forall e. Subject -> Subject -> MonadPerspectives (AjaxAvarCache e) Subject
+-- leastCommonAncestor t1 t2 = do
+--   (ancestorsOfT1 :: Array ID) <- closure_ (type_ >=> (pure <<< singleton)) t1
+--   iterateUntilM (isTypeOfT1 ancestorsOfT1) type_ t2
+--   where
+--     -- TODO. getPerspectEntiteit moet geen maybe teruggeven, maar een error gooien als
+--     -- er niets gevonden wordt. Dan kan de maybe hieronder weg.
+--     type_ :: Subject -> MonadPerspectives (AjaxAvarCache e) Subject
+--     type_ = ((getPerspectEntiteit :: Subject -> MonadPerspectives (AjaxAvarCache e) (Maybe PerspectContext)) >=> (pure <<< maybe "" (getType :: PerspectContext -> String)))
+--
+--     isTypeOfT1 :: Array Subject -> Subject -> Boolean
+--     isTypeOfT1 ancestors superOfT2 = isJust $ elemIndex superOfT2 ancestors
 
 
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
