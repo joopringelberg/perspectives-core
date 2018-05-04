@@ -423,7 +423,6 @@ context = withRoleCounting context' where
                 , pspType = "model:Perspectives$BuitenRol"
                 , context = (show instanceName)
                 , properties = fromFoldable publicProps
-                , binding = binding $ (show typeName) <> "_buitenRol"
                 })
             pure $ (show instanceName) <> "_buitenRol"
   collect :: List (Tuple RolName ID) -> StrMap (Array ID)
