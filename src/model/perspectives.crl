@@ -173,25 +173,17 @@ psp:Context psp:Verwijdert
 --------------------------------------------------------------------------------
 -- ZAAK
 --------------------------------------------------------------------------------
-psp:Context arc:Zaak
+psp:Context psp:Zaak
 	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $zaakInContext
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Zaak
 	$rolInContext =>
-		psp:Rol $activiteitInContext
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Activiteit
-	$rolInContext =>
-		psp:Rol $toestandInContext
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Toestand
-	$rolInContext =>
 		psp:Rol $actieInContext -- TODO: gewoon 'actie'?
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Actie
--- TODO: Activiteit en Toestand. En ook: Domein, Partij
+
 --------------------------------------------------------------------------------
 -- FUNCTION
 --------------------------------------------------------------------------------
