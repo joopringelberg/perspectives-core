@@ -127,6 +127,7 @@ getRolType = getRolMember \rol -> [rol_pspType rol]
 getRolBinding :: forall e. ObjectsGetter e
 getRolBinding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
+-- | From the instance of a Rol, find the instances of the Rol of the given type that bind it (has it as their binding).
 getGebondenAls :: forall e. RolName -> ObjectsGetter e
 getGebondenAls rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)
 

@@ -8,6 +8,8 @@ import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), 
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
 
+-- | Compose two queries like composing two function.
+-- | `psp:Function -> psp:Function -> psp:Function`
 compose :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
@@ -34,6 +36,10 @@ compose (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
 
 infixl 9 compose as >->
 
+-- | TripleGetter composition where the second operand is treated as lazy
+-- | (wrapped in a function). Useful for recursive queries that bottom out
+-- | when the first operator yields no results.
+-- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
 composeLazy :: forall e.
   TypedTripleGetter e ->
   (Unit -> TypedTripleGetter e) ->

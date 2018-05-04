@@ -3,7 +3,8 @@ module Perspectives.QueryCombinators where
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Loops (iterateUntilM)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, last, nub, null, singleton, union)
+import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, nub, null, singleton, union) as Arr
+import Data.HeytingAlgebra (not) as HA
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
@@ -17,9 +18,10 @@ import Perspectives.Syntax (PerspectContext)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
 import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
-import Data.HeytingAlgebra (not) as HA
 import Type.Data.Boolean (kind Boolean)
 
+-- | The recursive closure of a query, bottoming out when it has no results.
+-- | `psp:Function -> psp:Function`
 closure :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e
@@ -29,13 +31,13 @@ closure (TypedTripleGetter nameOfp p) =
     getter :: TripleGetter e
     getter id' = do
       t@(Triple{subject, object : objectsOfP}) <- p id'
-      (triples :: Array (Triple e)) <- traverse getter (difference objectsOfP [id'])
+      (triples :: Array (Triple e)) <- traverse getter (Arr.difference objectsOfP [id'])
       objects <- pure $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id'
                     , predicate : name
-                    , object : cons subject objects
+                    , object : Arr.cons subject objects
                     , dependencies : []
-                    , supports : map getRef (cons t triples)
+                    , supports : map getRef (Arr.cons t triples)
                     , tripleGetter : getter}
 
     name :: String
@@ -49,10 +51,11 @@ closure_ p = getter where
   getter :: ObjectsGetter e
   getter id = do
     objectsOfP <- p id
-    (results :: Array (Array String)) <- traverse getter (difference objectsOfP [id])
-    pure $ nub $ join results
+    (results :: Array (Array String)) <- traverse getter (Arr.difference objectsOfP [id])
+    pure $ Arr.nub $ join results
 
 -- | Return the last element in the chain
+-- | `psp:SingularFunction -> psp:SingularFunction`
 closure' :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e
@@ -62,11 +65,11 @@ closure' (TypedTripleGetter nameOfp p) =
     getter :: TripleGetter e
     getter id = do
       t@(Triple{subject, object : objectsOfP}) <- p id
-      case head objectsOfP of
+      case Arr.head objectsOfP of
         Nothing -> pure t
         (Just o) -> do
           pt@(Triple{object:bottom}) <- getter o
-          case head bottom of
+          case Arr.head bottom of
             Nothing -> pure t
             otherwise ->
               pure $ Triple { subject: id
@@ -80,8 +83,10 @@ closure' (TypedTripleGetter nameOfp p) =
     name = "(closure' " <>  nameOfp <> ")"
 
 mcons :: forall a. Maybe a -> Array a -> Array a
-mcons = maybe id cons
+mcons = maybe id Arr.cons
 
+-- | A selection of the results of the second query using the first (boolean) query as a criterium.
+-- | `psp:Constraint -> psp:Function -> psp:Function`
 filter :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
@@ -91,23 +96,25 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
     getter :: TripleGetter e
     getter id = do
       t@(Triple{object}) <- p id
-      (triples :: Array (Triple e)) <- traverse criterium (difference object [id])
-      (objects :: Array String) <- pure $ foldr addSubjectIfTrue [] triples
+      (triples :: Array (Triple e)) <- traverse criterium (Arr.difference object [id])
+      (objects :: Array String) <- pure $ Arr.foldr addSubjectIfTrue [] triples
       pure $ Triple { subject: id
                     , predicate : name
                     , object : objects
                     , dependencies : []
-                    , supports : map getRef (cons t triples)
+                    , supports : map getRef (Arr.cons t triples)
                     , tripleGetter : getter}
 
     addSubjectIfTrue :: Triple e -> Array String -> Array String
-    addSubjectIfTrue (Triple{subject, object}) arr = case elemIndex "true" object of
+    addSubjectIfTrue (Triple{subject, object}) arr = case Arr.elemIndex "true" object of
       Nothing -> arr
-      _ -> cons subject arr
+      _ -> Arr.cons subject arr
 
     name :: String
     name = "(filter " <> nameOfc <> " " <> nameOfp <> ")"
 
+-- The concatenation of the results of two queries applied to the same origin.
+-- | `psp:Function -> psp:Function -> psp:Function`
 concat :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
@@ -121,12 +128,29 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
       qt@(Triple{object : qs}) <- q id
       pure $ Triple { subject: id
                     , predicate : name
-                    , object : (union ps qs)
+                    , object : (Arr.union ps qs)
                     , dependencies : []
                     , supports : map getRef [pt, qt]
                     , tripleGetter : getter}
 
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+
+-- The intersection of the results of two queries applied to the same origin.
+-- | `psp:Function -> psp:Function -> psp:Function`
+intersect :: forall e. TypedTripleGetter e -> TypedTripleGetter e -> TypedTripleGetter e
+intersect (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
+  memorize getter name where
+    getter :: TripleGetter e
+    getter id = do
+      pt@(Triple{object : ps}) <- p id
+      qt@(Triple{object : qs}) <- q id
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : (Arr.intersect ps qs)
+                    , dependencies : []
+                    , supports : map getRef [pt, qt]
+                    , tripleGetter : getter}
+    name = "(intersect " <> nameOfp <> " " <> nameOfq <> ")"
 
 -- TODO. Waarom niet memoriseren?
 -- leastCommonAncestor :: forall e. Subject -> Subject -> MonadPerspectives (AjaxAvarCache e) Subject
@@ -140,15 +164,17 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
 --     type_ = ((getPerspectEntiteit :: Subject -> MonadPerspectives (AjaxAvarCache e) (Maybe PerspectContext)) >=> (pure <<< maybe "" (getType :: PerspectContext -> String)))
 --
 --     isTypeOfT1 :: Array Subject -> Subject -> Boolean
---     isTypeOfT1 ancestors superOfT2 = isJust $ elemIndex superOfT2 ancestors
+--     isTypeOfT1 ancestors superOfT2 = isJust $ Arr.elemIndex superOfT2 ancestors
 
 
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
 isNothing :: forall e. Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
-isNothing (Triple r@{object}) = pure (Triple(r {object = [show (HA.not $ null object)]}))
+isNothing (Triple r@{object}) = pure (Triple(r {object = [show (HA.not $ Arr.null object)]}))
 
+-- | A constraint constructed by checking of the value of the query is empty.
+-- | psp:Function -> psp:Constraint
 notEmpty :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
 
@@ -163,7 +189,7 @@ toBoolean :: forall e. TypedTripleGetter e -> RolID -> MonadPerspectivesQuery (A
 toBoolean (TypedTripleGetter nameOfp p) r = do
   result <- p r
   arrWithBool <- pure $ tripleObjects result
-  case head arrWithBool of
+  case Arr.head arrWithBool of
     Nothing -> pure false
     (Just x) -> pure (x == "true")
 
@@ -171,6 +197,7 @@ toBoolean (TypedTripleGetter nameOfp p) r = do
 -- | and will result in all instances of that role for the given context.
 -- | For domain we just take psp:Context. Range can only be psp:Rol because we have no
 -- | other knowledge on it.
+-- | psp:ContextInstance -> psp:Function
 rolesOf :: forall e. ContextID -> TypedTripleGetter e
 rolesOf cid = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$rolesOf" <> cid) f where
@@ -184,7 +211,7 @@ contains id' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpr
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
-    case elemIndex id' object of
+    case Arr.elemIndex id' object of
       Nothing -> pure ["false"]
       otherwise -> pure ["true"]
 
@@ -193,34 +220,42 @@ containsMatching criterium criteriumName (TypedTripleGetter nameOfp p) = constru
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f subject = do
     (Triple{object}) <- p subject
-    pure $ maybe ["true"] (const ["false"]) (findIndex (criterium subject) object)
+    pure $ maybe ["true"] (const ["false"]) (Arr.findIndex (criterium subject) object)
 
--- | Apply to a query and retrieve a boolean query that returns true iff its subject is a member of the result of
--- | the argument query.
+-- | Apply to a query and retrieve a boolean query that returns true iff its subject is
+-- | a member of the result of the argument query.
+-- | `psp:Function -> psp:Constraint`
 containedIn :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn_" <> nameOfp) f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
-    case elemIndex id object of
+    case Arr.elemIndex id object of
       Nothing -> pure ["false"]
       otherwise -> pure ["true"]
 
+-- | The logical negation of a Constraint.
+-- | `psp:Constraint -> psp:Constraint`
 not :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 not (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
   f :: (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
   f id = do
     (Triple{object}) <- p id
-    case head object of
+    case Arr.head object of
       (Just "true") -> pure ["false"]
       otherwise -> pure ["true"] -- NOTE: type checking guarantees we only have two values.
 
+-- | Turn a query of many arguments into a query of a single element.
+-- | The selected element depends on the ordering returned by the query.
+-- | `psp:Function -> psp:SingularFunction`
 lastElement :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 lastElement (TypedTripleGetter nameOfp (p :: TripleGetter e)) = constructTripleGetterFromEffectExpression
   ("(lastElement " <> nameOfp <> ")")
-  (p >=> pure <<< (maybe [] singleton) <<< last <<< tripleObjects)
+  (p >=> pure <<< (maybe [] Arr.singleton) <<< Arr.last <<< tripleObjects)
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
+-- | The resulting query returns exactly the same result as the argument query.
+-- | `psp:Function -> psp:Function`
 ignoreCache :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go r =
@@ -232,6 +267,8 @@ ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
       pure result
 
 -- | Use the cache of query results for the given named function.
+-- | The resulting query returns exactly the same result as the argument query.
+-- | `psp:Function -> psp:Function`
 useCache :: forall e a. TypedTripleGetter e -> TypedTripleGetter e
 useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go r =
@@ -250,6 +287,9 @@ constant subject = constructTripleGetterFromObjectsGetter
 -----------------------------------------------------------
 -- VARIABLES
 -----------------------------------------------------------
+-- | Save the query result under the given name in the query execution environment for future use.
+-- | The resulting query returns exactly the same result as the argument query.
+-- | `String -> psp:Function -> psp:Function`
 var :: forall e. String -> TypedTripleGetter e -> TypedTripleGetter e
 var name (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go subject = do
@@ -257,6 +297,9 @@ var name (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
     putQueryVariable name (TripleRef{subject: subject, predicate: nameOfp})
     pure r
 
+-- | Retrieve the result stored in the query environment under the given name.
+-- | Returns exactly the same value as the query used to store the value.
+-- | `String -> psp:Function`
 ref :: forall e. String -> TypedTripleGetter e
 ref name = TypedTripleGetter name ref'
 
@@ -266,6 +309,9 @@ ref' name = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
       mref <- lift $ liftEff $ lookupInTripleIndex subject predicate
       unsafePartial $ pure $ fromJust $ mref
 
+-- | Save the query variable value and restore it after computing the query.
+-- | Use this combinator to protect a query variable value.
+-- | `String -> psp:Function -> psp:Function`
 saveVar :: forall e. String -> TypedTripleGetter e -> TypedTripleGetter e
 saveVar name (TypedTripleGetter nameOfp p) = TypedTripleGetter ("saveVar_" <> name <> nameOfp) go where
   go subject = do
