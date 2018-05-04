@@ -38,20 +38,8 @@ rolQuery rn cid = ifNothing (lift $ queryCacheLookup rn)
       do
         if rn `isInNamespace` cid
           then pure $ constructRolGetter rn
-          else pure $ constructRolLookup (localName rn)
+          else pure $ constructRolLookup rn
   (pure <<< id)
-
-  -- (isAQuery :: Boolean) <- (toBoolean (contains "model:QueryAst$Query" (closure contextType)) rn)
-  -- if isAQuery
-  --   -- TODO: memorize!
-  --   then do
-  --     tg <- lift $ constructQueryFunction rn
-  --     -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
-  --     -- and can be found with TripleRef <subject> "model:Perspectives$identity". This TripleRef is stored in the query variable "#context".
-  --     pure $ (saveVar "#context" (identity >-> tg))
-  --   else do
-  --     -- TODO. Als de rol de namespace van de context heeft, maak dan een getter.
-  --     pure $ constructRolLookup (localName rn)
 
   where
     localName :: RolName -> LocalName

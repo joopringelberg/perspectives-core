@@ -88,7 +88,7 @@ constructRolGetter :: forall e.
 constructRolGetter rn = constructTripleGetter getRol rn
 
 constructRolLookup :: forall e.
-  LocalName ->
+  RolName ->
   TypedTripleGetter e
 constructRolLookup rn = constructTripleGetter getRolFromPrototypeHierarchy rn
 

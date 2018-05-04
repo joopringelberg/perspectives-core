@@ -73,7 +73,12 @@ getRolFromPrototypeHierarchy rn contextId = do
         bnd <- getRolBinding $ unsafePartial $ fromJust $ head br
         case head bnd of
           Nothing -> pure []
-          (Just b) -> getRolFromPrototypeHierarchy rn b
+          (Just b) -> do
+            -- b is the identification of the buitenRol of the prototype.
+            (prototypeIdArray :: Array ID) <- getRolContext b
+            case head prototypeIdArray of
+              Nothing -> pure []
+              (Just prototype) -> getRolFromPrototypeHierarchy rn prototype
       (Just value) -> pure value
     otherwise -> pure []
 
