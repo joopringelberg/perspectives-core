@@ -27,21 +27,20 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (TypedTripleGetter, MonadPerspectives, runMonadPerspectivesQuery, (##), tripleObjects)
+import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, runMonadPerspectivesQuery, tripleObjects, (##))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructNamespace, isUserEntiteitID)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.Property (getRolBinding)
+import Perspectives.Property (getRolBinding, getRolContext, makeFunction)
 import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (contains, rolesOf, toBoolean, filter)
+import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Perspectives.SystemQueries (binding, buitenRol, contextType, identity, isFunctionalProperty, isFunctionalRol, objectView, propertyReferentie, rolContext, rolUser)
+import Perspectives.SystemQueries (actieInContext, contextRolTypes, contextTypeOfRolType, identity, inverse_subjectRol, isFunctionalProperty, isFunctionalRol, mogelijkeBinding, objectRol, objectView, propertyReferentie, rolType, rolUser, subjectRol)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
-import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
 import Perspectives.Utilities (onNothing, onNothing') as Util
@@ -242,44 +241,42 @@ usersInvolvedInDelta :: forall e. Delta -> MonadPerspectives (AjaxAvarCache e) (
 usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInContext dlt else usersInvolvedInRol dlt
   where
 
+  -- From the instance of a Rol, retrieve the instances of users that play another Rol
+  -- in the same context, such that they have an Actie with an objectView that has the
+  -- changed property (as identified by memberName).
   usersInvolvedInRol :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array ID)
   usersInvolvedInRol (Delta{id, memberName}) =
     do
-      queryResult <-
-        -- Get the RolInContext (types) that have a perspective on (the context represented by) 'id'.
-        id ## (filter (hasRelevantView memberName) actiesWithThatLijdendVoorwerp) >-> onderwerpFillers >->
-        -- Get the instances of these roles in 'id'
-        (rolesOf id) >->
-        -- Get the users that are at the bottom of the telescope of these role instances.
-        rolUser
-      pure $ tripleObjects queryResult
+      (contextId :: ContextID) <- makeFunction "" getRolContext id
+      (Triple {object}) <-
+        id ## rolType >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUser
+      pure $ object
     where
-      actiesWithThatLijdendVoorwerp = isLijdendVoorwerpIn >-> rolContext
+      -- roles in context that play the subjectRol in the relevant acties
+      -- psp:Rol -> psp:Rol
+      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRol relevantActies)) (contextTypeOfRolType >-> contextRolTypes)
 
+      -- acties that have an objectView with the memberName
+      -- psp:Rol -> psp:Actie
+      relevantActies = filter (hasRelevantView memberName) (contextTypeOfRolType >-> actieInContext)
+
+  -- From the instance of the context, retrieve the instances of the users that play
+  -- a Rol in this context that have a subjectRol bound to an Actie that is bound as the
+  -- objectRol of the Rol of which memberName is an instance.
   usersInvolvedInContext :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array ID)
   usersInvolvedInContext (Delta{id, memberName}) =
     do
-      queryResult <-
-        -- Get the RolInContext (types) that have a perspective on (the context represented by) 'id'.
-        id ## (filter (hasRelevantView memberName) actiesWithThatLijdendVoorwerp) >-> onderwerpFillers >->
-        -- Get the instances of these roles in 'id'
-        (rolesOf id) >->
-        -- Get the users that are at the bottom of the telescope of these role instances.
-        rolUser
-      pure $ tripleObjects queryResult
+      (Triple {object}) <- id ## rolType >-> actorsForObject >-> (rolesOf id) >-> rolUser
+      pure object
     where
-      actiesWithThatLijdendVoorwerp = contextType >-> buitenRol >-> isLijdendVoorwerpIn >-> rolContext
-
-  -- Roles that fill the syntactic role "LijdendVoorwerp".
-  isLijdendVoorwerpIn :: TypedTripleGetter e
-  isLijdendVoorwerpIn = (constructInverseRolGetter "model:Perspectives$Rol$objectRol")
-
-  -- Fillers of the syntactic role "Onderwerp".
-  onderwerpFillers = (constructRolGetter "model:Arc$onderwerp") >-> binding
+      -- All Rollen that are the subject of Acties that have the Rol as object.
+      -- `psp:Rol -> psp:Rol`
+      actorsForObject = objectRol >-> inverse_subjectRol
 
   -- Tests an Actie for having memberName in the view that is its objectView.
+  -- psp:Actie -> psp:Boolean
   hasRelevantView :: ID -> TypedTripleGetter e
-  hasRelevantView id = contains id (objectView >-> propertyReferentie)
+  hasRelevantView id = contains id (objectView >-> propertyReferentie >-> mogelijkeBinding)
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
