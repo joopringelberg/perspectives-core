@@ -98,7 +98,7 @@ deconstructNamespace :: String -> Maybe Namespace
 deconstructNamespace = getFirstMatch namespaceRegex
 
 domeinURIRegex :: Regex
-domeinURIRegex = unsafeRegex "^model:(\\w*)\\$(\\w*)$" noFlags
+domeinURIRegex = unsafeRegex "^model:(\\w*).*\\$(\\w*)" noFlags
 
 -- | Returns "localName" from "model:ModelName$localName" or Nothing
 deconstructLocalNameFromDomeinURI :: String -> Maybe String
