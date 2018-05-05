@@ -73,10 +73,13 @@ checkRol cid rolType = do
       void $ (traverse (checkProperty rolId)) (tripleObjects rolPropertyTypes)
       -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
       b <- lift (rolId @@ binding)
-      mb <- lift (rolType @@ mogelijkeBinding)
-      ifM (lift $ lift $ rolIsInstanceOfType (tripleObject b) (tripleObject mb))
-        (pure unit) -- TODO. Controleer hier de binding? Denk aan wederzijdse recursie.
-        (tell [IncorrectBinding rolId rolType])
+      mmb <- lift (rolType @@ mogelijkeBinding)
+      case head (tripleObjects mmb) of
+        Nothing -> pure unit
+        (Just mb) -> do
+          ifM (lift $ lift $ rolIsInstanceOfType (tripleObject b) mb)
+            (pure unit) -- TODO. Controleer hier de binding? Denk aan wederzijdse recursie.
+            (tell [IncorrectBinding rolId rolType])
 
 rolIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 rolIsMandatory = toBoolean rolIsVerplicht

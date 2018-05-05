@@ -40,7 +40,7 @@ psp:Context psp:Property
 	$rolInContext =>
 		psp:Rol $range
 			extern $isFunctioneel = true
-			--$mogelijkeBinding => psp:Context
+			$mogelijkeBinding => psp:Context
 
 psp:Context psp:Context
 	$rolInContext =>

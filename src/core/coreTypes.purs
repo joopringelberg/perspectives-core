@@ -231,7 +231,7 @@ data UserMessage =
   | VariableAlreadyDeclaredAs VariableName TypeID
   | MissingAspect TypeID Aspect
   | MissingMogelijkeBinding TypeID
-  | MultipleDefinitions (Array TypeID)
+  | MultipleDefinitions LocalName (Array TypeID)
   | MissingUnqualifiedProperty LocalName RolName
   | MissingQualifiedProperty PropertyName RolName
   | MissingQualifiedRol RolName ContextID
@@ -243,4 +243,16 @@ data UserMessage =
 type FD = Either UserMessage ID
 
 instance showUserMessage :: Show UserMessage where
-  show _ = "This is a usermessage"
+  show (MissingVariableDeclaration s) = "De variabele '" <> s <> "' wordt gebruikt voor hij is gedefinieerd."
+  show (VariableAlreadyDeclaredAs var tp) = "De variabele '" <> var <> "' is al gedeclareerd als een waarde van het type '" <> tp <> "'"
+  show (MissingAspect tp as) = "Het type '" <> tp <> "' mist het aspect '" <> as <> "'."
+  show (MissingMogelijkeBinding tp) = "Voor Rol '" <> tp <> "' is geen mogelijkeBinding gedefinieerd."
+  show (MultipleDefinitions ln aspectArray) = "Elk van de volgende Aspecten heeft een definitie voor '" <> ln <> "': " <> show aspectArray
+  show (MissingUnqualifiedProperty ln rn) = "Er is geen definitie voor de property '" <> ln <> "' voor de rol '" <> rn <> "'."
+  show (MissingQualifiedProperty pn rn) = "Er is geen definitie voor de property '" <> pn <> "' voor de rol '" <> rn <> "'."
+  show (MissingQualifiedRol rn cid) = "Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
+  show (MissingUnqualifiedRol rn cid) = "Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
+  show (MissingType cid) = "De context '" <> cid <> "' heeft geen type."
+  show (MissingRolInstance rn cid) = "De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
+  show (IncorrectBinding rn tp) = "De rol '" <> rn <> "' mag niet gebonden worden aan '" <> tp <> "'."
+  -- show _ = "This is a usermessage"

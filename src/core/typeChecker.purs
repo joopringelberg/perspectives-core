@@ -58,7 +58,7 @@ checkRolForUnQualifiedProperty ln rn = do
   case length aspects of
     0 -> pure $ Left $ MissingUnqualifiedProperty ln rn
     1 -> pure $ Right $ unsafePartial $ fromJust $ head aspects
-    otherwise -> pure $ Left $ MultipleDefinitions aspects
+    otherwise -> pure $ Left $ MultipleDefinitions ln aspects
   where
 
     aspectsWithUnqualifiedProperty :: PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (Array ID)
@@ -91,7 +91,7 @@ checkContextForUnQualifiedRol ln cn = do
   case length aspects of
     0 -> pure $ Left $ MissingUnqualifiedRol ln cn
     1 -> pure $ Right $ unsafePartial $ fromJust $ head aspects
-    otherwise -> pure $ Left $ MultipleDefinitions aspects
+    otherwise -> pure $ Left $ MultipleDefinitions ln aspects
   where
 
     aspectsWithUnqualifiedRol :: MonadPerspectives (AjaxAvarCache e) (Array ID)
