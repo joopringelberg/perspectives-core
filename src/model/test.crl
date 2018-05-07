@@ -1,0 +1,44 @@
+-- TEST TYPE DEFINITION CHECKER
+
+Context model:Test als t:
+
+import model:Perspectives als psp:
+
+Section psp:rolInContext
+
+--------------------------------------------------------------------------------
+-- MissingRolInstance
+--------------------------------------------------------------------------------
+psp:Rol t:rolZonderMogelijkeBinding
+  extern $isFunctioneel = true
+
+--------------------------------------------------------------------------------
+-- IncorrectBinding
+--------------------------------------------------------------------------------
+psp:View t:viewMetVerkeerdeBinding
+  $propertyReferentie => psp:Rol
+    $volgNummer = 1
+
+--------------------------------------------------------------------------------
+-- UndefinedRol
+--------------------------------------------------------------------------------
+psp:View t:viewMetOngedefineerdeRol
+  $propertyReferentie => psp:Property
+    $volgNummer = 1
+  $ongedefinieerdeRol => psp:Context
+
+--------------------------------------------------------------------------------
+-- Rol defined in Aspect
+--------------------------------------------------------------------------------
+psp:Context t:AspectMetRol
+  $rolInContext $ongedefinieerdeRol
+    $mogelijkeBinding => psp:Context
+
+psp:Context t:ViewMetExtraRol
+  $aspect => psp:View
+  $aspect => t:AspectMetRol
+
+t:ViewMetExtraRol t:viewMetGedefinieerdeRol
+  $propertyReferentie => psp:Property
+    $volgNummer = 1
+  t:AspectMetRol$ongedefinieerdeRol => psp:Context

@@ -10,15 +10,16 @@ import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
 import Data.Array (head)
 import Data.Either (Either)
 import Data.Maybe (Maybe, fromJust)
-import Data.StrMap (StrMap, empty, insert, lookup, singleton)
+import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
+-- import Perspectives.TripleAdministration (addToTripleIndex)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, flip, pure, show, (&&), (<<<), (<>), (==), (>=>))
+import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -65,19 +66,6 @@ type QueryEnvironment = StrMap TripleRef
 type MonadPerspectivesQuery e =  StateT QueryEnvironment (MonadPerspectives e)
 
 type MonadPerspectivesObjects e = MonadPerspectives e (Array ID)
-
--- | Run the function in a QueryEnvironment that has Subject as the value of "#start".
-runMonadPerspectivesQuery :: forall e a.
-  Subject
-  -> (Subject -> MonadPerspectivesQuery e a)
-  -> (MonadPerspectives e a)
-runMonadPerspectivesQuery a f = evalStateT (f a) (singleton "#start" t)
-  where
-    t :: TripleRef
-    t = TripleRef
-          { subject: a
-          , predicate: "model:Perspectives$start"
-        }
 
 putQueryVariable :: forall e. VariableName -> TripleRef -> MonadPerspectivesQuery e Unit
 putQueryVariable var t = modify \env -> insert var t env
@@ -171,21 +159,6 @@ tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
 -----------------------------------------------------------
 type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 
--- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
-runTypedTripleGetter :: forall e.
-  TypedTripleGetter e
-  -> Subject
-  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
-runTypedTripleGetter (TypedTripleGetter _ f) a = runMonadPerspectivesQuery a f
-
-runQuery :: forall e.
-  Subject
-  -> TypedTripleGetter e
-  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
-runQuery = (flip runTypedTripleGetter)
-
-infix 0 runQuery as ##
-
 tripleGetter2function :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Maybe String)
 tripleGetter2function (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head)
 
@@ -239,6 +212,7 @@ data UserMessage =
   | MissingType ContextID
   | MissingRolInstance RolName ContextID
   | IncorrectBinding RolName TypeID TypeID
+  | RolNotDefined RolName ContextID TypeID
 
 type FD = Either UserMessage ID
 
@@ -255,4 +229,5 @@ instance showUserMessage :: Show UserMessage where
   show (MissingType cid) = "De context '" <> cid <> "' heeft geen type."
   show (MissingRolInstance rn cid) = "De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
   show (IncorrectBinding rn tp mb) = "De rol '" <> rn <> "' is gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
+  show (RolNotDefined rn cid tp) = "De context '" <> cid <> "' heeft een instantie van rol '" <> rn <> "' maar die is niet gedefinieerd voor '" <> tp <> "'."
   -- show _ = "This is a usermessage"

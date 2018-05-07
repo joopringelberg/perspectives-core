@@ -3,19 +3,20 @@ module Perspectives.TypeDefChecker (checkContext)
 where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
-import Data.Array (head)
+import Data.Array (elemIndex, head)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (rolIsInstanceOfType)
-import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, tripleGetter2function, tripleObject, tripleObjects, (@@))
+import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
+import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Property (getRolType)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (rolQuery)
-import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, mogelijkeBinding, rolContext, rolIsVerplicht, rolPropertyTypes, rolType)
+import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextOwnRolTypes, contextRolTypes, contextType, mogelijkeBinding, rolContext, rolIsVerplicht, rolPropertyTypes, rolType, rolTypen)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, discard, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
 
@@ -29,7 +30,7 @@ checkContext' :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkContext' cid = do
   ifNothing (lift $ tripleGetter2function contextType cid)
     (tell [MissingType cid])
-    \tp -> checkProperties tp cid *> checkRoles tp cid
+    \tp -> checkProperties tp cid *> checkDefinedRoles tp cid *> checkAvailableRoles tp cid
 
 checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkProperties typeId cid = do
@@ -46,9 +47,21 @@ get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
 infix 0 get as ~>
 
 -- TODO: each role must be defined. This involves a check the other way round.
--- TODO: neem rollen uit aspecten mee.
-checkRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkRoles typeId cid = void $ (typeId ~> contextRolTypes) >>= (traverse (checkRol cid))
+checkDefinedRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkDefinedRoles typeId cid = void $ (typeId ~> contextRolTypes) >>= (traverse (checkRol cid))
+
+-- | Does the type hold a definition for all roles given to the ContextInstantie?
+checkAvailableRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkAvailableRoles typeId cid = do
+  (Triple{object: availableRoles}) <- lift (cid @@ rolTypen)
+  for_ availableRoles (isDefined typeId)
+  where
+    isDefined :: RolName -> RolName -> TDChecker (AjaxAvarCache e) Unit
+    isDefined contextType rolType = do
+      (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## contextRolTypes)
+      case elemIndex rolType definedRollen of
+        Nothing -> tell [RolNotDefined rolType cid contextType]
+        otherwise -> pure unit
 
 -- To check:
 --  * if the property is mandatory, is it present?
@@ -62,7 +75,7 @@ checkProperty :: forall e. RolID -> TypeID -> TDChecker e Unit
 checkProperty rid propertyType = pure unit
 
 -- | If the role is mandatory and missing, adds a message. Checks each defined property with the instance of the rol.
--- | Checks the type of the binding.
+-- | Checks the type of the binding, if given.
 checkRol :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 checkRol cid rolType' = do
   rolGetter <- lift $ rolQuery rolType' cid

@@ -27,7 +27,8 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, runMonadPerspectivesQuery, tripleObjects, (##))
+import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, tripleObjects)
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
@@ -39,7 +40,7 @@ import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rol
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Perspectives.SystemQueries (actieInContext, contextRolTypes, contextTypeOfRolType, identity, inverse_subjectRol, isFunctionalProperty, isFunctionalRol, mogelijkeBinding, objectRol, objectView, propertyReferentie, rolType, rolUser, subjectRol)
+import Perspectives.SystemQueries (actieInContext, contextOwnRolTypes, contextTypeOfRolType, identity, inverse_subjectRol, isFunctionalProperty, isFunctionalRol, mogelijkeBinding, objectRol, objectView, propertyReferentie, rolType, rolUser, subjectRol)
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
 import Perspectives.User (getUser)
@@ -254,7 +255,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
     where
       -- roles in context that play the subjectRol in the relevant acties
       -- psp:Rol -> psp:Rol
-      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRol relevantActies)) (contextTypeOfRolType >-> contextRolTypes)
+      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRol relevantActies)) (contextTypeOfRolType >-> contextOwnRolTypes)
 
       -- acties that have an objectView with the memberName
       -- psp:Rol -> psp:Actie

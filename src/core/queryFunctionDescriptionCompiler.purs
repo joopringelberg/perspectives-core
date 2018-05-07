@@ -11,7 +11,8 @@ import Data.Tuple (Tuple(..), snd)
 import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, runTypedTripleGetter, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment, (##))
+import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
+import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
@@ -19,7 +20,7 @@ import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
-import Perspectives.SystemQueries (contextRolTypes, contextType, mogelijkeBinding, rolType)
+import Perspectives.SystemQueries (contextOwnRolTypes, contextType, mogelijkeBinding, rolType)
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
@@ -68,13 +69,13 @@ compileElementaryQueryStep s contextId = case s of
   IedereRolInContext -> ensureAspect (p "Context")
     do
       dom <- getQueryStepDomain
-      tps <- lift $ lift (dom ## contextRolTypes)
+      tps <- lift $ lift (dom ## contextOwnRolTypes)
       sumtype <- createSumType $ tripleObjects tps
       putQueryStepDomain sumtype
       createContextWithSingleRole contextId (q "iedereRolInContext") dom
   RolTypen -> ensureAspect (p "Context")
     do
-      getQueryStepDomain >>= lift <<< lift <<< runTypedTripleGetter contextRolTypes >>= pure <<< tripleObjects >>= lift <<< lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
+      getQueryStepDomain >>= lift <<< lift <<< runTypedTripleGetter contextOwnRolTypes >>= pure <<< tripleObjects >>= lift <<< lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
       parameterlessQueryFunction contextId (q "rolTypen")
   Label -> ensureAspect (p "Context")
     (putQueryStepDomain (p "String") *> parameterlessQueryFunction contextId (q "label"))

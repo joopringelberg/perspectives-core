@@ -156,10 +156,18 @@ rolPropertyTypes = QC.concat
   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> rolOwnPropertyTypes)))
     ((aspectRol >->> (\_ -> rolPropertyTypes)) "rolPropertyTypes"))
 
--- | All Rollen defined for a Context type.
+-- | All Rollen defined for a Context type (excluding Aspects).
+-- | `psp:Context -> psp:Rol`
+contextOwnRolTypes :: forall e. TypedTripleGetter e
+contextOwnRolTypes = constructRolGetter "model:Perspectives$Context$rolInContext" >-> binding >-> rolContext
+
+-- | All Rollen stored with the context instance (own and derived from Aspects).
 -- | `psp:Context -> psp:Rol`
 contextRolTypes :: forall e. TypedTripleGetter e
-contextRolTypes = constructRolGetter "model:Perspectives$Context$rolInContext" >-> binding >-> rolContext
+contextRolTypes = QC.concat
+  contextOwnRolTypes
+  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> contextOwnRolTypes)))
+    ((aspect >->> (\_ -> contextRolTypes)) "contextRolTypes"))
 
 -- | All properties defined on the BinnenRol of a Context type.
 -- | `psp:Context -> psp:Property`

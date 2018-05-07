@@ -301,10 +301,10 @@ var name (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
 -- | Returns exactly the same value as the query used to store the value.
 -- | `String -> psp:Function`
 ref :: forall e. String -> TypedTripleGetter e
-ref name = TypedTripleGetter name ref'
+ref name = TypedTripleGetter name (ref' name)
 
-ref' :: forall e. String -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
-ref' name = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
+ref' :: forall e. String -> String -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+ref' name ignore = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
     do
       mref <- lift $ liftEff $ lookupInTripleIndex subject predicate
       unsafePartial $ pure $ fromJust $ mref

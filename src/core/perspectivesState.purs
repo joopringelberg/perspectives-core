@@ -8,7 +8,7 @@ import Control.Monad.Eff.Ref (REF, Ref, newRef, readRef, writeRef)
 import Control.Monad.Reader (ask, runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
-import Perspectives.CoreTypes
+import Perspectives.CoreTypes (ContextDefinitions, MonadPerspectives, PerspectivesState, RolDefinitions, DomeinCache, UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
