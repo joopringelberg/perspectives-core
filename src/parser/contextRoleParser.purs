@@ -138,7 +138,7 @@ prefixedContextName = prefixedName localContextName
 
 -- prefixedPropertyName = prefix localPropertyName
 prefixedPropertyName :: forall e. IP QualifiedName e
-prefixedPropertyName = prefixedName localPropertyName
+prefixedPropertyName = prefixedContextName
 
 -- qualifiedResourceName = domeinName localContextName
 expandedContextName :: forall e. IP QualifiedName e
