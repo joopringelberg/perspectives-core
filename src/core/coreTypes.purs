@@ -238,7 +238,7 @@ data UserMessage =
   | MissingUnqualifiedRol RolName ContextID
   | MissingType ContextID
   | MissingRolInstance RolName ContextID
-  | IncorrectBinding RolName TypeID
+  | IncorrectBinding RolName TypeID TypeID
 
 type FD = Either UserMessage ID
 
@@ -254,5 +254,5 @@ instance showUserMessage :: Show UserMessage where
   show (MissingUnqualifiedRol rn cid) = "Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
   show (MissingType cid) = "De context '" <> cid <> "' heeft geen type."
   show (MissingRolInstance rn cid) = "De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
-  show (IncorrectBinding rn tp) = "De rol '" <> rn <> "' mag niet gebonden worden aan '" <> tp <> "'."
+  show (IncorrectBinding rn tp mb) = "De rol '" <> rn <> "' is gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
   -- show _ = "This is a usermessage"

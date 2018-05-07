@@ -12,9 +12,10 @@ import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, T
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID)
 import Perspectives.Property (getRolType)
+import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (rolQuery)
-import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, rolIsVerplicht, mogelijkeBinding, rolPropertyTypes)
+import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, mogelijkeBinding, rolContext, rolIsVerplicht, rolPropertyTypes, rolType)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, discard, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
 
@@ -63,26 +64,25 @@ checkProperty rid propertyType = pure unit
 -- | If the role is mandatory and missing, adds a message. Checks each defined property with the instance of the rol.
 -- | Checks the type of the binding.
 checkRol :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
-checkRol cid rolType = do
-  rolGetter <- lift $ rolQuery rolType cid
+checkRol cid rolType' = do
+  rolGetter <- lift $ rolQuery rolType' cid
   (Triple {object}) <- lift (cid @@ rolGetter)
   case head object of
-    Nothing -> ifM (lift (rolIsMandatory rolType))
-      (tell [MissingRolInstance rolType cid])
+    Nothing -> ifM (lift (rolIsMandatory rolType'))
+      (tell [MissingRolInstance rolType' cid])
       (pure unit)
     (Just rolId) -> do
-      rolPropertyTypes <- lift $ (rolType @@ rolPropertyTypes)
+      rolPropertyTypes <- lift $ (rolType' @@ rolPropertyTypes)
       void $ (traverse (checkProperty rolId)) (tripleObjects rolPropertyTypes)
       -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
-      b <- lift (rolId @@ binding)
-      mmb <- lift (rolType @@ mogelijkeBinding)
+      typeOfTheBinding <- lift (rolId @@ (binding >-> rolContext))
+      mmb <- lift (rolType' @@ mogelijkeBinding)
       case head (tripleObjects mmb) of
         Nothing -> pure unit
-        (Just mb) -> do
-          tp <- lift $ lift $ getRolType (tripleObject b) >>= \x -> unsafePartial $ pure $ fromJust $ head x
-          ifM (lift $ lift $ rolIsInstanceOfType tp mb)
+        (Just toegestaneBinding) -> do
+          ifM (lift $ lift $ rolIsInstanceOfType (tripleObject typeOfTheBinding) toegestaneBinding)
             (pure unit) -- TODO. Controleer hier de binding? Denk aan wederzijdse recursie.
-            (tell [IncorrectBinding rolId rolType])
+            (tell [IncorrectBinding rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 
 rolIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 rolIsMandatory = toBoolean rolIsVerplicht
