@@ -16,8 +16,8 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
--- import Perspectives.TripleAdministration (addToTripleIndex)
 import Perspectives.Utilities (onNothing')
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
 
@@ -174,6 +174,8 @@ data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e)
 typedTripleGetterName :: forall e. TypedTripleGetter e -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
 
+-- | NB. If the TripleGetter uses the #start queryvariable, this will not work, because
+-- | it will only be bound in runMonadPerspectivesQuery.
 applyTypedTripleGetter :: forall e.
   Subject
   -> TypedTripleGetter e

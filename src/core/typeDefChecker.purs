@@ -48,7 +48,11 @@ infix 0 get as ~>
 
 -- TODO: each role must be defined. This involves a check the other way round.
 checkDefinedRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkDefinedRoles typeId cid = void $ (typeId ~> contextRolTypes) >>= (traverse (checkRol cid))
+checkDefinedRoles typeId cid =
+  -- void $ (typeId ~> contextRolTypes) >>= (traverse (checkRol cid))
+  do
+    (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## contextRolTypes)
+    void $ traverse (checkRol cid) definedRollen
 
 -- | Does the type hold a definition for all roles given to the ContextInstantie?
 checkAvailableRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
@@ -59,6 +63,7 @@ checkAvailableRoles typeId cid = do
     isDefined :: RolName -> RolName -> TDChecker (AjaxAvarCache e) Unit
     isDefined contextType rolType = do
       (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## contextRolTypes)
+      -- definedRollen <- typeId ~> contextRolTypes
       case elemIndex rolType definedRollen of
         Nothing -> tell [RolNotDefined rolType cid contextType]
         otherwise -> pure unit

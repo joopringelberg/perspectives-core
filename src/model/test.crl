@@ -31,14 +31,32 @@ psp:View t:viewMetOngedefineerdeRol
 -- Rol defined in Aspect
 --------------------------------------------------------------------------------
 psp:Context t:AspectMetRol
-  $rolInContext $ongedefinieerdeRol
-    $mogelijkeBinding => psp:Context
+  $rolInContext =>
+    psp:Rol $ongedefinieerdeRol
+      $mogelijkeBinding => psp:Context
 
 psp:Context t:ViewMetExtraRol
   $aspect => psp:View
   $aspect => t:AspectMetRol
 
+-- No errors for this definition.
 t:ViewMetExtraRol t:viewMetGedefinieerdeRol
-  $propertyReferentie => psp:Property
+  psp:View$propertyReferentie => psp:Property
+    $volgNummer = 1
+  t:AspectMetRol$ongedefinieerdeRol => psp:Context
+
+--------------------------------------------------------------------------------
+-- Rol defined in Aspect not available because it is an aspectRol.
+--------------------------------------------------------------------------------
+psp:Context t:ViewMetAspectRol
+  $aspect => psp:View
+  $aspect => t:AspectMetRol
+  $rolInContext =>
+    psp:Rol $ongedefinieerdeRol
+      $aspectRol => t:AspectMetRol$ongedefinieerdeRol
+
+-- t:AspectMetRol$ongedefinieerdeRol should be unavailable.
+t:ViewMetAspectRol t:viewMetGedefinieerdeRol1
+  psp:View$propertyReferentie => psp:Property
     $volgNummer = 1
   t:AspectMetRol$ongedefinieerdeRol => psp:Context

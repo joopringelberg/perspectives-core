@@ -166,7 +166,7 @@ contextOwnRolTypes = constructRolGetter "model:Perspectives$Context$rolInContext
 contextRolTypes :: forall e. TypedTripleGetter e
 contextRolTypes = QC.concat
   contextOwnRolTypes
-  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> contextOwnRolTypes)))
+  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> contextOwnRolTypes >-> aspectRol)))
     ((aspect >->> (\_ -> contextRolTypes)) "contextRolTypes"))
 
 -- | All properties defined on the BinnenRol of a Context type.
