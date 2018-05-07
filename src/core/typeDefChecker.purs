@@ -4,12 +4,14 @@ where
 
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Data.Array (head)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Traversable (traverse)
+import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (rolIsInstanceOfType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), runMonadPerspectivesQuery, tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID)
+import Perspectives.Property (getRolType)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (rolQuery)
 import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, rolIsVerplicht, mogelijkeBinding, rolPropertyTypes)
@@ -77,7 +79,8 @@ checkRol cid rolType = do
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just mb) -> do
-          ifM (lift $ lift $ rolIsInstanceOfType (tripleObject b) mb)
+          tp <- lift $ lift $ getRolType (tripleObject b) >>= \x -> unsafePartial $ pure $ fromJust $ head x
+          ifM (lift $ lift $ rolIsInstanceOfType tp mb)
             (pure unit) -- TODO. Controleer hier de binding? Denk aan wederzijdse recursie.
             (tell [IncorrectBinding rolId rolType])
 

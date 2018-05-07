@@ -173,7 +173,7 @@ isInNamespace ns ident =
 -- | "model:Perspectives$Aangifte$Aangever" `isInNamespace` "model:Perspectives$Aangifte".
 -- | "a" `isInNamespace` "a" is true, too.
 isInNamespace' :: String -> String -> Boolean
-isInNamespace' a b = a == b || not (isContainingNamespace a b)
+isInNamespace' a b = a == b || (isContainingNamespace b a)
 
 -- | True iff the first argument is the first part of the second. E.g.:
 -- | "model:Perspectives$Aangifte" `isContainingNamespace` "model:Perspectives$Aangifte$Aangever".

@@ -117,8 +117,7 @@ mostSpecificCommonAspect types = do
   aspects <- pure $ join (tripleObjects <$> x)
   foldM (\msca t -> ifM (hasAspect msca t) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects
 
--- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect.
+-- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect. NOTE: rolId represents a type, not a RolInstantie!
 rolIsInstanceOfType :: forall e. RolID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
 rolIsInstanceOfType rolId typeId = do
-  tp <- getContextType rolId >>= \x -> unsafePartial $ pure $ fromJust $ head x
-  if typeId == tp then (pure true) else hasAspect typeId tp
+  if typeId == rolId then (pure true) else hasAspect typeId rolId

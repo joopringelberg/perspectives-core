@@ -119,6 +119,14 @@ psp:Context psp:Rol
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Actie
 
+psp:Rol psp:BuitenRol
+	extern $isFunctioneel = true
+	$mogelijkeBinding => psp:ElkType
+
+psp:Rol psp:BinnenRol
+	extern $isFunctioneel = true
+	$mogelijkeBinding => psp:BuitenRol
+
 psp:Context psp:View
 	$rolInContext =>
 		psp:Rol $propertyReferentie
