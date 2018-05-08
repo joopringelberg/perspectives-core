@@ -1,11 +1,12 @@
 module Perspectives.ContextRoleParser where
 
 import Perspectives.EntiteitAndRDFAliases
+
 import Control.Alt ((<|>))
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
+import Data.Array (cons, many, snoc, length, fromFoldable) as AR
 import Data.Array (dropEnd, intercalate)
-import Data.Array (cons, many, snoc, length) as AR
 import Data.Char.Unicode (isLower)
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
@@ -23,10 +24,10 @@ import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail)
-import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, try, (<?>), (<??>))
+import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
-import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
+import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.Token (alphaNum, upper)
 -----------------------------------------------------------
 -- Comments
@@ -277,11 +278,11 @@ typedPropertyAssignment scope = go (try (withComments
   (withPos
     (Tuple
       <$> (scope *> (propertyName <* (sameLine *> reservedOp "=")))
-      <*> (sameLine *> (simpleValue <|> dataType))))))
+      <*> (sameLine *> (simpleValue `sepBy` (STRING.string ",")))))))
   where
     go x = do
       (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
-      pure $ Tuple (show pname) (PropertyValueWithComments {value: [value], commentBefore: commentBefore, commentAfter: commentAfter})
+      pure $ Tuple (show pname) (PropertyValueWithComments {value: AR.fromFoldable value, commentBefore: commentBefore, commentAfter: commentAfter})
 
 -- | publicContextPropertyAssignment = 'extern' propertyName '=' simpleValue
 publicContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
