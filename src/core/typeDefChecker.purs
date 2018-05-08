@@ -14,12 +14,15 @@ import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (typeIsInstanceOfType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
+import Perspectives.Property (getPropertyTypen)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
+import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
-import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextRolTypes, contextType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolContext, rolIsVerplicht, rolPropertyTypes, rolTypen)
+import Perspectives.Syntax (PerspectRol(..))
+import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolContext, rolIsVerplicht, rolPropertyTypes, rolTypen)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (>>=), (<))
 
@@ -38,11 +41,15 @@ checkContext' cid = do
 checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkProperties typeId cid = do
   -- TODO. Neem ook properties uit Aspecten mee! De mogelijkeBinding valt buiten deze check, dat komt als de binding zelf gecheckt wordt.
-  void $ (typeId ~> contextInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
+  void $ (typeId ~> contextOwnInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
   -- TODO: Each internal property must be defined.
   -- TODO. Neem ook properties uit Aspecten mee!
-  void $ (typeId ~> contextExternePropertyTypes) >>= (traverse (checkProperty (cid <> "_buitenRol")))
-  -- TODO: Each external property must be defined.
+  void $ (typeId ~> contextOwnExternePropertyTypes) >>= (traverse (checkProperty (cid <> "_buitenRol")))
+
+  -- TODO: rolPropertyTypes werkt niet voor externe en interne properties. Daar moeten nieuwe queries voor geschreven worden.
+  (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## contextExternePropertyTypes)
+  availableProperties <- lift $ lift $ getPropertyTypen (cid <> "_buitenRol")
+  checkAvailableProperties (cid <> "_buitenRol") typeId availableProperties definedExternalProperties
 
 get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
 get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
@@ -67,6 +74,18 @@ checkAvailableRoles typeId cid = do
         Nothing -> tell [RolNotDefined rolType cid contextType]
         otherwise -> pure unit
 
+-- | Does the type hold a definition for all properties given to the RolInstantie?
+-- TODO: hier gebruik ik contextID voor het type van de rol. Dat is OK voor interne en externe properties, maar niet voor een RolInContext.
+checkAvailableProperties :: forall e. RolID -> TypeID -> Array PropertyName -> Array PropertyName -> TDChecker (AjaxAvarCache e) Unit
+checkAvailableProperties rolId contextId availableProperties definedProperties = do
+  for_ availableProperties isDefined
+  where
+    isDefined :: PropertyName -> TDChecker (AjaxAvarCache e) Unit
+    isDefined propertyName =
+      case elemIndex propertyName definedProperties of
+        Nothing -> tell [PropertyNotDefined propertyName rolId contextId]
+        otherwise -> pure unit
+
 -- To check:
 --  * if the property is mandatory, is it present?
 --  * guess the type of the property value of the given name. Does it have the range as Aspect?
@@ -76,8 +95,7 @@ checkInternalProperty cid propertyType = pure unit
 
 -- | If the Property is mandatory and missing, adds a message.
 -- | Checks the value of the Property with the range that has been defined.
-
---  * if the property is functional, not more than one value may be present.
+-- | If the Property is functional and more than one value has been given, adds a message.
 checkProperty :: forall e. RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 checkProperty rid propertyType = do
   propertyGetter <- lift $ propertyQuery propertyType rid
@@ -102,12 +120,12 @@ checkProperty rid propertyType = do
   where
     tryParseSimpleValue :: TypeID -> String -> TDChecker (AjaxAvarCache e) Boolean
     tryParseSimpleValue sv propertyValue = case sv of
-      "Number" -> pure $ maybe false (const true) (Nmb.fromString propertyValue)
-      "Boolean" -> case propertyValue of
+      "model:Perspectives$Number" -> pure $ maybe false (const true) (Nmb.fromString propertyValue)
+      "model:Perspectives$Boolean" -> case propertyValue of
         "true" -> pure true
         "false" -> pure true
         otherwise -> pure false
-      "Date" -> -- Dates *should* be represented as ISO strings.
+      "model:Perspectives$Date" -> -- Dates *should* be represented as ISO strings.
         case decodeJson $ fromString propertyValue of
           (Left err :: Either String ISO) -> pure false
           (Right iso :: Either String ISO) -> pure true

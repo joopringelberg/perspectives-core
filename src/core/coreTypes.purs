@@ -217,6 +217,7 @@ data UserMessage =
   | MissingPropertyValue PropertyName RolName
   | IncorrectPropertyValue PropertyName TypeID String
   | TooManyPropertyValues PropertyName
+  | PropertyNotDefined PropertyName RolID RolName
 
 type FD = Either UserMessage ID
 
@@ -237,4 +238,5 @@ instance showUserMessage :: Show UserMessage where
   show (MissingPropertyValue pn rid) = "De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "'."
   show (IncorrectPropertyValue pn sv val) = "De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "'."
   show (TooManyPropertyValues pn) = "De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde."
+  show (PropertyNotDefined pn rid rn) = "De rol '" <> rid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
   -- show _ = "This is a usermessage"

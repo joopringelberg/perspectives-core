@@ -89,6 +89,10 @@ getRollen = getContextMember \context -> nub $ join $ values (context_rolInConte
 getRolTypen :: forall e. ObjectsGetter e
 getRolTypen = getContextMember \context -> keys (context_rolInContext context)
 
+-- | The names of every property given to this rol.
+getPropertyTypen :: forall e. ObjectsGetter e
+getPropertyTypen = getRolMember \rol -> keys (rol_properties rol)
+
 getDisplayName :: forall e. ObjectsGetter e
 getDisplayName = getContextMember \context -> [(context_displayName context)]
 

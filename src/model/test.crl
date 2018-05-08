@@ -71,5 +71,20 @@ psp:Rol t:rolZonderFunctioneleProperty
 -- TooManyPropertyValues
 --------------------------------------------------------------------------------
 psp:Rol t:rolMetTeveelPropertyWaarden
-  extern $isFunctioneel = true, false
+  extern $isFunctioneel = true,false
+  $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- IncorrectPropertyValue
+--------------------------------------------------------------------------------
+psp:Rol t:rolMetVerkeerdePropertyWaarde
+  extern $isFunctioneel = 1
+  $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- PropertyNotDefined
+--------------------------------------------------------------------------------
+psp:Rol t:rolMetNietBestaandeProperty
+  extern $isFunctioneel = true
+  extern $bestaatNiet = 1
   $mogelijkeBinding => psp:Rol

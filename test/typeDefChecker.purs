@@ -16,7 +16,7 @@ import Perspectives.QueryCompiler (rolQuery)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
 import Perspectives.Syntax (PerspectContext(..))
-import Perspectives.SystemQueries (aspect, contextOwnRolTypes, contextRolTypes, contextType, propertyIsVerplicht)
+import Perspectives.SystemQueries (aspect, contextOwnRolTypes, contextRolTypes, contextType, propertyIsVerplicht, rolPropertyTypes)
 import Perspectives.TypeDefChecker (checkContext, propertyIsFunctional)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
@@ -35,15 +35,21 @@ test = do
   --
   -- messages5 <- checkContext "model:Test$viewMetGedefinieerdeRol1"
   -- lift $ for_ messages5 logShow
-
+  --
   -- messages6 <- checkContext "model:Test$rolZonderFunctioneleProperty"
   -- lift $ for_ messages6 logShow
+  --
+  -- messages7 <- checkContext "model:Test$rolMetTeveelPropertyWaarden"
+  -- lift $ for_ messages7 logShow
+  --
+  -- messages8 <- checkContext "model:Test$rolMetVerkeerdePropertyWaarde"
+  -- lift $ for_ messages8 logShow
 
-  messages7 <- checkContext "model:Test$rolMetTeveelPropertyWaarden"
-  lift $ for_ messages7 logShow
+  messages9 <- checkContext "model:Test$rolMetNietBestaandeProperty"
+  lift $ for_ messages9 logShow
 
-  -- t <- "model:Test$ViewMetAspectRol" ## contextRolTypes
-  -- lift $ logShow (tripleObjects t)
+  t <- "model:Test$rolMetNietBestaandeProperty" ## rolPropertyTypes
+  lift $ logShow (tripleObjects t)
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)
   -- lift $ logShow ("isFunctioneel: " <> show ismandatory)

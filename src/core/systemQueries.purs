@@ -171,13 +171,29 @@ contextRolTypes = QC.concat
 
 -- | All properties defined on the BinnenRol of a Context type.
 -- | `psp:Context -> psp:Property`
+contextOwnInternePropertyTypes :: forall e. TypedTripleGetter e
+contextOwnInternePropertyTypes = constructRolGetter "model:Perspectives$Context$internalProperty" >-> binding >-> rolContext
+
+-- | All properties defined on the BinnenRol of a Context type (own and derived from Aspects).
+-- | `psp:Context -> psp:Property`
 contextInternePropertyTypes :: forall e. TypedTripleGetter e
-contextInternePropertyTypes = constructRolGetter "model:Perspectives$Context$internalProperty" >-> binding >-> rolContext
+contextInternePropertyTypes = QC.concat
+  contextOwnInternePropertyTypes
+  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> contextOwnInternePropertyTypes)))
+    ((aspect >->> (\_ -> contextInternePropertyTypes)) "contextInternePropertyTypes"))
 
 -- | All properties defined on the BuitenRol of a Context type.
 -- | `psp:Context -> psp:Property`
+contextOwnExternePropertyTypes :: forall e. TypedTripleGetter e
+contextOwnExternePropertyTypes = constructRolGetter "model:Perspectives$Context$externalProperty" >-> binding >-> rolContext
+
+-- | All properties defined on the BuitenRol of a Context type (own and derived from Aspects).
+-- | `psp:Context -> psp:Property`
 contextExternePropertyTypes :: forall e. TypedTripleGetter e
-contextExternePropertyTypes = constructRolGetter "model:Perspectives$Context$externalProperty" >-> binding >-> rolContext
+contextExternePropertyTypes = QC.concat
+  contextOwnExternePropertyTypes
+  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> contextOwnInternePropertyTypes)))
+    ((aspect >->> (\_ -> contextExternePropertyTypes)) "contextExternePropertyTypes"))
 
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
