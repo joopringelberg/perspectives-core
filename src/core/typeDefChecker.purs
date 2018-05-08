@@ -15,14 +15,12 @@ import Perpectives.TypeChecker (typeIsInstanceOfType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
-import Perspectives.Property (getPropertyTypen)
+import Perspectives.Property (getPropertyTypen, getInternePropertyTypen)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
-import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
-import Perspectives.Syntax (PerspectRol(..))
-import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolContext, rolIsVerplicht, rolPropertyTypes, rolTypen)
+import Perspectives.SystemQueries (binding, contextExternePropertyTypes, contextInternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolContext, rolIsVerplicht, rolPropertyTypes, rolTypen)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, ifM, pure, unit, void, ($), (*>), (<<<), (<>), (>>=), (<))
 
@@ -40,16 +38,17 @@ checkContext' cid = do
 
 checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkProperties typeId cid = do
-  -- TODO. Neem ook properties uit Aspecten mee! De mogelijkeBinding valt buiten deze check, dat komt als de binding zelf gecheckt wordt.
   void $ (typeId ~> contextOwnInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
-  -- TODO: Each internal property must be defined.
-  -- TODO. Neem ook properties uit Aspecten mee!
+
   void $ (typeId ~> contextOwnExternePropertyTypes) >>= (traverse (checkProperty (cid <> "_buitenRol")))
 
-  -- TODO: rolPropertyTypes werkt niet voor externe en interne properties. Daar moeten nieuwe queries voor geschreven worden.
   (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## contextExternePropertyTypes)
   availableProperties <- lift $ lift $ getPropertyTypen (cid <> "_buitenRol")
   checkAvailableProperties (cid <> "_buitenRol") typeId availableProperties definedExternalProperties
+
+  (Triple{object: definedInternalProperties}) <- lift $ lift $ (typeId ## contextInternePropertyTypes)
+  availableProperties <- lift $ lift $ getInternePropertyTypen cid
+  checkAvailableProperties (cid <> "_binnenRol") typeId availableProperties definedExternalProperties
 
 get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
 get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
@@ -75,7 +74,6 @@ checkAvailableRoles typeId cid = do
         otherwise -> pure unit
 
 -- | Does the type hold a definition for all properties given to the RolInstantie?
--- TODO: hier gebruik ik contextID voor het type van de rol. Dat is OK voor interne en externe properties, maar niet voor een RolInContext.
 checkAvailableProperties :: forall e. RolID -> TypeID -> Array PropertyName -> Array PropertyName -> TDChecker (AjaxAvarCache e) Unit
 checkAvailableProperties rolId contextId availableProperties definedProperties = do
   for_ availableProperties isDefined
@@ -142,8 +140,14 @@ checkRol cid rolType' = do
       (tell [MissingRolInstance rolType' cid])
       (pure unit)
     (Just rolId) -> do
-      rolPropertyTypes <- lift $ (rolType' @@ rolPropertyTypes)
-      void $ (traverse (checkProperty rolId)) (tripleObjects rolPropertyTypes)
+      rolPropertyTypes' <- lift $ (rolType' @@ rolPropertyTypes)
+      void $ (traverse (checkProperty rolId)) (tripleObjects rolPropertyTypes')
+
+      -- Detect used but undefined properties.
+      (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## rolPropertyTypes)
+      availableProperties <- lift $ lift $ getPropertyTypen rolId
+      checkAvailableProperties rolId rolType' availableProperties definedRolProperties
+
       -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
       typeOfTheBinding <- lift (rolId @@ (binding >-> rolContext))
       mmb <- lift (rolType' @@ mogelijkeBinding)
@@ -151,7 +155,7 @@ checkRol cid rolType' = do
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
           ifM (lift $ lift $ typeIsInstanceOfType (tripleObject typeOfTheBinding) toegestaneBinding)
-            (pure unit) -- TODO. Controleer hier de binding? Denk aan wederzijdse recursie.
+            (pure unit)
             (tell [IncorrectBinding rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 
 rolIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean

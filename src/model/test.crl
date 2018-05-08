@@ -82,9 +82,25 @@ psp:Rol t:rolMetVerkeerdePropertyWaarde
   $mogelijkeBinding => psp:Rol
 
 --------------------------------------------------------------------------------
--- PropertyNotDefined
+-- PropertyNotDefined (extern)
 --------------------------------------------------------------------------------
-psp:Rol t:rolMetNietBestaandeProperty
+psp:Rol t:rolMetNietBestaandeExterneProperty
   extern $isFunctioneel = true
   extern $bestaatNiet = 1
   $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- PropertyNotDefined (intern)
+--------------------------------------------------------------------------------
+psp:Rol t:rolMetNietBestaandeInterneProperty
+  extern $isFunctioneel = true
+  intern $bestaatNiet = 1
+  $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- PropertyNotDefined (rol)
+--------------------------------------------------------------------------------
+psp:Rol t:nietBestaandeRolProperty
+  extern $isFunctioneel = true
+  $mogelijkeBinding => psp:Rol
+    $nietBestaandeProperty = 1

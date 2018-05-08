@@ -45,11 +45,17 @@ test = do
   -- messages8 <- checkContext "model:Test$rolMetVerkeerdePropertyWaarde"
   -- lift $ for_ messages8 logShow
 
-  messages9 <- checkContext "model:Test$rolMetNietBestaandeProperty"
-  lift $ for_ messages9 logShow
+  -- messages9 <- checkContext "model:Test$rolMetNietBestaandeExterneProperty"
+  -- lift $ for_ messages9 logShow
+  --
+  -- messages10 <- checkContext "model:Test$rolMetNietBestaandeInterneProperty"
+  -- lift $ for_ messages10 logShow
 
-  t <- "model:Test$rolMetNietBestaandeProperty" ## rolPropertyTypes
-  lift $ logShow (tripleObjects t)
+  messages11 <- checkContext "model:Test$nietBestaandeRolProperty"
+  lift $ for_ messages11 logShow
+
+  -- t <- "model:Test$rolMetNietBestaandeProperty" ## rolPropertyTypes
+  -- lift $ logShow (tripleObjects t)
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)
   -- lift $ logShow ("isFunctioneel: " <> show ismandatory)
