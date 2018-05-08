@@ -60,3 +60,16 @@ t:ViewMetAspectRol t:viewMetGedefinieerdeRol1
   psp:View$propertyReferentie => psp:Property
     $volgNummer = 1
   t:AspectMetRol$ongedefinieerdeRol => psp:Context
+
+--------------------------------------------------------------------------------
+-- MissingPropertyValue
+--------------------------------------------------------------------------------
+psp:Rol t:rolZonderFunctioneleProperty
+  $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- TooManyPropertyValues
+--------------------------------------------------------------------------------
+psp:Rol t:rolMetTeveelPropertyWaarden
+  extern $isFunctioneel = true, false
+  $mogelijkeBinding => psp:Rol

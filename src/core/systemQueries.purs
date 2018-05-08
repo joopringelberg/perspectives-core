@@ -80,12 +80,12 @@ rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$
 -- | True if the Rol has been defined as functional.
 -- | `psp:Rol -> psp:Boolean`
 isFunctionalRol :: forall e. TypedTripleGetter e
-isFunctionalRol = constructExternalPropertyGetter "model:Perspectives$Rol$isFunctional"
+isFunctionalRol = constructExternalPropertyGetter "model:Perspectives$Rol$isFunctioneel"
 
 -- | True if the Property has been defined as functional.
 -- | `psp:Property -> psp:Boolean`
 isFunctionalProperty :: forall e. TypedTripleGetter e
-isFunctionalProperty = constructExternalPropertyGetter "model:Perspectives$Property$isFunctional"
+isFunctionalProperty = constructExternalPropertyGetter "model:Perspectives$Property$isFunctioneel"
 
 -- | True if the Rol has been defined as mandatory.
 -- | `psp:Rol -> psp:Boolean`
@@ -100,7 +100,7 @@ propertyIsVerplicht = constructExternalPropertyGetter "model:Perspectives$Proper
 -- | The type of the range that has been defined for the Property.
 -- | `psp:Property -> psp:SimpleValue`
 range :: forall e. TypedTripleGetter e
-range = constructExternalPropertyGetter "model:Perspectives$Property$range"
+range = constructRolGetter "model:Perspectives$Property$range" >-> binding >-> rolContext
 
 -- | True iff the context instance has a label.
 -- | `psp:ContextInstance -> psp:Boolean`

@@ -142,26 +142,23 @@ getRolContext = getRolMember \rol -> [rol_context rol]
 getProperty :: forall e. PropertyName -> ObjectsGetter e
 getProperty pn = getRolMember \rol -> maybe [] propertyValue (lookup pn (rol_properties rol))
 
--- | In the roltelescope, find a property with a given local name.
-getPropertyFromRolTelescope :: forall e. LocalName -> ObjectsGetter e
-getPropertyFromRolTelescope ln rolId = do
+-- | In the roltelescope, find a property with a given qualified name.
+getPropertyFromRolTelescope :: forall e. PropertyName -> ObjectsGetter e
+getPropertyFromRolTelescope qn rolId = do
   maybeRol <- getPerspectEntiteit rolId
   case maybeRol of
-    (Just perspectRol) -> getPropertyFromRolTelescope' ln perspectRol
+    (Just perspectRol) -> getPropertyFromRolTelescope' qn perspectRol
     otherwise -> pure []
 
-getPropertyFromRolTelescope' :: forall e. LocalName -> PerspectRol -> MonadPerspectives (AjaxAvarCache e) (Array String)
-getPropertyFromRolTelescope' ln perspectRol =
-  case lookup localNameInRolNamespace (rol_properties perspectRol) of
+getPropertyFromRolTelescope' :: forall e. PropertyName -> PerspectRol -> MonadPerspectives (AjaxAvarCache e) (Array String)
+getPropertyFromRolTelescope' qn perspectRol =
+  case lookup qn (rol_properties perspectRol) of
     Nothing -> case rol_binding perspectRol of
       Nothing -> pure []
       (Just i) -> if i == (rol_id perspectRol)
         then pure []
-        else getPropertyFromRolTelescope ln i
+        else getPropertyFromRolTelescope qn i
     (Just (PropertyValueWithComments{value})) -> pure value
-  where
-    localNameInRolNamespace :: ID
-    localNameInRolNamespace = (maybe "" id (deconstructNamespace (rol_id perspectRol))) <> "$" <> ln
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of getRolContext), others roles (such as the result of getRolBinding). The Partial function below returns that

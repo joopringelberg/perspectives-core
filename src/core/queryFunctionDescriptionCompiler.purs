@@ -105,30 +105,39 @@ compileElementaryQueryStep s contextId = case s of
   UnqualifiedProperty ln -> ensureAspect (p "Rol")
     do
       rolType <- getQueryStepDomain
-      x <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
-      case x of
+      aspectOrMessage <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      case aspectOrMessage of
         (Left um) -> pure $ Left um
-        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
-          (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
-          (createContextWithSingleRole contextId (q "constructRolPropertyLookup") qn)
+        (Right aspect) -> do
+          let qn = aspect <> "$" <> ln
+          putQueryStepDomain qn
+          ifM (isInNamespace' aspect)
+            (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
+            (createContextWithSingleRole contextId (q "constructRolPropertyLookup") qn)
   UnqualifiedInternalProperty ln -> ensureAspect (p "Rol")
     do
       rolType <- getQueryStepDomain
-      x <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
-      case x of
+      aspectOrMessage <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      case aspectOrMessage of
         (Left um) -> pure $ Left um
-        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
-          (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
-          (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") qn)
+        (Right aspect) -> do
+          let qn = aspect <> "$" <> ln
+          putQueryStepDomain qn
+          ifM (isInNamespace' qn)
+            (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
+            (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") qn)
   UnqualifiedExternalProperty ln -> ensureAspect (p "Rol")
     do
       rolType <- getQueryStepDomain
-      x <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
-      case x of
+      aspectOrMessage <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      case aspectOrMessage of
         (Left um) -> pure $ Left um
-        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
-          (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
-          (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") qn)
+        (Right aspect) -> do
+          let qn = aspect <> "$" <> ln
+          putQueryStepDomain qn
+          ifM (isInNamespace' qn)
+            (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
+            (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") qn)
   QualifiedRol rn -> do
     dom <- getQueryStepDomain
     ensureContextHasRol dom rn
@@ -139,13 +148,15 @@ compileElementaryQueryStep s contextId = case s of
   UnqualifiedRol ln -> ensureAspect (p "Context")
     do
       contextType <- getQueryStepDomain
-      x <- lift $ lift $ checkContextForUnQualifiedRol ln contextType
-      case x of
+      aspectOrMessage <- lift $ lift $ checkContextForUnQualifiedRol ln contextType
+      case aspectOrMessage of
         (Left um) -> pure $ Left um
-        (Right qn) -> putQueryStepDomain qn *> ifM (isInNamespace' qn)
-          (createContextWithSingleRole contextId (q "constructRolGetter") qn)
-          (createContextWithSingleRole contextId (q "constructRolLookup") qn)
-
+        (Right aspect) -> do
+          let qn = aspect <> "$" <> ln
+          putQueryStepDomain qn
+          ifM (isInNamespace' qn)
+            (createContextWithSingleRole contextId (q "constructRolGetter") qn)
+            (createContextWithSingleRole contextId (q "constructRolLookup") qn)
   where
 
   isInNamespace' :: ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) Boolean

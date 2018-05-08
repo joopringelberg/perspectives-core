@@ -16,7 +16,6 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.Utilities (onNothing')
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
@@ -215,6 +214,9 @@ data UserMessage =
   | MissingRolInstance RolName ContextID
   | IncorrectBinding RolName TypeID TypeID
   | RolNotDefined RolName ContextID TypeID
+  | MissingPropertyValue PropertyName RolName
+  | IncorrectPropertyValue PropertyName TypeID String
+  | TooManyPropertyValues PropertyName
 
 type FD = Either UserMessage ID
 
@@ -230,6 +232,9 @@ instance showUserMessage :: Show UserMessage where
   show (MissingUnqualifiedRol rn cid) = "Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
   show (MissingType cid) = "De context '" <> cid <> "' heeft geen type."
   show (MissingRolInstance rn cid) = "De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
-  show (IncorrectBinding rn tp mb) = "De rol '" <> rn <> "' is gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
+  show (IncorrectBinding rn tp mb) = "De Rol '" <> rn <> "' is gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
   show (RolNotDefined rn cid tp) = "De context '" <> cid <> "' heeft een instantie van rol '" <> rn <> "' maar die is niet gedefinieerd voor '" <> tp <> "'."
+  show (MissingPropertyValue pn rid) = "De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "'."
+  show (IncorrectPropertyValue pn sv val) = "De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "'."
+  show (TooManyPropertyValues pn) = "De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde."
   -- show _ = "This is a usermessage"
