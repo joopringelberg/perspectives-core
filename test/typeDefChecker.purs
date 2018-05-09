@@ -6,7 +6,7 @@ import Control.Monad.Aff.Console (CONSOLE, logShow)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (for_, intercalate)
 import Data.Maybe (Maybe)
-import Perpectives.TypeChecker (typeIsInstanceOfType)
+import Perpectives.TypeChecker (typeIsOrHasAspect)
 import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Property (getContextType, getRolType)
@@ -57,11 +57,11 @@ test = do
   -- messages12 <- checkContext "model:Test$ongedefineerdeAspectRol"
   -- lift $ for_ messages12 logShow
 
-  messages13 <- checkContext "model:Test$Sub"
-  lift $ for_ messages13 logShow
+  -- messages13 <- checkContext "model:Test$Sub"
+  -- lift $ for_ messages13 logShow
 
-  t <- "model:Test$Sub" ## aspecten
-  lift $ logShow (tripleObjects t)
+  -- t <- "model:Test$Sub" ## aspecten
+  -- lift $ logShow (tripleObjects t)
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)
   -- lift $ logShow ("isFunctioneel: " <> show ismandatory)

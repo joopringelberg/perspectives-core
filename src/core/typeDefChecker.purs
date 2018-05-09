@@ -11,11 +11,11 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number (fromString) as Nmb
 import Data.Traversable (for_, traverse)
-import Perpectives.TypeChecker (typeIsInstanceOfType, typeIsInstanceOfType')
+import Perpectives.TypeChecker (typeIsOrHasAspect)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
-import Perspectives.Property (getPropertyTypen, getInternePropertyTypen)
+import Perspectives.Property (getContextTypeF, getInternePropertyTypen, getPropertyTypen)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
@@ -165,12 +165,12 @@ checkRol cid rolType' = do
 
       -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
       typeOfTheBinding <- lift (rolId @@ (binding >-> rolContext))
+      t <- lift $ lift $ getContextTypeF (tripleObject typeOfTheBinding)
       mmb <- lift (rolType' @@ mogelijkeBinding)
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
-          -- TODO. Iets gaat niet goed. Zie de test van: t:ongedefineerdeAspectRol
-          ifM (lift $ lift $ typeIsInstanceOfType' (tripleObject typeOfTheBinding) toegestaneBinding)
+          ifM (lift $ lift $ typeIsOrHasAspect t toegestaneBinding)
             (pure unit)
             (tell [IncorrectBinding rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 
