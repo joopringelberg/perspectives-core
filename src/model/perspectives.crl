@@ -211,6 +211,7 @@ psp:Context psp:SingularFunction
 		psp:Rol $range
 			extern $isFunctioneel = true
 
+-- De Unit van Perspectives.
 psp:Context psp:ElkType
 
 psp:Context psp:Constraint

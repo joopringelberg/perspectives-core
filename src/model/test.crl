@@ -104,3 +104,20 @@ psp:Rol t:nietBestaandeRolProperty
   extern $isFunctioneel = true
   $mogelijkeBinding => psp:Rol
     $nietBestaandeProperty = 1
+
+--------------------------------------------------------------------------------
+-- AspectRolNotFromAspect
+--------------------------------------------------------------------------------
+psp:Rol t:ongedefineerdeAspectRol
+  extern $isFunctioneel = true
+  $mogelijkeBinding => psp:Rol
+  $aspectRol => t:nietBestaandeRolProperty
+
+--------------------------------------------------------------------------------
+-- cycle in aspect
+--------------------------------------------------------------------------------
+psp:Context t:Sub
+  $aspect => t:Super
+
+psp:Context t:Super
+  $aspect => t:Sub

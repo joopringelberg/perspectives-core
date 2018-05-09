@@ -6,12 +6,13 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObjects, tripleObjects_)
-import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
+import Perspectives.Property (getContextTypeF)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
+import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
 import Perspectives.SystemQueries (aspecten, binding, contextOwnRolTypes, mogelijkeBinding, rolPropertyTypes)
 import Perspectives.TripleGetter (constructRolGetter)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
@@ -122,4 +123,11 @@ mostSpecificCommonAspect types = do
 -- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect. NOTE: rolId represents a type, not a RolInstantie!
 typeIsInstanceOfType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
 typeIsInstanceOfType subType typeId = do
+  if typeId == subType then (pure true) else hasAspect typeId subType
+
+-- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect.
+-- | `psp:ContextInstance -> psp:ElkType`
+typeIsInstanceOfType' :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
+typeIsInstanceOfType' inst typeId = do
+  subType <- getContextTypeF inst
   if typeId == subType then (pure true) else hasAspect typeId subType

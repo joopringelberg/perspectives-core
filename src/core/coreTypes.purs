@@ -218,6 +218,8 @@ data UserMessage =
   | IncorrectPropertyValue PropertyName TypeID String
   | TooManyPropertyValues PropertyName
   | PropertyNotDefined PropertyName RolID RolName
+  | AspectRolNotFromAspect RolName RolName
+  | CycleInAspects ContextID (Array TypeID)
 
 type FD = Either UserMessage ID
 
@@ -238,5 +240,7 @@ instance showUserMessage :: Show UserMessage where
   show (MissingPropertyValue pn rid) = "De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "'."
   show (IncorrectPropertyValue pn sv val) = "De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "'."
   show (TooManyPropertyValues pn) = "De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde."
-  show (PropertyNotDefined pn rid rn) = "De rol '" <> rid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
+  show (PropertyNotDefined pn rid rn) = "De Rol '" <> rid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
+  show (AspectRolNotFromAspect rn arn) = "De Rol '" <> rn <> "' gebruikt de Rol '" <> arn <> "' als aspectrol, maar die is niet beschikbaar in de Aspecten van '" <> rn <> "'."
+  show (CycleInAspects cid asps) = "De Context '" <> cid <> "' heeft een Aspect dat (indirect) weer '" <> cid <> "' als Aspect heeft. De betrokken Aspecten zijn: " <> show asps <> "."
   -- show _ = "This is a usermessage"

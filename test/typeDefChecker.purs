@@ -16,7 +16,7 @@ import Perspectives.QueryCompiler (rolQuery)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
 import Perspectives.Syntax (PerspectContext(..))
-import Perspectives.SystemQueries (aspect, contextOwnRolTypes, contextRolTypes, contextType, propertyIsVerplicht, rolPropertyTypes)
+import Perspectives.SystemQueries (aspect, aspectRol, aspecten, contextOwnRolTypes, contextRolTypes, contextType, propertyIsVerplicht, rolPropertyTypes)
 import Perspectives.TypeDefChecker (checkContext, propertyIsFunctional)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
@@ -24,8 +24,8 @@ test = do
   -- messages1 <- checkContext "model:Test$rolZonderMogelijkeBinding"
   -- lift $ for_ messages1 logShow
   --
-  -- messages2 <- checkContext "model:Test$viewMetVerkeerdeBinding"
-  -- lift $ for_ messages2 logShow
+  messages2 <- checkContext "model:Test$viewMetVerkeerdeBinding"
+  lift $ for_ messages2 logShow
   --
   -- messages3 <- checkContext "model:Test$viewMetOngedefineerdeRol"
   -- lift $ for_ messages3 logShow
@@ -51,11 +51,17 @@ test = do
   -- messages10 <- checkContext "model:Test$rolMetNietBestaandeInterneProperty"
   -- lift $ for_ messages10 logShow
 
-  messages11 <- checkContext "model:Test$nietBestaandeRolProperty"
-  lift $ for_ messages11 logShow
+  -- messages11 <- checkContext "model:Test$nietBestaandeRolProperty"
+  -- lift $ for_ messages11 logShow
 
-  -- t <- "model:Test$rolMetNietBestaandeProperty" ## rolPropertyTypes
-  -- lift $ logShow (tripleObjects t)
+  -- messages12 <- checkContext "model:Test$ongedefineerdeAspectRol"
+  -- lift $ for_ messages12 logShow
+
+  messages13 <- checkContext "model:Test$Sub"
+  lift $ for_ messages13 logShow
+
+  t <- "model:Test$Sub" ## aspecten
+  lift $ logShow (tripleObjects t)
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)
   -- lift $ logShow ("isFunctioneel: " <> show ismandatory)
