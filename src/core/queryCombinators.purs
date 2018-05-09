@@ -10,7 +10,7 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), putQueryVariable, readQueryVariable, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, Subject, Object)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Object, RolID, Subject, Value)
 import Perspectives.PerspectEntiteit (getType)
 import Perspectives.Property (getRol)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -21,38 +21,31 @@ import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>
 import Type.Data.Boolean (kind Boolean)
 
 -- | The recursive closure of a query, bottoming out when it has no results.
+-- | The result always contains the argument p.
 -- | `psp:Function -> psp:Function`
 closure :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e
 closure (TypedTripleGetter nameOfp p) =
-  memorize getter name
+  memorize (getter []) name
   where
-    getter :: TripleGetter e
-    getter id' = do
+    getter :: Array ID -> Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+    getter cumulator id' = do
       t@(Triple{subject, object : objectsOfP}) <- p id'
-      (triples :: Array (Triple e)) <- traverse getter (Arr.difference objectsOfP [id'])
-      objects <- pure $ join $ map (\(Triple{object}) -> object) triples
-      pure $ Triple { subject: id'
-                    , predicate : name
-                    , object : Arr.cons subject objects
-                    , dependencies : []
-                    , supports : map getRef (Arr.cons t triples)
-                    , tripleGetter : getter}
+      case Arr.elemIndex id' cumulator of
+        Nothing -> do
+          (triples :: Array (Triple e)) <- (traverse (getter (Arr.union cumulator objectsOfP))) (Arr.difference objectsOfP cumulator)
+          objects <- pure $ join $ map (\(Triple{object}) -> object) triples
+          pure $ Triple { subject: id'
+                        , predicate : name
+                        , object: Arr.union objectsOfP objects
+                        , dependencies : []
+                        , supports : map getRef (Arr.cons t triples)
+                        , tripleGetter : getter []}
+        otherwise -> pure t
 
     name :: String
     name = "(closure " <>  nameOfp <> ")"
-
--- | The closure of an ObjectsGetter.
-closure_ :: forall e.
-  ObjectsGetter e ->
-  ObjectsGetter e
-closure_ p = getter where
-  getter :: ObjectsGetter e
-  getter id = do
-    objectsOfP <- p id
-    (results :: Array (Array String)) <- traverse getter (Arr.difference objectsOfP [id])
-    pure $ Arr.nub $ join results
 
 -- | Return the last element in the chain
 -- | `psp:SingularFunction -> psp:SingularFunction`
@@ -60,27 +53,44 @@ closure' :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e
 closure' (TypedTripleGetter nameOfp p) =
-  memorize getter name
+  memorize (getter []) name
   where
-    getter :: TripleGetter e
-    getter id = do
+    getter :: Array ID -> Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+    getter cumulator id = do
       t@(Triple{subject, object : objectsOfP}) <- p id
-      case Arr.head objectsOfP of
-        Nothing -> pure t
-        (Just o) -> do
-          pt@(Triple{object:bottom}) <- getter o
-          case Arr.head bottom of
+      case Arr.elemIndex id cumulator of
+        Nothing -> do
+          case Arr.head objectsOfP of
             Nothing -> pure t
-            otherwise ->
-              pure $ Triple { subject: id
-                            , predicate : name
-                            , object : bottom
-                            , dependencies : []
-                            , supports : [getRef pt]
-                            , tripleGetter : getter}
+            (Just o) -> do
+              pt@(Triple{object:bottom}) <- getter (Arr.cons o cumulator) o
+              case Arr.head bottom of
+                Nothing -> pure t
+                otherwise ->
+                  pure $ Triple { subject: id
+                                , predicate : name
+                                , object : bottom
+                                , dependencies : []
+                                , supports : [getRef pt]
+                                , tripleGetter : getter cumulator}
+        otherwise -> pure t
 
     name :: String
     name = "(closure' " <>  nameOfp <> ")"
+
+-- | The closure of an ObjectsGetter.
+closure_ :: forall e.
+  ObjectsGetter e ->
+  ObjectsGetter e
+closure_ p = getter [] where
+  getter :: Array ID -> ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+  getter cumulator id = do
+    objectsOfP <- p id
+    case Arr.elemIndex id cumulator of
+      Nothing -> do
+        (results :: Array (Array String)) <- traverse (getter (Arr.union cumulator objectsOfP)) (Arr.difference objectsOfP cumulator)
+        pure $ Arr.nub $ join (Arr.cons objectsOfP results)
+      otherwise -> pure objectsOfP
 
 mcons :: forall a. Maybe a -> Array a -> Array a
 mcons = maybe id Arr.cons
