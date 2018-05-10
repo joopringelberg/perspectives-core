@@ -251,7 +251,7 @@ enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
 enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> perspectEntiteitIdentifier)
   _ <- setNamespace $ cname
-  _ <- setTypeNamespace $ cname
+  _ <- setTypeNamespace $ "model:Perspectives$Context"
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of
