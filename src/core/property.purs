@@ -10,7 +10,7 @@ import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, contex
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
-import Perspectives.Identifiers (LocalName, deconstructNamespace)
+import Perspectives.Identifiers (LocalName, buitenRol, deconstructNamespace)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
 import Perspectives.Utilities (onNothing)
@@ -109,7 +109,7 @@ getExternalProperty pn id = do
 
 -- | Look up a local name in the rol telescope of the buitenrol.
 lookupExternalProperty :: forall e. LocalName -> ObjectsGetter e
-lookupExternalProperty pn id = getPropertyFromRolTelescope pn $ id <> "_buitenRol"
+lookupExternalProperty pn id = getPropertyFromRolTelescope pn $ buitenRol id
 
 getInternalProperty :: forall e. PropertyName -> ObjectsGetter e
 getInternalProperty pn ident = do

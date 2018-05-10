@@ -19,10 +19,13 @@ module Perspectives.Identifiers
 , class PerspectEntiteitIdentifier
 , pe_namespace
 , pe_localName
+, binnenRol
+, buitenRol
 , PEIdentifier
 , Prefix
 , isUserURI
 , isUserEntiteitID
+, isModelName
   )
 
 where
@@ -36,9 +39,28 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, id, not, ($), (<<<), (<>), (==), (||))
+import Prelude (class Show, id, not, ($), (<>), (==), (||))
 
+-----------------------------------------------------------
+-- NAMESPACE, MODELNAME
+-----------------------------------------------------------
 -- | A Namespace has the form "model:Name"
+modelRegex :: Regex
+modelRegex = unsafeRegex "^model:(\\w*)$" noFlags
+
+isModelName :: String -> Boolean
+isModelName s = test modelRegex s
+
+binnenRol :: String -> String
+binnenRol s = if isModelName s
+  then s <> "$_binnenRol"
+  else s <> "_binnenRol"
+
+buitenRol :: String -> String
+buitenRol s = if isModelName s
+  then s <> "$_buitenRol"
+  else s <> "_buitenRol"
+
 type Namespace = String
 type LocalName = String
 type Prefix = String

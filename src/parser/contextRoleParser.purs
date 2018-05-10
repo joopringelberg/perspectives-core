@@ -16,7 +16,7 @@ import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Identifiers (ModelName(..), QualifiedName(..), PEIdentifier)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedNamespace, withExtendedTypeNamespace, withTypeNamespace)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
@@ -360,7 +360,7 @@ roleBindingWithReference :: forall e. QualifiedName
 roleBindingWithReference cName = roleBinding' cName do
   (ident :: QualifiedName) <- (sameLine *> contextName)
   cmt <- inLineComment
-  pure $ Tuple cmt ((show ident) <> "_buitenRol")
+  pure $ Tuple cmt (buitenRol (show ident))
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding :: forall e. QualifiedName
@@ -409,23 +409,23 @@ context = withRoleCounting context' where
                 , pspType = show typeName
                 , binnenRol =
                   PerspectRol defaultRolRecord
-                    { _id = (show instanceName) <> "_binnenRol"
+                    { _id = binnenRol (show instanceName)
                     , pspType = "model:Perspectives$BinnenRol"
-                    , binding = binding $ (show instanceName) <> "_buitenRol"
+                    , binding = binding $ buitenRol (show instanceName)
                     , properties = fromFoldable privateProps
                     }
-                , buitenRol = (show instanceName) <> "_buitenRol"
+                , buitenRol = buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
                 , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
               })
-            liftAffToIP $ cacheEntiteitPreservingVersion ((show instanceName) <> "_buitenRol")
+            liftAffToIP $ cacheEntiteitPreservingVersion (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
-                { _id = (show instanceName) <> "_buitenRol"
+                { _id = buitenRol (show instanceName)
                 , pspType = "model:Perspectives$BuitenRol"
                 , context = (show instanceName)
                 , properties = fromFoldable publicProps
                 })
-            pure $ (show instanceName) <> "_buitenRol"
+            pure $ buitenRol (show instanceName)
   collect :: List (Tuple RolName ID) -> StrMap (Array ID)
   collect Nil = empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
@@ -520,19 +520,19 @@ enclosingContext = withRoleCounting enclosingContext' where
           , pspType = "model:Perspectives$Context"
           , binnenRol =
             PerspectRol defaultRolRecord
-              { _id = textName <> "_binnenRol"
+              { _id = binnenRol textName
               , pspType = "model:Perspectives$BinnenRol"
-              , binding = binding $ textName <> "_buitenRol"
+              , binding = binding $ buitenRol textName
               , properties = fromFoldable privateProps
               }
-          , buitenRol = textName <> "_buitenRol"
+          , buitenRol = buitenRol textName
           , rolInContext = fromFoldable defs
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
 
-      lift $ lift $ lift $ cacheEntiteitPreservingVersion (textName <> "_buitenRol")
+      lift $ lift $ lift $ cacheEntiteitPreservingVersion (buitenRol textName)
         (PerspectRol defaultRolRecord
-          { _id = textName <> "_buitenRol"
+          { _id = buitenRol textName
           , pspType = "model:Perspectives$BuitenRol"
           , context = textName
           , properties = fromFoldable publicProps

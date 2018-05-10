@@ -12,13 +12,13 @@ import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
-import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
-import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
+import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
+import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.SystemQueries (contextOwnRolTypes, contextType, mogelijkeBinding, rolType)
 import Perspectives.Utilities (ifNothing, onNothing)
@@ -337,21 +337,21 @@ createContext name typeId roles properties = do
       , pspType = typeId
       , binnenRol =
           PerspectRol defaultRolRecord
-            { _id =  name <> "_binnenRol"
+            { _id =  binnenRol name
             , pspType = "model:Perspectives$BinnenRol"
-            , binding = binding (name <> "_buitenRol")
+            , binding = binding (buitenRol name)
             , properties = fromFoldable (createProperty <$> properties)
             }
       , rolInContext = fromFoldable roles
       })
-  lift $ lift $ cacheEntiteitPreservingVersion (name <> "_buitenRol")
+  lift $ lift $ cacheEntiteitPreservingVersion (buitenRol name)
     (PerspectRol defaultRolRecord
-      { _id = name <> "_buitenRol"
+      { _id = buitenRol name
       , pspType = "model:Perspectives$BuitenRol"
       , context = name
-      , binding = binding $ typeId <> "_buitenRol"
+      , binding = binding $ buitenRol typeId
       })
-  pure $ Right $ name <> "_buitenRol"
+  pure $ Right $ buitenRol name
 
   where
   createProperty :: Tuple PropertyName (Array String) -> (Tuple PropertyName PropertyValueWithComments)
