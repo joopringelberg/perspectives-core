@@ -4,7 +4,7 @@ Context model:Test als t:
 
 import model:Perspectives als psp:
 
-Section psp:rolInContext
+Section $rolInContext
 
 --------------------------------------------------------------------------------
 -- MissingRolInstance

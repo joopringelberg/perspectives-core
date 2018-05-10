@@ -2,11 +2,10 @@ module Test.Main where
 
 import Test.TypeDefChecker (test)
 import Test.TestEffects as TE
-import Control.Monad.Aff (Aff, Fiber, runAff, runAff_)
-import Control.Monad.Aff.Console (CONSOLE, log) as AC
+import Control.Monad.Aff (Fiber, runAff)
 import Control.Monad.Eff (Eff)
 import Perspectives.PerspectivesState (runPerspectives)
-import Prelude (class Show, Unit, pure, unit, (>>=), show)
+import Prelude (Unit)
 
 -- import Test.BoundContexts
 

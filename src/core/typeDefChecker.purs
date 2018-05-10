@@ -53,7 +53,7 @@ checkContext' cid = do
       checkProperties tp cid
       checkDefinedRoles tp cid
       checkAvailableRoles tp cid
-      checkAspectOfRolType cid
+      checkAspectOfRolType cid tp
       checkCyclicAspects cid
 
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
@@ -61,15 +61,15 @@ checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) 
 checkProperties typeId cid = do
   void $ (typeId ~> contextOwnInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
 
-  void $ (typeId ~> contextOwnExternePropertyTypes) >>= (traverse (comparePropertyInstanceToDefinition (buitenRol cid)))
+  void $ (typeId ~> contextOwnExternePropertyTypes) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
 
   (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## contextExternePropertyTypes)
-  availableProperties <- lift $ lift $ getPropertyTypen (buitenRol cid)
-  checkAvailableProperties (buitenRol cid) typeId availableProperties definedExternalProperties
+  availableExternalProperties <- lift $ lift $ getPropertyTypen (buitenRol cid)
+  checkAvailableProperties (buitenRol cid) typeId availableExternalProperties definedExternalProperties
 
   (Triple{object: definedInternalProperties}) <- lift $ lift $ (typeId ## contextInternePropertyTypes)
-  availableProperties <- lift $ lift $ getInternePropertyTypen cid
-  checkAvailableProperties (binnenRol cid) typeId availableProperties definedExternalProperties
+  availableInternalProperties <- lift $ lift $ getInternePropertyTypen cid
+  checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedExternalProperties
 
 get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
 get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
@@ -107,7 +107,7 @@ checkAvailableProperties rolId contextId availableProperties definedProperties =
     isDefined :: PropertyName -> TDChecker (AjaxAvarCache e) Unit
     isDefined propertyName =
       case elemIndex propertyName definedProperties of
-        Nothing -> tell [PropertyNotDefined propertyName rolId contextId]
+        Nothing -> tell [PropertyNotDefined contextId propertyName rolId contextId]
         otherwise -> pure unit
 
 -- To check:
@@ -121,14 +121,14 @@ checkInternalProperty cid propertyType = pure unit
 -- | If the Property is mandatory and missing, adds a message.
 -- | Checks the value of the Property with the range that has been defined.
 -- | If the Property is functional and more than one value has been given, adds a message.
--- | `psp:BuitenRolInstance -> psp:Property -> psp:ElkType`
-comparePropertyInstanceToDefinition :: forall e. RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
-comparePropertyInstanceToDefinition rid propertyType = do
+-- | `psp:ContextInstance -> psp:BuitenRolInstance -> psp:Property -> psp:ElkType`
+comparePropertyInstanceToDefinition :: forall e. ContextID -> RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
+comparePropertyInstanceToDefinition cid rid propertyType = do
   propertyGetter <- lift $ propertyQuery propertyType rid
   (Triple {object}) <- lift (rid @@ propertyGetter)
   case head object of
     Nothing -> ifM (lift (propertyIsMandatory propertyType))
-      (tell [MissingPropertyValue propertyType rid])
+      (tell [MissingPropertyValue cid propertyType rid])
       (pure unit)
     (Just propertyValue) -> do
       mrange <- lift (propertyType @@ range)
@@ -136,11 +136,11 @@ comparePropertyInstanceToDefinition rid propertyType = do
         Nothing -> pure unit -- There should be a range, however, we protect this function from failing on it.
         (Just sv) -> ifM (tryParseSimpleValue sv propertyValue)
           (pure unit)
-          (tell [IncorrectPropertyValue propertyType sv propertyValue])
+          (tell [IncorrectPropertyValue cid propertyType sv propertyValue])
       if length object < 2
         then pure unit
         else ifM (lift $ propertyIsFunctional propertyType)
-          (tell [TooManyPropertyValues propertyType])
+          (tell [TooManyPropertyValues cid propertyType])
           (pure unit)
 
   where
@@ -174,7 +174,7 @@ compareRolInstanceToDefinition cid rolType' = do
     (Just rolId) -> do
       -- Check the properties.
       rolPropertyTypes' <- lift $ (rolType' @@ rolPropertyTypes)
-      void $ (traverse (comparePropertyInstanceToDefinition rolId)) (tripleObjects rolPropertyTypes')
+      void $ (traverse (comparePropertyInstanceToDefinition cid rolId)) (tripleObjects rolPropertyTypes')
 
       -- Detect used but undefined properties.
       (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## rolPropertyTypes)
@@ -190,12 +190,12 @@ compareRolInstanceToDefinition cid rolType' = do
         (Just toegestaneBinding) -> do
           ifM (lift $ lift $ typeIsOrHasAspect t toegestaneBinding)
             (pure unit)
-            (tell [IncorrectBinding rolId (tripleObject typeOfTheBinding) toegestaneBinding])
+            (tell [IncorrectBinding cid rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?
--- | psp:ContextInstance -> psp:ElkType`
-checkAspectOfRolType :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkAspectOfRolType cid = do
+-- | psp:ContextInstance -> psp:Context -> psp:ElkType`
+checkAspectOfRolType :: forall e. ContextID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkAspectOfRolType cid ctype = do
   mar <- lift $ lift (cid ## aspectRol)
   case head (tripleObjects mar) of
     Nothing -> pure unit
@@ -203,7 +203,7 @@ checkAspectOfRolType cid = do
       (Triple{object:aspectRollen}) <- lift $ lift $ (cid ## contextType >-> aspect >-> contextRolTypes)
       if isJust $ elemIndex aspectRol aspectRollen
         then pure unit
-        else tell [AspectRolNotFromAspect cid aspectRol]
+        else tell [AspectRolNotFromAspect cid aspectRol ctype]
 
 -- | `psp:ContextInstance -> psp:ElkType`
 checkCyclicAspects :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit

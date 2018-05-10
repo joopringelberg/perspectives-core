@@ -1,16 +1,14 @@
 module Test.ContextRoleParser where
 
 import Prelude
-import Control.Monad.Aff (Aff, runAff_)
+import Control.Monad.Aff (runAff_)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Aff.Console (CONSOLE, log)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
-import Data.Maybe (Maybe)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.PerspectivesState (runPerspectives)
-import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.Syntax (PerspectContext)
+-- import Perspectives.Resource (getPerspectEntiteit)
 -----------------------------------------------------------
 -- Tests
 -----------------------------------------------------------
@@ -22,8 +20,8 @@ runTest t =
   runAff_ (\_->pure unit) (runPerspectives "admin" "admin" t >>= (\r -> log (show r)))
 
 -- getContextDef :: forall e. String -> Aff (DomeinFileEffects (prd :: PROPDEFS | e)) (Maybe PerspectContext)
-getContextDef id = do
-  getPerspectEntiteit id
+-- getContextDef id = do
+--   getPerspectEntiteit id
 
 -- runAndShowContext :: forall e. String -> Eff (DomeinFileEffects (prd :: PROPDEFS, console :: CONSOLE | e)) Unit
 -- runAndShowContext text = runTest ((runIndentParser text context) >>= (\x -> getContextDef (unsafePartial (fromRight x))) >>= (\r -> log (show r)))

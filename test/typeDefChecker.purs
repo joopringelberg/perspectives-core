@@ -4,20 +4,10 @@ import Prelude
 
 import Control.Monad.Aff.Console (CONSOLE, logShow)
 import Control.Monad.Trans.Class (lift)
-import Data.Foldable (for_, intercalate)
-import Data.Maybe (Maybe)
-import Perpectives.TypeChecker (typeIsOrHasAspect)
-import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
+import Data.Foldable (for_)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Property (getContextType, getRolType)
-import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (toBoolean, ref)
-import Perspectives.QueryCompiler (rolQuery)
-import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
-import Perspectives.Syntax (PerspectContext(..))
-import Perspectives.SystemQueries (aspect, aspectRol, aspecten, contextOwnRolTypes, contextRolTypes, contextType, propertyIsVerplicht, rolPropertyTypes)
-import Perspectives.TypeDefChecker (checkContext, checkModel)
+import Perspectives.TypeDefChecker (checkModel)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
@@ -66,7 +56,7 @@ test = do
   messages15 <- checkModel "model:Perspectives"
   lift $ for_ messages15 logShow
 
-  -- t <- "model:Test$Sub" ## aspecten
+  -- t <- "model:Perspectives$Context" ## contextRolTypes
   -- lift $ logShow (tripleObjects t)
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)

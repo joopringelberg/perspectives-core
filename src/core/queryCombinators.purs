@@ -1,20 +1,16 @@
 module Perspectives.QueryCombinators where
 
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Loops (iterateUntilM)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, nub, null, singleton, union) as Arr
 import Data.HeytingAlgebra (not) as HA
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), putQueryVariable, readQueryVariable, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Object, RolID, Subject, Value)
-import Perspectives.PerspectEntiteit (getType)
 import Perspectives.Property (getRol)
-import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.Syntax (PerspectContext)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
 import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
@@ -162,21 +158,6 @@ intersect (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
                     , tripleGetter : getter}
     name = "(intersect " <> nameOfp <> " " <> nameOfq <> ")"
 
--- TODO. Waarom niet memoriseren?
--- leastCommonAncestor :: forall e. Subject -> Subject -> MonadPerspectives (AjaxAvarCache e) Subject
--- leastCommonAncestor t1 t2 = do
---   (ancestorsOfT1 :: Array ID) <- closure_ (type_ >=> (pure <<< singleton)) t1
---   iterateUntilM (isTypeOfT1 ancestorsOfT1) type_ t2
---   where
---     -- TODO. getPerspectEntiteit moet geen maybe teruggeven, maar een error gooien als
---     -- er niets gevonden wordt. Dan kan de maybe hieronder weg.
---     type_ :: Subject -> MonadPerspectives (AjaxAvarCache e) Subject
---     type_ = ((getPerspectEntiteit :: Subject -> MonadPerspectives (AjaxAvarCache e) (Maybe PerspectContext)) >=> (pure <<< maybe "" (getType :: PerspectContext -> String)))
---
---     isTypeOfT1 :: Array Subject -> Subject -> Boolean
---     isTypeOfT1 ancestors superOfT2 = isJust $ Arr.elemIndex superOfT2 ancestors
-
-
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
@@ -279,7 +260,7 @@ ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
 -- | Use the cache of query results for the given named function.
 -- | The resulting query returns exactly the same result as the argument query.
 -- | `psp:Function -> psp:Function`
-useCache :: forall e a. TypedTripleGetter e -> TypedTripleGetter e
+useCache :: forall e. TypedTripleGetter e -> TypedTripleGetter e
 useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
   go r =
     do

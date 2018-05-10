@@ -2,7 +2,7 @@
 
 Context model:Perspectives als psp:
 
-Section psp:rolInContext
+Section $rolInContext
 
 --------------------------------------------------------------------------------
 -- SIMPLE VALUES
@@ -43,6 +43,7 @@ psp:Context psp:Property
 			$mogelijkeBinding => psp:Context
 
 psp:Context psp:Context
+	$aspect => psp:ElkType
 	$rolInContext =>
 		psp:Rol $externalProperty
 			extern $isFunctioneel = false
@@ -82,6 +83,7 @@ psp:Context psp:Rol
 		psp:Rol $mogelijkeBinding
 			extern $isFunctioneel = false
 			extern $isVerplicht = true
+			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		psp:Rol $viewInRol
 			extern $isFunctioneel = false
@@ -133,6 +135,7 @@ psp:Rol psp:BinnenRol
 psp:Context psp:View
 	$rolInContext =>
 		psp:Rol $propertyReferentie
+			extern $isVerplicht = true
 			$rolProperty =>
 				psp:Property $volgNummer
 					extern $isFunctioneel = true

@@ -15,7 +15,7 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, flip, pure, unit, ($), (<<<), (>>=))
 
-newPerspectivesState :: forall e. UserInfo -> AVar String -> PerspectivesState
+newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
 newPerspectivesState uinfo av =
   { rolDefinitions: new unit
   , contextDefinitions: new unit

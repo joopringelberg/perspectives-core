@@ -35,7 +35,7 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
 -- | to construct getters for the properties of contexts and roles that are not roles or properties, such as
 -- | psp:type, psp:binding, psp:label and psp:context. Furthermore, for psp:identity, psp:buitenRol, psp:binnenRol,
 -- | psp:iedereRolInContext and psp:rolTypen.
-constructTripleGetterFromObjectsGetter :: forall e a.
+constructTripleGetterFromObjectsGetter :: forall e.
   PropertyName ->
   ObjectsGetter e ->
   TypedTripleGetter e

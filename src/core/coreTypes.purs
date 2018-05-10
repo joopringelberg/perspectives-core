@@ -212,35 +212,35 @@ data UserMessage =
   | MissingUnqualifiedRol RolName ContextID
   | MissingType ContextID
   | MissingRolInstance RolName ContextID
-  | IncorrectBinding RolName TypeID TypeID
+  | IncorrectBinding ContextID RolName TypeID TypeID
   | RolNotDefined RolName ContextID TypeID
-  | MissingPropertyValue PropertyName RolName
-  | IncorrectPropertyValue PropertyName TypeID String
-  | TooManyPropertyValues PropertyName
-  | PropertyNotDefined PropertyName RolID RolName
-  | AspectRolNotFromAspect RolName RolName
+  | MissingPropertyValue ContextID PropertyName RolName
+  | IncorrectPropertyValue ContextID PropertyName TypeID String
+  | TooManyPropertyValues ContextID PropertyName
+  | PropertyNotDefined ContextID PropertyName RolID RolName
+  | AspectRolNotFromAspect RolName RolName ContextID
   | CycleInAspects ContextID (Array TypeID)
 
 type FD = Either UserMessage ID
 
 instance showUserMessage :: Show UserMessage where
-  show (MissingVariableDeclaration s) = "De variabele '" <> s <> "' wordt gebruikt voor hij is gedefinieerd."
-  show (VariableAlreadyDeclaredAs var tp) = "De variabele '" <> var <> "' is al gedeclareerd als een waarde van het type '" <> tp <> "'"
-  show (MissingAspect tp as) = "Het type '" <> tp <> "' mist het aspect '" <> as <> "'."
-  show (MissingMogelijkeBinding tp) = "Voor Rol '" <> tp <> "' is geen mogelijkeBinding gedefinieerd."
-  show (MultipleDefinitions ln aspectArray) = "Elk van de volgende Aspecten heeft een definitie voor '" <> ln <> "': " <> show aspectArray
-  show (MissingUnqualifiedProperty ln rn) = "Er is geen definitie voor de property '" <> ln <> "' voor de rol '" <> rn <> "'."
-  show (MissingQualifiedProperty pn rn) = "Er is geen definitie voor de property '" <> pn <> "' voor de rol '" <> rn <> "'."
-  show (MissingQualifiedRol rn cid) = "Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
-  show (MissingUnqualifiedRol rn cid) = "Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
-  show (MissingType cid) = "De context '" <> cid <> "' heeft geen type."
-  show (MissingRolInstance rn cid) = "De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
-  show (IncorrectBinding rn tp mb) = "De Rol '" <> rn <> "' is gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
-  show (RolNotDefined rn cid tp) = "De context '" <> cid <> "' heeft een instantie van rol '" <> rn <> "' maar die is niet gedefinieerd voor '" <> tp <> "'."
-  show (MissingPropertyValue pn rid) = "De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "'."
-  show (IncorrectPropertyValue pn sv val) = "De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "'."
-  show (TooManyPropertyValues pn) = "De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde."
-  show (PropertyNotDefined pn rid rn) = "De Rol '" <> rid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
-  show (AspectRolNotFromAspect rn arn) = "De Rol '" <> rn <> "' gebruikt de Rol '" <> arn <> "' als aspectrol, maar die is niet beschikbaar in de Aspecten van '" <> rn <> "'."
-  show (CycleInAspects cid asps) = "De Context '" <> cid <> "' heeft een Aspect dat (indirect) weer '" <> cid <> "' als Aspect heeft. De betrokken Aspecten zijn: " <> show asps <> "."
+  show (MissingVariableDeclaration s) = "(MissingVariableDeclaration) De variabele '" <> s <> "' wordt gebruikt voor hij is gedefinieerd."
+  show (VariableAlreadyDeclaredAs var tp) = "(VariableAlreadyDeclaredAs) De variabele '" <> var <> "' is al gedeclareerd als een waarde van het type '" <> tp <> "'"
+  show (MissingAspect tp as) = "(MissingAspect) Het type '" <> tp <> "' mist het aspect '" <> as <> "'."
+  show (MissingMogelijkeBinding tp) = "(MissingMogelijkeBinding) Voor Rol '" <> tp <> "' is geen mogelijkeBinding gedefinieerd."
+  show (MultipleDefinitions ln aspectArray) = "(MultipleDefinitions) Elk van de volgende Aspecten heeft een definitie voor '" <> ln <> "': " <> show aspectArray
+  show (MissingUnqualifiedProperty ln rn) = "(MissingUnqualifiedProperty) Er is geen definitie voor de property '" <> ln <> "' voor de rol '" <> rn <> "'."
+  show (MissingQualifiedProperty pn rn) = "(MissingQualifiedProperty) Er is geen definitie voor de property '" <> pn <> "' voor de rol '" <> rn <> "'."
+  show (MissingQualifiedRol rn cid) = "(MissingQualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
+  show (MissingUnqualifiedRol rn cid) = "(MissingUnqualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
+  show (MissingType cid) = "(MissingType) De context '" <> cid <> "' heeft geen type."
+  show (MissingRolInstance rn cid) = "(MissingRolInstance) De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
+  show (IncorrectBinding cid rn tp mb) = "(IncorrectBinding) In de context '" <> cid <> "' is de Rol '" <> rn <> "' gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
+  show (RolNotDefined rn cid tp) = "(RolNotDefined) De context '" <> cid <> "' heeft een instantie van rol '" <> rn <> "' maar die is niet gedefinieerd voor '" <> tp <> "'."
+  show (MissingPropertyValue cid pn rid) = "(MissingPropertyValue) De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "' van de context '" <> cid <> "'."
+  show (IncorrectPropertyValue cid pn sv val) = "(IncorrectPropertyValue) De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "' (in de context '" <> cid <> "')."
+  show (TooManyPropertyValues cid pn) = "(TooManyPropertyValues) De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde (in de context '" <> cid <> "')."
+  show (PropertyNotDefined cid pn rid rn) = "(PropertyNotDefined) De Rol '" <> rid <> "' van de context '" <> cid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
+  show (AspectRolNotFromAspect rn arn cid) = "(AspectRolNotFromAspect) De Rol '" <> rn <> "' gebruikt de Rol '" <> arn <> "' als aspectrol, maar die is niet beschikbaar in de Aspecten van '" <> cid <> "'."
+  show (CycleInAspects cid asps) = "(CycleInAspects) De Context '" <> cid <> "' heeft een Aspect dat (indirect) weer '" <> cid <> "' als Aspect heeft. De betrokken Aspecten zijn: " <> show asps <> "."
   -- show _ = "This is a usermessage"

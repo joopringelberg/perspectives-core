@@ -2,17 +2,14 @@ module Test.BoundContexts where
 
 import Control.Monad.Aff.Console (log) as AC
 import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Trans.Class (lift)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PropertyComposition ((>->))
-import Perspectives.QueryCombinators (ignoreCache, filter)
-import Perspectives.SystemQueries (binding, boundContexts, buitenRol, contextType, hasBinding, hasLabel, identity, iedereRolInContext, label, range, rolContext, rolHasType, rolType, rolTypen)
-import Perspectives.TripleGetter (constructRolGetter)
+import Perspectives.QueryCombinators (filter)
+import Perspectives.SystemQueries (binding, boundContexts, hasBinding, iedereRolInContext)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
-import Test.TestEffects (CancelerEffects)
 
 rolDef :: String
 -- rolDef = "model:Perspectives$externalProperty"

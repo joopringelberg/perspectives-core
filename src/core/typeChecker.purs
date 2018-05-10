@@ -9,7 +9,6 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypeID, TypedT
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
-import Perspectives.Property (getContextTypeF)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
@@ -23,11 +22,11 @@ checkRolForQualifiedProperty pn rn = do
   (&&) <$> checkRolHasAspect rn aspect <*> checkRolHasProperty aspect pn
   where
     checkRolHasAspect :: RolName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkRolHasAspect rn an = (||) <$> checkTypeImportsAspect rn an <*> checkMogelijkeBindingHasAspect rn an
+    checkRolHasAspect rn' an = (||) <$> checkTypeImportsAspect rn' an <*> checkMogelijkeBindingHasAspect rn' an
 
     checkMogelijkeBindingHasAspect :: RolName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkMogelijkeBindingHasAspect rn an = do
-      b <- runMonadPerspectivesQuery rn (tripleGetter2function mogelijkeBinding)
+    checkMogelijkeBindingHasAspect rn' an = do
+      b <- runMonadPerspectivesQuery rn' (tripleGetter2function mogelijkeBinding)
       case b of
         Nothing -> pure false
         (Just bd) -> do
@@ -37,7 +36,7 @@ checkRolForQualifiedProperty pn rn = do
             otherwise -> foldM (\r alt -> checkRolForQualifiedProperty pn alt >>= pure <<< (&&) r) true object
 
     checkRolHasProperty :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkRolHasProperty rn pn = runMonadPerspectivesQuery rn (toBoolean (contains pn rolPropertyTypes))
+    checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' rolPropertyTypes))
 
 checkTypeImportsAspect :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkTypeImportsAspect typeId an = runMonadPerspectivesQuery typeId (toBoolean (contains an aspecten))
@@ -51,24 +50,24 @@ checkContextForQualifiedRol rn cn = do
   (&&) <$> checkTypeImportsAspect cn aspect <*> checkContextHasRol aspect rn
   where
     checkContextHasRol :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkContextHasRol cn rn = runMonadPerspectivesQuery cn (toBoolean (contains rn contextOwnRolTypes))
+    checkContextHasRol cn' rn' = runMonadPerspectivesQuery cn' (toBoolean (contains rn' contextOwnRolTypes))
 
 -- | Returns the Aspect that defines the property, or a usermessage indicating that property with the given
 -- | local name can be found, or that several have been found.
 checkRolForUnQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) FD
-checkRolForUnQualifiedProperty ln rn = do
-  aspects <- aspectsWithUnqualifiedProperty ln rn
+checkRolForUnQualifiedProperty ln rn' = do
+  aspects <- aspectsWithUnqualifiedProperty ln rn'
   case length aspects of
-    0 -> pure $ Left $ MissingUnqualifiedProperty ln rn
+    0 -> pure $ Left $ MissingUnqualifiedProperty ln rn'
     1 -> pure $ Right $ unsafePartial $ fromJust $ head aspects
     otherwise -> pure $ Left $ MultipleDefinitions ln aspects
   where
 
     aspectsWithUnqualifiedProperty :: PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (Array ID)
-    aspectsWithUnqualifiedProperty ln rn = union <$> importedAspectsWithUnqualifiedProperty <*> aspectsFromMogelijkeBindingWithUnqualifiedProperty
+    aspectsWithUnqualifiedProperty ln' rn = union <$> importedAspectsWithUnqualifiedProperty <*> aspectsFromMogelijkeBindingWithUnqualifiedProperty
       where
         importedAspectsWithUnqualifiedProperty :: MonadPerspectives (AjaxAvarCache e) (Array ID)
-        importedAspectsWithUnqualifiedProperty = (rn ## filter (hasUnqualifiedProperty ln) aspecten) >>= tripleObjects_
+        importedAspectsWithUnqualifiedProperty = (rn ## filter (hasUnqualifiedProperty ln') aspecten) >>= tripleObjects_
 
         aspectsFromMogelijkeBindingWithUnqualifiedProperty :: MonadPerspectives (AjaxAvarCache e) (Array ID)
         aspectsFromMogelijkeBindingWithUnqualifiedProperty = do
@@ -78,14 +77,14 @@ checkRolForUnQualifiedProperty ln rn = do
             (Just bd) -> do
               (Triple{object} ) <- bd ## alternatives
               case head object of
-                Nothing -> aspectsWithUnqualifiedProperty ln bd -- Not a Sum type
-                otherwise -> foldM (\r alt -> aspectsWithUnqualifiedProperty ln alt >>= pure <<< intersect r) [] object
+                Nothing -> aspectsWithUnqualifiedProperty ln' bd -- Not a Sum type
+                otherwise -> foldM (\r alt -> aspectsWithUnqualifiedProperty ln' alt >>= pure <<< intersect r) [] object
 
 
     hasUnqualifiedProperty :: PropertyName -> TypedTripleGetter e
-    hasUnqualifiedProperty ln = containsMatching
-      (\rolName propertyName -> (rolName <> "$" <> ln) == propertyName)
-      ("UnqualifiedProperty" <> ln)
+    hasUnqualifiedProperty ln' = containsMatching
+      (\rolName propertyName -> (rolName <> "$" <> ln') == propertyName)
+      ("UnqualifiedProperty" <> ln')
       rolPropertyTypes
 
 checkContextForUnQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) FD
@@ -101,9 +100,9 @@ checkContextForUnQualifiedRol ln cn = do
     aspectsWithUnqualifiedRol = (cn ## filter (hasUnqualifiedRol ln) aspecten) >>= tripleObjects_
 
     hasUnqualifiedRol :: PropertyName -> TypedTripleGetter e
-    hasUnqualifiedRol ln = containsMatching
-      (\contextName rolName -> (contextName <> "$" <> ln) == rolName)
-      ("UnqualifiedRol" <> ln)
+    hasUnqualifiedRol ln' = containsMatching
+      (\contextName rolName -> (contextName <> "$" <> ln') == rolName)
+      ("UnqualifiedRol" <> ln')
       contextOwnRolTypes
 
 hasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
