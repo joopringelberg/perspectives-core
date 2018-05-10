@@ -9,7 +9,7 @@ import Data.StrMap (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Partial.Unsafe (unsafePartial)
-import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasAspect, mostSpecificCommonAspect)
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
 import Perspectives.Effects (AjaxAvarCache)
@@ -55,7 +55,7 @@ compileElementaryQueryStep s contextId = case s of
   Identity -> parameterlessQueryFunction contextId (q "identity")
   Type -> do
     dom <- getQueryStepDomain
-    ifM (lift $ lift $ hasAspect (psp "Context") dom)
+    ifM (lift $ lift $ dom `isOrHasAspect` (psp "Context"))
       do
         tp <- lift $ tripleGetter2function contextType dom
         putQueryStepDomain $ unsafePartial $ fromJust tp
@@ -170,7 +170,7 @@ compileElementaryQueryStep s contextId = case s of
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   ensureAspect aspect mv = do
     dom <- getQueryStepDomain
-    ifM (lift $ lift $ hasAspect aspect dom)
+    ifM (lift $ lift $ dom `isOrHasAspect` aspect)
       mv
       (pure $ Left $ MissingAspect dom aspect)
 

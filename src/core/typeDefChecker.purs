@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
-import Perpectives.TypeChecker (typeIsOrHasAspect)
+import Perpectives.TypeChecker (importsAspect, isOrHasAspect)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -24,7 +24,7 @@ import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
 import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
-import Perspectives.SystemQueries (aspect, aspectRol, aspecten, binding, contextExternePropertyTypes, contextInternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolContext, rolIsVerplicht, rolPropertyTypes, rolTypen)
+import Perspectives.SystemQueries (aspect, aspectRol, aspecten, binding, contextExternePropertyTypes, contextInternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextType, contextTypeOfRolType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolContext, rolIsVerplicht, rolPropertyTypes, rolTypen)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, ifM, pure, unit, void, ($), (<<<), (>>=), (<))
 
@@ -53,7 +53,13 @@ checkContext' cid = do
       checkProperties tp cid
       checkDefinedRoles tp cid
       checkAvailableRoles tp cid
-      checkAspectOfRolType cid tp
+      -- if this psp:ContextInstance represents a psp:Rol, and if it has an instance
+      -- of $aspectRol, check whether its namespace giving context has that Aspect.
+      -- NOTE: we check each context instance. If it does not represent a psp:Rol,
+      -- no messages are added.
+      ifM (lift $ lift $ (cid `importsAspect` "model:Perspectives$Rol"))
+        (checkAspectOfRolType cid)
+        (pure unit)
       checkCyclicAspects cid
 
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
@@ -188,22 +194,27 @@ compareRolInstanceToDefinition cid rolType' = do
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
-          ifM (lift $ lift $ typeIsOrHasAspect t toegestaneBinding)
+          ifM (lift $ lift $ t `isOrHasAspect` toegestaneBinding)
             (pure unit)
             (tell [IncorrectBinding cid rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?
--- | psp:ContextInstance -> psp:Context -> psp:ElkType`
-checkAspectOfRolType :: forall e. ContextID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkAspectOfRolType cid ctype = do
-  mar <- lift $ lift (cid ## aspectRol)
-  case head (tripleObjects mar) of
-    Nothing -> pure unit
-    (Just aspectRol) -> do
-      (Triple{object:aspectRollen}) <- lift $ lift $ (cid ## contextType >-> aspect >-> contextRolTypes)
-      if isJust $ elemIndex aspectRol aspectRollen
-        then pure unit
-        else tell [AspectRolNotFromAspect cid aspectRol ctype]
+-- | The first parameter is bound to a psp:ContextInstance that represents a psp:Rol.
+-- | psp:Rol -> psp:Context -> psp:ElkType`
+checkAspectOfRolType :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkAspectOfRolType cid = do
+  (Triple{object:ctypeArr}) <- lift $ lift (cid ## contextTypeOfRolType)
+  case head ctypeArr of
+    Nothing -> tell [RolWithoutContext cid]
+    (Just ctype) -> do
+      mar <- lift $ lift (cid ## aspectRol)
+      case head (tripleObjects mar) of -- TODO: er kunnen er meer zijn!
+        Nothing -> pure unit
+        (Just aspectRol) -> do
+          (Triple{object:aspectRollen}) <- lift $ lift $ (ctype ## aspect >-> contextRolTypes)
+          if isJust $ elemIndex aspectRol aspectRollen
+            then pure unit
+            else tell [AspectRolNotFromAspect cid aspectRol ctype]
 
 -- | `psp:ContextInstance -> psp:ElkType`
 checkCyclicAspects :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit

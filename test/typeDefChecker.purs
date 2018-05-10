@@ -5,8 +5,10 @@ import Prelude
 import Control.Monad.Aff.Console (CONSOLE, logShow)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (for_)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.RunMonadPerspectivesQuery ((##))
+import Perspectives.SystemQueries (contextTypeOfRolType)
 import Perspectives.TypeDefChecker (checkModel)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
@@ -56,7 +58,7 @@ test = do
   messages15 <- checkModel "model:Perspectives"
   lift $ for_ messages15 logShow
 
-  -- t <- "model:Perspectives$Context" ## contextRolTypes
+  -- t <- "model:Perspectives$Rol" ## contextTypeOfRolType
   -- lift $ logShow (tripleObjects t)
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)

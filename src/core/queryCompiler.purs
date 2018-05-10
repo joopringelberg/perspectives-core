@@ -5,7 +5,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, head, unsnoc)
 import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
-import Perpectives.TypeChecker (typeIsOrHasAspect)
+import Perpectives.TypeChecker (isOrHasAspect)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, TypedTripleGetter, MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
@@ -28,7 +28,7 @@ rolQuery  :: forall e.
   MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
 rolQuery rn cid = ifNothing (lift $ queryCacheLookup rn)
   do
-    ifM (lift $ typeIsOrHasAspect rn "model:Perspectives$Function")
+    ifM (lift $ rn `isOrHasAspect` "model:Perspectives$Function")
       do
         tg <- lift $ constructQueryFunction rn
         -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
@@ -48,7 +48,7 @@ propertyQuery  :: forall e.
   MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
 propertyQuery pn cid = ifNothing (lift $ queryCacheLookup pn)
   do
-    ifM (lift $ typeIsOrHasAspect pn "model:Perspectives$Function")
+    ifM (lift $ pn `isOrHasAspect` "model:Perspectives$Function")
       do
         tg <- lift $ constructQueryFunction pn
         -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved

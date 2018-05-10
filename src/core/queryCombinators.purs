@@ -17,7 +17,8 @@ import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>
 import Type.Data.Boolean (kind Boolean)
 
 -- | The recursive closure of a query, bottoming out when it has no results.
--- | The result always contains the argument p.
+-- | The result only contains the argument id if it can be obtained by applying p,
+-- | never because it is the starting point of the computation.
 -- | `psp:Function -> psp:Function`
 closure :: forall e.
   TypedTripleGetter e ->
@@ -26,13 +27,13 @@ closure (TypedTripleGetter nameOfp p) =
   memorize (getter []) name
   where
     getter :: Array ID -> Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
-    getter cumulator id' = do
-      t@(Triple{subject, object : objectsOfP}) <- p id'
-      case Arr.elemIndex id' cumulator of
+    getter cumulator id = do
+      t@(Triple{subject, object : objectsOfP}) <- p id
+      case Arr.elemIndex id cumulator of
         Nothing -> do
           (triples :: Array (Triple e)) <- (traverse (getter (Arr.union cumulator objectsOfP))) (Arr.difference objectsOfP cumulator)
           objects <- pure $ join $ map (\(Triple{object}) -> object) triples
-          pure $ Triple { subject: id'
+          pure $ Triple { subject: id
                         , predicate : name
                         , object: Arr.union objectsOfP objects
                         , dependencies : []

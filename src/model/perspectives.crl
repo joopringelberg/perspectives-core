@@ -56,7 +56,6 @@ psp:Context psp:Context
 		psp:Rol $rolInContext
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Rol
-			$mogelijkeBinding => psp:Function
 	$rolInContext =>
 		psp:Rol $interneView
 			extern $isFunctioneel = false
@@ -81,7 +80,7 @@ psp:Context psp:Rol
 			$mogelijkeBinding => psp:Property
 	$rolInContext =>
 		psp:Rol $mogelijkeBinding
-			extern $isFunctioneel = false
+			extern $isFunctioneel = true
 			extern $isVerplicht = true
 			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
@@ -136,6 +135,7 @@ psp:Context psp:View
 	$rolInContext =>
 		psp:Rol $propertyReferentie
 			extern $isVerplicht = true
+			extern $isFunctioneel = false
 			$rolProperty =>
 				psp:Property $volgNummer
 					extern $isFunctioneel = true

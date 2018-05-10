@@ -105,11 +105,14 @@ checkContextForUnQualifiedRol ln cn = do
       ("UnqualifiedRol" <> ln')
       contextOwnRolTypes
 
-hasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
-hasAspect aspect subtype = if aspect == subtype
+-- | True when both parameters are equal and also when the first has the second as aspect:
+-- | subtype `isOrHasAspect` aspect
+isOrHasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
+isOrHasAspect subtype aspect = if aspect == subtype
   then pure true
   else importsAspect aspect subtype
 
+-- | True iff one of the Aspecten contains the given Aspect.
 importsAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 importsAspect aspect = (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten))
 
@@ -117,10 +120,4 @@ mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAva
 mostSpecificCommonAspect types = do
   x <- traverse (runTypedTripleGetter aspecten) types
   aspects <- pure $ join (tripleObjects <$> x)
-  foldM (\msca t -> ifM (hasAspect msca t) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects
-
--- | Either the type of the Rol equals the RolID, or the type has RolID as Aspect.
--- | `psp:Context -> psp:Boolean`
-typeIsOrHasAspect :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
-typeIsOrHasAspect subType typeId = do
-  if typeId == subType then (pure true) else hasAspect typeId subType
+  foldM (\msca t -> ifM (t `isOrHasAspect` msca) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects
