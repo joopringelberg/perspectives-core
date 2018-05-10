@@ -119,6 +119,9 @@ psp:Context psp:Rol
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Actie
 
+-- This is awkward. These are not roles of model:Perspectives itself, but of
+-- psp:Context. However, we do not want to have these roles crop up as if
+-- the modeller could instantiate them himself.
 psp:Rol psp:BuitenRol
 	extern $isFunctioneel = true
 	$mogelijkeBinding => psp:ElkType

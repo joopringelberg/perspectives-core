@@ -17,15 +17,15 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
 import Perspectives.Syntax (PerspectContext(..))
 import Perspectives.SystemQueries (aspect, aspectRol, aspecten, contextOwnRolTypes, contextRolTypes, contextType, propertyIsVerplicht, rolPropertyTypes)
-import Perspectives.TypeDefChecker (checkContext, propertyIsFunctional)
+import Perspectives.TypeDefChecker (checkContext, checkModel)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
   -- messages1 <- checkContext "model:Test$rolZonderMogelijkeBinding"
   -- lift $ for_ messages1 logShow
   --
-  messages2 <- checkContext "model:Test$viewMetVerkeerdeBinding"
-  lift $ for_ messages2 logShow
+  -- messages2 <- checkContext "model:Test$viewMetVerkeerdeBinding"
+  -- lift $ for_ messages2 logShow
   --
   -- messages3 <- checkContext "model:Test$viewMetOngedefineerdeRol"
   -- lift $ for_ messages3 logShow
@@ -44,21 +44,27 @@ test = do
   --
   -- messages8 <- checkContext "model:Test$rolMetVerkeerdePropertyWaarde"
   -- lift $ for_ messages8 logShow
-
+  --
   -- messages9 <- checkContext "model:Test$rolMetNietBestaandeExterneProperty"
   -- lift $ for_ messages9 logShow
   --
   -- messages10 <- checkContext "model:Test$rolMetNietBestaandeInterneProperty"
   -- lift $ for_ messages10 logShow
-
+  --
   -- messages11 <- checkContext "model:Test$nietBestaandeRolProperty"
   -- lift $ for_ messages11 logShow
-
+  --
   -- messages12 <- checkContext "model:Test$ongedefineerdeAspectRol"
   -- lift $ for_ messages12 logShow
-
+  --
   -- messages13 <- checkContext "model:Test$Sub"
   -- lift $ for_ messages13 logShow
+
+  -- messages14 <- checkContext "model:Test$ViewMetAspectRol"
+  -- lift $ for_ messages14 logShow
+
+  messages15 <- checkModel "model:Perspectives"
+  lift $ for_ messages15 logShow
 
   -- t <- "model:Test$Sub" ## aspecten
   -- lift $ logShow (tripleObjects t)
