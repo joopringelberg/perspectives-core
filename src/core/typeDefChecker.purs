@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
-import Perpectives.TypeChecker (importsAspect, isOrHasAspect)
+import Perpectives.TypeChecker (importsAspect, isCorrectBinding, isOrHasAspect)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -190,12 +190,13 @@ compareRolInstanceToDefinition cid rolType' = do
 
       -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
       typeOfTheBinding <- lift (rolId @@ (binding >-> rolContext))
-      t <- lift $ lift $ getContextTypeF (tripleObject typeOfTheBinding)
+      -- t <- lift $ lift $ getContextTypeF (tripleObject typeOfTheBinding)
       mmb <- lift (rolType' @@ mogelijkeBinding)
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
-          ifM (lift $ lift $ t `isOrHasAspect` toegestaneBinding)
+          -- ifM (lift $ lift $ (tripleObject typeOfTheBinding) `isOrHasAspect` toegestaneBinding)
+          ifM (lift $ lift $ isCorrectBinding (tripleObject typeOfTheBinding) toegestaneBinding)
             (pure unit)
             (tell [IncorrectBinding cid rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 

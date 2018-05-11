@@ -9,6 +9,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, Triple(..), TypeID, TypedT
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
+import Perspectives.Property (getContextTypeF)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
@@ -116,6 +117,11 @@ importsAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvar
 importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
   then pure true
   else (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten)) tp
+
+isCorrectBinding :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
+isCorrectBinding binding mogelijkeBinding = do
+  typeOfBinding <- getContextTypeF binding
+  typeOfBinding `isOrHasAspect` mogelijkeBinding
 
 mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID
 mostSpecificCommonAspect types = do

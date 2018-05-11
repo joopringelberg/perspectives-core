@@ -9,17 +9,13 @@ Section $rolInContext
 --------------------------------------------------------------------------------
 psp:Context psp:SimpleValue
 
-psp:Context psp:Boolean
-	$aspect => psp:SimpleValue
+psp:SimpleValue psp:Boolean
 
-psp:Context psp:String
-	$aspect => psp:SimpleValue
+psp:SimpleValue psp:String
 
-psp:Context psp:Number
-	$aspect => psp:SimpleValue
+psp:SimpleValue psp:Number
 
-psp:Context psp:Date
-	$aspect => psp:SimpleValue
+psp:SimpleValue psp:Date
 
 --------------------------------------------------------------------------------
 -- SYSTEM BASE
@@ -76,7 +72,7 @@ psp:Context psp:Context
 	$rolInContext =>
 		psp:Rol $aspect
 			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Context
+			$mogelijkeBinding => psp:ElkType
 
 psp:Context psp:Rol
 	$externalProperty =>
