@@ -5,9 +5,10 @@ import Data.Maybe (maybe)
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
+import Perspectives.Property (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.PropertyComposition ((>->), (>->>))
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
-import Perspectives.TripleGetter (constructExternalPropertyGetter, constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
+import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
 import Prelude (const, pure, (<>), (>=>))
 
 -----------------------------------------------------------
@@ -80,22 +81,24 @@ rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$
 -- | True if the Rol has been defined as functional.
 -- | `psp:Rol -> psp:Boolean`
 isFunctionalRol :: forall e. TypedTripleGetter e
-isFunctionalRol = constructExternalPropertyGetter "model:Perspectives$Rol$isFunctioneel"
+isFunctionalRol = constructTripleGetterFromObjectsGetter "model:Perspectives$Rol$isFunctioneelR" Property.rolIsFunctioneel
 
 -- | True if the Property has been defined as functional.
 -- | `psp:Property -> psp:Boolean`
 isFunctionalProperty :: forall e. TypedTripleGetter e
-isFunctionalProperty = constructExternalPropertyGetter "model:Perspectives$Property$isFunctioneel"
+isFunctionalProperty = constructTripleGetterFromObjectsGetter "model:Perspectives$Property$isFunctioneelR" Property.propertyIsFunctioneel
 
 -- | True if the Rol has been defined as mandatory.
 -- | `psp:Rol -> psp:Boolean`
 rolIsVerplicht :: forall e. TypedTripleGetter e
-rolIsVerplicht = constructExternalPropertyGetter "model:Perspectives$Rol$isVerplicht"
+rolIsVerplicht = constructTripleGetterFromObjectsGetter "model:Perspectives$Rol$isVerplichtR" Property.rolIsVerplicht
 
--- | True if the Property has been defined as mandatory.
+-- | True if the Property has been defined as mandatory (possibly in an aspect).
 -- | `psp:Property -> psp:Boolean`
 propertyIsVerplicht :: forall e. TypedTripleGetter e
-propertyIsVerplicht = constructExternalPropertyGetter "model:Perspectives$Property$isVerplicht"
+propertyIsVerplicht = constructTripleGetterFromObjectsGetter "model:Perspectives$Property$isVerplichtR" Property.propertyIsVerplicht
+  -- NOTE. The terminating 'R' distinguishes this triple in the administration of the
+  -- 'own' property "model:Perspectives$Property$isVerplicht"
 
 -- | The type of the range that has been defined for the Property.
 -- | `psp:Property -> psp:SimpleValue`
@@ -224,6 +227,13 @@ aspectRollen = QC.closure aspectRol
 -- | `psp:Context -> psp:Context`
 aspecten :: forall e. TypedTripleGetter e
 aspecten = QC.closure aspect
+
+-- | All RolInstances of a Rol (definition), including those inherited from its rolAspect.
+-- | `psp:Rol -> psp:RolInstance`
+-- TODO: als we overschrijven toestaan, kunnen hier duplicaten inzitten...
+rolTypeRolInstances :: forall e. TypedTripleGetter e
+rolTypeRolInstances = QC.concat iedereRolInContext
+  ((aspectRol >->> (\_ -> rolTypeRolInstances)) "rolTypeRolInstances")
 
 -- | All acties defined in the Context.
 -- | `psp:Context -> psp:Actie`

@@ -27,23 +27,28 @@ psp:Context psp:Date
 psp:Context psp:Property
 	$externalProperty =>
 		psp:Property $isFunctioneel
-				extern $isFunctioneel = true
-				extern $isVerplicht = true
-				$range => psp:Boolean
-				$aspectProperty => psp:Property
-				$bindingProperty => psp:Property
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			$range => psp:Boolean
 	$externalProperty =>
 		psp:Property $isVerplicht
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			psp:range => psp:Boolean
+			$range => psp:Boolean
 	$rolInContext =>
 		psp:Rol $range
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Context
+			$mogelijkeBinding => psp:SimpleValue
+	$rolInContext =>
+		psp:Rol $aspectProperty
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Property
+	$rolInContext =>
+		psp:Rol $bindingProperty
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Property
 
 psp:Context psp:Context
-	$aspect => psp:ElkType
 	$rolInContext =>
 		psp:Rol $externalProperty
 			extern $isFunctioneel = false
@@ -74,6 +79,16 @@ psp:Context psp:Context
 			$mogelijkeBinding => psp:Context
 
 psp:Context psp:Rol
+	$externalProperty =>
+		psp:Property $isVerplicht
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$range => psp:Boolean
+	$externalProperty =>
+		psp:Property $isFunctioneel
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			$range => psp:Boolean
 	$rolInContext =>
 		psp:Rol $rolProperty
 			extern $isFunctioneel = false
@@ -87,22 +102,6 @@ psp:Context psp:Rol
 		psp:Rol $viewInRol
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:View
-	$externalProperty =>
-		psp:Property $isVerplicht
-			extern $isFunctioneel = true
-			extern $isVerplicht = false
-			$range => psp:Boolean
-	$externalProperty =>
-		psp:Property $isFunctioneel
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:Boolean
-			$aspectProperty => psp:Property
-			$bindingProperty => psp:Property
-	$rolInContext =>
-		psp:Rol $actie
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Actie
 	$rolInContext =>
 		psp:Rol $aspectRol
 			extern $isFunctioneel = false
@@ -208,14 +207,18 @@ psp:Context psp:Function
 			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		psp:Rol $range
-			extern psp:isFunctioneel = false
-			psp:mogelijkeBinding => psp:ElkType
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:ElkType
 
 psp:Context psp:SingularFunction
 	$aspect => psp:Function
 	$rolInContext =>
 		psp:Rol $range
 			extern $isFunctioneel = true
+			$aspectRol => psp:Function$range
+			-- de typeDefChecker meldt dat $range $mogelijkeBinding mist.
+			-- Die moet uit de aspectRol komen.
+			-- Alle rolInstanties van $range en ook die van zijn $aspectRol.
 
 -- De Unit van Perspectives.
 psp:Context psp:ElkType

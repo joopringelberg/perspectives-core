@@ -4,17 +4,17 @@ module Perspectives.PropertyComposition where
 import Data.Array (cons, difference, head, nub)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
+import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), ObjectsGetter)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
 
 -- | Compose two queries like composing two function.
 -- | `psp:Function -> psp:Function -> psp:Function`
-compose :: forall e.
+composeTripleGetters :: forall e.
   TypedTripleGetter e ->
   TypedTripleGetter e ->
   TypedTripleGetter e
-compose (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
+composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   memorize getter name
     where
     getter :: TripleGetter e
@@ -34,7 +34,18 @@ compose (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
     name :: String
     name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
-infixl 9 compose as >->
+infixl 9 composeTripleGetters as >->
+
+composeObjectsGetters :: forall e.
+  ObjectsGetter e ->
+  ObjectsGetter e ->
+  ObjectsGetter e
+composeObjectsGetters p q id = do
+  objectsOfP <- p id
+  objectArrays <- traverse q (difference objectsOfP [id])
+  pure $ nub $ join $ objectArrays
+
+infixl 9 composeObjectsGetters as /-/
 
 -- | TripleGetter composition where the second operand is treated as lazy
 -- | (wrapped in a function). Useful for recursive queries that bottom out

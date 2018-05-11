@@ -11,7 +11,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
-import Perspectives.PropertyComposition ((>->), compose)
+import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCache (queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, saveVar, var)
 import Perspectives.SystemQueries (identity)
@@ -96,7 +96,7 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$closure" -> applyUnaryCombinator closure queryStepType
     "model:QueryAst$closure'" -> applyUnaryCombinator closure' queryStepType
     "model:QueryAst$lastElement'" -> applyUnaryCombinator lastElement queryStepType
-    "model:QueryAst$compose" -> applyBinaryCombinator compose queryStepType
+    "model:QueryAst$compose" -> applyBinaryCombinator (>->) queryStepType
     "model:QueryAst$concat" -> do
       (operandIds :: Array ID) <- getRolByLocalName "operand" typeDescriptionID
       (operands :: Array (TypedTripleGetter e)) <- traverse constructQueryFunction operandIds

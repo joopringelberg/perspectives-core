@@ -22,7 +22,7 @@ checkRolForQualifiedProperty pn rn = do
   (&&) <$> checkRolHasAspect rn aspect <*> checkRolHasProperty aspect pn
   where
     checkRolHasAspect :: RolName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkRolHasAspect rn' an = (||) <$> checkTypeImportsAspect rn' an <*> checkMogelijkeBindingHasAspect rn' an
+    checkRolHasAspect rn' an = (||) <$> an `importsAspect` rn' <*> checkMogelijkeBindingHasAspect rn' an
 
     checkMogelijkeBindingHasAspect :: RolName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
     checkMogelijkeBindingHasAspect rn' an = do
@@ -38,16 +38,13 @@ checkRolForQualifiedProperty pn rn = do
     checkRolHasProperty :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
     checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' rolPropertyTypes))
 
-checkTypeImportsAspect :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Boolean
-checkTypeImportsAspect typeId an = runMonadPerspectivesQuery typeId (toBoolean (contains an aspecten))
-
 alternatives :: forall e. TypedTripleGetter e
 alternatives = (constructRolGetter "model:Perspectives$Sum$alternative") >-> binding
 
 checkContextForQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkContextForQualifiedRol rn cn = do
   aspect <- guardWellFormedNess deconstructLocalNameFromDomeinURI rn
-  (&&) <$> checkTypeImportsAspect cn aspect <*> checkContextHasRol aspect rn
+  (&&) <$> cn `importsAspect` aspect <*> checkContextHasRol aspect rn
   where
     checkContextHasRol :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
     checkContextHasRol cn' rn' = runMonadPerspectivesQuery cn' (toBoolean (contains rn' contextOwnRolTypes))
@@ -110,11 +107,15 @@ checkContextForUnQualifiedRol ln cn = do
 isOrHasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 isOrHasAspect subtype aspect = if aspect == subtype
   then pure true
-  else importsAspect aspect subtype
+  else subtype `importsAspect` aspect
 
--- | True iff one of the Aspecten contains the given Aspect.
+-- | True iff one of the Aspecten of tp contains the given Aspect.
+-- | tp `importsAspect` aspect
+-- | Every type has the Aspect psp:ElkType.
 importsAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
-importsAspect aspect = (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten))
+importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
+  then pure true
+  else (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten)) tp
 
 mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID
 mostSpecificCommonAspect types = do

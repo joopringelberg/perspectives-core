@@ -1,7 +1,7 @@
 module Perspectives.Property where
 
 import Control.Monad.Eff.Exception (error)
-import Data.Array (nub, singleton, head)
+import Data.Array (foldl, head, nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (keys, lookup, values)
@@ -9,12 +9,13 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol, deconstructNamespace)
+import Perspectives.PropertyComposition ((/-/))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
 import Perspectives.Utilities (onNothing)
-import Prelude (bind, id, join, pure, ($), (<>), (==), (>=>))
+import Prelude (bind, id, join, pure, ($), (<>), (==), (>=>), (||), (<$>), show)
 
 {-
 Property values are represented by Arrays.
@@ -178,3 +179,33 @@ toSingle og id = do
 
 getRolBinding' :: forall e. ObjectGetter e
 getRolBinding' = unsafePartial $ toSingle getRolBinding
+
+-- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+propertyIsVerplicht :: forall e. ObjectsGetter e
+propertyIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspectProperty"
+  "model:Perspectives$Property$isVerplicht"
+
+-- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
+propertyIsFunctioneel :: forall e. ObjectsGetter e
+propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$isFunctioneel"
+
+-- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+rolIsVerplicht :: forall e. ObjectsGetter e
+rolIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspect"
+  "model:Perspectives$Rol$isVerplicht"
+
+-- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+rolIsFunctioneel :: forall e. ObjectsGetter e
+rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
+  "model:Perspectives$Rol$isFunctioneel"
+
+booleanPropertyGetter :: forall e. RolID -> PropertyName -> ObjectsGetter e
+booleanPropertyGetter aspectRol propertyName = getter where
+  getter :: ObjectsGetter e
+  getter pid = do
+    ownIsVerplicht <- getExternalProperty propertyName pid
+    case head ownIsVerplicht of
+      Nothing -> do
+        aspectVerplichtValues <- (getRol aspectRol /-/ getRolBinding /-/ getRolContext /-/ getter) pid
+        pure [show $ foldl (||) false ((==) "true" <$> aspectVerplichtValues)]
+      otherwise -> pure ownIsVerplicht

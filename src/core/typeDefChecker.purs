@@ -55,8 +55,6 @@ checkContext' cid = do
       checkAvailableRoles tp cid
       -- if this psp:ContextInstance represents a psp:Rol, and if it has an instance
       -- of $aspectRol, check whether its namespace giving context has that Aspect.
-      -- NOTE: we check each context instance. If it does not represent a psp:Rol,
-      -- no messages are added.
       ifM (lift $ lift $ (cid `importsAspect` "model:Perspectives$Rol"))
         (checkAspectOfRolType cid)
         (pure unit)
@@ -172,7 +170,10 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
 compareRolInstanceToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 compareRolInstanceToDefinition cid rolType' = do
   rolGetter <- lift $ rolQuery rolType' cid
-  (Triple {object}) <- lift (cid @@ rolGetter)
+  (Triple {object}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRollen!
+  -- Misschien: haal alle rolInstanties op bij cid, en als die een rolAspect heeft,
+  -- haal dan ook daar de rolInstanties van op.
+  -- (Triple {object:rolinstances}) <- lift (cid @@ rolTypeRolInstances)
   case head object of
     Nothing -> ifM (lift (rolIsMandatory rolType'))
       (tell [MissingRolInstance rolType' cid])
