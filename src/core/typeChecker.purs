@@ -13,7 +13,7 @@ import Perspectives.Property (getContextTypeF)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
-import Perspectives.SystemQueries (aspecten, binding, contextOwnRolTypes, mogelijkeBinding, rolPropertyTypes)
+import Perspectives.SystemQueries (aspecten, binding, contextOwnRolTypes, contextType, mogelijkeBinding, rolContext, rolPropertyTypes)
 import Perspectives.TripleGetter (constructRolGetter)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
@@ -40,7 +40,7 @@ checkRolForQualifiedProperty pn rn = do
     checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' rolPropertyTypes))
 
 alternatives :: forall e. TypedTripleGetter e
-alternatives = (constructRolGetter "model:Perspectives$Sum$alternative") >-> binding
+alternatives = (constructRolGetter "model:Perspectives$Sum$alternative") >-> binding >-> rolContext
 
 checkContextForQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkContextForQualifiedRol rn cn = do
@@ -103,12 +103,17 @@ checkContextForUnQualifiedRol ln cn = do
       ("UnqualifiedRol" <> ln')
       contextOwnRolTypes
 
--- | True when both parameters are equal and also when the first has the second as aspect:
+-- | True when both parameters are equal and also when the first has the second as aspect.
+-- | If the aspect is a sum type, tries each of the alternatives.
 -- | subtype `isOrHasAspect` aspect
 isOrHasAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
-isOrHasAspect subtype aspect = if aspect == subtype
-  then pure true
-  else subtype `importsAspect` aspect
+isOrHasAspect subtype aspect = do
+  (Triple{object}) <- aspect ## alternatives
+  case head object of
+    Nothing -> if aspect == subtype
+      then pure true
+      else subtype `importsAspect` aspect
+    otherwise -> foldM (\r alt -> isOrHasAspect subtype alt >>= pure <<< (||) r) false object
 
 -- | True iff one of the Aspecten of tp contains the given Aspect.
 -- | tp `importsAspect` aspect

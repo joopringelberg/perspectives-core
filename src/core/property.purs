@@ -199,13 +199,29 @@ rolIsFunctioneel :: forall e. ObjectsGetter e
 rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
   "model:Perspectives$Rol$isFunctioneel"
 
+-- | Using either $aspect or $aspectProperty, climb the Aspect tree looking
+-- | for a Boolean Property bearing the given propertyName.
+-- | `psp:Rol -> psp:Property -> ObjectsGetter`
 booleanPropertyGetter :: forall e. RolID -> PropertyName -> ObjectsGetter e
 booleanPropertyGetter aspectRol propertyName = getter where
   getter :: ObjectsGetter e
   getter pid = do
-    ownIsVerplicht <- getExternalProperty propertyName pid
-    case head ownIsVerplicht of
+    ownProperty <- getExternalProperty propertyName pid
+    case head ownProperty of
       Nothing -> do
-        aspectVerplichtValues <- (getRol aspectRol /-/ getRolBinding /-/ getRolContext /-/ getter) pid
-        pure [show $ foldl (||) false ((==) "true" <$> aspectVerplichtValues)]
-      otherwise -> pure ownIsVerplicht
+        aspectPropertyValues <- (getRol aspectRol /-/ getRolBinding /-/ getRolContext /-/ getter) pid
+        pure [show $ foldl (||) false ((==) "true" <$> aspectPropertyValues)]
+      otherwise -> pure ownProperty
+
+-- | Climb the Aspect tree looking for a Rol bearing the given name.
+-- | `psp:Rol -> ObjectsGetter`
+getRolUsingAspects :: forall e. RolName -> ObjectsGetter e
+getRolUsingAspects rolName = getter where
+  getter :: ObjectsGetter e
+  getter pid = do
+    ownRol <- getRol rolName pid
+    case head ownRol of
+      Nothing -> do
+        (aspectRollen :: Array ID) <- (getRol "model:Perspectives$Rol$aspectRol" /-/ getRolBinding /-/ getRolContext /-/ getter) pid
+        pure aspectRollen
+      otherwise -> pure ownRol

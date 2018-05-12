@@ -8,6 +8,8 @@ Section $rolInContext
 -- SIMPLE VALUES
 --------------------------------------------------------------------------------
 psp:Context psp:SimpleValue
+	$aspect => psp:SimpleValue
+	$aspect => psp:Context
 
 psp:SimpleValue psp:Boolean
 
@@ -56,7 +58,10 @@ psp:Context psp:Context
 	$rolInContext =>
 		psp:Rol $rolInContext
 			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Rol
+			$mogelijkeBinding =>
+				psp:Sum $RolOrContext
+					$alternative => psp:Rol
+					$alternative => psp:Context
 	$rolInContext =>
 		psp:Rol $interneView
 			extern $isFunctioneel = false
@@ -235,11 +240,3 @@ psp:Context psp:Sum
 		psp:Rol $alternative
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
-
---------------------------------------------------------------------------------
--- SYSTEM ENTITIES
---------------------------------------------------------------------------------
-psp:Property psp:label
-	extern $isFunctioneel = true
-	extern $isVerplicht = true
-	$range => psp:String

@@ -19,7 +19,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.Property (getContextTypeF, getInternePropertyTypen, getPropertyTypen)
+import Perspectives.Property (getContextTypeF, getInternePropertyTypen, getPropertyTypen, getRolUsingAspects)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
@@ -86,7 +86,7 @@ infix 0 get as ~>
 checkDefinedRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkDefinedRoles typeId cid = do
   (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## contextRolTypes)
-  void $ traverse (compareRolInstanceToDefinition cid) definedRollen
+  void $ traverse (compareRolInstancesToDefinition cid) definedRollen
 
 -- | For each RolInstance in the ContextInstance, is there a Rol defined with the Context?
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
@@ -167,18 +167,18 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
 -- |  2. Checks the type of the binding, if given.
 -- | Finally, ff the Rol is mandatory and missing, adds a message.
 -- | `psp:ContextInstance -> psp:Rol -> psp:ElkType`
-compareRolInstanceToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
-compareRolInstanceToDefinition cid rolType' = do
-  rolGetter <- lift $ rolQuery rolType' cid
-  (Triple {object}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRollen!
-  -- Misschien: haal alle rolInstanties op bij cid, en als die een rolAspect heeft,
-  -- haal dan ook daar de rolInstanties van op.
-  -- (Triple {object:rolinstances}) <- lift (cid @@ rolTypeRolInstances)
-  case head object of
+compareRolInstancesToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
+compareRolInstancesToDefinition cid rolType' = do
+  rolInstances <- lift $ lift $ getRolUsingAspects rolType' cid
+  -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRollen!
+  case head rolInstances of
     Nothing -> ifM (lift (rolIsMandatory rolType'))
       (tell [MissingRolInstance rolType' cid])
       (pure unit)
-    (Just rolId) -> do
+    otherwise -> void $ traverse compareRolInstancesToDefinition rolInstances
+  where
+    compareRolInstancesToDefinition :: RolID -> TDChecker (AjaxAvarCache e) Unit
+    compareRolInstancesToDefinition rolId = do
       -- Check the properties.
       rolPropertyTypes' <- lift $ (rolType' @@ rolPropertyTypes)
       void $ (traverse (comparePropertyInstanceToDefinition cid rolId)) (tripleObjects rolPropertyTypes')
@@ -190,12 +190,10 @@ compareRolInstanceToDefinition cid rolType' = do
 
       -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
       typeOfTheBinding <- lift (rolId @@ (binding >-> rolContext))
-      -- t <- lift $ lift $ getContextTypeF (tripleObject typeOfTheBinding)
       mmb <- lift (rolType' @@ mogelijkeBinding)
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
-          -- ifM (lift $ lift $ (tripleObject typeOfTheBinding) `isOrHasAspect` toegestaneBinding)
           ifM (lift $ lift $ isCorrectBinding (tripleObject typeOfTheBinding) toegestaneBinding)
             (pure unit)
             (tell [IncorrectBinding cid rolId (tripleObject typeOfTheBinding) toegestaneBinding])

@@ -7,6 +7,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Foldable (for_)
 import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Property (getRol, getRolUsingAspects)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.SystemQueries (contextTypeOfRolType)
 import Perspectives.TypeDefChecker (checkModel)
@@ -60,6 +61,12 @@ test = do
 
   -- t <- "model:Perspectives$Rol" ## contextTypeOfRolType
   -- lift $ logShow (tripleObjects t)
+
+  -- t <- getRolUsingAspects "model:Perspectives$Rol$mogelijkeBinding" "model:Perspectives$SingularFunction$range"
+  -- lift $ logShow t
+
+  -- t2 <- getRol "model:Perspectives$Rol$aspectRol" "model:Perspectives$SingularFunction$range"
+  -- lift $ logShow t2
 
   -- ismandatory <- runMonadPerspectivesQuery "model:Perspectives$Rol$isFunctioneel" (toBoolean propertyIsVerplicht)
   -- lift $ logShow ("isFunctioneel: " <> show ismandatory)
