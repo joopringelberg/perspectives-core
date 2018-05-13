@@ -1,21 +1,23 @@
 module Perspectives.Property where
 
+import Control.Alt ((<|>))
+import Control.Plus (empty)
 import Control.Monad.Eff.Exception (error)
-import Data.Array (foldl, head, nub, singleton)
+import Data.Array (foldl, head, nub, singleton, null)
 import Data.Array.Partial (head) as ArrayPartial
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol, deconstructNamespace)
 import Perspectives.PropertyComposition ((/-/))
 import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.Syntax (PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
+import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
 import Perspectives.Utilities (onNothing)
-import Prelude (bind, id, join, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (||))
+import Prelude (bind, id, join, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (||), (>>=))
 
 {-
 Property values are represented by Arrays.
@@ -68,23 +70,10 @@ getRolByLocalName rn = getContextMember \context -> maybe [] id (lookup (rolName
 
 -- | Given a qualified name of a Rol, return that Rol from the context or recursively from its prototype.
 getRolFromPrototypeHierarchy :: forall e. RolName -> ObjectsGetter e
-getRolFromPrototypeHierarchy rn contextId = do
-  maybeContext <- getPerspectEntiteit contextId
-  case maybeContext of
-    (Just perspectContext) -> case lookup rn (context_rolInContext perspectContext) of
-      Nothing -> do
-        br <- getBuitenRol contextId
-        bnd <- getRolBinding $ unsafePartial $ fromJust $ head br
-        case head bnd of
-          Nothing -> pure []
-          (Just b) -> do
-            -- b is the identification of the buitenRol of the prototype.
-            (prototypeIdArray :: Array ID) <- getRolContext b
-            case head prototypeIdArray of
-              Nothing -> pure []
-              (Just prototype) -> getRolFromPrototypeHierarchy rn prototype
-      (Just value) -> pure value
-    otherwise -> pure []
+getRolFromPrototypeHierarchy rn contextId =
+  unlessNull (getRol rn) contextId
+  <|>
+  (getBuitenRol /-/ getRolBinding /-/ getRolContext /-/ getRolFromPrototypeHierarchy rn) contextId
 
 getRollen :: forall e. ObjectsGetter e
 getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)
@@ -125,11 +114,15 @@ getInternalProperty pn ident = do
 
 -- | Look up a local name in the rol telescope of the binnenrol.
 lookupInternalProperty :: forall e. LocalName -> ObjectsGetter e
-lookupInternalProperty pn id = do
-  maybeBinnenRol <- getContextMember' context_binnenRol id
-  case maybeBinnenRol of
-    Nothing -> pure []
-    (Just binnenRol) -> getPropertyFromRolTelescope' pn binnenRol
+lookupInternalProperty pn id =
+  unlessNull (getInternalProperty pn) id
+  <|>
+  (getRolBinding /-/ getPropertyFromRolTelescope pn) id
+
+-- | Combinator to make an ObjectsGetter fail if it returns an empty result.
+-- | Useful in combination with computing alternatives using <|>
+unlessNull :: forall e. ObjectsGetter e -> ObjectsGetter e
+unlessNull og id = og id >>= \r -> if (null r) then empty else pure r
 
 getRolMember :: forall e. (PerspectRol -> Array String) -> ObjectsGetter e
 getRolMember f c = do
@@ -155,22 +148,12 @@ getProperty :: forall e. PropertyName -> ObjectsGetter e
 getProperty pn = getRolMember \rol -> maybe [] propertyValue (lookup pn (rol_properties rol))
 
 -- | In the roltelescope, find a property with a given qualified name.
+-- | NOTE: This function will loop whenever a RolInstance binds to itself!
 getPropertyFromRolTelescope :: forall e. PropertyName -> ObjectsGetter e
-getPropertyFromRolTelescope qn rolId = do
-  maybeRol <- getPerspectEntiteit rolId
-  case maybeRol of
-    (Just perspectRol) -> getPropertyFromRolTelescope' qn perspectRol
-    otherwise -> pure []
-
-getPropertyFromRolTelescope' :: forall e. PropertyName -> PerspectRol -> MonadPerspectives (AjaxAvarCache e) (Array String)
-getPropertyFromRolTelescope' qn perspectRol =
-  case lookup qn (rol_properties perspectRol) of
-    Nothing -> case rol_binding perspectRol of
-      Nothing -> pure []
-      (Just i) -> if i == (rol_id perspectRol)
-        then pure []
-        else getPropertyFromRolTelescope qn i
-    (Just (PropertyValueWithComments{value})) -> pure value
+getPropertyFromRolTelescope qn rolId =
+  unlessNull (getProperty qn) rolId
+  <|>
+  (getRolBinding /-/ getPropertyFromRolTelescope qn) rolId
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of getRolContext), others roles (such as the result of getRolBinding). The Partial function below returns that
@@ -208,23 +191,18 @@ rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
 booleanPropertyGetter :: forall e. RolID -> PropertyName -> ObjectsGetter e
 booleanPropertyGetter aspectRol propertyName = getter where
   getter :: ObjectsGetter e
-  getter pid = do
-    ownProperty <- getExternalProperty propertyName pid
-    case head ownProperty of
-      Nothing -> do
-        aspectPropertyValues <- (getRol aspectRol /-/ getRolBinding /-/ getRolContext /-/ getter) pid
-        pure [show $ foldl (||) false ((==) "true" <$> aspectPropertyValues)]
-      otherwise -> pure ownProperty
+  getter pid =
+    unlessNull (getExternalProperty propertyName) pid
+    <|>
+    (getRol aspectRol /-/ getRolBinding /-/ getRolContext /-/ getter) pid >>=
+      \r -> pure [show $ foldl (||) false ((==) "true" <$> r)]
 
 -- | Climb the Aspect tree looking for a Rol bearing the given name.
 -- | `psp:Rol -> ObjectsGetter`
 getRolUsingAspects :: forall e. RolName -> ObjectsGetter e
 getRolUsingAspects rolName = getter where
   getter :: ObjectsGetter e
-  getter pid = do
-    ownRol <- getRol rolName pid
-    case head ownRol of
-      Nothing -> do
-        (aspectRollen :: Array ID) <- (getRol "model:Perspectives$Rol$aspectRol" /-/ getRolBinding /-/ getRolContext /-/ getter) pid
-        pure aspectRollen
-      otherwise -> pure ownRol
+  getter pid =
+    unlessNull (getRol rolName) pid
+    <|>
+    (getRol "model:Perspectives$Rol$aspectRol" /-/ getRolBinding /-/ getRolContext /-/ getter) pid
