@@ -15,7 +15,7 @@ import Perspectives.PropertyComposition ((/-/))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
 import Perspectives.Utilities (onNothing)
-import Prelude (bind, id, join, pure, ($), (<>), (==), (>=>), (||), (<$>), show)
+import Prelude (bind, id, join, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (||))
 
 {-
 Property values are represented by Arrays.
@@ -45,6 +45,9 @@ getContextTypeF = makeFunction "getContextTypeF" getContextType
 
 makeFunction :: forall e. String -> ObjectsGetter e -> ObjectGetter e
 makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no value: " <> name) (pure (head ta)))
+
+firstOnly :: forall e. ObjectsGetter e -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String))
+firstOnly g = g >=> (pure <<< head)
 
 -- Returns an empty array if the context does not exist.
 getBuitenRol :: forall e. ObjectsGetter e

@@ -2,22 +2,21 @@ module Perspectives.QueryCompiler where
 
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldl, head, unsnoc)
-import Data.Maybe (Maybe)
+import Data.Array (foldl, unsnoc)
 import Data.Traversable (traverse)
 import Perpectives.TypeChecker (isOrHasAspect)
-import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, TypedTripleGetter, MonadPerspectivesQuery)
+import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter, MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (isInNamespace)
-import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
+import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName, firstOnly)
 import Perspectives.PropertyComposition ((>->))
 import Perspectives.QueryCache (queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, saveVar, var)
 import Perspectives.SystemQueries (identity)
 import Perspectives.TripleGetter (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (bind, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), id)
+import Prelude (bind, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), id)
 
 -- | From a qualified name for a Rol and the context that it is defined in (hence, the domain of the rol-getter), construct a function that computes the instances of that Rol for a given context.
 -- | The Rol may be defined as computed. It may be in the same namespace as the context,
@@ -154,6 +153,3 @@ constructQueryFunction typeDescriptionID = do
 
     errorMessage :: String -> String -> Error
     errorMessage s t = error ("constructEffectStatement: " <> s <> " for: " <> t <> " " <> typeDescriptionID)
-
-    firstOnly :: ObjectsGetter e -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String))
-    firstOnly g = g >=> (pure <<< head)
