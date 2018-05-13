@@ -1,12 +1,12 @@
 module Perspectives.PropertyComposition where
 
 
-import Data.Array (cons, difference, head, nub)
+import Data.Array (cons, difference, foldM, head, intersect, nub, union)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), ObjectsGetter)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
+import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), (>>=), (<<<), (>=>))
 
 -- | Compose two queries like composing two function.
 -- | `psp:Function -> psp:Function -> psp:Function`
@@ -36,16 +36,29 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
 
 infixl 9 composeTripleGetters as >->
 
-composeObjectsGetters :: forall e.
+unionOfObjects :: forall e.
   ObjectsGetter e ->
   ObjectsGetter e ->
   ObjectsGetter e
-composeObjectsGetters p q id = do
-  objectsOfP <- p id
-  objectArrays <- traverse q (difference objectsOfP [id])
-  pure $ nub $ join $ objectArrays
+unionOfObjects p q = p >=>
+  (\objectsOfP -> foldM
+      (\r objectOfP -> q objectOfP >>= pure <<< union r)
+      []
+      objectsOfP)
 
-infixl 9 composeObjectsGetters as /-/
+infixl 9 unionOfObjects as /-/
+
+intersectionOfObjects :: forall e.
+  ObjectsGetter e ->
+  ObjectsGetter e ->
+  ObjectsGetter e
+intersectionOfObjects p q = p >=>
+  (\objectsOfP -> foldM
+      (\r objectOfP -> q objectOfP >>= pure <<< intersect r)
+      []
+      objectsOfP)
+
+infixl 9 intersectionOfObjects as \-\
 
 -- | TripleGetter composition where the second operand is treated as lazy
 -- | (wrapped in a function). Useful for recursive queries that bottom out
