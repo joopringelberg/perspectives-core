@@ -1,83 +1,18 @@
-module Perspectives.SystemQueries where
+module Perspectives.ModelBasedTripleGetters where
 
-import Data.Array (elemIndex)
-import Data.Maybe (maybe)
-import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
+import Perspectives.CoreTypes (TypedTripleGetter)
+import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, rolContext, rolHasType, buitenRol)
 import Perspectives.Property (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
-import Perspectives.TripleGetterComposition ((>->), (>->>))
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
+import Perspectives.TripleGetterComposition ((>->), (>->>))
 import Perspectives.TripleGetterConstructors (constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
-import Prelude (const, pure, (<>), (>=>))
-
------------------------------------------------------------
--- SYSTEM GETTERS
--- These getters are defined on other members of PerspectRol and PerspectContext than
--- rolInContext (PerspectContext) or properties (PerspectRol). All are memorizing.
------------------------------------------------------------
-
-identity' :: forall e. ObjectsGetter e
-identity' x = pure [x]
-
--- | Identity for all values, contexts and roles.
--- | `forall a. a -> a`
-identity :: forall e. TypedTripleGetter e
-identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity'
-
--- | The type of the context instance.
--- | `psp:ContextInstance -> psp:Context`
-contextType :: forall e. TypedTripleGetter e
-contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
-
--- | `psp:ContextInstance -> psp:BuitenRol`
-buitenRol :: forall e. TypedTripleGetter e
-buitenRol = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRol" getBuitenRol
-
--- | Every rol instance belonging to the context instance.
--- | `psp:ContextInstance -> psp:RolInstance`
-iedereRolInContext :: forall e. TypedTripleGetter e
-iedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives$iedereRolInContext" getRollen
-
--- | The types of the rol instances given to this context instance. Note: non-mandatory
--- | Rol types defined for the Context type may be missing!
--- | `psp:ContextInstance -> psp:Rol`
-rolTypen :: forall e. TypedTripleGetter e
-rolTypen =  constructTripleGetterFromObjectsGetter "model:Perspectives$rolTypen" getRolTypen
-
--- | The type of the rol instance.
--- | `psp:RolInstance -> psp:Rol`
-rolType :: forall e. TypedTripleGetter e
-rolType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getRolType
-
--- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
--- | `psp:RolInstance -> psp:RolInstance`
-binding :: forall e. TypedTripleGetter e
-binding = constructTripleGetterFromObjectsGetter "model:Perspectives$binding" getRolBinding
-
--- | The context instance of the rol instance.
--- | `psp:RolInstance -> psp:ContextInstance`
-rolContext :: forall e. TypedTripleGetter e
-rolContext = constructTripleGetterFromObjectsGetter "model:Perspectives$context" getRolContext
-
--- | The string that labels the context instance.
--- | `psp:ContextInstance -> psp:String`
-label :: forall e. TypedTripleGetter e
-label = constructTripleGetterFromObjectsGetter "model:Perspectives$label" getDisplayName
-
--- | A combinator from the type name of a Rol to a query that takes the instance of a Rol
--- | and returns a boolean value showing if the instance has the given type.
--- | NOTE: makes no use of Aspects!
--- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
-rolHasType :: forall e. ID -> TypedTripleGetter e
-rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$rolHasType" <> "_" <> typeId)
-  (getRolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
 
 -----------------------------------------------------------
 -- GETTERS BASED ON MODEL:PERSPECTIVES$
 -- These getters are based on properties (defined for roles) and roles (defined for contexts)
 -- as modelled in the definitions of CRL and ARC.
 -----------------------------------------------------------
+
 -- | True if the Rol has been defined as functional.
 -- | `psp:Rol -> psp:Boolean`
 isFunctionalRol :: forall e. TypedTripleGetter e

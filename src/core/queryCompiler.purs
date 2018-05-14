@@ -13,7 +13,7 @@ import Perspectives.Property (getContextType, getExternalProperty, getInternalPr
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCache (queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, saveVar, var)
-import Perspectives.SystemQueries (identity)
+import Perspectives.DataTypeTripleGetters (identity)
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
 import Prelude (bind, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), id)

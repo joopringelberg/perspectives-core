@@ -14,7 +14,7 @@ import Perspectives.Property (getContextTypeF, getRol, getRolBinding, getRolCont
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
-import Perspectives.SystemQueries (aspecten, contextOwnRolTypes, rolPropertyTypes)
+import Perspectives.ModelBasedTripleGetters (aspecten, contextOwnRolTypes, rolPropertyTypes)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 checkRolForQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
