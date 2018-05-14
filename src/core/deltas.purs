@@ -35,7 +35,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.Identifiers (deconstructNamespace, isUserEntiteitID)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.Property (getRolBinding, getRolContext, makeFunction)
-import Perspectives.PropertyComposition ((>->))
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)

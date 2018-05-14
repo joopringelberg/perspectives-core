@@ -1,12 +1,12 @@
-module Perspectives.PropertyComposition where
+module Perspectives.TripleGetterComposition where
 
 
-import Data.Array (cons, difference, foldM, head, intersect, nub, union)
+import Data.Array (cons, difference, head, nub)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), ObjectsGetter)
+import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), (>>=), (<<<), (>=>))
+import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
 
 -- | Compose two queries like composing two function.
 -- | `psp:Function -> psp:Function -> psp:Function`
@@ -24,6 +24,7 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
       (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
       -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
+      -- TODO. Het lijkt me dat dit triple geregistreerd moet worden?!
       pure $ Triple { subject: id
                     , predicate : name
                     , object : objects
@@ -35,30 +36,6 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
     name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 infixl 9 composeTripleGetters as >->
-
-unionOfObjects :: forall e.
-  ObjectsGetter e ->
-  ObjectsGetter e ->
-  ObjectsGetter e
-unionOfObjects p q = p >=>
-  (\objectsOfP -> foldM
-      (\r objectOfP -> q objectOfP >>= pure <<< union r)
-      []
-      objectsOfP)
-
-infixl 9 unionOfObjects as /-/
-
-intersectionOfObjects :: forall e.
-  ObjectsGetter e ->
-  ObjectsGetter e ->
-  ObjectsGetter e
-intersectionOfObjects p q = p >=>
-  (\objectsOfP -> foldM
-      (\r objectOfP -> q objectOfP >>= pure <<< intersect r)
-      []
-      objectsOfP)
-
-infixl 9 intersectionOfObjects as \-\
 
 -- | TripleGetter composition where the second operand is treated as lazy
 -- | (wrapped in a function). Useful for recursive queries that bottom out

@@ -29,7 +29,7 @@ psp:Context q:SingularPropertyFunction
 	psp:rolInContext =>
 		psp:Rol $range
 			extern psp:isFunctioneel = true
-			psp:aspectRol => psp:PropertyFunction$range
+			psp:aspectRol => q:PropertyFunction$range
 
 psp:Context q:RolFunction
 	psp:aspect => psp:Function

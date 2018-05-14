@@ -2,8 +2,10 @@ module Test.TypeDefChecker where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Control.Monad.Aff.Console (CONSOLE, logShow)
 import Control.Monad.Trans.Class (lift)
+import Control.Plus (empty)
 import Data.Foldable (for_)
 import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
@@ -58,6 +60,9 @@ test = do
 
   messages15 <- checkModel "model:Perspectives"
   lift $ for_ messages15 logShow
+
+
+  -- (lift $ logShow ["noot"]) *> empty <|> (lift $ logShow ["aap"])
 
   -- t <- "model:Perspectives$Rol" ## contextTypeOfRolType
   -- lift $ logShow (tripleObjects t)

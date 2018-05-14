@@ -13,7 +13,7 @@ import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol, deconstructNamespace)
-import Perspectives.PropertyComposition ((/-/))
+import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol(..), propertyValue)
 import Perspectives.Utilities (onNothing)
@@ -62,11 +62,11 @@ getBuitenRol' = getContextMember' \c -> context_buitenRol c
 getRol :: forall e. RolName -> ObjectsGetter e
 getRol rn = getContextMember \context -> maybe [] id (lookup rn (context_rolInContext context))
 
-rolNameInContext :: LocalName -> ContextID -> RolName
-rolNameInContext ln contextId = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
-
 getRolByLocalName :: forall e. RolName -> ObjectsGetter e
 getRolByLocalName rn = getContextMember \context -> maybe [] id (lookup (rolNameInContext rn (context_id context)) (context_rolInContext context))
+  where
+    rolNameInContext :: LocalName -> ContextID -> RolName
+    rolNameInContext ln contextId = (maybe "" id (deconstructNamespace contextId)) <> "$" <> ln
 
 -- | Given a qualified name of a Rol, return that Rol from the context or recursively from its prototype.
 getRolFromPrototypeHierarchy :: forall e. RolName -> ObjectsGetter e

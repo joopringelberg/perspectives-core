@@ -6,7 +6,7 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
-import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, TripleGetter, TypedTripleGetter(..))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
@@ -29,7 +29,13 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
         (Just t) -> pure t
     do
       (object :: Array String) <- objectsGetter id
-      lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+      pure (Triple{ subject: id
+                , predicate: pn
+                , object: object
+                , dependencies: []
+                , supports : []
+                , tripleGetter: tripleGetter
+                })
 
 -- | Construct a memorizing triple getter from an arbitrary ObjectsGetter. This function is used, a.o.,
 -- | to construct getters for the properties of contexts and roles that are not roles or properties, such as
