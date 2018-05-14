@@ -8,7 +8,7 @@ import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getR
 import Perspectives.Property (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.TripleGetterComposition ((>->), (>->>))
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
-import Perspectives.TripleGetter (constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
+import Perspectives.TripleGetterConstructors (constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter)
 import Prelude (const, pure, (<>), (>=>))
 
 -----------------------------------------------------------

@@ -12,7 +12,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Object, RolID, Subject, Value)
 import Perspectives.Property (getRol)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
-import Perspectives.TripleGetter (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
+import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
 import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
 import Type.Data.Boolean (kind Boolean)
 

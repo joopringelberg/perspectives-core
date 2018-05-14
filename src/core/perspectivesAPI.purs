@@ -18,7 +18,7 @@ import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryEffect ((~>))
 import Perspectives.SystemQueries (binding)
 import Perspectives.TripleAdministration (unRegisterTriple)
-import Perspectives.TripleGetter (constructRolGetter)
+import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------

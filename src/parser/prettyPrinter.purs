@@ -24,7 +24,7 @@ import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
 import Perspectives.SystemQueries (binding, rolContext, rolTypen)
-import Perspectives.TripleGetter (constructRolGetter)
+import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
 type IndentLevel = Int

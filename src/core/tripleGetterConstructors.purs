@@ -1,4 +1,4 @@
-module Perspectives.TripleGetter where
+module Perspectives.TripleGetterConstructors where
 
 import Perspectives.EntiteitAndRDFAliases
 
