@@ -112,21 +112,18 @@ ensureResource rid = do
     (Just m) -> pure m
 
 memorize :: forall e. TripleGetter e -> String -> TypedTripleGetter e
-memorize getter name = TypedTripleGetter name (\id -> do
-  remember <- memorizeQueryResults
-  case remember of
-    true -> do
-      mt <- lift $ liftEff (lookupInTripleIndex id name)
-      case mt of
-        Nothing -> do
-          t <- getter id
-          lift $ liftEff $ registerTriple t
-        (Just t) -> pure t
-    false -> do
-      -- TODO: Hier moet alleen een Triple gemaakt worden om terug
-      -- te geven; het moet niet worden opgeslagen.
-      t <- getter id
-      lift $ liftEff $ registerTriple t)
+memorize getter name = TypedTripleGetter name
+  \id -> do
+    remember <- memorizeQueryResults
+    case remember of
+      true -> do
+        mt <- lift $ liftEff (lookupInTripleIndex id name)
+        case mt of
+          Nothing -> do
+            t <- getter id
+            lift $ liftEff $ registerTriple t
+          (Just t) -> pure t
+      false -> getter id
 
 -- | Add the reference to the triple.
 foreign import addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
