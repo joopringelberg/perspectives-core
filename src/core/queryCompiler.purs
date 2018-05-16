@@ -5,38 +5,31 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Traversable (traverse)
 import Perpectives.TypeChecker (isOrHasAspect)
-import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter, MonadPerspectivesQuery)
+import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), MonadPerspectivesQuery)
+import Perspectives.DataTypeTripleGetters (identity)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName, firstOnly)
-import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.QueryCache (queryCacheLookup)
+import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, saveVar, var)
-import Perspectives.DataTypeTripleGetters (identity)
+import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (bind, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), id)
+import Prelude (bind, id, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
--- | From a qualified name for a Rol and the context that it is defined in (hence, the domain of the rol-getter), construct a function that computes the instances of that Rol for a given context.
--- | The Rol may be defined as computed. It may be in the same namespace as the context,
--- | that is, locally defined, or it may come from some Aspect (and so be in another namespace)
+-- | From a qualified name for a computed Rol and the context that it is defined in (hence, the domain of the rol-getter), construct a function that computes the instances of that Rol for a given context.
+-- | This function caches its results in the QueryCache.
 rolQuery  :: forall e.
   RolName ->
-  ContextID ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
-rolQuery rn cid = ifNothing (lift $ queryCacheLookup rn)
+  MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+rolQuery rn = ifNothing (queryCacheLookup rn)
   do
-    ifM (lift $ rn `isOrHasAspect` "model:Perspectives$Function")
-      do
-        tg <- lift $ constructQueryFunction rn
-        -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
-        -- and can be found with TripleRef <subject> "model:Perspectives$identity". This TripleRef is stored in the query variable "#context".
-        pure $ (saveVar "#context" (identity >-> tg))
-      do
-        if rn `isInNamespace` cid
-          then pure $ constructRolGetter rn
-          else pure $ constructRolLookup rn
+    -- We must run the resulting function in its own State.
+    -- TODO. Dit ziet er beter uit als we ObjectsGetters gebruiken.
+    tg@(TypedTripleGetter n _) <- constructQueryFunction rn
+    queryCacheInsert n $ TypedTripleGetter n (lift <<< (runTypedTripleGetter tg))
   (pure <<< id)
 
 -- | From a qualified name for a Property, construct a function that computes the values of that Property for a given rol.
@@ -81,8 +74,12 @@ constructQueryFunction typeDescriptionID = do
       applyPropertyConstructor constructRolPropertyGetter queryStepType
     "model:QueryAst$constructRolPropertyLookup" ->
       applyPropertyConstructor constructRolPropertyLookup queryStepType
-    "model:QueryAst$constructRolLookup" ->
-      applyPropertyConstructor constructRolLookup queryStepType
+    "model:QueryAst$rolQuery" -> do
+      rolName <- onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
+      rolQuery rolName
+    "model:QueryAst$constructRolLookup" -> do
+      rolName <- onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
+      pure $ constructRolLookup rolName
     "model:QueryAst$constructRolGetter" -> do
       rolName <- onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
       pure $ constructRolGetter rolName

@@ -119,15 +119,6 @@ domeinCacheLookup = lookup domeinCache
 domeinCacheInsert :: forall e. String -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
 domeinCacheInsert = insert domeinCache
 
--- queryCache :: forall e. MonadPerspectives e QueryCache
--- queryCache = getsGlobalState _.queryCache
---
--- queryCacheInsert :: forall e. String -> TypedTripleGetter() -> MonadPerspectives (AvarCache e) (TypedTripleGetter())
--- queryCacheInsert = insert queryCache
---
--- queryCacheLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP | e) (Maybe (TypedTripleGetter()))
--- queryCacheLookup = lookup queryCache
-
 insert :: forall eff a.
   MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
   String ->

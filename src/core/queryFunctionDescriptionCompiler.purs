@@ -12,18 +12,18 @@ import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
+import Perspectives.DataTypeTripleGetters (contextType, rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
+import Perspectives.ModelBasedTripleGetters (contextOwnRolTypes, mogelijkeBinding)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
-import Perspectives.DataTypeTripleGetters (contextType, rolType)
-import Perspectives.ModelBasedTripleGetters (contextOwnRolTypes, mogelijkeBinding)
 import Perspectives.Utilities (ifNothing, onNothing)
-import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
+import Prelude (class Monad, bind, discard, flip, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
 -- This function creates a context that describes a query. This context will be identified by contextId.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
@@ -143,9 +143,11 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureContextHasRol dom rn
       (putQueryStepDomain rn *>
-        ifM (isInNamespace' rn)
-          (createContextWithSingleRole contextId (q "constructRolGetter") rn)
-          (createContextWithSingleRole contextId (q "constructRolLookup") rn))
+        ifM (lift $ lift $ rn `isOrHasAspect` "model:Perspectives$Function")
+          (createContextWithSingleRole contextId (q "rolQuery") rn)
+          (ifM (isInNamespace' rn)
+            (createContextWithSingleRole contextId (q "constructRolGetter") rn)
+            (createContextWithSingleRole contextId (q "constructRolLookup") rn)))
   UnqualifiedRol ln -> ensureAspect (psp "Context")
     do
       contextType <- getQueryStepDomain
@@ -163,7 +165,7 @@ compileElementaryQueryStep s contextId = case s of
   isInNamespace' :: ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) Boolean
   isInNamespace' id = do
     ns <- getQueryStepDomain
-    pure $ isInNamespace id ns
+    pure $ id `isInNamespace` ns
 
   ensureAspect ::
     TypeID
