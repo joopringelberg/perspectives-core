@@ -23,7 +23,7 @@ import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.Utilities (ifNothing, onNothing)
-import Prelude (class Monad, bind, discard, flip, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
+import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
 -- This function creates a context that describes a query. This context will be identified by contextId.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
@@ -84,25 +84,31 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        (ifM (isInNamespace' p)
-          (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
-          -- TODO. Als de property bijgedragen wordt door een Aspect en niet afgebeeld is op een bindingProperty,
-          -- is hij óók lokaal gerepresenteerd en moet dan dus door constructRolPropertyGetter gevonden worden.
-          (createContextWithSingleRole contextId (q "constructRolPropertyLookup") p)))
+        ifM (lift $ lift $ p `isOrHasAspect` "model:Perspectives$Function")
+          (createContextWithSingleRole contextId (q "propertyQuery") p)
+          (ifM (isInNamespace' p)
+            (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
+            -- TODO. Als de property bijgedragen wordt door een Aspect en niet afgebeeld is op een bindingProperty,
+            -- is hij óók lokaal gerepresenteerd en moet dan dus door constructRolPropertyGetter gevonden worden.
+            (createContextWithSingleRole contextId (q "constructRolPropertyLookup") p)))
   QualifiedInternalProperty p -> do
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        (ifM (isInNamespace' p)
-          (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
-          (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") p)))
+        ifM (lift $ lift $ p `isOrHasAspect` "model:Perspectives$Function")
+          (createContextWithSingleRole contextId (q "propertyQuery") p)
+          (ifM (isInNamespace' p)
+            (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
+            (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") p)))
   QualifiedExternalProperty p -> do
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        (ifM (isInNamespace' p)
-          (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
-          (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") p)))
+        ifM (lift $ lift $ p `isOrHasAspect` "model:Perspectives$Function")
+          (createContextWithSingleRole contextId (q "propertyQuery") p)
+          (ifM (isInNamespace' p)
+            (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
+            (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") p)))
   UnqualifiedProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -112,9 +118,11 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (isInNamespace' aspect)
-            (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
-            (createContextWithSingleRole contextId (q "constructRolPropertyLookup") qn)
+          ifM (lift $ lift $ qn `isOrHasAspect` "model:Perspectives$Function")
+            (createContextWithSingleRole contextId (q "propertyQuery") qn)
+            (ifM (isInNamespace' aspect)
+              (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
+              (createContextWithSingleRole contextId (q "constructRolPropertyLookup") qn))
   UnqualifiedInternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -124,9 +132,11 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (isInNamespace' qn)
-            (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
-            (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") qn)
+          ifM (lift $ lift $ qn `isOrHasAspect` "model:Perspectives$Function")
+            (createContextWithSingleRole contextId (q "propertyQuery") qn)
+            (ifM (isInNamespace' qn)
+              (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
+              (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") qn))
   UnqualifiedExternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -136,13 +146,19 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (isInNamespace' qn)
-            (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
-            (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") qn)
+          ifM (lift $ lift $ qn `isOrHasAspect` "model:Perspectives$Function")
+            (createContextWithSingleRole contextId (q "propertyQuery") qn)
+            (ifM (isInNamespace' qn)
+              (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
+              (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") qn))
   QualifiedRol rn -> do
     dom <- getQueryStepDomain
     ensureContextHasRol dom rn
       (putQueryStepDomain rn *>
+        -- Is het een berekende rol?
+        -- Is het b.v. een Compose?
+        -- Heeft het type het aspect Function?
+        -- Dan moet je rolQuery doen. Met memorizing.
         ifM (lift $ lift $ rn `isOrHasAspect` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "rolQuery") rn)
           (ifM (isInNamespace' rn)
@@ -157,6 +173,7 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
+          -- TODO: controleer ook hier op berekende Rollen.
           ifM (isInNamespace' qn)
             (createContextWithSingleRole contextId (q "constructRolGetter") qn)
             (createContextWithSingleRole contextId (q "constructRolLookup") qn)

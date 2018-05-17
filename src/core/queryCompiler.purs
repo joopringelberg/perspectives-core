@@ -4,53 +4,34 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Traversable (traverse)
-import Perpectives.TypeChecker (isOrHasAspect)
-import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), MonadPerspectivesQuery)
-import Perspectives.DataTypeTripleGetters (identity)
+import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
-import Perspectives.Identifiers (isInNamespace)
-import Perspectives.Property (getContextType, getExternalProperty, getInternalProperty, getRol, getRolByLocalName, firstOnly)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName)
+import Perspectives.Property (firstOnly, getContextType, getContextTypeF, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
-import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, saveVar, var)
+import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (bind, id, ifM, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
+import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
--- | From a qualified name for a computed Rol and the context that it is defined in (hence, the domain of the rol-getter), construct a function that computes the instances of that Rol for a given context.
+-- | From a qualified name for a computed Rol or Property, construct a function that computes the instances of that Rol or the values of that Property for a given context.
 -- | This function caches its results in the QueryCache.
 rolQuery  :: forall e.
-  RolName ->
-  MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+  TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
 rolQuery rn = ifNothing (queryCacheLookup rn)
   do
     -- We must run the resulting function in its own State.
     -- TODO. Dit ziet er beter uit als we ObjectsGetters gebruiken.
-    tg@(TypedTripleGetter n _) <- constructQueryFunction rn
+    typeDescriptionID <- getContextTypeF rn
+    tg@(TypedTripleGetter n _) <- constructQueryFunction typeDescriptionID
     queryCacheInsert n $ TypedTripleGetter n (lift <<< (runTypedTripleGetter tg))
   (pure <<< id)
 
--- | From a qualified name for a Property, construct a function that computes the values of that Property for a given rol.
--- | The Property may be defined as computed.
 propertyQuery  :: forall e.
-  PropertyName ->
-  ContextID ->
-  MonadPerspectivesQuery (AjaxAvarCache e) (TypedTripleGetter e)
-propertyQuery pn cid = ifNothing (lift $ queryCacheLookup pn)
-  do
-    ifM (lift $ pn `isOrHasAspect` "model:Perspectives$Function")
-      do
-        tg <- lift $ constructQueryFunction pn
-        -- the identity TypedTripleGetter constructs a triple <subject identity subject> that is saved
-        -- and can be found with TripleRef <subject> "model:Perspectives$identity". This TripleRef is stored in the query variable "#context".
-        pure $ (saveVar "#context" (identity >-> tg))
-      do
-        if pn `isInNamespace` cid
-          then pure $ constructRolPropertyGetter pn
-          else pure $ constructRolPropertyLookup pn
-  (pure <<< id)
+  TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+propertyQuery rn = rolQuery rn
 
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
@@ -62,6 +43,9 @@ constructQueryFunction typeDescriptionID = do
   queryStepType <- onNothing (errorMessage "no type found" "")
     (firstOnly getContextType typeDescriptionID)
   case queryStepType of
+    "model:QueryAst$propertyQuery" -> do
+      propertyName <- onNothing (errorMessage "no propertyName" queryStepType) (firstOnly (getRol "model:QueryAst$propertyQuery$property") typeDescriptionID)
+      propertyQuery propertyName
     "model:QueryAst$constructExternalPropertyGetter" ->
       applyPropertyConstructor constructExternalPropertyGetter queryStepType
     "model:QueryAst$constructExternalPropertyLookup" ->
@@ -75,7 +59,7 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$constructRolPropertyLookup" ->
       applyPropertyConstructor constructRolPropertyLookup queryStepType
     "model:QueryAst$rolQuery" -> do
-      rolName <- onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
+      rolName <- onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$rolQuery$rol") typeDescriptionID)
       rolQuery rolName
     "model:QueryAst$constructRolLookup" -> do
       rolName <- onNothing (errorMessage "no rolName" queryStepType) (firstOnly (getRol "model:QueryAst$constructRolGetter$rol") typeDescriptionID)
