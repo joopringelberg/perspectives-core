@@ -121,8 +121,8 @@ importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
   then pure true
   else (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspecten)) tp
 
-isCorrectBinding :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
-isCorrectBinding binding mogelijkeBinding = do
+hasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
+hasType binding mogelijkeBinding = do
   typeOfBinding <- getContextTypeF binding
   typeOfBinding `isOrHasAspect` mogelijkeBinding
 

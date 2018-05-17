@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
-import Perpectives.TypeChecker (importsAspect, isCorrectBinding)
+import Perpectives.TypeChecker (importsAspect, hasType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -195,7 +195,7 @@ compareRolInstancesToDefinition cid rolType' = do
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
-          ifM (lift $ lift $ isCorrectBinding (tripleObject typeOfTheBinding) toegestaneBinding)
+          ifM (lift $ lift $ hasType (tripleObject typeOfTheBinding) toegestaneBinding)
             (pure unit)
             (tell [IncorrectBinding cid rolId (tripleObject typeOfTheBinding) toegestaneBinding])
 

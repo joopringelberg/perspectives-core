@@ -9,7 +9,7 @@ import Data.StrMap (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Partial.Unsafe (unsafePartial)
-import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, isOrHasAspect, mostSpecificCommonAspect)
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, hasType, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
 import Perspectives.DataTypeTripleGetters (contextType, rolType)
@@ -84,7 +84,7 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        ifM (lift $ lift $ p `isOrHasAspect` "model:Perspectives$Function")
+        ifM (lift $ lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
           (ifM (isInNamespace' p)
             (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
@@ -95,7 +95,7 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        ifM (lift $ lift $ p `isOrHasAspect` "model:Perspectives$Function")
+        ifM (lift $ lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
           (ifM (isInNamespace' p)
             (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
@@ -104,7 +104,7 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        ifM (lift $ lift $ p `isOrHasAspect` "model:Perspectives$Function")
+        ifM (lift $ lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
           (ifM (isInNamespace' p)
             (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
@@ -118,7 +118,7 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (lift $ lift $ qn `isOrHasAspect` "model:Perspectives$Function")
+          ifM (lift $ lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
             (ifM (isInNamespace' aspect)
               (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
@@ -132,7 +132,7 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (lift $ lift $ qn `isOrHasAspect` "model:Perspectives$Function")
+          ifM (lift $ lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
             (ifM (isInNamespace' qn)
               (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
@@ -146,7 +146,7 @@ compileElementaryQueryStep s contextId = case s of
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (lift $ lift $ qn `isOrHasAspect` "model:Perspectives$Function")
+          ifM (lift $ lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
             (ifM (isInNamespace' qn)
               (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
@@ -159,7 +159,7 @@ compileElementaryQueryStep s contextId = case s of
         -- Is het b.v. een Compose?
         -- Heeft het type het aspect Function?
         -- Dan moet je rolQuery doen. Met memorizing.
-        ifM (lift $ lift $ rn `isOrHasAspect` "model:Perspectives$Function")
+        ifM (lift $ lift $ rn `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "rolQuery") rn)
           (ifM (isInNamespace' rn)
             (createContextWithSingleRole contextId (q "constructRolGetter") rn)
