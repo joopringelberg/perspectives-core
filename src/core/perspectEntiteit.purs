@@ -66,6 +66,16 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   retrieveFromDomein = retrieveRolFromDomein
   cacheInDomeinFile ns c = modifyDomeinFileInCache ns (addRolToDomeinFile c)
 
+
+ensureInternalRepresentation :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AvarCache e) (AVar a)
+ensureInternalRepresentation c = do
+    mav <- retrieveInternally c
+    case mav of
+      Nothing -> representInternally c
+      (Just av) -> pure av
+
+-- | Caches the entiteit. If it was cached before, ensures that the newly cached
+-- | entiteit has the same revision value as the old one.
 cacheEntiteitPreservingVersion :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AvarCache e) Unit
 cacheEntiteitPreservingVersion id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
@@ -76,6 +86,8 @@ cacheEntiteitPreservingVersion id e = do
       e' <- pure $ setRevision' (getRevision' ent) e
       liftAff $ putVar e' avar
 
+-- | If the entiteit is represented in an AVar, overwrites the stored value.
+-- | Otherwise adds an AVar and stores the entiteit in it.
 cacheEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AvarCache e) Unit
 cacheEntiteit id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id

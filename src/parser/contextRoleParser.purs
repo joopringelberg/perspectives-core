@@ -2,7 +2,9 @@ module Perspectives.ContextRoleParser where
 
 import Perspectives.EntiteitAndRDFAliases
 
-import Control.Alt ((<|>))
+import Control.Alt (void, (<|>))
+import Control.Monad.Aff (forkAff)
+import Control.Monad.Aff.AVar (AVar, putVar, takeVar)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable) as AR
@@ -14,11 +16,12 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, defaultContextRecord, defaultRolRecord)
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedNamespace, withExtendedTypeNamespace, withTypeNamespace)
-import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
+import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, ensureInternalRepresentation)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
@@ -334,6 +337,12 @@ roleBinding' cname p = ("rolename => contextName" <??>
           , properties = fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
+
+      lift $ lift $ lift $ vultRol bindng (show rname) rolId
+      -- inverse binding: add this RolInstance to the RolInstance identified with bindng.
+      -- Issue: forward reference.
+      -- Aanpak: haal de binding op en voeg toe. Is er geen AVar, maak die dan aan en haal de inhoud op met een takeVar, om te wijzigen.
+      -- Vraag: is takeVar blokkerend? Zo ja, kunnen we dan forken?
       pure $ Tuple (show rname) rolId))
   where
     -- If there is an index in the text, it prevails.
@@ -343,6 +352,15 @@ roleBinding' cname p = ("rolename => contextName" <??>
       Nothing -> case nrInSequence of
         (Just n) -> n
         Nothing -> 0
+
+-- Ensure we have an AVar for the RolInstance that is represented by bindng.
+-- Take the Rol out of that AVar in a Forked Aff and add rolId to its gevuldeRollen.
+vultRol :: forall eff. RolID -> RolName -> RolID -> MonadPerspectives (AvarCache eff) Unit
+vultRol vuller rolName gevuldeRol = do
+  (av :: AVar PerspectRol) <- ensureInternalRepresentation vuller
+  lift $ void $ forkAff do
+    vullerRol <- takeVar av
+    putVar (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
 
 -- | The inline context may itself use a defaultNamespacedContextName name. However,
 -- | what is returned from the context parser is an QualifiedName.
@@ -410,7 +428,7 @@ context = withRoleCounting context' where
                 , binnenRol =
                   PerspectRol defaultRolRecord
                     { _id = binnenRol (show instanceName)
-                    , pspType = "model:Perspectives$BinnenRol"
+                    , pspType = "model:Perspectives$Context$binnenRol"
                     , binding = binding $ buitenRol (show instanceName)
                     , properties = fromFoldable privateProps
                     }
@@ -421,7 +439,7 @@ context = withRoleCounting context' where
             liftAffToIP $ cacheEntiteitPreservingVersion (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = buitenRol (show instanceName)
-                , pspType = "model:Perspectives$BuitenRol"
+                , pspType = "model:Perspectives$Context$buitenRol"
                 , context = (show instanceName)
                 , properties = fromFoldable publicProps
                 })
@@ -486,6 +504,7 @@ definition = do
       , binding = binding bindng
       , context = enclContext
       })
+  lift $ lift $ lift $ vultRol bindng (show prop) rolId
   pure rolId
 
 -----------------------------------------------------------
@@ -521,7 +540,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , binnenRol =
             PerspectRol defaultRolRecord
               { _id = binnenRol textName
-              , pspType = "model:Perspectives$BinnenRol"
+              , pspType = "model:Perspectives$Context$binnenRol"
               , binding = binding $ buitenRol textName
               , properties = fromFoldable privateProps
               }
@@ -533,7 +552,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       lift $ lift $ lift $ cacheEntiteitPreservingVersion (buitenRol textName)
         (PerspectRol defaultRolRecord
           { _id = buitenRol textName
-          , pspType = "model:Perspectives$BuitenRol"
+          , pspType = "model:Perspectives$Context$buitenRol"
           , context = textName
           , properties = fromFoldable publicProps
           })
