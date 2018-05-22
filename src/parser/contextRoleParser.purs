@@ -339,10 +339,6 @@ roleBinding' cname p = ("rolename => contextName" <??>
           })
 
       lift $ lift $ lift $ vultRol bindng (show rname) rolId
-      -- inverse binding: add this RolInstance to the RolInstance identified with bindng.
-      -- Issue: forward reference.
-      -- Aanpak: haal de binding op en voeg toe. Is er geen AVar, maak die dan aan en haal de inhoud op met een takeVar, om te wijzigen.
-      -- Vraag: is takeVar blokkerend? Zo ja, kunnen we dan forken?
       pure $ Tuple (show rname) rolId))
   where
     -- If there is an index in the text, it prevails.
@@ -428,7 +424,7 @@ context = withRoleCounting context' where
                 , binnenRol =
                   PerspectRol defaultRolRecord
                     { _id = binnenRol (show instanceName)
-                    , pspType = "model:Perspectives$Context$binnenRol"
+                    , pspType = show typeName <> "$binnenRolBeschrijving"
                     , binding = binding $ buitenRol (show instanceName)
                     , properties = fromFoldable privateProps
                     }
@@ -439,7 +435,7 @@ context = withRoleCounting context' where
             liftAffToIP $ cacheEntiteitPreservingVersion (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = buitenRol (show instanceName)
-                , pspType = "model:Perspectives$Context$buitenRol"
+                , pspType = show typeName <> "$buitenRolBeschrijving"
                 , context = (show instanceName)
                 , properties = fromFoldable publicProps
                 })
@@ -540,7 +536,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , binnenRol =
             PerspectRol defaultRolRecord
               { _id = binnenRol textName
-              , pspType = "model:Perspectives$Context$binnenRol"
+              , pspType = "model:Perspectives$Context$binnenRolBeschrijving"
               , binding = binding $ buitenRol textName
               , properties = fromFoldable privateProps
               }
@@ -552,7 +548,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       lift $ lift $ lift $ cacheEntiteitPreservingVersion (buitenRol textName)
         (PerspectRol defaultRolRecord
           { _id = buitenRol textName
-          , pspType = "model:Perspectives$Context$buitenRol"
+          , pspType = "model:Perspectives$Context$buitenRolBeschrijving"
           , context = textName
           , properties = fromFoldable publicProps
           })
