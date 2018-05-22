@@ -5,17 +5,18 @@ import Perspectives.EntiteitAndRDFAliases
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
-import Data.Array (elemIndex)
+import Data.Array (elemIndex, foldMap)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (alaF)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI, isInNamespace)
+import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
 import Perspectives.SystemObjectGetters (getRolType)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
-import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (<$>), (==))
+import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (==))
 
 constructTripleGetterFromEffectExpression :: forall e.
   PropertyName ->
@@ -120,4 +121,7 @@ rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$
 rolHasTypeWithLocalName :: forall e. ID -> TypedTripleGetter e
 rolHasTypeWithLocalName localName = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$rolHasTypeWithLocalName" <> "_" <> localName)
-  (getRolType `composeMonoidal` (Disj <<< maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI))
+  (getRolType `composeMonoidal` f)
+  where
+    f :: Array String -> Boolean
+    f = alaF Disj foldMap (maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI)

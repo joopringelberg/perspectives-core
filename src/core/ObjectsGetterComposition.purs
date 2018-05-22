@@ -1,8 +1,8 @@
 module Perspectives.ObjectsGetterComposition where
 
 import Data.Array (foldM, foldMap, intersect, singleton, union)
-import Data.Monoid (class Monoid)
 import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (alaF)
 import Perspectives.CoreTypes (ObjectsGetter)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Prelude (class Show, pure, show, (<<<), (==), (>=>), (>>=))
@@ -32,15 +32,13 @@ intersectionOfObjects p q = p >=>
 infixl 9 intersectionOfObjects as \-\
 
 -- | Compose an ObjectsGetter from an ObjectsGetter and a function
--- | that maps a String to a Monoid value that can be shown.
--- | The (String) results of the ObjectsGetter will be mapped into
--- | the Monoid, then folded, then shown and returned in an Array
--- | wrapped in the monad.
-composeMonoidal :: forall e m. Monoid m => Show m =>
+-- | that maps an Array String value to a value that can be shown.
+-- | This function typically folds over a monoid.
+composeMonoidal :: forall e a. Show a =>
   ObjectsGetter e
-  -> (String -> m)
+  -> (Array String -> a)
   -> ObjectsGetter e
-composeMonoidal p f = p >=> pure <<< singleton <<< show <<< foldMap f
+composeMonoidal p f = p >=> pure <<< singleton <<< show <<< f
 
 contains :: forall e. ID -> ObjectsGetter e -> ObjectsGetter e
-contains obj p = p `composeMonoidal` (Disj <<< (==) obj)
+contains obj p = p `composeMonoidal` (alaF Disj foldMap ((==) obj))

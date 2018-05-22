@@ -1,12 +1,9 @@
 module Perspectives.DataTypeTripleGetters where
 
-import Data.Array (elemIndex)
-import Data.Maybe (maybe)
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Property (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
-import Prelude (const, pure, (<>), (>=>))
+import Prelude (pure)
 
 identity' :: forall e. ObjectsGetter e
 identity' x = pure [x]
@@ -55,11 +52,3 @@ rolContext = constructTripleGetterFromObjectsGetter "model:Perspectives$context"
 -- | `psp:ContextInstance -> psp:String`
 label :: forall e. TypedTripleGetter e
 label = constructTripleGetterFromObjectsGetter "model:Perspectives$label" getDisplayName
-
--- | A combinator from the type name of a Rol to a query that takes the instance of a Rol
--- | and returns a boolean value showing if the instance has the given type.
--- | NOTE: makes no use of Aspects!
--- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
-rolHasType :: forall e. ID -> TypedTripleGetter e
-rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$rolHasType" <> "_" <> typeId)
-  (getRolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
