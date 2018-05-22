@@ -4,13 +4,16 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Traversable (traverse)
+import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName)
-import Perspectives.Property (firstOnly, getContextType, getContextTypeF, getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
+import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
+import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, lastElement, notEmpty, ref, rolesOf, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
+import Perspectives.SystemObjectGetters (getContextType, getContextTypeF, getRolBinding, getRolContext)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
@@ -111,8 +114,9 @@ constructQueryFunction typeDescriptionID = do
       -> ID
       -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
     applyPropertyConstructor f queryStepType = do
-      propertyId <- onNothing (errorMessage "no property found" queryStepType)
-        (firstOnly (getRolByLocalName "property") typeDescriptionID)
+      propertyId <- onNothing
+        (errorMessage "no property found" queryStepType)
+        (firstOnly (getRolByLocalName "property" /-/ getRolBinding /-/ getRolContext) typeDescriptionID)
       pure $ f propertyId
 
     applyUnaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e )
@@ -133,4 +137,4 @@ constructQueryFunction typeDescriptionID = do
       pure $ foldl c last init
 
     errorMessage :: String -> String -> Error
-    errorMessage s t = error ("constructEffectStatement: " <> s <> " for: " <> t <> " " <> typeDescriptionID)
+    errorMessage s t = error ("constructQueryFunction: " <> s <> " for: " <> t <> " " <> typeDescriptionID)

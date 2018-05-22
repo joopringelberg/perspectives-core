@@ -85,12 +85,12 @@ type QueryCompilerEnvironment =
   , declaredVariables :: StrMap ContextID
   }
 
-type MonadPerspectivesQueryCompiler e = StateT QueryCompilerEnvironment (MonadPerspectivesQuery e)
+type MonadPerspectivesQueryCompiler e = StateT QueryCompilerEnvironment (MonadPerspectives e)
 
 runMonadPerspectivesQueryCompiler :: forall e a.
   ContextID
   -> (MonadPerspectivesQueryCompiler e a)
-  -> MonadPerspectivesQuery e a
+  -> MonadPerspectives e a
 runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: empty}
 
 putQueryStepDomain :: forall e. Domain -> MonadPerspectivesQueryCompiler e Unit

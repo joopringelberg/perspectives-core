@@ -17,15 +17,20 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
 import Perspectives.ModelBasedTripleGetters (contextOwnRolTypes, mogelijkeBinding)
+import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##))
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
+import Perspectives.SystemObjectGetters (getRolBinding, getRolContext)
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
 -- This function creates a context that describes a query. This context will be identified by contextId.
+-- | The domain of the resulting function is the value of 'domain' in the
+-- | QueryCompilerEnvironment. It should be provided by the application of
+-- | runMonadPerspectivesQueryCompiler.
 compileElementaryQueryStep :: forall e. ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 compileElementaryQueryStep s contextId = case s of
   Constant tp v -> putQueryStepDomain tp *> createContextWithInternalProperty contextId (q "constant") v
@@ -41,7 +46,7 @@ compileElementaryQueryStep s contextId = case s of
   Binding -> ensureAspect (psp "Rol")
     do
       dom <- getQueryStepDomain
-      ifNothing (lift $ tripleGetter2function mogelijkeBinding dom)
+      ifNothing (lift $ runMonadPerspectivesQuery dom (tripleGetter2function mogelijkeBinding))
         (pure $ Left $ MissingMogelijkeBinding dom)
         \bindingType -> do
           putQueryStepDomain bindingType
@@ -56,13 +61,13 @@ compileElementaryQueryStep s contextId = case s of
   Identity -> parameterlessQueryFunction contextId (q "identity")
   Type -> do
     dom <- getQueryStepDomain
-    ifM (lift $ lift $ dom `isOrHasAspect` (psp "Context"))
+    ifM (lift $ dom `isOrHasAspect` (psp "Context"))
       do
-        tp <- lift $ tripleGetter2function contextType dom
+        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function contextType)
         putQueryStepDomain $ unsafePartial $ fromJust tp
         parameterlessQueryFunction contextId (q "contextType")
       do
-        tp <- lift $ tripleGetter2function rolType dom
+        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function rolType)
         putQueryStepDomain $ unsafePartial $ fromJust tp
         (parameterlessQueryFunction contextId (q "rolType"))
   BuitenRol -> ensureAspect (psp "Context")
@@ -70,13 +75,13 @@ compileElementaryQueryStep s contextId = case s of
   IedereRolInContext -> ensureAspect (psp "Context")
     do
       dom <- getQueryStepDomain
-      tps <- lift $ lift (dom ## contextOwnRolTypes)
+      tps <- lift (dom ## contextOwnRolTypes)
       sumtype <- createSumType $ tripleObjects tps
       putQueryStepDomain sumtype
       createContextWithSingleRole contextId (q "iedereRolInContext") dom
   RolTypen -> ensureAspect (psp "Context")
     do
-      getQueryStepDomain >>= lift <<< lift <<< runTypedTripleGetter contextOwnRolTypes >>= pure <<< tripleObjects >>= lift <<< lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
+      getQueryStepDomain >>= lift <<< runTypedTripleGetter contextOwnRolTypes >>= pure <<< tripleObjects >>= lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
       parameterlessQueryFunction contextId (q "rolTypen")
   Label -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "String") *> parameterlessQueryFunction contextId (q "label"))
@@ -84,7 +89,7 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        ifM (lift $ lift $ p `hasType` "model:Perspectives$Function")
+        ifM (lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
           (ifM (isInNamespace' p)
             (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
@@ -95,16 +100,17 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        ifM (lift $ lift $ p `hasType` "model:Perspectives$Function")
+        ifM (lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
           (ifM (isInNamespace' p)
             (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
             (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") p)))
   QualifiedExternalProperty p -> do
     dom <- getQueryStepDomain
+    -- TODO. Hier moet een controle komen op externe properties van een context.
     ensureRolHasProperty dom p
       (putQueryStepDomain p *>
-        ifM (lift $ lift $ p `hasType` "model:Perspectives$Function")
+        ifM (lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
           (ifM (isInNamespace' p)
             (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
@@ -112,13 +118,13 @@ compileElementaryQueryStep s contextId = case s of
   UnqualifiedProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
-      aspectOrMessage <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      aspectOrMessage <- lift $ checkRolForUnQualifiedProperty ln rolType
       case aspectOrMessage of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (lift $ lift $ qn `hasType` "model:Perspectives$Function")
+          ifM (lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
             (ifM (isInNamespace' aspect)
               (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
@@ -126,13 +132,13 @@ compileElementaryQueryStep s contextId = case s of
   UnqualifiedInternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
-      aspectOrMessage <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      aspectOrMessage <- lift $ checkRolForUnQualifiedProperty ln rolType
       case aspectOrMessage of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (lift $ lift $ qn `hasType` "model:Perspectives$Function")
+          ifM (lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
             (ifM (isInNamespace' qn)
               (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
@@ -140,13 +146,13 @@ compileElementaryQueryStep s contextId = case s of
   UnqualifiedExternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
-      aspectOrMessage <- lift $ lift $ checkRolForUnQualifiedProperty ln rolType
+      aspectOrMessage <- lift $ checkRolForUnQualifiedProperty ln rolType
       case aspectOrMessage of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
-          ifM (lift $ lift $ qn `hasType` "model:Perspectives$Function")
+          ifM (lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
             (ifM (isInNamespace' qn)
               (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
@@ -155,11 +161,7 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ensureContextHasRol dom rn
       (putQueryStepDomain rn *>
-        -- Is het een berekende rol?
-        -- Is het b.v. een Compose?
-        -- Heeft het type het aspect Function?
-        -- Dan moet je rolQuery doen. Met memorizing.
-        ifM (lift $ lift $ rn `hasType` "model:Perspectives$Function")
+        ifM (lift $ rn `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "rolQuery") rn)
           (ifM (isInNamespace' rn)
             (createContextWithSingleRole contextId (q "constructRolGetter") rn)
@@ -167,7 +169,7 @@ compileElementaryQueryStep s contextId = case s of
   UnqualifiedRol ln -> ensureAspect (psp "Context")
     do
       contextType <- getQueryStepDomain
-      aspectOrMessage <- lift $ lift $ checkContextForUnQualifiedRol ln contextType
+      aspectOrMessage <- lift $ checkContextForUnQualifiedRol ln contextType
       case aspectOrMessage of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
@@ -190,17 +192,18 @@ compileElementaryQueryStep s contextId = case s of
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   ensureAspect aspect mv = do
     dom <- getQueryStepDomain
-    ifM (lift $ lift $ dom `isOrHasAspect` aspect)
+    ifM (lift $ dom `isOrHasAspect` aspect)
       mv
       (pure $ Left $ MissingAspect dom aspect)
 
+-- | `psp:Rol -> psp:Property -> FD`
   ensureRolHasProperty ::
     RolID
     -> PropertyName
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   ensureRolHasProperty rolId propertyId mv =
-    ifM (lift $ lift $ checkRolForQualifiedProperty propertyId rolId)
+    ifM (lift $ checkRolForQualifiedProperty propertyId rolId)
       mv
       (pure $ Left $ MissingQualifiedProperty propertyId rolId)
 
@@ -210,12 +213,12 @@ compileElementaryQueryStep s contextId = case s of
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   ensureContextHasRol contextId' rolId mv =
-    ifM (lift $ lift $ checkContextForQualifiedRol rolId contextId')
+    ifM (lift $ checkContextForQualifiedRol rolId contextId')
       mv
       (pure $ Left $ MissingQualifiedRol rolId contextId')
 
--- This function creates a context that describes a query that is identified by contextId and that results from
--- applying a combinator to another query.
+-- This function creates a context that describes a query that is identified by
+-- contextId and that results from applying a combinator to another query.
 compileCombinatorQueryStep :: forall e. QueryStep -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 compileCombinatorQueryStep s contextId = case s of
   Filter cr ca -> compileCombinatorQueryStep cr (contextId <> "$criterium") `whenRight`
@@ -227,7 +230,7 @@ compileCombinatorQueryStep s contextId = case s of
       Nothing -> do
         (operands' :: Array (Tuple RolName (Array ID))) <- pure (unsafePartial (fromRight <$> operands))
         operandIds <- pure $ unsafePartial $ fromJust <<< head <<< snd <$> operands'
-        (lift $ lift $ mostSpecificCommonAspect operandIds) >>= putQueryStepDomain
+        (lift $ mostSpecificCommonAspect operandIds) >>= putQueryStepDomain
         createContext contextId (q "concat") operands' []
       (Just a) -> pure $ unsafePartial $ Left $ fromLeft a
   Compose oprnds -> do
@@ -303,13 +306,16 @@ parameterlessQueryFunction name typeId = createContext name typeId [] []
 --   $property => pol:Aangifte$Aangever$betrouwbaarheid
 createContextWithSingleRole :: forall e. String -> ContextID -> ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithSingleRole contextId contextType bindingValue = do
-  rolType <- lift $ onNothing (error $ "No rolType found for " <> contextType) (lift ((getRol "model:Perspectives$Context$rolInContext" contextType) >>= pure <<< head)) -- qualified name of rolType
-  rolInstanceId <- createRol rolType contextId bindingValue 0
+  rolType <- onNothing
+    (error $ "No rolType found for " <> contextType)
+    (lift $
+      ((getRol "model:Perspectives$Context$rolInContext") /-/ getRolBinding /-/ getRolContext) contextType >>= pure <<< head) -- qualified name of rolType
+  rolInstanceId <- createRol rolType contextId (buitenRol bindingValue) 0
   createContext contextId contextType [Tuple rolType [rolInstanceId]] []
 
 createContextWithMultipleRoleInstances :: forall e. String -> ContextID -> RolID -> Array ContextID ->  MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithMultipleRoleInstances contextId contextType rolName bindings = do
-  roles <- traverseWithIndex (\i b -> createRol rolName contextId b i) bindings
+  roles <- traverseWithIndex (\i b -> createRol rolName contextId b i) (buitenRol <$> bindings)
   createContext contextId contextType (Tuple rolName <<< singleton <$> roles) []
 
 createSumType :: forall e. Array ContextID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) ID
@@ -322,7 +328,7 @@ createSumType types = do
 -- | The property (type) name is retrieved as the value of the internalProperty role of that contextType.
 createContextWithInternalProperty :: forall e. String -> ContextID -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContextWithInternalProperty contextId contextType propVal = do
-  propertyName <- lift $ onNothing (error $ "No parameter found for " <> contextType) (lift ((getRol "model:Perspectives$Context$internalProperty" contextType) >>= pure <<< head)) -- qualified name of property
+  propertyName <- onNothing (error $ "No parameter found for " <> contextType) (lift ((getRol "model:Perspectives$Context$internalProperty" contextType) >>= pure <<< head)) -- qualified name of property
   createContext contextId contextType [] [Tuple propertyName [propVal]]
 
 -- rolName gives the type of the Rol to create.
@@ -332,7 +338,7 @@ createRol :: forall e. RolName -> ContextID -> ID -> Int -> MonadPerspectivesQue
 createRol rolName contextId bindingValue i = do
   rolLn <- guardWellFormedNess deconstructLocalNameFromDomeinURI rolName
   rolInstanceName <- pure (contextId <> "$" <> rolLn <> (show i)) -- qualified name of rol instance
-  lift $ lift $ cacheEntiteitPreservingVersion rolInstanceName
+  lift $ cacheEntiteitPreservingVersion rolInstanceName
     (PerspectRol defaultRolRecord
       { _id = rolInstanceName
       , pspType = rolName
@@ -349,7 +355,7 @@ createContext :: forall e.
   MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
 createContext name typeId roles properties = do
   ln <- guardWellFormedNess deconstructLocalNameFromDomeinURI name
-  lift $ lift $ cacheEntiteitPreservingVersion name
+  lift $ cacheEntiteitPreservingVersion name
    (PerspectContext defaultContextRecord
       { _id = name
       , _rev = toRevision Nothing
@@ -358,20 +364,20 @@ createContext name typeId roles properties = do
       , binnenRol =
           PerspectRol defaultRolRecord
             { _id =  binnenRol name
-            , pspType = "model:Perspectives$BinnenRol"
+            , pspType = "model:Perspectives$Context$binnenRol"
             , binding = binding (buitenRol name)
             , properties = fromFoldable (createProperty <$> properties)
             }
       , rolInContext = fromFoldable roles
       })
-  lift $ lift $ cacheEntiteitPreservingVersion (buitenRol name)
+  lift $ cacheEntiteitPreservingVersion (buitenRol name)
     (PerspectRol defaultRolRecord
       { _id = buitenRol name
-      , pspType = "model:Perspectives$BuitenRol"
+      , pspType = "model:Perspectives$Context$buitenRol"
       , context = name
       , binding = binding $ buitenRol typeId
       })
-  pure $ Right $ buitenRol name
+  pure $ Right $ name
 
   where
   createProperty :: Tuple PropertyName (Array String) -> (Tuple PropertyName PropertyValueWithComments)
