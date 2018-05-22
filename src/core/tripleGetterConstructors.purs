@@ -5,13 +5,17 @@ import Perspectives.EntiteitAndRDFAliases
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
-import Data.Maybe (Maybe(..))
+import Data.Array (elemIndex)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Monoid.Disj (Disj(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Identifiers (LocalName)
+import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI, isInNamespace)
+import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.Property (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
+import Perspectives.SystemObjectGetters (getRolType)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
-import Prelude (bind, ifM, pure, ($), (<<<))
+import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (<$>), (==))
 
 constructTripleGetterFromEffectExpression :: forall e.
   PropertyName ->
@@ -102,3 +106,18 @@ constructInverseRolGetter :: forall e.
   RolName ->
   TypedTripleGetter e
 constructInverseRolGetter pn = constructTripleGetter getGebondenAls pn
+
+-- | A combinator from the type name of a Rol to a query that takes the instance of a Rol
+-- | and returns a boolean value showing if the instance has the given type.
+-- | NOTE: makes no use of Aspects!
+-- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
+rolHasType :: forall e. ID -> TypedTripleGetter e
+rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$rolHasType" <> "_" <> typeId)
+  (getRolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
+
+-- | Tests whether the type of the Rol has a specific local name. Used to test if a Rol is a BuitenRol type or a BinnenRol type.
+-- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
+rolHasTypeWithLocalName :: forall e. ID -> TypedTripleGetter e
+rolHasTypeWithLocalName localName = constructTripleGetterFromObjectsGetter
+  ("model:Perspectives$rolHasTypeWithLocalName" <> "_" <> localName)
+  (getRolType `composeMonoidal` (Disj <<< maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI))
