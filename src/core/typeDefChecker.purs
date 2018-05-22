@@ -21,7 +21,7 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
-import Perspectives.Identifiers (binnenRol, buitenRol)
+import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedTripleGetters (aspect, aspectRol, aspecten, contextExternePropertyTypes, contextInternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextTypeOfRolType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolIsVerplicht, rolPropertyTypes)
 import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolUsingAspects)
 import Perspectives.ObjectsGetterComposition ((/-/))
@@ -141,11 +141,6 @@ checkInternalProperty cid propertyType = pure unit
 comparePropertyInstanceToDefinition :: forall e. ContextID -> RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 comparePropertyInstanceToDefinition cid rid propertyType = do
   rolType <- lift $ lift $ getRolTypeF rid
-  -- TODO: eerst stond hier een eenvoudig propertyGetter. Dat werkte.
-  -- Maar getPropertyFunction probeert een definitie voor de property
-  -- op het roltype te vinden. En dat mislukt voor externe en interne properties.
-  -- (MissingQualifiedProperty) Er is geen definitie voor de property 'model:Perspectives$Rol$isVerplicht' voor de rol 'model:Perspectives$Context$buitenRol'.
-  -- Nee, maar er is wel een externe property isVerplicht voor psp:Rol.
   (propertyGetter :: TypedTripleGetter e) <- lift $ lift $ getPropertyFunction propertyType rolType
   (Triple {object}) <- lift (rid @@ propertyGetter)
   pure unit
@@ -185,15 +180,10 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
 -- `Property -> Rol -> (RolInstance -> PropertyValue)`
 getPropertyFunction :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
 getPropertyFunction pn rn = do
-  queryStep <- do
-    isInternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$internalProperty") pn
-    case head isInternal of
-      Nothing -> do
-        isExternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$externalProperty") pn
-        case head isExternal of
-          Nothing -> pure QualifiedProperty
-          otherwise -> pure QualifiedExternalProperty
-      otherwise -> pure QualifiedInternalProperty
+  queryStep <- pure $ case deconstructLocalNameFromDomeinURI rn of
+    (Just "binnenRolBeschrijving") -> QualifiedInternalProperty
+    (Just "buitenRolBeschrijving") -> QualifiedExternalProperty
+    otherwise -> QualifiedProperty
   r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (queryStep pn) (pn <> "_getter"))
   case r of
     (Left m) -> throwError $ error $ show m
