@@ -193,12 +193,20 @@ psp:Context q:iedereRolInContext
 -- COMBINATORS
 --------------------------------------------------------------------------------
 psp:Context q:laatste
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $query
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:compose
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $operand
 			extern $isFunctioneel = true
@@ -206,24 +214,40 @@ psp:Context q:compose
 
 -- notEmpty is itself not a Criterium, but the application of notEmpty to a Query is.
 psp:Context q:notEmpty
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $query
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:closure
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $query
 			extern $isFunctioneel = true
 			$mogelijkeBinding => q:RolFunction
 
 psp:Context q:closure'
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 	 	psp:Rol $query
 			extern $isFunctioneel = true
 			$mogelijkeBinding => q:RolFunction
 
 psp:Context q:filter
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 	 	psp:Rol $criterium
 			extern $isFunctioneel = true
@@ -234,21 +258,34 @@ psp:Context q:filter
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:concat
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $operand
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:rolesOf
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $context
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Context
+
 --------------------------------------------------------------------------------
 -- COMBINATOR CONSTRUCTORS
 --------------------------------------------------------------------------------
 -- It is unlikely we will use this constructor in a model.
 q:Context q:contains
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $valueOrId
 			extern $isFunctioneel = true
@@ -261,29 +298,44 @@ q:Context q:contains
 --------------------------------------------------------------------------------
 -- CONSTANT
 --------------------------------------------------------------------------------
-psp:Rol q:Constant
-	$internalProperty =>
-		psp:Property $value
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:String
+psp:Context q:Constant
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$rolProperty =>
+				psp:Property $value
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+			$mogelijkeBinding => psp:ElkType
 
 --------------------------------------------------------------------------------
 -- VARIABLE
 --------------------------------------------------------------------------------
 psp:Context q:Variable
-	$internalProperty =>
-		psp:Property $name
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:String
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$rolProperty =>
+				psp:Property $name
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+			$mogelijkeBinding => psp:ElkType
 
 psp:Context q:setVariable
-	$internalProperty =>
-		psp:Property $name
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:String
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$rolProperty =>
+				psp:Property $name
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		psp:Rol $value
 			extern $isFunctioneel = true
@@ -305,12 +357,17 @@ psp:Context q:setVariable
 --			q:constructRolLookup <gen>
 --				$rol => pol:Aangifte$verdachte
 psp:Context q:assignToRol
-	$internalProperty =>
-		psp:Property $operation
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			-- possible values are: "add", "remove", "set"
-			$range => psp:String
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$rolProperty =>
+				psp:Property $operation
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					-- possible values are: "add", "remove", "set"
+					$range => psp:String
+			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		-- The rol we will assign to. The qualified name is used!
 		psp:Rol $rol
@@ -345,17 +402,22 @@ psp:Context q:assignToRol
 --				$operand (2) =>
 --					q:constructExternalPropertyLookup $voornaam
 psp:Context q:assignToProperty
-	$internalProperty =>
-		psp:Property $operation
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			-- possible values are: "add", "remove", "set"
-			$range => psp:String
-	$internalProperty =>
-		psp:Property $constantValue
-			extern $isFunctioneel = true
-			extern $isVerplicht = false
-			$range => psp:String
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$rolProperty =>
+				psp:Property $operation
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					-- possible values are: "add", "remove", "set"
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $constantValue
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		-- The rol we will change a property of. The qualified name is used!
 		psp:Rol $rol
