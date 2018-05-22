@@ -223,7 +223,7 @@ enclosingContext theText = do
       mc <- lift $ lift $ getPerspectEntiteit id
       case mc of
         (Just c) -> do
-          if isInNamespace (context_id theText) id || isInNamespace "model:User" id
+          if id `isInNamespace` (context_id theText) || id `isInNamespace` "model:User"
             then do
               context definedContexts c
               newline

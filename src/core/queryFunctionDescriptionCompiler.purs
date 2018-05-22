@@ -91,7 +91,7 @@ compileElementaryQueryStep s contextId = case s of
       (putQueryStepDomain p *>
         ifM (lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
-          (ifM (isInNamespace' p)
+          (ifM (isInQueryStepDomain p)
             (createContextWithSingleRole contextId (q "constructRolPropertyGetter") p)
             -- TODO. Als de property bijgedragen wordt door een Aspect en niet afgebeeld is op een bindingProperty,
             -- is hij óók lokaal gerepresenteerd en moet dan dus door constructRolPropertyGetter gevonden worden.
@@ -102,7 +102,7 @@ compileElementaryQueryStep s contextId = case s of
       (putQueryStepDomain p *>
         ifM (lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
-          (ifM (isInNamespace' p)
+          (ifM (isInQueryStepDomain p)
             (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") p)
             (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") p)))
   QualifiedExternalProperty p -> do
@@ -112,7 +112,7 @@ compileElementaryQueryStep s contextId = case s of
       (putQueryStepDomain p *>
         ifM (lift $ p `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "propertyQuery") p)
-          (ifM (isInNamespace' p)
+          (ifM (isInQueryStepDomain p)
             (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") p)
             (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") p)))
   UnqualifiedProperty ln -> ensureAspect (psp "Rol")
@@ -126,7 +126,7 @@ compileElementaryQueryStep s contextId = case s of
           putQueryStepDomain qn
           ifM (lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
-            (ifM (isInNamespace' aspect)
+            (ifM (isInQueryStepDomain aspect)
               (createContextWithSingleRole contextId (q "constructRolPropertyGetter") qn)
               (createContextWithSingleRole contextId (q "constructRolPropertyLookup") qn))
   UnqualifiedInternalProperty ln -> ensureAspect (psp "Rol")
@@ -140,7 +140,7 @@ compileElementaryQueryStep s contextId = case s of
           putQueryStepDomain qn
           ifM (lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
-            (ifM (isInNamespace' qn)
+            (ifM (isInQueryStepDomain qn)
               (createContextWithSingleRole contextId (q "constructInternalPropertyGetter") qn)
               (createContextWithSingleRole contextId (q "constructInternalPropertyLookup") qn))
   UnqualifiedExternalProperty ln -> ensureAspect (psp "Rol")
@@ -154,7 +154,7 @@ compileElementaryQueryStep s contextId = case s of
           putQueryStepDomain qn
           ifM (lift $ qn `hasType` "model:Perspectives$Function")
             (createContextWithSingleRole contextId (q "propertyQuery") qn)
-            (ifM (isInNamespace' qn)
+            (ifM (isInQueryStepDomain qn)
               (createContextWithSingleRole contextId (q "constructExternalPropertyGetter") qn)
               (createContextWithSingleRole contextId (q "constructExternalPropertyLookup") qn))
   QualifiedRol rn -> do
@@ -163,7 +163,7 @@ compileElementaryQueryStep s contextId = case s of
       (putQueryStepDomain rn *>
         ifM (lift $ rn `hasType` "model:Perspectives$Function")
           (createContextWithSingleRole contextId (q "rolQuery") rn)
-          (ifM (isInNamespace' rn)
+          (ifM (isInQueryStepDomain rn)
             (createContextWithSingleRole contextId (q "constructRolGetter") rn)
             (createContextWithSingleRole contextId (q "constructRolLookup") rn)))
   UnqualifiedRol ln -> ensureAspect (psp "Context")
@@ -176,13 +176,13 @@ compileElementaryQueryStep s contextId = case s of
           let qn = aspect <> "$" <> ln
           putQueryStepDomain qn
           -- TODO: controleer ook hier op berekende Rollen.
-          ifM (isInNamespace' qn)
+          ifM (isInQueryStepDomain qn)
             (createContextWithSingleRole contextId (q "constructRolGetter") qn)
             (createContextWithSingleRole contextId (q "constructRolLookup") qn)
   where
 
-  isInNamespace' :: ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) Boolean
-  isInNamespace' id = do
+  isInQueryStepDomain :: ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) Boolean
+  isInQueryStepDomain id = do
     ns <- getQueryStepDomain
     pure $ id `isInNamespace` ns
 
@@ -364,7 +364,7 @@ createContext name typeId roles properties = do
       , binnenRol =
           PerspectRol defaultRolRecord
             { _id =  binnenRol name
-            , pspType = "model:Perspectives$Context$binnenRol"
+            , pspType = typeId <> "$binnenRolBeschrijving"
             , binding = binding (buitenRol name)
             , properties = fromFoldable (createProperty <$> properties)
             }
@@ -373,7 +373,7 @@ createContext name typeId roles properties = do
   lift $ cacheEntiteitPreservingVersion (buitenRol name)
     (PerspectRol defaultRolRecord
       { _id = buitenRol name
-      , pspType = "model:Perspectives$Context$buitenRol"
+      , pspType = typeId <> "$buitenRolBeschrijving"
       , context = name
       , binding = binding $ buitenRol typeId
       })

@@ -12,7 +12,6 @@ module Perspectives.Identifiers
 , roleIndexNr
 , escapeCouchdbDocumentName
 , isInNamespace
-, isInNamespace'
 , isContainingNamespace
 , isQualifiedWithDomein
 , ModelName(..)
@@ -34,13 +33,13 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (index, unsafeIndex)
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
+import Data.String (Pattern(..), Replacement(..), contains, replaceAll)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, id, not, ($), (<>), (==), (||))
+import Prelude (class Show, id, ($), (<>), (==), (||))
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -186,21 +185,11 @@ roleIndexNr s = case match roleIndexNrRegex s of
 escapeCouchdbDocumentName :: String -> String
 escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
 
--- | True, if the first argument is part of the second.
--- | Hence: "model:Perspectives$Aangifte" `isInNamespace` "model:Perspectives$Aangifte$Aangever".
--- TODO. Dit moet andersom.
-isInNamespace :: String -> String -> Boolean
-isInNamespace ns ident =
-  -- A quick test: strip ns from ident. What remains may not hold a "$".
-  ns == ident ||
-    (not $ contains (Pattern "$") (maybe "$" id (stripPrefix (Pattern (ns <> "$")) ident)))
-
-
 -- | True iff the first argument contains the second (as its first part). E.g.:
 -- | "model:Perspectives$Aangifte$Aangever" `isInNamespace` "model:Perspectives$Aangifte".
 -- | "a" `isInNamespace` "a" is true, too.
-isInNamespace' :: String -> String -> Boolean
-isInNamespace' a b = a == b || (isContainingNamespace b a)
+isInNamespace :: String -> String -> Boolean
+isInNamespace a b = a == b || (isContainingNamespace b a)
 
 -- | True iff the first argument is the first part of the second. E.g.:
 -- | "model:Perspectives$Aangifte" `isContainingNamespace` "model:Perspectives$Aangifte$Aangever".

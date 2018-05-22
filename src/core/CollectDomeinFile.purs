@@ -11,7 +11,7 @@ import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.Identifiers (isInNamespace')
+import Perspectives.Identifiers (isInNamespace)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
@@ -40,7 +40,7 @@ domeinFileFromContext enclosingContext = do
             (pure unit)
             (flip collect ((context_id c) == (context_id enclosingContext)))
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
-        saveContext ctxt definedAtToplevel' = if (context_id ctxt) `isInNamespace'` (context_id enclosingContext)
+        saveContext ctxt definedAtToplevel' = if (context_id ctxt) `isInNamespace` (context_id enclosingContext)
           then
             ifM (inDomeinFile (context_id ctxt))
               (pure false)
@@ -56,7 +56,7 @@ domeinFileFromContext enclosingContext = do
                       (pure unit)
                       (modify <<< insertRolInDomeinFile)
                 pure true
-          else if definedAtToplevel' && (context_id ctxt) `isInNamespace'` "model:User"
+          else if definedAtToplevel' && (context_id ctxt) `isInNamespace` "model:User"
             then if (savedToCouchdb ctxt)
               then pure false
               else
