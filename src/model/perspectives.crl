@@ -1,5 +1,3 @@
--- CRL DEFINITIE
-
 Context model:Perspectives als psp:
 
 Section $rolInContext
@@ -8,6 +6,10 @@ Section $rolInContext
 -- SIMPLE VALUES
 --------------------------------------------------------------------------------
 psp:Context psp:SimpleValue
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$aspect => psp:SimpleValue
 	$aspect => psp:Context
 
@@ -23,16 +25,21 @@ psp:SimpleValue psp:Date
 -- SYSTEM BASE
 --------------------------------------------------------------------------------
 psp:Context psp:Property
-	$externalProperty =>
-		psp:Property $isFunctioneel
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:Boolean
-	$externalProperty =>
-		psp:Property $isVerplicht
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:Boolean
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			$rolProperty =>
+				psp:Property $isFunctioneel
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+			$rolProperty =>
+				psp:Property $isVerplicht
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+			$mogelijkeBinding => psp:ElkType
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $range
 			extern $isFunctioneel = true
@@ -47,14 +54,20 @@ psp:Context psp:Property
 			$mogelijkeBinding => psp:Property
 
 psp:Context psp:Context
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijvingVanContext
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijvingVanContext
 	$rolInContext =>
-		psp:Rol $externalProperty
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Property
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$mogelijkeBinding => psp:Context
 	$rolInContext =>
-		psp:Rol $internalProperty
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Property
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$mogelijkeBinding => psp:Context
 	$rolInContext =>
 		psp:Rol $rolInContext
 			extern $isFunctioneel = false
@@ -79,26 +92,21 @@ psp:Context psp:Context
 		psp:Rol $aspect
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
-	$rolInContext =>
-		psp:Rol $buitenRol
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
-	$rolInContext =>
-		psp:Rol $binnenRol
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
 
 psp:Context psp:Rol
-	$externalProperty =>
-		psp:Property $isVerplicht
-			extern $isFunctioneel = true
-			extern $isVerplicht = false
-			$range => psp:Boolean
-	$externalProperty =>
-		psp:Property $isFunctioneel
-			extern $isFunctioneel = true
-			extern $isVerplicht = true
-			$range => psp:Boolean
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			$rolProperty =>
+				psp:Property $isFunctioneel
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+			$rolProperty =>
+				psp:Property $isVerplicht
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		psp:Rol $rolProperty
 			extern $isFunctioneel = false
@@ -130,6 +138,10 @@ psp:Context psp:Rol
 			$mogelijkeBinding => psp:Actie
 
 psp:Context psp:View
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $propertyReferentie
 			extern $isVerplicht = true
@@ -145,6 +157,10 @@ psp:Context psp:View
 -- ACTIES
 --------------------------------------------------------------------------------
 psp:Context psp:Actie
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $subjectView
 			extern $isFunctioneel = true
@@ -169,18 +185,38 @@ psp:Context psp:Actie
 			$mogelijkeBinding => psp:Constraint
 
 psp:Context psp:Werkwoord
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Beheert
 	$aspect => psp:Werkwoord
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Raadpleegt
 	$aspect => psp:Werkwoord
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Creëert
 	$aspect => psp:Werkwoord
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Verwijdert
 	$aspect => psp:Werkwoord
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 
 --------------------------------------------------------------------------------
 -- ZAAK
@@ -200,6 +236,10 @@ psp:Context psp:Zaak
 -- FUNCTION
 --------------------------------------------------------------------------------
 psp:Context psp:Function
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $domain
 			extern $isFunctioneel = true
@@ -215,12 +255,14 @@ psp:Context psp:SingularFunction
 		psp:Rol $range
 			extern $isFunctioneel = true
 			$aspectRol => psp:Function$range
-			-- de typeDefChecker meldt dat $range $mogelijkeBinding mist.
-			-- Die moet uit de aspectRol komen.
-			-- Alle rolInstanties van $range en ook die van zijn $aspectRol.
 
 -- De Unit van Perspectives.
 psp:Context psp:ElkType
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+
 
 psp:Context psp:Constraint
 	$aspect => psp:Function
@@ -234,6 +276,10 @@ psp:Context psp:Constraint
 -- SUM TYPES
 --------------------------------------------------------------------------------
 psp:Context psp:Sum
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $alternative
 			extern $isFunctioneel = false
