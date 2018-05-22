@@ -7,6 +7,7 @@ module Perspectives.ResourceRetrieval
 where
 
 import Prelude
+
 import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
@@ -22,7 +23,7 @@ import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
 import Perspectives.Couchdb.Databases (ensureAuthentication, defaultPerspectRequest)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Identifiers (deconstructNamespace, isQualifiedWithDomein, isUserURI)
+import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein, isUserURI)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
 import Perspectives.User (entitiesDatabase)
 
@@ -33,7 +34,7 @@ fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> Mona
 fetchPerspectEntiteitFromCouchdb id = if isUserURI id
   then fetchEntiteit id
   else if isQualifiedWithDomein id
-    then case deconstructNamespace id of
+    then case deconstructModelName id of
       Nothing -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: Cannot construct namespace out of id " <> id)
       (Just ns) -> do
         ent <- retrieveFromDomein id ns

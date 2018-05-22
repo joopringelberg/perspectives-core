@@ -9,21 +9,30 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (FD, MonadPerspectives, TypeID, TypedTripleGetter, UserMessage(..), ObjectsGetter, tripleObjects, tripleObjects_)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
-import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, guardWellFormedNess)
-import Perspectives.Property (getContextTypeF, getRol, getRolBinding, getRolContext, unlessNull)
+import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, guardWellFormedNess)
+import Perspectives.ModelBasedTripleGetters (aspecten, contextOwnRolTypes, rolPropertyTypes)
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
+import Perspectives.Property (getContextTypeF, getRol, getRolBinding, getRolContext, unlessNull)
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
-import Perspectives.ModelBasedTripleGetters (aspecten, contextOwnRolTypes, rolPropertyTypes)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
+-- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
+-- erft een context interne- of externe properties van aspecten?
+-- checkContextForQualifiedInternalProperty
+-- checkContextForQualifiedExternalProperty
+-- checkContextForUnQualifiedInternalProperty
+-- checkContextForUnQualifiedExternalProperty
+
+-- | `psp:Rol -> psp:Property -> Boolean`
 checkRolForQualifiedProperty :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkRolForQualifiedProperty pn rn = do
-  aspect <- guardWellFormedNess deconstructLocalNameFromDomeinURI pn
-  (&&) <$> checkRolHasAspect rn aspect <*> checkRolHasProperty aspect pn
+  -- Hier stond deconstructLocalNameFromDomeinURI ipv deconstructNamespace.
+  namespaceOfProperty <- guardWellFormedNess deconstructNamespace pn
+  (&&) <$> checkRolHasAspect rn namespaceOfProperty <*> checkRolHasProperty namespaceOfProperty pn
   where
     checkRolHasAspect :: RolName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkRolHasAspect rn' an = (||) <$> an `importsAspect` rn' <*> checkMogelijkeBindingHasAspect rn' an
+    checkRolHasAspect rn' an = (||) <$> rn' `isOrHasAspect` an <*> checkMogelijkeBindingHasAspect rn' an
 
     checkMogelijkeBindingHasAspect :: RolName -> RolName -> MonadPerspectives (AjaxAvarCache e) Boolean
     checkMogelijkeBindingHasAspect rn' an = do

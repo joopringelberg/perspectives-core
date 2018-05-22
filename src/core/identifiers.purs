@@ -2,6 +2,7 @@ module Perspectives.Identifiers
 ( deconstructPrefix
 , deconstructLocalNameFromCurie
 , deconstructLocalNameFromDomeinURI
+, deconstructModelName
 , deconstructNamespace
 , guardWellFormedNess
 , getFirstMatch
@@ -115,12 +116,16 @@ isQualifiedWithDomein s = test domeinURIQualifiedRegex s
 namespaceRegex :: Regex
 namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
 
--- | Returns the Namespace part of an identifier or Nothing.
-deconstructNamespace :: String -> Maybe Namespace
-deconstructNamespace = getFirstMatch namespaceRegex
+-- | Returns the "model:ModelName" part of an identifier or Nothing.
+deconstructModelName :: String -> Maybe Namespace
+deconstructModelName = getFirstMatch namespaceRegex
 
 domeinURIRegex :: Regex
-domeinURIRegex = unsafeRegex "^model:(\\w*).*\\$(\\w*)" noFlags
+domeinURIRegex = unsafeRegex "^(model:\\w*.*)\\$(\\w*)" noFlags
+
+-- | Returns the Namespace part of an identifier or Nothing.
+deconstructNamespace :: String -> Maybe Namespace
+deconstructNamespace = getFirstMatch domeinURIRegex
 
 -- | Returns "localName" from "model:ModelName$localName" or Nothing
 deconstructLocalNameFromDomeinURI :: String -> Maybe String
