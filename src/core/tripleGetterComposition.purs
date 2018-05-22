@@ -24,7 +24,6 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
       (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
       -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
-      -- TODO. Het lijkt me dat dit triple geregistreerd moet worden?!
       pure $ Triple { subject: id
                     , predicate : name
                     , object : objects

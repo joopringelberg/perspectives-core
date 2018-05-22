@@ -1,7 +1,5 @@
 module Perspectives.QueryAST where
 
--- TODO: positie in de oorspronkelijke tekst toevoegen.
-
 import Perspectives.EntiteitAndRDFAliases (ContextID)
 
 -- TODO: positie in de oorspronkelijke tekst toevoegen.

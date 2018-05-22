@@ -168,7 +168,7 @@ context definedResources c = do
           case maybeRol of
             Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
             (Just boundRol@(PerspectRol bindingProperties)) -> do
-              case rol_pspType boundRol == "model:Perspectives$BuitenRol" of
+              case rol_pspType boundRol == "model:Perspectives$Context$buitenRol" of
                 -- boundRol is a BuitenRol of some context.
                 true -> if isInNamespace (context_id c) (rol_context boundRol)
                   -- boundRol is in the namespace of context c

@@ -74,7 +74,7 @@ isContext = QC.notEmpty rolContext
 -- | The context instances that are bound to a rol of the context instance.
 -- | `psp:ContextInstance -> psp:ContextInstance`
 boundContexts :: forall e. TypedTripleGetter e
-boundContexts = (QC.filter (rolHasType "model:Perspectives$BuitenRol") (iedereRolInContext >-> binding)) >-> rolContext
+boundContexts = (QC.filter (rolHasType "model:Perspectives$Context$buitenRol") (iedereRolInContext >-> binding)) >-> rolContext
 
 -- | All properties defined in namespace of the Rol.
 -- | `psp:Rol -> psp:Property`

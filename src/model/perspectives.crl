@@ -61,6 +61,7 @@ psp:Context psp:Context
 			$mogelijkeBinding =>
 				psp:Sum $RolOrContext
 					$alternative => psp:Rol
+					-- Hier moet denk ik een query bij.
 					$alternative => psp:Context
 	$rolInContext =>
 		psp:Rol $interneView
@@ -78,6 +79,14 @@ psp:Context psp:Context
 		psp:Rol $aspect
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
+	$rolInContext =>
+		psp:Rol $buitenRol
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$rolInContext =>
+		psp:Rol $binnenRol
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
 
 psp:Context psp:Rol
 	$externalProperty =>
@@ -119,17 +128,6 @@ psp:Context psp:Rol
 		psp:Rol $subjectRol
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Actie
-
--- This is awkward. These are not roles of model:Perspectives itself, but of
--- psp:Context. However, we do not want to have these roles crop up as if
--- the modeller could instantiate them himself.
-psp:Rol psp:BuitenRol
-	extern $isFunctioneel = true
-	$mogelijkeBinding => psp:ElkType
-
-psp:Rol psp:BinnenRol
-	extern $isFunctioneel = true
-	$mogelijkeBinding => psp:BuitenRol
 
 psp:Context psp:View
 	$rolInContext =>

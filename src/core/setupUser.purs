@@ -39,7 +39,7 @@ contextRecord ns ln tp = defaultContextRecord
   , pspType = tp
   , binnenRol = PerspectRol $ defaultRolRecord
     { _id = ns <> "$" <> ln <> "_BinnenRol"
-    , pspType = "model:Perspectives$BinnenRol"
+    , pspType = "model:Perspectives$Context$binnenRol"
     , binding = binding $ ns <> "$" <> ln <> "_BuitenRol"
     }
   , buitenRol = ns <> "$" <> ln <> "_BuitenRol"
@@ -48,9 +48,9 @@ contextRecord ns ln tp = defaultContextRecord
 rolRecord :: ContextID -> Namespace -> LocalName -> RolRecord
 rolRecord tp ns ln = defaultRolRecord
   { _id = ns <> "$" <> ln <> "_BuitenRol"
-  , pspType = "model:Perspectives$BuitenRol"
+  , pspType = "model:Perspectives$Context$buitenRol"
   , context = ns <> "$" <> ln
   }
 
 buitenRolRecord :: Namespace -> LocalName -> RolRecord
-buitenRolRecord = rolRecord "model:Perspectives$BuitenRol"
+buitenRolRecord = rolRecord "model:Perspectives$Context$buitenRol"
