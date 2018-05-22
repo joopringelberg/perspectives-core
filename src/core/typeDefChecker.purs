@@ -1,7 +1,9 @@
-module Perspectives.TypeDefChecker (checkContext, checkModel)
+module Perspectives.TypeDefChecker (checkContext, checkModel, getPropertyFunction)
 
 where
 
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Data.Argonaut.Core (fromString)
 import Data.Argonaut.Decode (decodeJson)
@@ -13,21 +15,26 @@ import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (importsAspect, hasType)
-import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), tripleGetter2function, tripleObject, tripleObjects, (@@))
+import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleGetter2function, tripleObject, tripleObjects, (@@))
+import Perspectives.DataTypeTripleGetters (binding, contextType, rolContext, rolTypen)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.Property (getInternePropertyTypen, getPropertyTypen, getRolUsingAspects)
-import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.QueryCombinators (toBoolean)
-import Perspectives.QueryCompiler (propertyQuery)
-import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
 import Perspectives.ModelBasedTripleGetters (aspect, aspectRol, aspecten, contextExternePropertyTypes, contextInternePropertyTypes, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextRolTypes, contextTypeOfRolType, isFunctionalProperty, mogelijkeBinding, propertyIsVerplicht, range, rolIsVerplicht, rolPropertyTypes)
-import Perspectives.DataTypeTripleGetters (binding, contextType, rolContext, rolTypen)
+import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolUsingAspects)
+import Perspectives.ObjectsGetterComposition ((/-/))
+import Perspectives.Property (getBuitenRol)
+import Perspectives.QueryAST (ElementaryQueryStep(..))
+import Perspectives.QueryCombinators (toBoolean)
+import Perspectives.QueryCompiler (constructQueryFunction)
+import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
+import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
+import Perspectives.SystemObjectGetters (getInternePropertyTypen, getPropertyTypen, getRolTypeF)
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, const, discard, ifM, pure, unit, void, ($), (<<<), (>>=), (<))
+import Prelude (Unit, bind, const, discard, ifM, pure, show, unit, void, ($), (<), (<<<), (<>), (>>=))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery e)
 
@@ -40,6 +47,7 @@ checkModel modelId = runMonadPerspectivesQuery modelId checkAllContexts
       for_ (keys contexts) checkContext'
 
 
+-- | `psp:ContextInstance -> psp:ElkType`
 checkContext :: forall e. ContextID -> MP e (Array UserMessage)
 checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContext' x
 
@@ -66,6 +74,8 @@ checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) 
 checkProperties typeId cid = do
   void $ (typeId ~> contextOwnInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
 
+  -- TODO. De buitenrol (zijn type) is niet de drager van de properties die met
+  -- contextOwnExternePropertyTypes gevonden worden!
   void $ (typeId ~> contextOwnExternePropertyTypes) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
 
   (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## contextExternePropertyTypes)
@@ -121,18 +131,26 @@ checkAvailableProperties rolId contextId availableProperties definedProperties =
 --  * if the property is functional, not more than one value may be present.
 -- `psp:ContextInstance -> psp:Property -> psp:ElkType`
 checkInternalProperty :: forall e. ContextID -> TypeID -> TDChecker e Unit
+-- TODO: schrijf deze functie!
 checkInternalProperty cid propertyType = pure unit
 
 -- | If the Property is mandatory and missing, adds a message.
 -- | Checks the value of the Property with the range that has been defined.
 -- | If the Property is functional and more than one value has been given, adds a message.
--- | `psp:ContextInstance -> psp:BuitenRolInstance -> psp:Property -> psp:ElkType`
+-- | `psp:ContextInstance -> psp:RolInstance -> psp:Property -> psp:ElkType`
 comparePropertyInstanceToDefinition :: forall e. ContextID -> RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 comparePropertyInstanceToDefinition cid rid propertyType = do
-  propertyGetter <- lift $ propertyQuery propertyType rid
+  rolType <- lift $ lift $ getRolTypeF rid
+  -- TODO: eerst stond hier een eenvoudig propertyGetter. Dat werkte.
+  -- Maar getPropertyFunction probeert een definitie voor de property
+  -- op het roltype te vinden. En dat mislukt voor externe en interne properties.
+  -- (MissingQualifiedProperty) Er is geen definitie voor de property 'model:Perspectives$Rol$isVerplicht' voor de rol 'model:Perspectives$Context$buitenRol'.
+  -- Nee, maar er is wel een externe property isVerplicht voor psp:Rol.
+  (propertyGetter :: TypedTripleGetter e) <- lift $ lift $ getPropertyFunction propertyType rolType
   (Triple {object}) <- lift (rid @@ propertyGetter)
+  pure unit
   case head object of
-    Nothing -> ifM (lift (propertyIsMandatory propertyType))
+    Nothing -> ifM (lift $ propertyIsMandatory propertyType)
       (tell [MissingPropertyValue cid propertyType rid])
       (pure unit)
     (Just propertyValue) -> do
@@ -149,6 +167,7 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
           (pure unit)
 
   where
+
     tryParseSimpleValue :: TypeID -> String -> TDChecker (AjaxAvarCache e) Boolean
     tryParseSimpleValue sv propertyValue = case sv of
       "model:Perspectives$Number" -> pure $ maybe false (const true) (Nmb.fromString propertyValue)
@@ -161,6 +180,24 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
           (Left err :: Either String ISO) -> pure false
           (Right iso :: Either String ISO) -> pure true
       otherwise -> pure true
+
+-- Returns a getter, lookup function or compiled query.
+-- `Property -> Rol -> (RolInstance -> PropertyValue)`
+getPropertyFunction :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+getPropertyFunction pn rn = do
+  queryStep <- do
+    isInternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$internalProperty") pn
+    case head isInternal of
+      Nothing -> do
+        isExternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$externalProperty") pn
+        case head isExternal of
+          Nothing -> pure QualifiedProperty
+          otherwise -> pure QualifiedExternalProperty
+      otherwise -> pure QualifiedInternalProperty
+  r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (queryStep pn) (pn <> "_getter"))
+  case r of
+    (Left m) -> throwError $ error $ show m
+    (Right descriptionId) -> constructQueryFunction descriptionId
 
 -- | For this Rol (definition), looks for an instance of it in the ContextInstance.
 -- | Compares that RolInstance to its definition:

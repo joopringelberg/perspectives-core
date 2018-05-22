@@ -8,7 +8,7 @@ import Control.Monad.Trans.Class (lift)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.SystemQueries (iedereRolInContext)
+import Perspectives.DataTypeTripleGetters (iedereRolInContext)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do

@@ -56,7 +56,7 @@ constructTripleGetter :: forall e.
   (String -> ObjectsGetter e) ->
   PropertyName ->
   TypedTripleGetter e
-constructTripleGetter objectsGetter pn = constructTripleGetterFromObjectsGetter pn $ objectsGetter pn
+constructTripleGetter objectsGetterConstructor pn = constructTripleGetterFromObjectsGetter pn $ objectsGetterConstructor pn
 
 constructExternalPropertyGetter :: forall e.
   PropertyName ->

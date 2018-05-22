@@ -1,6 +1,6 @@
 module Test.QueryEffects where
 
-import Perspectives.SystemQueries
+import Perspectives.DataTypeTripleGetters (label) 
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)

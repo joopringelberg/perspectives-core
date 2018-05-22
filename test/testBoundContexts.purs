@@ -6,9 +6,10 @@ import Control.Monad.Trans.Class (lift)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.PropertyComposition ((>->))
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (filter)
-import Perspectives.SystemQueries (binding, boundContexts, hasBinding, iedereRolInContext)
+import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext)
+import Perspectives.ModelBasedTripleGetters (boundContexts, hasBinding)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 
 rolDef :: String

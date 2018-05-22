@@ -6,13 +6,25 @@ import Control.Alt ((<|>))
 import Control.Monad.Aff.Console (CONSOLE, logShow)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
+import Data.Array (head)
 import Data.Foldable (for_)
-import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
+import Data.Maybe (Maybe)
+import Perpectives.TypeChecker (checkRolForQualifiedProperty, hasType, isOrHasAspect)
+import Perspectives.ContextRolAccessors (firstOnly)
+import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Property (getRol, getRolUsingAspects)
-import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.SystemQueries (contextTypeOfRolType)
-import Perspectives.TypeDefChecker (checkModel)
+import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace)
+import Perspectives.ModelBasedTripleGetters (contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextTypeOfRolType, rolOwnPropertyTypes, rolPropertyTypes)
+import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolByLocalName)
+import Perspectives.ObjectsGetterComposition ((/-/))
+import Perspectives.QueryAST (ElementaryQueryStep(..))
+import Perspectives.QueryCombinators (contains, toBoolean)
+import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
+import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
+import Perspectives.Syntax (PerspectContext(..))
+import Perspectives.SystemObjectGetters (getBuitenRol, getRolBinding, getRolContext)
+import Perspectives.TypeDefChecker (checkContext, checkModel, getPropertyFunction)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
@@ -58,9 +70,59 @@ test = do
   -- messages14 <- checkContext "model:Test$ViewMetAspectRol"
   -- lift $ for_ messages14 logShow
 
-  messages15 <- checkModel "model:Perspectives"
-  lift $ for_ messages15 logShow
+  -- messages15 <- checkModel "model:Perspectives"
+  -- lift $ for_ messages15 logShow
 
+  -- b <- "model:Perspectives$BuitenRol" `isOrHasAspect` "model:Perspectives$Rol"
+  -- lift $ logShow b
+
+  -- context "model:Perspectives$Context$externalProperty_buitenRol"
+
+  -- pts <- "model:Perspectives$Rol" ## contextOwnExternePropertyTypes
+  -- lift $ logShow pts
+
+  let pn = "model:Perspectives$Rol$isVerplicht"
+  let rn = "model:Perspectives$Rol"
+  --
+  r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedExternalProperty pn) (pn <> "_getter"))
+  lift $ logShow r
+  --
+  -- x <- firstOnly (getRolByLocalName "property" /-/ getRolBinding /-/ getRolContext) "model:Perspectives$View$propertyReferentie$volgNummer_getter"
+  -- lift $ logShow x
+  --
+  -- _ <- getPropertyFunction pn rn
+  -- pure unit
+
+  -- isExternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$externalProperty") pn
+  -- lift $ logShow $ head isExternal
+
+  -- (y :: Maybe PerspectContext) <- getPerspectEntiteit "model:Perspectives$View$propertyReferentie$volgNummer_getter"
+  -- lift $ logShow y
+
+
+  -- b <- checkRolForQualifiedProperty pn rn
+  -- lift $ logShow b
+
+  -- b <- runMonadPerspectivesQuery rn (toBoolean (contains pn rolPropertyTypes))
+  -- lift $ logShow b
+
+  -- b <- rn ## rolPropertyTypes
+  -- lift $ logShow b
+  --
+  -- props <- rn ## rolOwnPropertyTypes
+  -- lift $ logShow props
+
+  -- b <- rn `isOrHasAspect` "model:Perspectives$Rol"
+  -- lift $ logShow b
+  -- -- true
+
+  -- ln <- pure $ deconstructLocalNameFromDomeinURI pn
+  -- lift $ logShow ln
+  --  (Just "isVerplicht")
+
+  -- ln <- pure $ deconstructNamespace pn
+  -- lift $ logShow ln
+  -- --  (Just "model:Perspectives$Rol")
 
   -- (lift $ logShow ["noot"]) *> empty <|> (lift $ logShow ["aap"])
 
