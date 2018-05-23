@@ -189,8 +189,8 @@ contextDef = buitenRol >-> constructInverseRolGetter "model:Perspectives$Context
 
 -- | `psp:Context -> psp:RolInstance`
 buitenRolBeschrijving :: forall e. TypedTripleGetter e
-buitenRolBeschrijving = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenBeschrijving" getBuitenRolBeschrijving
+buitenRolBeschrijving = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRolBeschrijving" getBuitenRolBeschrijving
 
 -- | `psp:Context -> psp:RolInstance`
 binnenRolBeschrijving :: forall e. TypedTripleGetter e
-binnenRolBeschrijving = constructTripleGetterFromObjectsGetter "model:Perspectives$binnenBeschrijving" getBinnenRolBeschrijving
+binnenRolBeschrijving = constructTripleGetterFromObjectsGetter "model:Perspectives$binnenRolBeschrijving" getBinnenRolBeschrijving

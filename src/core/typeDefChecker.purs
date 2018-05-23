@@ -176,11 +176,11 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
 -- `Property -> Rol -> (RolInstance -> PropertyValue)`
 getPropertyFunction :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
 getPropertyFunction pn rn = do
-  queryStep <- pure $ case deconstructLocalNameFromDomeinURI rn of
-    (Just "binnenRolBeschrijving") -> QualifiedInternalProperty
-    (Just "buitenRolBeschrijving") -> QualifiedExternalProperty
-    otherwise -> QualifiedProperty
-  r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (queryStep pn) (pn <> "_getter"))
+  -- queryStep <- pure $ case deconstructLocalNameFromDomeinURI rn of
+  --   (Just "binnenRolBeschrijving") -> QualifiedInternalProperty
+  --   (Just "buitenRolBeschrijving") -> QualifiedExternalProperty
+  --   otherwise -> QualifiedProperty
+  r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
   case r of
     (Left m) -> throwError $ error $ show m
     (Right descriptionId) -> constructQueryFunction descriptionId
