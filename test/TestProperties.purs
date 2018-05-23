@@ -7,8 +7,8 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
-import Perspectives.DataTypeTripleGetters (binding, buitenRol, contextType, label, rolContext, iedereRolInContext, rolType, rolTypen, identity)
-import Perspectives.ModelBasedTripleGetters (hasBinding, hasLabel, rolIsVerplicht, range)
+import Perspectives.DataTypeTripleGetters (binding, buitenRol, contextType, label, context, iedereRolInContext, rolType, typeVanIedereRolInContext, identity)
+import Perspectives.ModelBasedTripleGetters (hasBinding, hasLabel, rolIsVerplicht, rangeDef)
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 import Test.TestEffects (CancelerEffects)
@@ -34,20 +34,20 @@ test = do
   l2 <-  rolDef ## iedereRolInContext >-> binding
   log ( " rolDef ## iedereRolInContext >-> binding = " <> (show l2))
 
-  l3 <-  rolDef ## iedereRolInContext >-> binding >-> rolContext
-  log ( " rolDef ## iedereRolInContext >-> binding >-> rolContext = " <> (show l3))
+  l3 <-  rolDef ## iedereRolInContext >-> binding >-> context
+  log ( " rolDef ## iedereRolInContext >-> binding >-> context = " <> (show l3))
 
   l4 <-  rolDef ## iedereRolInContext >-> identity
   log ( " rolDef ## iedereRolInContext >-> identity = " <> (show l4))
 
-  l5 <-  rolDef ## iedereRolInContext >-> binding >-> rolContext >-> contextType
+  l5 <-  rolDef ## iedereRolInContext >-> binding >-> context >-> contextType
   log ( " rolDef ## iedereRolInContext >-> identity >-> contextType = " <> (show l5))
 
   l6 <-  rolDef ## buitenRol
   log ( " rolDef ## buitenRol = " <> (show l6))
 
-  l7 <-  rolDef ## rolTypen
-  log ( " rolDef ## rolTypen = " <> (show l7))
+  l7 <-  rolDef ## typeVanIedereRolInContext
+  log ( " rolDef ## typeVanIedereRolInContext = " <> (show l7))
 
   l8 <-  rolDef ## iedereRolInContext >-> rolType
   log ( " rolDef ## iedereRolInContext >-> rolType = " <> (show l8))
@@ -58,8 +58,8 @@ test = do
   l10 <-  rolDef ## label
   log ( " rolDef ## label = " <> (show l10))
 
-  l11 <-  rolIsVerplichtDef ## range
-  log ( " rolIsVerplichtDef ## range = " <> (show l11))
+  l11 <-  rolIsVerplichtDef ## rangeDef
+  log ( " rolIsVerplichtDef ## rangeDef = " <> (show l11))
 
   l12 <-  rolDef ## hasLabel
   log ( " rolDef ## hasLabel = " <> (show l12))
@@ -68,8 +68,8 @@ test = do
   log ( " viewDef ## iedereRolInContext >-> hasBinding = " <> (show l13))
 
   log "========================= TESTING TO DEBUG MODEL LOADING ================================"
-  l14 <- psp ## rolTypen
-  log ( "psp ## rolTypen = " <> show l14)
+  l14 <- psp ## typeVanIedereRolInContext
+  log ( "psp ## typeVanIedereRolInContext = " <> show l14)
 
   l15 <- psp ## ignoreCache (constructRolGetter "model:Perspectives$rolInContext")
   log ( "psp ## (constructRolGetter 'model:Perspectives$rolInContext') = " <> show l15)

@@ -22,10 +22,8 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI)
-import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspecten, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneel, bindingDef, propertyIsVerplicht, rangeDef, rolIsVerplicht, propertyDef)
-import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolUsingAspects)
-import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.Property (getBuitenRol)
+import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneel, bindingDef, propertyIsVerplicht, rangeDef, rolIsVerplicht, propertyDef)
+import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (constructQueryFunction)
@@ -245,7 +243,7 @@ checkAspectOfRolType cid = do
 -- | `psp:ContextInstance -> psp:ElkType`
 checkCyclicAspects :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkCyclicAspects cid = do
-  (Triple {object: aspects}) <- lift $ lift (cid ## aspecten)
+  (Triple {object: aspects}) <- lift $ lift (cid ## aspectDefClosure)
   case elemIndex cid aspects of
     Nothing -> pure unit
     otherwise -> tell [CycleInAspects cid aspects]

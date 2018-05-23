@@ -14,7 +14,7 @@ import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace)
-import Perspectives.ModelBasedTripleGetters (boundContexts, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextTypeOfRolType, rolOwnPropertyTypes, rolPropertyTypes)
+import Perspectives.ModelBasedTripleGetters (boundContexts, ownExternePropertyDef, ownInternePropertyDef, contextDef, ownPropertyDef, propertyDef)
 import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolByLocalName)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryAST (ElementaryQueryStep(..))
@@ -83,7 +83,7 @@ test = do
 
   -- context "model:Perspectives$Context$externalProperty_buitenRol"
 
-  -- pts <- "model:Perspectives$Rol" ## contextOwnExternePropertyTypes
+  -- pts <- "model:Perspectives$Rol" ## ownExternePropertyDef
   -- lift $ logShow pts
 
   -- let pn = "model:Perspectives$Rol$buitenRol$isVerplicht"
@@ -108,13 +108,13 @@ test = do
   -- b <- checkRolForQualifiedProperty pn rn
   -- lift $ logShow b
 
-  -- b <- runMonadPerspectivesQuery rn (toBoolean (contains pn rolPropertyTypes))
+  -- b <- runMonadPerspectivesQuery rn (toBoolean (contains pn propertyDef))
   -- lift $ logShow b
 
-  -- b <- rn ## rolPropertyTypes
+  -- b <- rn ## propertyDef
   -- lift $ logShow b
   --
-  -- props <- rn ## rolOwnPropertyTypes
+  -- props <- rn ## ownPropertyDef
   -- lift $ logShow props
 
   -- b <- rn `isOrHasAspect` "model:Perspectives$Rol"
@@ -131,7 +131,7 @@ test = do
 
   -- (lift $ logShow ["noot"]) *> empty <|> (lift $ logShow ["aap"])
 
-  -- t <- "model:Perspectives$Rol" ## contextTypeOfRolType
+  -- t <- "model:Perspectives$Rol" ## contextDef
   -- lift $ logShow (tripleObjects t)
 
   -- t <- getRolUsingAspects "model:Perspectives$Rol$mogelijkeBinding" "model:Perspectives$SingularFunction$range"
