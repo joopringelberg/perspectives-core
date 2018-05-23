@@ -74,8 +74,6 @@ checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) 
 checkProperties typeId cid = do
   void $ (typeId ~> contextOwnInternePropertyTypes) >>= (traverse (checkInternalProperty cid))
 
-  -- TODO. De buitenrol (zijn type) is niet de drager van de properties die met
-  -- contextOwnExternePropertyTypes gevonden worden!
   void $ (typeId ~> contextOwnExternePropertyTypes) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
 
   (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## contextExternePropertyTypes)

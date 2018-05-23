@@ -2,7 +2,7 @@ module Perspectives.ModelBasedTripleGetters where
 
 import Perspectives.CoreTypes (TypedTripleGetter)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, rolContext, buitenRol)
-import Perspectives.ModelBasedObjectGetters (getBuitenRolBeschrijving)
+import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving)
 import Perspectives.Property (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
 import Perspectives.TripleGetterComposition ((>->), (>->>))
@@ -111,7 +111,7 @@ contextRolTypes = QC.concat
 -- | All properties defined on the BinnenRol of a Context type.
 -- | `psp:Context -> psp:Property`
 contextOwnInternePropertyTypes :: forall e. TypedTripleGetter e
-contextOwnInternePropertyTypes = constructRolGetter "model:Perspectives$Context$internalProperty" >-> binding >-> rolContext
+contextOwnInternePropertyTypes = binnenRolBeschrijving >-> binding >-> rolContext >-> rolPropertyTypes
 
 -- | All properties defined on the BinnenRol of a Context type (own and derived from Aspects).
 -- | `psp:Context -> psp:Property`
@@ -125,7 +125,7 @@ contextInternePropertyTypes = QC.concat
 -- | `psp:Context -> psp:Property`
 contextOwnExternePropertyTypes :: forall e. TypedTripleGetter e
 -- Neem psp:Context$buitenRol van het contexttype. Neem daarvan de rolProperties (en daarvan de binding en daarvan de rolContext).
-contextOwnExternePropertyTypes = buitenRolBeschrijving >-> binding >-> rolContext
+contextOwnExternePropertyTypes = buitenRolBeschrijving >-> binding >-> rolContext >-> rolPropertyTypes
 
 -- | All properties defined on the BuitenRol of a Context type (own and derived from Aspects).
 -- | `psp:Context -> psp:Property`
@@ -165,6 +165,7 @@ aspectRollen = QC.closure aspectRol
 aspecten :: forall e. TypedTripleGetter e
 aspecten = QC.closure aspect
 
+-- TODO. Deze query wordt niet gebruikt. Ik twijfel ook aan zijn betekenis!
 -- | All RolInstances of a Rol (definition), including those inherited from its rolAspect.
 -- | `psp:Rol -> psp:RolInstance`
 -- TODO: als we overschrijven toestaan, kunnen hier duplicaten inzitten...
@@ -200,3 +201,7 @@ contextTypeOfRolType = buitenRol >-> constructInverseRolGetter "model:Perspectiv
 -- | `psp:Context -> psp:RolInstance`
 buitenRolBeschrijving :: forall e. TypedTripleGetter e
 buitenRolBeschrijving = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenBeschrijving" getBuitenRolBeschrijving
+
+-- | `psp:Context -> psp:RolInstance`
+binnenRolBeschrijving :: forall e. TypedTripleGetter e
+binnenRolBeschrijving = constructTripleGetterFromObjectsGetter "model:Perspectives$binnenBeschrijving" getBinnenRolBeschrijving

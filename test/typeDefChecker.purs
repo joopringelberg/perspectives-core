@@ -14,7 +14,7 @@ import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace)
-import Perspectives.ModelBasedTripleGetters (contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextTypeOfRolType, rolOwnPropertyTypes, rolPropertyTypes)
+import Perspectives.ModelBasedTripleGetters (boundContexts, contextOwnExternePropertyTypes, contextOwnInternePropertyTypes, contextTypeOfRolType, rolOwnPropertyTypes, rolPropertyTypes)
 import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolByLocalName)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryAST (ElementaryQueryStep(..))
@@ -70,8 +70,13 @@ test = do
   -- messages14 <- checkContext "model:Test$ViewMetAspectRol"
   -- lift $ for_ messages14 logShow
 
-  -- messages15 <- checkModel "model:Perspectives"
-  -- lift $ for_ messages15 logShow
+  messages15 <- checkModel "model:Perspectives"
+  lift $ for_ messages15 logShow
+
+   -- bc <- "model:Perspectives" ## boundContexts
+   -- lift $ logShow bc
+   --
+   -- rt <- getRolType
 
   -- b <- "model:Perspectives$BuitenRol" `isOrHasAspect` "model:Perspectives$Rol"
   -- lift $ logShow b
@@ -81,11 +86,11 @@ test = do
   -- pts <- "model:Perspectives$Rol" ## contextOwnExternePropertyTypes
   -- lift $ logShow pts
 
-  let pn = "model:Perspectives$Rol$isVerplicht"
-  let rn = "model:Perspectives$Rol"
+  -- let pn = "model:Perspectives$Rol$buitenRol$isVerplicht"
+  -- let rn = "model:Perspectives$Rol$buitenRol"
   --
-  r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedExternalProperty pn) (pn <> "_getter"))
-  lift $ logShow r
+  -- r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedExternalProperty pn) (pn <> "_getter"))
+  -- lift $ logShow r
   --
   -- x <- firstOnly (getRolByLocalName "property" /-/ getRolBinding /-/ getRolContext) "model:Perspectives$View$propertyReferentie$volgNummer_getter"
   -- lift $ logShow x

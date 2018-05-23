@@ -35,3 +35,9 @@ range = getRol "model:Perspectives$Property$range" /-/ getRolBinding /-/ getRolC
 -- | `psp:Context -> psp:RolInstance`
 getBuitenRolBeschrijving :: forall e. ObjectsGetter e
 getBuitenRolBeschrijving = getRol "model:Perspectives$Context$buitenRolBeschrijving"
+
+-- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
+-- | are defined on that Rol.
+-- | `psp:Context -> psp:RolInstance`
+getBinnenRolBeschrijving :: forall e. ObjectsGetter e
+getBinnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijving"
