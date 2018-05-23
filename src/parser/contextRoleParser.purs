@@ -3,7 +3,7 @@ module Perspectives.ContextRoleParser where
 import Perspectives.EntiteitAndRDFAliases
 
 import Control.Alt (void, (<|>))
-import Control.Monad.Aff (forkAff)
+import Control.Monad.Aff (catchError, forkAff)
 import Control.Monad.Aff.AVar (AVar, putVar, takeVar)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
@@ -12,16 +12,18 @@ import Data.Array (dropEnd, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Tuple (Tuple(..))
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedNamespace, withExtendedTypeNamespace, withTypeNamespace)
-import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, ensureInternalRepresentation)
+import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, ensureInternalRepresentation, retrieveInternally)
+import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
@@ -351,9 +353,18 @@ roleBinding' cname p = ("rolename => contextName" <??>
 
 -- Ensure we have an AVar for the RolInstance that is represented by bindng.
 -- Take the Rol out of that AVar in a Forked Aff and add rolId to its gevuldeRollen.
-vultRol :: forall eff. RolID -> RolName -> RolID -> MonadPerspectives (AvarCache eff) Unit
+vultRol :: forall eff. RolID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache eff) Unit
 vultRol vuller rolName gevuldeRol = do
-  (av :: AVar PerspectRol) <- ensureInternalRepresentation vuller
+  (av :: AVar PerspectRol) <- catchError
+    -- First, try to retrieve the Rol from its domein.
+    do
+      (_ :: Maybe PerspectRol) <- getPerspectEntiteit vuller
+      -- By now, either we have an error, or there is an AVar available.
+      mv <- retrieveInternally vuller
+      pure $ unsafePartial $ fromJust $ mv
+    -- Otherwise, create the AVar and trust it will be filled by the parser.
+    \_ -> ensureInternalRepresentation vuller
+
   lift $ void $ forkAff do
     vullerRol <- takeVar av
     putVar (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
