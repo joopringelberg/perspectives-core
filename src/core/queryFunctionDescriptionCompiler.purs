@@ -19,7 +19,7 @@ import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromD
 import Perspectives.ModelBasedTripleGetters (ownRolDef, bindingDef)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
-import Perspectives.Property (getRol)
+import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)

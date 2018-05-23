@@ -3,7 +3,7 @@ module Perspectives.ModelBasedTripleGetters where
 import Perspectives.CoreTypes (TypedTripleGetter)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, buitenRol)
 import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving)
-import Perspectives.Property (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
+import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
 import Perspectives.TripleGetterComposition ((>->), (>->>))
 import Perspectives.TripleGetterConstructors (constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter, rolHasTypeWithLocalName)

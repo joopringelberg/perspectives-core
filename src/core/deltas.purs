@@ -35,7 +35,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, contextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneel, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.Property (getRolBinding, getRolContext, makeFunction)
+import Perspectives.SystemObjectGetters (getRolBinding, getRolContext, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
