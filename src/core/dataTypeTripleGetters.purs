@@ -18,6 +18,11 @@ identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" 
 contextType :: forall e. TypedTripleGetter e
 contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
 
+-- | The type of the rol instance.
+-- | `psp:RolInstance -> psp:Rol`
+rolType :: forall e. TypedTripleGetter e
+rolType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getRolType
+
 -- | `psp:ContextInstance -> psp:BuitenRol`
 buitenRol :: forall e. TypedTripleGetter e
 buitenRol = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRol" getBuitenRol
@@ -30,13 +35,8 @@ iedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives
 -- | The types of the rol instances given to this context instance. Note: non-mandatory
 -- | Rol types defined for the Context type may be missing!
 -- | `psp:ContextInstance -> psp:Rol`
-rolTypen :: forall e. TypedTripleGetter e
-rolTypen =  constructTripleGetterFromObjectsGetter "model:Perspectives$rolTypen" getRolTypen
-
--- | The type of the rol instance.
--- | `psp:RolInstance -> psp:Rol`
-rolType :: forall e. TypedTripleGetter e
-rolType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getRolType
+typeVanIedereRolInContext :: forall e. TypedTripleGetter e
+typeVanIedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives$typeVanIedereRolInContext" getRolTypen
 
 -- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
 -- | `psp:RolInstance -> psp:RolInstance`
@@ -45,8 +45,8 @@ binding = constructTripleGetterFromObjectsGetter "model:Perspectives$binding" ge
 
 -- | The context instance of the rol instance.
 -- | `psp:RolInstance -> psp:ContextInstance`
-rolContext :: forall e. TypedTripleGetter e
-rolContext = constructTripleGetterFromObjectsGetter "model:Perspectives$context" getRolContext
+context :: forall e. TypedTripleGetter e
+context = constructTripleGetterFromObjectsGetter "model:Perspectives$context" getRolContext
 
 -- | The string that labels the context instance.
 -- | `psp:ContextInstance -> psp:String`

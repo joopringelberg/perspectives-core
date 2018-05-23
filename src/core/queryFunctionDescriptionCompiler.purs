@@ -16,7 +16,7 @@ import Perspectives.DataTypeTripleGetters (contextType, rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
-import Perspectives.ModelBasedTripleGetters (contextOwnRolTypes, mogelijkeBinding)
+import Perspectives.ModelBasedTripleGetters (ownRolDef, bindingDef)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Property (getRol)
@@ -46,7 +46,7 @@ compileElementaryQueryStep s contextId = case s of
   Binding -> ensureAspect (psp "Rol")
     do
       dom <- getQueryStepDomain
-      ifNothing (lift $ runMonadPerspectivesQuery dom (tripleGetter2function mogelijkeBinding))
+      ifNothing (lift $ runMonadPerspectivesQuery dom (tripleGetter2function bindingDef))
         (pure $ Left $ MissingMogelijkeBinding dom)
         \bindingType -> do
           putQueryStepDomain bindingType
@@ -75,14 +75,14 @@ compileElementaryQueryStep s contextId = case s of
   IedereRolInContext -> ensureAspect (psp "Context")
     do
       dom <- getQueryStepDomain
-      tps <- lift (dom ## contextOwnRolTypes)
+      tps <- lift (dom ## ownRolDef)
       sumtype <- createSumType $ tripleObjects tps
       putQueryStepDomain sumtype
       createContextWithSingleRole contextId (q "iedereRolInContext") dom
   RolTypen -> ensureAspect (psp "Context")
     do
-      getQueryStepDomain >>= lift <<< runTypedTripleGetter contextOwnRolTypes >>= pure <<< tripleObjects >>= lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
-      parameterlessQueryFunction contextId (q "rolTypen")
+      getQueryStepDomain >>= lift <<< runTypedTripleGetter ownRolDef >>= pure <<< tripleObjects >>= lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
+      parameterlessQueryFunction contextId (q "typeVanIedereRolInContext")
   Label -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "String") *> parameterlessQueryFunction contextId (q "label"))
   QualifiedProperty p -> do

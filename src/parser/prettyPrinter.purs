@@ -23,7 +23,7 @@ import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Perspectives.DataTypeTripleGetters (binding, rolContext, rolTypen)
+import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
@@ -204,7 +204,7 @@ enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
   withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
   newline
-  sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache rolTypen))
+  sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache DTG.typeVanIedereRolInContext))
   traverse_ section (tripleObjects sectionIds)
 
   where
@@ -214,8 +214,8 @@ enclosingContext theText = do
       identifier sectionId
       newline
       newline
-      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> binding >-> rolContext)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.binding)) -- These are all a buitenRol.
+      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.binding >-> DTG.context)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     ppContext :: Array ID -> ID -> PerspectText e

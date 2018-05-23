@@ -45,7 +45,7 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
 -- | Construct a memorizing triple getter from an arbitrary ObjectsGetter. This function is used, a.o.,
 -- | to construct getters for the properties of contexts and roles that are not roles or properties, such as
 -- | psp:type, psp:binding, psp:label and psp:context. Furthermore, for psp:identity, psp:buitenRol, psp:binnenRol,
--- | psp:iedereRolInContext and psp:rolTypen.
+-- | psp:iedereRolInContext and psp:typeVanIedereRolInContext.
 constructTripleGetterFromObjectsGetter :: forall e.
   PropertyName ->
   ObjectsGetter e ->
