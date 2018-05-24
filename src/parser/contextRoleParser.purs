@@ -22,6 +22,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedNamespace, withExtendedTypeNamespace, withTypeNamespace)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijving)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, ensureInternalRepresentation, retrieveInternally)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
@@ -422,8 +423,8 @@ context = withRoleCounting context' where
         withTypeNamespace (show typeName)
           do
             -- Parsing the body
-            (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block publicContextPropertyAssignment))
-            (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> (block privateContextPropertyAssignment))
+            (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment))
+            (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment))
             (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
             -- Storing
@@ -536,8 +537,8 @@ enclosingContext = withRoleCounting enclosingContext' where
       -- TODO dit kan ook een ModelName zijn!
       (EnclosingContextDeclaration textName cmt) <- enclosingContextDeclaration
       _ <- AR.many importExpression
-      (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block publicContextPropertyAssignment)
-      (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- (block privateContextPropertyAssignment)
+      (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment)
+      (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment)
       defs <- AR.many section
       liftAffToIP $ cacheEntiteitPreservingVersion textName
         (PerspectContext defaultContextRecord

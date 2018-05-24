@@ -28,6 +28,7 @@ makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no val
 getContextType :: forall e. ObjectsGetter e
 getContextType = getContextMember \context -> [context_pspType context]
 
+-- | `psp:ContextInstance -> psp:Context`
 getContextTypeF :: forall e. ObjectGetter e
 getContextTypeF = makeFunction "getContextTypeF" getContextType
 

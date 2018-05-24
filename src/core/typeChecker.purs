@@ -11,11 +11,11 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, guardWellFormedNess)
 import Perspectives.ModelBasedTripleGetters (aspectDefClosure, ownRolDef, propertyDef)
-import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
-import Perspectives.SystemObjectGetters (getContextTypeF, getRolBinding, getRolContext)
 import Perspectives.ObjectGetterConstructors (getRol, unlessNull)
+import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
+import Perspectives.SystemObjectGetters (getContextTypeF, getRolBinding, getRolContext, getRolTypeF)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
@@ -131,9 +131,16 @@ importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
   then pure true
   else (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspectDefClosure)) tp
 
-hasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
-hasType binding mogelijkeBinding = do
+-- | `psp:ContextInstance -> psp:Rol -> Boolean`
+contextHasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
+contextHasType binding mogelijkeBinding = do
   typeOfBinding <- getContextTypeF binding
+  typeOfBinding `isOrHasAspect` mogelijkeBinding
+
+-- | `psp:ContextInstance -> psp:Rol -> Boolean`
+rolHasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
+rolHasType binding mogelijkeBinding = do
+  typeOfBinding <- getRolTypeF binding
   typeOfBinding `isOrHasAspect` mogelijkeBinding
 
 mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID

@@ -66,7 +66,6 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   retrieveFromDomein = retrieveRolFromDomein
   cacheInDomeinFile ns c = modifyDomeinFileInCache ns (addRolToDomeinFile c)
 
-
 ensureInternalRepresentation :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AvarCache e) (AVar a)
 ensureInternalRepresentation c = do
     mav <- retrieveInternally c
