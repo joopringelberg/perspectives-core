@@ -236,6 +236,7 @@ psp:Context psp:Zaak
 -- FUNCTION
 --------------------------------------------------------------------------------
 psp:Context psp:Function
+	$aspect => psp:Context
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>

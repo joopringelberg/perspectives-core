@@ -100,13 +100,14 @@ checkDefinedRoles typeId cid = do
 checkAvailableRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkAvailableRoles typeId cid = do
   (Triple{object: availableRoles}) <- lift (cid @@ typeVanIedereRolInContext)
-  for_ availableRoles (isDefined typeId)
+  for_ availableRoles isDefined
   where
-    isDefined :: RolName -> RolName -> TDChecker (AjaxAvarCache e) Unit
-    isDefined contextType rolType = do
+    -- `psp:Context -> psp:Rol -> Unit`
+    isDefined :: RolName -> TDChecker (AjaxAvarCache e) Unit
+    isDefined rolType = do
       (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## rolDef)
       case elemIndex rolType definedRollen of
-        Nothing -> tell [RolNotDefined rolType cid contextType]
+        Nothing -> tell [RolNotDefined rolType cid typeId]
         otherwise -> pure unit
 
 -- | Does the type hold a definition for all properties given to the RolInstantie?

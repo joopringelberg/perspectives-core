@@ -2,7 +2,7 @@ Context model:QueryAst als q:
 
 import model:Perspectives als psp:
 
-Section psp:rolInContext
+Section psp:Context$rolInContext
 
 --------------------------------------------------------------------------------
 -- ASPECTEN
@@ -86,7 +86,7 @@ psp:SingularFunction q:context
 	$domain => psp:Rol
 	$range => psp:Context
 
-psp:SingularPropertyFunction q:label
+q:SingularPropertyFunction q:label
 	$rolInContext =>
 		psp:Rol $range
 			$aspectRol => q:SingularPropertyFunction$range
@@ -281,7 +281,7 @@ psp:Context q:rolesOf
 -- COMBINATOR CONSTRUCTORS
 --------------------------------------------------------------------------------
 -- It is unlikely we will use this constructor in a model.
-q:Context q:contains
+psp:Context q:contains
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>

@@ -84,12 +84,12 @@ propertyDef = QC.concat
   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownPropertyDef)))
     ((aspectRolDef >->> (\_ -> propertyDef)) "propertyDef"))
 
--- | All Rollen defined for a Context type (excluding Aspects).
+-- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`
 ownRolDef :: forall e. TypedTripleGetter e
 ownRolDef = constructRolGetter "model:Perspectives$Context$rolInContext" >-> binding >-> context
 
--- | All Rollen stored with the context instance (own and derived from Aspects).
+-- | All Rollen defined for a Context type, including Aspects.
 -- | `psp:Context -> psp:Rol`
 rolDef :: forall e. TypedTripleGetter e
 rolDef = QC.concat
