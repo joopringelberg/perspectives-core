@@ -211,15 +211,17 @@ compareRolInstancesToDefinition cid rolType' = do
       checkAvailableProperties rolId rolType' availableProperties definedRolProperties
 
       -- check the binding. Does the binding have the type given by bindingDef, or has its type that Aspect?
-      -- Note that we work on type level. So the bindingType is a Context describing a type of Rol.
-      bindingType <- lift (rolId @@ binding >-> context)
+      -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.
+      theBinding <- lift (rolId @@ binding >-> context)
       mmb <- lift (rolType' @@ bindingDef)
       case head (tripleObjects mmb) of
         Nothing -> pure unit
         (Just toegestaneBinding) -> do
-          ifM (lift $ lift $ contextHasType (tripleObject bindingType) toegestaneBinding)
+          ifM (lift $ lift $ contextHasType (tripleObject theBinding) toegestaneBinding)
             (pure unit)
-            (tell [IncorrectBinding cid rolId (tripleObject bindingType) toegestaneBinding])
+            (do
+              typeOfTheBinding <- lift ((tripleObject theBinding) @@ contextType)
+              (tell [IncorrectBinding cid rolId (tripleObject theBinding) (tripleObject typeOfTheBinding) toegestaneBinding]))
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?
 -- | The first parameter is bound to a psp:ContextInstance that represents a psp:Rol.

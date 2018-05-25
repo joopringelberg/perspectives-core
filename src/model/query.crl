@@ -11,6 +11,7 @@ Section psp:Context$rolInContext
 --	q:DataTypeGetter q:identity
 -- 		extern $functionName = "identity"
 psp:Context q:DataTypeGetter
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -29,6 +30,7 @@ psp:Context q:DataTypeGetter
 -- 		extern $functionName = "constructExternalPropertyGetter"
 --		$property => psp:Context$buitenRolBeschrijving$isVerplicht
 psp:Context q:PropertyGetter
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -52,6 +54,7 @@ psp:Context q:PropertyGetter
 -- 		extern $functionName = "constructRolGetter"
 --		$rol => psp:Context$buitenRolBeschrijving
 psp:Context q:RolGetter
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -68,12 +71,6 @@ psp:Context q:RolGetter
 			$range => psp:Rol
 
 --------------------------------------------------------------------------------
--- MISCELLANEOUS
---------------------------------------------------------------------------------
---q:Query q:useCache
---q:Query q:ignoreCache
-
---------------------------------------------------------------------------------
 -- UNARYCOMBINATOR
 --------------------------------------------------------------------------------
 -- Instances will be created by the QueryFunctionDescriptionCompiler, e.g.
@@ -81,6 +78,7 @@ psp:Context q:RolGetter
 -- 		extern $functionName = "notEmpty"
 --		$query => q:compose ...
 psp:Context q:UnaryCombinator
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -105,6 +103,7 @@ psp:Context q:UnaryCombinator
 --		$operand(1) => q:compose ...
 --		$operand(2) => ...
 psp:Context q:nAryCombinator
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -124,6 +123,7 @@ psp:Context q:nAryCombinator
 -- COMBINATORS
 --------------------------------------------------------------------------------
 psp:Context q:filter
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -131,13 +131,14 @@ psp:Context q:filter
 	$rolInContext =>
 	 	psp:Rol $criterium
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Constraint
+			$mogelijkeBinding => psp:Function
 	$rolInContext =>
 		psp:Rol $candidates
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:rolesOf
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -152,6 +153,7 @@ psp:Context q:rolesOf
 --------------------------------------------------------------------------------
 -- It is unlikely we will use this constructor in a model.
 psp:Context q:contains
+	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
@@ -169,6 +171,7 @@ psp:Context q:contains
 -- CONSTANT
 --------------------------------------------------------------------------------
 psp:Context q:Constant
+	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
@@ -184,6 +187,7 @@ psp:Context q:Constant
 -- VARIABLE
 --------------------------------------------------------------------------------
 psp:Context q:Variable
+	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
@@ -196,6 +200,7 @@ psp:Context q:Variable
 		psp:Rol $binnenRolBeschrijving
 
 psp:Context q:setVariable
+	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 	$binnenRolBeschrijving =>

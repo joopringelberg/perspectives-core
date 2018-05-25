@@ -7,117 +7,39 @@ import model:Perspectives als psp:
 Section $rolInContext
 
 --------------------------------------------------------------------------------
--- MissingRolInstance
+-- RolNotDefined
 --------------------------------------------------------------------------------
-psp:Rol t:rolZonderMogelijkeBinding
-  extern $isFunctioneel = true
+psp:Context t:Test1
+  $interneView =>
+    psp:View t:viewMetOngedefineerdeRol
+      $propertyReferentie => psp:Rol$buitenRolBeschrijving$isVerplicht
+        $volgNummer = 1
+      $ongedefinieerdeRol => psp:Context
 
 --------------------------------------------------------------------------------
--- IncorrectBinding
+-- PropertyNotDefined (Extern)
 --------------------------------------------------------------------------------
-psp:View t:viewMetVerkeerdeBinding
-  $propertyReferentie => psp:Rol
-    $volgNummer = 1
+psp:Context t:Test2
+  extern $ongedefineerdeExterneProperty = 1
 
 --------------------------------------------------------------------------------
--- UndefinedRol
+-- PropertyNotDefined (Intern)
 --------------------------------------------------------------------------------
-psp:View t:viewMetOngedefineerdeRol
-  $propertyReferentie => psp:Property
-    $volgNummer = 1
-  $ongedefinieerdeRol => psp:Context
+psp:Context t:Test3
+  extern $ongedefineerdeInterneProperty = 1
 
 --------------------------------------------------------------------------------
--- Rol defined in Aspect
+-- PropertyNotDefined (Rol)
 --------------------------------------------------------------------------------
-psp:Context t:AspectMetRol
+psp:Context t:Test4
   $rolInContext =>
-    psp:Rol $ongedefinieerdeRol
-      $mogelijkeBinding => psp:Context
-
-psp:Context t:ViewMetExtraRol
-  $aspect => psp:View
-  $aspect => t:AspectMetRol
-
--- No errors for this definition.
-t:ViewMetExtraRol t:viewMetGedefinieerdeRol
-  psp:View$propertyReferentie => psp:Property
-    $volgNummer = 1
-  t:AspectMetRol$ongedefinieerdeRol => psp:Context
+    psp:Rol $rol
+      $ongedefineerdeRolProperty = 1
 
 --------------------------------------------------------------------------------
--- Rol defined in Aspect not available because it is an aspectRol.
+-- MissingPropertyValue (Rol)
+-- deze test detecteert het probleem niet. Werkt booleanPropertyGetter nog wel?
 --------------------------------------------------------------------------------
-psp:Context t:ViewMetAspectRol
-  $aspect => psp:View
-  $aspect => t:AspectMetRol
+psp:Context t:Test6
   $rolInContext =>
-    psp:Rol $ongedefinieerdeRol
-      $aspectRol => t:AspectMetRol$ongedefinieerdeRol
-
--- t:AspectMetRol$ongedefinieerdeRol should be unavailable.
-t:ViewMetAspectRol t:viewMetGedefinieerdeRol1
-  psp:View$propertyReferentie => psp:Property
-    $volgNummer = 1
-  t:AspectMetRol$ongedefinieerdeRol => psp:Context
-
---------------------------------------------------------------------------------
--- MissingPropertyValue
---------------------------------------------------------------------------------
-psp:Rol t:rolZonderFunctioneleProperty
-  $mogelijkeBinding => psp:Rol
-
---------------------------------------------------------------------------------
--- TooManyPropertyValues
---------------------------------------------------------------------------------
-psp:Rol t:rolMetTeveelPropertyWaarden
-  extern $isFunctioneel = true,false
-  $mogelijkeBinding => psp:Rol
-
---------------------------------------------------------------------------------
--- IncorrectPropertyValue
---------------------------------------------------------------------------------
-psp:Rol t:rolMetVerkeerdePropertyWaarde
-  extern $isFunctioneel = 1
-  $mogelijkeBinding => psp:Rol
-
---------------------------------------------------------------------------------
--- PropertyNotDefined (extern)
---------------------------------------------------------------------------------
-psp:Rol t:rolMetNietBestaandeExterneProperty
-  extern $isFunctioneel = true
-  extern $bestaatNiet = 1
-  $mogelijkeBinding => psp:Rol
-
---------------------------------------------------------------------------------
--- PropertyNotDefined (intern)
---------------------------------------------------------------------------------
-psp:Rol t:rolMetNietBestaandeInterneProperty
-  extern $isFunctioneel = true
-  intern $bestaatNiet = 1
-  $mogelijkeBinding => psp:Rol
-
---------------------------------------------------------------------------------
--- PropertyNotDefined (rol)
---------------------------------------------------------------------------------
-psp:Rol t:nietBestaandeRolProperty
-  extern $isFunctioneel = true
-  $mogelijkeBinding => psp:Rol
-    $nietBestaandeProperty = 1
-
---------------------------------------------------------------------------------
--- AspectRolNotFromAspect
---------------------------------------------------------------------------------
-psp:Rol t:ongedefineerdeAspectRol
-  extern $isFunctioneel = true
-  $mogelijkeBinding => psp:Rol
-  $aspectRol => t:nietBestaandeRolProperty
-
---------------------------------------------------------------------------------
--- cycle in aspect
---------------------------------------------------------------------------------
-psp:Context t:Sub
-  $aspect => t:Super
-
-psp:Context t:Super
-  $aspect => t:Sub
+    psp:Rol $rol

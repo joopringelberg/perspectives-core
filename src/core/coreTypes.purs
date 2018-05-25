@@ -212,7 +212,7 @@ data UserMessage =
   | MissingUnqualifiedRol RolName ContextID
   | MissingType ContextID
   | MissingRolInstance RolName ContextID
-  | IncorrectBinding ContextID RolName TypeID TypeID
+  | IncorrectBinding ContextID RolName TypeID TypeID TypeID
   | RolNotDefined RolName ContextID TypeID
   | MissingPropertyValue ContextID PropertyName RolName
   | IncorrectPropertyValue ContextID PropertyName TypeID String
@@ -236,7 +236,7 @@ instance showUserMessage :: Show UserMessage where
   show (MissingUnqualifiedRol rn cid) = "(MissingUnqualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
   show (MissingType cid) = "(MissingType) De context '" <> cid <> "' heeft geen type."
   show (MissingRolInstance rn cid) = "(MissingRolInstance) De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
-  show (IncorrectBinding cid rn tp mb) = "(IncorrectBinding) In de context '" <> cid <> "' is de Rol '" <> rn <> "' gebonden aan een instantie van type '" <> tp <> "' maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
+  show (IncorrectBinding cid rn bd tp mb) = "(IncorrectBinding) In de context '" <> cid <> "' is de Rol '" <> rn <> "' gebonden aan '" <> bd <> "'(type: '" <> tp <> "') maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
   show (RolNotDefined rn cid tp) = "(RolNotDefined) De context '" <> cid <> "' heeft een instantie van rol '" <> rn <> "' maar die is niet gedefinieerd voor '" <> tp <> "'."
   show (MissingPropertyValue cid pn rid) = "(MissingPropertyValue) De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "' van de context '" <> cid <> "'."
   show (IncorrectPropertyValue cid pn sv val) = "(IncorrectPropertyValue) De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "' (in de context '" <> cid <> "')."

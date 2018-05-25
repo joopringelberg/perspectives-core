@@ -61,12 +61,12 @@ psp:Context psp:Context
 	$rolInContext =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
-			extern $isVerplicht = false
+			extern $isVerplicht = true
 			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
-			extern $isVerplicht = false
+			extern $isVerplicht = true
 			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
 		psp:Rol $rolInContext
@@ -93,18 +93,26 @@ psp:Context psp:Context
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
 
+psp:Context psp:ContextPrototype
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
+
 psp:Context psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $isFunctioneel
 					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isVerplicht = false
 					$range => psp:Boolean
 			$rolProperty =>
 				psp:Property $isVerplicht
 					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isVerplicht = false
 					$range => psp:Boolean
 			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
@@ -127,7 +135,7 @@ psp:Context psp:Rol
 	$rolInContext =>
 		psp:Rol $constraint
 			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Constraint
+			$mogelijkeBinding => psp:Function
 	$rolInContext =>
 		psp:Rol $objectRol
 			extern $isFunctioneel = false
@@ -177,12 +185,12 @@ psp:Context psp:Actie
 		psp:Rol $objectConstraint
 			extern $isFunctioneel = true
 			extern $isVerplicht = false
-			$mogelijkeBinding => psp:Constraint
+			$mogelijkeBinding => psp:Function
 	$rolInContext =>
 		psp:Rol $subjectConstraint
 			extern $isFunctioneel = true
 			extern $isVerplicht = false
-			$mogelijkeBinding => psp:Constraint
+			$mogelijkeBinding => psp:Function
 
 psp:Context psp:Werkwoord
 	$binnenRolBeschrijving =>
@@ -241,39 +249,18 @@ psp:Context psp:Function
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
-	$rolInContext =>
-		psp:Rol $domain
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:ElkType
-	$rolInContext =>
-		psp:Rol $range
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:ElkType
 
-psp:Context psp:SingularFunction
-	$aspect => psp:Function
-	$rolInContext =>
-		psp:Rol $range
-			extern $isFunctioneel = true
-			$aspectRol => psp:Function$range
-
--- De Unit van Perspectives.
+--------------------------------------------------------------------------------
+-- UNIT TYPE: ELKTYPE
+--------------------------------------------------------------------------------
 psp:Context psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 
-psp:Context psp:Constraint
-	$aspect => psp:Function
-	$rolInContext =>
-		psp:Rol $range
-			extern $isFunctioneel = true
-			$aspectRol => psp:Function$range
-			$mogelijkeBinding => psp:Boolean
-
 --------------------------------------------------------------------------------
--- SUM TYPES
+-- SUM TYPE
 --------------------------------------------------------------------------------
 psp:Context psp:Sum
 	$binnenRolBeschrijving =>

@@ -8,21 +8,21 @@ import Perspectives.SystemObjectGetters (getRolBinding, getRolContext)
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 propertyIsVerplicht :: forall e. ObjectsGetter e
 propertyIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspectProperty"
-  "model:Perspectives$Property$isVerplicht"
+  "model:Perspectives$Property$buitenRolBeschrijving$isVerplicht"
 
 -- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
 propertyIsFunctioneel :: forall e. ObjectsGetter e
-propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$isFunctioneel"
+propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e
 rolIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspect"
-  "model:Perspectives$Rol$isVerplicht"
+  "model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsFunctioneel :: forall e. ObjectsGetter e
 rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
-  "model:Perspectives$Rol$isFunctioneel"
+  "model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
 
 -- TODO. Dit is een functie naar voorbeeld van een ModelBasedTripleGetter.
 -- | The type of the range that has been defined for the Property.

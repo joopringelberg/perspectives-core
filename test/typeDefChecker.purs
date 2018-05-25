@@ -9,12 +9,12 @@ import Control.Plus (empty)
 import Data.Array (head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe)
-import Perpectives.TypeChecker (checkRolForQualifiedProperty, hasType, isOrHasAspect)
+import Perpectives.TypeChecker (checkRolForQualifiedProperty, contextHasType, isOrHasAspect)
 import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace)
-import Perspectives.ModelBasedTripleGetters (boundContexts, ownExternePropertyDef, ownInternePropertyDef, contextDef, ownPropertyDef, propertyDef)
+import Perspectives.ModelBasedTripleGetters (aspectDef, aspectDefClosure, boundContexts, buitenRolBeschrijving, contextDef, ownExternePropertyDef, ownInternePropertyDef, ownPropertyDef, ownRolDef, propertyDef, propertyIsVerplicht, rolDef)
 import Perspectives.ObjectGetterConstructors (getGebondenAls, getRolByLocalName)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryAST (ElementaryQueryStep(..))
@@ -30,6 +30,10 @@ test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Uni
 test = do
   -- messages1 <- checkContext "model:Test$rolZonderMogelijkeBinding"
   -- lift $ for_ messages1 logShow
+
+  -- let pn = "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName"
+  -- let rn =
+  -- r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
   --
   -- messages2 <- checkContext "model:Test$viewMetVerkeerdeBinding"
   -- lift $ for_ messages2 logShow
@@ -71,7 +75,25 @@ test = do
   -- lift $ for_ messages14 logShow
 
   messages15 <- checkModel "model:Perspectives"
-  lift $ for_ messages15 logShow
+  lift $ for_ messages15
+    \m -> do
+      logShow m
+      logShow "------"
+
+  -- b <- "model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht" ## propertyIsVerplicht
+  -- lift $ logShow b
+
+  -- b <- contextHasType "model:Perspectives$Property" "model:Perspectives$Property"
+  -- lift $ logShow b
+
+  -- b <- "model:QueryAst$label" `contextHasType` "model:Perspectives$Context"
+  -- lift $ logShow b
+
+  -- as <- "model:QueryAst$SingularPropertyFunction" ## aspectDefClosure
+  -- lift $ logShow as
+
+  -- as <- "model:QueryAst$contextType" ## aspectDef
+  -- lift $ logShow as
 
    -- bc <- "model:Perspectives" ## boundContexts
    -- lift $ logShow bc
