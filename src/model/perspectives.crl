@@ -146,10 +146,7 @@ psp:Context psp:Rol
 			$mogelijkeBinding => psp:Actie
 
 psp:Context psp:View
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
+	prototype psp:ContextPrototype
 	$rolInContext =>
 		psp:Rol $propertyReferentie
 			extern $isVerplicht = true

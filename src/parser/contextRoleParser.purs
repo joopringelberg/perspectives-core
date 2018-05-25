@@ -19,10 +19,9 @@ import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache, AvarCache)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedNamespace, withExtendedTypeNamespace, withTypeNamespace)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijving)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, ensureInternalRepresentation, retrieveInternally)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
@@ -412,6 +411,8 @@ withRoleCounting p = do
 -- | effect of storing its constituent roles and contexts.
 context :: forall e. IP ID (AjaxAvarCache e)
 context = withRoleCounting context' where
+
+  context' :: IP ID (AjaxAvarCache e)
   context' = do
     -- Parsing
     cmtBefore <- manyOneLineComments
@@ -423,6 +424,7 @@ context = withRoleCounting context' where
         withTypeNamespace (show typeName)
           do
             -- Parsing the body
+            (prototype :: Maybe ContextID) <- option Nothing (indented *> prototypeDeclaration)
             (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment))
             (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment))
             (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
@@ -449,6 +451,7 @@ context = withRoleCounting context' where
                 { _id = buitenRol (show instanceName)
                 , pspType = show typeName <> "$buitenRolBeschrijving"
                 , context = (show instanceName)
+                , binding = binding $ maybe "" buitenRol prototype
                 , properties = fromFoldable publicProps
                 })
             pure $ buitenRol (show instanceName)
@@ -458,6 +461,12 @@ context = withRoleCounting context' where
     case lookup rname map of
       Nothing -> insert rname [id] map
       (Just ids) -> insert rname (AR.cons id ids) map
+
+  prototypeDeclaration :: IP (Maybe ID) (AjaxAvarCache e)
+  prototypeDeclaration = do
+    prototype <- reserved "prototype" *> contextName
+    pure $ Just $ show prototype
+
 
 -- Helper functions for development.
 allTheRest :: forall e. IP String e

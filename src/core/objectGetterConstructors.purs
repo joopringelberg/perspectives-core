@@ -89,11 +89,10 @@ booleanPropertyGetter aspectRol propertyName = getter where
       \r -> pure [show $ foldl (||) false ((==) "true" <$> r)]
 
 -- | Climb the Aspect tree looking for a Rol bearing the given name.
+-- | Uses getRolFromPrototypeHierarchy internally, so caters for prototyping.
 -- | `psp:Rol -> ObjectsGetter`
 getRolUsingAspects :: forall e. RolName -> ObjectsGetter e
-getRolUsingAspects rolName = getter where
-  getter :: ObjectsGetter e
-  getter pid =
-    unlessNull (getRol rolName) pid
+getRolUsingAspects rolName contextId =
+  unlessNull (getRolFromPrototypeHierarchy rolName) contextId
     <|>
-    (getRol "model:Perspectives$Rol$aspectRol" /-/ getRolBinding /-/ getRolContext /-/ getter) pid
+    (getRol "model:Perspectives$Rol$aspectRol" /-/ getRolBinding /-/ getRolContext /-/ getRolUsingAspects rolName) contextId
