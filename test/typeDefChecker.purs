@@ -74,11 +74,16 @@ test = do
   -- messages14 <- checkContext "model:Test$ViewMetAspectRol"
   -- lift $ for_ messages14 logShow
 
-  messages15 <- checkModel "model:Perspectives"
+  messages15 <- checkModel "model:Test"
   lift $ for_ messages15
     \m -> do
       logShow m
       logShow "------"
+
+  -- getter <- (getPropertyFunction "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
+  --   "model:Perspectives$Property$buitenRolBeschrijving")
+  -- b <- "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel_buitenRol" ## getter
+  -- lift $ logShow b
 
   -- b <- "model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht" ## propertyIsVerplicht
   -- lift $ logShow b

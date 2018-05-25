@@ -10,36 +10,43 @@ Section $rolInContext
 -- RolNotDefined
 --------------------------------------------------------------------------------
 psp:Context t:Test1
+  prototype psp:ContextPrototype
   $interneView =>
     psp:View t:viewMetOngedefineerdeRol
       $propertyReferentie => psp:Rol$buitenRolBeschrijving$isVerplicht
-        $volgNummer = 1
+        $volgNummer = 1 -- Deze ziet ie niet!
       $ongedefinieerdeRol => psp:Context
 
 --------------------------------------------------------------------------------
 -- PropertyNotDefined (Extern)
 --------------------------------------------------------------------------------
 psp:Context t:Test2
+  prototype psp:ContextPrototype
   extern $ongedefineerdeExterneProperty = 1
 
 --------------------------------------------------------------------------------
 -- PropertyNotDefined (Intern)
 --------------------------------------------------------------------------------
 psp:Context t:Test3
+  prototype psp:ContextPrototype
   extern $ongedefineerdeInterneProperty = 1
 
 --------------------------------------------------------------------------------
 -- PropertyNotDefined (Rol)
 --------------------------------------------------------------------------------
 psp:Context t:Test4
+  prototype psp:ContextPrototype
   $rolInContext =>
     psp:Rol $rol
-      $ongedefineerdeRolProperty = 1
+      extern $ongedefineerdeRolProperty = 1
+      $mogelijkeBinding => psp:Rol
 
 --------------------------------------------------------------------------------
 -- MissingPropertyValue (Rol)
 -- deze test detecteert het probleem niet. Werkt booleanPropertyGetter nog wel?
 --------------------------------------------------------------------------------
-psp:Context t:Test6
+psp:Context t:Test5
+  prototype psp:ContextPrototype
   $rolInContext =>
     psp:Rol $rol
+      $mogelijkeBinding => psp:Rol

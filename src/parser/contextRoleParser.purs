@@ -572,5 +572,6 @@ enclosingContext = withRoleCounting enclosingContext' where
           , pspType = "model:Perspectives$Context$buitenRolBeschrijving"
           , context = textName
           , properties = fromFoldable publicProps
+          , binding = binding "model:Perspectives$ContextPrototype_buitenRol"
           })
       pure $ textName

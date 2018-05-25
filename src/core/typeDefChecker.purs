@@ -76,11 +76,11 @@ checkProperties typeId cid = do
 
   (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## externePropertyDef)
   availableExternalProperties <- lift $ lift $ getPropertyTypen (buitenRol cid)
-  checkAvailableProperties (buitenRol cid) typeId availableExternalProperties definedExternalProperties
+  checkAvailableProperties (buitenRol cid) typeId availableExternalProperties definedExternalProperties cid
 
   (Triple{object: definedInternalProperties}) <- lift $ lift $ (typeId ## internePropertyDef)
   availableInternalProperties <- lift $ lift $ getInternePropertyTypen cid
-  checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedExternalProperties
+  checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedExternalProperties cid
 
 get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
 get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
@@ -112,14 +112,14 @@ checkAvailableRoles typeId cid = do
 
 -- | Does the type hold a definition for all properties given to the RolInstantie?
 -- | `psp:BinnenRolInstance -> psp:Context -> Array psp:Property -> Array psp:Property -> psp:ElkType`
-checkAvailableProperties :: forall e. RolID -> TypeID -> Array PropertyName -> Array PropertyName -> TDChecker (AjaxAvarCache e) Unit
-checkAvailableProperties rolId contextId availableProperties definedProperties = do
+checkAvailableProperties :: forall e. RolID -> TypeID -> Array PropertyName -> Array PropertyName -> ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkAvailableProperties rolId contextId availableProperties definedProperties cid = do
   for_ availableProperties isDefined
   where
     isDefined :: PropertyName -> TDChecker (AjaxAvarCache e) Unit
     isDefined propertyName =
       case elemIndex propertyName definedProperties of
-        Nothing -> tell [PropertyNotDefined contextId propertyName rolId contextId]
+        Nothing -> tell [PropertyNotDefined cid propertyName rolId contextId]
         otherwise -> pure unit
 
 -- To check:
@@ -208,7 +208,7 @@ compareRolInstancesToDefinition cid rolType' = do
       -- Detect used but undefined properties.
       (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## propertyDef)
       availableProperties <- lift $ lift $ getPropertyTypen rolId
-      checkAvailableProperties rolId rolType' availableProperties definedRolProperties
+      checkAvailableProperties rolId rolType' availableProperties definedRolProperties cid
 
       -- check the binding. Does the binding have the type given by bindingDef, or has its type that Aspect?
       -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.

@@ -6,20 +6,21 @@ Section $rolInContext
 -- SIMPLE VALUES
 --------------------------------------------------------------------------------
 psp:Context psp:SimpleValue
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
+	prototype psp:ContextPrototype
 	$aspect => psp:SimpleValue
 	$aspect => psp:Context
 
 psp:SimpleValue psp:Boolean
+	prototype psp:ContextPrototype
 
 psp:SimpleValue psp:String
+	prototype psp:ContextPrototype
 
 psp:SimpleValue psp:Number
+	prototype psp:ContextPrototype
 
 psp:SimpleValue psp:Date
+	prototype psp:ContextPrototype
 
 --------------------------------------------------------------------------------
 -- SYSTEM BASE
@@ -29,17 +30,18 @@ psp:Context psp:Property
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $isFunctioneel
-					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isFunctioneel = true -- ziet ie niet (maar is er wel)
+					extern $isVerplicht = true -- ziet ie niet
 					$range => psp:Boolean
 			$rolProperty =>
 				psp:Property $isVerplicht
-					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isFunctioneel = true -- ziet ie niet
+					extern $isVerplicht = true -- ziet ie niet
 					$range => psp:Boolean
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
 		psp:Rol $range
 			extern $isFunctioneel = true
@@ -54,10 +56,7 @@ psp:Context psp:Property
 			$mogelijkeBinding => psp:Property
 
 psp:Context psp:Context
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijvingVanContext
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijvingVanContext
+	prototype psp:ContextPrototype
 	$rolInContext =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
@@ -102,17 +101,20 @@ psp:Context psp:ContextPrototype
 			$mogelijkeBinding => psp:Rol
 
 psp:Context psp:Rol
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $isFunctioneel
-					extern $isFunctioneel = true
-					extern $isVerplicht = false
+					extern $isFunctioneel = true -- ziet ie niet
+					extern $isVerplicht = false -- ziet ie niet
 					$range => psp:Boolean
 			$rolProperty =>
 				psp:Property $isVerplicht
-					extern $isFunctioneel = true
-					extern $isVerplicht = false
+					extern $isFunctioneel = true -- ziet ie niet
+					extern $isVerplicht = false -- ziet ie niet
 					$range => psp:Boolean
 			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
@@ -153,8 +155,8 @@ psp:Context psp:View
 			extern $isFunctioneel = false
 			$rolProperty =>
 				psp:Property $volgNummer
-					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isFunctioneel = true -- ziet ie niet
+					extern $isVerplicht = true -- ziet ie niet
 					$range => psp:Number
 			$mogelijkeBinding => psp:Property
 
@@ -162,10 +164,7 @@ psp:Context psp:View
 -- ACTIES
 --------------------------------------------------------------------------------
 psp:Context psp:Actie
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
+	prototype psp:ContextPrototype
 	$rolInContext =>
 		psp:Rol $subjectView
 			extern $isFunctioneel = true
@@ -190,43 +189,29 @@ psp:Context psp:Actie
 			$mogelijkeBinding => psp:Function
 
 psp:Context psp:Werkwoord
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
+	prototype psp:ContextPrototype
 
 psp:Context psp:Beheert
+	prototype psp:ContextPrototype
 	$aspect => psp:Werkwoord
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Raadpleegt
+	prototype psp:ContextPrototype
 	$aspect => psp:Werkwoord
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Creëert
+	prototype psp:ContextPrototype
 	$aspect => psp:Werkwoord
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 
 psp:Context psp:Verwijdert
+	prototype psp:ContextPrototype
 	$aspect => psp:Werkwoord
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 
 --------------------------------------------------------------------------------
 -- ZAAK
 --------------------------------------------------------------------------------
 psp:Context psp:Zaak
+	prototype psp:ContextPrototype
 	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $zaakInContext
@@ -241,29 +226,20 @@ psp:Context psp:Zaak
 -- FUNCTION
 --------------------------------------------------------------------------------
 psp:Context psp:Function
+	prototype psp:ContextPrototype
 	$aspect => psp:Context
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 
 --------------------------------------------------------------------------------
 -- UNIT TYPE: ELKTYPE
 --------------------------------------------------------------------------------
 psp:Context psp:ElkType
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
+	prototype psp:ContextPrototype
 
 --------------------------------------------------------------------------------
 -- SUM TYPE
 --------------------------------------------------------------------------------
 psp:Context psp:Sum
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
+	prototype psp:ContextPrototype
 	$rolInContext =>
 		psp:Rol $alternative
 			extern $isFunctioneel = false

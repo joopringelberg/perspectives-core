@@ -14,12 +14,14 @@ psp:Context q:DataTypeGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
-					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isFunctioneel = true -- ziet ie niet
+					extern $isVerplicht = true -- ziet ie niet
 					$range => psp:String
 
 --------------------------------------------------------------------------------
@@ -33,12 +35,14 @@ psp:Context q:PropertyGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
-					extern $isFunctioneel = true
-					extern $isVerplicht = true
+					extern $isFunctioneel = true -- ziet ie niet
+					extern $isVerplicht = true -- ziet ie niet
 					$range => psp:String
 	$rolInContext =>
 		psp:Rol $property
@@ -57,7 +61,9 @@ psp:Context q:RolGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
+		$mogelijkeBinding => psp:Rol
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $functionName
@@ -81,8 +87,10 @@ psp:Context q:UnaryCombinator
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
 					extern $isFunctioneel = true
@@ -106,8 +114,10 @@ psp:Context q:nAryCombinator
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
 					extern $isFunctioneel = true
@@ -123,11 +133,8 @@ psp:Context q:nAryCombinator
 -- COMBINATORS
 --------------------------------------------------------------------------------
 psp:Context q:filter
+	prototype psp:ContextPrototype
 	$aspect => psp:Function
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 	 	psp:Rol $criterium
 			extern $isFunctioneel = true
@@ -138,11 +145,8 @@ psp:Context q:filter
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:rolesOf
+	prototype psp:ContextPrototype
 	$aspect => psp:Function
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $context
 			extern $isFunctioneel = true
@@ -153,11 +157,8 @@ psp:Context q:rolesOf
 --------------------------------------------------------------------------------
 -- It is unlikely we will use this constructor in a model.
 psp:Context q:contains
+	prototype psp:ContextPrototype
 	$aspect => psp:Function
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
 	$rolInContext =>
 		psp:Rol $valueOrId
 			extern $isFunctioneel = true
@@ -174,6 +175,7 @@ psp:Context q:Constant
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $value
 					extern $isFunctioneel = true
@@ -182,6 +184,7 @@ psp:Context q:Constant
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 
 --------------------------------------------------------------------------------
 -- VARIABLE
@@ -198,11 +201,13 @@ psp:Context q:Variable
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 
 psp:Context q:setVariable
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			$rolProperty =>
@@ -233,6 +238,7 @@ psp:Context q:setVariable
 psp:Context q:assignToRol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			$rolProperty =>
@@ -278,6 +284,7 @@ psp:Context q:assignToRol
 psp:Context q:assignToProperty
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			$rolProperty =>
