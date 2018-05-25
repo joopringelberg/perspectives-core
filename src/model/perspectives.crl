@@ -264,7 +264,6 @@ psp:Context psp:ElkType
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 
-
 psp:Context psp:Constraint
 	$aspect => psp:Function
 	$rolInContext =>

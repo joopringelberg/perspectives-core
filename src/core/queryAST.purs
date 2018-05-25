@@ -12,6 +12,8 @@ data QueryStep
   | Closure QueryStep
   | Closure' QueryStep
   | LastElement QueryStep
+  | UseCache QueryStep
+  | IgnoreCache QueryStep
   | Contains QueryStep QueryStep
   | SetVariable String QueryStep
   | Terminal ElementaryQueryStep
@@ -30,8 +32,6 @@ data ElementaryQueryStep
   | Variable String
   | Binding
   | Context
-  | UseCache
-  | IgnoreCache
   | Identity
   | Type
   | BuitenRol
