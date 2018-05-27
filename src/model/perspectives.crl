@@ -41,6 +41,7 @@ psp:Context psp:Property
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
 		psp:Rol $range
@@ -109,7 +110,7 @@ psp:Context psp:Rol
 			$rolProperty =>
 				psp:Property $isFunctioneel
 					extern $isFunctioneel = true -- ziet ie niet
-					extern $isVerplicht = false -- ziet ie niet
+					extern $isVerplicht = true -- ziet ie niet
 					$range => psp:Boolean
 			$rolProperty =>
 				psp:Property $isVerplicht

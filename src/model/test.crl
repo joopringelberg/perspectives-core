@@ -1,4 +1,12 @@
 -- TEST TYPE DEFINITION CHECKER
+--------------------------------------------------------------------------------
+-- CycleInAspects
+-- Ik kan geen cyclische definitie opstellen.
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- RolWithoutContext
+-- Het lukt me niet om dit te testen.
+--------------------------------------------------------------------------------
 
 Context model:Test als t:
 
@@ -43,10 +51,66 @@ psp:Context t:Test4
 
 --------------------------------------------------------------------------------
 -- MissingPropertyValue (Rol)
--- deze test detecteert het probleem niet. Werkt booleanPropertyGetter nog wel?
 --------------------------------------------------------------------------------
 psp:Context t:Test5
   prototype psp:ContextPrototype
   $rolInContext =>
     psp:Rol $rol
       $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- IncorrectPropertyValue
+--------------------------------------------------------------------------------
+psp:Context t:Test6
+  prototype psp:ContextPrototype
+  $rolInContext =>
+    psp:Rol $rol
+      extern $isFunctioneel = 1
+      $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- TooManyPropertyValues
+--------------------------------------------------------------------------------
+psp:Context t:Test7
+  prototype psp:ContextPrototype
+  $rolInContext =>
+    psp:Rol $rol
+      extern $isFunctioneel = true,false
+      $mogelijkeBinding => psp:Rol
+
+--------------------------------------------------------------------------------
+-- MissingRolInstance
+--------------------------------------------------------------------------------
+psp:Context t:Test8
+  prototype psp:ContextPrototype
+  $rolInContext =>
+    psp:Rol $rol
+      extern $isFunctioneel = true
+
+--------------------------------------------------------------------------------
+-- IncorrectBinding
+--------------------------------------------------------------------------------
+psp:Context t:Test9
+  prototype psp:ContextPrototype
+  $rolInContext =>
+    psp:Rol $rol
+      extern $isFunctioneel = true
+      $mogelijkeBinding =>
+        psp:Rol $toegelatenBinding
+          extern $isFunctioneel = false
+          $mogelijkeBinding => psp:Rol
+
+t:Test9 t:Test10
+  prototype psp:ContextPrototype
+  $rol => psp:Rol
+
+--------------------------------------------------------------------------------
+-- AspectRolNotFromAspect
+--------------------------------------------------------------------------------
+psp:Context t:Test11
+  prototype psp:ContextPrototype
+  $aspect => psp:Rol
+  $rolInContext =>
+    psp:Rol $rol
+      extern $isFunctioneel = false
+      $aspectRol => psp:Context$interneView
