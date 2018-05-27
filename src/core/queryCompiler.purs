@@ -4,18 +4,19 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
+import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, contextType, identity, iedereRolInContext, label, rolType)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName)
-import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol, getRolByLocalName)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
+import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, ignoreCache, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
-import Perspectives.SystemObjectGetters (getContextType, getContextTypeF, getRolBinding, getRolContext)
+import Perspectives.SystemObjectGetters (getContextType, getContextTypeF, getRolBindingDef)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
@@ -62,7 +63,9 @@ constructQueryFunction typeDescriptionID = do
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")
     "model:QueryAst$PropertyGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") typeDescriptionID)
-      property <- onNothing (errorMessage "no property provided" queryStepType) (firstOnly (getRol "model:QueryAst$PropertyGetter$property") typeDescriptionID)
+      property <- onNothing
+        (errorMessage "no property provided" queryStepType)
+        (getBindingOfRol "model:QueryAst$PropertyGetter$property" typeDescriptionID)
       case functionName of
         "constructExternalPropertyGetter" -> pure $ constructExternalPropertyGetter property
         "constructExternalPropertyLookup" -> pure $ constructExternalPropertyLookup property
@@ -74,7 +77,9 @@ constructQueryFunction typeDescriptionID = do
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for PropertyGetter: '" <> functionName <> "'")
     "model:QueryAst$RolGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName") typeDescriptionID)
-      rol <- onNothing (errorMessage "no rol provided" queryStepType) (firstOnly (getRol "model:QueryAst$RolGetter$rol") typeDescriptionID)
+      rol <- onNothing
+        (errorMessage "no rol provided" queryStepType)
+        (getBindingOfRol "model:QueryAst$RolGetter$rol" typeDescriptionID)
       case functionName of
         "constructRolGetter" -> pure $ constructRolGetter rol
         "rolQuery" -> rolQuery rol
@@ -82,7 +87,9 @@ constructQueryFunction typeDescriptionID = do
         "constructInverseRolGetter" -> pure $ constructInverseRolGetter rol
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for RolGetter: '" <> functionName <> "'")
     "model:QueryAst$rolesOf" ->
-      rolesOf <$> (onNothing (errorMessage "no context" queryStepType) (firstOnly (getRol "model:QueryAst$rolesOf$context") queryStepType))
+      rolesOf <$> (onNothing
+        (errorMessage "no context" queryStepType)
+        (getBindingOfRol "model:QueryAst$rolesOf$context" queryStepType))
     "model:QueryAst$UnaryCombinator" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") typeDescriptionID)
       case functionName of
@@ -101,9 +108,9 @@ constructQueryFunction typeDescriptionID = do
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for nAryCombinator: '" <> functionName <> "'")
     "model:QueryAst$filter" -> do
       criteriumId <- onNothing (errorMessage "no criterium" queryStepType)
-        (firstOnly (getRolByLocalName "criterium") typeDescriptionID)
+        (getBindingOfRol "model:QueryAST$filter$criterium" typeDescriptionID)
       candidateId <- onNothing (errorMessage "no candidates" queryStepType)
-        (firstOnly (getRolByLocalName "criterium") typeDescriptionID)
+        (getBindingOfRol "model:QueryAST$filter$candidates" typeDescriptionID)
       filter <$> (constructQueryFunction criteriumId) <*> constructQueryFunction candidateId
     "model:QueryAst$Constant" -> do
       constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$Constant$value") typeDescriptionID)
@@ -115,7 +122,7 @@ constructQueryFunction typeDescriptionID = do
       variableName <- onNothing (errorMessage "no variable name found" queryStepType)
         (firstOnly (getInternalProperty "model:QueryAst$Variable$name") typeDescriptionID)
       valueDescriptionID <- onNothing (errorMessage "no value found" queryStepType)
-        (firstOnly (getRolByLocalName "value") typeDescriptionID)
+        (getBindingOfRol "model:QueryAST$setVariable$value" typeDescriptionID)
       valueQuery <- constructQueryFunction valueDescriptionID
       pure $ var variableName valueQuery
 
@@ -123,27 +130,21 @@ constructQueryFunction typeDescriptionID = do
     _ -> throwError (error $ "constructQueryFunction: unknown type description: '" <> typeDescriptionID <> "'")
 
   where
-    applyPropertyConstructor :: (PropertyName -> TypedTripleGetter e)
-      -> ID
-      -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
-    applyPropertyConstructor f queryStepType = do
-      propertyId <- onNothing
-        (errorMessage "no property found" queryStepType)
-        (firstOnly (getRolByLocalName "property" /-/ getRolBinding /-/ getRolContext) typeDescriptionID)
-      pure $ f propertyId
+    getBindingOfRol :: ID -> ID -> MonadPerspectives (AjaxAvarCache e) (Maybe ID)
+    getBindingOfRol rolName = firstOnly (getRol rolName /-/ getRolBindingDef)
 
     applyUnaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e )
       -> ID
       -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
     applyUnaryCombinator c queryStepType = do
-      query <- onNothing (errorMessage "no query provided" queryStepType) (firstOnly (getRol "model:QueryAst$UnaryCombinator$query") typeDescriptionID)
+      query <- onNothing (errorMessage "no query provided" queryStepType) (getBindingOfRol "model:QueryAst$UnaryCombinator$query" typeDescriptionID)
       constructQueryFunction query >>= pure <<< c
 
     applyBinaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e -> TypedTripleGetter e)
       -> ID
       -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
     applyBinaryCombinator c queryStepType = do
-      (operandIds :: Array ID) <- getRolByLocalName "operand" typeDescriptionID
+      (operandIds :: Array ID) <- (getRol "model:QueryAST$nAryCombinator$operand" /-/ getRolBindingDef)  typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
       {init, last} <- onNothing' (errorMessage "too few operands" queryStepType) (unsnoc operands)
       pure $ foldl c last init
