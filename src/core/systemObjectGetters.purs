@@ -11,6 +11,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getContextMember', ge
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
+import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Utilities (onNothing)
 import Prelude (bind, join, pure, ($), (<>), (>=>))
 
@@ -66,6 +67,9 @@ getRolTypeF = makeFunction "getRolTypeF" getRolType
 
 getRolBinding :: forall e. ObjectsGetter e
 getRolBinding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
+
+getRolBindingDef :: forall e. ObjectsGetter e
+getRolBindingDef = getRolBinding /-/ getRolContext
 
 getRolContext :: forall e. ObjectsGetter e
 getRolContext = getRolMember \rol -> [rol_context rol]

@@ -14,7 +14,7 @@ psp:Context t:Test1
   $interneView =>
     psp:View t:viewMetOngedefineerdeRol
       $propertyReferentie => psp:Rol$buitenRolBeschrijving$isVerplicht
-        $volgNummer = 1 -- Deze ziet ie niet!
+        $volgNummer = 1
       $ongedefinieerdeRol => psp:Context
 
 --------------------------------------------------------------------------------
