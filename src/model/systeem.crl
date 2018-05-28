@@ -1,56 +1,38 @@
 -- MODELLERING VAN TRUSTEDCLUSTER
 Context model:Systeem als sys:
+
 import model:Arc als arc:
 import model:Perspectives als psp:
-import model:User als usr:
 
-Section psp:zaakInContext
+Section psp:Context$rolInContext
 
-arc:Zaak sys:Systeem
-	psp:rolInContext =>
+psp:Context sys:Systeem
+	prototype psp:ContextPrototype
+	$rolInContext =>
 		psp:Rol $gebruiker
-			extern isFunctioneel = true
+			-- wat is de mogelijkeBinding van gebruiker?
+			-- we gaan niets binden, dus elk type is goed.
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:ElkType
 
 arc:Zaak sys:TrustedCluster
-	psp:internalProperty =>
-		psp:Property $aantekening
-			extern psp:isFunctioneel = true
-			extern psp:isVerplicht = false
-			psp:range => psp:String
-	psp:rolInContext =>
+	prototype psp:ContextPrototype
+	psp:Context$rolInContext =>
 		psp:Rol $clusterGenoot
-			psp:mogelijkeBinding => sys:Systeem$gebruiker
-			psp:rolProperty =>
+			extern $isFunctioneel = false
+			$mogelijkeBinding => sys:Systeem$gebruiker
+			$rolProperty =>
 				psp:Property $url
-					extern psp:isFunctioneel = true
-					extern psp:isVerplicht = true
-					psp:range => psp:String
-			psp:viewInRol =>
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+			$viewInRol =>
 				psp:View $Adressering
-					psp:propertyReferentie => $$url
-	psp:actieInContext =>
+					$propertyReferentie => $$url
+						$volgNummer = 1
+			$objectRol => $$RaadpleegtClusterGenoot
+			$subjectRol => $$RaadpleegtClusterGenoot
+	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
-			arc:onderwerp => $$clusterGenoot
-			arc:werkwoord => arc:raadpleegt
-			arc:lijdendVoorwerp => $$clusterGenoot
-			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$clusterGenoot$Adressering
-	psp:actieInContext =>
-		psp:Actie $RaadpleegtTrustedCluster
-			arc:onderwerp => $$clusterGenoot
-			arc:werkwoord => arc:raadpleegt
-			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$viewInterneAantekening
-	psp:interneView =>
-		psp:View $viewInterneAantekening
-			psp:propertyReferentie => $$aantekening
-
--- Experimentele syntax om een rol zonder binding te maken. Zulke rollen vormen
--- de bodem van de roltelescoop.
---sys:Systeem usr:Systeem
---	$gebruiker => ()
-
--- Experimentele syntax om een query uit te voeren op een beginpunt. Zoiets is noodzakelijk
--- om een rol te kunnen binden aan een bestaande, andere rol. Zo'n rol kunnen we niet
--- met een naam bereiken.
---sys:TrustedCluster usr:TrustedCluster
---	$clusterGenoot =>
---		usr:Systeem ~> gebruiker
+			$werkwoord => psp:Raadpleegt
+			$objectView => $$clusterGenoot$Adressering
