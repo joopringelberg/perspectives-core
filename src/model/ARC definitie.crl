@@ -4,50 +4,56 @@ Context model:Arc als arc:
 
 import model:Perspectives als psp:
 
-Section psp:rolInContext
-
-psp:Rol arc:zaakInContext
-	extern psp:isFunctioneel = false
-	psp:mogelijkeBinding => arc:Zaak
-
-psp:Rol arc:actieInContext
-	extern psp:isFunctioneel = false
-	psp:mogelijkeBinding => psp:Actie
-
-psp:Context arc:activiteitInContext
-	extern psp:isFunctioneel = false
-	psp:mogelijkeBinding => arc:Activiteit
-
-psp:Context arc:toestandInContext
-	extern psp:isFunctioneel = false
-	psp:mogelijkeBinding => arc:Toestand
+Section psp:Context$rolInContext
 
 psp:Context arc:Domein
-	psp:rolInContext => psp:externalProperty
-	psp:rolInContext => psp:internalProperty
-	psp:rolInContext => psp:rolInContext
-	psp:rolInContext => arc:actieInContext
-
-psp:Context arc:Partij
-	psp:rolInContext => psp:externalProperty
-	psp:rolInContext => psp:internalProperty
-	psp:rolInContext => psp:rolInContext
-	psp:rolInContext => arc:actieInContext
-
-psp:Context arc:Zaak
-	psp:aspect => psp:Context
-	psp:rolInContext => arc:zaakInContext
-	psp:rolInContext => arc:activiteitInContext
-	psp:rolInContext => arc:toestandInContext
-
-psp:Context arc:Toestand
-	psp:rolInContext => psp:externalProperty
-	psp:rolInContext => psp:internalProperty
-	psp:rolInContext => psp:rolInContext
-	psp:rolInContext => arc:actieInContext
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $actie
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
 
 psp:Context arc:Activiteit
-	psp:rolInContext => psp:externalProperty
-	psp:rolInContext => psp:internalProperty
-	psp:rolInContext => psp:rolInContext
-	psp:rolInContext => arc:actieInContext
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $actie
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
+
+psp:Context arc:Toestand
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $actie
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
+
+psp:Context arc:Partij
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $partij
+			extern $isFunctioneel = false
+			$mogelijkeBinding => arc:Partij
+	$rolInContext =>
+		psp:Rol $actie
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
+
+psp:Context arc:Zaak
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $zaak
+			extern $isFunctioneel = false
+			$mogelijkeBinding => arc:Zaak
+	$rolInContext =>
+		psp:Rol $activiteit
+			extern $isFunctioneel = false
+			$mogelijkeBinding => arc:Activiteit
+	$rolInContext =>
+		psp:Rol $toestand
+			extern $isFunctioneel = false
+			$mogelijkeBinding => arc:Toestand
