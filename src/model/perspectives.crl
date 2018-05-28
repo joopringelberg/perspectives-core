@@ -197,22 +197,19 @@ psp:Context psp:Actie
 
 psp:Context psp:Werkwoord
 	prototype psp:ContextPrototype
+	$aspect => psp:Context
 
-psp:Context psp:Beheert
+psp:Werkwoord psp:Beheert
 	prototype psp:ContextPrototype
-	$aspect => psp:Werkwoord
 
-psp:Context psp:Raadpleegt
+psp:Werkwoord psp:Raadpleegt
 	prototype psp:ContextPrototype
-	$aspect => psp:Werkwoord
 
-psp:Context psp:Creëert
+psp:Werkwoord psp:Creëert
 	prototype psp:ContextPrototype
-	$aspect => psp:Werkwoord
 
-psp:Context psp:Verwijdert
+psp:Werkwoord psp:Verwijdert
 	prototype psp:ContextPrototype
-	$aspect => psp:Werkwoord
 
 --------------------------------------------------------------------------------
 -- ZAAK

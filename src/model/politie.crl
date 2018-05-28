@@ -1,4 +1,7 @@
 -- POLITIE MODEL MET AANGIFTE
+--arc:Aangifte arc:UrgenteAangiftePrototype
+--	$urgentie = 10
+
 Context model:Politie als pol:
 
 import model:Perspectives als psp:
@@ -16,6 +19,7 @@ arc:Zaak $Aangifte
 	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $urgentie
 					extern $isFunctioneel = true
@@ -24,15 +28,21 @@ arc:Zaak $Aangifte
 	psp:Context$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $aantekening
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
 					$range => psp:String
+	$actie =>
+		psp:Actie $Actie_1
+			$werkwoord => psp:Beheert
+			$objectView => $$Aangever$Adres
 	psp:Context$rolInContext =>
 		psp:Rol $Aangever
 			extern $isFunctioneel = true
 			$mogelijkeBinding => pol:Persoon
+			$objectRol => $$Actie_1
 			$rolProperty =>
 				psp:Property $betrouwbaarheid
 					extern $isFunctioneel = true
@@ -42,32 +52,24 @@ arc:Zaak $Aangifte
 				psp:View $Adres
 					$propertyReferentie => $$betrouwbaarheid
 						$volgNummer = 1
-
-	psp:rolInContext =>
+	psp:Context$rolInContext =>
 		psp:Rol $Verbalisant
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => pol:Medewerker
-	arc:activiteitInContext =>
-			psp:Activiteit $Intake
-				psp:rolInContext =>
-					psp:Rol $Uitvoerder
-						extern psp:isFunctioneel = true
-						psp:mogelijkeBinding => $$$Verbalisant
-	psp:rolInContext =>
-		psp:Rol $Start
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => $$Intake
-			psp:rolProperty =>
+			extern $isFunctioneel = true
+			$mogelijkeBinding => pol:Medewerker
+			$subjectRol => $$Actie_1
+	$activiteit =>
+		arc:Activiteit $Intake
+			prototype psp:ContextPrototype
+			psp:Context$rolInContext =>
+				psp:Rol $Uitvoerder
+					extern $isFunctioneel = true
+					$mogelijkeBinding => $$$Verbalisant
+	psp:Context$rolInContext =>
+		psp:Rol $start
+			extern $isFunctioneel = true
+			$mogelijkeBinding => $$Intake
+			$rolProperty =>
 				psp:Property $toegewezen
-					extern psp:isFunctioneel = true
-					extern psp:isVerplicht = true
-					psp:range => Boolean
-	arc:actieInContext =>
-		arc:Actie $Actie_1
-			arc:onderwerp => $$Verbalisant
-			arc:werkwoord => arc:beheert
-			arc:lijdendVoorwerp => $$UserRol
-			arc:bijvoegelijkeBepalingVanLijdendVoorwerp => $$UserRol$Adres
-
-arc:Aangifte arc:UrgenteAangiftePrototype
-	$urgentie = 10
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean

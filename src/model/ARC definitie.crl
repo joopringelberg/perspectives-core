@@ -57,3 +57,7 @@ psp:Context arc:Zaak
 		psp:Rol $toestand
 			extern $isFunctioneel = false
 			$mogelijkeBinding => arc:Toestand
+	$rolInContext =>
+		psp:Rol $actie
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Actie
