@@ -106,7 +106,7 @@ constructRolLookup rn = constructTripleGetter getRolFromPrototypeHierarchy rn
 constructInverseRolGetter :: forall e.
   RolName ->
   TypedTripleGetter e
-constructInverseRolGetter pn = constructTripleGetter getGebondenAls pn
+constructInverseRolGetter pn = constructTripleGetterFromObjectsGetter (pn <> "_inverse") $ getGebondenAls pn
 
 -- | A combinator from the type name of a Rol to a query that takes the instance of a Rol
 -- | and returns a boolean value showing if the instance has the given type.

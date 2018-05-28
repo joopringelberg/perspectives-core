@@ -1,18 +1,10 @@
 module Perspectives.ModelBasedObjectGetters where
 
+import Control.Alt ((<|>))
 import Perspectives.CoreTypes (ObjectsGetter)
-import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getRol)
+import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.SystemObjectGetters (getRolBinding, getRolContext)
-
--- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
-propertyIsVerplicht :: forall e. ObjectsGetter e
-propertyIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspectProperty"
-  "model:Perspectives$Property$buitenRolBeschrijving$isVerplicht"
-
--- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
-propertyIsFunctioneel :: forall e. ObjectsGetter e
-propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
+import Perspectives.SystemObjectGetters (getBuitenRol, getRolBinding, getRolContext)
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e
@@ -41,3 +33,31 @@ getBuitenRolBeschrijving = getRol "model:Perspectives$Context$buitenRolBeschrijv
 -- | `psp:Context -> psp:RolInstance`
 getBinnenRolBeschrijving :: forall e. ObjectsGetter e
 getBinnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijving"
+
+-- | `psp:Rol -> psp:Context`
+getContextDef :: forall e. ObjectsGetter e
+getContextDef rid = unlessNull getRolInContextContextDef rid <|> unlessNull getBinnenRolContextDef rid <|> unlessNull getBuitenRolContextDef rid
+
+-- | The Context of the RolInContext.
+-- | `psp:Rol -> psp:Context`
+getRolInContextContextDef :: forall e. ObjectsGetter e
+getRolInContextContextDef = getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$rolInContext" /-/ getRolContext
+
+-- | The Context of the BinnenRol.
+-- | `psp:Rol -> psp:Context`
+getBinnenRolContextDef :: forall e. ObjectsGetter e
+getBinnenRolContextDef = getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ getRolContext
+
+-- | The Context of the BuitenRol.
+-- | `psp:Rol -> psp:Context`
+getBuitenRolContextDef :: forall e. ObjectsGetter e
+getBuitenRolContextDef = getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ getRolContext
+
+-- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+propertyIsVerplicht :: forall e. ObjectsGetter e
+propertyIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspectProperty"
+  "model:Perspectives$Property$buitenRolBeschrijving$isVerplicht"
+
+-- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
+propertyIsFunctioneel :: forall e. ObjectsGetter e
+propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"

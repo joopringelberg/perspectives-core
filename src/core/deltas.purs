@@ -33,7 +33,7 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
-import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, contextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneel, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
+import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneel, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.SystemObjectGetters (getRolBinding, getRolContext, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
@@ -256,11 +256,11 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
     where
       -- roles in context that play the subjectRol in the relevant acties
       -- psp:Rol -> psp:Rol
-      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRolDef relevantActies)) (contextDef >-> ownRolDef)
+      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRolDef relevantActies)) (rolInContextDef >-> ownRolDef)
 
       -- acties that have an objectView with the memberName
       -- psp:Rol -> psp:Actie
-      relevantActies = filter (hasRelevantView memberName) (contextDef >-> actieInContextDef)
+      relevantActies = filter (hasRelevantView memberName) (rolInContextDef >-> actieInContextDef)
 
   -- From the instance of the context, retrieve the instances of the users that play
   -- a Rol in this context that have a subjectRol bound to an Actie that is bound as the
