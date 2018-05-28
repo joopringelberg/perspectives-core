@@ -4,34 +4,45 @@ Context model:Politie als pol:
 import model:Perspectives als psp:
 import model:Arc als arc:
 
-Section arc:zaakInContext
+Section psp:Context$rolInContext
 
 arc:Partij pol:Persoon
+	prototype psp:ContextPrototype
+
 arc:Partij pol:Medewerker
+	prototype psp:ContextPrototype
 
 arc:Zaak $Aangifte
-	psp:externalProperty =>
-		psp:Property $urgentie
-			extern psp:isFunctioneel = true
-			extern psp:isVerplicht = false
-			psp:range => psp:Number
-	psp:internalProperty =>
-		psp:Property $aantekening
-			extern psp:isFunctioneel = true
-			extern psp:isVerplicht = false
-			psp:range => psp:String
-	psp:rolInContext =>
-		psp:Rol $UserRol
-			extern psp:isFunctioneel = true
-			psp:mogelijkeBinding => pol:Persoon
-			psp:rolProperty =>
+	psp:Context$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$rolProperty =>
+				psp:Property $urgentie
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:Number
+	psp:Context$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$rolProperty =>
+				psp:Property $aantekening
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+	psp:Context$rolInContext =>
+		psp:Rol $Aangever
+			extern $isFunctioneel = true
+			$mogelijkeBinding => pol:Persoon
+			$rolProperty =>
 				psp:Property $betrouwbaarheid
-					extern psp:isFunctioneel = true
-					extern psp:isVerplicht = true
-					psp:range => psp:Number
-			psp:viewInRol =>
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Number
+			$viewInRol =>
 				psp:View $Adres
-					psp:propertyReferentie => $$betrouwbaarheid
+					$propertyReferentie => $$betrouwbaarheid
+						$volgNummer = 1
+
 	psp:rolInContext =>
 		psp:Rol $Verbalisant
 			extern psp:isFunctioneel = true
