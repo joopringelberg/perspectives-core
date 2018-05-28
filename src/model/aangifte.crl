@@ -1,11 +1,11 @@
 -- POLITIE MODEL MET AANGIFTE
-Context model:Test als tst:
+Context model:PolitieTest als ptst:
 
 import model:Perspectives als psp:
 import model:Arc als arc:
 import model:Politie als pol:
 
-Section arc:zaakInContext
+Section psp:Context$rolInContext
 
 pol:Medewerker usr:Jansen
 
