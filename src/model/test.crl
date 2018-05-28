@@ -20,7 +20,7 @@ Section $rolInContext
 psp:Context t:Test1
   prototype psp:ContextPrototype
   $interneView =>
-    psp:View t:viewMetOngedefineerdeRol
+    psp:View $viewMetOngedefineerdeRol
       $propertyReferentie => psp:Rol$buitenRolBeschrijving$isVerplicht
         $volgNummer = 1
       $ongedefinieerdeRol => psp:Context
@@ -46,6 +46,7 @@ psp:Context t:Test4
   prototype psp:ContextPrototype
   $rolInContext =>
     psp:Rol $rol
+      extern $isFunctioneel = true
       extern $ongedefineerdeRolProperty = 1
       $mogelijkeBinding => psp:Rol
 

@@ -28,6 +28,7 @@ psp:SimpleValue psp:Date
 psp:Context psp:Property
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $isFunctioneel
 					extern $isFunctioneel = true -- ziet ie niet (maar is er wel)
@@ -97,17 +98,21 @@ psp:Context psp:Context
 psp:Context psp:ContextPrototype
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 
 psp:Context psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $isFunctioneel
 					extern $isFunctioneel = true

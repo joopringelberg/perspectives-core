@@ -36,7 +36,12 @@ getBinnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijv
 
 -- | `psp:Rol -> psp:Context`
 getContextDef :: forall e. ObjectsGetter e
-getContextDef rid = unlessNull getRolInContextContextDef rid <|> unlessNull getBinnenRolContextDef rid <|> unlessNull getBuitenRolContextDef rid
+getContextDef rid = unlessNull getRolInContextContextDef rid <|> unlessNull getBinnenRolContextDef rid <|> unlessNull getBuitenRolContextDef rid <|> getBindingDef rid
+
+-- | The type of Rol or Context that can be bound to the Rol.
+-- | `psp:Rol -> psp:Context | psp:Rol`
+getBindingDef :: forall e. ObjectsGetter e
+getBindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ getRolBinding /-/ getRolContext
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`

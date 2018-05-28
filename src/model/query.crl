@@ -14,9 +14,11 @@ psp:Context q:DataTypeGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
@@ -35,9 +37,11 @@ psp:Context q:PropertyGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName

@@ -1,0 +1,31 @@
+model:Test kan niet meer in zijn geheel gecontroleerd worden. Er wordt een foutmelding gegenereerd: "Always fails" en dat komt uit de Plus module.
+
+Maar elke context afzonderlijk kan wel worden getest.
+
+Test per geval:
+	- Test1 geeft geen foutmelding meer. Maar dat klopt. Het gaat om de geneste View en daarop wordt wel een melding gegeven.
+	- Test2 geeft een correcte semantische foutmelding: PropertyNotDefined (Extern)
+	- Test3 geeft een correcte semantische foutmelding: PropertyNotDefined (Intern)
+	- Test4 geeft geen foutmelding meer. Maar op "model:Test$Test4$rol" wel.
+	- Test5 idem. Maar op "model:Test$Test5$rol" wel.
+	- Test6 idem. Maar op "model:Test$Test6$rol" wel.
+	- Test7 idem. Maar op "model:Test$Test7$rol" wel.
+	- Test8 idem. Maar op "model:Test$Test8$rol" wel.
+	- Test9 idem. Maar dit is een context die geen fout moet bevatten.
+	- Test10 geeft een correcte semantische foutmelding: IncorrectBinding
+	- Test11 geeft geen foutmelding meer. Maar op "model:Test$Test11$rol" wel.
+
+Kortom, de TypeDefChecker genereert een correcte melding voor elke individuele context die een opzettelijke fout bevat.
+
+Waarom kan de hele test niet worden uitgevoerd?
+
+De melding zoals die verschijnt, staat in de module Control.Monad.Aff:
+
+instance plusAff ∷ Plus (Aff eff) where
+  empty = throwError (error "Always fails")
+
+Dus de empty functie van de Plus instantie genereert deze fout.
+
+De testcode moet dus een keer de empty functie aanroepen.
+
+Gevonden! Het ging om de getContextDef definitie. Het laatste lid moet niet óók unlessNull gebruiken.
