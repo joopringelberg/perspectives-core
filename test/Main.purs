@@ -1,6 +1,6 @@
 module Test.Main where
 
-import Test.TypeDefChecker (test)
+import Test.ObjectsGetterLookup (test)
 import Test.TestEffects as TE
 import Control.Monad.Aff (Fiber, runAff)
 import Control.Monad.Eff (Eff)
