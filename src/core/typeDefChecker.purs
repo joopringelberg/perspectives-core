@@ -14,7 +14,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
-import Perpectives.TypeChecker (contextHasType, isOrHasAspect, rolHasType)
+import Perpectives.TypeChecker (contextHasType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleGetter2function, tripleObject, tripleObjects, (@@))
 import Perspectives.DataTypeTripleGetters (binding, context, contextType, typeVanIedereRolInContext)
 import Perspectives.DomeinCache (retrieveDomeinFile)

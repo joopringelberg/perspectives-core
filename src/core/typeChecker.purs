@@ -78,14 +78,14 @@ checkRolForUnQualifiedProperty ln rn' = do
     aspectsWithUnqualifiedProperty ln' rn = union <$> importedAspectsWithUnqualifiedProperty rn <*> aspectsFromMogelijkeBindingWithUnqualifiedProperty rn
       where
         importedAspectsWithUnqualifiedProperty :: ObjectsGetter e
-        importedAspectsWithUnqualifiedProperty rn' = (rn' ## filter (hasUnqualifiedProperty ln') aspectDefClosure) >>= tripleObjects_
+        importedAspectsWithUnqualifiedProperty rn'' = (rn'' ## filter (hasUnqualifiedProperty ln') aspectDefClosure) >>= tripleObjects_
 
         aspectsFromMogelijkeBindingWithUnqualifiedProperty :: ObjectsGetter e
-        aspectsFromMogelijkeBindingWithUnqualifiedProperty rn' =
+        aspectsFromMogelijkeBindingWithUnqualifiedProperty rn'' =
           (unlessNull
-            ((mogelijkeBinding /-/ alternatives) \-\ aspectsWithUnqualifiedProperty ln')) rn'
+            ((mogelijkeBinding /-/ alternatives) \-\ aspectsWithUnqualifiedProperty ln')) rn''
           <|>
-          (mogelijkeBinding /-/ aspectsWithUnqualifiedProperty ln') rn'
+          (mogelijkeBinding /-/ aspectsWithUnqualifiedProperty ln') rn''
 
     hasUnqualifiedProperty :: PropertyName -> TypedTripleGetter e
     hasUnqualifiedProperty ln' = containsMatching
@@ -133,15 +133,15 @@ importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
 
 -- | `psp:ContextInstance -> psp:Rol -> Boolean`
 contextHasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
-contextHasType binding mogelijkeBinding = do
+contextHasType binding mogelijkeBnding = do
   typeOfBinding <- getContextTypeF binding
-  typeOfBinding `isOrHasAspect` mogelijkeBinding
+  typeOfBinding `isOrHasAspect` mogelijkeBnding
 
 -- | `psp:ContextInstance -> psp:Rol -> Boolean`
 rolHasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
-rolHasType binding mogelijkeBinding = do
+rolHasType binding mogelijkeBnding = do
   typeOfBinding <- getRolTypeF binding
-  typeOfBinding `isOrHasAspect` mogelijkeBinding
+  typeOfBinding `isOrHasAspect` mogelijkeBnding
 
 mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID
 mostSpecificCommonAspect types = do
