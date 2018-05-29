@@ -117,7 +117,7 @@ Dus: door de modelleur gemaakte berekende rollen worden altijd in MonadPerspecti
 
 
 REFACTOR-STAPPEN
-0. Maak een isomorphie tussen predicaat en ObjectsGetter.
+0. Maak een isomorphie tussen predicaat en ObjectsGetter. KLAAR
 1. Ontwerp een Triple zonder Subject en Predicaat: TrackedObject.
 2. Herschrijf de TripleAdministratie zodat hij niet met triples werkt maar met TrackedObjects.
 3. Herschrijf de ObjectsCompositie operatoren zodanig dat ze kunnen memoriseren in termen van TrackedObjects.
@@ -129,4 +129,30 @@ REFACTOR-STAPPEN
 	- daar waar modelBasedObjectGetters namen worden gebruikt, moet je die dus vervangen.
 	- de meeste ModelBasedTripleGetters zullen nog geschreven moeten worden in termen van ObjectsGetters.
 
+
+===================================================================================================================
+OPNIEUW: MOETEN WE TRIPLES TERUGGEVEN OM DEPENDENCY TRACKING TE KUNNEN DOEN?
+Ik heb een aantal gevallen ontdekt waarin de subjecten en predicaten van triples wel degelijk gebruikt worden (met een search naar "Triple{"):
+1. Perspectives.Api: getQuery.
+
+getQuery :: forall e. ContextID -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getQuery cid query@(TypedTripleGetter qn _) setter = do
+  (Triple{subject, predicate}) <- cid ## query ~> NamedFunction (cid <> qn) (setter >=> pure <<< const unit)
+  pure $ unRegisterTriple $ TripleRef {subject, predicate}
+
+Maar hier kunnen we subject vervangen door cid en predicate door de naam van query, waar query straks gebonden is aan een ObjectsGetter.
+
+2. Perspectives.QueryCombinators: filter. Hier moeten we een andere, echte filter constructie gebruiken.
+
+3. Perspectives.QueryEffect: addEffectToQuery. Hier moeten we in addEffectToQuery' de id als subject meegeven aan effectFun, en de naam van de ObjectsGetter als predicaat.
+
+4. Perspectives.TheoryChange. De queue is inherent en essentieel gebaseerd op triples. 
+	a. Inventarisatie van de interface van TheoryChange is: (updateFromSeeds, modifyTriple) en die wordt exclusief gebruikt in Perspectives.Delta.
+	b. Alleen updateFromSeeds brengt van buiten triples op de queue naar binnen. 
+	c. In Perspectives.Deltas.runInTransactie wordt Perspectives.TheoryChange.modifyTriple aangeroepen met een Delta. Deze functie raadpleegt de Triple administratie, maar zou zonder verlies ook met een TrackedObject administratie uit de voeten kunnen en tòch een Triple teruggeven.
+	d. Deze triples gaan naar updateFromSeeds.
+	e. In Perspectives.TheorChange.getDependencies kunnen we dan Triples in elkaar schroeven. Zij vormen de queue.
+
+EINDCONCLUSIE
+Overal kunnen we om de Triples heen, behalve in TheoryChange. Daar moet de queue bestaan uit Triples. Maar die kunnen we lokaal in elkaar zetten.
 

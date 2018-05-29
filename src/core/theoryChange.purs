@@ -1,4 +1,4 @@
-module Perspectives.TheoryChange where
+module Perspectives.TheoryChange (updateFromSeeds, modifyTriple) where
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)

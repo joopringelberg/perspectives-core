@@ -3,7 +3,7 @@ module Test.TypeDefChecker where
 import Prelude
 
 import Control.Alt ((<|>))
-import Control.Monad.Aff.Console (CONSOLE, logShow)
+import Control.Monad.Aff.Console (CONSOLE, log, logShow)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
 import Data.Array (head)
@@ -24,11 +24,12 @@ import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (contains, toBoolean)
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
 import Perspectives.Syntax (PerspectContext(..))
-import Perspectives.SystemObjectGetters (getBuitenRol, getRolBinding, getRolContext)
+import Perspectives.SystemObjectGetters (getBuitenRol, getRolBinding, getRolContext, getRollen)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructInverseRolGetter, constructRolPropertyGetter)
+import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructInverseRolGetter, constructRolGetter, constructRolPropertyGetter)
 import Perspectives.TypeDefChecker (checkContext, checkModel, getPropertyFunction)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
@@ -79,11 +80,14 @@ test = do
   -- messages14 <- checkContext "model:Test$Test11$rol"
   -- lift $ for_ messages14 logShow
 
-  messages15 <- checkModel "model:Test"
+  messages15 <- checkModel "model:Systeem"
   lift $ for_ messages15
     \m -> do
       logShow m
       logShow "------"
+
+-- betrouwbaarheid <- "model:User$MijnAangifte" ## ((constructRolGetter "model:Politie$Aangifte$Verbalisant")
+-- >-> (constructExternalPropertyGetter "model:Politie$Aangifte$Verbalisant$betrouwbaarheid"))
 
 -- De buitenRol is er wel, maar ik kan niet terugnavigeren over rolInContext. En dat klopt, want het is een binnenRolBeschrijving rol.
   -- c <- getBinnenRolContextDef "model:Perspectives$Property$binnenRolBeschrijving"

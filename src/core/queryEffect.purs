@@ -19,7 +19,7 @@ addEffectToQuery (TypedTripleGetter tgName tg) (NamedFunction effectName effect)
 
     addEffectToQuery' :: TripleGetter e
     addEffectToQuery' id = do
-      t@(Triple{subject, predicate, object}) <- tg id
+      t <- tg id
       et <- effectFun t id
       liftEff $ registerTriple et
       -- To unsubscribe the effect, de-register the effect triple.

@@ -28,7 +28,7 @@ closure (TypedTripleGetter nameOfp p) =
   where
     getter :: Array ID -> Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
     getter cumulator id = do
-      t@(Triple{subject, object : objectsOfP}) <- p id
+      t@(Triple{object : objectsOfP}) <- p id
       case Arr.elemIndex id cumulator of
         Nothing -> do
           (triples :: Array (Triple e)) <- (traverse (getter (Arr.union cumulator objectsOfP))) (Arr.difference objectsOfP cumulator)
@@ -54,7 +54,7 @@ closure' (TypedTripleGetter nameOfp p) =
   where
     getter :: Array ID -> Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
     getter cumulator id = do
-      t@(Triple{subject, object : objectsOfP}) <- p id
+      t@(Triple{object : objectsOfP}) <- p id
       case Arr.elemIndex id cumulator of
         Nothing -> do
           case Arr.head objectsOfP of
