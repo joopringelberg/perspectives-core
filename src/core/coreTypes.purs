@@ -36,7 +36,6 @@ type PerspectivesState =
   , couchdbSessionStarted :: Boolean
   , sessionCookie :: AVar String
   , memorizeQueryResults :: Boolean
-  -- , queryCache :: QueryCache
   }
 
 -----------------------------------------------------------
