@@ -16,7 +16,7 @@ import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (contextHasType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleGetter2function, tripleObject, tripleObjects, (@@))
-import Perspectives.DataTypeTripleGetters (binding, context, contextTypeM, typeVanIedereRolInContext)
+import Perspectives.DataTypeTripleGetters (binding, context, contextTypeM, typeVanIedereRolInContextM)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -99,7 +99,7 @@ checkDefinedRoles typeId cid = do
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
 checkAvailableRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkAvailableRoles typeId cid = do
-  (Triple{object: availableRoles}) <- lift (cid @@ typeVanIedereRolInContext)
+  (Triple{object: availableRoles}) <- lift (cid @@ typeVanIedereRolInContextM)
   for_ availableRoles isDefined
   where
     -- `psp:Context -> psp:Rol -> Unit`

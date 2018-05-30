@@ -23,7 +23,7 @@ import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
+import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContextM) as DTG
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
@@ -204,7 +204,7 @@ enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
   withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
   newline
-  sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache DTG.typeVanIedereRolInContext))
+  sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache DTG.typeVanIedereRolInContextM))
   traverse_ section (tripleObjects sectionIds)
 
   where

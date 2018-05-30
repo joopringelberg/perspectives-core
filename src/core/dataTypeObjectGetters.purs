@@ -45,8 +45,8 @@ iedereRolInContext :: forall e. ObjectsGetter e
 iedereRolInContext = getContextMember \context -> nub $ join $ values (context_rolInContext context)
 
 -- | The names of every rol given to this context.
-getRolTypen :: forall e. ObjectsGetter e
-getRolTypen = getContextMember \context -> keys (context_rolInContext context)
+typeVanIedereRolInContext :: forall e. ObjectsGetter e
+typeVanIedereRolInContext = getContextMember \context -> keys (context_rolInContext context)
 
 -- | The names of every property given to this rol.
 getPropertyTypen :: forall e. ObjectsGetter e

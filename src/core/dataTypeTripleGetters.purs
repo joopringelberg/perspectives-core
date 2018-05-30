@@ -1,7 +1,7 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (buitenRol, contextType, getDisplayName, getRolBinding, getRolContext, rolType, getRolTypen, iedereRolInContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, contextType, getDisplayName, getRolBinding, getRolContext, rolType, typeVanIedereRolInContext, iedereRolInContext)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
 import Prelude (pure)
 
@@ -35,8 +35,8 @@ iedereRolInContextM =  constructTripleGetterFromObjectsGetter "model:Perspective
 -- | The types of the rol instances given to this context instance. Note: non-mandatory
 -- | Rol types defined for the Context type may be missing!
 -- | `psp:ContextInstance -> psp:Rol`
-typeVanIedereRolInContext :: forall e. TypedTripleGetter e
-typeVanIedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives$typeVanIedereRolInContext" getRolTypen
+typeVanIedereRolInContextM :: forall e. TypedTripleGetter e
+typeVanIedereRolInContextM =  constructTripleGetterFromObjectsGetter "model:Perspectives$typeVanIedereRolInContext" typeVanIedereRolInContext
 
 -- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
 -- | `psp:RolInstance -> psp:RolInstance`
