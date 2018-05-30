@@ -2,7 +2,7 @@ module Perspectives.ModelBasedTripleGetters where
 
 import Perspectives.CoreTypes (TypedTripleGetter)
 import Perspectives.DataTypeTripleGetters (bindingM, iedereRolInContextM, labelM, contextM, buitenRolM)
-import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving, getContextDef, propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht)
+import Perspectives.ModelBasedObjectGetters (binnenRolBeschrijving, buitenRolBeschrijving, contextDef, propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht)
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
 import Perspectives.TripleGetterComposition ((>->), (>->>))
 import Perspectives.TripleGetterConstructors (constructInverseRolGetter, constructRolGetter, constructTripleGetterFromObjectsGetter, rolHasTypeWithLocalName)
@@ -175,7 +175,7 @@ inverse_subjectRolDefM = buitenRolM >-> constructInverseRolGetter "model:Perspec
 
 -- | `psp:Rol -> psp:Context`
 contextDefM :: forall e. TypedTripleGetter e
-contextDefM = constructTripleGetterFromObjectsGetter "model:Perspectives$getContextDef" getContextDef
+contextDefM = constructTripleGetterFromObjectsGetter "model:Perspectives$getContextDef" contextDef
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`
@@ -194,8 +194,8 @@ buitenRolContextDefM = buitenRolM >-> constructInverseRolGetter "model:Perspecti
 
 -- | `psp:Context -> psp:RolInstance`
 buitenRolBeschrijvingM :: forall e. TypedTripleGetter e
-buitenRolBeschrijvingM = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRolBeschrijving" getBuitenRolBeschrijving
+buitenRolBeschrijvingM = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRolBeschrijving" buitenRolBeschrijving
 
 -- | `psp:Context -> psp:RolInstance`
 binnenRolBeschrijvingM :: forall e. TypedTripleGetter e
-binnenRolBeschrijvingM = constructTripleGetterFromObjectsGetter "model:Perspectives$binnenRolBeschrijving" getBinnenRolBeschrijving
+binnenRolBeschrijvingM = constructTripleGetterFromObjectsGetter "model:Perspectives$binnenRolBeschrijving" binnenRolBeschrijving

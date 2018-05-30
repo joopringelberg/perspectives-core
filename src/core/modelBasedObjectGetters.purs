@@ -25,38 +25,38 @@ range = getRol "model:Perspectives$Property$range" /-/ binding /-/ context
 -- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
 -- | `psp:Context -> psp:RolInstance`
-getBuitenRolBeschrijving :: forall e. ObjectsGetter e
-getBuitenRolBeschrijving = getRol "model:Perspectives$Context$buitenRolBeschrijving"
+buitenRolBeschrijving :: forall e. ObjectsGetter e
+buitenRolBeschrijving = getRol "model:Perspectives$Context$buitenRolBeschrijving"
 
 -- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
 -- | `psp:Context -> psp:RolInstance`
-getBinnenRolBeschrijving :: forall e. ObjectsGetter e
-getBinnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijving"
+binnenRolBeschrijving :: forall e. ObjectsGetter e
+binnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijving"
 
 -- | `psp:Rol -> psp:Context`
-getContextDef :: forall e. ObjectsGetter e
-getContextDef rid = unlessNull getRolInContextContextDef rid <|> unlessNull getBinnenRolContextDef rid <|> unlessNull getBuitenRolContextDef rid <|> getBindingDef rid
+contextDef :: forall e. ObjectsGetter e
+contextDef rid = unlessNull rolInContextContextDef rid <|> unlessNull binnenRolContextDef rid <|> unlessNull buitenRolContextDef rid <|> bindingDef rid
 
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
-getBindingDef :: forall e. ObjectsGetter e
-getBindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ binding /-/ context
+bindingDef :: forall e. ObjectsGetter e
+bindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ binding /-/ context
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`
-getRolInContextContextDef :: forall e. ObjectsGetter e
-getRolInContextContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$rolInContext" /-/ context
+rolInContextContextDef :: forall e. ObjectsGetter e
+rolInContextContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$rolInContext" /-/ context
 
 -- | The Context of the BinnenRol.
 -- | `psp:Rol -> psp:Context`
-getBinnenRolContextDef :: forall e. ObjectsGetter e
-getBinnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ context
+binnenRolContextDef :: forall e. ObjectsGetter e
+binnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ context
 
 -- | The Context of the BuitenRol.
 -- | `psp:Rol -> psp:Context`
-getBuitenRolContextDef :: forall e. ObjectsGetter e
-getBuitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
+buitenRolContextDef :: forall e. ObjectsGetter e
+buitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 propertyIsVerplicht :: forall e. ObjectsGetter e
