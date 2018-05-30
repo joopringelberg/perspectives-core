@@ -1,31 +1,31 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (getBuitenRol, getContextType, getDisplayName, getRolBinding, getRolContext, getRolType, getRolTypen, getRollen)
+import Perspectives.DataTypeObjectGetters (buitenRol, contextType, getDisplayName, getRolBinding, getRolContext, rolType, getRolTypen, getRollen)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
 import Prelude (pure)
 
-identity' :: forall e. ObjectsGetter e
-identity' x = pure [x]
+identity :: forall e. ObjectsGetter e
+identity x = pure [x]
 
 -- | Identity for all values, contexts and roles.
 -- | `forall a. a -> a`
-identity :: forall e. TypedTripleGetter e
-identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity'
+identityM :: forall e. TypedTripleGetter e
+identityM = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity
 
 -- | The type of the context instance.
 -- | `psp:ContextInstance -> psp:Context`
-contextType :: forall e. TypedTripleGetter e
-contextType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getContextType
+contextTypeM :: forall e. TypedTripleGetter e
+contextTypeM = constructTripleGetterFromObjectsGetter "model:Perspectives$type" contextType
 
 -- | The type of the rol instance.
 -- | `psp:RolInstance -> psp:Rol`
-rolType :: forall e. TypedTripleGetter e
-rolType = constructTripleGetterFromObjectsGetter "model:Perspectives$type" getRolType
+rolTypeM :: forall e. TypedTripleGetter e
+rolTypeM = constructTripleGetterFromObjectsGetter "model:Perspectives$type" rolType
 
 -- | `psp:ContextInstance -> psp:BuitenRol`
-buitenRol :: forall e. TypedTripleGetter e
-buitenRol = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRol" getBuitenRol
+buitenRolM :: forall e. TypedTripleGetter e
+buitenRolM = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRol" buitenRol
 
 -- | Every rol instance belonging to the context instance.
 -- | `psp:ContextInstance -> psp:RolInstance`

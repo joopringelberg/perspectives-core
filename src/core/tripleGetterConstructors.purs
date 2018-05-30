@@ -14,7 +14,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
-import Perspectives.DataTypeObjectGetters (getRolType)
+import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (==))
 
@@ -114,14 +114,14 @@ constructInverseRolGetter pn = constructTripleGetterFromObjectsGetter (pn <> "_i
 -- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
 rolHasType :: forall e. ID -> TypedTripleGetter e
 rolHasType typeId = constructTripleGetterFromObjectsGetter ("model:Perspectives$rolHasType" <> "_" <> typeId)
-  (getRolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
+  (rolType >=> \(objs::Array String) -> pure (maybe ["false"] (const ["true"]) (elemIndex typeId objs)))
 
 -- | Tests whether the type of the Rol has a specific local name. Used to test if a Rol is a BuitenRol type or a BinnenRol type.
 -- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
 rolHasTypeWithLocalName :: forall e. ID -> TypedTripleGetter e
 rolHasTypeWithLocalName localName = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$rolHasTypeWithLocalName" <> "_" <> localName)
-  (getRolType `composeMonoidal` f)
+  (rolType `composeMonoidal` f)
   where
     f :: Array String -> Boolean
     f = alaF Disj foldMap (maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI)

@@ -9,6 +9,7 @@ module Perspectives.TripleAdministration
   , unRegisterTriple
   , memorize
   , removeDependency_
+  , setSupports_
   )
   where
 

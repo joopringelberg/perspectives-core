@@ -8,7 +8,7 @@ import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
-import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, contextType, identity, iedereRolInContext, label, rolType)
+import Perspectives.DataTypeTripleGetters (binding, buitenRolM, context, contextTypeM, identityM, iedereRolInContext, label, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol)
@@ -16,7 +16,7 @@ import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, ignoreCache, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (getContextType, getContextTypeF, getRolBindingDef)
+import Perspectives.DataTypeObjectGetters (contextType, contextTypeF, getRolBindingDef)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
@@ -30,7 +30,7 @@ rolQuery rn = ifNothing (queryCacheLookup rn)
   do
     -- We must run the resulting function in its own State.
     -- TODO. Dit ziet er beter uit als we ObjectsGetters gebruiken.
-    typeDescriptionID <- getContextTypeF rn
+    typeDescriptionID <- contextTypeF rn
     tg@(TypedTripleGetter n _) <- constructQueryFunction typeDescriptionID
     queryCacheInsert n $ TypedTripleGetter n (lift <<< (runTypedTripleGetter tg))
   (pure <<< id)
@@ -47,17 +47,17 @@ constructQueryFunction :: forall e.
   MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
 constructQueryFunction typeDescriptionID = do
   queryStepType <- onNothing (errorMessage "no type found" "")
-    (firstOnly getContextType typeDescriptionID)
+    (firstOnly contextType typeDescriptionID)
   case queryStepType of
     "model:QueryAst$DataTypeGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName") typeDescriptionID)
       case functionName of
         "binding" -> pure binding
         "context" -> pure context
-        "identity" -> pure identity
-        "contextType" -> pure contextType
-        "rolType" -> pure rolType
-        "buitenRol" -> pure buitenRol
+        "identity" -> pure identityM
+        "contextType" -> pure contextTypeM
+        "rolType" -> pure rolTypeM
+        "buitenRol" -> pure buitenRolM
         "iedereRolInContext" -> pure iedereRolInContext
         "label" -> pure label
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")

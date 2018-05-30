@@ -16,7 +16,7 @@ import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (contextHasType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleGetter2function, tripleObject, tripleObjects, (@@))
-import Perspectives.DataTypeTripleGetters (binding, context, contextType, typeVanIedereRolInContext)
+import Perspectives.DataTypeTripleGetters (binding, context, contextTypeM, typeVanIedereRolInContext)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -53,7 +53,7 @@ checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContex
 -- | `psp:ContextInstance -> psp:ElkType`
 checkContext' :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkContext' cid = do
-  ifNothing (lift $ tripleGetter2function contextType cid)
+  ifNothing (lift $ tripleGetter2function contextTypeM cid)
     (tell [MissingType cid])
     -- tp is psp:Context
     \tp -> do
@@ -220,7 +220,7 @@ compareRolInstancesToDefinition cid rolType' = do
           ifM (lift $ lift $ contextHasType (tripleObject theBinding) toegestaneBinding)
             (pure unit)
             (do
-              typeOfTheBinding <- lift ((tripleObject theBinding) @@ contextType)
+              typeOfTheBinding <- lift ((tripleObject theBinding) @@ contextTypeM)
               (tell [IncorrectBinding cid rolId (tripleObject theBinding) (tripleObject typeOfTheBinding) toegestaneBinding]))
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?

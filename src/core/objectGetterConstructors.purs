@@ -9,10 +9,10 @@ import Perspectives.ContextAndRole (context_binnenRol, context_pspType, context_
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (ObjectsGetter)
 import Perspectives.EntiteitAndRDFAliases (PropertyName, RolName, RolID)
-import Perspectives.Identifiers (LocalName, buitenRol)
+import Perspectives.Identifiers (LocalName, buitenRol) as Id
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Perspectives.DataTypeObjectGetters (getBuitenRol, getBuitenRol', getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', getRolBinding, getRolContext)
 import Prelude (bind, id, pure, show, ($), (<$>), (<>), (==), (||), (>>=))
 
 getRol :: forall e. RolName -> ObjectsGetter e
@@ -28,18 +28,18 @@ getRolFromPrototypeHierarchy :: forall e. RolName -> ObjectsGetter e
 getRolFromPrototypeHierarchy rn contextId =
   unlessNull (getRol rn) contextId
   <|>
-  (getBuitenRol /-/ getRolBinding /-/ getRolContext /-/ getRolFromPrototypeHierarchy rn) contextId
+  (buitenRol /-/ getRolBinding /-/ getRolContext /-/ getRolFromPrototypeHierarchy rn) contextId
 
 getExternalProperty :: forall e. PropertyName -> ObjectsGetter e
 getExternalProperty pn id = do
-  mbr <- getBuitenRol' id
+  mbr <- buitenRol' id
   case mbr of
     Nothing -> pure []
     (Just br) -> getProperty pn br
 
 -- | Look up a local name in the rol telescope of the buitenrol.
-lookupExternalProperty :: forall e. LocalName -> ObjectsGetter e
-lookupExternalProperty pn id = getPropertyFromRolTelescope pn $ buitenRol id
+lookupExternalProperty :: forall e. Id.LocalName -> ObjectsGetter e
+lookupExternalProperty pn id = getPropertyFromRolTelescope pn $ Id.buitenRol id
 
 getInternalProperty :: forall e. PropertyName -> ObjectsGetter e
 getInternalProperty pn ident = do
@@ -50,7 +50,7 @@ getInternalProperty pn ident = do
     (Just rol) -> pure $ (maybe [] propertyValue) (lookup pn (rol_properties rol))
 
 -- | Look up a local name in the rol telescope of the binnenrol.
-lookupInternalProperty :: forall e. LocalName -> ObjectsGetter e
+lookupInternalProperty :: forall e. Id.LocalName -> ObjectsGetter e
 lookupInternalProperty pn id =
   unlessNull (getInternalProperty pn) id
   <|>

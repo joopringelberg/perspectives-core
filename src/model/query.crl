@@ -8,8 +8,8 @@ Section psp:Context$rolInContext
 -- DATATYPEGETTER
 --------------------------------------------------------------------------------
 -- Instances will be created by the QueryFunctionDescriptionCompiler, e.g.
---	q:DataTypeGetter q:identity
--- 		extern $functionName = "identity"
+--	q:DataTypeGetter q:identityM
+-- 		extern $functionName = "identityM"
 psp:Context q:DataTypeGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>

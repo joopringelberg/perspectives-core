@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Perspectives.CoreTypes (ObjectsGetter)
 import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.DataTypeObjectGetters (getBuitenRol, getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, getRolBinding, getRolContext)
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e
@@ -46,12 +46,12 @@ getBindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ getRolBindi
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`
 getRolInContextContextDef :: forall e. ObjectsGetter e
-getRolInContextContextDef = getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$rolInContext" /-/ getRolContext
+getRolInContextContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$rolInContext" /-/ getRolContext
 
 -- | The Context of the BinnenRol.
 -- | `psp:Rol -> psp:Context`
 getBinnenRolContextDef :: forall e. ObjectsGetter e
-getBinnenRolContextDef = getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ getRolContext
+getBinnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ getRolContext
 
 -- | The Context of the BuitenRol.
 -- | `psp:Rol -> psp:Context`

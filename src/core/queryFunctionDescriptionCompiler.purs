@@ -12,7 +12,7 @@ import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, contextHasType, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
-import Perspectives.DataTypeTripleGetters (contextType, rolType)
+import Perspectives.DataTypeTripleGetters (contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
@@ -56,18 +56,18 @@ compileElementaryQueryStep s contextId = case s of
       rolType <- getQueryStepDomain
       putQueryStepDomain $ unsafePartial $ fromJust $ deconstructLocalNameFromDomeinURI rolType
       createDataTypeGetterDescription contextId "context"
-  Identity -> createDataTypeGetterDescription contextId  "identity"
+  Identity -> createDataTypeGetterDescription contextId  "identityM"
   Type -> do
     dom <- getQueryStepDomain
     ifM (lift $ dom `isOrHasAspect` (psp "Context"))
       do
-        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function contextType)
+        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function contextTypeM)
         putQueryStepDomain $ unsafePartial $ fromJust tp
-        createDataTypeGetterDescription contextId "contextType"
+        createDataTypeGetterDescription contextId "contextTypeM"
       do
-        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function rolType)
+        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function rolTypeM)
         putQueryStepDomain $ unsafePartial $ fromJust tp
-        createDataTypeGetterDescription contextId "rolType"
+        createDataTypeGetterDescription contextId "rolTypeM"
   BuitenRol -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "Rol") *> createDataTypeGetterDescription contextId "buitenRol")
   IedereRolInContext -> ensureAspect (psp "Context")

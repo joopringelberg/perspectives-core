@@ -1,7 +1,7 @@
 module Perspectives.ModelBasedTripleGetters where
 
 import Perspectives.CoreTypes (TypedTripleGetter)
-import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, buitenRol)
+import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, buitenRolM)
 import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving, getContextDef)
 import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
@@ -180,7 +180,7 @@ objectRolDef = constructRolGetter "model:Perspectives$Rol$objectRol" >-> binding
 -- | The Rollen that have this Actie as subjectRol.
 -- | `psp:Actie -> psp:Rol`
 inverse_subjectRolDef :: forall e. TypedTripleGetter e
-inverse_subjectRolDef = buitenRol >-> constructInverseRolGetter "model:Perspectives$Rol$subjectRol" >-> context
+inverse_subjectRolDef = buitenRolM >-> constructInverseRolGetter "model:Perspectives$Rol$subjectRol" >-> context
 
 -- | `psp:Rol -> psp:Context`
 contextDef :: forall e. TypedTripleGetter e
@@ -189,17 +189,17 @@ contextDef = constructTripleGetterFromObjectsGetter "model:Perspectives$getConte
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`
 rolInContextDef :: forall e. TypedTripleGetter e
-rolInContextDef = buitenRol >-> constructInverseRolGetter "model:Perspectives$Context$rolInContext" >-> context
+rolInContextDef = buitenRolM >-> constructInverseRolGetter "model:Perspectives$Context$rolInContext" >-> context
 
 -- | The Context of the BinnenRol.
 -- | `psp:Rol -> psp:Context`
 binnenRolContextDef :: forall e. TypedTripleGetter e
-binnenRolContextDef = buitenRol >-> constructInverseRolGetter "model:Perspectives$Context$binnenRolBeschrijving" >-> context
+binnenRolContextDef = buitenRolM >-> constructInverseRolGetter "model:Perspectives$Context$binnenRolBeschrijving" >-> context
 
 -- | The Context of the BuitenRol.
 -- | `psp:Rol -> psp:Context`
 buitenRolContextDef :: forall e. TypedTripleGetter e
-buitenRolContextDef = buitenRol >-> constructInverseRolGetter "model:Perspectives$Context$buitenRolBeschrijving" >-> context
+buitenRolContextDef = buitenRolM >-> constructInverseRolGetter "model:Perspectives$Context$buitenRolBeschrijving" >-> context
 
 -- | `psp:Context -> psp:RolInstance`
 buitenRolBeschrijving :: forall e. TypedTripleGetter e

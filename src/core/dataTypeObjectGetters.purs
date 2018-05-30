@@ -26,20 +26,20 @@ toSingle og id = do
 makeFunction :: forall e. String -> ObjectsGetter e -> ObjectGetter e
 makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no value: " <> name) (pure (head ta)))
 
-getContextType :: forall e. ObjectsGetter e
-getContextType = getContextMember \context -> [context_pspType context]
+contextType :: forall e. ObjectsGetter e
+contextType = getContextMember \context -> [context_pspType context]
 
 -- | `psp:ContextInstance -> psp:Context`
-getContextTypeF :: forall e. ObjectGetter e
-getContextTypeF = makeFunction "getContextTypeF" getContextType
+contextTypeF :: forall e. ObjectGetter e
+contextTypeF = makeFunction "contextTypeF" contextType
 
 -- Returns an empty array if the context does not exist.
-getBuitenRol :: forall e. ObjectsGetter e
-getBuitenRol = getContextMember \c -> [context_buitenRol c]
+buitenRol :: forall e. ObjectsGetter e
+buitenRol = getContextMember \c -> [context_buitenRol c]
 
 -- Returns Nothing if the context does not exist.
-getBuitenRol' :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String)
-getBuitenRol' = getContextMember' \c -> context_buitenRol c
+buitenRol' :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String)
+buitenRol' = getContextMember' \c -> context_buitenRol c
 
 getRollen :: forall e. ObjectsGetter e
 getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)
@@ -59,11 +59,11 @@ getInternePropertyTypen = getContextMember \context -> keys (rol_properties (con
 getDisplayName :: forall e. ObjectsGetter e
 getDisplayName = getContextMember \context -> [(context_displayName context)]
 
-getRolType :: forall e. ObjectsGetter e
-getRolType = getRolMember \rol -> [rol_pspType rol]
+rolType :: forall e. ObjectsGetter e
+rolType = getRolMember \rol -> [rol_pspType rol]
 
 getRolTypeF :: forall e. ObjectGetter e
-getRolTypeF = makeFunction "getRolTypeF" getRolType
+getRolTypeF = makeFunction "getRolTypeF" rolType
 
 getRolBinding :: forall e. ObjectsGetter e
 getRolBinding = getRolMember \rol -> maybe [] singleton (rol_binding rol)

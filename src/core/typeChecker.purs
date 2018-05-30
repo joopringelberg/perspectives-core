@@ -15,7 +15,7 @@ import Perspectives.ObjectGetterConstructors (getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
-import Perspectives.DataTypeObjectGetters (getContextTypeF, getRolBinding, getRolContext, getRolTypeF)
+import Perspectives.DataTypeObjectGetters (contextTypeF, getRolBinding, getRolContext, getRolTypeF)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
@@ -134,7 +134,7 @@ importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
 -- | `psp:ContextInstance -> psp:Rol -> Boolean`
 contextHasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
 contextHasType binding mogelijkeBnding = do
-  typeOfBinding <- getContextTypeF binding
+  typeOfBinding <- contextTypeF binding
   typeOfBinding `isOrHasAspect` mogelijkeBnding
 
 -- | `psp:ContextInstance -> psp:Rol -> Boolean`
