@@ -12,7 +12,7 @@ import Perspectives.EntiteitAndRDFAliases (PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol) as Id
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', binding, getRolContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', binding, context)
 import Prelude (bind, id, pure, show, ($), (<$>), (<>), (==), (||), (>>=))
 
 getRol :: forall e. RolName -> ObjectsGetter e
@@ -28,7 +28,7 @@ getRolFromPrototypeHierarchy :: forall e. RolName -> ObjectsGetter e
 getRolFromPrototypeHierarchy rn contextId =
   unlessNull (getRol rn) contextId
   <|>
-  (buitenRol /-/ binding /-/ getRolContext /-/ getRolFromPrototypeHierarchy rn) contextId
+  (buitenRol /-/ binding /-/ context /-/ getRolFromPrototypeHierarchy rn) contextId
 
 getExternalProperty :: forall e. PropertyName -> ObjectsGetter e
 getExternalProperty pn id = do
@@ -85,7 +85,7 @@ booleanPropertyGetter aspectRol propertyName = getter where
   getter pid =
     unlessNull (getExternalProperty propertyName) pid
     <|>
-    (getRol aspectRol /-/ binding /-/ getRolContext /-/ getter) pid >>=
+    (getRol aspectRol /-/ binding /-/ context /-/ getter) pid >>=
       \r -> pure [show $ foldl (||) false ((==) "true" <$> r)]
 
 -- | Climb the Aspect tree looking for a Rol bearing the given name.
@@ -95,4 +95,4 @@ getRolUsingAspects :: forall e. RolName -> ObjectsGetter e
 getRolUsingAspects rolName contextId =
   unlessNull (getRolFromPrototypeHierarchy rolName) contextId
     <|>
-    (getRol "model:Perspectives$Rol$aspectRol" /-/ binding /-/ getRolContext /-/ getRolUsingAspects rolName) contextId
+    (getRol "model:Perspectives$Rol$aspectRol" /-/ binding /-/ context /-/ getRolUsingAspects rolName) contextId

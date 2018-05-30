@@ -8,7 +8,7 @@ import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
-import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, context, contextTypeM, identityM, iedereRolInContextM, label, rolTypeM)
+import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, contextM, contextTypeM, identityM, iedereRolInContextM, label, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol)
@@ -53,7 +53,7 @@ constructQueryFunction typeDescriptionID = do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (firstOnly (getExternalProperty "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName") typeDescriptionID)
       case functionName of
         "binding" -> pure bindingM
-        "context" -> pure context
+        "context" -> pure contextM
         "identity" -> pure identityM
         "contextType" -> pure contextTypeM
         "rolType" -> pure rolTypeM

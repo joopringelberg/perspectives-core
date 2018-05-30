@@ -35,7 +35,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneel, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.DataTypeObjectGetters (binding, getRolContext, makeFunction)
+import Perspectives.DataTypeObjectGetters (binding, context, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
@@ -249,7 +249,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   usersInvolvedInRol :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array ID)
   usersInvolvedInRol (Delta{id, memberName}) =
     do
-      (contextId :: ContextID) <- makeFunction "" getRolContext id
+      (contextId :: ContextID) <- makeFunction "" context id
       (Triple {object}) <-
         id ## rolTypeM >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUser
       pure $ object

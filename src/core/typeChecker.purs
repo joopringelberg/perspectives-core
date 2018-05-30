@@ -15,7 +15,7 @@ import Perspectives.ObjectGetterConstructors (getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
 import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
-import Perspectives.DataTypeObjectGetters (contextTypeF, binding, getRolContext, getRolTypeF)
+import Perspectives.DataTypeObjectGetters (contextTypeF, binding, context, getRolTypeF)
 import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
@@ -50,10 +50,10 @@ checkRolForQualifiedProperty pn rn = do
     checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' propertyDef))
 
 mogelijkeBinding :: forall e. ObjectsGetter e
-mogelijkeBinding = (getRol "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ getRolContext
+mogelijkeBinding = (getRol "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
 
 alternatives :: forall e. ObjectsGetter e
-alternatives = (getRol "model:Perspectives$Sum$alternative") /-/ binding /-/ getRolContext
+alternatives = (getRol "model:Perspectives$Sum$alternative") /-/ binding /-/ context
 
 checkContextForQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 checkContextForQualifiedRol rn cn = do

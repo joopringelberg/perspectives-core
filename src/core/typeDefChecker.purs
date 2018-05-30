@@ -16,7 +16,7 @@ import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (contextHasType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleGetter2function, tripleObject, tripleObjects, (@@))
-import Perspectives.DataTypeTripleGetters (bindingM, context, contextTypeM, typeVanIedereRolInContextM)
+import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, typeVanIedereRolInContextM)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -212,7 +212,7 @@ compareRolInstancesToDefinition cid rolType' = do
 
       -- check the binding. Does the binding have the type given by bindingDef, or has its type that Aspect?
       -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.
-      theBinding <- lift (rolId @@ bindingM >-> context)
+      theBinding <- lift (rolId @@ bindingM >-> contextM)
       mmb <- lift (rolType' @@ bindingDef)
       case head (tripleObjects mmb) of
         Nothing -> pure unit

@@ -23,7 +23,7 @@ import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Perspectives.DataTypeTripleGetters (bindingM, context, typeVanIedereRolInContextM) as DTG
+import Perspectives.DataTypeTripleGetters (bindingM, contextM, typeVanIedereRolInContextM) as DTG
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
@@ -215,7 +215,7 @@ enclosingContext theText = do
       newline
       newline
       (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM >-> DTG.context)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM >-> DTG.contextM)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) (tripleObjects contextIds)
 
     ppContext :: Array ID -> ID -> PerspectText e
