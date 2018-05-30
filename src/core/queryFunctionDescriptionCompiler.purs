@@ -23,7 +23,7 @@ import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
-import Perspectives.SystemObjectGetters (getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (getRolBinding, getRolContext)
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 

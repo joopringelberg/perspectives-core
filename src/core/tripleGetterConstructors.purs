@@ -14,7 +14,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
-import Perspectives.SystemObjectGetters (getRolType)
+import Perspectives.DataTypeObjectGetters (getRolType)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (==))
 

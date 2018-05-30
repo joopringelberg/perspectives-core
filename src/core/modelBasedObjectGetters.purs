@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Perspectives.CoreTypes (ObjectsGetter)
 import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.SystemObjectGetters (getBuitenRol, getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (getBuitenRol, getRolBinding, getRolContext)
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e

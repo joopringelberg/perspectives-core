@@ -1,4 +1,4 @@
-module Perspectives.SystemObjectGetters where
+module Perspectives.DataTypeObjectGetters where
 
 import Control.Monad.Eff.Exception (error)
 import Data.Array (head, nub, singleton)

@@ -12,7 +12,7 @@ import Perspectives.EntiteitAndRDFAliases (PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Perspectives.SystemObjectGetters (getBuitenRol, getBuitenRol', getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (getBuitenRol, getBuitenRol', getRolBinding, getRolContext)
 import Prelude (bind, id, pure, show, ($), (<$>), (<>), (==), (||), (>>=))
 
 getRol :: forall e. RolName -> ObjectsGetter e
