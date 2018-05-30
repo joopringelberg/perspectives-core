@@ -49,12 +49,12 @@ typeVanIedereRolInContext :: forall e. ObjectsGetter e
 typeVanIedereRolInContext = getContextMember \context -> keys (context_rolInContext context)
 
 -- | The names of every property given to this rol.
-getPropertyTypen :: forall e. ObjectsGetter e
-getPropertyTypen = getRolMember \rol -> keys (rol_properties rol)
+propertyTypen :: forall e. ObjectsGetter e
+propertyTypen = getRolMember \rol -> keys (rol_properties rol)
 
 -- | The names of every internal property given to this context.
-getInternePropertyTypen :: forall e. ObjectsGetter e
-getInternePropertyTypen = getContextMember \context -> keys (rol_properties (context_binnenRol context))
+internePropertyTypen :: forall e. ObjectsGetter e
+internePropertyTypen = getContextMember \context -> keys (rol_properties (context_binnenRol context))
 
 label :: forall e. ObjectsGetter e
 label = getContextMember \context -> [(context_displayName context)]
@@ -68,8 +68,8 @@ getRolTypeF = makeFunction "getRolTypeF" rolType
 binding :: forall e. ObjectsGetter e
 binding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
-getRolBindingDef :: forall e. ObjectsGetter e
-getRolBindingDef = binding /-/ context
+rolBindingDef :: forall e. ObjectsGetter e
+rolBindingDef = binding /-/ context
 
 context :: forall e. ObjectsGetter e
 context = getRolMember \rol -> [rol_context rol]

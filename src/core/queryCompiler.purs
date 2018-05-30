@@ -16,7 +16,7 @@ import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, ignoreCache, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (contextType, contextTypeF, getRolBindingDef)
+import Perspectives.DataTypeObjectGetters (contextType, contextTypeF, rolBindingDef)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
@@ -131,7 +131,7 @@ constructQueryFunction typeDescriptionID = do
 
   where
     getBindingOfRol :: ID -> ID -> MonadPerspectives (AjaxAvarCache e) (Maybe ID)
-    getBindingOfRol rolName = firstOnly (getRol rolName /-/ getRolBindingDef)
+    getBindingOfRol rolName = firstOnly (getRol rolName /-/ rolBindingDef)
 
     applyUnaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e )
       -> ID
@@ -144,7 +144,7 @@ constructQueryFunction typeDescriptionID = do
       -> ID
       -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
     applyBinaryCombinator c queryStepType = do
-      (operandIds :: Array ID) <- (getRol "model:QueryAST$nAryCombinator$operand" /-/ getRolBindingDef)  typeDescriptionID
+      (operandIds :: Array ID) <- (getRol "model:QueryAST$nAryCombinator$operand" /-/ rolBindingDef)  typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
       {init, last} <- onNothing' (errorMessage "too few operands" queryStepType) (unsnoc operands)
       pure $ foldl c last init

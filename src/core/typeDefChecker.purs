@@ -29,7 +29,7 @@ import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
-import Perspectives.DataTypeObjectGetters (getInternePropertyTypen, getPropertyTypen, getRolTypeF)
+import Perspectives.DataTypeObjectGetters (internePropertyTypen, propertyTypen, getRolTypeF)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, ifM, pure, show, unit, void, ($), (<), (<<<), (<>), (>>=))
@@ -75,11 +75,11 @@ checkProperties typeId cid = do
   void $ (typeId ~> ownExternePropertyDef) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
 
   (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## externePropertyDef)
-  availableExternalProperties <- lift $ lift $ getPropertyTypen (buitenRol cid)
+  availableExternalProperties <- lift $ lift $ propertyTypen (buitenRol cid)
   checkAvailableProperties (buitenRol cid) typeId availableExternalProperties definedExternalProperties cid
 
   (Triple{object: definedInternalProperties}) <- lift $ lift $ (typeId ## internePropertyDef)
-  availableInternalProperties <- lift $ lift $ getInternePropertyTypen cid
+  availableInternalProperties <- lift $ lift $ internePropertyTypen cid
   checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedExternalProperties cid
 
 get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
@@ -207,7 +207,7 @@ compareRolInstancesToDefinition cid rolType' = do
 
       -- Detect used but undefined properties.
       (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## propertyDef)
-      availableProperties <- lift $ lift $ getPropertyTypen rolId
+      availableProperties <- lift $ lift $ propertyTypen rolId
       checkAvailableProperties rolId rolType' availableProperties definedRolProperties cid
 
       -- check the binding. Does the binding have the type given by bindingDef, or has its type that Aspect?
