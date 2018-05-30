@@ -15,7 +15,7 @@ import Perspectives.Identifiers (isInNamespace)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
-import Perspectives.DataTypeTripleGetters (iedereRolInContext)
+import Perspectives.DataTypeTripleGetters (iedereRolInContextM)
 import Perspectives.ModelBasedTripleGetters (boundContexts)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const)
@@ -49,7 +49,7 @@ domeinFileFromContext enclosingContext = do
                 ifNothing (lift $ getPerspectEntiteit (context_buitenRol ctxt))
                   (pure unit)
                   (modify <<< insertRolInDomeinFile)
-                rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
+                rollen <- lift $ ((context_id ctxt) ## iedereRolInContextM)
                 for_ (tripleObjects rollen)
                   \rolID ->
                     ifNothing (lift $ getPerspectEntiteit rolID)
@@ -62,7 +62,7 @@ domeinFileFromContext enclosingContext = do
               else
                 do
                 lift $ void ((saveEntiteit (context_buitenRol ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-                rollen <- lift $ ((context_id ctxt) ## iedereRolInContext)
+                rollen <- lift $ ((context_id ctxt) ## iedereRolInContextM)
                 for_ (tripleObjects rollen)
                   \rolID -> lift ((saveEntiteit rolID)  :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
                 lift $ void ((saveEntiteit (context_id ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)

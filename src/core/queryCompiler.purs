@@ -8,7 +8,7 @@ import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Perspectives.ContextRolAccessors (firstOnly)
 import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
-import Perspectives.DataTypeTripleGetters (binding, buitenRolM, context, contextTypeM, identityM, iedereRolInContext, label, rolTypeM)
+import Perspectives.DataTypeTripleGetters (binding, buitenRolM, context, contextTypeM, identityM, iedereRolInContextM, label, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol)
@@ -58,7 +58,7 @@ constructQueryFunction typeDescriptionID = do
         "contextType" -> pure contextTypeM
         "rolType" -> pure rolTypeM
         "buitenRol" -> pure buitenRolM
-        "iedereRolInContext" -> pure iedereRolInContext
+        "iedereRolInContext" -> pure iedereRolInContextM
         "label" -> pure label
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")
     "model:QueryAst$PropertyGetter" -> do

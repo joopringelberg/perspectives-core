@@ -41,8 +41,8 @@ buitenRol = getContextMember \c -> [context_buitenRol c]
 buitenRol' :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String)
 buitenRol' = getContextMember' \c -> context_buitenRol c
 
-getRollen :: forall e. ObjectsGetter e
-getRollen = getContextMember \context -> nub $ join $ values (context_rolInContext context)
+iedereRolInContext :: forall e. ObjectsGetter e
+iedereRolInContext = getContextMember \context -> nub $ join $ values (context_rolInContext context)
 
 -- | The names of every rol given to this context.
 getRolTypen :: forall e. ObjectsGetter e

@@ -56,7 +56,7 @@ getBinnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Contex
 -- | The Context of the BuitenRol.
 -- | `psp:Rol -> psp:Context`
 getBuitenRolContextDef :: forall e. ObjectsGetter e
-getBuitenRolContextDef = getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ getRolContext
+getBuitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ getRolContext
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 propertyIsVerplicht :: forall e. ObjectsGetter e

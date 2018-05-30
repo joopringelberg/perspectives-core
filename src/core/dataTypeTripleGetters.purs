@@ -1,7 +1,7 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (buitenRol, contextType, getDisplayName, getRolBinding, getRolContext, rolType, getRolTypen, getRollen)
+import Perspectives.DataTypeObjectGetters (buitenRol, contextType, getDisplayName, getRolBinding, getRolContext, rolType, getRolTypen, iedereRolInContext)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
 import Prelude (pure)
 
@@ -29,8 +29,8 @@ buitenRolM = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRo
 
 -- | Every rol instance belonging to the context instance.
 -- | `psp:ContextInstance -> psp:RolInstance`
-iedereRolInContext :: forall e. TypedTripleGetter e
-iedereRolInContext =  constructTripleGetterFromObjectsGetter "model:Perspectives$iedereRolInContext" getRollen
+iedereRolInContextM :: forall e. TypedTripleGetter e
+iedereRolInContextM =  constructTripleGetterFromObjectsGetter "model:Perspectives$iedereRolInContext" iedereRolInContext
 
 -- | The types of the rol instances given to this context instance. Note: non-mandatory
 -- | Rol types defined for the Context type may be missing!

@@ -1,7 +1,7 @@
 module Perspectives.ModelBasedTripleGetters where
 
 import Perspectives.CoreTypes (TypedTripleGetter)
-import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, buitenRolM)
+import Perspectives.DataTypeTripleGetters (binding, iedereRolInContextM, label, context, buitenRolM)
 import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving, getContextDef)
 import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
@@ -69,7 +69,7 @@ propertyReferentie = constructRolGetter "model:Perspectives$View$propertyReferen
 -- | The context instances that are bound to a rol of the context instance.
 -- | `psp:ContextInstance -> psp:ContextInstance`
 boundContexts :: forall e. TypedTripleGetter e
-boundContexts = (QC.filter (rolHasTypeWithLocalName "buitenRolBeschrijving") (iedereRolInContext >-> binding)) >-> context
+boundContexts = (QC.filter (rolHasTypeWithLocalName "buitenRolBeschrijving") (iedereRolInContextM >-> binding)) >-> context
 
 -- | All properties defined in namespace of the Rol.
 -- | `psp:Rol -> psp:Property`
@@ -159,7 +159,7 @@ aspectDefClosure = QC.closure aspectDef
 -- | `psp:Rol -> psp:RolInstance`
 -- TODO: als we overschrijven toestaan, kunnen hier duplicaten inzitten...
 rolTypeRolInstances :: forall e. TypedTripleGetter e
-rolTypeRolInstances = QC.concat iedereRolInContext
+rolTypeRolInstances = QC.concat iedereRolInContextM
   ((aspectRolDef >->> (\_ -> rolTypeRolInstances)) "rolTypeRolInstances")
 
 -- | All acties defined in the Context.
