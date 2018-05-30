@@ -1,7 +1,7 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (buitenRol, contextType, getDisplayName, binding, context, rolType, typeVanIedereRolInContext, iedereRolInContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, contextType, label, binding, context, rolType, typeVanIedereRolInContext, iedereRolInContext)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
 import Prelude (pure)
 
@@ -50,5 +50,5 @@ contextM = constructTripleGetterFromObjectsGetter "model:Perspectives$context" c
 
 -- | The string that labels the context instance.
 -- | `psp:ContextInstance -> psp:String`
-label :: forall e. TypedTripleGetter e
-label = constructTripleGetterFromObjectsGetter "model:Perspectives$label" getDisplayName
+labelM :: forall e. TypedTripleGetter e
+labelM = constructTripleGetterFromObjectsGetter "model:Perspectives$label" label

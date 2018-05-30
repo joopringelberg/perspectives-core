@@ -56,8 +56,8 @@ getPropertyTypen = getRolMember \rol -> keys (rol_properties rol)
 getInternePropertyTypen :: forall e. ObjectsGetter e
 getInternePropertyTypen = getContextMember \context -> keys (rol_properties (context_binnenRol context))
 
-getDisplayName :: forall e. ObjectsGetter e
-getDisplayName = getContextMember \context -> [(context_displayName context)]
+label :: forall e. ObjectsGetter e
+label = getContextMember \context -> [(context_displayName context)]
 
 rolType :: forall e. ObjectsGetter e
 rolType = getRolMember \rol -> [rol_pspType rol]

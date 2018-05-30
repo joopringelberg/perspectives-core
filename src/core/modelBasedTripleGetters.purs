@@ -1,7 +1,7 @@
 module Perspectives.ModelBasedTripleGetters where
 
 import Perspectives.CoreTypes (TypedTripleGetter)
-import Perspectives.DataTypeTripleGetters (bindingM, iedereRolInContextM, label, contextM, buitenRolM)
+import Perspectives.DataTypeTripleGetters (bindingM, iedereRolInContextM, labelM, contextM, buitenRolM)
 import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving, getContextDef)
 import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
@@ -44,7 +44,7 @@ rangeDef = constructRolGetter "model:Perspectives$Property$range" >-> bindingM >
 -- | True iff the context instance has a label.
 -- | `psp:ContextInstance -> psp:Boolean`
 hasLabel :: forall e. TypedTripleGetter e
-hasLabel = QC.notEmpty label
+hasLabel = QC.notEmpty labelM
 
 -- | True if the rol instance has a binding.
 -- | `psp:RolInstance -> psp:Boolean`
