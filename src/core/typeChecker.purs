@@ -10,7 +10,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, TypeID, TypedTripleGetter,
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, guardWellFormedNess)
-import Perspectives.ModelBasedTripleGetters (aspectDefClosure, ownRolDef, propertyDef)
+import Perspectives.ModelBasedTripleGetters (aspectDefClosure, ownRolDef, propertyMDef)
 import Perspectives.ObjectGetterConstructors (getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
@@ -47,7 +47,7 @@ checkRolForQualifiedProperty pn rn = do
             otherwise -> foldM (\r alt -> checkRolForQualifiedProperty pn alt >>= pure <<< (&&) r) true object
 
     checkRolHasProperty :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' propertyDef))
+    checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' propertyMDef))
 
 mogelijkeBinding :: forall e. ObjectsGetter e
 mogelijkeBinding = (getRol "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
@@ -91,7 +91,7 @@ checkRolForUnQualifiedProperty ln rn' = do
     hasUnqualifiedProperty ln' = containsMatching
       (\rolName propertyName -> (rolName <> "$" <> ln') == propertyName)
       ("UnqualifiedProperty" <> ln')
-      propertyDef
+      propertyMDef
 
 checkContextForUnQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) FD
 checkContextForUnQualifiedRol ln cn = do

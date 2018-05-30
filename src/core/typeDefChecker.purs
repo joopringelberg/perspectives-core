@@ -22,7 +22,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneelM, bindingDef, rolIsVerplichtM, rangeMDef, propertyIsVerplichtM, propertyDef)
+import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneelM, bindingDef, rolIsVerplichtM, rangeMDef, propertyIsVerplichtM, propertyMDef)
 import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -202,11 +202,11 @@ compareRolInstancesToDefinition cid rolType' = do
     compareRolInstanceToDefinition :: RolID -> TDChecker (AjaxAvarCache e) Unit
     compareRolInstanceToDefinition rolId = do
       -- Check the properties.
-      propertyDef' <- lift $ (rolType' @@ propertyDef)
+      propertyDef' <- lift $ (rolType' @@ propertyMDef)
       void $ (traverse (comparePropertyInstanceToDefinition cid rolId)) (tripleObjects propertyDef')
 
       -- Detect used but undefined properties.
-      (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## propertyDef)
+      (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## propertyMDef)
       availableProperties <- lift $ lift $ propertyTypen rolId
       checkAvailableProperties rolId rolType' availableProperties definedRolProperties cid
 

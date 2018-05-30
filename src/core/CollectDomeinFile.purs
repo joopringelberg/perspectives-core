@@ -16,7 +16,7 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
 import Perspectives.DataTypeTripleGetters (iedereRolInContextM)
-import Perspectives.ModelBasedTripleGetters (boundContexts)
+import Perspectives.ModelBasedTripleGetters (boundContextsM)
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const)
 
@@ -30,7 +30,7 @@ domeinFileFromContext enclosingContext = do
     collect c definedAtToplevel =
       ifM (saveContext c definedAtToplevel)
         do
-          boundContexts <- lift $ ((context_id c) ## boundContexts)
+          boundContexts <- lift $ ((context_id c) ## boundContextsM)
           for_ (tripleObjects boundContexts) recursiveCollect
         (pure unit)
       where
