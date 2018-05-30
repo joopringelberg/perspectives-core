@@ -16,7 +16,7 @@ import Perspectives.DataTypeTripleGetters (contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
-import Perspectives.ModelBasedTripleGetters (bindingDef, ownRolMDef)
+import Perspectives.ModelBasedTripleGetters (bindingDefM, ownRolDefM)
 import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
@@ -46,7 +46,7 @@ compileElementaryQueryStep s contextId = case s of
   Binding -> ensureAspect (psp "Rol")
     do
       dom <- getQueryStepDomain
-      ifNothing (lift $ runMonadPerspectivesQuery dom (tripleGetter2function bindingDef))
+      ifNothing (lift $ runMonadPerspectivesQuery dom (tripleGetter2function bindingDefM))
         (pure $ Left $ MissingMogelijkeBinding dom)
         \bindingType -> do
           putQueryStepDomain bindingType
@@ -73,13 +73,13 @@ compileElementaryQueryStep s contextId = case s of
   IedereRolInContext -> ensureAspect (psp "Context")
     do
       dom <- getQueryStepDomain
-      tps <- lift (dom ## ownRolMDef)
+      tps <- lift (dom ## ownRolDefM)
       sumtype <- createSumType $ tripleObjects tps
       putQueryStepDomain sumtype
       createDataTypeGetterDescription contextId "iedereRolInContext"
   RolTypen -> ensureAspect (psp "Context")
     do
-      getQueryStepDomain >>= lift <<< runTypedTripleGetter ownRolMDef >>= pure <<< tripleObjects >>= lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
+      getQueryStepDomain >>= lift <<< runTypedTripleGetter ownRolDefM >>= pure <<< tripleObjects >>= lift <<< mostSpecificCommonAspect >>= putQueryStepDomain
       createDataTypeGetterDescription contextId "typeVanIedereRolInContext"
   Label -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "String") *> createDataTypeGetterDescription contextId "label")

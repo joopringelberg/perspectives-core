@@ -33,7 +33,7 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
-import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolMDef, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDef, objectRolDef, objectViewMDef, propertyReferentieM, rolUserM, subjectRolDef)
+import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDefM, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDefM, objectRolDef, objectViewDefM, propertyReferentieM, rolUserM, subjectRolDef)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.DataTypeObjectGetters (binding, context, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
@@ -256,7 +256,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
     where
       -- roles in context that play the subjectRol in the relevant acties
       -- psp:Rol -> psp:Rol
-      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRolDef relevantActies)) (rolInContextDef >-> ownRolMDef)
+      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRolDef relevantActies)) (rolInContextDef >-> ownRolDefM)
 
       -- acties that have an objectView with the memberName
       -- psp:Rol -> psp:Actie
@@ -278,7 +278,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   -- Tests an Actie for having memberName in the view that is its objectView.
   -- psp:Actie -> psp:Boolean
   hasRelevantView :: ID -> TypedTripleGetter e
-  hasRelevantView id = contains id (objectViewMDef >-> propertyReferentieM >-> bindingDef)
+  hasRelevantView id = contains id (objectViewDefM >-> propertyReferentieM >-> bindingDefM)
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
