@@ -22,7 +22,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.ModelBasedTripleGetters (aspectDefM, aspectRolDefM, aspectDefMClosure, externePropertyDefM, internePropertyDefM, ownExternePropertyDefM, ownInternePropertyDefM, rolDefM, contextDefM, propertyIsFunctioneelM, bindingDefM, rolIsVerplichtM, rangeDefM, propertyIsVerplichtM, propertyDefM)
+import Perspectives.ModelBasedTripleGetters (aspectenDefM, aspectRollenDefM, aspectenDefMClosure, externePropertiesDefM, internePropertiesDefM, ownExternePropertiesDefM, ownInternePropertiesDefM, rollenDefM, contextDefM, propertyIsFunctioneelM, bindingDefM, rolIsVerplichtM, rangeDefM, propertyIsVerplichtM, propertiesDefM)
 import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -70,15 +70,15 @@ checkContext' cid = do
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
 checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkProperties typeId cid = do
-  void $ (typeId ~> ownInternePropertyDefM) >>= (traverse (checkInternalProperty cid))
+  void $ (typeId ~> ownInternePropertiesDefM) >>= (traverse (checkInternalProperty cid))
 
-  void $ (typeId ~> ownExternePropertyDefM) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
+  void $ (typeId ~> ownExternePropertiesDefM) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
 
-  (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## externePropertyDefM)
+  (Triple{object: definedExternalProperties}) <- lift $ lift $ (typeId ## externePropertiesDefM)
   availableExternalProperties <- lift $ lift $ propertyTypen (buitenRol cid)
   checkAvailableProperties (buitenRol cid) typeId availableExternalProperties definedExternalProperties cid
 
-  (Triple{object: definedInternalProperties}) <- lift $ lift $ (typeId ## internePropertyDefM)
+  (Triple{object: definedInternalProperties}) <- lift $ lift $ (typeId ## internePropertiesDefM)
   availableInternalProperties <- lift $ lift $ internePropertyTypen cid
   checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedExternalProperties cid
 
@@ -92,7 +92,7 @@ infix 0 get as ~>
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
 checkDefinedRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkDefinedRoles typeId cid = do
-  (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## rolDefM)
+  (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## rollenDefM)
   void $ traverse (compareRolInstancesToDefinition cid) definedRollen
 
 -- | For each RolInstance in the ContextInstance, is there a Rol defined with the Context?
@@ -105,7 +105,7 @@ checkAvailableRoles typeId cid = do
     -- `psp:Context -> psp:Rol -> Unit`
     isDefined :: RolName -> TDChecker (AjaxAvarCache e) Unit
     isDefined rolType = do
-      (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## rolDefM)
+      (Triple{object: definedRollen}) <- lift $ lift $ (typeId ## rollenDefM)
       case elemIndex rolType definedRollen of
         Nothing -> tell [RolNotDefined rolType cid typeId]
         otherwise -> pure unit
@@ -191,7 +191,7 @@ getPropertyFunction pn rn = do
 compareRolInstancesToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 compareRolInstancesToDefinition cid rolType' = do
   rolInstances <- lift $ lift $ getRolUsingAspects rolType' cid
-  -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRolDefMClosure!
+  -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRollenDefMClosure!
   case head rolInstances of
     Nothing -> ifM (lift (rolIsMandatory rolType'))
       (tell [MissingRolInstance rolType' cid])
@@ -202,11 +202,11 @@ compareRolInstancesToDefinition cid rolType' = do
     compareRolInstanceToDefinition :: RolID -> TDChecker (AjaxAvarCache e) Unit
     compareRolInstanceToDefinition rolId = do
       -- Check the properties.
-      propertyDef' <- lift $ (rolType' @@ propertyDefM)
+      propertyDef' <- lift $ (rolType' @@ propertiesDefM)
       void $ (traverse (comparePropertyInstanceToDefinition cid rolId)) (tripleObjects propertyDef')
 
       -- Detect used but undefined properties.
-      (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## propertyDefM)
+      (Triple{object: definedRolProperties}) <- lift $ lift $ (rolType' ## propertiesDefM)
       availableProperties <- lift $ lift $ propertyTypen rolId
       checkAvailableProperties rolId rolType' availableProperties definedRolProperties cid
 
@@ -232,19 +232,19 @@ checkAspectOfRolType cid = do
   case head ctypeArr of
     Nothing -> tell [RolWithoutContext cid]
     (Just ctype) -> do
-      mar <- lift $ lift (cid ## aspectRolDefM)
+      mar <- lift $ lift (cid ## aspectRollenDefM)
       case head (tripleObjects mar) of -- TODO: er kunnen er meer zijn!
         Nothing -> pure unit
         (Just aspectRol) -> do
-          (Triple{object:aspectRolDefMClosure}) <- lift $ lift $ (ctype ## aspectDefM >-> rolDefM)
-          if isJust $ elemIndex aspectRol aspectRolDefMClosure
+          (Triple{object:aspectRollenDefMClosure}) <- lift $ lift $ (ctype ## aspectenDefM >-> rollenDefM)
+          if isJust $ elemIndex aspectRol aspectRollenDefMClosure
             then pure unit
             else tell [AspectRolNotFromAspect cid aspectRol ctype]
 
 -- | `psp:ContextInstance -> psp:ElkType`
 checkCyclicAspects :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkCyclicAspects cid = do
-  (Triple {object: aspects}) <- lift $ lift (cid ## aspectDefMClosure)
+  (Triple {object: aspects}) <- lift $ lift (cid ## aspectenDefMClosure)
   case elemIndex cid aspects of
     Nothing -> pure unit
     otherwise -> tell [CycleInAspects cid aspects]

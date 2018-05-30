@@ -33,7 +33,7 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
-import Perspectives.ModelBasedTripleGetters (actieInContextDefM, ownRolDefM, rolInContextDefM, inverse_subjectRolDefM, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDefM, objectRolDefM, objectViewDefM, propertyReferentieM, rolUserM, subjectRolDefM)
+import Perspectives.ModelBasedTripleGetters (actiesInContextDefM, ownRollenDefM, rolInContextDefM, inverse_subjectRollenDefM, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDefM, objectRollenDefM, objectViewDefM, propertyReferentiesM, rolUserM, subjectRollenDefM)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.DataTypeObjectGetters (binding, context, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
@@ -256,11 +256,11 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
     where
       -- roles in context that play the subjectRol in the relevant acties
       -- psp:Rol -> psp:Rol
-      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRolDefM relevantActies)) (rolInContextDefM >-> ownRolDefM)
+      subjectsOfRelevantActies = filter (notEmpty (intersect subjectRollenDefM relevantActies)) (rolInContextDefM >-> ownRollenDefM)
 
       -- acties that have an objectView with the memberName
       -- psp:Rol -> psp:Actie
-      relevantActies = filter (hasRelevantView memberName) (rolInContextDefM >-> actieInContextDefM)
+      relevantActies = filter (hasRelevantView memberName) (rolInContextDefM >-> actiesInContextDefM)
 
   -- From the instance of the context, retrieve the instances of the users that play
   -- a Rol in this context that have a subjectRol bound to an Actie that is bound as the
@@ -273,12 +273,12 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
     where
       -- All Rollen that are the subject of Acties that have the Rol as object.
       -- `psp:Rol -> psp:Rol`
-      actorsForObject = objectRolDefM >-> inverse_subjectRolDefM
+      actorsForObject = objectRollenDefM >-> inverse_subjectRollenDefM
 
   -- Tests an Actie for having memberName in the view that is its objectView.
   -- psp:Actie -> psp:Boolean
   hasRelevantView :: ID -> TypedTripleGetter e
-  hasRelevantView id = contains id (objectViewDefM >-> propertyReferentieM >-> bindingDefM)
+  hasRelevantView id = contains id (objectViewDefM >-> propertyReferentiesM >-> bindingDefM)
 
 {-
 Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.

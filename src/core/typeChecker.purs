@@ -10,7 +10,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, TypeID, TypedTripleGetter,
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, guardWellFormedNess)
-import Perspectives.ModelBasedTripleGetters (aspectDefMClosure, ownRolDefM, propertyDefM)
+import Perspectives.ModelBasedTripleGetters (aspectenDefMClosure, ownRollenDefM, propertiesDefM)
 import Perspectives.ObjectGetterConstructors (getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
@@ -47,7 +47,7 @@ checkRolForQualifiedProperty pn rn = do
             otherwise -> foldM (\r alt -> checkRolForQualifiedProperty pn alt >>= pure <<< (&&) r) true object
 
     checkRolHasProperty :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' propertyDefM))
+    checkRolHasProperty rn' pn' = runMonadPerspectivesQuery rn' (toBoolean (contains pn' propertiesDefM))
 
 mogelijkeBinding :: forall e. ObjectsGetter e
 mogelijkeBinding = (getRol "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
@@ -61,7 +61,7 @@ checkContextForQualifiedRol rn cn = do
   (&&) <$> cn `importsAspect` aspect <*> checkContextHasRol aspect rn
   where
     checkContextHasRol :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkContextHasRol cn' rn' = runMonadPerspectivesQuery cn' (toBoolean (contains rn' ownRolDefM))
+    checkContextHasRol cn' rn' = runMonadPerspectivesQuery cn' (toBoolean (contains rn' ownRollenDefM))
 
 -- | Returns the Aspect that defines the property, or a usermessage indicating that property with the given
 -- | local name can be found, or that several have been found.
@@ -78,7 +78,7 @@ checkRolForUnQualifiedProperty ln rn' = do
     aspectsWithUnqualifiedProperty ln' rn = union <$> importedAspectsWithUnqualifiedProperty rn <*> aspectsFromMogelijkeBindingWithUnqualifiedProperty rn
       where
         importedAspectsWithUnqualifiedProperty :: ObjectsGetter e
-        importedAspectsWithUnqualifiedProperty rn'' = (rn'' ## filter (hasUnqualifiedProperty ln') aspectDefMClosure) >>= tripleObjects_
+        importedAspectsWithUnqualifiedProperty rn'' = (rn'' ## filter (hasUnqualifiedProperty ln') aspectenDefMClosure) >>= tripleObjects_
 
         aspectsFromMogelijkeBindingWithUnqualifiedProperty :: ObjectsGetter e
         aspectsFromMogelijkeBindingWithUnqualifiedProperty rn'' =
@@ -91,7 +91,7 @@ checkRolForUnQualifiedProperty ln rn' = do
     hasUnqualifiedProperty ln' = containsMatching
       (\rolName propertyName -> (rolName <> "$" <> ln') == propertyName)
       ("UnqualifiedProperty" <> ln')
-      propertyDefM
+      propertiesDefM
 
 checkContextForUnQualifiedRol :: forall e. RolName -> ContextID -> MonadPerspectives (AjaxAvarCache e) FD
 checkContextForUnQualifiedRol ln cn = do
@@ -103,13 +103,13 @@ checkContextForUnQualifiedRol ln cn = do
   where
 
     aspectsWithUnqualifiedRol :: MonadPerspectives (AjaxAvarCache e) (Array ID)
-    aspectsWithUnqualifiedRol = (cn ## filter (hasUnqualifiedRol ln) aspectDefMClosure) >>= tripleObjects_
+    aspectsWithUnqualifiedRol = (cn ## filter (hasUnqualifiedRol ln) aspectenDefMClosure) >>= tripleObjects_
 
     hasUnqualifiedRol :: PropertyName -> TypedTripleGetter e
     hasUnqualifiedRol ln' = containsMatching
       (\contextName rolName -> (contextName <> "$" <> ln') == rolName)
       ("UnqualifiedRol" <> ln')
-      ownRolDefM
+      ownRollenDefM
 
 -- | True when both parameters are equal and also when the first has the second as aspect.
 -- | If the aspect is a sum type, tries each of the alternatives.
@@ -129,7 +129,7 @@ isOrHasAspect subtype aspect = do
 importsAspect :: forall e. ContextID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Boolean
 importsAspect tp aspect = if aspect == "model:Perspectives$ElkType"
   then pure true
-  else (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspectDefMClosure)) tp
+  else (flip runMonadPerspectivesQuery) (toBoolean (contains aspect aspectenDefMClosure)) tp
 
 -- | `psp:ContextInstance -> psp:Rol -> Boolean`
 contextHasType :: forall e. TypeID -> TypeID -> MonadPerspectives (AjaxAvarCache e) Boolean
@@ -145,6 +145,6 @@ rolHasType binding mogelijkeBnding = do
 
 mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID
 mostSpecificCommonAspect types = do
-  x <- traverse (runTypedTripleGetter aspectDefMClosure) types
+  x <- traverse (runTypedTripleGetter aspectenDefMClosure) types
   aspects <- pure $ join (tripleObjects <$> x)
   foldM (\msca t -> ifM (t `isOrHasAspect` msca) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects
