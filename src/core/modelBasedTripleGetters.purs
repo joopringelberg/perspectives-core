@@ -37,8 +37,8 @@ propertyIsVerplichtM = constructTripleGetterFromObjectsGetter "model:Perspective
 
 -- | The type of the range that has been defined for the Property.
 -- | `psp:Property -> psp:SimpleValue`
-rangeDef :: forall e. TypedTripleGetter e
-rangeDef = constructRolGetter "model:Perspectives$Property$range" >-> bindingM >-> contextM
+rangeMDef :: forall e. TypedTripleGetter e
+rangeMDef = constructRolGetter "model:Perspectives$Property$range" >-> bindingM >-> contextM
 
 -- | True iff the context instance has a label.
 -- | `psp:ContextInstance -> psp:Boolean`

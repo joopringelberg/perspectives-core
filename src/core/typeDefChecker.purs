@@ -22,7 +22,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneelM, bindingDef, rolIsVerplichtM, rangeDef, propertyIsVerplichtM, propertyDef)
+import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneelM, bindingDef, rolIsVerplichtM, rangeMDef, propertyIsVerplichtM, propertyDef)
 import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -146,7 +146,7 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
       (tell [MissingPropertyValue cid propertyType rid])
       (pure unit)
     (Just propertyValue) -> do
-      mrange <- lift (propertyType @@ rangeDef)
+      mrange <- lift (propertyType @@ rangeMDef)
       case head (tripleObjects mrange) of
         Nothing -> pure unit -- There should be a range, however, we protect this function from failing on it.
         (Just sv) -> ifM (tryParseSimpleValue sv propertyValue)
