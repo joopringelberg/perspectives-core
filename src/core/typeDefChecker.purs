@@ -22,7 +22,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneel, bindingDef, propertyIsVerplicht, rangeDef, rolIsVerplicht, propertyDef)
+import Perspectives.ModelBasedTripleGetters (aspectDef, aspectRolDef, aspectDefClosure, externePropertyDef, internePropertyDef, ownExternePropertyDef, ownInternePropertyDef, rolDef, contextDef, propertyIsFunctioneelM, bindingDef, propertyIsVerplicht, rangeDef, rolIsVerplicht, propertyDef)
 import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -256,4 +256,4 @@ propertyIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache 
 propertyIsMandatory = toBoolean propertyIsVerplicht
 
 propertyIsFunctional :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
-propertyIsFunctional = toBoolean propertyIsFunctioneel
+propertyIsFunctional = toBoolean propertyIsFunctioneelM

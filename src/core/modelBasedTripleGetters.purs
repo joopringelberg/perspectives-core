@@ -21,8 +21,8 @@ rolIsFunctioneelM = constructTripleGetterFromObjectsGetter "model:Perspectives$R
 
 -- | True if the Property has been defined as functional.
 -- | `psp:Property -> psp:Boolean`
-propertyIsFunctioneel :: forall e. TypedTripleGetter e
-propertyIsFunctioneel = constructTripleGetterFromObjectsGetter "model:Perspectives$Property$isFunctioneelR" Property.propertyIsFunctioneel
+propertyIsFunctioneelM :: forall e. TypedTripleGetter e
+propertyIsFunctioneelM = constructTripleGetterFromObjectsGetter "model:Perspectives$Property$isFunctioneelR" Property.propertyIsFunctioneel
 
 -- | True if the Rol has been defined as mandatory.
 -- | `psp:Rol -> psp:Boolean`
