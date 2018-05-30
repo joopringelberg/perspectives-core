@@ -85,15 +85,15 @@ propertyMDef = QC.concat
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`
-ownRolDef :: forall e. TypedTripleGetter e
-ownRolDef = constructRolGetter "model:Perspectives$Context$rolInContext" >-> bindingM >-> contextM
+ownRolMDef :: forall e. TypedTripleGetter e
+ownRolMDef = constructRolGetter "model:Perspectives$Context$rolInContext" >-> bindingM >-> contextM
 
 -- | All Rollen defined for a Context type, including Aspects.
 -- | `psp:Context -> psp:Rol`
 rolDef :: forall e. TypedTripleGetter e
 rolDef = QC.concat
-  ownRolDef
-  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownRolDef >-> aspectRolDef)))
+  ownRolMDef
+  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownRolMDef >-> aspectRolDef)))
     ((aspectDef >->> (\_ -> rolDef)) "rolDef"))
 
 -- | All properties defined on the BinnenRol of a Context type.

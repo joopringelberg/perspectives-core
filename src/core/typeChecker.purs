@@ -10,7 +10,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, TypeID, TypedTripleGetter,
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, guardWellFormedNess)
-import Perspectives.ModelBasedTripleGetters (aspectDefClosure, ownRolDef, propertyMDef)
+import Perspectives.ModelBasedTripleGetters (aspectDefClosure, ownRolMDef, propertyMDef)
 import Perspectives.ObjectGetterConstructors (getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
 import Perspectives.QueryCombinators (contains, containsMatching, toBoolean, filter)
@@ -61,7 +61,7 @@ checkContextForQualifiedRol rn cn = do
   (&&) <$> cn `importsAspect` aspect <*> checkContextHasRol aspect rn
   where
     checkContextHasRol :: RolName -> PropertyName -> MonadPerspectives (AjaxAvarCache e) Boolean
-    checkContextHasRol cn' rn' = runMonadPerspectivesQuery cn' (toBoolean (contains rn' ownRolDef))
+    checkContextHasRol cn' rn' = runMonadPerspectivesQuery cn' (toBoolean (contains rn' ownRolMDef))
 
 -- | Returns the Aspect that defines the property, or a usermessage indicating that property with the given
 -- | local name can be found, or that several have been found.
@@ -109,7 +109,7 @@ checkContextForUnQualifiedRol ln cn = do
     hasUnqualifiedRol ln' = containsMatching
       (\contextName rolName -> (contextName <> "$" <> ln') == rolName)
       ("UnqualifiedRol" <> ln')
-      ownRolDef
+      ownRolMDef
 
 -- | True when both parameters are equal and also when the first has the second as aspect.
 -- | If the aspect is a sum type, tries each of the alternatives.
