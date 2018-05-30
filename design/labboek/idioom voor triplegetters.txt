@@ -71,3 +71,4 @@ NAAMGEVING TRIPLE- EN OBJECTSGETTERS
 1. Objectsgetters hebben een onversierde naam.
 2. Een ObjectsGetter of TripleGetter die op type niveau werkt (dus waarvoor we een context als type interpreteren), heeft "Def" als suffix.
 3. Een TripleGetter heeft "M" als suffix (deze suffix komt altijd achter "Def").
+4. "Closure" volgt op alles.

@@ -22,7 +22,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.ModelBasedTripleGetters (aspectDefM, aspectRolDefM, aspectDefClosure, externePropertyDefM, internePropertyDefM, ownExternePropertyDefM, ownInternePropertyDefM, rolDefM, contextDef, propertyIsFunctioneelM, bindingDefM, rolIsVerplichtM, rangeDefM, propertyIsVerplichtM, propertyDefM)
+import Perspectives.ModelBasedTripleGetters (aspectDefM, aspectRolDefM, aspectDefMClosure, externePropertyDefM, internePropertyDefM, ownExternePropertyDefM, ownInternePropertyDefM, rolDefM, contextDefM, propertyIsFunctioneelM, bindingDefM, rolIsVerplichtM, rangeDefM, propertyIsVerplichtM, propertyDefM)
 import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -191,7 +191,7 @@ getPropertyFunction pn rn = do
 compareRolInstancesToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 compareRolInstancesToDefinition cid rolType' = do
   rolInstances <- lift $ lift $ getRolUsingAspects rolType' cid
-  -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRolDefClosure!
+  -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRolDefMClosure!
   case head rolInstances of
     Nothing -> ifM (lift (rolIsMandatory rolType'))
       (tell [MissingRolInstance rolType' cid])
@@ -228,7 +228,7 @@ compareRolInstancesToDefinition cid rolType' = do
 -- | psp:Rol -> psp:Context -> psp:ElkType`
 checkAspectOfRolType :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkAspectOfRolType cid = do
-  (Triple{object:ctypeArr}) <- lift $ lift (cid ## contextDef)
+  (Triple{object:ctypeArr}) <- lift $ lift (cid ## contextDefM)
   case head ctypeArr of
     Nothing -> tell [RolWithoutContext cid]
     (Just ctype) -> do
@@ -236,15 +236,15 @@ checkAspectOfRolType cid = do
       case head (tripleObjects mar) of -- TODO: er kunnen er meer zijn!
         Nothing -> pure unit
         (Just aspectRol) -> do
-          (Triple{object:aspectRolDefClosure}) <- lift $ lift $ (ctype ## aspectDefM >-> rolDefM)
-          if isJust $ elemIndex aspectRol aspectRolDefClosure
+          (Triple{object:aspectRolDefMClosure}) <- lift $ lift $ (ctype ## aspectDefM >-> rolDefM)
+          if isJust $ elemIndex aspectRol aspectRolDefMClosure
             then pure unit
             else tell [AspectRolNotFromAspect cid aspectRol ctype]
 
 -- | `psp:ContextInstance -> psp:ElkType`
 checkCyclicAspects :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkCyclicAspects cid = do
-  (Triple {object: aspects}) <- lift $ lift (cid ## aspectDefClosure)
+  (Triple {object: aspects}) <- lift $ lift (cid ## aspectDefMClosure)
   case elemIndex cid aspects of
     Nothing -> pure unit
     otherwise -> tell [CycleInAspects cid aspects]
