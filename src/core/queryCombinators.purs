@@ -176,7 +176,7 @@ notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
   name :: String
   name = "(notEmpty " <> nameOfp <> ")"
 
--- | Construct a function that returns a bool in Aff, from a TripleGetter.
+-- | Construct a function that returns a bool in Aff, from a TypedTripleGetter.
 toBoolean :: forall e. TypedTripleGetter e -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 toBoolean (TypedTripleGetter nameOfp p) r = do
   result <- p r

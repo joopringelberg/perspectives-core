@@ -1,4 +1,16 @@
-module Perspectives.TripleAdministration where
+module Perspectives.TripleAdministration
+  ( memorizeQueryResults
+  , setMemorizeQueryResults
+  , getRef
+  , lookupInTripleIndex
+  , getTriple
+  , addToTripleIndex
+  , registerTriple
+  , unRegisterTriple
+  , memorize
+  , removeDependency_
+  )
+  where
 
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)

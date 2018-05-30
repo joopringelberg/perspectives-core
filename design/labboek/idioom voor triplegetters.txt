@@ -1,0 +1,73 @@
+IDIOOM VOOR TRIPLEGETTERS
+
+1. Er zijn vier veelvoorkomende use cases, namelijk dat je een TypedTriplegetter toe wil passen en alleen geïnteresseerd bent in
+	- het triple
+	- alleen de objecten
+	- het eerste object, dat er al dan niet is
+	- het eerste object, waarvan ik aanneem dat het er is.
+
+2. Functies die ik geschreven heb om met die use cases te dealen:
+	- toBoolean
+	- tripleGetter2function
+	- tripleGetter2function'
+
+-- | Construct a function that returns a bool in Aff, from a TypedTripleGetter.
+toBoolean :: forall e. TypedTripleGetter e -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
+toBoolean (TypedTripleGetter nameOfp p) r = do
+  result <- p r
+  arrWithBool <- pure $ tripleObjects result
+  case Arr.head arrWithBool of
+    Nothing -> pure false
+    (Just x) -> pure (x == "true")
+
+tripleGetter2function :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Maybe String)
+tripleGetter2function (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head)
+
+tripleGetter2function' :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) String
+tripleGetter2function' (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head) >=> (onNothing' (error ("No result for " <> name)))
+
+3. Op het niveau van ObjectsGetters:
+	- makeFunction (wordt overigens maar vier keer ingezet)
+	- firstOnly (wordt 11 keer ingezet). FirstOnly geeft de mogelijkheid om een custom error te gooien.
+
+makeFunction :: forall e. String -> ObjectsGetter e -> ObjectGetter e
+makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no value: " <> name) (pure (head ta)))
+
+firstOnly :: forall e. ObjectsGetter e -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String))
+firstOnly g = g >=> (pure <<< head)
+
+ALS HET EERSTE OBJECT WORDT AANGENOMEN MAAR ER NIET IS
+Dit is een foutsituatie waarvoor throwError ingezet moet worden. Dat is de strategie die ik in makeFunction volgt (voor ObjectsGetters)
+
+TRIPLE-OBJECTGETTER DIMENSIE IS ORTHOGONAAL MBT DE USE CASES 
+
+RESULTAAT IN MONADPERSPECTIVESQUERY EN IN MONADPERSPECTIVES
+Van een query die gebruik maakt van variabelen, moeten we het resultaat apart berekenen in MonadPerspectives (dus door runMonadPerspectivesQuery toe te passen). Alleen dan krijgt de berekening een prive omgeving waarin de variabelen gebonden worden.
+Queries die geen gebruik maken van variabelen, mogen gezamenlijk worden uitgerekend in MonadPerspectives.
+
+Ook deze dimensie is orthogonaal mbt de use cases.
+
+SYSTEMATIEK VOOR INFIX OPERATOREN
+De dimensie MonadPerpectives-MonadPerspectivesQuery-ObjectsGetters:
+1. ## past een TypedTripleGetter toe in MonadPerspectives.
+2. @@ past een TypedTripleGetter toe in MonadPerspectivesQuery.
+3. %% past een ObjectsGetter toe (dit voegt niets toe aan gewone functie applicatie)
+De vier use cases:
+1. zonder verdere versiering leveren we een triple (TripleGetter), resp. een Array van objecten (ObjectsGetter)
+2. Met = erachter krijgen we een array van objecten (doet niets voor een ObjectsGetter)
+3. Met > erachter krijgen we een Maybe ID
+4. Met >> erachter krijgen we een ID of er wordt een foutmelding gegenereerd.
+Voorbeelden:
+
+##> levert MonadPerspectives e (Maybe ID)
+@@>> levert MonadPerspectivesQuery e ID of een foutmelding
+%%>> levert een ID of een foutmelding.
+@@= levert MonadPerspectivesQuery e (Array ID)
+## levert MonadPerspectives e (Triple e)
+
+toBoolean = (@@>) >>= pure <<< maybe false (eq "true")
+
+NAAMGEVING TRIPLE- EN OBJECTSGETTERS
+1. Objectsgetters hebben een onversierde naam.
+2. Een ObjectsGetter of TripleGetter die op type niveau werkt (dus waarvoor we een context als type interpreteren), heeft "Def" als suffix.
+3. Een TripleGetter heeft "M" als suffix (deze suffix komt altijd achter "Def").
