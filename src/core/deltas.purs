@@ -33,7 +33,7 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
-import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneel, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
+import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneelM, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.DataTypeObjectGetters (binding, context, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
@@ -173,7 +173,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      (isfunc :: Boolean) <- lift $ runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneel else propertyIsFunctioneel ))
+      (isfunc :: Boolean) <- lift $ runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneel ))
       if isfunc
         then do
           x <- pure $ findIndex equalExceptRolID deltas

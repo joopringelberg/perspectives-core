@@ -16,8 +16,8 @@ import Perspectives.TripleGetterConstructors (constructInverseRolGetter, constru
 
 -- | True if the Rol has been defined as functional.
 -- | `psp:Rol -> psp:Boolean`
-rolIsFunctioneel :: forall e. TypedTripleGetter e
-rolIsFunctioneel = constructTripleGetterFromObjectsGetter "model:Perspectives$Rol$isFunctioneelR" Property.rolIsFunctioneel
+rolIsFunctioneelM :: forall e. TypedTripleGetter e
+rolIsFunctioneelM = constructTripleGetterFromObjectsGetter "model:Perspectives$Rol$isFunctioneelR" Property.rolIsFunctioneel
 
 -- | True if the Property has been defined as functional.
 -- | `psp:Property -> psp:Boolean`
