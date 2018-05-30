@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Perspectives.CoreTypes (ObjectsGetter)
 import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.DataTypeObjectGetters (buitenRol, getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, binding, getRolContext)
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e
@@ -20,7 +20,7 @@ rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
 -- | The type of the range that has been defined for the Property.
 -- | `psp:Property -> psp:SimpleValue`
 range :: forall e. ObjectsGetter e
-range = getRol "model:Perspectives$Property$range" /-/ getRolBinding /-/ getRolContext
+range = getRol "model:Perspectives$Property$range" /-/ binding /-/ getRolContext
 
 -- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
@@ -41,7 +41,7 @@ getContextDef rid = unlessNull getRolInContextContextDef rid <|> unlessNull getB
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
 getBindingDef :: forall e. ObjectsGetter e
-getBindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ getRolBinding /-/ getRolContext
+getBindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ binding /-/ getRolContext
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`

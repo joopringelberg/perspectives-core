@@ -16,7 +16,7 @@ import Perspectives.Utilities (onNothing)
 import Prelude (bind, join, pure, ($), (<>), (>=>))
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
--- | of getRolContext), others roles (such as the result of getRolBinding). The Partial function below returns that
+-- | of getRolContext), others roles (such as the result of binding). The Partial function below returns that
 -- | single ID instead of the Array holding it, effectively turning an ObjectsGetter into an ObjectGetter.
 toSingle :: forall e. Partial => ObjectsGetter e -> ObjectGetter e
 toSingle og id = do
@@ -65,14 +65,14 @@ rolType = getRolMember \rol -> [rol_pspType rol]
 getRolTypeF :: forall e. ObjectGetter e
 getRolTypeF = makeFunction "getRolTypeF" rolType
 
-getRolBinding :: forall e. ObjectsGetter e
-getRolBinding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
+binding :: forall e. ObjectsGetter e
+binding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
 getRolBindingDef :: forall e. ObjectsGetter e
-getRolBindingDef = getRolBinding /-/ getRolContext
+getRolBindingDef = binding /-/ getRolContext
 
 getRolContext :: forall e. ObjectsGetter e
 getRolContext = getRolMember \rol -> [rol_context rol]
 
-getRolBinding' :: forall e. ObjectGetter e
-getRolBinding' = unsafePartial $ toSingle getRolBinding
+binding' :: forall e. ObjectGetter e
+binding' = unsafePartial $ toSingle binding

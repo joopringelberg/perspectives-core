@@ -1,7 +1,7 @@
 module Perspectives.ModelBasedTripleGetters where
 
 import Perspectives.CoreTypes (TypedTripleGetter)
-import Perspectives.DataTypeTripleGetters (binding, iedereRolInContextM, label, context, buitenRolM)
+import Perspectives.DataTypeTripleGetters (bindingM, iedereRolInContextM, label, context, buitenRolM)
 import Perspectives.ModelBasedObjectGetters (getBinnenRolBeschrijving, getBuitenRolBeschrijving, getContextDef)
 import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht) as Property
 import Perspectives.QueryCombinators (closure, closure', filter, notEmpty, concat, containedIn, not, ref) as QC
@@ -39,7 +39,7 @@ propertyIsVerplicht = constructTripleGetterFromObjectsGetter "model:Perspectives
 -- | The type of the range that has been defined for the Property.
 -- | `psp:Property -> psp:SimpleValue`
 rangeDef :: forall e. TypedTripleGetter e
-rangeDef = constructRolGetter "model:Perspectives$Property$range" >-> binding >-> context
+rangeDef = constructRolGetter "model:Perspectives$Property$range" >-> bindingM >-> context
 
 -- | True iff the context instance has a label.
 -- | `psp:ContextInstance -> psp:Boolean`
@@ -49,17 +49,17 @@ hasLabel = QC.notEmpty label
 -- | True if the rol instance has a binding.
 -- | `psp:RolInstance -> psp:Boolean`
 hasBinding :: forall e. TypedTripleGetter e
-hasBinding = QC.notEmpty binding
+hasBinding = QC.notEmpty bindingM
 
 -- | The role instance at the bottom of the telescope of the rol instance (that role instance will have no binding).
 -- | `psp:RolInstance -> psp:RolInstance`
 rolUser :: forall e. TypedTripleGetter e
-rolUser = QC.closure' binding
+rolUser = QC.closure' bindingM
 
 -- | The view that is needed for the object of the Actie.
 -- | `psp:Actie -> psp:View`
 objectViewDef :: forall e. TypedTripleGetter e
-objectViewDef = (constructRolGetter "model:Perspectives$Actie$objectView") >-> binding >-> context
+objectViewDef = (constructRolGetter "model:Perspectives$Actie$objectView") >-> bindingM >-> context
 
 -- | The PropertyReferences of the View.
 -- | `psp:View -> psp:PropertyReferentie`
@@ -69,12 +69,12 @@ propertyReferentie = constructRolGetter "model:Perspectives$View$propertyReferen
 -- | The context instances that are bound to a rol of the context instance.
 -- | `psp:ContextInstance -> psp:ContextInstance`
 boundContexts :: forall e. TypedTripleGetter e
-boundContexts = (QC.filter (rolHasTypeWithLocalName "buitenRolBeschrijving") (iedereRolInContextM >-> binding)) >-> context
+boundContexts = (QC.filter (rolHasTypeWithLocalName "buitenRolBeschrijving") (iedereRolInContextM >-> bindingM)) >-> context
 
 -- | All properties defined in namespace of the Rol.
 -- | `psp:Rol -> psp:Property`
 ownPropertyDef :: forall e. TypedTripleGetter e
-ownPropertyDef = constructRolGetter "model:Perspectives$Rol$rolProperty" >-> binding >-> context
+ownPropertyDef = constructRolGetter "model:Perspectives$Rol$rolProperty" >-> bindingM >-> context
 
 -- | All properties stored with the rol instance (own and derived from Aspects).
 -- | `psp:Rol -> psp:Property`
@@ -87,7 +87,7 @@ propertyDef = QC.concat
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`
 ownRolDef :: forall e. TypedTripleGetter e
-ownRolDef = constructRolGetter "model:Perspectives$Context$rolInContext" >-> binding >-> context
+ownRolDef = constructRolGetter "model:Perspectives$Context$rolInContext" >-> bindingM >-> context
 
 -- | All Rollen defined for a Context type, including Aspects.
 -- | `psp:Context -> psp:Rol`
@@ -100,7 +100,7 @@ rolDef = QC.concat
 -- | All properties defined on the BinnenRol of a Context type.
 -- | `psp:Context -> psp:Property`
 ownInternePropertyDef :: forall e. TypedTripleGetter e
-ownInternePropertyDef = binnenRolBeschrijving >-> binding >-> context >-> propertyDef
+ownInternePropertyDef = binnenRolBeschrijving >-> bindingM >-> context >-> propertyDef
 
 -- | All properties defined on the BinnenRol of a Context type (own and derived from Aspects).
 -- | `psp:Context -> psp:Property`
@@ -114,7 +114,7 @@ internePropertyDef = QC.concat
 -- | `psp:Context -> psp:Property`
 ownExternePropertyDef :: forall e. TypedTripleGetter e
 -- Neem psp:Context$buitenRol van het contexttype. Neem daarvan de rolProperties (en daarvan de binding en daarvan de context).
-ownExternePropertyDef = buitenRolBeschrijving >-> binding >-> context >-> propertyDef
+ownExternePropertyDef = buitenRolBeschrijving >-> bindingM >-> context >-> propertyDef
 
 -- | All properties defined on the BuitenRol of a Context type (own and derived from Aspects).
 -- | `psp:Context -> psp:Property`
@@ -127,7 +127,7 @@ externePropertyDef = QC.concat
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
 bindingDef :: forall e. TypedTripleGetter e
-bindingDef = constructRolGetter "model:Perspectives$Rol$mogelijkeBinding"  >-> binding >-> context
+bindingDef = constructRolGetter "model:Perspectives$Rol$mogelijkeBinding"  >-> bindingM >-> context
 
 -- | The instances of the Rol psp:Context$rolInContext of a context.
 -- | `psp:ContextInstance -> psp:RolInstance`
@@ -137,12 +137,12 @@ rolInContext = constructRolGetter "model:Perspectives$Context$rolInContext"
 -- | All direct Aspecten of a Context.
 -- | `psp:Context -> psp:Context`
 aspectDef :: forall e. TypedTripleGetter e
-aspectDef = constructRolGetter "model:Perspectives$Context$aspect" >-> binding >-> context
+aspectDef = constructRolGetter "model:Perspectives$Context$aspect" >-> bindingM >-> context
 
 -- | All Rollen from Aspects that have been directly added to a Rol.
 -- | `psp:Rol -> psp:Rol`
 aspectRolDef :: forall e. TypedTripleGetter e
-aspectRolDef = constructRolGetter "model:Perspectives$Rol$aspectRol" >-> binding >-> context
+aspectRolDef = constructRolGetter "model:Perspectives$Rol$aspectRol" >-> bindingM >-> context
 
 -- | All Rollen from Aspects that have been recursively added to a Rol (the entire inherited hiërarchy).
 -- | `psp:Rol -> psp:Rol`
@@ -165,17 +165,17 @@ rolTypeRolInstances = QC.concat iedereRolInContextM
 -- | All acties defined in the Context.
 -- | `psp:Context -> psp:Actie`
 actieInContextDef :: forall e. TypedTripleGetter e
-actieInContextDef = constructRolGetter "model:Perspectives$Zaak$actieInContext" >-> binding >-> context
+actieInContextDef = constructRolGetter "model:Perspectives$Zaak$actieInContext" >-> bindingM >-> context
 
 -- | The Acties that the Rol is the subject (Actor) of.
 -- | `psp:Rol -> psp:Actie`
 subjectRolDef :: forall e. TypedTripleGetter e
-subjectRolDef = constructRolGetter "model:Perspectives$Rol$subjectRol" >-> binding >-> context
+subjectRolDef = constructRolGetter "model:Perspectives$Rol$subjectRol" >-> bindingM >-> context
 
 -- | The Acties that the Rol is the object of.
 -- | `psp:Rol -> psp:Actie`
 objectRolDef :: forall e. TypedTripleGetter e
-objectRolDef = constructRolGetter "model:Perspectives$Rol$objectRol" >-> binding >-> context
+objectRolDef = constructRolGetter "model:Perspectives$Rol$objectRol" >-> bindingM >-> context
 
 -- | The Rollen that have this Actie as subjectRol.
 -- | `psp:Actie -> psp:Rol`

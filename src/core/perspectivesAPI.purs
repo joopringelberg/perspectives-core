@@ -16,7 +16,7 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.DataTypeObjectGetters (contextTypeF)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryEffect ((~>))
-import Perspectives.DataTypeTripleGetters (binding)
+import Perspectives.DataTypeTripleGetters (bindingM)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
@@ -114,7 +114,7 @@ getQuery cid query@(TypedTripleGetter qn _) setter = do
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRolBinding cid rn setter = do
   contextType <- contextTypeF cid
-  getQuery cid (constructRolGetter rn >-> binding) setter
+  getQuery cid (constructRolGetter rn >-> bindingM) setter
 
 -- | Retrieve the rol from the context, subscribe to it.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)

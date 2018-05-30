@@ -35,7 +35,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (actieInContextDef, ownRolDef, rolInContextDef, inverse_subjectRolDef, propertyIsFunctioneel, rolIsFunctioneel, bindingDef, objectRolDef, objectViewDef, propertyReferentie, rolUser, subjectRolDef)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.DataTypeObjectGetters (getRolBinding, getRolContext, makeFunction)
+import Perspectives.DataTypeObjectGetters (binding, getRolContext, makeFunction)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
@@ -402,18 +402,18 @@ setContext = updatePerspectEntiteit
     })
 
 setBinding :: forall e. ID -> ID -> MonadTransactie e Unit
-setBinding rid binding = do
-  oldBinding <- lift $ getRolBinding rid
-  updatePerspectEntiteit' changeRol_binding rid binding
+setBinding rid boundRol = do
+  oldBinding <- lift $ binding rid
+  updatePerspectEntiteit' changeRol_binding rid boundRol
   case head oldBinding of
     Nothing -> pure unit
     (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob "model:Perspectives$binding" rid
-  updatePerspectEntiteitMember' addRol_gevuldeRollen binding "model:Perspectives$binding" rid
+  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol "model:Perspectives$binding" rid
   addDelta $ Delta
     { id : rid
     , memberName: "model:Perspectives$binding"
     , deltaType: Change
-    , value: NullOrUndefined (Just binding)
+    , value: NullOrUndefined (Just boundRol)
     , isContext: false
     }
 

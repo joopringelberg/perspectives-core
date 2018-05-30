@@ -12,7 +12,7 @@ import Perspectives.EntiteitAndRDFAliases (PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol) as Id
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', binding, getRolContext)
 import Prelude (bind, id, pure, show, ($), (<$>), (<>), (==), (||), (>>=))
 
 getRol :: forall e. RolName -> ObjectsGetter e
@@ -28,7 +28,7 @@ getRolFromPrototypeHierarchy :: forall e. RolName -> ObjectsGetter e
 getRolFromPrototypeHierarchy rn contextId =
   unlessNull (getRol rn) contextId
   <|>
-  (buitenRol /-/ getRolBinding /-/ getRolContext /-/ getRolFromPrototypeHierarchy rn) contextId
+  (buitenRol /-/ binding /-/ getRolContext /-/ getRolFromPrototypeHierarchy rn) contextId
 
 getExternalProperty :: forall e. PropertyName -> ObjectsGetter e
 getExternalProperty pn id = do
@@ -54,7 +54,7 @@ lookupInternalProperty :: forall e. Id.LocalName -> ObjectsGetter e
 lookupInternalProperty pn id =
   unlessNull (getInternalProperty pn) id
   <|>
-  (getRolBinding /-/ getPropertyFromRolTelescope pn) id
+  (binding /-/ getPropertyFromRolTelescope pn) id
 
 -- | Combinator to make an ObjectsGetter fail if it returns an empty result.
 -- | Useful in combination with computing alternatives using <|>
@@ -74,7 +74,7 @@ getPropertyFromRolTelescope :: forall e. PropertyName -> ObjectsGetter e
 getPropertyFromRolTelescope qn rolId =
   unlessNull (getProperty qn) rolId
   <|>
-  (getRolBinding /-/ getPropertyFromRolTelescope qn) rolId
+  (binding /-/ getPropertyFromRolTelescope qn) rolId
 
 -- | Using either $aspect or $aspectProperty, climb the Aspect tree looking
 -- | for a Boolean Property bearing the given propertyName.
@@ -85,7 +85,7 @@ booleanPropertyGetter aspectRol propertyName = getter where
   getter pid =
     unlessNull (getExternalProperty propertyName) pid
     <|>
-    (getRol aspectRol /-/ getRolBinding /-/ getRolContext /-/ getter) pid >>=
+    (getRol aspectRol /-/ binding /-/ getRolContext /-/ getter) pid >>=
       \r -> pure [show $ foldl (||) false ((==) "true" <$> r)]
 
 -- | Climb the Aspect tree looking for a Rol bearing the given name.
@@ -95,4 +95,4 @@ getRolUsingAspects :: forall e. RolName -> ObjectsGetter e
 getRolUsingAspects rolName contextId =
   unlessNull (getRolFromPrototypeHierarchy rolName) contextId
     <|>
-    (getRol "model:Perspectives$Rol$aspectRol" /-/ getRolBinding /-/ getRolContext /-/ getRolUsingAspects rolName) contextId
+    (getRol "model:Perspectives$Rol$aspectRol" /-/ binding /-/ getRolContext /-/ getRolUsingAspects rolName) contextId

@@ -23,7 +23,7 @@ import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, runTypedTripleGetter, (##))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
-import Perspectives.DataTypeObjectGetters (getRolBinding, getRolContext)
+import Perspectives.DataTypeObjectGetters (binding, getRolContext) as DTG
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
 
@@ -67,7 +67,7 @@ compileElementaryQueryStep s contextId = case s of
       do
         tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function rolTypeM)
         putQueryStepDomain $ unsafePartial $ fromJust tp
-        createDataTypeGetterDescription contextId "rolTypeM"
+        createDataTypeGetterDescription contextId "rolType"
   BuitenRol -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "Rol") *> createDataTypeGetterDescription contextId "buitenRol")
   IedereRolInContext -> ensureAspect (psp "Context")
@@ -315,7 +315,7 @@ createContextWithSingleRole contextId contextType bindingValue = do
   rolType <- onNothing
     (error $ "No rolType found for " <> contextType)
     (lift $
-      ((getRol "model:Perspectives$Context$rolInContext") /-/ getRolBinding /-/ getRolContext) contextType >>= pure <<< head) -- qualified name of rolType
+      ((getRol "model:Perspectives$Context$rolInContext") /-/ DTG.binding /-/ DTG.getRolContext) contextType >>= pure <<< head) -- qualified name of rolType
   rolInstanceId <- createRol rolType contextId (buitenRol bindingValue) 0
   createContext contextId contextType [Tuple rolType [rolInstanceId]] []
 
