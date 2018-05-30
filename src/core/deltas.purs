@@ -27,7 +27,7 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, tripleObjects, (%%>>))
+import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, (%%>>))
 import Perspectives.DataTypeTripleGetters (identityM, rolTypeM)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
@@ -39,7 +39,7 @@ import Perspectives.DataTypeObjectGetters (binding, context)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##), (##>))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleGetterComposition ((>->))
@@ -225,8 +225,8 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
 
 sendTransactieToUser :: forall e. ID -> Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
 sendTransactieToUser userId t = do
-  tripleUserIP <- userId ## identityM
-  (userIP :: String) <- onNothing' ("sendTransactieToUser: user has no IP: " <> userId) (head (tripleObjects tripleUserIP))
+  tripleUserIP <- userId ##> identityM
+  (userIP :: String) <- onNothing' ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
   -- TODO controleer of hier authentication nodig is!
   (res :: AJ.AffjaxResponse String)  <- liftAff $ AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
   (StatusCode n) <- pure res.status

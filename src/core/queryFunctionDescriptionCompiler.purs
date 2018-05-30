@@ -21,7 +21,7 @@ import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##), (##>), (##>>))
+import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##>), (##>>), (##=))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.DataTypeObjectGetters (binding, context) as DTG
 import Perspectives.Utilities (ifNothing, onNothing)
@@ -71,8 +71,8 @@ compileElementaryQueryStep s contextId = case s of
   IedereRolInContext -> ensureAspect (psp "Context")
     do
       dom <- getQueryStepDomain
-      tps <- lift (dom ## ownRollenDefM)
-      sumtype <- createSumType $ tripleObjects tps
+      tps <- lift (dom ##= ownRollenDefM)
+      sumtype <- createSumType tps
       putQueryStepDomain sumtype
       createDataTypeGetterDescription contextId "iedereRolInContext"
   RolTypen -> ensureAspect (psp "Context")

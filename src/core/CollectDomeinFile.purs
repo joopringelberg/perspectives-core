@@ -6,8 +6,8 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (insert, lookup)
 import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev, rol_id)
-import Perspectives.CoreTypes (MonadPerspectives, tripleObjects)
-import Perspectives.RunMonadPerspectivesQuery ((##))
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
@@ -30,8 +30,8 @@ domeinFileFromContext enclosingContext = do
     collect c definedAtToplevel =
       ifM (saveContext c definedAtToplevel)
         do
-          boundContexts <- lift $ ((context_id c) ## boundContextsM)
-          for_ (tripleObjects boundContexts) recursiveCollect
+          boundContexts <- lift $ ((context_id c) ##= boundContextsM)
+          for_ boundContexts recursiveCollect
         (pure unit)
       where
         recursiveCollect :: ContextID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Unit
@@ -49,8 +49,8 @@ domeinFileFromContext enclosingContext = do
                 ifNothing (lift $ getPerspectEntiteit (context_buitenRol ctxt))
                   (pure unit)
                   (modify <<< insertRolInDomeinFile)
-                rollen <- lift $ ((context_id ctxt) ## iedereRolInContextM)
-                for_ (tripleObjects rollen)
+                rollen <- lift $ ((context_id ctxt) ##= iedereRolInContextM)
+                for_ rollen
                   \rolID ->
                     ifNothing (lift $ getPerspectEntiteit rolID)
                       (pure unit)
@@ -62,8 +62,8 @@ domeinFileFromContext enclosingContext = do
               else
                 do
                 lift $ void ((saveEntiteit (context_buitenRol ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-                rollen <- lift $ ((context_id ctxt) ## iedereRolInContextM)
-                for_ (tripleObjects rollen)
+                rollen <- lift $ ((context_id ctxt) ##= iedereRolInContextM)
+                for_ rollen
                   \rolID -> lift ((saveEntiteit rolID)  :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
                 lift $ void ((saveEntiteit (context_id ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)
                 pure true

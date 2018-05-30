@@ -14,8 +14,8 @@ import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
-import Perspectives.CoreTypes (Triple(..), MonadPerspectives, tripleObjects)
-import Perspectives.RunMonadPerspectivesQuery ((##))
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
@@ -204,8 +204,8 @@ enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
   withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
   newline
-  sectionIds <- lift $ lift ((context_id theText) ## (ignoreCache DTG.typeVanIedereRolInContextM))
-  traverse_ section (tripleObjects sectionIds)
+  sectionIds <- lift $ lift ((context_id theText) ##= (ignoreCache DTG.typeVanIedereRolInContextM))
+  traverse_ section sectionIds
 
   where
     section :: ID -> PerspectText e
@@ -214,9 +214,9 @@ enclosingContext theText = do
       identifier sectionId
       newline
       newline
-      (Triple{object: definedContexts}) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM)) -- These are all a buitenRol.
-      (contextIds :: Triple e) <- lift $ lift ((context_id theText) ## ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM >-> DTG.contextM)) -- For each of these buitenRollen, this is the ID of the context represented by it.
-      traverse_ (ppContext definedContexts) (tripleObjects contextIds)
+      definedContexts <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM)) -- These are all a buitenRol.
+      contextIds <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM >-> DTG.contextM)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      traverse_ (ppContext definedContexts) contextIds
 
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
