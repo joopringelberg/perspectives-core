@@ -27,7 +27,7 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, tripleObjects)
+import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, tripleObjects, (%%>>))
 import Perspectives.DataTypeTripleGetters (identityM, rolTypeM)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
@@ -35,7 +35,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (actiesInContextDefM, ownRollenDefM, rolInContextDefM, inverse_subjectRollenDefM, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDefM, objectRollenDefM, objectViewDefM, propertyReferentiesM, rolUserM, subjectRollenDefM)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.DataTypeObjectGetters (binding, context, makeFunction)
+import Perspectives.DataTypeObjectGetters (binding, context)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
@@ -249,7 +249,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   usersInvolvedInRol :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array ID)
   usersInvolvedInRol (Delta{id, memberName}) =
     do
-      (contextId :: ContextID) <- makeFunction "" context id
+      (contextId :: ContextID) <- id %%>> context
       (Triple {object}) <-
         id ## rolTypeM >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUserM
       pure $ object

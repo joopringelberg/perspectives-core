@@ -15,7 +15,8 @@ import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (contextHasType)
-import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleGetter2function, tripleObject, tripleObjects, (@@))
+import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObject, tripleObjects, (@@), (@@>), (%%>>))
+import Perspectives.DataTypeObjectGetters (internePropertyTypen, propertyTypen, rolType)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, typeVanIedereRolInContextM)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -29,7 +30,6 @@ import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.RunMonadPerspectivesQuery ((##), runMonadPerspectivesQuery)
-import Perspectives.DataTypeObjectGetters (internePropertyTypen, propertyTypen, getRolTypeF)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, ifM, pure, show, unit, void, ($), (<), (<<<), (<>), (>>=))
@@ -53,7 +53,7 @@ checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContex
 -- | `psp:ContextInstance -> psp:ElkType`
 checkContext' :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkContext' cid = do
-  ifNothing (lift $ tripleGetter2function contextTypeM cid)
+  ifNothing (lift (cid @@> contextTypeM))
     (tell [MissingType cid])
     -- tp is psp:Context
     \tp -> do
@@ -137,7 +137,7 @@ checkInternalProperty cid propertyType = pure unit
 -- | `psp:ContextInstance -> psp:RolInstance -> psp:Property -> psp:ElkType`
 comparePropertyInstanceToDefinition :: forall e. ContextID -> RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 comparePropertyInstanceToDefinition cid rid propertyType = do
-  rolType <- lift $ lift $ getRolTypeF rid
+  rolType <- lift $ lift (rid %%>> rolType)
   (propertyGetter :: TypedTripleGetter e) <- lift $ lift $ getPropertyFunction propertyType rolType
   (Triple {object}) <- lift (rid @@ propertyGetter)
   pure unit

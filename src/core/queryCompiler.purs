@@ -7,7 +7,7 @@ import Data.Array (foldl, unsnoc)
 import Data.Maybe (Maybe)
 import Data.Traversable (traverse)
 import Perspectives.ContextRolAccessors (firstOnly)
-import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID)
+import Perspectives.CoreTypes (MonadPerspectives, TypedTripleGetter(..), TypeID, (%%>>))
 import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, contextM, contextTypeM, identityM, iedereRolInContextM, labelM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
@@ -16,7 +16,7 @@ import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, ignoreCache, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (contextType, contextTypeF, rolBindingDef)
+import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
@@ -30,7 +30,7 @@ rolQuery rn = ifNothing (queryCacheLookup rn)
   do
     -- We must run the resulting function in its own State.
     -- TODO. Dit ziet er beter uit als we ObjectsGetters gebruiken.
-    typeDescriptionID <- contextTypeF rn
+    typeDescriptionID <- rn %%>> contextType
     tg@(TypedTripleGetter n _) <- constructQueryFunction typeDescriptionID
     queryCacheInsert n $ TypedTripleGetter n (lift <<< (runTypedTripleGetter tg))
   (pure <<< id)

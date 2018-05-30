@@ -1,15 +1,13 @@
 module Perspectives.ContextRolAccessors where
 
-import Control.Monad.Eff.Exception (error)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
-import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
+import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Perspectives.Utilities (onNothing)
-import Prelude (bind, pure, ($), (<<<), (<>), (>=>))
+import Prelude (bind, pure, ($), (<<<), (>=>))
 
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
 getContextMember f c = do
@@ -32,9 +30,6 @@ getRolMember f c = do
   case maybeRol of
     (Just perspectRol) -> pure $ f perspectRol
     otherwise -> pure []
-
-makeFunction :: forall e. String -> ObjectsGetter e -> ObjectGetter e
-makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no value: " <> name) (pure (head ta)))
 
 firstOnly :: forall e. ObjectsGetter e -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe String))
 firstOnly g = g >=> (pure <<< head)

@@ -2,14 +2,16 @@ module Perspectives.CoreTypes where
 
 import Perspectives.EntiteitAndRDFAliases
 
-import Control.Monad.Aff (Aff, error)
+import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar)
 import Control.Monad.Eff.Ref (REF, Ref)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
 import Data.Array (head)
 import Data.Either (Either)
-import Data.Maybe (Maybe, fromJust)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile)
@@ -17,8 +19,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Perspectives.Utilities (onNothing')
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>=>))
+import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>>=), ($))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -118,6 +119,25 @@ type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
 
 type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
 
+applyObjectsGetter :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+applyObjectsGetter id g = g id
+
+infix 0 applyObjectsGetter as %%
+infix 0 applyObjectsGetter as %%=
+
+applyObjectsGetterToMaybeObject :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) (Maybe Value)
+applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
+
+infix 0 applyObjectsGetterToMaybeObject as %%>
+
+applyObjectsGetterToObject :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) Value
+applyObjectsGetterToObject id g = g id >>= \objs ->
+  case head objs of
+    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> id <> "'."
+    (Just obj) -> pure obj
+
+infix 0 applyObjectsGetterToObject as %%>>
+
 -----------------------------------------------------------
 -- NAMEDFUNCTION
 -----------------------------------------------------------
@@ -157,12 +177,6 @@ tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
 -----------------------------------------------------------
 type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
 
-tripleGetter2function :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Maybe String)
-tripleGetter2function (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head)
-
-tripleGetter2function' :: forall e. TypedTripleGetter e -> ID -> MonadPerspectivesQuery (AjaxAvarCache e) String
-tripleGetter2function' (TypedTripleGetter name tg)= tg >=> tripleObjects_ >=> (pure <<< head) >=> (onNothing' (error ("No result for " <> name)))
-
 -----------------------------------------------------------
 -- TYPED GETTERS
 -----------------------------------------------------------
@@ -181,6 +195,33 @@ applyTypedTripleGetter :: forall e.
 applyTypedTripleGetter a (TypedTripleGetter _ f) = f a
 
 infix 0 applyTypedTripleGetter as @@
+
+applyTypedTripleGetterToObjects :: forall e.
+  Subject
+  -> TypedTripleGetter e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Array ID)
+applyTypedTripleGetterToObjects a (TypedTripleGetter _ f) = f a >>= pure <<< tripleObjects
+
+infix 0 applyTypedTripleGetterToObjects as @@=
+
+applyTypedTripleGetterToMaybeObject :: forall e.
+  Subject
+  -> TypedTripleGetter e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Maybe ID)
+applyTypedTripleGetterToMaybeObject a (TypedTripleGetter _ f) = f a >>= pure <<< head <<< tripleObjects
+
+infix 0 applyTypedTripleGetterToMaybeObject as @@>
+
+applyTypedTripleGetterToObject :: forall e.
+  Subject
+  -> TypedTripleGetter e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) ID
+applyTypedTripleGetterToObject a (TypedTripleGetter n f) = f a >>= \(Triple{object}) ->
+  case head object of
+    Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> a <> "'."
+    (Just obj) -> pure obj
+
+infix 0 applyTypedTripleGetterToObject as @@>>
 
 -----------------------------------------------------------
 -- TRIPLEREF

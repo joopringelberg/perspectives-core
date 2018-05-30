@@ -7,13 +7,13 @@ import Data.HeytingAlgebra (not) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), putQueryVariable, readQueryVariable, tripleObjects)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Object, RolID, Subject, Value)
 import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
-import Prelude (bind, const, discard, id, join, map, pure, show, ($), (<<<), (<>), (==), (>>=), (>=>))
+import Prelude (bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=))
 import Type.Data.Boolean (kind Boolean)
 
 -- | The recursive closure of a query, bottoming out when it has no results.
@@ -178,12 +178,7 @@ notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
 
 -- | Construct a function that returns a bool in Aff, from a TypedTripleGetter.
 toBoolean :: forall e. TypedTripleGetter e -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
-toBoolean (TypedTripleGetter nameOfp p) r = do
-  result <- p r
-  arrWithBool <- pure $ tripleObjects result
-  case Arr.head arrWithBool of
-    Nothing -> pure false
-    (Just x) -> pure (x == "true")
+toBoolean tg = flip applyTypedTripleGetterToMaybeObject tg >=> pure <<< maybe false (eq "true")
 
 -- | This query constructor takes a context id as argument. The query step that results can be applied to a role id
 -- | and will result in all instances of that role for the given context.

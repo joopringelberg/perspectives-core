@@ -8,12 +8,12 @@ import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
-import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
+import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives, (%%>>))
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.DataTypeObjectGetters (contextTypeF)
+import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryEffect ((~>))
 import Perspectives.DataTypeTripleGetters (bindingM)
@@ -113,11 +113,11 @@ getQuery cid query@(TypedTripleGetter qn _) setter = do
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRolBinding cid rn setter = do
-  contextType <- contextTypeF cid
+  contextType <- cid %%>> contextType
   getQuery cid (constructRolGetter rn >-> bindingM) setter
 
 -- | Retrieve the rol from the context, subscribe to it.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRol cid rn setter = do
-  contextType <- contextTypeF cid
+  contextType <- cid %%>> contextType
   getQuery cid (constructRolGetter rn) setter

@@ -1,7 +1,6 @@
 module Perspectives.DataTypeObjectGetters where
 
-import Control.Monad.Eff.Exception (error)
-import Data.Array (head, nub, singleton)
+import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe, maybe)
 import Data.StrMap (keys, values)
@@ -12,8 +11,7 @@ import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.Utilities (onNothing)
-import Prelude (bind, join, pure, ($), (<>), (>=>))
+import Prelude (bind, join, pure, ($))
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of context), others roles (such as the result of binding). The Partial function below returns that
@@ -23,15 +21,8 @@ toSingle og id = do
   (ar :: Array String) <- og id
   pure $ ArrayPartial.head ar
 
-makeFunction :: forall e. String -> ObjectsGetter e -> ObjectGetter e
-makeFunction name og = og >=> (\ta -> onNothing (error $ "Function yields no value: " <> name) (pure (head ta)))
-
 contextType :: forall e. ObjectsGetter e
 contextType = getContextMember \context -> [context_pspType context]
-
--- | `psp:ContextInstance -> psp:Context`
-contextTypeF :: forall e. ObjectGetter e
-contextTypeF = makeFunction "contextTypeF" contextType
 
 -- Returns an empty array if the context does not exist.
 buitenRol :: forall e. ObjectsGetter e
@@ -61,9 +52,6 @@ label = getContextMember \context -> [(context_displayName context)]
 
 rolType :: forall e. ObjectsGetter e
 rolType = getRolMember \rol -> [rol_pspType rol]
-
-getRolTypeF :: forall e. ObjectGetter e
-getRolTypeF = makeFunction "getRolTypeF" rolType
 
 binding :: forall e. ObjectsGetter e
 binding = getRolMember \rol -> maybe [] singleton (rol_binding rol)

@@ -11,8 +11,8 @@ import Data.Tuple (Tuple(..), snd)
 import Partial.Unsafe (unsafePartial)
 import Perpectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, contextHasType, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleGetter2function, tripleObjects, withQueryCompilerEnvironment)
-import Perspectives.DataTypeTripleGetters (contextTypeM, rolTypeM)
+import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleObjects, withQueryCompilerEnvironment)
+import Perspectives.DataTypeTripleGetters (contextTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
@@ -21,7 +21,7 @@ import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, runTypedTripleGetter, (##))
+import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##), (##>), (##>>))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
 import Perspectives.DataTypeObjectGetters (binding, context) as DTG
 import Perspectives.Utilities (ifNothing, onNothing)
@@ -46,7 +46,7 @@ compileElementaryQueryStep s contextId = case s of
   Binding -> ensureAspect (psp "Rol")
     do
       dom <- getQueryStepDomain
-      ifNothing (lift $ runMonadPerspectivesQuery dom (tripleGetter2function bindingDefM))
+      ifNothing (lift (dom ##> bindingDefM))
         (pure $ Left $ MissingMogelijkeBinding dom)
         \bindingType -> do
           putQueryStepDomain bindingType
@@ -61,12 +61,10 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     ifM (lift $ dom `isOrHasAspect` (psp "Context"))
       do
-        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function contextTypeM)
-        putQueryStepDomain $ unsafePartial $ fromJust tp
+        tp <- lift (dom ##>> contextTypeM) >>= putQueryStepDomain
         createDataTypeGetterDescription contextId "contextTypeM"
       do
-        tp <- lift $ runMonadPerspectivesQuery dom (tripleGetter2function rolTypeM)
-        putQueryStepDomain $ unsafePartial $ fromJust tp
+        tp <- lift (dom ##>> contextTypeM) >>= putQueryStepDomain
         createDataTypeGetterDescription contextId "rolType"
   BuitenRol -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "Rol") *> createDataTypeGetterDescription contextId "buitenRol")
