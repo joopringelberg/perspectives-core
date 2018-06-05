@@ -3,6 +3,7 @@ module Perspectives.Couchdb where
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (elemIndex)
+import Data.Foreign (unsafeFromForeign)
 import Data.Foreign.Class (class Decode)
 import Data.Foreign.Generic (defaultOptions, genericDecode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
@@ -10,11 +11,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Map (Map, fromFoldable, lookup)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Network.HTTP.StatusCode (StatusCode(..))
-import Prelude (show, ($), (<>), (==))
+import Prelude (otherwise, pure, show, ($), (<>), (==))
 
 -----------------------------------------------------------
 -- ALIASES
@@ -30,9 +31,11 @@ type DatabaseName = String
 -----------------------------------------------------------
 
 newtype PutCouchdbDocument = PutCouchdbDocument
-  { ok :: Boolean
-  , id :: String
-  , rev :: String}
+  { ok :: NullOrUndefined Boolean
+  , id :: NullOrUndefined String
+  , rev :: NullOrUndefined String
+  , error :: NullOrUndefined String
+  , reason :: NullOrUndefined String}
 
 derive instance genericPutCouchdbDocument :: Generic PutCouchdbDocument _
 
@@ -124,6 +127,8 @@ couchdDBStatusCodes = fromFoldable
   , Tuple 500 "Internal server error. The request was invalid, either because the supplied JSON was invalid, or invalid information was supplied as part of the request."
   ]
 
+-- | Throws an error pertinent to the statuscode if it is not one of the statusCodes that are acceptable.
+-- | Otherwise evaluates f.
 -- onAccepted :: forall m a. MonadError Error m => StatusCode -> Array Int -> String -> m a -> m a
 onAccepted :: forall a m. MonadError Error m => StatusCode -> Array Int -> String -> m a -> m a
 onAccepted (StatusCode n) statusCodes fname f = case elemIndex n statusCodes of
