@@ -8,8 +8,8 @@ import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (filter)
-import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext)
-import Perspectives.ModelBasedTripleGetters (boundContexts, hasBinding)
+import Perspectives.DataTypeTripleGetters (bindingM, iedereRolInContextM)
+import Perspectives.ModelBasedTripleGetters (boundContextsM, hasBindingM)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 
 rolDef :: String
@@ -19,20 +19,20 @@ rolDef = "model:Perspectives$Property"
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
   log "=========================Test.BoundContexts================================"
-  l0 <-  rolDef ## iedereRolInContext
-  log ( "rolDef ## iedereRolInContext = " <> (show l0))
+  l0 <-  rolDef ## iedereRolInContextM
+  log ( "rolDef ## iedereRolInContextM = " <> (show l0))
 
-  l1 <-  rolDef ## iedereRolInContext >-> binding
-  log ( "rolDef ## iedereRolInContext >-> binding = " <> (show l1))
+  l1 <-  rolDef ## iedereRolInContextM >-> bindingM
+  log ( "rolDef ## iedereRolInContextM >-> bindingM = " <> (show l1))
   --
-  l2 <- "model:Perspectives$externalProperty" ## iedereRolInContext
-  log ("model:Perspectives$externalProperty ## iedereRolInContext) = " <> (show l2))
+  l2 <- "model:Perspectives$externalProperty" ## iedereRolInContextM
+  log ("model:Perspectives$externalProperty ## iedereRolInContextM) = " <> (show l2))
   --
-  l3 <-  rolDef ## filter hasBinding iedereRolInContext
-  log ( "rolDef ## filter iedereRolInContext hasBinding = " <> (show l3))
+  l3 <-  rolDef ## filter hasBindingM iedereRolInContextM
+  log ( "rolDef ## filter iedereRolInContextM hasBindingM = " <> (show l3))
 
-  l4 <- rolDef ## boundContexts
-  log ( "rolDef ## boundContexts = " <> (show l4))
+  l4 <- rolDef ## boundContextsM
+  log ( "rolDef ## boundContextsM = " <> (show l4))
 
 log :: forall e. String -> MonadPerspectives (console :: CONSOLE | e) Unit
 log = lift <<< AC.log

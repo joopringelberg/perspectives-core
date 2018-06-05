@@ -1,0 +1,26 @@
+CONTEXTEN EN ROLLEN IN HET USER DOMEIN OPSLAAN
+
+Uitgangspunt is dat alle contexten, op elk niveau van nesting, als root de model:User namespace hebben (d.w.z. hun identifier begint met "model:User").
+
+Invariant: elke Entiteit die we gaan opslaan, is gecached met zijn meest recente versienummer of heeft nog geen versienummer.
+
+De parser verzamelt een array van BuitenRollen.
+Itereer over al die rollen en sla ze op.
+Gebruik daarbij een state die bestaat uit een Array van Entiteit Identifiers.
+
+BUITENROL OPSLAAN
+1. Is de BuitenRol in de state?
+	- Ja: stop.
+	- Nee: 
+		* Voeg de BuitenRol toe aan de state.
+		* Sla de BuitenRol op in de database.
+		* Sla de Context op.
+
+CONTEXT OPSLAAN
+Invariant: de context is nog niet opgeslagen.
+1. Voeg de Context toe aan de state.
+2. Sla de Context op in de database.
+3. Voeg alle Rollen van de Context toe aan de state.
+4. Voor elke Rol: is de binding een BuitenRol?
+	- Ja: sla de buitenrol op.
+	- Nee: stop.

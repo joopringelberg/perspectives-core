@@ -3,15 +3,17 @@ module Perspectives.ResourceRetrieval
 , saveUnversionedEntiteit
 , saveVersionedEntiteit
 , saveEntiteit
+, saveEntiteitPreservingVersion
+, fetchEntiteit
   )
 where
 
 import Prelude
 
-import Control.Monad.Aff.AVar (AVar, isEmptyVar, putVar, readVar, takeVar)
+import Control.Monad.Aff.AVar (AVar, putVar, readVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
 import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.HTTP.Method (Method(..))
@@ -54,6 +56,12 @@ fetchEntiteit id = ensureAuthentication $ do
   liftAff $ onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
   liftAff $ readVar v
 
+-- saveEntiteitPreservingVersion :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
+-- saveEntiteitPreservingVersion id = catchError
+--   ((fetchPerspectEntiteitFromCouchdb id :: MonadPerspectives (AjaxAvarCache e) a) *> saveEntiteit id)
+--   \e -> saveEntiteit id
+saveEntiteitPreservingVersion = saveEntiteit
+
 saveEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 saveEntiteit id = do
   pe <- readEntiteitFromCache id
@@ -69,18 +77,14 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
   case mAvar of
     Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> id)
     (Just avar) -> do
-      empty <- liftAff $ isEmptyVar avar
-      if empty
-        then throwError $ error ("saveUnversionedEntiteit needs a locally stored and filled resource for " <> id)
-        else do
-          pe <- liftAff $ takeVar avar
-          ebase <- entitiesDatabase
-          (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
-          -- (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName id) (encode pe)
-          (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> id), content = Just (encode pe)}
-          liftAff $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-            $ putVar (setRevision (unwrap res.response).rev pe) avar
-          pure pe
+      pe <- liftAff $ takeVar avar
+      ebase <- entitiesDatabase
+      (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+      -- (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put (ebase <> escapeCouchdbDocumentName id) (encode pe)
+      (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> id), content = Just (encode pe)}
+      liftAff $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
+        $ putVar (setRevision (unwrap res.response).rev pe) avar
+      pure pe
 
 saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AjaxAvarCache e) a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do

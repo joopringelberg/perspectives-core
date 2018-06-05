@@ -48,12 +48,13 @@ data AceQuery a
   = Initialize Mode Theme a
   | Finalize a
   | ChangeText String a
+  | SendTextForSave a
   | HandleChange (H.SubscribeStatus -> a) -- This is a Request, where: type Request f a = (a -> a) -> f a
   | SetAnnotations (Array AceError) a
   | ClearAnnotations a
   | HandleContextRenaming DocumentEvent (H.SubscribeStatus -> a)
 
-data AceOutput = TextChanged String
+data AceOutput = TextChanged String | TextForSave String
 
 -- | Effects embedding the Ace editor requires.
 type AceEffects eff = AjaxAvarCache (ace :: ACE, dom :: DOM, console :: CONSOLE, react :: REACT | eff)
@@ -133,6 +134,14 @@ aceComponent mode theme =
             void $ H.liftEff $ Editor.setValue text Nothing editor
       H.raise $ TextChanged text
       pure next
+    SendTextForSave next -> do
+      maybeEditor <- H.gets _.editor
+      case maybeEditor of
+        Nothing -> pure next
+        Just editor -> do
+          text <- H.liftEff $ Editor.getValue editor
+          H.raise $ TextForSave text
+          pure next
     HandleChange reply -> do
       maybeEditor <- H.gets _.editor
       case maybeEditor of

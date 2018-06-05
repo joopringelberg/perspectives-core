@@ -34,6 +34,7 @@ type DomeinFileContexts = StrMap PerspectContext
 
 type DomeinFileRoles = StrMap PerspectRol
 
+-- The same context may be inserted multiple times without consequence; it is an idempotent operation.
 addContextToDomeinFile :: PerspectContext -> DomeinFile -> DomeinFile
 addContextToDomeinFile c@(PerspectContext {_id}) (DomeinFile dff@{contexts}) = DomeinFile dff {contexts = insert _id c contexts}
 

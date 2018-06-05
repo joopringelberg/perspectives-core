@@ -8,16 +8,15 @@ import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
-import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives, (%%>>))
-import Perspectives.RunMonadPerspectivesQuery ((##))
+import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
+import Perspectives.DataTypeTripleGetters (bindingM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.DataTypeObjectGetters (contextType)
-import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryEffect ((~>))
-import Perspectives.DataTypeTripleGetters (bindingM)
+import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.TripleAdministration (unRegisterTriple)
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
@@ -26,8 +25,9 @@ import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), 
 -----------------------------------------------------------
 data ApiRequest e =
   GetRolBinding ContextID RolName (ReactStateSetter e)
+  | GetRol ContextID RolName (ReactStateSetter e)
   | ShutDown
-  | WrongRequest
+  | WrongRequest -- Represents a request from the client Perspectives does not recognize.
 
 data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
   | Error
@@ -77,15 +77,19 @@ dispatch :: forall e. AVar (RequestRecord e) -> AVar (ApiResponse e) -> MonadPer
 dispatch request response = do
   reqr <- lift $ takeVar request
   let req = marshallRequestRecord reqr
-  if (isShutDown req)
+  if (isShutDown req) -- Catch ShutDown here, so...
     then pure unit
     else do
       case req of
         (GetRolBinding cid rn setter) -> do
           unsubscriber <- getRolBinding cid rn setter
           send (Unsubscriber unsubscriber)
+        (GetRol cid rn setter) -> do
+          unsubscriber <- getRol cid rn setter
+          send (Unsubscriber unsubscriber)
         WrongRequest -> send Error
-        ShutDown -> send Error -- this case will never occur!
+        ShutDown -> send Error -- ...this case will never occur!
+      -- Recursive call.
       dispatch request response
   where
     send :: ApiResponse e -> MonadPerspectives (ApiEffects e) Unit
@@ -113,11 +117,9 @@ getQuery cid query@(TypedTripleGetter qn _) setter = do
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRolBinding cid rn setter = do
-  contextType <- cid %%>> contextType
   getQuery cid (constructRolGetter rn >-> bindingM) setter
 
--- | Retrieve the rol from the context, subscribe to it.
+-- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRol cid rn setter = do
-  contextType <- cid %%>> contextType
   getQuery cid (constructRolGetter rn) setter

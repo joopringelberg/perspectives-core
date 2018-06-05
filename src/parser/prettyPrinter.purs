@@ -5,7 +5,7 @@ import Control.Monad.State (StateT, get, modify, lift)
 import Control.Monad.State.Trans (evalStateT)
 import Control.Monad.Writer (WriterT)
 import Control.Monad.Writer.Trans (runWriterT, tell)
-import Data.Array (catMaybes, elemIndex, replicate, sortBy)
+import Data.Array (elemIndex, replicate, sortBy)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, foldM, values)
@@ -143,16 +143,14 @@ context definedResources c = do
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
-  (bindings :: Array (Maybe (PerspectRol))) <- traverse (lift <<< lift <<< getPerspectEntiteit) (join (values (context_rolInContext c)))
-  traverse_ (indent roleBinding) (sortBy compareOccurrences (catMaybes bindings))
+  (bindings :: Array PerspectRol) <- traverse (lift <<< lift <<< getPerspectEntiteit) (join (values (context_rolInContext c)))
+  traverse_ (indent roleBinding) (sortBy compareOccurrences bindings)
   where
 
     publicProperties = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
-      maybeBuitenRol <- lift $ lift $ getPerspectEntiteit $ context_buitenRol c
-      case maybeBuitenRol of
-        (Just buitenRol) -> strMapTraverse_ publicProperty (rol_properties buitenRol)
-        Nothing -> pure unit
+      buitenRol <- lift $ lift $ getPerspectEntiteit $ context_buitenRol c
+      strMapTraverse_ publicProperty (rol_properties buitenRol)
 
     privateProperties = strMapTraverse_ privateProperty (rol_properties (context_binnenRol c))
 
@@ -164,32 +162,24 @@ context definedResources c = do
       case elemIndex binding definedResources of
         -- binding is NOT a BuitenRol of a context defined at top level in the Text.
         Nothing -> do
-          maybeRol <- lift $ lift $ getPerspectEntiteit binding
-          case maybeRol of
-            Nothing -> comment $ "Binding does not exist: " <> binding -- Error situation!
-            (Just boundRol@(PerspectRol bindingProperties)) -> do
+              boundRol@(PerspectRol bindingProperties) <- lift $ lift $ getPerspectEntiteit binding
               case rol_pspType boundRol == "model:Perspectives$Context$buitenRol" of
                 -- boundRol is a BuitenRol of some context.
                 true -> if isInNamespace (context_id c) (rol_context boundRol)
                   -- boundRol is in the namespace of context c
                   then
                     do
-                      maybeContext <- lift $ lift $ getPerspectEntiteit $ rol_context boundRol
-                      case maybeContext of
-                        Nothing -> reference role boundRol
-                        (Just contxt) -> do
-                          withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => ")
-                          -- Only if in namespace of c!
-                          indent (context definedResources) contxt
+                      contxt <- lift $ lift $ getPerspectEntiteit $ rol_context boundRol
+                      withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => ")
+                      -- Only if in namespace of c!
+                      indent (context definedResources) contxt
                   -- boundRol is not in the namespace of context c.
                   else reference role boundRol
                 false -> reference role boundRol -- The boundRol is a RoleInContext of some context.
         -- binding is a BuitenRol of a context defined at top level in the Text.
         otherwise -> do
-          maybeRol <- lift $ lift $ getPerspectEntiteit binding
-          case maybeRol of
-            Nothing -> comment $ "Binding does not exist: " <> binding
-            (Just buitenRol) -> reference role buitenRol
+          buitenRol <- lift $ lift $ getPerspectEntiteit binding
+          reference role buitenRol
 
       strMapTraverse_ roleProperty (rol_properties role)
 
@@ -220,14 +210,11 @@ enclosingContext theText = do
 
     ppContext :: Array ID -> ID -> PerspectText e
     ppContext definedContexts id = do
-      mc <- lift $ lift $ getPerspectEntiteit id
-      case mc of
-        (Just c) -> do
-          if id `isInNamespace` (context_id theText) || id `isInNamespace` "model:User"
-            then do
-              context definedContexts c
-              newline
-            else do
-              withComments context_comments fullContextDeclaration c
-              newline
-        Nothing -> pure unit
+      c <- lift $ lift $ getPerspectEntiteit id
+      if id `isInNamespace` (context_id theText) || id `isInNamespace` "model:User"
+        then do
+          context definedContexts c
+          newline
+        else do
+          withComments context_comments fullContextDeclaration c
+          newline

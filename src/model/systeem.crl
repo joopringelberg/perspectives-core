@@ -1,19 +1,29 @@
 -- MODELLERING VAN TRUSTEDCLUSTER
 Context model:Systeem als sys:
 
-import model:Arc als arc:
 import model:Perspectives als psp:
+
+import model:Arc als arc:
 
 Section psp:Context$rolInContext
 
 psp:Context sys:Systeem
 	prototype psp:ContextPrototype
 	$rolInContext =>
+		psp:Rol $trustedCluster
+			extern $isFunctioneel = true
+			$mogelijkeBinding => sys:TrustedCluster
+	$rolInContext =>
 		psp:Rol $gebruiker
 			-- wat is de mogelijkeBinding van gebruiker?
 			-- we gaan niets binden, dus elk type is goed.
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:ElkType
+			$rolProperty =>
+				psp:Property $voornaam
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
 
 arc:Zaak sys:TrustedCluster
 	prototype psp:ContextPrototype
@@ -36,3 +46,13 @@ arc:Zaak sys:TrustedCluster
 		psp:Actie $RaadpleegtClusterGenoot
 			$werkwoord => psp:Raadpleegt
 			$objectView => $$clusterGenoot$Adressering
+
+psp:Context usr:OverbodigeBinding
+
+sys:Systeem usr:MijnSysteem
+	$gebruiker => usr:OverbodigeBinding
+		$voornaam = "Joop"
+	$trustedCluster =>
+		sys:TrustedCluster $MijnCluster
+			$clusterGenoot => $$gebruiker
+				$url = "http://localhost"

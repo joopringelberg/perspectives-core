@@ -8,17 +8,17 @@ import Control.Monad.Trans.Class (lift)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.DataTypeTripleGetters (iedereRolInContext)
+import Perspectives.DataTypeTripleGetters (iedereRolInContextM)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
   lift $ log "=========================Test.BoundContexts================================"
-  l0 <-  "model:Perspectives$Property" ## iedereRolInContext
-  lift $ log ( "model:Perspectives$Property ## iedereRolInContext = " <> (show l0))
+  l0 <-  "model:Perspectives$Property" ## iedereRolInContextM
+  lift $ log ( "model:Perspectives$Property ## iedereRolInContextM = " <> (show l0))
 
   lift $ log "=========================Test.BoundContexts================================"
-  l1 <-  "model:Perspectives$externalProperty" ## iedereRolInContext
-  lift $ log ( "model:Perspectives$externalProperty ## iedereRolInContext = " <> (show l1))
+  l1 <-  "model:Perspectives$externalProperty" ## iedereRolInContextM
+  lift $ log ( "model:Perspectives$externalProperty ## iedereRolInContextM = " <> (show l1))
 
 
 

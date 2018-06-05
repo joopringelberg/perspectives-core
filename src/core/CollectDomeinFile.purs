@@ -4,21 +4,20 @@ import Control.Monad.Eff (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify, get)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (insert, lookup)
-import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev, rol_id)
+import Data.StrMap (lookup)
+import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
+import Perspectives.DataTypeTripleGetters (iedereRolInContextM)
+import Perspectives.DomeinFile (DomeinFile(..), addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.Identifiers (isInNamespace)
+import Perspectives.ModelBasedTripleGetters (boundContextsM)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
+import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
-import Perspectives.DataTypeTripleGetters (iedereRolInContextM)
-import Perspectives.ModelBasedTripleGetters (boundContextsM)
-import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const)
+import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const, (>>=))
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> MonadPerspectives (AjaxAvarCache e) DomeinFile
@@ -35,26 +34,19 @@ domeinFileFromContext enclosingContext = do
         (pure unit)
       where
         recursiveCollect :: ContextID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Unit
-        recursiveCollect subContextId =
-          ifNothing (lift $ getPerspectEntiteit subContextId)
-            (pure unit)
-            (flip collect ((context_id c) == (context_id enclosingContext)))
+        recursiveCollect subContextId = (lift $ getPerspectEntiteit subContextId) >>= (flip collect ((context_id c) == (context_id enclosingContext)))
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
         saveContext ctxt definedAtToplevel' = if (context_id ctxt) `isInNamespace` (context_id enclosingContext)
           then
             ifM (inDomeinFile (context_id ctxt))
               (pure false)
               do
-                modify $ insertContextInDomeinFile ctxt
-                ifNothing (lift $ getPerspectEntiteit (context_buitenRol ctxt))
-                  (pure unit)
-                  (modify <<< insertRolInDomeinFile)
+                modify $ addContextToDomeinFile ctxt
+                (lift $ getPerspectEntiteit (context_buitenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
                 rollen <- lift $ ((context_id ctxt) ##= iedereRolInContextM)
                 for_ rollen
                   \rolID ->
-                    ifNothing (lift $ getPerspectEntiteit rolID)
-                      (pure unit)
-                      (modify <<< insertRolInDomeinFile)
+                    (lift $ getPerspectEntiteit rolID) >>= (modify <<< addRolToDomeinFile)
                 pure true
           else if definedAtToplevel' && (context_id ctxt) `isInNamespace` "model:User"
             then if (savedToCouchdb ctxt)
@@ -68,13 +60,6 @@ domeinFileFromContext enclosingContext = do
                 lift $ void ((saveEntiteit (context_id ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)
                 pure true
             else pure false
-
-        -- The same context may be inserted multiple times without consequence; it is an idempotent operation.
-        insertContextInDomeinFile :: PerspectContext -> DomeinFile -> DomeinFile
-        insertContextInDomeinFile ctxt (DomeinFile dfc@{contexts}) = DomeinFile $ dfc {contexts = insert (context_id ctxt) ctxt contexts}
-
-        insertRolInDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
-        insertRolInDomeinFile r (DomeinFile dfc@{roles}) = DomeinFile $ dfc {roles = insert (rol_id r) r roles}
 
         inDomeinFile :: ID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
         inDomeinFile id = do

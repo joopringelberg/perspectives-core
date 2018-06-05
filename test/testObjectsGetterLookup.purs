@@ -7,17 +7,15 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DataTypeTripleGetters (iedereRolInContext)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.ObjectGetterLookup (lookupObjectsGetterByName, lookupObjectsGetterName, objectsGetterCacheInsert)
-import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.SystemObjectGetters (getContextType)
+import Perspectives.DataTypeObjectGetters (contextType)
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE | e)) Unit
 test = do
   lift $ log "=========================Test.ObjectsGetterLookup================================"
-  _ <-  pure $ objectsGetterCacheInsert "model:Perspectives$ContextType" getContextType
-  naam <- pure $ lookupObjectsGetterName getContextType
+  _ <-  pure $ objectsGetterCacheInsert "model:Perspectives$ContextType" contextType
+  naam <- pure $ lookupObjectsGetterName contextType
   case naam of
     Nothing -> lift $ log "Niet gevonden!"
     (Just n) -> do

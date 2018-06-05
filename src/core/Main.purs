@@ -22,11 +22,8 @@
 module Main where
 
 import Prelude
-import Halogen as H
-import Halogen.Aff as HA
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Control.Monad.Aff (Aff, error, liftEff', throwError)
+
+import Control.Monad.Aff (Aff, catchError, error, liftEff', throwError)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (newRef)
@@ -43,12 +40,15 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable, lookup)
 import Data.Tuple (Tuple(..))
 import Data.URI.Query (Query(..), parser) as URI
+import Halogen as H
+import Halogen.Aff as HA
 import Halogen.Component.ChildPath (cp1, cp2, cp3)
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent) as ACE
--- import Perspectives.Api (setUpApi)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
-import Perspectives.ContextRoleParser (enclosingContext) as CRP
+import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (User, Password)
 import Perspectives.Couchdb.Databases (requestAuthentication)
@@ -56,10 +56,10 @@ import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect) as MS
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.Effects (AvarCache)
-import Perspectives.IndentParser (runIndentParser)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.SaveUserData (saveUserData)
 import Perspectives.SetupCouchdb (partyMode, setupCouchdb)
 import Perspectives.Syntax (PerspectContext)
 import Text.Parsing.StringParser (ParseError, runParser)
@@ -106,6 +106,7 @@ data Query a
   | Save a
   | Initialize a
   | Finalize a
+  | TextForSave String a
 
 -- | The query algebra for the children
 type ChildQuery = Coproduct3 ACE.AceQuery MS.ModelSelectQuery ReadTextFileQuery
@@ -163,8 +164,8 @@ ui =
           ]
       , HH.div_
           [ HH.slot' cp1 (AceSlot 1) (ACE.aceComponent "ace/mode/perspectives" "ace/theme/perspectives") unit handlePerspectOutput ]
-      , HH.div_
-          [ HH.slot' cp1 (AceSlot 2) (ACE.aceComponent "ace/mode/perspectives" "ace/theme/perspectives") unit (const Nothing) ]
+      -- , HH.div_
+      --     [ HH.slot' cp1 (AceSlot 2) (ACE.aceComponent "ace/mode/perspectives" "ace/theme/perspectives") unit (const Nothing) ]
       , HH.pre_
           [ HH.text ("Current text: " <> text) ]
       ]
@@ -181,18 +182,26 @@ ui =
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ACE.ChangeText "")
     pure next
   eval (HandleAceUpdate text next) = do
-    parseResult <- lift $ runIndentParser text CRP.enclosingContext
+    H.modify (_ { text = "Attempting to parse..." })
+    parseResult <- lift $ parseAndCache text
     case parseResult of
-      (Right textName) -> do
-        (maybeContext :: Maybe PerspectContext) <- lift $ getPerspectEntiteit textName
-        case maybeContext of
-          Nothing -> do
-            H.modify (_ { text = "Cannot find the context that represents this text." })
-            pure next
-          (Just (c :: PerspectContext)) -> do
-            t <- lift $ prettyPrint c enclosingContext
-            _ <- H.query' cp1 (AceSlot 2) $ H.action (ACE.ChangeText t)
-            H.modify (_ { text = text })
+      (Right parseRoot) ->
+        case parseRoot of
+          (RootContext textName)-> do
+            (maybeContext :: Maybe PerspectContext) <- lift $ catchError ((getPerspectEntiteit textName) >>= pure <<< Just)
+              (\_ -> pure Nothing)
+            case maybeContext of
+              Nothing -> do
+                H.modify (_ { text = "Cannot find the context that represents this text." })
+                pure next
+              (Just (c :: PerspectContext)) -> do
+                t <- lift $ prettyPrint c enclosingContext
+                -- _ <- H.query' cp1 (AceSlot 2) $ H.action (ACE.ChangeText t)
+                H.modify (_ { text = text })
+                pure next
+          (UserData buitenRollen) -> do
+            -- lift $ saveUserData buitenRollen
+            H.modify (_ { text = show buitenRollen })
             pure next
       (Left e) -> do
         H.modify (_ { text = show e })
@@ -202,7 +211,9 @@ ui =
     _ <- H.query' cp1 (AceSlot 1) $ H.action (ACE.ChangeText text)
     pure next
   eval (LoadContext id next) = do
-    (maybeContext :: Maybe PerspectContext) <- lift $ getPerspectEntiteit id
+    (maybeContext :: Maybe PerspectContext) <- lift $ catchError ((getPerspectEntiteit id) >>= pure <<< Just)
+      (\_ -> pure Nothing)
+
     case maybeContext of
       Nothing -> do
         H.modify (_ { text = "Cannot find this context: "  <> id })
@@ -212,29 +223,41 @@ ui =
         _ <- H.query' cp1 (AceSlot 1) $ H.action (ACE.ChangeText t)
         pure next
   eval (Save next) = do
-    text <- H.gets _.text
-    parseResult <- lift $ runIndentParser text CRP.enclosingContext
+    _ <- H.query' cp1 (AceSlot 1) $ H.action ACE.SendTextForSave
+    pure next
+  eval (TextForSave text next) = do
+    H.modify (_ { text = "Attempting to parse..." })
+    parseResult <- lift $ parseAndCache text
     case parseResult of
-      (Right textName) -> do
-        -- save it
-        mCtxt <- lift $ getPerspectEntiteit textName
-        case mCtxt of
-          Nothing -> do
-            H.modify (_ { text = "Cannot find context " <> textName })
-            pure next
-          (Just ctxt) -> do
-            df <- lift $ domeinFileFromContext ctxt
-            lift $ storeDomeinFileInCouchdb df
-            H.modify (_ { text = show textName })
-            -- notify the ModelSelect
-            _ <- H.query' cp2 unit $ H.action MS.Reload
+      (Right parseRoot) ->
+        case parseRoot of
+          (RootContext textName)-> do
+            -- save it
+            (mCtxt :: Maybe PerspectContext) <- lift $ catchError ((getPerspectEntiteit textName) >>= pure <<< Just)
+              (\_ -> pure Nothing)
+            case mCtxt of
+              Nothing -> do
+                H.modify (_ { text = "Cannot find context " <> textName })
+                pure next
+              (Just ctxt) -> do
+                df <- lift $ domeinFileFromContext ctxt
+                lift $ storeDomeinFileInCouchdb df
+                H.modify (_ { text = "Saved " <> show textName })
+                -- notify the ModelSelect
+                _ <- H.query' cp2 unit $ H.action MS.Reload
+                pure next
+          (UserData buitenRollen) -> do
+            H.modify (_ { text = "Attempting to save..." })
+            lift $ saveUserData buitenRollen
+            H.modify (_ { text = show buitenRollen })
             pure next
       (Left e) -> do
-        H.modify (_ { text = show e })
+        H.modify (_ { text = text })
         pure next
 
   handlePerspectOutput :: ACE.AceOutput -> Maybe (Query Unit)
   handlePerspectOutput (ACE.TextChanged text) = Just $ H.action $ HandleAceUpdate text
+  handlePerspectOutput (ACE.TextForSave text) = Just $ H.action $ TextForSave text
 
   handleModelSelect :: MS.ModelSelected -> Maybe (Query Unit)
   handleModelSelect (MS.ModelSelected modelname) = Just $ H.action $ LoadContext modelname

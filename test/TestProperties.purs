@@ -7,8 +7,8 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
-import Perspectives.DataTypeTripleGetters (binding, buitenRol, contextType, label, context, iedereRolInContext, rolType, typeVanIedereRolInContext, identity)
-import Perspectives.ModelBasedTripleGetters (hasBinding, hasLabel, rolIsVerplicht, rangeDef)
+import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, contextTypeM, labelM, contextM, iedereRolInContextM, rolTypeM, typeVanIedereRolInContextM, identityM)
+import Perspectives.ModelBasedTripleGetters (hasBindingM, hasLabelM, rolIsVerplichtM, rangeDefM)
 import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (Unit, bind, discard, show, (<<<), (<>))
 import Test.TestEffects (CancelerEffects)
@@ -28,70 +28,70 @@ psp = "model:Perspectives"
 test :: forall e. MonadPerspectives (CancelerEffects e) Unit
 test = do
   log "=========================Test.Properties================================"
-  l1 <-  rolDef ## iedereRolInContext
-  log ( "rolDef ## iedereRolInContext = " <> (show l1))
+  l1 <-  rolDef ## iedereRolInContextM
+  log ( "rolDef ## iedereRolInContextM = " <> (show l1))
 
-  l2 <-  rolDef ## iedereRolInContext >-> binding
-  log ( " rolDef ## iedereRolInContext >-> binding = " <> (show l2))
+  l2 <-  rolDef ## iedereRolInContextM >-> bindingM
+  log ( " rolDef ## iedereRolInContextM >-> bindingM = " <> (show l2))
 
-  l3 <-  rolDef ## iedereRolInContext >-> binding >-> context
-  log ( " rolDef ## iedereRolInContext >-> binding >-> context = " <> (show l3))
+  l3 <-  rolDef ## iedereRolInContextM >-> bindingM >-> contextM
+  log ( " rolDef ## iedereRolInContextM >-> bindingM >-> contextM = " <> (show l3))
 
-  l4 <-  rolDef ## iedereRolInContext >-> identity
-  log ( " rolDef ## iedereRolInContext >-> identity = " <> (show l4))
+  l4 <-  rolDef ## iedereRolInContextM >-> identityM
+  log ( " rolDef ## iedereRolInContextM >-> identity = " <> (show l4))
 
-  l5 <-  rolDef ## iedereRolInContext >-> binding >-> context >-> contextType
-  log ( " rolDef ## iedereRolInContext >-> identity >-> contextType = " <> (show l5))
+  l5 <-  rolDef ## iedereRolInContextM >-> bindingM >-> contextM >-> contextTypeM
+  log ( " rolDef ## iedereRolInContextM >-> identity >-> contextTypeM = " <> (show l5))
 
-  l6 <-  rolDef ## buitenRol
-  log ( " rolDef ## buitenRol = " <> (show l6))
+  l6 <-  rolDef ## buitenRolM
+  log ( " rolDef ## buitenRolM = " <> (show l6))
 
-  l7 <-  rolDef ## typeVanIedereRolInContext
-  log ( " rolDef ## typeVanIedereRolInContext = " <> (show l7))
+  l7 <-  rolDef ## typeVanIedereRolInContextM
+  log ( " rolDef ## typeVanIedereRolInContextM = " <> (show l7))
 
-  l8 <-  rolDef ## iedereRolInContext >-> rolType
-  log ( " rolDef ## iedereRolInContext >-> rolType = " <> (show l8))
+  l8 <-  rolDef ## iedereRolInContextM >-> rolTypeM
+  log ( " rolDef ## iedereRolInContextM >-> rolTypeM = " <> (show l8))
 
-  l9 <-  rolIsVerplichtDef ## rolIsVerplicht
-  log ( " rolIsVerplichtDef ## rolIsVerplicht = " <> (show l9))
+  l9 <-  rolIsVerplichtDef ## rolIsVerplichtM
+  log ( " rolIsVerplichtDef ## rolIsVerplichtM = " <> (show l9))
 
-  l10 <-  rolDef ## label
-  log ( " rolDef ## label = " <> (show l10))
+  l10 <-  rolDef ## labelM
+  log ( " rolDef ## labelM = " <> (show l10))
 
-  l11 <-  rolIsVerplichtDef ## rangeDef
-  log ( " rolIsVerplichtDef ## rangeDef = " <> (show l11))
+  l11 <-  rolIsVerplichtDef ## rangeDefM
+  log ( " rolIsVerplichtDef ## rangeDefM = " <> (show l11))
 
-  l12 <-  rolDef ## hasLabel
-  log ( " rolDef ## hasLabel = " <> (show l12))
+  l12 <-  rolDef ## hasLabelM
+  log ( " rolDef ## hasLabelM = " <> (show l12))
 
-  l13 <-  viewDef ## iedereRolInContext >-> hasBinding
-  log ( " viewDef ## iedereRolInContext >-> hasBinding = " <> (show l13))
+  l13 <-  viewDef ## iedereRolInContextM >-> hasBindingM
+  log ( " viewDef ## iedereRolInContextM >-> hasBindingM = " <> (show l13))
 
   log "========================= TESTING TO DEBUG MODEL LOADING ================================"
-  l14 <- psp ## typeVanIedereRolInContext
-  log ( "psp ## typeVanIedereRolInContext = " <> show l14)
+  l14 <- psp ## typeVanIedereRolInContextM
+  log ( "psp ## typeVanIedereRolInContextM = " <> show l14)
 
   l15 <- psp ## ignoreCache (constructRolGetter "model:Perspectives$rolInContext")
   log ( "psp ## (constructRolGetter 'model:Perspectives$rolInContext') = " <> show l15)
 
-  l16 <- psp ## ignoreCache (constructRolGetter "model:Perspectives$rolInContext") >-> binding
-  log ( "psp ## (constructRolGetter 'model:Perspectives$rolInContext') >-> binding = " <> show l16)
+  l16 <- psp ## ignoreCache (constructRolGetter "model:Perspectives$rolInContext") >-> bindingM
+  log ( "psp ## (constructRolGetter 'model:Perspectives$rolInContext') >-> bindingM = " <> show l16)
 
   l17 <-  rolDef ## (constructRolGetter "model:Perspectives$rolInContext")
   log ( "rolDef ## (constructRolGetter 'model:Perspectives$rolInContext') = " <> (show l17))
 
-  l18 <- psp ## ignoreCache iedereRolInContext
-  log ( "psp ## iedereRolInContext = " <> show l18)
+  l18 <- psp ## ignoreCache iedereRolInContextM
+  log ( "psp ## iedereRolInContextM = " <> show l18)
 
-  l19 <- psp ## ignoreCache iedereRolInContext >-> binding
-  log ( "psp ## iedereRolInContext >-> binding = " <> show l19)
+  l19 <- psp ## ignoreCache iedereRolInContextM >-> bindingM
+  log ( "psp ## iedereRolInContextM >-> bindingM = " <> show l19)
 
   -- Dit levert een lege lijst!
-  l20 <- "model:Perspectives$rolInContext1" ## binding
-  log ( "'model:Perspectives$rolInContext1' ## binding = " <> show l20)
+  l20 <- "model:Perspectives$rolInContext1" ## bindingM
+  log ( "'model:Perspectives$rolInContext1' ## bindingM = " <> show l20)
 
-  l21 <- "model:Perspectives$rolInContext1" ## rolType
-  log ( "'model:Perspectives$rolInContext1' ## rolType = " <> show l21)
+  l21 <- "model:Perspectives$rolInContext1" ## rolTypeM
+  log ( "'model:Perspectives$rolInContext1' ## rolTypeM = " <> show l21)
 
 log :: forall e. String -> MonadPerspectives (console :: CONSOLE | e) Unit
 log = lift <<< AC.log

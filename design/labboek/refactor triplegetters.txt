@@ -118,8 +118,8 @@ Dus: door de modelleur gemaakte berekende rollen worden altijd in MonadPerspecti
 
 REFACTOR-STAPPEN
 0. Maak een isomorphie tussen predicaat en ObjectsGetter. KLAAR
-1. Ontwerp een Triple zonder Subject en Predicaat: TrackedObject.
-2. Herschrijf de TripleAdministratie zodat hij niet met triples werkt maar met TrackedObjects.
+1. Ontwerp een Triple zonder Subject en Predicaat: TrackedObject.	KLAAR
+2. Herschrijf de TripleAdministratie zodat hij niet met triples werkt maar met TrackedObjects. KLAAR
 3. Herschrijf de ObjectsCompositie operatoren zodanig dat ze kunnen memoriseren in termen van TrackedObjects.
 4. Schrijf Combinatoren voor ObjectsGetters, die kunnen memoriseren in termen van TrackedObjects.
 5. Gebruik de namen van de DataTypeTripleGetters voor de SystemObjectGetters

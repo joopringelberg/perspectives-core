@@ -1,8 +1,19 @@
+let resolver, rejecter;
+
+const Perspectives = new Promise(
+  function (resolve, reject)
+  {
+    resolver = resolve;
+    rejecter = reject;
+  });
+
 function connect ({request, response, getter, setter})
 {
   return function ()
   {
     window.pproxy = new PerspectivesProxy(request, response, getter, setter);
+    // Now resolve the promise made above for the proxy.
+    resolver(window.pproxy);
   };
 }
 
@@ -32,6 +43,23 @@ class PerspectivesProxy
     this.setter(req)(this.request)();
     this.getter(this.response)().then(handleUnsubscriber);
   }
+
+  getRol (contextID, rolName, receiveValues, handleUnsubscriber)
+  {
+    const req = {
+      request: "GetRol",
+      contextID: contextID,
+      rolName: rolName,
+      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
+      reactStateSetter: function (arrString)
+      {
+        receiveValues(arrString);
+        return function () {};
+      }
+    };
+    this.setter(req)(this.request)();
+    this.getter(this.response)().then(handleUnsubscriber);
+  }
 }
 
 window.test = function (contextID, rolName)
@@ -49,5 +77,9 @@ window.test = function (contextID, rolName)
     });
 };
 
-// export {connect};
-exports.connect = connect;
+// exports.connect = connect;
+
+module.exports = {
+  Perspectives: Perspectives,
+  connect: connect
+};

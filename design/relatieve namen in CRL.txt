@@ -1,0 +1,40 @@
+RELATIEVE NAMEN IN CRL
+Met het $-teken kunnen we een //relatieve// naam gebruiken in een CRL tekst. Er blijken twee verschillende syntactische vormen te moeten bestaan:
+	- een vorm om een RolInstantie mee aan te duiden.
+	- een vorm om een ContextInstantie mee te identificeren, of een RolType, PropertyType of ContextType mee aan te duiden;
+
+ROLINSTANTIES AANDUIDEN
+Het is mogelijk om een rol te binden aan een andere rol. Daar bestaan twee mogelijkheden voor:
+	1. Met een query (nog niet geïmplementeerd)
+	2. Met een relativeRolInstanceID.
+De laatste vorm stelt ons in staat om als het ware 'omhoog te reiken' in de hiërarchie van geneste contexten en op een willekeurig niveau een rolinstantie aan te wijzen. De verwijzing bestaat uit drie delen:
+	- een aantal (minstens 2) $-tekens, waarmee we bepalen hoeveel niveaus we omhoog reiken (één $-teken reikt binnen de context van de rol (die we willen binden) zelf, en dat staan we om semantische reden niet toe).
+	- de naam van de Rol (het type, dus)
+	- een index tussen haakjes waarmee we de instantie van de Rol identificeren.
+
+IDENTIFIER VOOR CONTEXTTYPE MAKEN
+In een ContextDeclaratie moeten we een identifier voor de gedeclareerde context instantie geven. We kunnen dat doen door gebruik te maken van de namespace die bij de syntactische positie hoort, door een naam met een $-teken te prefixen. Daarmee hebben we de volgende mogelijkheden om een identifier voor een gedeclareerde context te maken:
+	- expandedContextName
+	- prefixedContextName
+	- relativeContextInstanceID
+
+CONTEXTEN, ROLLEN EN PROPERTIES AANDUIDEN
+In context-declaratie, een rolbinding-expressie, en in een property-assignment expressie, moeten we respectievelijk de context-, rol- en propertynaam gebruiken. Daarbij kunnen we gebruik maken van de type-namespace. Een relatieve naam construeren we door een $-teken voor de lokale rol- of propertynaam te zetten.
+
+PARSER NAMEN
+We gebruiken de volgende namen voor de deelparsers die deze constructies verwerken:
+	- relativeContextInstanceID ($contextinstancename)
+	- relativeRolInstanceID ($$gebruiker(1))
+	- relativeContextTypeName ($contextName <instantienaam>)
+	- relativeRolTypeName ($rolname => ...)
+	- relativePropertyTypeName ($propertyname = ...)
+
+
+ROLBINDING: AAN ROL OF CONTEXT
+We kunnen een RolInContext binden aan een andere RolInContext, of aan de BuitenRol van een Context.
+1. Binding aan een RolInContext kan op twee manieren:
+	- met een relativeRolInstanceID
+	- met een query, waarmee we een context bij zijn absolute naam kunnen identificeren en vandaar met een aantal stappen naar een rol kunnen navigeren. Deze mogelijkheid wordt nog niet door de parser ondersteund.
+2. Binding aan een Context kan door een expanded of prefixed ContextName te gebruiken. De parser bindt onder water de context niet rechtstreeks, maar via zijn buitenrol. De modelleur hoeft die buitenrol niet op te schrijven.
+Je kunt **Nooit** een rol aan een Context binden door een relativeContextInstanceID te gebruiken. 
+

@@ -2,9 +2,9 @@ module Perspectives.ModelBasedObjectGetters where
 
 import Control.Alt ((<|>))
 import Perspectives.CoreTypes (ObjectsGetter)
-import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, unlessNull)
-import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.DataTypeObjectGetters (buitenRol, binding, context)
+import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, getRolFromPrototypeHierarchy, unlessNull)
+import Perspectives.ObjectsGetterComposition ((/-/))
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e
@@ -22,11 +22,16 @@ rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
 range :: forall e. ObjectsGetter e
 range = getRol "model:Perspectives$Property$range" /-/ binding /-/ context
 
--- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
--- | are defined on that Rol.
+-- | Get the rol psp:Context$buitenRolBeschrijving.
 -- | `psp:Context -> psp:RolInstance`
 buitenRolBeschrijving :: forall e. ObjectsGetter e
 buitenRolBeschrijving = getRol "model:Perspectives$Context$buitenRolBeschrijving"
+
+-- | Get the Context that describes the buitenRol of a Context that is a definition. External properties of that Context
+-- | are defined on that Rol.
+-- | `psp:Context -> psp:RolInstance`
+buitenRolBeschrijvingDef :: forall e. ObjectsGetter e
+buitenRolBeschrijvingDef = getRolFromPrototypeHierarchy "model:Perspectives$Context$buitenRolBeschrijving" /-/ binding /-/ context
 
 -- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
@@ -53,8 +58,9 @@ rolInContextContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Contex
 binnenRolContextDef :: forall e. ObjectsGetter e
 binnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ context
 
--- | The Context of the BuitenRol.
--- | `psp:Rol -> psp:Context`
+-- | The Context of the buitenRolBeschrijving. I.e. starting from a Context that is a BuitenRolBeschrijving, returns
+-- | the Context that describes the type that the BuitenRolBeschrijving belongs to.
+-- | `psp:Context -> psp:Context`
 buitenRolContextDef :: forall e. ObjectsGetter e
 buitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
 

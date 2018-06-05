@@ -1,31 +1,20 @@
 module Perspectives.ContextRolAccessors where
 
+import Control.Monad.Error.Class (catchError)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (bind, pure, ($))
+import Prelude (pure, (>=>), (<<<), (>>=))
 
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
-getContextMember f c = do
-  maybeContext <- getPerspectEntiteit c
-  case maybeContext of
-    (Just perspectContext) -> pure $ f perspectContext
-    otherwise -> pure []
+getContextMember f = getPerspectEntiteit >=> pure <<< f
 
 -- Even though members of a context will always be present, the context itself may not. Hence we return a Maybe value.
 getContextMember' :: forall a e. (PerspectContext -> a) -> (ID -> MonadPerspectives (AjaxAvarCache e) (Maybe a))
-getContextMember' f c = do
-  maybeContext <- getPerspectEntiteit c
-  case maybeContext of
-    (Just perspectContext) -> pure $ Just $ f perspectContext
-    otherwise -> pure Nothing
+getContextMember' f c = catchError (getPerspectEntiteit c >>= pure <<< Just <<< f) \_ -> pure Nothing
 
 getRolMember :: forall e. (PerspectRol -> Array String) -> ObjectsGetter e
-getRolMember f c = do
-  maybeRol <- getPerspectEntiteit c
-  case maybeRol of
-    (Just perspectRol) -> pure $ f perspectRol
-    otherwise -> pure []
+getRolMember f = getPerspectEntiteit >=> pure <<< f

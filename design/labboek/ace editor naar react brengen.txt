@@ -1,0 +1,51 @@
+ACE EDITOR NAAR REACT BRENGEN
+
+1. Hoe zien de propTypes eruit? (zie: https://reactjs.org/docs/typechecking-with-proptypes.html)
+	- beschrijf de vorm
+	- maak functies om ze te genereren
+	- besluit wanneer ze gegenereerd worden (on demand? on production?)
+	- besluit waar ze weggeschreven worden.
+
+2. Schrijf in javascript de ContextContainer, ContextProxyContainer, RolContainer en ViewContainer.
+	- wat bedoel ik met 'De programmeur past die functie toe in de constructor van de ContextContainer als hij een RolContainer voor die rol wil opnemen' in de beschrijving van ContextContainer?
+	- ik heb beschreven dat ContextContainers door Perspectives per Context gegenereerd worden.
+
+PROPTYPES
+1. Je maakt proptypes als de gelijknamige property van het Class object dat gebaseerd is op React.Component.
+2. De propTypes property is een object waarvan de sleutels overeenkomen met this.props van de Component, terwijl de waarden die bij die sleutels zijn opgeslagen, een standaard type representatie zijn. Deze types zijn gerepresenteerd als de properties van het object PropTypes (geleverd door de React prop-types library).
+3. De waarde voor Perspectives is voornamelijk dat de programmeur intellisense ondersteuning krijgt bij het schrijven van de render functie.
+
+CONTEXTCONTAINER
+Vermoedelijk zag ik voor me dat een ContextContainer begint als code die door Perspectives wordt gegenereerd. De programmeur schrijft dan verder? Maar hoe zit het met roundtrippen bij modelverandering?
+
+Waar het om gaat, is dat Perspecives een ContextContainer kan maken die in potentie alle rollen draagt, terwijl de programmeur daar een selectie uit wil maken om te presenteren. We zouden daarom eerder een generator moeten maken in Perspectives, die de programmeur gebruikt om een concrete container te maken.
+
+Een Container heeft wel degelijk een render functie. Daarmee kunnen subcomponenten worden gemaakt.
+
+EEN EERSTE INTERFACE, MET DE HAND GESCHREVEN
+Doel:
+We zien op het scherm
+	* de naam van de gebruiker
+	* de naam van het TrustedCluster
+		* daarbinnen de namen van de leden van het TrustedCluster
+		* en per lid zijn URL.
+
+AANPAK
+1. Ik maak een React Component Systeem. Deze heeft als props de systeemID. Die geef ik mee in de aanroep van Systeem. Ik mag daar de naam usr:MijnSysteem gebruiken: dat is een naam waar de programmeur altijd over beschikt.
+2. In de render-functie gebruik ik twee componenten:
+	- Gebruiker
+	- TrustedCluster
+3. De Gebruiker component krijgt een waarde mee: de (ID van de) gebruikerRol van Systeem. Merk op dat we hier meteen een edge case in handen hebben: deze rol is namelijk niet gevuld.
+4. De gebruikerRol heeft de delen van de naam van de gebruiker als properties: voor- en achternaam.
+5. De gebruikerRol heeft één of meerdere views ($viewInRol). De render functie van Gebruiker heeft één subcomponent, namelijk <view instantie=...>. Deze component krijgt als props een object mee dat de propertywaarden van de view bevat.
+LET OP. Hier kiest de programmeur in elk geval een bepaalde View. 
+	- hoe weet hij wat de alternatieven zijn? 
+	- de alternatieven zijn op typeniveau voor de Rol gedefinieerd.
+	- na de keuze van een view moet de 'instantie' van de view opgehaald worden en meegegeven worden aan de Component die daadwerkelijk zal renderen.
+	- deze Component zou generiek kunnen zijn, maar hier maken we specifieke componenten. Er zou dus een Component kunnen zijn die de naam van de View draagt.
+	- de keuze van de programmeur zou dus zijn beslag kunnen krijgen door de keuze voor een type View Component. 
+	- maar waar komen deze componenten vandaan?
+	- dit is de plek waar de programmeur met PropTypes geïnformeerd zou kunnen worden. Immers, PropTypes worden gekoppeld aan een Component, dus in dit geval een specifieke View component - b.v. GebruikerNaam, of wat dan ook de naam van de View op de Rol Gebruiker is.
+6. TrustedCluster krijgt als props mee de ID van het TrustedCluster, of zijn BuitenRol. Ik kies voor de ContextID, dat is conceptueel eenvoudiger. We moeten hoe dan ook de context instantie zelf opvragen en via de BinnenRol kunnen we eenvoudig aan BuitenRol properties komen (de naam van het cluster modelleer ik als property van de BuitenRol).
+7. In TrustedCluster moet ik een Component ClusterLid itereren over de leden van het Cluster. 
+8. In ClusterLid gebruik ik in de render functie weer een View component.

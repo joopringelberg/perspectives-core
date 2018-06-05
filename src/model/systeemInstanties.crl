@@ -1,0 +1,11 @@
+GebruikerGegevens
+
+import model:Systeem als sys:
+
+sys:Systeem usr:MijnSysteem
+	$gebruiker(1) => ()
+		$voornaam = "Joop"
+	$trustedCluster =>
+		sys:TrustedCluster $MijnCluster
+			$clusterGenoot => $$gebruiker(1)
+				$url = "http://localhost"

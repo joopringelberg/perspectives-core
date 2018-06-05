@@ -21,7 +21,7 @@ Welke acties gaat de programmeur gebruiken?
 Intermezzo. We moeten hier opletten: Perspectives raadpleegt-acties zijn geen acties in de zin zoals React en Redux ze opvatten.
 Einde.
 
-Een raadpleegt-actie op een bepaalde rol (met die rol als lijdend voorwerp) vereist een RolComponent. Een Raadpleegt-actie zal in een presentatie-component uitgewerkt worden. Als we nu eens een RaadpleegtContainer maken? Dat is een container met precies de props van de view op het leidend voorwerp van die raadpleegt actie.
+Een raadpleegt-actie op een bepaalde rol (met die rol als lijdend voorwerp) vereist een RolComponent. Een Raadpleegt-actie zal in een presentatie-component uitgewerkt worden. Als we nu eens een RaadpleegtContainer maken? Dat is een container met precies de props van de view op het lijdend voorwerp van die raadpleegt actie.
 Ik vermoed dat een raadpleegt-actie altijd alleen maar een lijdend voorwerp heeft, geen meewerkend voorwerp. 'De properties' is daarom eenduidig, in dit verband.
 
 Een Context container bevat dus een aantal Raadpleegt containers die elk één Rol vereisen. De Context container moet dus queries opstellen voor elk van die rollen.
@@ -111,11 +111,11 @@ ONTWERP INTERFACE PERSPECTIVES - REACT GUI
 1. De programmeur van een React Gui voor Perspectives werkt met vier container componenten: ContextContainer, RolContainer, ContextProxyContainer en ViewContainer. 
 
 2. De eerste drie componenten hebben state. 
-	- ContextContainers hebben in hun state property (this.state) een property voor elke rol die in gui voor de context gebruikt wordt. De waarde daarvan is een RolID voor een functionele rol en een array van RolIDs voor relationele rollen.
+	- ContextContainers hebben in hun state property (this.state) een property voor elke rol die in de gui voor de context gebruikt wordt. De waarde daarvan is een RolID voor een functionele rol en een array van RolIDs voor relationele rollen.
 	- RolContainers hebben een property 'rolID' op hun state.
 	- ContextProxyContainers zijn als RolContainers.
 
-ViewContainers hebben een property op hun props voor elke view in de property. Geen state.
+ViewContainers hebben een property op hun props voor elke property in de view. Geen state.
 	
 3. Context-, Rol- en ContextProxyContainer worden geïnitialiseerd met een Perspectives ID. De ViewContainer wordt geïnitialiseerd met een object met property-values. Dit wil zeggen dat de props deze properties bevatten.
 

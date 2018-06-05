@@ -125,9 +125,9 @@ readEntiteitFromCache :: forall e a. PerspectEntiteit a => ID -> MonadPerspectiv
 readEntiteitFromCache id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error ("getEntiteitFromCache needs a locally stored resource for " <> id)
+    Nothing -> throwError $ error ("readEntiteitFromCache needs a locally stored resource for " <> id)
     (Just avar) -> do
       empty <- liftAff $ isEmptyVar avar
       if empty
-        then throwError $ error ("getEntiteitFromCache found an empty AVar for " <> id)
+        then throwError $ error ("readEntiteitFromCache found an empty AVar for " <> id)
         else liftAff $ readVar avar

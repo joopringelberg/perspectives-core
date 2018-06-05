@@ -340,7 +340,7 @@ updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   ID -> Value -> MonadTransactie e Unit
 updatePerspectEntiteit' changeEntity cid value = do
-  (entity) <- lift $ onNothing ("updatePerspectEntiteit: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  (entity) <- lift $ (getPerspectEntiteit cid)
   if (isUserEntiteitID cid)
     then do
       -- Change the entity in cache:
@@ -432,7 +432,7 @@ updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   ID -> MemberName -> Value -> MonadTransactie e Unit
 updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
-  (context) <- lift $ onNothing ("updateRoleProperty: cannot find this context: " <> cid) (getPerspectEntiteit cid)
+  (context :: a) <- lift $ getPerspectEntiteit cid
   -- Change the entity in cache:
   void $ lift $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
   void $ lift $ saveVersionedEntiteit cid context

@@ -104,7 +104,9 @@ fromBinding :: Binding -> Maybe RolID
 fromBinding = unNullOrUndefined
 
 binding :: RolID -> Binding
-binding id = NullOrUndefined (Just id)
+binding id = case id of
+  "" -> NullOrUndefined Nothing
+  otherwise -> NullOrUndefined (Just id)
 
 -----------------------------------------------------------
 -- COMMENTS

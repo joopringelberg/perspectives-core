@@ -1,7 +1,7 @@
 module Perspectives.IndentParser where
   -- type Parser s = ParserT s Identity
 
-import Control.Monad.State (StateT, evalStateT)
+import Control.Monad.State (StateT, evalStateT, runStateT)
 import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
@@ -9,10 +9,12 @@ import Data.Maybe (Maybe, maybe)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.DomeinFile (DomeinFile, addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (Prefix, QualifiedName(..))
-import Perspectives.CoreTypes (MonadPerspectives)
-import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=))
+import Perspectives.Syntax (PerspectContext, PerspectRol)
+import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=), ($))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
 import Text.Parsing.Parser.Pos (Position)
@@ -22,16 +24,16 @@ import Text.Parsing.Parser.Pos (Position)
 -- | - the namespace for context declarations. The namespace does not terminate on a $!
 -- | - the section, i.e. the current role that should be used to stick a role in a context;
 -- | - the prefixes: a map of prefixes to namespaces.
-type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: StrMap String}
+type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: StrMap String, domeinFile :: DomeinFile}
 
 defaultPrefixes :: StrMap String
 defaultPrefixes = fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes}
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes, domeinFile: defaultDomeinFile}
 
 -- | This is the monad stack we use for the ContextRoleParser.
--- | The underlying monad is Aff, which we need to access couchdb.
+-- | The underlying monad is MonadPerspectives, which we need to access couchdb.
 -- | Then we have ContextRoleParserState, which we need to keep track of the number of
 -- | instances of a particular role type in a context (to generate unique names).
 -- | Finally, the StateT Position part is used by the IndentParser.
@@ -45,6 +47,10 @@ type IP a e = ParserT String (ContextRoleParserMonad e) a
 -- | Apply a parser, keeping only the parsed result.
 runIndentParser :: forall a e. String -> IP a e -> MonadPerspectives e (Either ParseError a)
 runIndentParser s p = evalStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
+
+-- | Apply a parser, keeping both state and the parsed result.
+runIndentParser' :: forall a e. String -> IP a e -> MonadPerspectives e (Tuple (Either ParseError a) ContextRoleParserState)
+runIndentParser' s p = runStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
 
 -- | As convienience, to lift functions on Aff all the way up:
 liftAffToIP :: forall a e. MonadPerspectives e a -> IP a e
@@ -92,6 +98,15 @@ withExtendedNamespace extension p = do
     false -> setNamespace (namespace <> "$" <> extension)
     otherwise -> pure unit
   -- _ <- setNamespace (namespace <> "$" <> extension)
+  result <- p
+  _ <- setNamespace namespace
+  pure result
+
+-- Note that the namespace in state is not terminated by a $.
+withNamespace :: forall a e. String -> IP a e -> IP a e
+withNamespace ns p = do
+  namespace <- getNamespace
+  _ <- setNamespace ns
   result <- p
   _ <- setNamespace namespace
   pure result
@@ -149,3 +164,12 @@ setPrefix pre exp = do
 
 getPrefix :: forall e. Prefix -> IP (Maybe String) e
 getPrefix pre = lift (lift (gets (\{prefixes} -> lookup pre prefixes)))
+
+-----------------------------------------------------------
+-- Domeinfile
+-----------------------------------------------------------
+addRol :: forall e. PerspectRol -> IP Unit e
+addRol rol = lift $ lift $ modify \s@{domeinFile} -> s {domeinFile = addRolToDomeinFile rol domeinFile }
+
+addContext :: forall e. PerspectContext -> IP Unit e
+addContext ctxt = lift (lift (modify \s@{domeinFile} -> s {domeinFile = addContextToDomeinFile ctxt domeinFile }))
