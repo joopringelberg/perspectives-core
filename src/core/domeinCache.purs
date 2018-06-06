@@ -11,22 +11,25 @@ import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
 import Data.Foreign.Generic (encodeJSON)
+import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.StrMap (lookup)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
+import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
+import Perspectives.Couchdb.Databases (retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
+import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup)
 import Perspectives.Syntax (PerspectContext, PerspectRol, fromRevision, revision)
-import Prelude (Unit, bind, discard, pure, ($), (*>), (<$>), (<>), (>>=))
+import Prelude (Unit, bind, discard, pure, ($), (*>), (<$>), (<>), (>>=), (==))
 
 type URL = String
 
@@ -115,13 +118,19 @@ storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
 createDomeinFileInCouchdb :: forall e. DomeinFile -> MonadPerspectives (AjaxAvarCache e) Unit
 createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
   ev <- (liftAff makeEmptyVar) >>= domeinCacheInsert _id
-  -- ev <- makeEmptyVar
-  -- _ <- liftEff $ poke domeinCache _id ev
   (res :: AffjaxResponse PutCouchdbDocument)  <- liftAff $ put (modelsURL <> escapeCouchdbDocumentName _id) (encodeJSON df)
-  liftAff $ onAccepted res.status [200, 201] "createDomeinFileInCouchdb"
-    $ putVar (DomeinFile (dfr {_rev = (revision (_.rev (unwrap res.response)))})) ev
+  if res.status == (StatusCode 409)
+    then do
+      rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
+      setRevision rev ev
+      updatedDomeinFile <- liftAff $ readVar ev
+      modifyDomeinFileInCouchdb updatedDomeinFile ev
+    else onAccepted res.status [200, 201] "createDomeinFileInCouchdb" $ setRevision (unsafePartial $ fromJust $ unNullOrUndefined (unwrap res.response).rev) ev
+  where
+    setRevision :: String -> (AVar DomeinFile) -> MonadPerspectives (AjaxAvarCache e) Unit
+    setRevision s av = liftAff $ putVar (DomeinFile (dfr {_rev = (revision s)})) av
 
-modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> MonadPerspectives (AjaxAvar e) Unit
+modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> MonadPerspectives (AjaxAvarCache e) Unit
 modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   (DomeinFile {_rev}) <- liftAff $ readVar av
   originalRevision <- pure $ unsafePartial $ fromJust $ fromRevision _rev
@@ -129,8 +138,16 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put
     (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision)
     (encodeJSON (DomeinFile dfr {_rev = _rev}))
-  liftAff $ onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb"
-    $ putVar (DomeinFile (dfr {_rev = (revision (_.rev (unwrap res.response)))})) av
+  if res.status == (StatusCode 409)
+    then do
+      rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
+      setRevision rev
+      updatedDomeinFile <- liftAff $ readVar av
+      modifyDomeinFileInCouchdb updatedDomeinFile av
+    else onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb" $ setRevision (unsafePartial $ fromJust $ unNullOrUndefined (unwrap res.response).rev)
+  where
+    setRevision :: String -> MonadPerspectives (AjaxAvarCache e) Unit
+    setRevision s = liftAff $ putVar (DomeinFile (dfr {_rev = (revision s)})) av
 
 modelsURL :: URL
 modelsURL = "http://localhost:5984/perspect_models/"

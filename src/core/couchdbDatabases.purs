@@ -14,15 +14,17 @@ import Data.Map (fromFoldable, insert)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.StrMap (fromFoldable) as StrMap
+import Data.String (Pattern(..), stripPrefix, stripSuffix)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AJAX, AffjaxRequest)
 import Network.HTTP.Affjax (AffjaxResponse, affjax, get) as AJ
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Network.HTTP.ResponseHeader (ResponseHeader, responseHeaderName, responseHeaderValue)
 import Network.HTTP.StatusCode (StatusCode(..))
-import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted', DBS)
-import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted', onAccepted, DBS)
+import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
+import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.PerspectivesState (sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
 import Prelude (Unit, bind, const, ifM, pure, unit, void, ($), (*>), (/=), (<<<), (<>), (==), (>>=))
@@ -146,3 +148,30 @@ allDbs = do
   base <- getCouchdbBaseURL
   (res :: AJ.AffjaxResponse DBS) <- lift $ AJ.get (base <> "_all_dbs")
   pure $ unwrap res.response
+
+-----------------------------------------------------------
+-- DOCUMENT VERSION
+-----------------------------------------------------------
+retrieveDocumentVersion :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) String
+retrieveDocumentVersion url = do
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+  (res :: AJ.AffjaxResponse Unit) <- liftAff $ AJ.affjax $ rq {method = Left HEAD, url = url}
+  vs <- version res.headers
+  liftAff $ onAccepted res.status [200, 304] "retrieveDocumentVersion" (pure vs)
+
+  where
+    version :: Array ResponseHeader -> MonadPerspectives (AjaxAvarCache e) String
+    version headers =  case find (\rh -> (responseHeaderName rh) == "ETag") headers of
+      Nothing -> throwError $ error ("retrieveDocumentVersion: couchdb returns no ETag header holding a document version number for " <> url)
+      (Just h) -> (pure $ responseHeaderValue h) >>= removeDoubleQuotes
+
+    removeDoubleQuotes :: String -> MonadPerspectives (AjaxAvarCache e) String
+    removeDoubleQuotes s = do
+      ms1 <- pure $ stripPrefix (Pattern "\"") s
+      case ms1 of
+        Nothing -> throwError $ error ("retrieveDocumentVersion: couchdb returns ETag value that is not a valid JSON string for " <> url)
+        (Just s1) -> do
+          ms2 <- pure $ stripSuffix (Pattern "\"") s1
+          case ms2 of
+            Nothing -> throwError $ error ("retrieveDocumentVersion: couchdb returns ETag value that is not a double quoted string for " <> url)
+            (Just s2) -> pure s2

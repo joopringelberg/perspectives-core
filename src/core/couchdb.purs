@@ -3,7 +3,6 @@ module Perspectives.Couchdb where
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (elemIndex)
-import Data.Foreign (unsafeFromForeign)
 import Data.Foreign.Class (class Decode)
 import Data.Foreign.Generic (defaultOptions, genericDecode)
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
@@ -11,11 +10,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Map (Map, fromFoldable, lookup)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (mempty)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Network.HTTP.StatusCode (StatusCode(..))
-import Prelude (otherwise, pure, show, ($), (<>), (==))
+import Prelude (show, ($), (<>), (==))
 
 -----------------------------------------------------------
 -- ALIASES

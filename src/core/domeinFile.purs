@@ -7,7 +7,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
-import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision, noRevision)
+import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision, noRevision, toRevision)
 import Prelude (($))
 
 newtype DomeinFile = DomeinFile
@@ -40,3 +40,6 @@ addContextToDomeinFile c@(PerspectContext {_id}) (DomeinFile dff@{contexts}) = D
 
 addRolToDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
 addRolToDomeinFile c@(PerspectRol {_id}) (DomeinFile dff@{roles}) = DomeinFile dff {roles = insert _id c roles}
+
+setRevision :: String -> DomeinFile -> DomeinFile
+setRevision vs (DomeinFile dff) = DomeinFile $ dff {_rev = toRevision $ Just vs}

@@ -32,6 +32,7 @@ yarn-error.log*
 /dist/**
 /output/
 /src/output
+/test.json
 /public/Apache-CouchDB-2.1.1-1.zip
 README.md
 test.js
