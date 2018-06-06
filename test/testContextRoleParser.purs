@@ -11,6 +11,14 @@ import Perspectives.PerspectivesState (runPerspectives)
 -- import Perspectives.Resource (getPerspectEntiteit)
 -----------------------------------------------------------
 -- Tests
+-- Open Psci and import:
+-- import Perspectives.ContextRoleParser
+-- import Perspectives.IndentParser
+-- import Test.ContextRoleParser
+-- import Perspectives.Identifiers
+--
+-- Then run tests like this:
+-- runTest (runIndentParser test9 context)
 -----------------------------------------------------------
 
 -- runAff_ (\_->pure unit) ((runIndentParser test1 context) >>= (\r -> log (show r)))

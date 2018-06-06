@@ -175,8 +175,8 @@ expandedPropertyName =
     ln <- localPropertyName
     pure $ QualifiedName dn ln
 
-relativeContextInstanceID :: forall e. IP QualifiedName e
-relativeContextInstanceID = lexeme do
+contextInstanceIDInCurrentNamespace :: forall e. IP QualifiedName e
+contextInstanceIDInCurrentNamespace = lexeme do
   namespace <- getNamespace
   ln <- (STRING.string "$") *> localContextName
   pure $ QualifiedName namespace ln
@@ -200,7 +200,7 @@ relativePropertyTypeName = lexeme do
   pure $ QualifiedName namespace ln
 
 contextName :: forall e. IP QualifiedName e
-contextName = (expandedContextName <|> prefixedContextName <|> relativeContextInstanceID) <?> "the name of a resource (Context or Role)."
+contextName = (expandedContextName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace) <?> "the name of a resource (Context or Role)."
 
 typeContextName :: forall e. IP QualifiedName e
 typeContextName = (expandedContextName <|> prefixedContextName <|> relativeContextTypeName) <?> "the name of a resource (Context or Role)."
@@ -369,7 +369,7 @@ cacheContext contextId ctxt = do
   addContext ctxt
   liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
 
--- | The inline context may itself use a relativeContextInstanceID to identify the context instance. However,
+-- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
 roleBindingWithInlineContext :: forall e. QualifiedName
   -> IP (Tuple RolName ID) (AjaxAvarCache e)
@@ -390,17 +390,17 @@ emptyRoleBinding cName = roleBinding' cName do
 roleBindingWithReference :: forall e. QualifiedName
   -> IP (Tuple RolName ID) (AjaxAvarCache e)
 roleBindingWithReference cName = roleBinding' cName do
-  ident <- (sameLine *> contextReference <|> relativeRolInstanceID)
+  ident <- (sameLine *> relativeRolInstanceID <|> contextReference)
   cmt <- inLineComment
   pure $ Tuple cmt (Just ident)
   where
     contextReference :: IP RolName (AjaxAvarCache e)
     contextReference = do
-      qn <- (expandedContextName <|> prefixedContextName)
+      qn <- (expandedContextName <|> prefixedContextName <|> relativeContextInstanceID)
       pure $ buitenRol (show qn)
 
     relativeRolInstanceID :: IP RolName (AjaxAvarCache e)
-    relativeRolInstanceID = do
+    relativeRolInstanceID = try do
       qn <- rolInHigherContext
       i <- roleOccurrence
       pure $ show qn <> "_" <> show i
@@ -412,6 +412,14 @@ roleBindingWithReference cName = roleBinding' cName do
       localName <- localContextName
       namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
       pure $ QualifiedName namespace' localName
+
+    relativeContextInstanceID :: IP QualifiedName (AjaxAvarCache e)
+    relativeContextInstanceID = lexeme do
+      namespace <- getNamespace -- not $-terminated!
+      namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
+      sName <- segmentedName
+      namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
+      pure $ QualifiedName namespace' sName
 
     -- Returns a string that is NOT terminated on a "$".
     -- NOTE: in order to be able to fail, we need do this in IP.
