@@ -37,9 +37,9 @@ arc:Zaak $Aangifte
 	$actie =>
 		psp:Actie $Actie_1
 			$werkwoord => psp:Beheert
-			$objectView => $$Aangever$Adres
+			$objectView => $$aangever$Adres
 	psp:Context$rolInContext =>
-		psp:Rol $Aangever
+		psp:Rol $aangever
 			extern $isFunctioneel = true
 			$mogelijkeBinding => pol:Persoon
 			$objectRol => $$Actie_1
@@ -53,7 +53,7 @@ arc:Zaak $Aangifte
 					$propertyReferentie => $$betrouwbaarheid
 						$volgNummer = 1
 	psp:Context$rolInContext =>
-		psp:Rol $Verbalisant
+		psp:Rol $verbalisant
 			extern $isFunctioneel = true
 			$mogelijkeBinding => pol:Medewerker
 			$subjectRol => $$Actie_1
@@ -63,7 +63,7 @@ arc:Zaak $Aangifte
 			psp:Context$rolInContext =>
 				psp:Rol $Uitvoerder
 					extern $isFunctioneel = true
-					$mogelijkeBinding => $$$Verbalisant
+					$mogelijkeBinding => $$$verbalisant
 	psp:Context$rolInContext =>
 		psp:Rol $start
 			extern $isFunctioneel = true
