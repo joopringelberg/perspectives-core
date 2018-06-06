@@ -47,6 +47,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.VDom.Driver (runUI)
 import PerspectAceComponent (AceEffects, AceOutput(..), AceQuery(..), aceComponent) as ACE
+import Perspectives.Api (setUpApi)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -175,7 +176,7 @@ ui =
     ifM (lift partyMode)
       (lift setupCouchdb)
       (lift requestAuthentication)
-    -- lift setUpApi
+    lift setUpApi
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do

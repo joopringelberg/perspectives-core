@@ -18,7 +18,7 @@ import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructRolGetter)
-import Prelude (Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (class Show, Unit, bind, const, discard, flip, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -29,14 +29,23 @@ data ApiRequest e =
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
 
+instance showApiRequest :: Show (ApiRequest e) where
+  show (GetRolBinding cid rn _) = "{GetRolBinding " <> cid <> " " <> rn <> "}"
+  show (GetRol cid rn _) = "{GetRol " <> cid <> " " <> rn <> "}"
+  show ShutDown = "ShutDown"
+  show WrongRequest = "WrongRequest"
+
 data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
-  | Error
+  | Error String
 
 type RequestRecord e =
   { request :: String
   , contextID :: String
   , rolName :: String
   , reactStateSetter :: ReactStateSetter e}
+
+showRequestRecord :: forall e. RequestRecord e -> String
+showRequestRecord {request, contextID, rolName} = "{" <> request <> ", " <> contextID <> ", " <> rolName <> "}"
 
 type ApiChannel e =
   { request :: AVar (RequestRecord e)
@@ -64,6 +73,7 @@ foreign import connect :: forall e1 e2. ApiChannel e1 -> Eff (react:: REACT | e2
 marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
 marshallRequestRecord r@{request} = case request of
   "GetRolBinding" -> GetRolBinding r.contextID r.rolName r.reactStateSetter
+  "GetRol" -> GetRol r.contextID r.rolName r.reactStateSetter
   "ShutDown" -> ShutDown
   otherwise -> WrongRequest
 
@@ -87,8 +97,8 @@ dispatch request response = do
         (GetRol cid rn setter) -> do
           unsubscriber <- getRol cid rn setter
           send (Unsubscriber unsubscriber)
-        WrongRequest -> send Error
-        ShutDown -> send Error -- ...this case will never occur!
+        WrongRequest -> send $ Error ("This request is invalid: " <> showRequestRecord reqr)
+        ShutDown -> send $ Error "shutdown" -- ...this case will never occur!
       -- Recursive call.
       dispatch request response
   where

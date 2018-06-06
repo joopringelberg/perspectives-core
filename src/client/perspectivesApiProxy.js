@@ -41,13 +41,13 @@ class PerspectivesProxy
       }
     };
     this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleUnsubscriber);
+    this.getter(this.response)().then(handleChannelError(handleUnsubscriber)); // doe iets met Error.
   }
 
   getRol (contextID, rolName, receiveValues, handleUnsubscriber)
   {
     const req = {
-      request: "GetRol",
+      request: "GetRolXXX",
       contextID: contextID,
       rolName: rolName,
       // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
@@ -58,8 +58,29 @@ class PerspectivesProxy
       }
     };
     this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleUnsubscriber);
+    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
   }
+}
+// Capture Error responses.
+function handleChannelError(handleUnsubscriber)
+{
+  return function(message)
+  {
+    if (isError(message))
+    {
+      console.error( message.value0 );
+    }
+    else
+    {
+      handleUnsubscriber( message.value0 );
+    }
+  }
+}
+
+// A proxy testing whether o is constructed with the ApiResponse Error data constructor.
+function isError(o)
+{
+  return o.constructor.toString().match(/function \$\$Error/)
 }
 
 window.test = function (contextID, rolName)

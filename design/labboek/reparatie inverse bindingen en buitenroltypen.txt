@@ -47,3 +47,18 @@ sys:Systeem usr:MijnSysteem
 2. PROBLEEM. roleBindingWithReference leunt op contextName, maar plakt altijd "_buitenRol" achter het resultaat. Dat gaat dus fout als de referentie niet naar een Context, maar naar een RolInContext is!
 
 ANALYSE: zie RELATIEVE NAMEN IN CRL
+
+GebruikerGegevens
+
+import model:Systeem als sys:
+
+sys:Systeem usr:MijnSysteem
+	$gebruiker(1) => ()
+		$voornaam = "Joop"
+	$trustedCluster =>
+		sys:TrustedCluster $MijnCluster
+			$clusterGenoot => $$gebruiker(1)
+				$url = "http://localhost"
+
+
+1. Klopt het pspType van de binnenRol van model:User$MijnSysteem$MijnCluster?

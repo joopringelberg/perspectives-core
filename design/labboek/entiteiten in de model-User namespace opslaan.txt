@@ -17,10 +17,10 @@ BUITENROL OPSLAAN
 		* Sla de Context op.
 
 CONTEXT OPSLAAN
-Invariant: de context is nog niet opgeslagen.
 1. Voeg de Context toe aan de state.
 2. Sla de Context op in de database.
 3. Voeg alle Rollen van de Context toe aan de state.
+4. Sla alle Rollen van de Context op in de database.
 4. Voor elke Rol: is de binding een BuitenRol?
 	- Ja: sla de buitenrol op.
 	- Nee: stop.
