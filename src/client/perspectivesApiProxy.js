@@ -47,7 +47,7 @@ class PerspectivesProxy
   getRol (contextID, rolName, receiveValues, handleUnsubscriber)
   {
     const req = {
-      request: "GetRolXXX",
+      request: "GetRol",
       contextID: contextID,
       rolName: rolName,
       // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
