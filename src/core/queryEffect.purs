@@ -4,11 +4,11 @@ import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Ref (REF)
 import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery)
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Effects (AjaxAvarCache, AjaxCache)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, const, pure, ($), (<>))
 
-type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit)
+type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache e) Unit)
 
 -- | Make an effect function (QueryEffect) dependent on the objects of a tripleGetter.
 -- | The result of the function (a Triple) should be unsubscribed from the triple index in order to

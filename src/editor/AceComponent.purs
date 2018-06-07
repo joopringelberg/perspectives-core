@@ -1,17 +1,16 @@
 module PerspectAceComponent (AceEffects, AceQuery(..), Mode, Theme, AceOutput(..), aceComponent) where
 
 import Prelude
+
 import Ace as Ace
-import Ace.EditSession as Session
-import Ace.Editor as Editor
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Properties as HP
 import Ace.Document (getLine, onChange) as Document
 import Ace.EditSession (clearAnnotations, getDocument, setAnnotations, setUseSoftTabs)
+import Ace.EditSession as Session
+import Ace.Editor as Editor
 import Ace.Types (ACE, Document, DocumentEvent(..), DocumentEventType(..), Editor, Position(..), Tokenizer)
 import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Trans.Class (lift)
@@ -23,10 +22,13 @@ import Data.Function.Uncurried (mkFn3)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.String (drop, splitAt, take, length)
 import Data.Tuple (Tuple(..))
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextRoleParser (contextDeclaration, contextName) as CRP
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache, REACT)
+import Perspectives.Effects (REACT, AjaxCache)
 import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.Parser (AceError)
@@ -57,7 +59,7 @@ data AceQuery a
 data AceOutput = TextChanged String | TextForSave String
 
 -- | Effects embedding the Ace editor requires.
-type AceEffects eff = AjaxAvarCache (ace :: ACE, dom :: DOM, console :: CONSOLE, react :: REACT | eff)
+type AceEffects eff = AjaxCache (ace :: ACE, dom :: DOM, console :: CONSOLE, react :: REACT, avar :: AVAR | eff)
 
 -- | The Ace component definition.
 aceComponent ::  forall eff. Mode -> Theme -> H.Component HH.HTML AceQuery Unit AceOutput (MonadPerspectives (AceEffects eff))

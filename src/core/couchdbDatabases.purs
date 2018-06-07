@@ -16,7 +16,7 @@ import Data.Newtype (unwrap)
 import Data.StrMap (fromFoldable) as StrMap
 import Data.String (Pattern(..), stripPrefix, stripSuffix)
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax (AJAX, AffjaxRequest)
+import Network.HTTP.Affjax (AffjaxRequest)
 import Network.HTTP.Affjax (AffjaxResponse, affjax, get) as AJ
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Network.HTTP.ResponseHeader (ResponseHeader, responseHeaderName, responseHeaderValue)
@@ -143,7 +143,7 @@ deleteDatabase dbname = ensureAuthentication do
 -----------------------------------------------------------
 -- ALLDBS
 -----------------------------------------------------------
-allDbs :: forall e. MonadPerspectives (ajax :: AJAX | e) (Array String)
+allDbs :: forall e. MonadPerspectives (AjaxAvar e) (Array String)
 allDbs = do
   base <- getCouchdbBaseURL
   (res :: AJ.AffjaxResponse DBS) <- lift $ AJ.get (base <> "_all_dbs")

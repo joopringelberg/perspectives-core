@@ -4,7 +4,6 @@ import Perspectives.EntiteitAndRDFAliases
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar)
-import Control.Monad.Eff.Ref (REF, Ref)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
@@ -53,7 +52,7 @@ type UserInfo =
 -----------------------------------------------------------
 -- | MonadPerspectives is an instance of MonadAff.
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
-type MonadPerspectives e = ReaderT (Ref PerspectivesState) (Aff (ref :: REF | e))
+type MonadPerspectives e = ReaderT (AVar PerspectivesState) (Aff e)
 
 type MP e = MonadPerspectives (AjaxAvarCache e)
 -----------------------------------------------------------

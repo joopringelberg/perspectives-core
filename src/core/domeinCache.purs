@@ -25,7 +25,7 @@ import Perspectives.Couchdb.Databases (retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, poke)
+import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup)
 import Perspectives.Syntax (PerspectContext, PerspectRol, fromRevision, revision)
@@ -33,7 +33,7 @@ import Prelude (Unit, bind, discard, pure, ($), (*>), (<$>), (<>), (>>=), (==))
 
 type URL = String
 
-storeDomeinFileInCache :: forall e. Namespace -> AVar DomeinFile -> MonadPerspectives (gm :: GLOBALMAP | e) (AVar DomeinFile)
+storeDomeinFileInCache :: forall e. Namespace -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
 storeDomeinFileInCache ns df= do
   dc <- domeinCache
   liftAff $ liftEff $ poke dc ns df *> pure df

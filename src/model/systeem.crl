@@ -19,6 +19,17 @@ psp:Context sys:Systeem
 			-- we gaan niets binden, dus elk type is goed.
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:ElkType
+			$viewInRol =>
+				psp:View $VolledigeNaam
+					$propertyReferentie => $$voornaam
+						$volgNummer = 1
+					$propertyReferentie => $$achternaam
+						$volgNummer = 2
+			$rolProperty =>
+				psp:Property $achternaam
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
 			$rolProperty =>
 				psp:Property $voornaam
 					extern $isFunctioneel = false
@@ -46,13 +57,3 @@ arc:Zaak sys:TrustedCluster
 		psp:Actie $RaadpleegtClusterGenoot
 			$werkwoord => psp:Raadpleegt
 			$objectView => $$clusterGenoot$Adressering
-
-psp:Context usr:OverbodigeBinding
-
-sys:Systeem usr:MijnSysteem
-	$gebruiker => usr:OverbodigeBinding
-		$voornaam = "Joop"
-	$trustedCluster =>
-		sys:TrustedCluster $MijnCluster
-			$clusterGenoot => $$gebruiker
-				$url = "http://localhost"

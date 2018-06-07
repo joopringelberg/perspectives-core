@@ -4,7 +4,6 @@ import Control.Monad.Aff (launchAff_)
 import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, takeVar)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
@@ -18,7 +17,7 @@ import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructRolGetter)
-import Prelude (class Show, Unit, bind, const, discard, flip, pure, show, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (class Show, Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -113,7 +112,7 @@ dispatch request response = do
 -----------------------------------------------------------
 -- API FUNCTIONS
 -----------------------------------------------------------
-type ReactStateSetter e = Array String -> Eff (AjaxAvarCache (ref :: REF, react :: REACT | e)) (NullOrUndefined Unit)
+type ReactStateSetter e = Array String -> Eff (AjaxAvarCache (react :: REACT | e)) (NullOrUndefined Unit)
 
 type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 

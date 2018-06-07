@@ -23,10 +23,9 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Aff (Aff, catchError, error, liftEff', throwError)
+import Control.Monad.Aff (Aff, catchError, error, forkAff, liftEff', throwError)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Ref (newRef)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import DOM (DOM)
@@ -57,7 +56,7 @@ import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.Editor.ModelSelect (ModelSelectQuery(..), ModelSelected(..), modelSelect) as MS
 import Perspectives.Editor.ReadTextFile (ReadTextFileQuery, TextFileRead(..), readTextFile)
 import Perspectives.Effects (AvarCache)
-import Perspectives.PerspectivesState (newPerspectivesState)
+import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
 import Perspectives.PrettyPrinter (prettyPrint, enclosingContext)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.SaveUserData (saveUserData)
@@ -77,8 +76,10 @@ main = HA.runHalogenAff $
         url <- pure "http://127.0.0.1:5984/"
         (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
         body <- HA.awaitBody
-        rf <- liftEff' $ newRef $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
-        runUI (H.hoist (flip runReaderT rf) ui) unit body
+        state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
+        void $ forkAff $ runUI (H.hoist (flip runReaderT state) ui) unit body
+        forkAff $ runPerspectivesWithState setUpApi state
+
 
 -- TODO. Als geen waarde in usr beschikbaar is, moet de gebruiker een naam (opnieuw) invoeren!
 credentialsFromQueryString :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe (Tuple User Password))
@@ -176,7 +177,6 @@ ui =
     ifM (lift partyMode)
       (lift setupCouchdb)
       (lift requestAuthentication)
-    lift setUpApi
     pure next
   eval (Finalize next) = pure next
   eval (ClearText next) = do

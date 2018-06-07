@@ -14,22 +14,23 @@ module Perspectives.TripleAdministration
   where
 
 import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
-import Perspectives.PerspectivesState (getsGlobalState, modifyGlobalState)
+import Perspectives.PerspectivesState (getsPerspectivesState, modifyPerspectivesState)
 import Prelude (Unit, bind, discard, pure, unit, void, ($))
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
-memorizeQueryResults :: forall e. MonadPerspectivesQuery e Boolean
-memorizeQueryResults = lift $ getsGlobalState _.memorizeQueryResults
+memorizeQueryResults :: forall e. MonadPerspectivesQuery (avar :: AVAR | e) Boolean
+memorizeQueryResults = lift $ getsPerspectivesState _.memorizeQueryResults
 
-setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery e Unit
-setMemorizeQueryResults b = lift $ modifyGlobalState \ps -> ps {memorizeQueryResults = b}
+setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery (avar :: AVAR | e) Unit
+setMemorizeQueryResults b = lift $ modifyPerspectivesState \ps -> ps {memorizeQueryResults = b}
 
 getRef :: forall e. Triple e -> TripleRef
 getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}

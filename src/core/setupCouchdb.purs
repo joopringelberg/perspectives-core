@@ -6,11 +6,11 @@ import Data.Array (null)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
+import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, User, onAccepted)
 import Perspectives.Couchdb.Databases (createDatabase, defaultPerspectRequest, ensureAuthentication, allDbs)
-import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
 import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
 import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (<>), (>>=))
 
@@ -74,5 +74,5 @@ createUserDatabases user = do
 -- PARTYMODE
 -----------------------------------------------------------
 -- | PartyMode operationalized as Couchdb having no databases.
-partyMode :: forall e. MonadPerspectives (ajax :: AJAX | e) Boolean
+partyMode :: forall e. MonadPerspectives (AjaxAvar e) Boolean
 partyMode = allDbs >>= pure <<< null
