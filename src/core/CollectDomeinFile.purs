@@ -48,18 +48,7 @@ domeinFileFromContext enclosingContext = do
                   \rolID ->
                     (lift $ getPerspectEntiteit rolID) >>= (modify <<< addRolToDomeinFile)
                 pure true
-          else if definedAtToplevel' && (context_id ctxt) `isInNamespace` "model:User"
-            then if (savedToCouchdb ctxt)
-              then pure false
-              else
-                do
-                lift $ void ((saveEntiteit (context_buitenRol ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-                rollen <- lift $ ((context_id ctxt) ##= iedereRolInContextM)
-                for_ rollen
-                  \rolID -> lift ((saveEntiteit rolID)  :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-                lift $ void ((saveEntiteit (context_id ctxt)) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)
-                pure true
-            else pure false
+          else pure false
 
         inDomeinFile :: ID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
         inDomeinFile id = do
