@@ -1,0 +1,4113 @@
+├─┬ purescript-ace#4.0.0 (latest is 5.0.0)
+│ ├── purescript-arrays#4.4.0 (latest is 5.0.0)
+│ ├─┬ purescript-console#3.0.0 (latest is 4.1.0)
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1 (latest is 4.0.0)
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0 (latest is 4.0.0)
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0 (latest is 3.0.0)
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├── purescript-dom#4.16.0
+│ ├─┬ purescript-foreign#4.0.1 (latest is 5.0.0)
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├─┬ purescript-either#3.2.0 (latest is 4.0.0)
+│ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├── purescript-foldable-traversable#3.7.1 (latest is 4.0.0)
+│ │ ├─┬ purescript-functions#3.0.0 (latest is 4.0.0)
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-integers#3.2.0 (latest is 4.0.0)
+│ │ │ ├── purescript-globals#3.0.0 (latest is 4.0.0)
+│ │ │ ├── purescript-math#2.1.1
+│ │ │ ├─┬ purescript-maybe#3.1.0 (latest is 4.0.0)
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └── purescript-partial#1.2.1 (latest is 2.0.0)
+│ │ ├─┬ purescript-lists#4.12.0 (latest is 5.0.0)
+│ │ │ ├── purescript-foldable-traversable#3.7.1 (latest is 4.0.0)
+│ │ │ ├─┬ purescript-lazy#3.0.0 (latest is 4.0.0)
+│ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ ├─┬ purescript-nonempty#4.3.0 (latest is 5.0.0)
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-unfoldable#3.2.0 (latest is 4.0.0)
+│ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │   └─┬ purescript-tuples#4.1.0 (latest is 5.0.0)
+│ │ │ │     ├─┬ purescript-distributive#3.0.0 (latest is 4.0.0)
+│ │ │ │     │ └─┬ purescript-identity#3.1.0 (latest is 4.0.0)
+│ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │     └─┬ purescript-type-equality#2.1.0 (latest is 3.0.0)
+│ │ │ │       └── purescript-eff#3.2.1
+│ │ │ ├── purescript-partial#1.2.1 (latest is 2.0.0)
+│ │ │ ├── purescript-tailrec#3.3.0 (latest is 4.0.0)
+│ │ │ └── purescript-unfoldable#3.2.0 (latest is 4.0.0)
+│ │ ├─┬ purescript-strings#3.5.0 (latest is 4.0.0)
+│ │ │ ├── purescript-arrays#4.4.0 (latest is 5.0.0)
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-gen#1.3.1 (latest is 2.0.0)
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1 (latest is 4.0.0)
+│ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-nonempty#4.3.0 (latest is 5.0.0)
+│ │ │ │ ├─┬ purescript-tailrec#3.3.0 (latest is 4.0.0)
+│ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ └─┬ purescript-st#3.0.0 (latest is 4.0.0)
+│ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├── purescript-integers#3.2.0 (latest is 4.0.0)
+│ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ └─┬ purescript-transformers#3.6.0 (latest is 4.1.0)
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-distributive#3.0.0
+│ │   │ └─┬ purescript-identity#3.1.0
+│ │   │   └── purescript-foldable-traversable#3.7.1
+│ │   ├─┬ purescript-lazy#3.0.0
+│ │   │ └── purescript-monoid#3.3.0
+│ │   └─┬ purescript-tuples#4.1.0
+│ │     ├─┬ purescript-distributive#3.0.0
+│ │     │ └─┬ purescript-identity#3.1.0
+│ │     │   └── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-prelude#3.3.0
+│ │     └─┬ purescript-type-equality#2.1.0
+│ │       └── purescript-eff#3.2.1
+│ ├─┬ purescript-nullable#3.0.0 (latest is 4.0.0)
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-maybe#3.1.0
+│ │   ├── purescript-monoid#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ └── purescript-prelude#3.3.0 (latest is 4.0.1)
+├─┬ purescript-aff#4.0.2 (4.1.1 available, latest is 5.0.0)
+│ ├─┬ purescript-avar#2.0.1 (latest is 3.0.0)
+│ │ ├── purescript-eff#3.2.1
+│ │ ├── purescript-either#3.2.0 (latest is 4.0.0)
+│ │ ├── purescript-exceptions#3.1.0
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-maybe#3.1.0
+│ │   ├── purescript-monoid#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├─┬ purescript-console#3.0.0
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├── purescript-datetime#3.4.1 (latest is 4.0.0)
+│ ├── purescript-exceptions#3.1.0 (latest is 4.0.0)
+│ ├─┬ purescript-free#4.3.0 (latest is 5.0.0)
+│ │ ├─┬ purescript-catenable-lists#4.0.0 (latest is 5.0.0)
+│ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │   └── purescript-eff#3.2.1
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ ├─┬ purescript-control#3.3.1
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-exists#3.0.0 (latest is 4.0.0)
+│ │ │ └── purescript-unsafe-coerce#3.0.0
+│ │ ├─┬ purescript-transformers#3.6.0
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ └─┬ purescript-tuples#4.1.0
+│ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │   ├── purescript-foldable-traversable#3.7.1
+│ │ │   ├── purescript-prelude#3.3.0
+│ │ │   └─┬ purescript-type-equality#2.1.0
+│ │ │     └── purescript-eff#3.2.1
+│ │ └── purescript-unsafe-coerce#3.0.0
+│ ├─┬ purescript-functions#3.0.0
+│ │ └── purescript-prelude#3.3.0
+│ ├─┬ purescript-parallel#3.3.1 (latest is 4.0.0)
+│ │ ├── purescript-foldable-traversable#3.7.1 (latest is 4.0.0)
+│ │ ├─┬ purescript-functors#2.2.0 (latest is 3.0.0)
+│ │ │ ├─┬ purescript-const#3.2.0 (latest is 4.0.0)
+│ │ │ │ ├─┬ purescript-contravariant#3.3.0 (latest is 4.0.0)
+│ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └─┬ purescript-tuples#4.1.0
+│ │ │ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │   ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │   ├── purescript-prelude#3.3.0
+│ │ │ │ │   └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │     └── purescript-eff#3.2.1
+│ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └── purescript-unsafe-coerce#3.0.0
+│ │ ├─┬ purescript-refs#3.0.0 (latest is 4.1.0)
+│ │ │ └─┬ purescript-eff#3.2.1
+│ │ │   ├─┬ purescript-monoid#3.3.0
+│ │ │   │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │   │ ├─┬ purescript-invariant#3.0.0
+│ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │   │ └─┬ purescript-newtype#2.0.0
+│ │ │   │   └── purescript-prelude#3.3.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-transformers#3.6.0
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-distributive#3.0.0
+│ │   │ └─┬ purescript-identity#3.1.0
+│ │   │   └── purescript-foldable-traversable#3.7.1
+│ │   ├─┬ purescript-lazy#3.0.0
+│ │   │ └── purescript-monoid#3.3.0
+│ │   └─┬ purescript-tuples#4.1.0
+│ │     ├─┬ purescript-distributive#3.0.0
+│ │     │ └─┬ purescript-identity#3.1.0
+│ │     │   └── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-prelude#3.3.0
+│ │     └─┬ purescript-type-equality#2.1.0
+│ │       └── purescript-eff#3.2.1
+│ ├─┬ purescript-st#3.0.0
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├─┬ purescript-transformers#3.6.0
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ └─┬ purescript-identity#3.1.0
+│ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ └── purescript-monoid#3.3.0
+│ │ └─┬ purescript-tuples#4.1.0
+│ │   ├─┬ purescript-distributive#3.0.0
+│ │   │ └─┬ purescript-identity#3.1.0
+│ │   │   └── purescript-foldable-traversable#3.7.1
+│ │   ├── purescript-foldable-traversable#3.7.1
+│ │   ├── purescript-prelude#3.3.0
+│ │   └─┬ purescript-type-equality#2.1.0
+│ │     └── purescript-eff#3.2.1
+│ ├─┬ purescript-type-equality#2.1.0
+│ │ └── purescript-eff#3.2.1
+│ └── purescript-unsafe-coerce#3.0.0 (latest is 4.0.0)
+├─┬ purescript-aff-promise#1.0.0 (latest is 2.0.0)
+│ ├── purescript-aff#4.0.2 (latest is 5.0.0)
+│ └─┬ purescript-foreign#4.0.1
+│   ├── purescript-arrays#4.4.0
+│   ├─┬ purescript-either#3.2.0
+│   │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ └─┬ purescript-maybe#3.1.0
+│   │ │   ├── purescript-monoid#3.3.0
+│   │ │   └── purescript-prelude#3.3.0
+│   │ └── purescript-prelude#3.3.0
+│   ├── purescript-foldable-traversable#3.7.1
+│   ├─┬ purescript-functions#3.0.0
+│   │ └── purescript-prelude#3.3.0
+│   ├─┬ purescript-integers#3.2.0
+│   │ ├── purescript-globals#3.0.0
+│   │ ├── purescript-math#2.1.1
+│   │ ├─┬ purescript-maybe#3.1.0
+│   │ │ ├── purescript-monoid#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ └── purescript-partial#1.2.1
+│   ├─┬ purescript-lists#4.12.0
+│   │ ├── purescript-foldable-traversable#3.7.1
+│   │ ├─┬ purescript-lazy#3.0.0
+│   │ │ └── purescript-monoid#3.3.0
+│   │ ├─┬ purescript-nonempty#4.3.0
+│   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ ├── purescript-prelude#3.3.0
+│   │ │ └─┬ purescript-unfoldable#3.2.0
+│   │ │   ├── purescript-partial#1.2.1
+│   │ │   └─┬ purescript-tuples#4.1.0
+│   │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │     ├── purescript-prelude#3.3.0
+│   │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │       └── purescript-eff#3.2.1
+│   │ ├── purescript-partial#1.2.1
+│   │ ├── purescript-tailrec#3.3.0
+│   │ └── purescript-unfoldable#3.2.0
+│   ├─┬ purescript-strings#3.5.0
+│   │ ├── purescript-arrays#4.4.0
+│   │ ├─┬ purescript-either#3.2.0
+│   │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├─┬ purescript-gen#1.3.1
+│   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └── purescript-partial#1.2.1
+│   │ │ ├── purescript-nonempty#4.3.0
+│   │ │ ├─┬ purescript-tailrec#3.3.0
+│   │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ └─┬ purescript-st#3.0.0
+│   │ │ │   └─┬ purescript-eff#3.2.1
+│   │ │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │ │     │   └── purescript-prelude#3.3.0
+│   │ │ │     └── purescript-prelude#3.3.0
+│   │ │ ├─┬ purescript-tuples#4.1.0
+│   │ │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │ │   └── purescript-eff#3.2.1
+│   │ │ └── purescript-unfoldable#3.2.0
+│   │ ├── purescript-integers#3.2.0
+│   │ ├─┬ purescript-maybe#3.1.0
+│   │ │ ├── purescript-monoid#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├── purescript-partial#1.2.1
+│   │ └── purescript-unfoldable#3.2.0
+│   └─┬ purescript-transformers#3.6.0
+│     ├── purescript-arrays#4.4.0
+│     ├─┬ purescript-distributive#3.0.0
+│     │ └─┬ purescript-identity#3.1.0
+│     │   └── purescript-foldable-traversable#3.7.1
+│     ├─┬ purescript-lazy#3.0.0
+│     │ └── purescript-monoid#3.3.0
+│     └─┬ purescript-tuples#4.1.0
+│       ├─┬ purescript-distributive#3.0.0
+│       │ └─┬ purescript-identity#3.1.0
+│       │   └── purescript-foldable-traversable#3.7.1
+│       ├── purescript-foldable-traversable#3.7.1
+│       ├── purescript-prelude#3.3.0
+│       └─┬ purescript-type-equality#2.1.0
+│         └── purescript-eff#3.2.1
+├─┬ purescript-affjax#5.0.0 (latest is 6.0.0)
+│ ├── purescript-aff#4.0.2 (4.1.1 available, latest is 5.0.0)
+│ ├─┬ purescript-argonaut-core#3.1.1 (latest is 4.0.0)
+│ │ ├── purescript-enums#3.2.1 (latest is 4.0.0)
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├── purescript-gen#1.3.1 (latest is 2.0.0)
+│ │ └── purescript-maps#3.6.0
+│ ├── purescript-arraybuffer-types#1.0.0 (latest is 2.0.0)
+│ ├── purescript-dom#4.16.0
+│ ├─┬ purescript-foreign#4.0.1
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├─┬ purescript-either#3.2.0
+│ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-integers#3.2.0
+│ │ │ ├── purescript-globals#3.0.0
+│ │ │ ├── purescript-math#2.1.1
+│ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └── purescript-partial#1.2.1
+│ │ ├─┬ purescript-lists#4.12.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │       └── purescript-eff#3.2.1
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ ├─┬ purescript-strings#3.5.0
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-gen#1.3.1
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├── purescript-integers#3.2.0
+│ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ └─┬ purescript-transformers#3.6.0
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-distributive#3.0.0
+│ │   │ └─┬ purescript-identity#3.1.0
+│ │   │   └── purescript-foldable-traversable#3.7.1
+│ │   ├─┬ purescript-lazy#3.0.0
+│ │   │ └── purescript-monoid#3.3.0
+│ │   └─┬ purescript-tuples#4.1.0
+│ │     ├─┬ purescript-distributive#3.0.0
+│ │     │ └─┬ purescript-identity#3.1.0
+│ │     │   └── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-prelude#3.3.0
+│ │     └─┬ purescript-type-equality#2.1.0
+│ │       └── purescript-eff#3.2.1
+│ ├─┬ purescript-form-urlencoded#3.0.0 (latest is 4.0.0)
+│ │ ├─┬ purescript-generics#4.0.0
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├─┬ purescript-proxy#2.1.0 (latest is 3.0.0)
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-strings#3.5.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-either#3.2.0
+│ │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   │ │   ├── purescript-monoid#3.3.0
+│ │ │   │ │   └── purescript-prelude#3.3.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   ├─┬ purescript-gen#1.3.1
+│ │ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ ├─┬ purescript-integers#3.2.0
+│ │ │   │ │ ├── purescript-globals#3.0.0
+│ │ │   │ │ ├── purescript-math#2.1.1
+│ │ │   │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │   │ │ │ ├── purescript-monoid#3.3.0
+│ │ │   │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ └── purescript-partial#1.2.1
+│ │ │   │ ├── purescript-nonempty#4.3.0
+│ │ │   │ ├─┬ purescript-tailrec#3.3.0
+│ │ │   │ │ ├─┬ purescript-either#3.2.0
+│ │ │   │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │   │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │   │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │   │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ ├─┬ purescript-identity#3.1.0
+│ │ │   │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-partial#1.2.1
+│ │ │   │ │ └─┬ purescript-st#3.0.0
+│ │ │   │ │   └─┬ purescript-eff#3.2.1
+│ │ │   │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │   │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │     │   └── purescript-prelude#3.3.0
+│ │ │   │ │     └── purescript-prelude#3.3.0
+│ │ │   │ ├─┬ purescript-tuples#4.1.0
+│ │ │   │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │   │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │   │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │   │ │   └── purescript-eff#3.2.1
+│ │ │   │ └── purescript-unfoldable#3.2.0
+│ │ │   ├── purescript-integers#3.2.0
+│ │ │   ├─┬ purescript-maybe#3.1.0
+│ │ │   │ ├── purescript-monoid#3.3.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   ├── purescript-partial#1.2.1
+│ │ │   └── purescript-unfoldable#3.2.0
+│ │ ├── purescript-globals#3.0.0
+│ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-strings#3.5.0
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-gen#1.3.1
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├── purescript-integers#3.2.0
+│ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ └─┬ purescript-tuples#4.1.0
+│ │   ├─┬ purescript-distributive#3.0.0
+│ │   │ └─┬ purescript-identity#3.1.0
+│ │   │   └── purescript-foldable-traversable#3.7.1
+│ │   ├── purescript-foldable-traversable#3.7.1
+│ │   ├── purescript-prelude#3.3.0
+│ │   └─┬ purescript-type-equality#2.1.0
+│ │     └── purescript-eff#3.2.1
+│ ├─┬ purescript-http-methods#3.0.0 (latest is 4.0.0)
+│ │ └─┬ purescript-generics#4.0.0
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-either#3.2.0
+│ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │   │ │ │   └── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │   │ │   ├── purescript-monoid#3.3.0
+│ │   │ │   └── purescript-prelude#3.3.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   ├─┬ purescript-identity#3.1.0
+│ │   │ └── purescript-foldable-traversable#3.7.1
+│ │   ├─┬ purescript-lists#4.12.0
+│ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ ├─┬ purescript-lazy#3.0.0
+│ │   │ │ └── purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-nonempty#4.3.0
+│ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ │ ├── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-unfoldable#3.2.0
+│ │   │ │   ├── purescript-partial#1.2.1
+│ │   │ │   └─┬ purescript-tuples#4.1.0
+│ │   │ │     ├─┬ purescript-distributive#3.0.0
+│ │   │ │     │ └─┬ purescript-identity#3.1.0
+│ │   │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │   │ │     ├── purescript-foldable-traversable#3.7.1
+│ │   │ │     ├── purescript-prelude#3.3.0
+│ │   │ │     └─┬ purescript-type-equality#2.1.0
+│ │   │ │       └── purescript-eff#3.2.1
+│ │   │ ├── purescript-partial#1.2.1
+│ │   │ ├── purescript-tailrec#3.3.0
+│ │   │ └── purescript-unfoldable#3.2.0
+│ │   ├─┬ purescript-proxy#2.1.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   └─┬ purescript-strings#3.5.0
+│ │     ├── purescript-arrays#4.4.0
+│ │     ├─┬ purescript-either#3.2.0
+│ │     │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │     │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │     │ │ │ ├─┬ purescript-control#3.3.1
+│ │     │ │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ │ └─┬ purescript-newtype#2.0.0
+│ │     │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ └─┬ purescript-maybe#3.1.0
+│ │     │ │   ├── purescript-monoid#3.3.0
+│ │     │ │   └── purescript-prelude#3.3.0
+│ │     │ └── purescript-prelude#3.3.0
+│ │     ├─┬ purescript-gen#1.3.1
+│ │     │ ├── purescript-foldable-traversable#3.7.1
+│ │     │ ├─┬ purescript-integers#3.2.0
+│ │     │ │ ├── purescript-globals#3.0.0
+│ │     │ │ ├── purescript-math#2.1.1
+│ │     │ │ ├─┬ purescript-maybe#3.1.0
+│ │     │ │ │ ├── purescript-monoid#3.3.0
+│ │     │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ └── purescript-partial#1.2.1
+│ │     │ ├── purescript-nonempty#4.3.0
+│ │     │ ├─┬ purescript-tailrec#3.3.0
+│ │     │ │ ├─┬ purescript-either#3.2.0
+│ │     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │     │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │     │ │ │ │   ├── purescript-monoid#3.3.0
+│ │     │ │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ ├─┬ purescript-identity#3.1.0
+│ │     │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-partial#1.2.1
+│ │     │ │ └─┬ purescript-st#3.0.0
+│ │     │ │   └─┬ purescript-eff#3.2.1
+│ │     │ │     ├─┬ purescript-monoid#3.3.0
+│ │     │ │     │ ├─┬ purescript-control#3.3.1
+│ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ │     │ └─┬ purescript-newtype#2.0.0
+│ │     │ │     │   └── purescript-prelude#3.3.0
+│ │     │ │     └── purescript-prelude#3.3.0
+│ │     │ ├─┬ purescript-tuples#4.1.0
+│ │     │ │ ├─┬ purescript-distributive#3.0.0
+│ │     │ │ │ └─┬ purescript-identity#3.1.0
+│ │     │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-prelude#3.3.0
+│ │     │ │ └─┬ purescript-type-equality#2.1.0
+│ │     │ │   └── purescript-eff#3.2.1
+│ │     │ └── purescript-unfoldable#3.2.0
+│ │     ├── purescript-integers#3.2.0
+│ │     ├─┬ purescript-maybe#3.1.0
+│ │     │ ├── purescript-monoid#3.3.0
+│ │     │ └── purescript-prelude#3.3.0
+│ │     ├── purescript-partial#1.2.1
+│ │     └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-integers#3.2.0
+│ │ ├── purescript-globals#3.0.0
+│ │ ├── purescript-math#2.1.1
+│ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └── purescript-partial#1.2.1
+│ ├── purescript-math#2.1.1
+│ ├─┬ purescript-media-types#3.0.0 (latest is 4.0.0)
+│ │ └─┬ purescript-generics#4.0.0
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-either#3.2.0
+│ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │   │ │ │   └── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │   │ │   ├── purescript-monoid#3.3.0
+│ │   │ │   └── purescript-prelude#3.3.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   ├─┬ purescript-identity#3.1.0
+│ │   │ └── purescript-foldable-traversable#3.7.1
+│ │   ├─┬ purescript-lists#4.12.0
+│ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ ├─┬ purescript-lazy#3.0.0
+│ │   │ │ └── purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-nonempty#4.3.0
+│ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ │ ├── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-unfoldable#3.2.0
+│ │   │ │   ├── purescript-partial#1.2.1
+│ │   │ │   └─┬ purescript-tuples#4.1.0
+│ │   │ │     ├─┬ purescript-distributive#3.0.0
+│ │   │ │     │ └─┬ purescript-identity#3.1.0
+│ │   │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │   │ │     ├── purescript-foldable-traversable#3.7.1
+│ │   │ │     ├── purescript-prelude#3.3.0
+│ │   │ │     └─┬ purescript-type-equality#2.1.0
+│ │   │ │       └── purescript-eff#3.2.1
+│ │   │ ├── purescript-partial#1.2.1
+│ │   │ ├── purescript-tailrec#3.3.0
+│ │   │ └── purescript-unfoldable#3.2.0
+│ │   ├─┬ purescript-proxy#2.1.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   └─┬ purescript-strings#3.5.0
+│ │     ├── purescript-arrays#4.4.0
+│ │     ├─┬ purescript-either#3.2.0
+│ │     │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │     │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │     │ │ │ ├─┬ purescript-control#3.3.1
+│ │     │ │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ │ └─┬ purescript-newtype#2.0.0
+│ │     │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ └─┬ purescript-maybe#3.1.0
+│ │     │ │   ├── purescript-monoid#3.3.0
+│ │     │ │   └── purescript-prelude#3.3.0
+│ │     │ └── purescript-prelude#3.3.0
+│ │     ├─┬ purescript-gen#1.3.1
+│ │     │ ├── purescript-foldable-traversable#3.7.1
+│ │     │ ├─┬ purescript-integers#3.2.0
+│ │     │ │ ├── purescript-globals#3.0.0
+│ │     │ │ ├── purescript-math#2.1.1
+│ │     │ │ ├─┬ purescript-maybe#3.1.0
+│ │     │ │ │ ├── purescript-monoid#3.3.0
+│ │     │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ └── purescript-partial#1.2.1
+│ │     │ ├── purescript-nonempty#4.3.0
+│ │     │ ├─┬ purescript-tailrec#3.3.0
+│ │     │ │ ├─┬ purescript-either#3.2.0
+│ │     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │     │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │     │ │ │ │   ├── purescript-monoid#3.3.0
+│ │     │ │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ ├─┬ purescript-identity#3.1.0
+│ │     │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-partial#1.2.1
+│ │     │ │ └─┬ purescript-st#3.0.0
+│ │     │ │   └─┬ purescript-eff#3.2.1
+│ │     │ │     ├─┬ purescript-monoid#3.3.0
+│ │     │ │     │ ├─┬ purescript-control#3.3.1
+│ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ │     │ └─┬ purescript-newtype#2.0.0
+│ │     │ │     │   └── purescript-prelude#3.3.0
+│ │     │ │     └── purescript-prelude#3.3.0
+│ │     │ ├─┬ purescript-tuples#4.1.0
+│ │     │ │ ├─┬ purescript-distributive#3.0.0
+│ │     │ │ │ └─┬ purescript-identity#3.1.0
+│ │     │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-prelude#3.3.0
+│ │     │ │ └─┬ purescript-type-equality#2.1.0
+│ │     │ │   └── purescript-eff#3.2.1
+│ │     │ └── purescript-unfoldable#3.2.0
+│ │     ├── purescript-integers#3.2.0
+│ │     ├─┬ purescript-maybe#3.1.0
+│ │     │ ├── purescript-monoid#3.3.0
+│ │     │ └── purescript-prelude#3.3.0
+│ │     ├── purescript-partial#1.2.1
+│ │     └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-nullable#3.0.0
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-maybe#3.1.0
+│ │   ├── purescript-monoid#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├─┬ purescript-refs#3.0.0
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ └── purescript-unsafe-coerce#3.0.0
+├─┬ purescript-argonaut#3.1.0
+│ ├── purescript-argonaut-codecs#3.3.0 (latest is 4.0.0)
+│ ├── purescript-argonaut-core#3.1.1 (latest is 4.0.0)
+│ └─┬ purescript-argonaut-traversals#3.1.0
+│   ├── purescript-argonaut-codecs#3.3.0
+│   ├── purescript-argonaut-core#3.1.1
+│   └─┬ purescript-profunctor-lenses#3.8.0 (latest is 4.0.0)
+│     ├─┬ purescript-const#3.2.0
+│     │ ├─┬ purescript-contravariant#3.3.0
+│     │ │ ├─┬ purescript-either#3.2.0
+│     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│     │ │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│     │ │ │ │   ├── purescript-monoid#3.3.0
+│     │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ └── purescript-prelude#3.3.0
+│     │ │ ├── purescript-monoid#3.3.0
+│     │ │ └─┬ purescript-tuples#4.1.0
+│     │ │   ├─┬ purescript-distributive#3.0.0
+│     │ │   │ └─┬ purescript-identity#3.1.0
+│     │ │   │   └── purescript-foldable-traversable#3.7.1
+│     │ │   ├── purescript-foldable-traversable#3.7.1
+│     │ │   ├── purescript-prelude#3.3.0
+│     │ │   └─┬ purescript-type-equality#2.1.0
+│     │ │     └── purescript-eff#3.2.1
+│     │ └── purescript-foldable-traversable#3.7.1
+│     ├── purescript-foldable-traversable#3.7.1
+│     ├─┬ purescript-functors#2.2.0
+│     │ ├─┬ purescript-const#3.2.0
+│     │ │ ├─┬ purescript-contravariant#3.3.0
+│     │ │ │ ├─┬ purescript-either#3.2.0
+│     │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│     │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│     │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│     │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│     │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│     │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│     │ │ │ │ │   ├── purescript-monoid#3.3.0
+│     │ │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ │ └── purescript-prelude#3.3.0
+│     │ │ │ ├── purescript-monoid#3.3.0
+│     │ │ │ └─┬ purescript-tuples#4.1.0
+│     │ │ │   ├─┬ purescript-distributive#3.0.0
+│     │ │ │   │ └─┬ purescript-identity#3.1.0
+│     │ │ │   │   └── purescript-foldable-traversable#3.7.1
+│     │ │ │   ├── purescript-foldable-traversable#3.7.1
+│     │ │ │   ├── purescript-prelude#3.3.0
+│     │ │ │   └─┬ purescript-type-equality#2.1.0
+│     │ │ │     └── purescript-eff#3.2.1
+│     │ │ └── purescript-foldable-traversable#3.7.1
+│     │ ├─┬ purescript-either#3.2.0
+│     │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│     │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│     │ │ │ │ ├─┬ purescript-control#3.3.1
+│     │ │ │ │ │ └── purescript-prelude#3.3.0
+│     │ │ │ │ └─┬ purescript-newtype#2.0.0
+│     │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ └─┬ purescript-maybe#3.1.0
+│     │ │ │   ├── purescript-monoid#3.3.0
+│     │ │ │   └── purescript-prelude#3.3.0
+│     │ │ └── purescript-prelude#3.3.0
+│     │ └── purescript-unsafe-coerce#3.0.0
+│     ├─┬ purescript-identity#3.1.0
+│     │ └── purescript-foldable-traversable#3.7.1
+│     ├── purescript-profunctor#3.2.0 (latest is 4.0.0)
+│     ├─┬ purescript-record#0.2.6 (latest is 1.0.0)
+│     │ ├─┬ purescript-functions#3.0.0
+│     │ │ └── purescript-prelude#3.3.0
+│     │ ├─┬ purescript-st#3.0.0
+│     │ │ └─┬ purescript-eff#3.2.1
+│     │ │   ├─┬ purescript-monoid#3.3.0
+│     │ │   │ ├─┬ purescript-control#3.3.1
+│     │ │   │ │ └── purescript-prelude#3.3.0
+│     │ │   │ ├─┬ purescript-invariant#3.0.0
+│     │ │   │ │ └── purescript-prelude#3.3.0
+│     │ │   │ └─┬ purescript-newtype#2.0.0
+│     │ │   │   └── purescript-prelude#3.3.0
+│     │ │   └── purescript-prelude#3.3.0
+│     │ ├─┬ purescript-symbols#3.0.0
+│     │ │ ├── purescript-prelude#3.3.0
+│     │ │ └── purescript-unsafe-coerce#3.0.0
+│     │ └─┬ purescript-typelevel-prelude#2.7.0 (latest is 3.0.0)
+│     │   ├── purescript-proxy#2.1.0
+│     │   ├─┬ purescript-symbols#3.0.0
+│     │   │ ├── purescript-prelude#3.3.0
+│     │   │ └── purescript-unsafe-coerce#3.0.0
+│     │   └── purescript-type-equality#2.1.0 (latest is 3.0.0)
+│     ├─┬ purescript-sets#3.2.0
+│     │ ├── purescript-maps#3.6.0
+│     │ └─┬ purescript-tailrec#3.3.0
+│     │   ├─┬ purescript-either#3.2.0
+│     │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│     │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│     │   │ │ │ ├─┬ purescript-control#3.3.1
+│     │   │ │ │ │ └── purescript-prelude#3.3.0
+│     │   │ │ │ └─┬ purescript-newtype#2.0.0
+│     │   │ │ │   └── purescript-prelude#3.3.0
+│     │   │ │ └─┬ purescript-maybe#3.1.0
+│     │   │ │   ├── purescript-monoid#3.3.0
+│     │   │ │   └── purescript-prelude#3.3.0
+│     │   │ └── purescript-prelude#3.3.0
+│     │   ├─┬ purescript-identity#3.1.0
+│     │   │ └── purescript-foldable-traversable#3.7.1
+│     │   ├── purescript-partial#1.2.1
+│     │   └─┬ purescript-st#3.0.0
+│     │     └─┬ purescript-eff#3.2.1
+│     │       ├─┬ purescript-monoid#3.3.0
+│     │       │ ├─┬ purescript-control#3.3.1
+│     │       │ │ └── purescript-prelude#3.3.0
+│     │       │ ├─┬ purescript-invariant#3.0.0
+│     │       │ │ └── purescript-prelude#3.3.0
+│     │       │ └─┬ purescript-newtype#2.0.0
+│     │       │   └── purescript-prelude#3.3.0
+│     │       └── purescript-prelude#3.3.0
+│     ├─┬ purescript-transformers#3.6.0
+│     │ ├── purescript-arrays#4.4.0
+│     │ ├─┬ purescript-distributive#3.0.0
+│     │ │ └─┬ purescript-identity#3.1.0
+│     │ │   └── purescript-foldable-traversable#3.7.1
+│     │ ├─┬ purescript-lazy#3.0.0
+│     │ │ └── purescript-monoid#3.3.0
+│     │ └─┬ purescript-tuples#4.1.0
+│     │   ├─┬ purescript-distributive#3.0.0
+│     │   │ └─┬ purescript-identity#3.1.0
+│     │   │   └── purescript-foldable-traversable#3.7.1
+│     │   ├── purescript-foldable-traversable#3.7.1
+│     │   ├── purescript-prelude#3.3.0
+│     │   └─┬ purescript-type-equality#2.1.0
+│     │     └── purescript-eff#3.2.1
+│     └── purescript-unsafe-coerce#3.0.0
+├─┬ purescript-argonaut-codecs#3.3.0 (latest is 4.0.0)
+│ ├── purescript-argonaut-core#3.1.1
+│ ├─┬ purescript-generics#4.0.0
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├─┬ purescript-either#3.2.0
+│ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-identity#3.1.0
+│ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-lists#4.12.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │       └── purescript-eff#3.2.1
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ ├─┬ purescript-proxy#2.1.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-strings#3.5.0
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-either#3.2.0
+│ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │   │ │ │   └── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │   │ │   ├── purescript-monoid#3.3.0
+│ │   │ │   └── purescript-prelude#3.3.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   ├─┬ purescript-gen#1.3.1
+│ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ ├─┬ purescript-integers#3.2.0
+│ │   │ │ ├── purescript-globals#3.0.0
+│ │   │ │ ├── purescript-math#2.1.1
+│ │   │ │ ├─┬ purescript-maybe#3.1.0
+│ │   │ │ │ ├── purescript-monoid#3.3.0
+│ │   │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ └── purescript-partial#1.2.1
+│ │   │ ├── purescript-nonempty#4.3.0
+│ │   │ ├─┬ purescript-tailrec#3.3.0
+│ │   │ │ ├─┬ purescript-either#3.2.0
+│ │   │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │   │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │   │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │   │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │   │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │   │ │ │ │   ├── purescript-monoid#3.3.0
+│ │   │ │ │ │   └── purescript-prelude#3.3.0
+│ │   │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ ├─┬ purescript-identity#3.1.0
+│ │   │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │   │ │ ├── purescript-partial#1.2.1
+│ │   │ │ └─┬ purescript-st#3.0.0
+│ │   │ │   └─┬ purescript-eff#3.2.1
+│ │   │ │     ├─┬ purescript-monoid#3.3.0
+│ │   │ │     │ ├─┬ purescript-control#3.3.1
+│ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │   │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │   │ │     │ └─┬ purescript-newtype#2.0.0
+│ │   │ │     │   └── purescript-prelude#3.3.0
+│ │   │ │     └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-tuples#4.1.0
+│ │   │ │ ├─┬ purescript-distributive#3.0.0
+│ │   │ │ │ └─┬ purescript-identity#3.1.0
+│ │   │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ │ ├── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-type-equality#2.1.0
+│ │   │ │   └── purescript-eff#3.2.1
+│ │   │ └── purescript-unfoldable#3.2.0
+│ │   ├── purescript-integers#3.2.0
+│ │   ├─┬ purescript-maybe#3.1.0
+│ │   │ ├── purescript-monoid#3.3.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   ├── purescript-partial#1.2.1
+│ │   └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-integers#3.2.0
+│ │ ├── purescript-globals#3.0.0
+│ │ ├── purescript-math#2.1.1
+│ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └── purescript-partial#1.2.1
+│ └─┬ purescript-maybe#3.1.0
+│   ├── purescript-monoid#3.3.0
+│   └── purescript-prelude#3.3.0
+├─┬ purescript-arrays#4.4.0 (latest is 5.0.0)
+│ ├── purescript-foldable-traversable#3.7.1
+│ ├─┬ purescript-nonempty#4.3.0
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├── purescript-prelude#3.3.0
+│ │ └─┬ purescript-unfoldable#3.2.0
+│ │   ├── purescript-partial#1.2.1
+│ │   └─┬ purescript-tuples#4.1.0
+│ │     ├─┬ purescript-distributive#3.0.0
+│ │     │ └─┬ purescript-identity#3.1.0
+│ │     │   └── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-foldable-traversable#3.7.1
+│ │     ├── purescript-prelude#3.3.0
+│ │     └─┬ purescript-type-equality#2.1.0
+│ │       └── purescript-eff#3.2.1
+│ ├── purescript-partial#1.2.1
+│ ├─┬ purescript-st#3.0.0
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├─┬ purescript-tailrec#3.3.0
+│ │ ├─┬ purescript-either#3.2.0
+│ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-identity#3.1.0
+│ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ ├── purescript-partial#1.2.1
+│ │ └─┬ purescript-st#3.0.0
+│ │   └─┬ purescript-eff#3.2.1
+│ │     ├─┬ purescript-monoid#3.3.0
+│ │     │ ├─┬ purescript-control#3.3.1
+│ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ ├─┬ purescript-invariant#3.0.0
+│ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ └─┬ purescript-newtype#2.0.0
+│ │     │   └── purescript-prelude#3.3.0
+│ │     └── purescript-prelude#3.3.0
+│ ├─┬ purescript-tuples#4.1.0
+│ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ └─┬ purescript-identity#3.1.0
+│ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├── purescript-prelude#3.3.0
+│ │ └─┬ purescript-type-equality#2.1.0
+│ │   └── purescript-eff#3.2.1
+│ ├── purescript-unfoldable#3.2.0
+│ └── purescript-unsafe-coerce#3.0.0
+├─┬ purescript-console#3.0.0 (latest is 4.1.0)
+│ └─┬ purescript-eff#3.2.1
+│   ├─┬ purescript-monoid#3.3.0
+│   │ ├─┬ purescript-control#3.3.1
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├─┬ purescript-invariant#3.0.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ └─┬ purescript-newtype#2.0.0
+│   │   └── purescript-prelude#3.3.0
+│   └── purescript-prelude#3.3.0
+├── purescript-datetime#3.4.1 (latest is 4.0.0)
+├─┬ purescript-datetime-iso#1.0.2
+│ ├─┬ purescript-argonaut-codecs#3.3.0 (latest is 4.0.0)
+│ │ ├── purescript-argonaut-core#3.1.1
+│ │ ├─┬ purescript-generics#4.0.0
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├─┬ purescript-proxy#2.1.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-strings#3.5.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-either#3.2.0
+│ │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   │ │   ├── purescript-monoid#3.3.0
+│ │ │   │ │   └── purescript-prelude#3.3.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   ├─┬ purescript-gen#1.3.1
+│ │ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ ├─┬ purescript-integers#3.2.0
+│ │ │   │ │ ├── purescript-globals#3.0.0
+│ │ │   │ │ ├── purescript-math#2.1.1
+│ │ │   │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │   │ │ │ ├── purescript-monoid#3.3.0
+│ │ │   │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ └── purescript-partial#1.2.1
+│ │ │   │ ├── purescript-nonempty#4.3.0
+│ │ │   │ ├─┬ purescript-tailrec#3.3.0
+│ │ │   │ │ ├─┬ purescript-either#3.2.0
+│ │ │   │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │   │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │   │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │   │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ ├─┬ purescript-identity#3.1.0
+│ │ │   │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-partial#1.2.1
+│ │ │   │ │ └─┬ purescript-st#3.0.0
+│ │ │   │ │   └─┬ purescript-eff#3.2.1
+│ │ │   │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │   │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │     │   └── purescript-prelude#3.3.0
+│ │ │   │ │     └── purescript-prelude#3.3.0
+│ │ │   │ ├─┬ purescript-tuples#4.1.0
+│ │ │   │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │   │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │   │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │   │ │   └── purescript-eff#3.2.1
+│ │ │   │ └── purescript-unfoldable#3.2.0
+│ │ │   ├── purescript-integers#3.2.0
+│ │ │   ├─┬ purescript-maybe#3.1.0
+│ │ │   │ ├── purescript-monoid#3.3.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   ├── purescript-partial#1.2.1
+│ │ │   └── purescript-unfoldable#3.2.0
+│ │ ├─┬ purescript-integers#3.2.0
+│ │ │ ├── purescript-globals#3.0.0
+│ │ │ ├── purescript-math#2.1.1
+│ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └── purescript-partial#1.2.1
+│ │ └─┬ purescript-maybe#3.1.0
+│ │   ├── purescript-monoid#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├── purescript-datetime#3.4.1 (latest is 4.0.0)
+│ ├─┬ purescript-newtype#2.0.0
+│ │ └── purescript-prelude#3.3.0
+│ └─┬ purescript-parsing#4.3.1
+│   ├── purescript-arrays#4.4.0
+│   ├─┬ purescript-either#3.2.0
+│   │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ └─┬ purescript-maybe#3.1.0
+│   │ │   ├── purescript-monoid#3.3.0
+│   │ │   └── purescript-prelude#3.3.0
+│   │ └── purescript-prelude#3.3.0
+│   ├── purescript-foldable-traversable#3.7.1
+│   ├─┬ purescript-identity#3.1.0
+│   │ └── purescript-foldable-traversable#3.7.1
+│   ├─┬ purescript-integers#3.2.0
+│   │ ├── purescript-globals#3.0.0
+│   │ ├── purescript-math#2.1.1
+│   │ ├─┬ purescript-maybe#3.1.0
+│   │ │ ├── purescript-monoid#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ └── purescript-partial#1.2.1
+│   ├─┬ purescript-lists#4.12.0
+│   │ ├── purescript-foldable-traversable#3.7.1
+│   │ ├─┬ purescript-lazy#3.0.0
+│   │ │ └── purescript-monoid#3.3.0
+│   │ ├─┬ purescript-nonempty#4.3.0
+│   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ ├── purescript-prelude#3.3.0
+│   │ │ └─┬ purescript-unfoldable#3.2.0
+│   │ │   ├── purescript-partial#1.2.1
+│   │ │   └─┬ purescript-tuples#4.1.0
+│   │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │     ├── purescript-prelude#3.3.0
+│   │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │       └── purescript-eff#3.2.1
+│   │ ├── purescript-partial#1.2.1
+│   │ ├── purescript-tailrec#3.3.0
+│   │ └── purescript-unfoldable#3.2.0
+│   ├─┬ purescript-maybe#3.1.0
+│   │ ├── purescript-monoid#3.3.0
+│   │ └── purescript-prelude#3.3.0
+│   ├─┬ purescript-strings#3.5.0
+│   │ ├── purescript-arrays#4.4.0
+│   │ ├─┬ purescript-either#3.2.0
+│   │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├─┬ purescript-gen#1.3.1
+│   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └── purescript-partial#1.2.1
+│   │ │ ├── purescript-nonempty#4.3.0
+│   │ │ ├─┬ purescript-tailrec#3.3.0
+│   │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ └─┬ purescript-st#3.0.0
+│   │ │ │   └─┬ purescript-eff#3.2.1
+│   │ │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │ │     │   └── purescript-prelude#3.3.0
+│   │ │ │     └── purescript-prelude#3.3.0
+│   │ │ ├─┬ purescript-tuples#4.1.0
+│   │ │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │ │   └── purescript-eff#3.2.1
+│   │ │ └── purescript-unfoldable#3.2.0
+│   │ ├── purescript-integers#3.2.0
+│   │ ├─┬ purescript-maybe#3.1.0
+│   │ │ ├── purescript-monoid#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├── purescript-partial#1.2.1
+│   │ └── purescript-unfoldable#3.2.0
+│   ├─┬ purescript-transformers#3.6.0
+│   │ ├── purescript-arrays#4.4.0
+│   │ ├─┬ purescript-distributive#3.0.0
+│   │ │ └─┬ purescript-identity#3.1.0
+│   │ │   └── purescript-foldable-traversable#3.7.1
+│   │ ├─┬ purescript-lazy#3.0.0
+│   │ │ └── purescript-monoid#3.3.0
+│   │ └─┬ purescript-tuples#4.1.0
+│   │   ├─┬ purescript-distributive#3.0.0
+│   │   │ └─┬ purescript-identity#3.1.0
+│   │   │   └── purescript-foldable-traversable#3.7.1
+│   │   ├── purescript-foldable-traversable#3.7.1
+│   │   ├── purescript-prelude#3.3.0
+│   │   └─┬ purescript-type-equality#2.1.0
+│   │     └── purescript-eff#3.2.1
+│   └─┬ purescript-unicode#3.0.2 (latest is 4.0.0)
+│     ├── purescript-foldable-traversable#3.7.1
+│     ├─┬ purescript-maybe#3.1.0
+│     │ ├── purescript-monoid#3.3.0
+│     │ └── purescript-prelude#3.3.0
+│     └─┬ purescript-strings#3.5.0
+│       ├── purescript-arrays#4.4.0
+│       ├─┬ purescript-either#3.2.0
+│       │ ├─┬ purescript-foldable-traversable#3.7.1
+│       │ │ ├─┬ purescript-bifunctors#3.0.0
+│       │ │ │ ├─┬ purescript-control#3.3.1
+│       │ │ │ │ └── purescript-prelude#3.3.0
+│       │ │ │ └─┬ purescript-newtype#2.0.0
+│       │ │ │   └── purescript-prelude#3.3.0
+│       │ │ └─┬ purescript-maybe#3.1.0
+│       │ │   ├── purescript-monoid#3.3.0
+│       │ │   └── purescript-prelude#3.3.0
+│       │ └── purescript-prelude#3.3.0
+│       ├─┬ purescript-gen#1.3.1
+│       │ ├── purescript-foldable-traversable#3.7.1
+│       │ ├─┬ purescript-integers#3.2.0
+│       │ │ ├── purescript-globals#3.0.0
+│       │ │ ├── purescript-math#2.1.1
+│       │ │ ├─┬ purescript-maybe#3.1.0
+│       │ │ │ ├── purescript-monoid#3.3.0
+│       │ │ │ └── purescript-prelude#3.3.0
+│       │ │ └── purescript-partial#1.2.1
+│       │ ├── purescript-nonempty#4.3.0
+│       │ ├─┬ purescript-tailrec#3.3.0
+│       │ │ ├─┬ purescript-either#3.2.0
+│       │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│       │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│       │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│       │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│       │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│       │ │ │ │ │   └── purescript-prelude#3.3.0
+│       │ │ │ │ └─┬ purescript-maybe#3.1.0
+│       │ │ │ │   ├── purescript-monoid#3.3.0
+│       │ │ │ │   └── purescript-prelude#3.3.0
+│       │ │ │ └── purescript-prelude#3.3.0
+│       │ │ ├─┬ purescript-identity#3.1.0
+│       │ │ │ └── purescript-foldable-traversable#3.7.1
+│       │ │ ├── purescript-partial#1.2.1
+│       │ │ └─┬ purescript-st#3.0.0
+│       │ │   └─┬ purescript-eff#3.2.1
+│       │ │     ├─┬ purescript-monoid#3.3.0
+│       │ │     │ ├─┬ purescript-control#3.3.1
+│       │ │     │ │ └── purescript-prelude#3.3.0
+│       │ │     │ ├─┬ purescript-invariant#3.0.0
+│       │ │     │ │ └── purescript-prelude#3.3.0
+│       │ │     │ └─┬ purescript-newtype#2.0.0
+│       │ │     │   └── purescript-prelude#3.3.0
+│       │ │     └── purescript-prelude#3.3.0
+│       │ ├─┬ purescript-tuples#4.1.0
+│       │ │ ├─┬ purescript-distributive#3.0.0
+│       │ │ │ └─┬ purescript-identity#3.1.0
+│       │ │ │   └── purescript-foldable-traversable#3.7.1
+│       │ │ ├── purescript-foldable-traversable#3.7.1
+│       │ │ ├── purescript-prelude#3.3.0
+│       │ │ └─┬ purescript-type-equality#2.1.0
+│       │ │   └── purescript-eff#3.2.1
+│       │ └── purescript-unfoldable#3.2.0
+│       ├── purescript-integers#3.2.0
+│       ├─┬ purescript-maybe#3.1.0
+│       │ ├── purescript-monoid#3.3.0
+│       │ └── purescript-prelude#3.3.0
+│       ├── purescript-partial#1.2.1
+│       └── purescript-unfoldable#3.2.0
+├─┬ purescript-dom-classy#2.2.0
+│ └── purescript-dom#4.16.0
+├─┬ purescript-dom-filereader#3.0.0
+│ ├── purescript-aff#4.0.2
+│ ├── purescript-arraybuffer-types#1.0.0
+│ └── purescript-dom#4.16.0
+├─┬ purescript-exceptions#3.1.0 (latest is 4.0.0)
+│ ├─┬ purescript-eff#3.2.1
+│ │ ├─┬ purescript-monoid#3.3.0
+│ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ └── purescript-prelude#3.3.0
+│ ├─┬ purescript-either#3.2.0
+│ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   ├── purescript-monoid#3.3.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ └── purescript-prelude#3.3.0
+│ └─┬ purescript-maybe#3.1.0
+│   ├── purescript-monoid#3.3.0
+│   └── purescript-prelude#3.3.0
+├─┬ purescript-folds#3.1.0
+│ ├─┬ purescript-control#3.3.1
+│ │ └── purescript-prelude#3.3.0
+│ └─┬ purescript-profunctor#3.2.0
+│   ├─┬ purescript-contravariant#3.3.0
+│   │ ├─┬ purescript-either#3.2.0
+│   │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├── purescript-monoid#3.3.0
+│   │ └─┬ purescript-tuples#4.1.0
+│   │   ├─┬ purescript-distributive#3.0.0
+│   │   │ └─┬ purescript-identity#3.1.0
+│   │   │   └── purescript-foldable-traversable#3.7.1
+│   │   ├── purescript-foldable-traversable#3.7.1
+│   │   ├── purescript-prelude#3.3.0
+│   │   └─┬ purescript-type-equality#2.1.0
+│   │     └── purescript-eff#3.2.1
+│   ├─┬ purescript-distributive#3.0.0
+│   │ └─┬ purescript-identity#3.1.0
+│   │   └── purescript-foldable-traversable#3.7.1
+│   ├─┬ purescript-either#3.2.0
+│   │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ └─┬ purescript-maybe#3.1.0
+│   │ │   ├── purescript-monoid#3.3.0
+│   │ │   └── purescript-prelude#3.3.0
+│   │ └── purescript-prelude#3.3.0
+│   ├─┬ purescript-exists#3.0.0
+│   │ └── purescript-unsafe-coerce#3.0.0
+│   └─┬ purescript-tuples#4.1.0
+│     ├─┬ purescript-distributive#3.0.0
+│     │ └─┬ purescript-identity#3.1.0
+│     │   └── purescript-foldable-traversable#3.7.1
+│     ├── purescript-foldable-traversable#3.7.1
+│     ├── purescript-prelude#3.3.0
+│     └─┬ purescript-type-equality#2.1.0
+│       └── purescript-eff#3.2.1
+├─┬ purescript-foreign-generic#5.0.1 (latest is 6.0.0)
+│ ├─┬ purescript-console#3.0.0
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├── purescript-eff#3.2.1
+│ ├── purescript-exceptions#3.1.0
+│ ├── purescript-foreign#4.0.1 (latest is 5.0.0)
+│ ├─┬ purescript-generics-rep#5.4.0 (latest is 6.0.0)
+│ │ ├── purescript-enums#3.2.1 (latest is 4.0.0)
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├── purescript-monoid#3.3.0
+│ │ ├── purescript-prelude#3.3.0
+│ │ └─┬ purescript-symbols#3.0.0
+│ │   ├── purescript-prelude#3.3.0
+│ │   └── purescript-unsafe-coerce#3.0.0
+│ ├── purescript-globals#3.0.0
+│ ├─┬ purescript-maps#3.6.0
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├── purescript-foldable-traversable#3.7.1 (latest is 4.0.0)
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-gen#1.3.1
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-partial#1.2.1
+│ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │   └── purescript-eff#3.2.1
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ ├─┬ purescript-lists#4.12.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │       └── purescript-eff#3.2.1
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ └─┬ purescript-st#3.0.0
+│ │   └─┬ purescript-eff#3.2.1
+│ │     ├─┬ purescript-monoid#3.3.0
+│ │     │ ├─┬ purescript-control#3.3.1
+│ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ ├─┬ purescript-invariant#3.0.0
+│ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ └─┬ purescript-newtype#2.0.0
+│ │     │   └── purescript-prelude#3.3.0
+│ │     └── purescript-prelude#3.3.0
+│ ├─┬ purescript-nullable#3.0.0
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-maybe#3.1.0
+│ │   ├── purescript-monoid#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├── purescript-proxy#2.1.0 (latest is 3.0.0)
+│ └─┬ purescript-symbols#3.0.0
+│   ├── purescript-prelude#3.3.0
+│   └── purescript-unsafe-coerce#3.0.0
+├─┬ purescript-halogen#3.1.3 (latest is 4.0.0)
+│ ├── purescript-aff#4.0.2
+│ ├─┬ purescript-const#3.2.0
+│ │ ├─┬ purescript-contravariant#3.3.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └─┬ purescript-tuples#4.1.0
+│ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │   ├── purescript-foldable-traversable#3.7.1
+│ │ │   ├── purescript-prelude#3.3.0
+│ │ │   └─┬ purescript-type-equality#2.1.0
+│ │ │     └── purescript-eff#3.2.1
+│ │ └── purescript-foldable-traversable#3.7.1
+│ ├─┬ purescript-coroutines#4.0.0 (latest is 5.0.0)
+│ │ ├─┬ purescript-freet#3.0.0 (latest is 4.0.0)
+│ │ │ ├─┬ purescript-console#3.0.0
+│ │ │ │ └─┬ purescript-eff#3.2.1
+│ │ │ │   ├─┬ purescript-monoid#3.3.0
+│ │ │ │   │ ├─┬ purescript-control#3.3.1
+│ │ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   │   └── purescript-prelude#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-eff#3.2.1
+│ │ │ │ ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-exists#3.0.0
+│ │ │ │ └── purescript-unsafe-coerce#3.0.0
+│ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-transformers#3.6.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │   ├─┬ purescript-lazy#3.0.0
+│ │ │   │ └── purescript-monoid#3.3.0
+│ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-prelude#3.3.0
+│ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │       └── purescript-eff#3.2.1
+│ │ ├─┬ purescript-parallel#3.3.1
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-functors#2.2.0
+│ │ │ │ ├─┬ purescript-const#3.2.0
+│ │ │ │ │ ├─┬ purescript-contravariant#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │   ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │   ├── purescript-prelude#3.3.0
+│ │ │ │ │ │   └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │     └── purescript-eff#3.2.1
+│ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-unsafe-coerce#3.0.0
+│ │ │ ├─┬ purescript-refs#3.0.0
+│ │ │ │ └─┬ purescript-eff#3.2.1
+│ │ │ │   ├─┬ purescript-monoid#3.3.0
+│ │ │ │   │ ├─┬ purescript-control#3.3.1
+│ │ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   │   └── purescript-prelude#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-transformers#3.6.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │   ├─┬ purescript-lazy#3.0.0
+│ │ │   │ └── purescript-monoid#3.3.0
+│ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-prelude#3.3.0
+│ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │       └── purescript-eff#3.2.1
+│ │ └── purescript-profunctor#3.2.0
+│ ├── purescript-dom#4.16.0
+│ ├─┬ purescript-dom-indexed#5.0.0 (latest is 6.0.0)
+│ │ ├── purescript-dom#4.16.0
+│ │ ├─┬ purescript-media-types#3.0.0
+│ │ │ └─┬ purescript-generics#4.0.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-either#3.2.0
+│ │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   │ │   ├── purescript-monoid#3.3.0
+│ │ │   │ │   └── purescript-prelude#3.3.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   ├─┬ purescript-identity#3.1.0
+│ │ │   │ └── purescript-foldable-traversable#3.7.1
+│ │ │   ├─┬ purescript-lists#4.12.0
+│ │ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ ├─┬ purescript-lazy#3.0.0
+│ │ │   │ │ └── purescript-monoid#3.3.0
+│ │ │   │ ├─┬ purescript-nonempty#4.3.0
+│ │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │   │ │   ├── purescript-partial#1.2.1
+│ │ │   │ │   └─┬ purescript-tuples#4.1.0
+│ │ │   │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │   │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │   │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │   │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ │     ├── purescript-prelude#3.3.0
+│ │ │   │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │   │ │       └── purescript-eff#3.2.1
+│ │ │   │ ├── purescript-partial#1.2.1
+│ │ │   │ ├── purescript-tailrec#3.3.0
+│ │ │   │ └── purescript-unfoldable#3.2.0
+│ │ │   ├─┬ purescript-proxy#2.1.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   └─┬ purescript-strings#3.5.0
+│ │ │     ├── purescript-arrays#4.4.0
+│ │ │     ├─┬ purescript-either#3.2.0
+│ │ │     │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │     │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │     │ │ │   └── purescript-prelude#3.3.0
+│ │ │     │ │ └─┬ purescript-maybe#3.1.0
+│ │ │     │ │   ├── purescript-monoid#3.3.0
+│ │ │     │ │   └── purescript-prelude#3.3.0
+│ │ │     │ └── purescript-prelude#3.3.0
+│ │ │     ├─┬ purescript-gen#1.3.1
+│ │ │     │ ├── purescript-foldable-traversable#3.7.1
+│ │ │     │ ├─┬ purescript-integers#3.2.0
+│ │ │     │ │ ├── purescript-globals#3.0.0
+│ │ │     │ │ ├── purescript-math#2.1.1
+│ │ │     │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │     │ │ │ ├── purescript-monoid#3.3.0
+│ │ │     │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ └── purescript-partial#1.2.1
+│ │ │     │ ├── purescript-nonempty#4.3.0
+│ │ │     │ ├─┬ purescript-tailrec#3.3.0
+│ │ │     │ │ ├─┬ purescript-either#3.2.0
+│ │ │     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │     │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │     │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │     │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │     │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ ├─┬ purescript-identity#3.1.0
+│ │ │     │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├── purescript-partial#1.2.1
+│ │ │     │ │ └─┬ purescript-st#3.0.0
+│ │ │     │ │   └─┬ purescript-eff#3.2.1
+│ │ │     │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │     │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │     │ │     │   └── purescript-prelude#3.3.0
+│ │ │     │ │     └── purescript-prelude#3.3.0
+│ │ │     │ ├─┬ purescript-tuples#4.1.0
+│ │ │     │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │     │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │     │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├── purescript-prelude#3.3.0
+│ │ │     │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │     │ │   └── purescript-eff#3.2.1
+│ │ │     │ └── purescript-unfoldable#3.2.0
+│ │ │     ├── purescript-integers#3.2.0
+│ │ │     ├─┬ purescript-maybe#3.1.0
+│ │ │     │ ├── purescript-monoid#3.3.0
+│ │ │     │ └── purescript-prelude#3.3.0
+│ │ │     ├── purescript-partial#1.2.1
+│ │ │     └── purescript-unfoldable#3.2.0
+│ │ └── purescript-prelude#3.3.0
+│ ├── purescript-foreign#4.0.1
+│ ├─┬ purescript-fork#3.0.0 (latest is 4.0.0)
+│ │ └── purescript-aff#4.0.2
+│ ├── purescript-free#4.3.0 (latest is 5.0.0)
+│ ├─┬ purescript-freeap#3.0.1 (latest is 5.0.1)
+│ │ ├─┬ purescript-const#3.2.0
+│ │ │ ├─┬ purescript-contravariant#3.3.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └─┬ purescript-tuples#4.1.0
+│ │ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │   ├── purescript-foldable-traversable#3.7.1
+│ │ │ │   ├── purescript-prelude#3.3.0
+│ │ │ │   └─┬ purescript-type-equality#2.1.0
+│ │ │ │     └── purescript-eff#3.2.1
+│ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ └─┬ purescript-exists#3.0.0
+│ │   └── purescript-unsafe-coerce#3.0.0
+│ ├─┬ purescript-halogen-vdom#2.0.1 (latest is 3.0.0)
+│ │ ├─┬ purescript-bifunctors#3.0.0 (latest is 4.0.0)
+│ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ ├── purescript-dom#4.16.0
+│ │ ├─┬ purescript-eff#3.2.1
+│ │ │ ├─┬ purescript-monoid#3.3.0
+│ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-foreign#4.0.1
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-functions#3.0.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-partial#1.2.1
+│ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├─┬ purescript-strings#3.5.0
+│ │ │ │ ├── purescript-arrays#4.4.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-gen#1.3.1
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ ├── purescript-integers#3.2.0
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ └─┬ purescript-transformers#3.6.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │   ├─┬ purescript-lazy#3.0.0
+│ │ │   │ └── purescript-monoid#3.3.0
+│ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-prelude#3.3.0
+│ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │       └── purescript-eff#3.2.1
+│ │ ├── purescript-maps#3.6.0
+│ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-refs#3.0.0
+│ │ │ └─┬ purescript-eff#3.2.1
+│ │ │   ├─┬ purescript-monoid#3.3.0
+│ │ │   │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │   │ ├─┬ purescript-invariant#3.0.0
+│ │ │   │ │ └── purescript-prelude#3.3.0
+│ │ │   │ └─┬ purescript-newtype#2.0.0
+│ │ │   │   └── purescript-prelude#3.3.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │   └── purescript-eff#3.2.1
+│ │ └── purescript-unsafe-coerce#3.0.0
+│ ├── purescript-maps#3.6.0
+│ ├─┬ purescript-media-types#3.0.0
+│ │ └─┬ purescript-generics#4.0.0
+│ │   ├── purescript-arrays#4.4.0
+│ │   ├─┬ purescript-either#3.2.0
+│ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │   │ │ │   └── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │   │ │   ├── purescript-monoid#3.3.0
+│ │   │ │   └── purescript-prelude#3.3.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   ├─┬ purescript-identity#3.1.0
+│ │   │ └── purescript-foldable-traversable#3.7.1
+│ │   ├─┬ purescript-lists#4.12.0
+│ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ ├─┬ purescript-lazy#3.0.0
+│ │   │ │ └── purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-nonempty#4.3.0
+│ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │   │ │ ├── purescript-prelude#3.3.0
+│ │   │ │ └─┬ purescript-unfoldable#3.2.0
+│ │   │ │   ├── purescript-partial#1.2.1
+│ │   │ │   └─┬ purescript-tuples#4.1.0
+│ │   │ │     ├─┬ purescript-distributive#3.0.0
+│ │   │ │     │ └─┬ purescript-identity#3.1.0
+│ │   │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │   │ │     ├── purescript-foldable-traversable#3.7.1
+│ │   │ │     ├── purescript-prelude#3.3.0
+│ │   │ │     └─┬ purescript-type-equality#2.1.0
+│ │   │ │       └── purescript-eff#3.2.1
+│ │   │ ├── purescript-partial#1.2.1
+│ │   │ ├── purescript-tailrec#3.3.0
+│ │   │ └── purescript-unfoldable#3.2.0
+│ │   ├─┬ purescript-proxy#2.1.0
+│ │   │ └── purescript-prelude#3.3.0
+│ │   └─┬ purescript-strings#3.5.0
+│ │     ├── purescript-arrays#4.4.0
+│ │     ├─┬ purescript-either#3.2.0
+│ │     │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │     │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │     │ │ │ ├─┬ purescript-control#3.3.1
+│ │     │ │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ │ └─┬ purescript-newtype#2.0.0
+│ │     │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ └─┬ purescript-maybe#3.1.0
+│ │     │ │   ├── purescript-monoid#3.3.0
+│ │     │ │   └── purescript-prelude#3.3.0
+│ │     │ └── purescript-prelude#3.3.0
+│ │     ├─┬ purescript-gen#1.3.1
+│ │     │ ├── purescript-foldable-traversable#3.7.1
+│ │     │ ├─┬ purescript-integers#3.2.0
+│ │     │ │ ├── purescript-globals#3.0.0
+│ │     │ │ ├── purescript-math#2.1.1
+│ │     │ │ ├─┬ purescript-maybe#3.1.0
+│ │     │ │ │ ├── purescript-monoid#3.3.0
+│ │     │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ └── purescript-partial#1.2.1
+│ │     │ ├── purescript-nonempty#4.3.0
+│ │     │ ├─┬ purescript-tailrec#3.3.0
+│ │     │ │ ├─┬ purescript-either#3.2.0
+│ │     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │     │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │     │ │ │ │   ├── purescript-monoid#3.3.0
+│ │     │ │ │ │   └── purescript-prelude#3.3.0
+│ │     │ │ │ └── purescript-prelude#3.3.0
+│ │     │ │ ├─┬ purescript-identity#3.1.0
+│ │     │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-partial#1.2.1
+│ │     │ │ └─┬ purescript-st#3.0.0
+│ │     │ │   └─┬ purescript-eff#3.2.1
+│ │     │ │     ├─┬ purescript-monoid#3.3.0
+│ │     │ │     │ ├─┬ purescript-control#3.3.1
+│ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ │     │ └─┬ purescript-newtype#2.0.0
+│ │     │ │     │   └── purescript-prelude#3.3.0
+│ │     │ │     └── purescript-prelude#3.3.0
+│ │     │ ├─┬ purescript-tuples#4.1.0
+│ │     │ │ ├─┬ purescript-distributive#3.0.0
+│ │     │ │ │ └─┬ purescript-identity#3.1.0
+│ │     │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-foldable-traversable#3.7.1
+│ │     │ │ ├── purescript-prelude#3.3.0
+│ │     │ │ └─┬ purescript-type-equality#2.1.0
+│ │     │ │   └── purescript-eff#3.2.1
+│ │     │ └── purescript-unfoldable#3.2.0
+│ │     ├── purescript-integers#3.2.0
+│ │     ├─┬ purescript-maybe#3.1.0
+│ │     │ ├── purescript-monoid#3.3.0
+│ │     │ └── purescript-prelude#3.3.0
+│ │     ├── purescript-partial#1.2.1
+│ │     └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-nullable#3.0.0
+│ │ ├─┬ purescript-functions#3.0.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └─┬ purescript-maybe#3.1.0
+│ │   ├── purescript-monoid#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├── purescript-parallel#3.3.1 (latest is 4.0.0)
+│ ├── purescript-profunctor#3.2.0 (latest is 4.0.0)
+│ ├── purescript-profunctor-lenses#3.8.0 (latest is 4.0.0)
+│ ├── purescript-unsafe-coerce#3.0.0
+│ └── purescript-unsafe-reference#2.0.0 (latest is 3.0.0)
+├── purescript-js-date#5.2.0 (latest is 6.0.0)
+├─┬ purescript-maps#3.6.0
+│ ├── purescript-arrays#4.4.0
+│ ├── purescript-foldable-traversable#3.7.1
+│ ├─┬ purescript-functions#3.0.0
+│ │ └── purescript-prelude#3.3.0
+│ ├─┬ purescript-gen#1.3.1
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-integers#3.2.0
+│ │ │ ├── purescript-globals#3.0.0
+│ │ │ ├── purescript-math#2.1.1
+│ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └── purescript-partial#1.2.1
+│ │ ├── purescript-nonempty#4.3.0
+│ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-partial#1.2.1
+│ │ │ └─┬ purescript-st#3.0.0
+│ │ │   └─┬ purescript-eff#3.2.1
+│ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │     │   └── purescript-prelude#3.3.0
+│ │ │     └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │   └── purescript-eff#3.2.1
+│ │ └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-lists#4.12.0
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ └── purescript-monoid#3.3.0
+│ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │   ├── purescript-partial#1.2.1
+│ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-prelude#3.3.0
+│ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │       └── purescript-eff#3.2.1
+│ │ ├── purescript-partial#1.2.1
+│ │ ├── purescript-tailrec#3.3.0
+│ │ └── purescript-unfoldable#3.2.0
+│ └─┬ purescript-st#3.0.0
+│   └─┬ purescript-eff#3.2.1
+│     ├─┬ purescript-monoid#3.3.0
+│     │ ├─┬ purescript-control#3.3.1
+│     │ │ └── purescript-prelude#3.3.0
+│     │ ├─┬ purescript-invariant#3.0.0
+│     │ │ └── purescript-prelude#3.3.0
+│     │ └─┬ purescript-newtype#2.0.0
+│     │   └── purescript-prelude#3.3.0
+│     └── purescript-prelude#3.3.0
+├─┬ purescript-maybe#3.1.0 (latest is 4.0.0)
+│ ├── purescript-monoid#3.3.0
+│ └── purescript-prelude#3.3.0
+├─┬ purescript-monad-loops#0.4.0
+│ ├── purescript-lists#4.12.0 (latest is 5.0.0)
+│ ├─┬ purescript-maybe#3.1.0
+│ │ ├── purescript-monoid#3.3.0
+│ │ └── purescript-prelude#3.3.0
+│ ├── purescript-monoid#3.3.0
+│ ├── purescript-prelude#3.3.0
+│ ├─┬ purescript-tailrec#3.3.0
+│ │ ├─┬ purescript-either#3.2.0
+│ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-identity#3.1.0
+│ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ ├── purescript-partial#1.2.1
+│ │ └─┬ purescript-st#3.0.0
+│ │   └─┬ purescript-eff#3.2.1
+│ │     ├─┬ purescript-monoid#3.3.0
+│ │     │ ├─┬ purescript-control#3.3.1
+│ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ ├─┬ purescript-invariant#3.0.0
+│ │     │ │ └── purescript-prelude#3.3.0
+│ │     │ └─┬ purescript-newtype#2.0.0
+│ │     │   └── purescript-prelude#3.3.0
+│ │     └── purescript-prelude#3.3.0
+│ └─┬ purescript-tuples#4.1.0
+│   ├─┬ purescript-distributive#3.0.0
+│   │ └─┬ purescript-identity#3.1.0
+│   │   └── purescript-foldable-traversable#3.7.1
+│   ├── purescript-foldable-traversable#3.7.1
+│   ├── purescript-prelude#3.3.0
+│   └─┬ purescript-type-equality#2.1.0
+│     └── purescript-eff#3.2.1
+├─┬ purescript-now#3.0.0 (latest is 4.0.0)
+│ ├── purescript-datetime#3.4.1
+│ └─┬ purescript-eff#3.2.1
+│   ├─┬ purescript-monoid#3.3.0
+│   │ ├─┬ purescript-control#3.3.1
+│   │ │ └── purescript-prelude#3.3.0
+│   │ ├─┬ purescript-invariant#3.0.0
+│   │ │ └── purescript-prelude#3.3.0
+│   │ └─┬ purescript-newtype#2.0.0
+│   │   └── purescript-prelude#3.3.0
+│   └── purescript-prelude#3.3.0
+├─┬ purescript-numbers#5.0.0 (latest is 6.0.0)
+│ ├── purescript-globals#3.0.0
+│ ├── purescript-math#2.1.1
+│ └─┬ purescript-maybe#3.1.0
+│   ├── purescript-monoid#3.3.0
+│   └── purescript-prelude#3.3.0
+├─┬ purescript-parsing#4.3.1
+│ ├── purescript-arrays#4.4.0
+│ ├─┬ purescript-either#3.2.0
+│ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   ├── purescript-monoid#3.3.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ └── purescript-prelude#3.3.0
+│ ├── purescript-foldable-traversable#3.7.1
+│ ├─┬ purescript-identity#3.1.0
+│ │ └── purescript-foldable-traversable#3.7.1
+│ ├─┬ purescript-integers#3.2.0
+│ │ ├── purescript-globals#3.0.0
+│ │ ├── purescript-math#2.1.1
+│ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ └── purescript-partial#1.2.1
+│ ├─┬ purescript-lists#4.12.0
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ └── purescript-monoid#3.3.0
+│ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │   ├── purescript-partial#1.2.1
+│ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-prelude#3.3.0
+│ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │       └── purescript-eff#3.2.1
+│ │ ├── purescript-partial#1.2.1
+│ │ ├── purescript-tailrec#3.3.0
+│ │ └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-maybe#3.1.0
+│ │ ├── purescript-monoid#3.3.0
+│ │ └── purescript-prelude#3.3.0
+│ ├─┬ purescript-strings#3.5.0
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├─┬ purescript-either#3.2.0
+│ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-gen#1.3.1
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-partial#1.2.1
+│ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │   └── purescript-eff#3.2.1
+│ │ │ └── purescript-unfoldable#3.2.0
+│ │ ├── purescript-integers#3.2.0
+│ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ ├── purescript-monoid#3.3.0
+│ │ │ └── purescript-prelude#3.3.0
+│ │ ├── purescript-partial#1.2.1
+│ │ └── purescript-unfoldable#3.2.0
+│ ├─┬ purescript-transformers#3.6.0
+│ │ ├── purescript-arrays#4.4.0
+│ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ └─┬ purescript-identity#3.1.0
+│ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ └── purescript-monoid#3.3.0
+│ │ └─┬ purescript-tuples#4.1.0
+│ │   ├─┬ purescript-distributive#3.0.0
+│ │   │ └─┬ purescript-identity#3.1.0
+│ │   │   └── purescript-foldable-traversable#3.7.1
+│ │   ├── purescript-foldable-traversable#3.7.1
+│ │   ├── purescript-prelude#3.3.0
+│ │   └─┬ purescript-type-equality#2.1.0
+│ │     └── purescript-eff#3.2.1
+│ └─┬ purescript-unicode#3.0.2
+│   ├── purescript-foldable-traversable#3.7.1
+│   ├─┬ purescript-maybe#3.1.0
+│   │ ├── purescript-monoid#3.3.0
+│   │ └── purescript-prelude#3.3.0
+│   └─┬ purescript-strings#3.5.0
+│     ├── purescript-arrays#4.4.0
+│     ├─┬ purescript-either#3.2.0
+│     │ ├─┬ purescript-foldable-traversable#3.7.1
+│     │ │ ├─┬ purescript-bifunctors#3.0.0
+│     │ │ │ ├─┬ purescript-control#3.3.1
+│     │ │ │ │ └── purescript-prelude#3.3.0
+│     │ │ │ └─┬ purescript-newtype#2.0.0
+│     │ │ │   └── purescript-prelude#3.3.0
+│     │ │ └─┬ purescript-maybe#3.1.0
+│     │ │   ├── purescript-monoid#3.3.0
+│     │ │   └── purescript-prelude#3.3.0
+│     │ └── purescript-prelude#3.3.0
+│     ├─┬ purescript-gen#1.3.1
+│     │ ├── purescript-foldable-traversable#3.7.1
+│     │ ├─┬ purescript-integers#3.2.0
+│     │ │ ├── purescript-globals#3.0.0
+│     │ │ ├── purescript-math#2.1.1
+│     │ │ ├─┬ purescript-maybe#3.1.0
+│     │ │ │ ├── purescript-monoid#3.3.0
+│     │ │ │ └── purescript-prelude#3.3.0
+│     │ │ └── purescript-partial#1.2.1
+│     │ ├── purescript-nonempty#4.3.0
+│     │ ├─┬ purescript-tailrec#3.3.0
+│     │ │ ├─┬ purescript-either#3.2.0
+│     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│     │ │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│     │ │ │ │   ├── purescript-monoid#3.3.0
+│     │ │ │ │   └── purescript-prelude#3.3.0
+│     │ │ │ └── purescript-prelude#3.3.0
+│     │ │ ├─┬ purescript-identity#3.1.0
+│     │ │ │ └── purescript-foldable-traversable#3.7.1
+│     │ │ ├── purescript-partial#1.2.1
+│     │ │ └─┬ purescript-st#3.0.0
+│     │ │   └─┬ purescript-eff#3.2.1
+│     │ │     ├─┬ purescript-monoid#3.3.0
+│     │ │     │ ├─┬ purescript-control#3.3.1
+│     │ │     │ │ └── purescript-prelude#3.3.0
+│     │ │     │ ├─┬ purescript-invariant#3.0.0
+│     │ │     │ │ └── purescript-prelude#3.3.0
+│     │ │     │ └─┬ purescript-newtype#2.0.0
+│     │ │     │   └── purescript-prelude#3.3.0
+│     │ │     └── purescript-prelude#3.3.0
+│     │ ├─┬ purescript-tuples#4.1.0
+│     │ │ ├─┬ purescript-distributive#3.0.0
+│     │ │ │ └─┬ purescript-identity#3.1.0
+│     │ │ │   └── purescript-foldable-traversable#3.7.1
+│     │ │ ├── purescript-foldable-traversable#3.7.1
+│     │ │ ├── purescript-prelude#3.3.0
+│     │ │ └─┬ purescript-type-equality#2.1.0
+│     │ │   └── purescript-eff#3.2.1
+│     │ └── purescript-unfoldable#3.2.0
+│     ├── purescript-integers#3.2.0
+│     ├─┬ purescript-maybe#3.1.0
+│     │ ├── purescript-monoid#3.3.0
+│     │ └── purescript-prelude#3.3.0
+│     ├── purescript-partial#1.2.1
+│     └── purescript-unfoldable#3.2.0
+├── purescript-prelude#3.3.0 (latest is 4.0.1)
+├─┬ purescript-psci-support#3.0.0 (latest is 4.0.0)
+│ └─┬ purescript-console#3.0.0
+│   └─┬ purescript-eff#3.2.1
+│     ├─┬ purescript-monoid#3.3.0
+│     │ ├─┬ purescript-control#3.3.1
+│     │ │ └── purescript-prelude#3.3.0
+│     │ ├─┬ purescript-invariant#3.0.0
+│     │ │ └── purescript-prelude#3.3.0
+│     │ └─┬ purescript-newtype#2.0.0
+│     │   └── purescript-prelude#3.3.0
+│     └── purescript-prelude#3.3.0
+├─┬ purescript-signal#9.0.0 (latest is 10.1.0)
+│ ├─┬ purescript-dom#4.16.0
+│ │ ├── purescript-arraybuffer-types#1.0.0
+│ │ ├─┬ purescript-datetime#3.4.1
+│ │ │ ├─┬ purescript-enums#3.2.1
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-strings#3.5.0
+│ │ │ │ │ ├── purescript-arrays#4.4.0
+│ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-gen#1.3.1
+│ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ │ ├── purescript-integers#3.2.0
+│ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-functions#3.0.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-generics#4.0.0
+│ │ │ │ ├── purescript-arrays#4.4.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ ├─┬ purescript-proxy#2.1.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └─┬ purescript-strings#3.5.0
+│ │ │ │   ├── purescript-arrays#4.4.0
+│ │ │ │   ├─┬ purescript-either#3.2.0
+│ │ │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   │ │   └── purescript-prelude#3.3.0
+│ │ │ │   │ └── purescript-prelude#3.3.0
+│ │ │ │   ├─┬ purescript-gen#1.3.1
+│ │ │ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │   │ ├─┬ purescript-integers#3.2.0
+│ │ │ │   │ │ ├── purescript-globals#3.0.0
+│ │ │ │   │ │ ├── purescript-math#2.1.1
+│ │ │ │   │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │   │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │   │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ │ └── purescript-partial#1.2.1
+│ │ │ │   │ ├── purescript-nonempty#4.3.0
+│ │ │ │   │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │   │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │   │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │   │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │   │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │   │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │   │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │   │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │   │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │   │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │   │ │ ├── purescript-partial#1.2.1
+│ │ │ │   │ │ └─┬ purescript-st#3.0.0
+│ │ │ │   │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │   │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │   │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │   │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │   │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │   │ │     └── purescript-prelude#3.3.0
+│ │ │ │   │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │   │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │   │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │   │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │   │ │ ├── purescript-prelude#3.3.0
+│ │ │ │   │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │   │ │   └── purescript-eff#3.2.1
+│ │ │ │   │ └── purescript-unfoldable#3.2.0
+│ │ │ │   ├── purescript-integers#3.2.0
+│ │ │ │   ├─┬ purescript-maybe#3.1.0
+│ │ │ │   │ ├── purescript-monoid#3.3.0
+│ │ │ │   │ └── purescript-prelude#3.3.0
+│ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │   └── purescript-unfoldable#3.2.0
+│ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-partial#1.2.1
+│ │ │ ├── purescript-maps#3.6.0
+│ │ │ └── purescript-math#2.1.1
+│ │ ├── purescript-enums#3.2.1
+│ │ ├── purescript-exceptions#3.1.0
+│ │ ├── purescript-foldable-traversable#3.7.1
+│ │ ├─┬ purescript-foreign#4.0.1
+│ │ │ ├── purescript-arrays#4.4.0
+│ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ ├─┬ purescript-functions#3.0.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-partial#1.2.1
+│ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ ├─┬ purescript-strings#3.5.0
+│ │ │ │ ├── purescript-arrays#4.4.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-gen#1.3.1
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ ├── purescript-integers#3.2.0
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ └─┬ purescript-transformers#3.6.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │   ├─┬ purescript-lazy#3.0.0
+│ │ │   │ └── purescript-monoid#3.3.0
+│ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │     ├── purescript-prelude#3.3.0
+│ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │       └── purescript-eff#3.2.1
+│ │ ├─┬ purescript-js-date#5.2.0
+│ │ │ ├── purescript-datetime#3.4.1
+│ │ │ ├── purescript-exceptions#3.1.0
+│ │ │ ├─┬ purescript-foreign#4.0.1
+│ │ │ │ ├── purescript-arrays#4.4.0
+│ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ ├─┬ purescript-functions#3.0.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ ├─┬ purescript-lists#4.12.0
+│ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ ├─┬ purescript-lazy#3.0.0
+│ │ │ │ │ │ └── purescript-monoid#3.3.0
+│ │ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │ │ │ │   ├── purescript-partial#1.2.1
+│ │ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │       └── purescript-eff#3.2.1
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ ├── purescript-tailrec#3.3.0
+│ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ ├─┬ purescript-strings#3.5.0
+│ │ │ │ │ ├── purescript-arrays#4.4.0
+│ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├─┬ purescript-gen#1.3.1
+│ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └── purescript-partial#1.2.1
+│ │ │ │ │ │ ├── purescript-nonempty#4.3.0
+│ │ │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│ │ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│ │ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ │ │ └─┬ purescript-st#3.0.0
+│ │ │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│ │ │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│ │ │ │ │ │ │     └── purescript-prelude#3.3.0
+│ │ │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│ │ │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│ │ │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │ │ │ │ │   └── purescript-eff#3.2.1
+│ │ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ │ ├── purescript-integers#3.2.0
+│ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ │ ├── purescript-partial#1.2.1
+│ │ │ │ │ └── purescript-unfoldable#3.2.0
+│ │ │ │ └─┬ purescript-transformers#3.6.0
+│ │ │ │   ├── purescript-arrays#4.4.0
+│ │ │ │   ├─┬ purescript-distributive#3.0.0
+│ │ │ │   │ └─┬ purescript-identity#3.1.0
+│ │ │ │   │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │   ├─┬ purescript-lazy#3.0.0
+│ │ │ │   │ └── purescript-monoid#3.3.0
+│ │ │ │   └─┬ purescript-tuples#4.1.0
+│ │ │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │ │     ├── purescript-prelude#3.3.0
+│ │ │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │ │       └── purescript-eff#3.2.1
+│ │ │ ├─┬ purescript-integers#3.2.0
+│ │ │ │ ├── purescript-globals#3.0.0
+│ │ │ │ ├── purescript-math#2.1.1
+│ │ │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │ │ │ ├── purescript-monoid#3.3.0
+│ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ │ └── purescript-partial#1.2.1
+│ │ │ └─┬ purescript-now#3.0.0
+│ │ │   ├── purescript-datetime#3.4.1
+│ │ │   └─┬ purescript-eff#3.2.1
+│ │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │     │   └── purescript-prelude#3.3.0
+│ │ │     └── purescript-prelude#3.3.0
+│ │ ├─┬ purescript-media-types#3.0.0
+│ │ │ └─┬ purescript-generics#4.0.0
+│ │ │   ├── purescript-arrays#4.4.0
+│ │ │   ├─┬ purescript-either#3.2.0
+│ │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │   │ │ │   └── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   │ │   ├── purescript-monoid#3.3.0
+│ │ │   │ │   └── purescript-prelude#3.3.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   ├─┬ purescript-identity#3.1.0
+│ │ │   │ └── purescript-foldable-traversable#3.7.1
+│ │ │   ├─┬ purescript-lists#4.12.0
+│ │ │   │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ ├─┬ purescript-lazy#3.0.0
+│ │ │   │ │ └── purescript-monoid#3.3.0
+│ │ │   │ ├─┬ purescript-nonempty#4.3.0
+│ │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ │ ├── purescript-prelude#3.3.0
+│ │ │   │ │ └─┬ purescript-unfoldable#3.2.0
+│ │ │   │ │   ├── purescript-partial#1.2.1
+│ │ │   │ │   └─┬ purescript-tuples#4.1.0
+│ │ │   │ │     ├─┬ purescript-distributive#3.0.0
+│ │ │   │ │     │ └─┬ purescript-identity#3.1.0
+│ │ │   │ │     │   └── purescript-foldable-traversable#3.7.1
+│ │ │   │ │     ├── purescript-foldable-traversable#3.7.1
+│ │ │   │ │     ├── purescript-prelude#3.3.0
+│ │ │   │ │     └─┬ purescript-type-equality#2.1.0
+│ │ │   │ │       └── purescript-eff#3.2.1
+│ │ │   │ ├── purescript-partial#1.2.1
+│ │ │   │ ├── purescript-tailrec#3.3.0
+│ │ │   │ └── purescript-unfoldable#3.2.0
+│ │ │   ├─┬ purescript-proxy#2.1.0
+│ │ │   │ └── purescript-prelude#3.3.0
+│ │ │   └─┬ purescript-strings#3.5.0
+│ │ │     ├── purescript-arrays#4.4.0
+│ │ │     ├─┬ purescript-either#3.2.0
+│ │ │     │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │     │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │     │ │ │   └── purescript-prelude#3.3.0
+│ │ │     │ │ └─┬ purescript-maybe#3.1.0
+│ │ │     │ │   ├── purescript-monoid#3.3.0
+│ │ │     │ │   └── purescript-prelude#3.3.0
+│ │ │     │ └── purescript-prelude#3.3.0
+│ │ │     ├─┬ purescript-gen#1.3.1
+│ │ │     │ ├── purescript-foldable-traversable#3.7.1
+│ │ │     │ ├─┬ purescript-integers#3.2.0
+│ │ │     │ │ ├── purescript-globals#3.0.0
+│ │ │     │ │ ├── purescript-math#2.1.1
+│ │ │     │ │ ├─┬ purescript-maybe#3.1.0
+│ │ │     │ │ │ ├── purescript-monoid#3.3.0
+│ │ │     │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ └── purescript-partial#1.2.1
+│ │ │     │ ├── purescript-nonempty#4.3.0
+│ │ │     │ ├─┬ purescript-tailrec#3.3.0
+│ │ │     │ │ ├─┬ purescript-either#3.2.0
+│ │ │     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│ │ │     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│ │ │     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│ │ │     │ │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │     │ │ │ │   ├── purescript-monoid#3.3.0
+│ │ │     │ │ │ │   └── purescript-prelude#3.3.0
+│ │ │     │ │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │ ├─┬ purescript-identity#3.1.0
+│ │ │     │ │ │ └── purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├── purescript-partial#1.2.1
+│ │ │     │ │ └─┬ purescript-st#3.0.0
+│ │ │     │ │   └─┬ purescript-eff#3.2.1
+│ │ │     │ │     ├─┬ purescript-monoid#3.3.0
+│ │ │     │ │     │ ├─┬ purescript-control#3.3.1
+│ │ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │     │ ├─┬ purescript-invariant#3.0.0
+│ │ │     │ │     │ │ └── purescript-prelude#3.3.0
+│ │ │     │ │     │ └─┬ purescript-newtype#2.0.0
+│ │ │     │ │     │   └── purescript-prelude#3.3.0
+│ │ │     │ │     └── purescript-prelude#3.3.0
+│ │ │     │ ├─┬ purescript-tuples#4.1.0
+│ │ │     │ │ ├─┬ purescript-distributive#3.0.0
+│ │ │     │ │ │ └─┬ purescript-identity#3.1.0
+│ │ │     │ │ │   └── purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├── purescript-foldable-traversable#3.7.1
+│ │ │     │ │ ├── purescript-prelude#3.3.0
+│ │ │     │ │ └─┬ purescript-type-equality#2.1.0
+│ │ │     │ │   └── purescript-eff#3.2.1
+│ │ │     │ └── purescript-unfoldable#3.2.0
+│ │ │     ├── purescript-integers#3.2.0
+│ │ │     ├─┬ purescript-maybe#3.1.0
+│ │ │     │ ├── purescript-monoid#3.3.0
+│ │ │     │ └── purescript-prelude#3.3.0
+│ │ │     ├── purescript-partial#1.2.1
+│ │ │     └── purescript-unfoldable#3.2.0
+│ │ ├─┬ purescript-nullable#3.0.0
+│ │ │ ├─┬ purescript-functions#3.0.0
+│ │ │ │ └── purescript-prelude#3.3.0
+│ │ │ └─┬ purescript-maybe#3.1.0
+│ │ │   ├── purescript-monoid#3.3.0
+│ │ │   └── purescript-prelude#3.3.0
+│ │ ├── purescript-prelude#3.3.0
+│ │ └── purescript-unsafe-coerce#3.0.0
+│ ├── purescript-foldable-traversable#3.7.1
+│ ├─┬ purescript-js-timers#3.0.0 (latest is 4.0.0)
+│ │ └─┬ purescript-eff#3.2.1
+│ │   ├─┬ purescript-monoid#3.3.0
+│ │   │ ├─┬ purescript-control#3.3.1
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ ├─┬ purescript-invariant#3.0.0
+│ │   │ │ └── purescript-prelude#3.3.0
+│ │   │ └─┬ purescript-newtype#2.0.0
+│ │   │   └── purescript-prelude#3.3.0
+│ │   └── purescript-prelude#3.3.0
+│ ├─┬ purescript-maybe#3.1.0
+│ │ ├── purescript-monoid#3.3.0
+│ │ └── purescript-prelude#3.3.0
+│ ├── purescript-monoid#3.3.0
+│ └── purescript-prelude#3.3.0
+├─┬ purescript-signal-loop#2.0.0
+│ └─┬ purescript-signal#9.0.0 (latest is 10.1.0)
+│   ├─┬ purescript-dom#4.16.0
+│   │ ├── purescript-arraybuffer-types#1.0.0
+│   │ ├─┬ purescript-datetime#3.4.1
+│   │ │ ├─┬ purescript-enums#3.2.1
+│   │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├─┬ purescript-strings#3.5.0
+│   │ │ │ │ ├── purescript-arrays#4.4.0
+│   │ │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ ├─┬ purescript-gen#1.3.1
+│   │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └── purescript-partial#1.2.1
+│   │ │ │ │ │ ├── purescript-nonempty#4.3.0
+│   │ │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│   │ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ │ │ └─┬ purescript-st#3.0.0
+│   │ │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│   │ │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │     └── purescript-prelude#3.3.0
+│   │ │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│   │ │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │ │ │ │ │   └── purescript-eff#3.2.1
+│   │ │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ │ ├── purescript-integers#3.2.0
+│   │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-functions#3.0.0
+│   │ │ │ └── purescript-prelude#3.3.0
+│   │ │ ├─┬ purescript-generics#4.0.0
+│   │ │ │ ├── purescript-arrays#4.4.0
+│   │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├─┬ purescript-lists#4.12.0
+│   │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ ├─┬ purescript-lazy#3.0.0
+│   │ │ │ │ │ └── purescript-monoid#3.3.0
+│   │ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│   │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│   │ │ │ │ │   ├── purescript-partial#1.2.1
+│   │ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│   │ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │     ├── purescript-prelude#3.3.0
+│   │ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │ │ │ │       └── purescript-eff#3.2.1
+│   │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ ├── purescript-tailrec#3.3.0
+│   │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ ├─┬ purescript-proxy#2.1.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └─┬ purescript-strings#3.5.0
+│   │ │ │   ├── purescript-arrays#4.4.0
+│   │ │ │   ├─┬ purescript-either#3.2.0
+│   │ │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │   │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │   │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │   │ │   ├── purescript-monoid#3.3.0
+│   │ │ │   │ │   └── purescript-prelude#3.3.0
+│   │ │ │   │ └── purescript-prelude#3.3.0
+│   │ │ │   ├─┬ purescript-gen#1.3.1
+│   │ │ │   │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │   │ ├─┬ purescript-integers#3.2.0
+│   │ │ │   │ │ ├── purescript-globals#3.0.0
+│   │ │ │   │ │ ├── purescript-math#2.1.1
+│   │ │ │   │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │   │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │   │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │   │ │ └── purescript-partial#1.2.1
+│   │ │ │   │ ├── purescript-nonempty#4.3.0
+│   │ │ │   │ ├─┬ purescript-tailrec#3.3.0
+│   │ │ │   │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │   │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │   │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │   │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │   │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │   │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │   │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │   │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │   │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │   │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │   │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │   │ │ ├── purescript-partial#1.2.1
+│   │ │ │   │ │ └─┬ purescript-st#3.0.0
+│   │ │ │   │ │   └─┬ purescript-eff#3.2.1
+│   │ │ │   │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │ │   │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │   │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │ │   │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │   │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │ │   │ │     │   └── purescript-prelude#3.3.0
+│   │ │ │   │ │     └── purescript-prelude#3.3.0
+│   │ │ │   │ ├─┬ purescript-tuples#4.1.0
+│   │ │ │   │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │ │   │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │ │   │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │   │ │ ├── purescript-prelude#3.3.0
+│   │ │ │   │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │ │   │ │   └── purescript-eff#3.2.1
+│   │ │ │   │ └── purescript-unfoldable#3.2.0
+│   │ │ │   ├── purescript-integers#3.2.0
+│   │ │ │   ├─┬ purescript-maybe#3.1.0
+│   │ │ │   │ ├── purescript-monoid#3.3.0
+│   │ │ │   │ └── purescript-prelude#3.3.0
+│   │ │ │   ├── purescript-partial#1.2.1
+│   │ │ │   └── purescript-unfoldable#3.2.0
+│   │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └── purescript-partial#1.2.1
+│   │ │ ├── purescript-maps#3.6.0
+│   │ │ └── purescript-math#2.1.1
+│   │ ├── purescript-enums#3.2.1
+│   │ ├── purescript-exceptions#3.1.0
+│   │ ├── purescript-foldable-traversable#3.7.1
+│   │ ├─┬ purescript-foreign#4.0.1
+│   │ │ ├── purescript-arrays#4.4.0
+│   │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ └── purescript-prelude#3.3.0
+│   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ ├─┬ purescript-functions#3.0.0
+│   │ │ │ └── purescript-prelude#3.3.0
+│   │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └── purescript-partial#1.2.1
+│   │ │ ├─┬ purescript-lists#4.12.0
+│   │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├─┬ purescript-lazy#3.0.0
+│   │ │ │ │ └── purescript-monoid#3.3.0
+│   │ │ │ ├─┬ purescript-nonempty#4.3.0
+│   │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│   │ │ │ │   ├── purescript-partial#1.2.1
+│   │ │ │ │   └─┬ purescript-tuples#4.1.0
+│   │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │     ├── purescript-prelude#3.3.0
+│   │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │ │ │       └── purescript-eff#3.2.1
+│   │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ ├── purescript-tailrec#3.3.0
+│   │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ ├─┬ purescript-strings#3.5.0
+│   │ │ │ ├── purescript-arrays#4.4.0
+│   │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├─┬ purescript-gen#1.3.1
+│   │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └── purescript-partial#1.2.1
+│   │ │ │ │ ├── purescript-nonempty#4.3.0
+│   │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│   │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ │ └─┬ purescript-st#3.0.0
+│   │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│   │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │     └── purescript-prelude#3.3.0
+│   │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│   │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │ │ │ │   └── purescript-eff#3.2.1
+│   │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ ├── purescript-integers#3.2.0
+│   │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ └─┬ purescript-transformers#3.6.0
+│   │ │   ├── purescript-arrays#4.4.0
+│   │ │   ├─┬ purescript-distributive#3.0.0
+│   │ │   │ └─┬ purescript-identity#3.1.0
+│   │ │   │   └── purescript-foldable-traversable#3.7.1
+│   │ │   ├─┬ purescript-lazy#3.0.0
+│   │ │   │ └── purescript-monoid#3.3.0
+│   │ │   └─┬ purescript-tuples#4.1.0
+│   │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │     ├── purescript-prelude#3.3.0
+│   │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │       └── purescript-eff#3.2.1
+│   │ ├─┬ purescript-js-date#5.2.0
+│   │ │ ├── purescript-datetime#3.4.1
+│   │ │ ├── purescript-exceptions#3.1.0
+│   │ │ ├─┬ purescript-foreign#4.0.1
+│   │ │ │ ├── purescript-arrays#4.4.0
+│   │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ ├─┬ purescript-functions#3.0.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ └── purescript-partial#1.2.1
+│   │ │ │ ├─┬ purescript-lists#4.12.0
+│   │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ ├─┬ purescript-lazy#3.0.0
+│   │ │ │ │ │ └── purescript-monoid#3.3.0
+│   │ │ │ │ ├─┬ purescript-nonempty#4.3.0
+│   │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ │ │ └─┬ purescript-unfoldable#3.2.0
+│   │ │ │ │ │   ├── purescript-partial#1.2.1
+│   │ │ │ │ │   └─┬ purescript-tuples#4.1.0
+│   │ │ │ │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │     ├── purescript-prelude#3.3.0
+│   │ │ │ │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │ │ │ │       └── purescript-eff#3.2.1
+│   │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ ├── purescript-tailrec#3.3.0
+│   │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ ├─┬ purescript-strings#3.5.0
+│   │ │ │ │ ├── purescript-arrays#4.4.0
+│   │ │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ ├─┬ purescript-gen#1.3.1
+│   │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └── purescript-partial#1.2.1
+│   │ │ │ │ │ ├── purescript-nonempty#4.3.0
+│   │ │ │ │ │ ├─┬ purescript-tailrec#3.3.0
+│   │ │ │ │ │ │ ├─┬ purescript-either#3.2.0
+│   │ │ │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │ │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ ├─┬ purescript-identity#3.1.0
+│   │ │ │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ │ │ └─┬ purescript-st#3.0.0
+│   │ │ │ │ │ │   └─┬ purescript-eff#3.2.1
+│   │ │ │ │ │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │ │ │ │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │ │ │ │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │ │ │ │ │     │   └── purescript-prelude#3.3.0
+│   │ │ │ │ │ │     └── purescript-prelude#3.3.0
+│   │ │ │ │ │ ├─┬ purescript-tuples#4.1.0
+│   │ │ │ │ │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │ │ │ │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │ │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │ │ │ │ │ ├── purescript-prelude#3.3.0
+│   │ │ │ │ │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │ │ │ │ │   └── purescript-eff#3.2.1
+│   │ │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ │ ├── purescript-integers#3.2.0
+│   │ │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ │ ├── purescript-partial#1.2.1
+│   │ │ │ │ └── purescript-unfoldable#3.2.0
+│   │ │ │ └─┬ purescript-transformers#3.6.0
+│   │ │ │   ├── purescript-arrays#4.4.0
+│   │ │ │   ├─┬ purescript-distributive#3.0.0
+│   │ │ │   │ └─┬ purescript-identity#3.1.0
+│   │ │ │   │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │   ├─┬ purescript-lazy#3.0.0
+│   │ │ │   │ └── purescript-monoid#3.3.0
+│   │ │ │   └─┬ purescript-tuples#4.1.0
+│   │ │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │ │     ├── purescript-prelude#3.3.0
+│   │ │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │ │       └── purescript-eff#3.2.1
+│   │ │ ├─┬ purescript-integers#3.2.0
+│   │ │ │ ├── purescript-globals#3.0.0
+│   │ │ │ ├── purescript-math#2.1.1
+│   │ │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │ │ │ ├── purescript-monoid#3.3.0
+│   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │ │ └── purescript-partial#1.2.1
+│   │ │ └─┬ purescript-now#3.0.0
+│   │ │   ├── purescript-datetime#3.4.1
+│   │ │   └─┬ purescript-eff#3.2.1
+│   │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │     │   └── purescript-prelude#3.3.0
+│   │ │     └── purescript-prelude#3.3.0
+│   │ ├─┬ purescript-media-types#3.0.0
+│   │ │ └─┬ purescript-generics#4.0.0
+│   │ │   ├── purescript-arrays#4.4.0
+│   │ │   ├─┬ purescript-either#3.2.0
+│   │ │   │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │   │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │   │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │   │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │   │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │   │ │ │   └── purescript-prelude#3.3.0
+│   │ │   │ │ └─┬ purescript-maybe#3.1.0
+│   │ │   │ │   ├── purescript-monoid#3.3.0
+│   │ │   │ │   └── purescript-prelude#3.3.0
+│   │ │   │ └── purescript-prelude#3.3.0
+│   │ │   ├─┬ purescript-identity#3.1.0
+│   │ │   │ └── purescript-foldable-traversable#3.7.1
+│   │ │   ├─┬ purescript-lists#4.12.0
+│   │ │   │ ├── purescript-foldable-traversable#3.7.1
+│   │ │   │ ├─┬ purescript-lazy#3.0.0
+│   │ │   │ │ └── purescript-monoid#3.3.0
+│   │ │   │ ├─┬ purescript-nonempty#4.3.0
+│   │ │   │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │   │ │ ├── purescript-prelude#3.3.0
+│   │ │   │ │ └─┬ purescript-unfoldable#3.2.0
+│   │ │   │ │   ├── purescript-partial#1.2.1
+│   │ │   │ │   └─┬ purescript-tuples#4.1.0
+│   │ │   │ │     ├─┬ purescript-distributive#3.0.0
+│   │ │   │ │     │ └─┬ purescript-identity#3.1.0
+│   │ │   │ │     │   └── purescript-foldable-traversable#3.7.1
+│   │ │   │ │     ├── purescript-foldable-traversable#3.7.1
+│   │ │   │ │     ├── purescript-prelude#3.3.0
+│   │ │   │ │     └─┬ purescript-type-equality#2.1.0
+│   │ │   │ │       └── purescript-eff#3.2.1
+│   │ │   │ ├── purescript-partial#1.2.1
+│   │ │   │ ├── purescript-tailrec#3.3.0
+│   │ │   │ └── purescript-unfoldable#3.2.0
+│   │ │   ├─┬ purescript-proxy#2.1.0
+│   │ │   │ └── purescript-prelude#3.3.0
+│   │ │   └─┬ purescript-strings#3.5.0
+│   │ │     ├── purescript-arrays#4.4.0
+│   │ │     ├─┬ purescript-either#3.2.0
+│   │ │     │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │     │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │     │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │     │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │     │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │     │ │ │   └── purescript-prelude#3.3.0
+│   │ │     │ │ └─┬ purescript-maybe#3.1.0
+│   │ │     │ │   ├── purescript-monoid#3.3.0
+│   │ │     │ │   └── purescript-prelude#3.3.0
+│   │ │     │ └── purescript-prelude#3.3.0
+│   │ │     ├─┬ purescript-gen#1.3.1
+│   │ │     │ ├── purescript-foldable-traversable#3.7.1
+│   │ │     │ ├─┬ purescript-integers#3.2.0
+│   │ │     │ │ ├── purescript-globals#3.0.0
+│   │ │     │ │ ├── purescript-math#2.1.1
+│   │ │     │ │ ├─┬ purescript-maybe#3.1.0
+│   │ │     │ │ │ ├── purescript-monoid#3.3.0
+│   │ │     │ │ │ └── purescript-prelude#3.3.0
+│   │ │     │ │ └── purescript-partial#1.2.1
+│   │ │     │ ├── purescript-nonempty#4.3.0
+│   │ │     │ ├─┬ purescript-tailrec#3.3.0
+│   │ │     │ │ ├─┬ purescript-either#3.2.0
+│   │ │     │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+│   │ │     │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+│   │ │     │ │ │ │ │ ├─┬ purescript-control#3.3.1
+│   │ │     │ │ │ │ │ │ └── purescript-prelude#3.3.0
+│   │ │     │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+│   │ │     │ │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │     │ │ │ │ └─┬ purescript-maybe#3.1.0
+│   │ │     │ │ │ │   ├── purescript-monoid#3.3.0
+│   │ │     │ │ │ │   └── purescript-prelude#3.3.0
+│   │ │     │ │ │ └── purescript-prelude#3.3.0
+│   │ │     │ │ ├─┬ purescript-identity#3.1.0
+│   │ │     │ │ │ └── purescript-foldable-traversable#3.7.1
+│   │ │     │ │ ├── purescript-partial#1.2.1
+│   │ │     │ │ └─┬ purescript-st#3.0.0
+│   │ │     │ │   └─┬ purescript-eff#3.2.1
+│   │ │     │ │     ├─┬ purescript-monoid#3.3.0
+│   │ │     │ │     │ ├─┬ purescript-control#3.3.1
+│   │ │     │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │     │ │     │ ├─┬ purescript-invariant#3.0.0
+│   │ │     │ │     │ │ └── purescript-prelude#3.3.0
+│   │ │     │ │     │ └─┬ purescript-newtype#2.0.0
+│   │ │     │ │     │   └── purescript-prelude#3.3.0
+│   │ │     │ │     └── purescript-prelude#3.3.0
+│   │ │     │ ├─┬ purescript-tuples#4.1.0
+│   │ │     │ │ ├─┬ purescript-distributive#3.0.0
+│   │ │     │ │ │ └─┬ purescript-identity#3.1.0
+│   │ │     │ │ │   └── purescript-foldable-traversable#3.7.1
+│   │ │     │ │ ├── purescript-foldable-traversable#3.7.1
+│   │ │     │ │ ├── purescript-prelude#3.3.0
+│   │ │     │ │ └─┬ purescript-type-equality#2.1.0
+│   │ │     │ │   └── purescript-eff#3.2.1
+│   │ │     │ └── purescript-unfoldable#3.2.0
+│   │ │     ├── purescript-integers#3.2.0
+│   │ │     ├─┬ purescript-maybe#3.1.0
+│   │ │     │ ├── purescript-monoid#3.3.0
+│   │ │     │ └── purescript-prelude#3.3.0
+│   │ │     ├── purescript-partial#1.2.1
+│   │ │     └── purescript-unfoldable#3.2.0
+│   │ ├─┬ purescript-nullable#3.0.0
+│   │ │ ├─┬ purescript-functions#3.0.0
+│   │ │ │ └── purescript-prelude#3.3.0
+│   │ │ └─┬ purescript-maybe#3.1.0
+│   │ │   ├── purescript-monoid#3.3.0
+│   │ │   └── purescript-prelude#3.3.0
+│   │ ├── purescript-prelude#3.3.0
+│   │ └── purescript-unsafe-coerce#3.0.0
+│   ├── purescript-foldable-traversable#3.7.1
+│   ├─┬ purescript-js-timers#3.0.0
+│   │ └─┬ purescript-eff#3.2.1
+│   │   ├─┬ purescript-monoid#3.3.0
+│   │   │ ├─┬ purescript-control#3.3.1
+│   │   │ │ └── purescript-prelude#3.3.0
+│   │   │ ├─┬ purescript-invariant#3.0.0
+│   │   │ │ └── purescript-prelude#3.3.0
+│   │   │ └─┬ purescript-newtype#2.0.0
+│   │   │   └── purescript-prelude#3.3.0
+│   │   └── purescript-prelude#3.3.0
+│   ├─┬ purescript-maybe#3.1.0
+│   │ ├── purescript-monoid#3.3.0
+│   │ └── purescript-prelude#3.3.0
+│   ├── purescript-monoid#3.3.0
+│   └── purescript-prelude#3.3.0
+└─┬ purescript-uri#4.2.4 (latest is 5.1.0)
+  ├── purescript-generics-rep#5.4.0 (latest is 6.0.0)
+  ├── purescript-globals#3.0.0
+  ├─┬ purescript-integers#3.2.0
+  │ ├── purescript-globals#3.0.0
+  │ ├── purescript-math#2.1.1
+  │ ├─┬ purescript-maybe#3.1.0
+  │ │ ├── purescript-monoid#3.3.0
+  │ │ └── purescript-prelude#3.3.0
+  │ └── purescript-partial#1.2.1
+  ├── purescript-maps#3.6.0
+  ├─┬ purescript-pathy#4.1.0 (latest is 5.0.0)
+  │ ├─┬ purescript-console#3.0.0
+  │ │ └─┬ purescript-eff#3.2.1
+  │ │   ├─┬ purescript-monoid#3.3.0
+  │ │   │ ├─┬ purescript-control#3.3.1
+  │ │   │ │ └── purescript-prelude#3.3.0
+  │ │   │ ├─┬ purescript-invariant#3.0.0
+  │ │   │ │ └── purescript-prelude#3.3.0
+  │ │   │ └─┬ purescript-newtype#2.0.0
+  │ │   │   └── purescript-prelude#3.3.0
+  │ │   └── purescript-prelude#3.3.0
+  │ ├── purescript-exceptions#3.1.0
+  │ ├─┬ purescript-lists#4.12.0
+  │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ ├─┬ purescript-lazy#3.0.0
+  │ │ │ └── purescript-monoid#3.3.0
+  │ │ ├─┬ purescript-nonempty#4.3.0
+  │ │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ │ ├── purescript-prelude#3.3.0
+  │ │ │ └─┬ purescript-unfoldable#3.2.0
+  │ │ │   ├── purescript-partial#1.2.1
+  │ │ │   └─┬ purescript-tuples#4.1.0
+  │ │ │     ├─┬ purescript-distributive#3.0.0
+  │ │ │     │ └─┬ purescript-identity#3.1.0
+  │ │ │     │   └── purescript-foldable-traversable#3.7.1
+  │ │ │     ├── purescript-foldable-traversable#3.7.1
+  │ │ │     ├── purescript-prelude#3.3.0
+  │ │ │     └─┬ purescript-type-equality#2.1.0
+  │ │ │       └── purescript-eff#3.2.1
+  │ │ ├── purescript-partial#1.2.1
+  │ │ ├── purescript-tailrec#3.3.0
+  │ │ └── purescript-unfoldable#3.2.0
+  │ ├── purescript-partial#1.2.1
+  │ ├── purescript-profunctor#3.2.0
+  │ ├─┬ purescript-strings#3.5.0
+  │ │ ├── purescript-arrays#4.4.0
+  │ │ ├─┬ purescript-either#3.2.0
+  │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+  │ │ │ │ │ ├─┬ purescript-control#3.3.1
+  │ │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ │ └─┬ purescript-maybe#3.1.0
+  │ │ │ │   ├── purescript-monoid#3.3.0
+  │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ └── purescript-prelude#3.3.0
+  │ │ ├─┬ purescript-gen#1.3.1
+  │ │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ │ ├─┬ purescript-integers#3.2.0
+  │ │ │ │ ├── purescript-globals#3.0.0
+  │ │ │ │ ├── purescript-math#2.1.1
+  │ │ │ │ ├─┬ purescript-maybe#3.1.0
+  │ │ │ │ │ ├── purescript-monoid#3.3.0
+  │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ └── purescript-partial#1.2.1
+  │ │ │ ├── purescript-nonempty#4.3.0
+  │ │ │ ├─┬ purescript-tailrec#3.3.0
+  │ │ │ │ ├─┬ purescript-either#3.2.0
+  │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+  │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+  │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+  │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+  │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+  │ │ │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ ├─┬ purescript-identity#3.1.0
+  │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├── purescript-partial#1.2.1
+  │ │ │ │ └─┬ purescript-st#3.0.0
+  │ │ │ │   └─┬ purescript-eff#3.2.1
+  │ │ │ │     ├─┬ purescript-monoid#3.3.0
+  │ │ │ │     │ ├─┬ purescript-control#3.3.1
+  │ │ │ │     │ │ └── purescript-prelude#3.3.0
+  │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+  │ │ │ │     │ │ └── purescript-prelude#3.3.0
+  │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │     │   └── purescript-prelude#3.3.0
+  │ │ │ │     └── purescript-prelude#3.3.0
+  │ │ │ ├─┬ purescript-tuples#4.1.0
+  │ │ │ │ ├─┬ purescript-distributive#3.0.0
+  │ │ │ │ │ └─┬ purescript-identity#3.1.0
+  │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├── purescript-prelude#3.3.0
+  │ │ │ │ └─┬ purescript-type-equality#2.1.0
+  │ │ │ │   └── purescript-eff#3.2.1
+  │ │ │ └── purescript-unfoldable#3.2.0
+  │ │ ├── purescript-integers#3.2.0
+  │ │ ├─┬ purescript-maybe#3.1.0
+  │ │ │ ├── purescript-monoid#3.3.0
+  │ │ │ └── purescript-prelude#3.3.0
+  │ │ ├── purescript-partial#1.2.1
+  │ │ └── purescript-unfoldable#3.2.0
+  │ ├─┬ purescript-transformers#3.6.0
+  │ │ ├── purescript-arrays#4.4.0
+  │ │ ├─┬ purescript-distributive#3.0.0
+  │ │ │ └─┬ purescript-identity#3.1.0
+  │ │ │   └── purescript-foldable-traversable#3.7.1
+  │ │ ├─┬ purescript-lazy#3.0.0
+  │ │ │ └── purescript-monoid#3.3.0
+  │ │ └─┬ purescript-tuples#4.1.0
+  │ │   ├─┬ purescript-distributive#3.0.0
+  │ │   │ └─┬ purescript-identity#3.1.0
+  │ │   │   └── purescript-foldable-traversable#3.7.1
+  │ │   ├── purescript-foldable-traversable#3.7.1
+  │ │   ├── purescript-prelude#3.3.0
+  │ │   └─┬ purescript-type-equality#2.1.0
+  │ │     └── purescript-eff#3.2.1
+  │ └── purescript-unsafe-coerce#3.0.0
+  ├── purescript-profunctor-lenses#3.8.0
+  ├─┬ purescript-string-parsers#3.1.0 (latest is 4.0.0)
+  │ ├── purescript-arrays#4.4.0
+  │ ├─┬ purescript-control#3.3.1
+  │ │ └── purescript-prelude#3.3.0
+  │ ├─┬ purescript-either#3.2.0
+  │ │ ├─┬ purescript-foldable-traversable#3.7.1
+  │ │ │ ├─┬ purescript-bifunctors#3.0.0
+  │ │ │ │ ├─┬ purescript-control#3.3.1
+  │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ └─┬ purescript-maybe#3.1.0
+  │ │ │   ├── purescript-monoid#3.3.0
+  │ │ │   └── purescript-prelude#3.3.0
+  │ │ └── purescript-prelude#3.3.0
+  │ ├── purescript-foldable-traversable#3.7.1
+  │ ├─┬ purescript-lists#4.12.0
+  │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ ├─┬ purescript-lazy#3.0.0
+  │ │ │ └── purescript-monoid#3.3.0
+  │ │ ├─┬ purescript-nonempty#4.3.0
+  │ │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ │ ├── purescript-prelude#3.3.0
+  │ │ │ └─┬ purescript-unfoldable#3.2.0
+  │ │ │   ├── purescript-partial#1.2.1
+  │ │ │   └─┬ purescript-tuples#4.1.0
+  │ │ │     ├─┬ purescript-distributive#3.0.0
+  │ │ │     │ └─┬ purescript-identity#3.1.0
+  │ │ │     │   └── purescript-foldable-traversable#3.7.1
+  │ │ │     ├── purescript-foldable-traversable#3.7.1
+  │ │ │     ├── purescript-prelude#3.3.0
+  │ │ │     └─┬ purescript-type-equality#2.1.0
+  │ │ │       └── purescript-eff#3.2.1
+  │ │ ├── purescript-partial#1.2.1
+  │ │ ├── purescript-tailrec#3.3.0
+  │ │ └── purescript-unfoldable#3.2.0
+  │ ├─┬ purescript-maybe#3.1.0
+  │ │ ├── purescript-monoid#3.3.0
+  │ │ └── purescript-prelude#3.3.0
+  │ ├─┬ purescript-strings#3.5.0
+  │ │ ├── purescript-arrays#4.4.0
+  │ │ ├─┬ purescript-either#3.2.0
+  │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+  │ │ │ │ │ ├─┬ purescript-control#3.3.1
+  │ │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ │ └─┬ purescript-maybe#3.1.0
+  │ │ │ │   ├── purescript-monoid#3.3.0
+  │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ └── purescript-prelude#3.3.0
+  │ │ ├─┬ purescript-gen#1.3.1
+  │ │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ │ ├─┬ purescript-integers#3.2.0
+  │ │ │ │ ├── purescript-globals#3.0.0
+  │ │ │ │ ├── purescript-math#2.1.1
+  │ │ │ │ ├─┬ purescript-maybe#3.1.0
+  │ │ │ │ │ ├── purescript-monoid#3.3.0
+  │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ └── purescript-partial#1.2.1
+  │ │ │ ├── purescript-nonempty#4.3.0
+  │ │ │ ├─┬ purescript-tailrec#3.3.0
+  │ │ │ │ ├─┬ purescript-either#3.2.0
+  │ │ │ │ │ ├─┬ purescript-foldable-traversable#3.7.1
+  │ │ │ │ │ │ ├─┬ purescript-bifunctors#3.0.0
+  │ │ │ │ │ │ │ ├─┬ purescript-control#3.3.1
+  │ │ │ │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ │ │ │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ │ │ │ └─┬ purescript-maybe#3.1.0
+  │ │ │ │ │ │   ├── purescript-monoid#3.3.0
+  │ │ │ │ │ │   └── purescript-prelude#3.3.0
+  │ │ │ │ │ └── purescript-prelude#3.3.0
+  │ │ │ │ ├─┬ purescript-identity#3.1.0
+  │ │ │ │ │ └── purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├── purescript-partial#1.2.1
+  │ │ │ │ └─┬ purescript-st#3.0.0
+  │ │ │ │   └─┬ purescript-eff#3.2.1
+  │ │ │ │     ├─┬ purescript-monoid#3.3.0
+  │ │ │ │     │ ├─┬ purescript-control#3.3.1
+  │ │ │ │     │ │ └── purescript-prelude#3.3.0
+  │ │ │ │     │ ├─┬ purescript-invariant#3.0.0
+  │ │ │ │     │ │ └── purescript-prelude#3.3.0
+  │ │ │ │     │ └─┬ purescript-newtype#2.0.0
+  │ │ │ │     │   └── purescript-prelude#3.3.0
+  │ │ │ │     └── purescript-prelude#3.3.0
+  │ │ │ ├─┬ purescript-tuples#4.1.0
+  │ │ │ │ ├─┬ purescript-distributive#3.0.0
+  │ │ │ │ │ └─┬ purescript-identity#3.1.0
+  │ │ │ │ │   └── purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├── purescript-foldable-traversable#3.7.1
+  │ │ │ │ ├── purescript-prelude#3.3.0
+  │ │ │ │ └─┬ purescript-type-equality#2.1.0
+  │ │ │ │   └── purescript-eff#3.2.1
+  │ │ │ └── purescript-unfoldable#3.2.0
+  │ │ ├── purescript-integers#3.2.0
+  │ │ ├─┬ purescript-maybe#3.1.0
+  │ │ │ ├── purescript-monoid#3.3.0
+  │ │ │ └── purescript-prelude#3.3.0
+  │ │ ├── purescript-partial#1.2.1
+  │ │ └── purescript-unfoldable#3.2.0
+  │ └─┬ purescript-tailrec#3.3.0
+  │   ├─┬ purescript-either#3.2.0
+  │   │ ├─┬ purescript-foldable-traversable#3.7.1
+  │   │ │ ├─┬ purescript-bifunctors#3.0.0
+  │   │ │ │ ├─┬ purescript-control#3.3.1
+  │   │ │ │ │ └── purescript-prelude#3.3.0
+  │   │ │ │ └─┬ purescript-newtype#2.0.0
+  │   │ │ │   └── purescript-prelude#3.3.0
+  │   │ │ └─┬ purescript-maybe#3.1.0
+  │   │ │   ├── purescript-monoid#3.3.0
+  │   │ │   └── purescript-prelude#3.3.0
+  │   │ └── purescript-prelude#3.3.0
+  │   ├─┬ purescript-identity#3.1.0
+  │   │ └── purescript-foldable-traversable#3.7.1
+  │   ├── purescript-partial#1.2.1
+  │   └─┬ purescript-st#3.0.0
+  │     └─┬ purescript-eff#3.2.1
+  │       ├─┬ purescript-monoid#3.3.0
+  │       │ ├─┬ purescript-control#3.3.1
+  │       │ │ └── purescript-prelude#3.3.0
+  │       │ ├─┬ purescript-invariant#3.0.0
+  │       │ │ └── purescript-prelude#3.3.0
+  │       │ └─┬ purescript-newtype#2.0.0
+  │       │   └── purescript-prelude#3.3.0
+  │       └── purescript-prelude#3.3.0
+  └── purescript-unfoldable#3.2.0
