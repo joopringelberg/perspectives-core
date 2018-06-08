@@ -90,14 +90,6 @@ PULP BUILD
 De build met pulp faalt met 18 errors op libraries. Ik zal deze libraries moeten updaten naar hun laatste versies.
 Hierbij moet ik erop letten dat mijn eigen aanpassingen van de Parser niet verloren gaan!
 
-Hoe kan ik met Bower alle packages naar hun meest recente versie updaten?
-Er is geen standaard faciliteit in Bower. Wat ik heb gedaan:
 
-	bower list > bowerlist.txt
+{INTERMEZZO: ik heb geprobeerd alle Purescript libs te updaten naar hun laatste versie. Maar dat geeft een incompatibele verzameling libraries. zie voor een verslag: "update alle purescript libs.txt". Ik zal meer probleemgericht moeten werken. }
 
-Je hebt dan een tekstfile met daarin de complete tree van packages die zijn geinstalleerd. Zoek in Webstorm met de regex 
-	purescript-aff.*\(
-naar regels met info over meer recente packages.
-
-Vervang aan de hand van bower.json (project root) 'purescript-aff' door alle entries in de .json file.
-purescript-aff#4.0.2 (4.1.1 available, latest is 5.0.0)

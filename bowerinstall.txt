@@ -1,0 +1,1591 @@
+bower purescript-console#^4.1.0 cached https://github.com/purescript/purescript-console.git#4.1.0
+bower purescript-console#^4.1.0         validate 4.1.0 against https://github.com/purescript/purescript-console.git#^4.1.0
+bower purescript-prelude#^4.0.1           cached https://github.com/purescript/purescript-prelude.git#4.0.1
+bower purescript-prelude#^4.0.1         validate 4.0.1 against https://github.com/purescript/purescript-prelude.git#^4.0.1
+bower purescript-exceptions#^4.0.0        cached https://github.com/purescript/purescript-exceptions.git#4.0.0
+bower purescript-exceptions#^4.0.0      validate 4.0.0 against https://github.com/purescript/purescript-exceptions.git#^4.0.0
+bower purescript-maybe#^4.0.0             cached https://github.com/purescript/purescript-maybe.git#4.0.0
+bower purescript-maybe#^4.0.0           validate 4.0.0 against https://github.com/purescript/purescript-maybe.git#^4.0.0
+bower purescript-arrays#^5.0.0            cached https://github.com/purescript/purescript-arrays.git#5.0.0
+bower purescript-arrays#^5.0.0          validate 5.0.0 against https://github.com/purescript/purescript-arrays.git#^5.0.0
+bower purescript-folds#^3.1.0             cached https://github.com/paf31/purescript-folds.git#3.1.0
+bower purescript-folds#^3.1.0           validate 3.1.0 against https://github.com/paf31/purescript-folds.git#^3.1.0
+bower purescript-maps#^3.3.1              cached https://github.com/purescript/purescript-maps.git#3.6.0
+bower purescript-maps#^3.3.1            validate 3.6.0 against https://github.com/purescript/purescript-maps.git#^3.3.1
+bower purescript-signal#^10.0.1           cached https://github.com/bodil/purescript-signal.git#10.1.0
+bower purescript-signal#^10.0.1         validate 10.1.0 against https://github.com/bodil/purescript-signal.git#^10.0.1
+bower purescript-aff#^5.0.0               cached https://github.com/slamdata/purescript-aff.git#5.0.0
+bower purescript-aff#^5.0.0             validate 5.0.0 against https://github.com/slamdata/purescript-aff.git#^5.0.0
+bower purescript-affjax#^6.0.0            cached https://github.com/slamdata/purescript-affjax.git#6.0.0
+bower purescript-affjax#^6.0.0          validate 6.0.0 against https://github.com/slamdata/purescript-affjax.git#^6.0.0
+bower purescript-argonaut-codecs#^4.0.0   cached https://github.com/purescript-contrib/purescript-argonaut-codecs.git#4.0.0
+bower purescript-argonaut-codecs#^4.0.0 validate 4.0.0 against https://github.com/purescript-contrib/purescript-argonaut-codecs.git#^4.0.0
+bower purescript-argonaut#^3.1.0          cached https://github.com/purescript-contrib/purescript-argonaut.git#3.1.0
+bower purescript-argonaut#^3.1.0        validate 3.1.0 against https://github.com/purescript-contrib/purescript-argonaut.git#^3.1.0
+bower purescript-signal-loop#^2.0.0       cached https://github.com/paf31/purescript-signal-loop.git#2.0.0
+bower purescript-signal-loop#^2.0.0     validate 2.0.0 against https://github.com/paf31/purescript-signal-loop.git#^2.0.0
+bower purescript-halogen#^4.0.0           cached https://github.com/slamdata/purescript-halogen.git#4.0.0
+bower purescript-halogen#^4.0.0         validate 4.0.0 against https://github.com/slamdata/purescript-halogen.git#^4.0.0
+bower purescript-parsing#^4.3.1           cached https://github.com/purescript/purescript-parsing.git#4.3.1
+bower purescript-parsing#^4.3.1         validate 4.3.1 against https://github.com/purescript/purescript-parsing.git#^4.3.1
+bower purescript-ace#^5.0.0               cached https://github.com/slamdata/purescript-ace.git#5.0.0
+bower purescript-ace#^5.0.0             validate 5.0.0 against https://github.com/slamdata/purescript-ace.git#^5.0.0
+bower purescript-foreign-generic#^6.0.0   cached https://github.com/paf31/purescript-foreign-generic.git#6.0.0
+bower purescript-foreign-generic#^6.0.0 validate 6.0.0 against https://github.com/paf31/purescript-foreign-generic.git#^6.0.0
+bower purescript-dom-classy#^2.1.0        cached https://github.com/garyb/purescript-dom-classy.git#2.2.0
+bower purescript-dom-classy#^2.1.0      validate 2.2.0 against https://github.com/garyb/purescript-dom-classy.git#^2.1.0
+bower purescript-dom-filereader#^3.0.0    cached https://github.com/nwolverson/purescript-dom-filereader.git#3.0.0
+bower purescript-dom-filereader#^3.0.0  validate 3.0.0 against https://github.com/nwolverson/purescript-dom-filereader.git#^3.0.0
+bower purescript-now#^4.0.0               cached https://github.com/garyb/purescript-now.git#4.0.0
+bower purescript-now#^4.0.0             validate 4.0.0 against https://github.com/garyb/purescript-now.git#^4.0.0
+bower purescript-js-date#^6.0.0           cached https://github.com/garyb/purescript-js-date.git#6.0.0
+bower purescript-js-date#^6.0.0         validate 6.0.0 against https://github.com/garyb/purescript-js-date.git#^6.0.0
+bower purescript-datetime#^4.0.0          cached https://github.com/purescript/purescript-datetime.git#4.0.0
+bower purescript-datetime#^4.0.0        validate 4.0.0 against https://github.com/purescript/purescript-datetime.git#^4.0.0
+bower purescript-aff-promise#^2.0.0       cached https://github.com/nwolverson/purescript-aff-promise.git#2.0.0
+bower purescript-aff-promise#^2.0.0     validate 2.0.0 against https://github.com/nwolverson/purescript-aff-promise.git#^2.0.0
+bower purescript-uri#^5.1.0               cached https://github.com/slamdata/purescript-uri.git#5.1.0
+bower purescript-uri#^5.1.0             validate 5.1.0 against https://github.com/slamdata/purescript-uri.git#^5.1.0
+bower purescript-monad-loops#^0.4.0       cached https://github.com/mlang/purescript-monad-loops.git#0.4.0
+bower purescript-monad-loops#^0.4.0     validate 0.4.0 against https://github.com/mlang/purescript-monad-loops.git#^0.4.0
+bower purescript-numbers#^6.0.0           cached https://github.com/sharkdp/purescript-numbers.git#6.0.0
+bower purescript-numbers#^6.0.0         validate 6.0.0 against https://github.com/sharkdp/purescript-numbers.git#^6.0.0
+bower purescript-datetime-iso#^1.0.2      cached https://github.com/jmackie4/purescript-datetime-iso.git#1.0.2
+bower purescript-datetime-iso#^1.0.2    validate 1.0.2 against https://github.com/jmackie4/purescript-datetime-iso.git#^1.0.2
+bower purescript-psci-support#^4.0.0      cached https://github.com/purescript/purescript-psci-support.git#4.0.0
+bower purescript-psci-support#^4.0.0    validate 4.0.0 against https://github.com/purescript/purescript-psci-support.git#^4.0.0
+bower purescript-effect#^2.0.0            cached https://github.com/purescript/purescript-effect.git#2.0.0
+bower purescript-effect#^2.0.0          validate 2.0.0 against https://github.com/purescript/purescript-effect.git#^2.0.0
+bower purescript-newtype#^3.0.0           cached https://github.com/garyb/purescript-newtype.git#3.0.0
+bower purescript-newtype#^3.0.0         validate 3.0.0 against https://github.com/garyb/purescript-newtype.git#^3.0.0
+bower purescript-invariant#^4.0.0         cached https://github.com/purescript/purescript-invariant.git#4.0.0
+bower purescript-invariant#^4.0.0       validate 4.0.0 against https://github.com/purescript/purescript-invariant.git#^4.0.0
+bower purescript-control#^4.0.0           cached https://github.com/purescript/purescript-control.git#4.0.0
+bower purescript-control#^4.0.0         validate 4.0.0 against https://github.com/purescript/purescript-control.git#^4.0.0
+bower purescript-either#^4.0.0            cached https://github.com/purescript/purescript-either.git#4.0.0
+bower purescript-either#^4.0.0          validate 4.0.0 against https://github.com/purescript/purescript-either.git#^4.0.0
+bower purescript-bifunctors#^4.0.0        cached https://github.com/purescript-contrib/purescript-bifunctors.git#4.0.0
+bower purescript-bifunctors#^4.0.0      validate 4.0.0 against https://github.com/purescript-contrib/purescript-bifunctors.git#^4.0.0
+bower purescript-partial#^2.0.0           cached https://github.com/purescript/purescript-partial.git#2.0.0
+bower purescript-partial#^2.0.0         validate 2.0.0 against https://github.com/purescript/purescript-partial.git#^2.0.0
+bower purescript-nonempty#^5.0.0          cached https://github.com/paf31/purescript-nonempty.git#5.0.0
+bower purescript-nonempty#^5.0.0        validate 5.0.0 against https://github.com/paf31/purescript-nonempty.git#^5.0.0
+bower purescript-foldable-traversable#^4.0.0           cached https://github.com/purescript/purescript-foldable-traversable.git#4.0.0
+bower purescript-foldable-traversable#^4.0.0         validate 4.0.0 against https://github.com/purescript/purescript-foldable-traversable.git#^4.0.0
+bower purescript-st#^4.0.0                             cached https://github.com/purescript/purescript-st.git#4.0.0
+bower purescript-st#^4.0.0                           validate 4.0.0 against https://github.com/purescript/purescript-st.git#^4.0.0
+bower purescript-tuples#^5.0.0                         cached https://github.com/purescript/purescript-tuples.git#5.0.0
+bower purescript-tuples#^5.0.0                       validate 5.0.0 against https://github.com/purescript/purescript-tuples.git#^5.0.0
+bower purescript-tailrec#^4.0.0                        cached https://github.com/paf31/purescript-tailrec.git#4.0.0
+bower purescript-tailrec#^4.0.0                      validate 4.0.0 against https://github.com/paf31/purescript-tailrec.git#^4.0.0
+bower purescript-unfoldable#^4.0.0                     cached https://github.com/paf31/purescript-unfoldable.git#4.0.0
+bower purescript-unfoldable#^4.0.0                   validate 4.0.0 against https://github.com/paf31/purescript-unfoldable.git#^4.0.0
+bower purescript-unsafe-coerce#^4.0.0                  cached https://github.com/purescript-contrib/purescript-unsafe-coerce.git#4.0.0
+bower purescript-unsafe-coerce#^4.0.0                validate 4.0.0 against https://github.com/purescript-contrib/purescript-unsafe-coerce.git#^4.0.0
+bower purescript-control#^3.0.0                        cached https://github.com/purescript/purescript-control.git#3.3.1
+bower purescript-control#^3.0.0                      validate 3.3.1 against https://github.com/purescript/purescript-control.git#^3.0.0
+bower purescript-profunctor#^3.0.0                     cached https://github.com/mankyKitty/purescript-profunctor.git#3.2.0
+bower purescript-profunctor#^3.0.0                   validate 3.2.0 against https://github.com/mankyKitty/purescript-profunctor.git#^3.0.0
+bower purescript-js-timers#^4.0.0                      cached https://github.com/purescript-contrib/purescript-js-timers.git#4.0.0
+bower purescript-js-timers#^4.0.0                    validate 4.0.0 against https://github.com/purescript-contrib/purescript-js-timers.git#^4.0.0
+bower purescript-argonaut-core#^4.0.0                  cached https://github.com/purescript-contrib/purescript-argonaut-core.git#4.0.0
+bower purescript-argonaut-core#^4.0.0                validate 4.0.0 against https://github.com/purescript-contrib/purescript-argonaut-core.git#^4.0.0
+bower purescript-web-xhr#^2.0.0                        cached https://github.com/purescript-web/purescript-web-xhr.git#2.0.0
+bower purescript-web-xhr#^2.0.0                      validate 2.0.0 against https://github.com/purescript-web/purescript-web-xhr.git#^2.0.0
+bower purescript-arraybuffer-types#^2.0.0              cached https://github.com/jacereda/purescript-arraybuffer-types.git#2.0.0
+bower purescript-arraybuffer-types#^2.0.0            validate 2.0.0 against https://github.com/jacereda/purescript-arraybuffer-types.git#^2.0.0
+bower purescript-foreign#^5.0.0                        cached https://github.com/purescript/purescript-foreign.git#5.0.0
+bower purescript-foreign#^5.0.0                      validate 5.0.0 against https://github.com/purescript/purescript-foreign.git#^5.0.0
+bower purescript-form-urlencoded#^4.0.0                cached https://github.com/purescript-contrib/purescript-form-urlencoded.git#4.0.0
+bower purescript-form-urlencoded#^4.0.0              validate 4.0.0 against https://github.com/purescript-contrib/purescript-form-urlencoded.git#^4.0.0
+bower purescript-http-methods#^4.0.0                   cached https://github.com/purescript-contrib/purescript-http-methods.git#4.0.0
+bower purescript-http-methods#^4.0.0                 validate 4.0.0 against https://github.com/purescript-contrib/purescript-http-methods.git#^4.0.0
+bower purescript-integers#^4.0.0                       cached https://github.com/purescript/purescript-integers.git#4.0.0
+bower purescript-integers#^4.0.0                     validate 4.0.0 against https://github.com/purescript/purescript-integers.git#^4.0.0
+bower purescript-math#^2.1.1                           cached https://github.com/purescript/purescript-math.git#2.1.1
+bower purescript-math#^2.1.1                         validate 2.1.1 against https://github.com/purescript/purescript-math.git#^2.1.1
+bower purescript-media-types#^4.0.0                    cached https://github.com/purescript-contrib/purescript-media-types.git#4.0.0
+bower purescript-media-types#^4.0.0                  validate 4.0.0 against https://github.com/purescript-contrib/purescript-media-types.git#^4.0.0
+bower purescript-refs#^4.1.0                           cached https://github.com/purescript/purescript-refs.git#4.1.0
+bower purescript-refs#^4.1.0                         validate 4.1.0 against https://github.com/purescript/purescript-refs.git#^4.1.0
+bower purescript-nullable#^4.0.0                       cached https://github.com/paf31/purescript-nullable.git#4.0.0
+bower purescript-nullable#^4.0.0                     validate 4.0.0 against https://github.com/paf31/purescript-nullable.git#^4.0.0
+bower purescript-arrays#^4.0.0                         cached https://github.com/purescript/purescript-arrays.git#4.4.0
+bower purescript-arrays#^4.0.0                       validate 4.4.0 against https://github.com/purescript/purescript-arrays.git#^4.0.0
+bower purescript-st#^3.0.0                             cached https://github.com/purescript/purescript-st.git#3.0.0
+bower purescript-st#^3.0.0                           validate 3.0.0 against https://github.com/purescript/purescript-st.git#^3.0.0
+bower purescript-foldable-traversable#^3.6.1           cached https://github.com/purescript/purescript-foldable-traversable.git#3.7.1
+bower purescript-foldable-traversable#^3.6.1         validate 3.7.1 against https://github.com/purescript/purescript-foldable-traversable.git#^3.6.1
+bower purescript-nonempty#^4.0.0                       cached https://github.com/paf31/purescript-nonempty.git#4.3.0
+bower purescript-nonempty#^4.0.0                     validate 4.3.0 against https://github.com/paf31/purescript-nonempty.git#^4.0.0
+bower purescript-partial#^1.2.0                        cached https://github.com/purescript/purescript-partial.git#1.2.1
+bower purescript-partial#^1.2.0                      validate 1.2.1 against https://github.com/purescript/purescript-partial.git#^1.2.0
+bower purescript-tailrec#^3.0.0                        cached https://github.com/paf31/purescript-tailrec.git#3.3.0
+bower purescript-tailrec#^3.0.0                      validate 3.3.0 against https://github.com/paf31/purescript-tailrec.git#^3.0.0
+bower purescript-tuples#^4.0.0                         cached https://github.com/purescript/purescript-tuples.git#4.1.0
+bower purescript-tuples#^4.0.0                       validate 4.1.0 against https://github.com/purescript/purescript-tuples.git#^4.0.0
+bower purescript-unfoldable#^3.0.0                     cached https://github.com/paf31/purescript-unfoldable.git#3.2.0
+bower purescript-unfoldable#^3.0.0                   validate 3.2.0 against https://github.com/paf31/purescript-unfoldable.git#^3.0.0
+bower purescript-unsafe-coerce#^3.0.0                  cached https://github.com/purescript-contrib/purescript-unsafe-coerce.git#3.0.0
+bower purescript-unsafe-coerce#^3.0.0                validate 3.0.0 against https://github.com/purescript-contrib/purescript-unsafe-coerce.git#^3.0.0
+bower purescript-lists#^4.0.0                          cached https://github.com/paf31/purescript-lists.git#4.12.0
+bower purescript-lists#^4.0.0                        validate 4.12.0 against https://github.com/paf31/purescript-lists.git#^4.0.0
+bower purescript-gen#^1.1.0                            cached https://github.com/garyb/purescript-gen.git#1.3.1
+bower purescript-gen#^1.1.0                          validate 1.3.1 against https://github.com/garyb/purescript-gen.git#^1.1.0
+bower purescript-functions#^3.0.0                      cached https://github.com/purescript/purescript-functions.git#3.0.0
+bower purescript-functions#^3.0.0                    validate 3.0.0 against https://github.com/purescript/purescript-functions.git#^3.0.0
+bower purescript-functions#^4.0.0                      cached https://github.com/purescript/purescript-functions.git#4.0.0
+bower purescript-functions#^4.0.0                    validate 4.0.0 against https://github.com/purescript/purescript-functions.git#^4.0.0
+bower purescript-parallel#^4.0.0                       cached https://github.com/paf31/purescript-parallel.git#4.0.0
+bower purescript-parallel#^4.0.0                     validate 4.0.0 against https://github.com/paf31/purescript-parallel.git#^4.0.0
+bower purescript-transformers#^4.0.0                   cached https://github.com/purescript/purescript-transformers.git#4.1.0
+bower purescript-transformers#^4.0.0                 validate 4.1.0 against https://github.com/purescript/purescript-transformers.git#^4.0.0
+bower purescript-argonaut-codecs#^3.0.0                cached https://github.com/purescript-contrib/purescript-argonaut-codecs.git#3.3.0
+bower purescript-argonaut-codecs#^3.0.0              validate 3.3.0 against https://github.com/purescript-contrib/purescript-argonaut-codecs.git#^3.0.0
+bower purescript-argonaut-core#^3.1.0                  cached https://github.com/purescript-contrib/purescript-argonaut-core.git#3.1.1
+bower purescript-argonaut-core#^3.1.0                validate 3.1.1 against https://github.com/purescript-contrib/purescript-argonaut-core.git#^3.1.0
+bower purescript-ordered-collections#^1.0.0            cached https://github.com/purescript/purescript-ordered-collections.git#1.0.0
+bower purescript-ordered-collections#^1.0.0          validate 1.0.0 against https://github.com/purescript/purescript-ordered-collections.git#^1.0.0
+bower purescript-foreign-object#^1.0.0                 cached https://github.com/purescript/purescript-foreign-object.git#1.0.0
+bower purescript-foreign-object#^1.0.0               validate 1.0.0 against https://github.com/purescript/purescript-foreign-object.git#^1.0.0
+bower purescript-integers#^3.0.0                       cached https://github.com/purescript/purescript-integers.git#3.2.0
+bower purescript-integers#^3.0.0                     validate 3.2.0 against https://github.com/purescript/purescript-integers.git#^3.0.0
+bower purescript-argonaut-traversals#^3.0.0            cached https://github.com/purescript-contrib/purescript-argonaut-traversals.git#3.1.0
+bower purescript-argonaut-traversals#^3.0.0          validate 3.1.0 against https://github.com/purescript-contrib/purescript-argonaut-traversals.git#^3.0.0
+bower purescript-maybe#^3.0.0                          cached https://github.com/purescript/purescript-maybe.git#3.1.0
+bower purescript-maybe#^3.0.0                        validate 3.1.0 against https://github.com/purescript/purescript-maybe.git#^3.0.0
+bower purescript-prelude#^3.0.0                        cached https://github.com/purescript/purescript-prelude.git#3.3.0
+bower purescript-prelude#^3.0.0                      validate 3.3.0 against https://github.com/purescript/purescript-prelude.git#^3.0.0
+bower purescript-generics#^4.0.0                       cached https://github.com/purescript/purescript-generics.git#4.0.0
+bower purescript-generics#^4.0.0                     validate 4.0.0 against https://github.com/purescript/purescript-generics.git#^4.0.0
+bower purescript-monoid#^3.0.0                         cached https://github.com/purescript/purescript-monoid.git#3.3.0
+bower purescript-monoid#^3.0.0                       validate 3.3.0 against https://github.com/purescript/purescript-monoid.git#^3.0.0
+bower purescript-signal#^9.0.0                         cached https://github.com/bodil/purescript-signal.git#9.0.0
+bower purescript-signal#^9.0.0                       validate 9.0.0 against https://github.com/bodil/purescript-signal.git#^9.0.0
+bower purescript-js-timers#^3.0.0                      cached https://github.com/purescript-contrib/purescript-js-timers.git#3.0.0
+bower purescript-js-timers#^3.0.0                    validate 3.0.0 against https://github.com/purescript-contrib/purescript-js-timers.git#^3.0.0
+bower purescript-dom#^4.0.0                            cached https://github.com/joneshf/purescript-dom.git#4.16.0
+bower purescript-dom#^4.0.0                          validate 4.16.0 against https://github.com/joneshf/purescript-dom.git#^4.0.0
+bower purescript-profunctor#^4.0.0                     cached https://github.com/mankyKitty/purescript-profunctor.git#4.0.0
+bower purescript-profunctor#^4.0.0                   validate 4.0.0 against https://github.com/mankyKitty/purescript-profunctor.git#^4.0.0
+bower purescript-either#^3.0.0                         cached https://github.com/purescript/purescript-either.git#3.2.0
+bower purescript-either#^3.0.0                       validate 3.2.0 against https://github.com/purescript/purescript-either.git#^3.0.0
+bower purescript-transformers#^3.0.0                   cached https://github.com/purescript/purescript-transformers.git#3.6.0
+bower purescript-transformers#^3.0.0                 validate 3.6.0 against https://github.com/purescript/purescript-transformers.git#^3.0.0
+bower purescript-avar#^3.0.0                           cached https://github.com/slamdata/purescript-avar.git#3.0.0
+bower purescript-avar#^3.0.0                         validate 3.0.0 against https://github.com/slamdata/purescript-avar.git#^3.0.0
+bower purescript-coroutines#^5.0.0                     cached https://github.com/paf31/purescript-coroutines.git#5.0.0
+bower purescript-coroutines#^5.0.0                   validate 5.0.0 against https://github.com/paf31/purescript-coroutines.git#^5.0.0
+bower purescript-web-uievents#^1.0.0                   cached https://github.com/purescript-web/purescript-web-uievents.git#1.0.0
+bower purescript-web-uievents#^1.0.0                 validate 1.0.0 against https://github.com/purescript-web/purescript-web-uievents.git#^1.0.0
+bower purescript-const#^4.0.0                          cached https://github.com/mankyKitty/purescript-const.git#4.0.0
+bower purescript-const#^4.0.0                        validate 4.0.0 against https://github.com/mankyKitty/purescript-const.git#^4.0.0
+bower purescript-fork#^4.0.0                           cached https://github.com/slamdata/purescript-fork.git#4.0.0
+bower purescript-fork#^4.0.0                         validate 4.0.0 against https://github.com/slamdata/purescript-fork.git#^4.0.0
+bower purescript-dom-indexed#^6.0.0                    cached https://github.com/slamdata/purescript-dom-indexed.git#6.0.0
+bower purescript-dom-indexed#^6.0.0                  validate 6.0.0 against https://github.com/slamdata/purescript-dom-indexed.git#^6.0.0
+bower purescript-freeap#^5.0.0                         cached https://github.com/ethul/purescript-freeap.git#5.0.1
+bower purescript-freeap#^5.0.0                       validate 5.0.1 against https://github.com/ethul/purescript-freeap.git#^5.0.0
+bower purescript-free#^5.0.0                           cached https://github.com/purescript/purescript-free.git#5.0.0
+bower purescript-free#^5.0.0                         validate 5.0.0 against https://github.com/purescript/purescript-free.git#^5.0.0
+bower purescript-halogen-vdom#^3.0.0                   cached https://github.com/slamdata/purescript-halogen-vdom.git#3.0.0
+bower purescript-halogen-vdom#^3.0.0                 validate 3.0.0 against https://github.com/slamdata/purescript-halogen-vdom.git#^3.0.0
+bower purescript-profunctor-lenses#^4.0.0              cached https://github.com/paf31/purescript-profunctor-lenses.git#4.0.0
+bower purescript-profunctor-lenses#^4.0.0            validate 4.0.0 against https://github.com/paf31/purescript-profunctor-lenses.git#^4.0.0
+bower purescript-unsafe-reference#^3.0.0               cached https://github.com/purescript-contrib/purescript-unsafe-reference.git#3.0.0
+bower purescript-unsafe-reference#^3.0.0             validate 3.0.0 against https://github.com/purescript-contrib/purescript-unsafe-reference.git#^3.0.0
+bower purescript-identity#^3.0.0                       cached https://github.com/purescript/purescript-identity.git#3.1.0
+bower purescript-identity#^3.0.0                     validate 3.1.0 against https://github.com/purescript/purescript-identity.git#^3.0.0
+bower purescript-strings#^3.0.0                        cached https://github.com/purescript/purescript-strings.git#3.5.0
+bower purescript-strings#^3.0.0                      validate 3.5.0 against https://github.com/purescript/purescript-strings.git#^3.0.0
+bower purescript-unicode#^3.0.0                        cached https://github.com/purescript-contrib/purescript-unicode.git#3.0.2
+bower purescript-unicode#^3.0.0                      validate 3.0.2 against https://github.com/purescript-contrib/purescript-unicode.git#^3.0.0
+bower purescript-console#^3.0.0                        cached https://github.com/purescript/purescript-console.git#3.0.0
+bower purescript-console#^3.0.0                      validate 3.0.0 against https://github.com/purescript/purescript-console.git#^3.0.0
+bower purescript-foreign#^4.0.1                        cached https://github.com/purescript/purescript-foreign.git#4.0.1
+bower purescript-foreign#^4.0.1                      validate 4.0.1 against https://github.com/purescript/purescript-foreign.git#^4.0.1
+bower purescript-exceptions#^3.0.0                     cached https://github.com/purescript/purescript-exceptions.git#3.1.0
+bower purescript-exceptions#^3.0.0                   validate 3.1.0 against https://github.com/purescript/purescript-exceptions.git#^3.0.0
+bower purescript-nullable#^3.0.0                       cached https://github.com/paf31/purescript-nullable.git#3.0.0
+bower purescript-nullable#^3.0.0                     validate 3.0.0 against https://github.com/paf31/purescript-nullable.git#^3.0.0
+bower purescript-eff#^3.1.0                            cached https://github.com/purescript/purescript-eff.git#3.2.1
+bower purescript-eff#^3.1.0                          validate 3.2.1 against https://github.com/purescript/purescript-eff.git#^3.1.0
+bower purescript-globals#^3.0.0                        cached https://github.com/purescript/purescript-globals.git#3.0.0
+bower purescript-globals#^3.0.0                      validate 3.0.0 against https://github.com/purescript/purescript-globals.git#^3.0.0
+bower purescript-generics-rep#^5.1.0                   cached https://github.com/purescript/purescript-generics-rep.git#5.4.0
+bower purescript-generics-rep#^5.1.0                 validate 5.4.0 against https://github.com/purescript/purescript-generics-rep.git#^5.1.0
+bower purescript-proxy#^2.1.0                          cached https://github.com/purescript/purescript-proxy.git#2.1.0
+bower purescript-proxy#^2.1.0                        validate 2.1.0 against https://github.com/purescript/purescript-proxy.git#^2.1.0
+bower purescript-symbols#^3.0.0                        cached https://github.com/purescript/purescript-symbols.git#3.0.0
+bower purescript-symbols#^3.0.0                      validate 3.0.0 against https://github.com/purescript/purescript-symbols.git#^3.0.0
+bower purescript-web-html#^1.0.0                       cached https://github.com/purescript-web/purescript-web-html.git#1.0.0
+bower purescript-web-html#^1.0.0                     validate 1.0.0 against https://github.com/purescript-web/purescript-web-html.git#^1.0.0
+bower purescript-arraybuffer-types#^1.0.0              cached https://github.com/jacereda/purescript-arraybuffer-types.git#1.0.0
+bower purescript-arraybuffer-types#^1.0.0            validate 1.0.0 against https://github.com/jacereda/purescript-arraybuffer-types.git#^1.0.0
+bower purescript-aff#^4.0.0                            cached https://github.com/slamdata/purescript-aff.git#4.1.1
+bower purescript-aff#^4.0.0                          validate 4.1.1 against https://github.com/slamdata/purescript-aff.git#^4.0.0
+bower purescript-parallel#^3.0.0                       cached https://github.com/paf31/purescript-parallel.git#3.3.1
+bower purescript-parallel#^3.0.0                     validate 3.3.1 against https://github.com/paf31/purescript-parallel.git#^3.0.0
+bower purescript-datetime#^3.0.0                       cached https://github.com/purescript/purescript-datetime.git#3.4.1
+bower purescript-datetime#^3.0.0                     validate 3.4.1 against https://github.com/purescript/purescript-datetime.git#^3.0.0
+bower purescript-free#^4.0.1                           cached https://github.com/purescript/purescript-free.git#4.3.0
+bower purescript-free#^4.0.1                         validate 4.3.0 against https://github.com/purescript/purescript-free.git#^4.0.1
+bower purescript-avar#^2.0.0                           cached https://github.com/slamdata/purescript-avar.git#2.0.1
+bower purescript-avar#^2.0.0                         validate 2.0.1 against https://github.com/slamdata/purescript-avar.git#^2.0.0
+bower purescript-type-equality#^2.1.0                  cached https://github.com/purescript/purescript-type-equality.git#2.1.0
+bower purescript-type-equality#^2.1.0                validate 2.1.0 against https://github.com/purescript/purescript-type-equality.git#^2.1.0
+bower purescript-gen#^2.0.0                            cached https://github.com/garyb/purescript-gen.git#2.0.0
+bower purescript-gen#^2.0.0                          validate 2.0.0 against https://github.com/garyb/purescript-gen.git#^2.0.0
+bower purescript-lists#^5.0.0                          cached https://github.com/paf31/purescript-lists.git#5.0.0
+bower purescript-lists#^5.0.0                        validate 5.0.0 against https://github.com/paf31/purescript-lists.git#^5.0.0
+bower purescript-enums#^4.0.0                          cached https://github.com/purescript/purescript-enums.git#4.0.0
+bower purescript-enums#^4.0.0                        validate 4.0.0 against https://github.com/purescript/purescript-enums.git#^4.0.0
+bower purescript-profunctor-lenses#^3.7.0              cached https://github.com/paf31/purescript-profunctor-lenses.git#3.8.0
+bower purescript-profunctor-lenses#^3.7.0            validate 3.8.0 against https://github.com/paf31/purescript-profunctor-lenses.git#^3.7.0
+bower purescript-these#^3.0.0                          cached https://github.com/purescript-contrib/purescript-these.git#3.1.0
+bower purescript-these#^3.0.0                        validate 3.1.0 against https://github.com/purescript-contrib/purescript-these.git#^3.0.0
+bower purescript-globals#^4.0.0                        cached https://github.com/purescript/purescript-globals.git#4.0.0
+bower purescript-globals#^4.0.0                      validate 4.0.0 against https://github.com/purescript/purescript-globals.git#^4.0.0
+bower purescript-newtype#^2.0.0                        cached https://github.com/garyb/purescript-newtype.git#2.0.0
+bower purescript-newtype#^2.0.0                      validate 2.0.0 against https://github.com/garyb/purescript-newtype.git#^2.0.0
+bower purescript-bifunctors#^3.0.0                     cached https://github.com/purescript-contrib/purescript-bifunctors.git#3.0.0
+bower purescript-bifunctors#^3.0.0                   validate 3.0.0 against https://github.com/purescript-contrib/purescript-bifunctors.git#^3.0.0
+bower purescript-orders#^4.0.0                         cached https://github.com/purescript/purescript-orders.git#4.0.0
+bower purescript-orders#^4.0.0                       validate 4.0.0 against https://github.com/purescript/purescript-orders.git#^4.0.0
+bower purescript-identity#^4.0.0                       cached https://github.com/purescript/purescript-identity.git#4.0.0
+bower purescript-identity#^4.0.0                     validate 4.0.0 against https://github.com/purescript/purescript-identity.git#^4.0.0
+bower purescript-type-equality#^3.0.0                  cached https://github.com/purescript/purescript-type-equality.git#3.0.0
+bower purescript-type-equality#^3.0.0                validate 3.0.0 against https://github.com/purescript/purescript-type-equality.git#^3.0.0
+bower purescript-distributive#^3.0.0                   cached https://github.com/mankyKitty/purescript-distributive.git#3.0.0
+bower purescript-distributive#^3.0.0                 validate 3.0.0 against https://github.com/mankyKitty/purescript-distributive.git#^3.0.0
+bower purescript-distributive#^4.0.0                   cached https://github.com/mankyKitty/purescript-distributive.git#4.0.0
+bower purescript-distributive#^4.0.0                 validate 4.0.0 against https://github.com/mankyKitty/purescript-distributive.git#^4.0.0
+bower purescript-contravariant#^3.0.0                  cached https://github.com/mankyKitty/purescript-contravariant.git#3.3.0
+bower purescript-contravariant#^3.0.0                validate 3.3.0 against https://github.com/mankyKitty/purescript-contravariant.git#^3.0.0
+bower purescript-exists#^4.0.0                         cached https://github.com/paf31/purescript-exists.git#4.0.0
+bower purescript-exists#^4.0.0                       validate 4.0.0 against https://github.com/paf31/purescript-exists.git#^4.0.0
+bower purescript-exists#^3.0.0                         cached https://github.com/paf31/purescript-exists.git#3.0.0
+bower purescript-exists#^3.0.0                       validate 3.0.0 against https://github.com/paf31/purescript-exists.git#^3.0.0
+bower purescript-contravariant#^4.0.0                  cached https://github.com/mankyKitty/purescript-contravariant.git#4.0.0
+bower purescript-contravariant#^4.0.0                validate 4.0.0 against https://github.com/mankyKitty/purescript-contravariant.git#^4.0.0
+bower purescript-enums#^3.0.0                          cached https://github.com/purescript/purescript-enums.git#3.2.1
+bower purescript-enums#^3.0.0                        validate 3.2.1 against https://github.com/purescript/purescript-enums.git#^3.0.0
+bower purescript-strings#^4.0.0                        cached https://github.com/purescript/purescript-strings.git#4.0.0
+bower purescript-strings#^4.0.0                      validate 4.0.0 against https://github.com/purescript/purescript-strings.git#^4.0.0
+bower purescript-web-dom#^1.0.0                        cached https://github.com/purescript-web/purescript-web-dom.git#1.0.0
+bower purescript-web-dom#^1.0.0                      validate 1.0.0 against https://github.com/purescript-web/purescript-web-dom.git#^1.0.0
+bower purescript-web-file#^1.0.0                       cached https://github.com/purescript-web/purescript-web-file.git#1.0.0
+bower purescript-web-file#^1.0.0                     validate 1.0.0 against https://github.com/purescript-web/purescript-web-file.git#^1.0.0
+bower purescript-lazy#^4.0.0                           cached https://github.com/purescript/purescript-lazy.git#4.0.0
+bower purescript-lazy#^4.0.0                         validate 4.0.0 against https://github.com/purescript/purescript-lazy.git#^4.0.0
+bower purescript-lazy#^3.0.0                           cached https://github.com/purescript/purescript-lazy.git#3.0.0
+bower purescript-lazy#^3.0.0                         validate 3.0.0 against https://github.com/purescript/purescript-lazy.git#^3.0.0
+bower purescript-refs#^3.0.0                           cached https://github.com/purescript/purescript-refs.git#3.0.0
+bower purescript-refs#^3.0.0                         validate 3.0.0 against https://github.com/purescript/purescript-refs.git#^3.0.0
+bower purescript-functors#^3.0.0                       cached https://github.com/purescript/purescript-functors.git#3.0.0
+bower purescript-functors#^3.0.0                     validate 3.0.0 against https://github.com/purescript/purescript-functors.git#^3.0.0
+bower purescript-functors#^2.0.0                       cached https://github.com/purescript/purescript-functors.git#2.2.0
+bower purescript-functors#^2.0.0                     validate 2.2.0 against https://github.com/purescript/purescript-functors.git#^2.0.0
+bower purescript-invariant#^3.0.0                      cached https://github.com/purescript/purescript-invariant.git#3.0.0
+bower purescript-invariant#^3.0.0                    validate 3.0.0 against https://github.com/purescript/purescript-invariant.git#^3.0.0
+bower purescript-js-date#^4.0.0                        cached https://github.com/garyb/purescript-js-date.git#4.0.0
+bower purescript-js-date#^4.0.0                      validate 4.0.0 against https://github.com/garyb/purescript-js-date.git#^4.0.0
+bower purescript-media-types#^3.0.0                    cached https://github.com/purescript-contrib/purescript-media-types.git#3.0.0
+bower purescript-media-types#^3.0.0                  validate 3.0.0 against https://github.com/purescript-contrib/purescript-media-types.git#^3.0.0
+bower purescript-freet#^4.0.0                          cached https://github.com/paf31/purescript-freet.git#4.0.0
+bower purescript-freet#^4.0.0                        validate 4.0.0 against https://github.com/paf31/purescript-freet.git#^4.0.0
+bower purescript-web-touchevents#^1.0.0                cached https://github.com/purescript-web/purescript-web-touchevents.git#1.0.0
+bower purescript-web-touchevents#^1.0.0              validate 1.0.0 against https://github.com/purescript-web/purescript-web-touchevents.git#^1.0.0
+bower purescript-web-clipboard#^1.0.0                  cached https://github.com/purescript-web/purescript-web-clipboard.git#1.0.0
+bower purescript-web-clipboard#^1.0.0                validate 1.0.0 against https://github.com/purescript-web/purescript-web-clipboard.git#^1.0.0
+bower purescript-catenable-lists#^4.0.0                cached https://github.com/purescript/purescript-catenable-lists.git#4.0.0
+bower purescript-catenable-lists#^4.0.0              validate 4.0.0 against https://github.com/purescript/purescript-catenable-lists.git#^4.0.0
+bower purescript-catenable-lists#^5.0.0                cached https://github.com/purescript/purescript-catenable-lists.git#5.0.0
+bower purescript-catenable-lists#^5.0.0              validate 5.0.0 against https://github.com/purescript/purescript-catenable-lists.git#^5.0.0
+bower purescript-const#^3.0.0                          cached https://github.com/mankyKitty/purescript-const.git#3.2.0
+bower purescript-const#^3.0.0                        validate 3.2.0 against https://github.com/mankyKitty/purescript-const.git#^3.0.0
+bower purescript-sets#^3.0.0                           cached https://github.com/purescript/purescript-sets.git#3.2.0
+bower purescript-sets#^3.0.0                         validate 3.2.0 against https://github.com/purescript/purescript-sets.git#^3.0.0
+bower purescript-record#^1.0.0                         cached https://github.com/purescript/purescript-record.git#1.0.0
+bower purescript-record#^1.0.0                       validate 1.0.0 against https://github.com/purescript/purescript-record.git#^1.0.0
+bower purescript-record#^0.2.0                         cached https://github.com/purescript/purescript-record.git#0.2.6
+bower purescript-record#^0.2.0                       validate 0.2.6 against https://github.com/purescript/purescript-record.git#^0.2.0
+bower purescript-web-storage#^2.0.0                    cached https://github.com/ianbollinger/purescript-web-storage.git#2.0.0
+bower purescript-web-storage#^2.0.0                  validate 2.0.0 against https://github.com/ianbollinger/purescript-web-storage.git#^2.0.0
+bower purescript-web-events#^1.0.0                     cached https://github.com/purescript-web/purescript-web-events.git#1.0.0
+bower purescript-web-events#^1.0.0                   validate 1.0.0 against https://github.com/purescript-web/purescript-web-events.git#^1.0.0
+bower purescript-typelevel-prelude#^2.3.1              cached https://github.com/purescript/purescript-typelevel-prelude.git#2.7.0
+bower purescript-typelevel-prelude#^2.3.1            validate 2.7.0 against https://github.com/purescript/purescript-typelevel-prelude.git#^2.3.1
+bower purescript-typelevel-prelude#^3.0.0              cached https://github.com/purescript/purescript-typelevel-prelude.git#3.0.0
+bower purescript-typelevel-prelude#^3.0.0            validate 3.0.0 against https://github.com/purescript/purescript-typelevel-prelude.git#^3.0.0
+bower purescript-proxy#^3.0.0                          cached https://github.com/purescript/purescript-proxy.git#3.0.0
+bower purescript-proxy#^3.0.0                        validate 3.0.0 against https://github.com/purescript/purescript-proxy.git#^3.0.0
+
+Please note that,
+    purescript-aff#4.1.1, purescript-foreign-generic#6.0.0 depends on purescript-console#^3.0.0 which resolved to purescript-console#3.0.0
+    perspectivesInPurescript, purescript-halogen#4.0.0 depends on purescript-console#^4.1.0 which resolved to purescript-console#4.1.0
+    purescript-psci-support#4.0.0 depends on purescript-console#^4.0.0 which resolved to purescript-console#4.1.0
+Resort to using purescript-console# which resolved to purescript-console#4.1.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-argonaut-codecs#3.3.0, purescript-avar#2.0.1, purescript-exceptions#3.1.0, purescript-foldable-traversable#3.7.1, purescript-integers#3.2.0, purescript-monad-loops#0.4.0, purescript-nullable#3.0.0, purescript-parsing#4.3.1, purescript-signal#9.0.0, purescript-strings#3.5.0, purescript-unicode#3.0.2 depends on purescript-maybe#^3.0.0 which resolved to purescript-maybe#3.1.0
+    perspectivesInPurescript, purescript-argonaut-codecs#4.0.0, purescript-argonaut-core#4.0.0, purescript-arrays#5.0.0, purescript-avar#3.0.0, purescript-catenable-lists#5.0.0, purescript-datetime#4.0.0, purescript-either#4.0.0, purescript-enums#4.0.0, purescript-exceptions#4.0.0, purescript-foldable-traversable#4.0.0, purescript-foreign#5.0.0, purescript-foreign-object#1.0.0, purescript-form-urlencoded#4.0.0, purescript-free#5.0.0, purescript-functors#3.0.0, purescript-gen#2.0.0, purescript-halogen-vdom#3.0.0, purescript-integers#4.0.0, purescript-lists#5.0.0, purescript-nonempty#5.0.0, purescript-nullable#4.0.0, purescript-numbers#6.0.0, purescript-ordered-collections#1.0.0, purescript-parallel#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-signal#10.1.0, purescript-strings#4.0.0, purescript-tailrec#4.0.0, purescript-transformers#4.1.0, purescript-tuples#5.0.0, purescript-unfoldable#4.0.0 depends on purescript-maybe#^4.0.0 which resolved to purescript-maybe#4.0.0
+Resort to using purescript-maybe# which resolved to purescript-maybe#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-avar#2.0.1, purescript-dom#4.16.0, purescript-foreign-generic#6.0.0, purescript-js-date#4.0.0 depends on purescript-exceptions#^3.0.0 which resolved to purescript-exceptions#3.1.0
+    perspectivesInPurescript, purescript-aff#5.0.0, purescript-avar#3.0.0, purescript-js-date#6.0.0 depends on purescript-exceptions#^4.0.0 which resolved to purescript-exceptions#4.0.0
+Resort to using purescript-exceptions# which resolved to purescript-exceptions#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-control#3.3.1, purescript-dom#4.16.0, purescript-eff#3.2.1, purescript-either#3.2.0, purescript-functions#3.0.0, purescript-generics-rep#5.4.0, purescript-invariant#3.0.0, purescript-maybe#3.1.0, purescript-monad-loops#0.4.0, purescript-newtype#2.0.0, purescript-nonempty#4.3.0, purescript-proxy#2.1.0, purescript-signal#9.0.0, purescript-symbols#3.0.0, purescript-tuples#4.1.0 depends on purescript-prelude#^3.0.0 which resolved to purescript-prelude#3.3.0
+    purescript-ace#5.0.0, purescript-argonaut-core#4.0.0, purescript-arrays#5.0.0, purescript-bifunctors#4.0.0, purescript-catenable-lists#5.0.0, purescript-console#4.1.0, purescript-const#4.0.0, purescript-contravariant#4.0.0, purescript-control#4.0.0, purescript-datetime#4.0.0, purescript-distributive#4.0.0, purescript-dom-indexed#6.0.0, purescript-effect#2.0.0, purescript-either#4.0.0, purescript-enums#4.0.0, purescript-exceptions#4.0.0, purescript-foldable-traversable#4.0.0, purescript-foreign#5.0.0, purescript-foreign-object#1.0.0, purescript-form-urlencoded#4.0.0, purescript-free#5.0.0, purescript-freet#4.0.0, purescript-functions#4.0.0, purescript-functors#3.0.0, purescript-gen#2.0.0, purescript-halogen-vdom#3.0.0, purescript-http-methods#4.0.0, purescript-identity#4.0.0, purescript-integers#4.0.0, purescript-invariant#4.0.0, purescript-lazy#4.0.0, purescript-lists#5.0.0, purescript-maybe#4.0.0, purescript-media-types#4.0.0, purescript-newtype#3.0.0, purescript-nonempty#5.0.0, purescript-ordered-collections#1.0.0, purescript-orders#4.0.0, purescript-parallel#4.0.0, purescript-profunctor#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-proxy#3.0.0, purescript-psci-support#4.0.0, purescript-record#1.0.0, purescript-refs#4.1.0, purescript-signal#10.1.0, purescript-st#4.0.0, purescript-strings#4.0.0, purescript-tailrec#4.0.0, purescript-transformers#4.1.0, purescript-tuples#5.0.0, purescript-typelevel-prelude#3.0.0, purescript-unfoldable#4.0.0 depends on purescript-prelude#^4.0.0 which resolved to purescript-prelude#4.0.1
+    perspectivesInPurescript depends on purescript-prelude#^4.0.1 which resolved to purescript-prelude#4.0.1
+Resort to using purescript-prelude# which resolved to purescript-prelude#4.0.1
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-foreign#4.0.1, purescript-generics#4.0.0, purescript-maps#3.6.0, purescript-parsing#4.3.1, purescript-transformers#3.6.0 depends on purescript-arrays#^4.0.0 which resolved to purescript-arrays#4.4.0
+    purescript-uri#5.1.0 depends on purescript-arrays#^4.3.0 which resolved to purescript-arrays#4.4.0
+    purescript-strings#3.5.0 depends on purescript-arrays#^4.0.1 which resolved to purescript-arrays#4.4.0
+    perspectivesInPurescript, purescript-ace#5.0.0, purescript-argonaut-core#4.0.0, purescript-foreign-object#1.0.0, purescript-ordered-collections#1.0.0, purescript-profunctor-lenses#4.0.0, purescript-strings#4.0.0 depends on purescript-arrays#^5.0.0 which resolved to purescript-arrays#5.0.0
+Resort to using purescript-arrays# which resolved to purescript-arrays#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-signal-loop#2.0.0 depends on purescript-signal#^9.0.0 which resolved to purescript-signal#9.0.0
+    perspectivesInPurescript depends on purescript-signal#^10.0.1 which resolved to purescript-signal#10.1.0
+Resort to using purescript-signal# which resolved to purescript-signal#10.1.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-dom-filereader#3.0.0 depends on purescript-aff#^4.0.0 which resolved to purescript-aff#4.1.1
+    perspectivesInPurescript, purescript-aff-promise#2.0.0, purescript-affjax#6.0.0, purescript-avar#3.0.0, purescript-fork#4.0.0, purescript-halogen#4.0.0, purescript-signal#10.1.0 depends on purescript-aff#^5.0.0 which resolved to purescript-aff#5.0.0
+Resort to using purescript-aff# which resolved to purescript-aff#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-argonaut#3.1.0, purescript-argonaut-traversals#3.1.0 depends on purescript-argonaut-codecs#^3.0.0 which resolved to purescript-argonaut-codecs#3.3.0
+    purescript-datetime-iso#1.0.2 depends on purescript-argonaut-codecs#^3.2.0 which resolved to purescript-argonaut-codecs#3.3.0
+    perspectivesInPurescript depends on purescript-argonaut-codecs#^4.0.0 which resolved to purescript-argonaut-codecs#4.0.0
+Resort to using purescript-argonaut-codecs# which resolved to purescript-argonaut-codecs#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-dom#4.16.0 depends on purescript-js-date#^4.0.0 which resolved to purescript-js-date#4.0.0
+    perspectivesInPurescript, purescript-web-html#1.0.0 depends on purescript-js-date#^6.0.0 which resolved to purescript-js-date#6.0.0
+Resort to using purescript-js-date# which resolved to purescript-js-date#6.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-dom#4.16.0, purescript-js-date#4.0.0 depends on purescript-datetime#^3.0.0 which resolved to purescript-datetime#3.4.1
+    purescript-datetime-iso#1.0.2 depends on purescript-datetime#^3.4.1 which resolved to purescript-datetime#3.4.1
+    perspectivesInPurescript, purescript-aff#5.0.0, purescript-js-date#6.0.0, purescript-now#4.0.0, purescript-web-events#1.0.0, purescript-web-xhr#2.0.0 depends on purescript-datetime#^4.0.0 which resolved to purescript-datetime#4.0.0
+Resort to using purescript-datetime# which resolved to purescript-datetime#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-bifunctors#3.0.0, purescript-datetime-iso#1.0.2, purescript-monoid#3.3.0 depends on purescript-newtype#^2.0.0 which resolved to purescript-newtype#2.0.0
+    purescript-bifunctors#4.0.0, purescript-const#4.0.0, purescript-contravariant#4.0.0, purescript-datetime#4.0.0, purescript-distributive#4.0.0, purescript-enums#4.0.0, purescript-foldable-traversable#4.0.0, purescript-form-urlencoded#4.0.0, purescript-functors#3.0.0, purescript-gen#2.0.0, purescript-identity#4.0.0, purescript-lists#5.0.0, purescript-maybe#4.0.0, purescript-media-types#4.0.0, purescript-orders#4.0.0, purescript-parallel#4.0.0, purescript-profunctor#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-strings#4.0.0, purescript-transformers#4.1.0, purescript-tuples#5.0.0 depends on purescript-newtype#^3.0.0 which resolved to purescript-newtype#3.0.0
+Resort to using purescript-newtype# which resolved to purescript-newtype#3.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-monoid#3.3.0 depends on purescript-invariant#^3.0.0 which resolved to purescript-invariant#3.0.0
+    purescript-const#4.0.0, purescript-either#4.0.0, purescript-free#5.0.0, purescript-identity#4.0.0, purescript-lazy#4.0.0, purescript-maybe#4.0.0, purescript-profunctor#4.0.0, purescript-tuples#5.0.0 depends on purescript-invariant#^4.0.0 which resolved to purescript-invariant#4.0.0
+Resort to using purescript-invariant# which resolved to purescript-invariant#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-bifunctors#3.0.0, purescript-catenable-lists#4.0.0, purescript-folds#3.1.0, purescript-free#4.3.0, purescript-monoid#3.3.0 depends on purescript-control#^3.0.0 which resolved to purescript-control#3.3.1
+    purescript-argonaut-core#4.0.0, purescript-arrays#5.0.0, purescript-catenable-lists#5.0.0, purescript-datetime#4.0.0, purescript-either#4.0.0, purescript-enums#4.0.0, purescript-foldable-traversable#4.0.0, purescript-free#5.0.0, purescript-functors#3.0.0, purescript-identity#4.0.0, purescript-lazy#4.0.0, purescript-lists#5.0.0, purescript-maybe#4.0.0, purescript-nonempty#5.0.0, purescript-parallel#4.0.0, purescript-profunctor#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-strings#4.0.0, purescript-transformers#4.1.0, purescript-tuples#5.0.0 depends on purescript-control#^4.0.0 which resolved to purescript-control#4.0.0
+Resort to using purescript-control# which resolved to purescript-control#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-contravariant#3.3.0, purescript-enums#3.2.1, purescript-exceptions#3.1.0, purescript-foreign#4.0.1, purescript-functors#2.2.0, purescript-generics#4.0.0, purescript-parsing#4.3.1, purescript-profunctor#3.2.0, purescript-strings#3.5.0, purescript-tailrec#3.3.0 depends on purescript-either#^3.0.0 which resolved to purescript-either#3.2.0
+    purescript-avar#2.0.1 depends on purescript-either#^3.1.0 which resolved to purescript-either#3.2.0
+    purescript-argonaut-core#4.0.0, purescript-avar#3.0.0, purescript-contravariant#4.0.0, purescript-datetime#4.0.0, purescript-enums#4.0.0, purescript-exceptions#4.0.0, purescript-foreign#5.0.0, purescript-free#5.0.0, purescript-freet#4.0.0, purescript-functors#3.0.0, purescript-gen#2.0.0, purescript-http-methods#4.0.0, purescript-parallel#4.0.0, purescript-profunctor#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-strings#4.0.0, purescript-tailrec#4.0.0, purescript-transformers#4.1.0 depends on purescript-either#^4.0.0 which resolved to purescript-either#4.0.0
+Resort to using purescript-either# which resolved to purescript-either#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-foldable-traversable#3.7.1 depends on purescript-bifunctors#^3.0.0 which resolved to purescript-bifunctors#3.0.0
+    purescript-arrays#5.0.0, purescript-datetime#4.0.0, purescript-either#4.0.0, purescript-foldable-traversable#4.0.0, purescript-freet#4.0.0, purescript-functors#3.0.0, purescript-halogen-vdom#3.0.0, purescript-lists#5.0.0, purescript-profunctor-lenses#4.0.0, purescript-tailrec#4.0.0, purescript-tuples#5.0.0 depends on purescript-bifunctors#^4.0.0 which resolved to purescript-bifunctors#4.0.0
+Resort to using purescript-bifunctors# which resolved to purescript-bifunctors#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-arrays#4.4.0, purescript-integers#3.2.0, purescript-strings#3.5.0, purescript-tailrec#3.3.0, purescript-unfoldable#3.2.0 depends on purescript-partial#^1.2.0 which resolved to purescript-partial#1.2.1
+    purescript-lists#4.12.0 depends on purescript-partial#^1.0.0 which resolved to purescript-partial#1.2.1
+    purescript-arrays#5.0.0, purescript-datetime#4.0.0, purescript-enums#4.0.0, purescript-lists#5.0.0, purescript-ordered-collections#1.0.0, purescript-profunctor-lenses#4.0.0, purescript-st#4.0.0, purescript-strings#4.0.0, purescript-tailrec#4.0.0, purescript-unfoldable#4.0.0 depends on purescript-partial#^2.0.0 which resolved to purescript-partial#2.0.0
+Resort to using purescript-partial# which resolved to purescript-partial#2.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-arrays#4.4.0, purescript-lists#4.12.0 depends on purescript-nonempty#^4.0.0 which resolved to purescript-nonempty#4.3.0
+    purescript-gen#1.3.1 depends on purescript-nonempty#^4.2.0 which resolved to purescript-nonempty#4.3.0
+    purescript-argonaut-core#4.0.0, purescript-arrays#5.0.0, purescript-enums#4.0.0, purescript-gen#2.0.0, purescript-lists#5.0.0, purescript-strings#4.0.0 depends on purescript-nonempty#^5.0.0 which resolved to purescript-nonempty#5.0.0
+Resort to using purescript-nonempty# which resolved to purescript-nonempty#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-catenable-lists#4.0.0, purescript-const#3.2.0, purescript-datetime#3.4.1, purescript-dom#4.16.0, purescript-either#3.2.0, purescript-foreign#4.0.1, purescript-generics-rep#5.4.0, purescript-identity#3.1.0, purescript-parsing#4.3.1, purescript-signal#9.0.0, purescript-tuples#4.1.0, purescript-unicode#3.0.2 depends on purescript-foldable-traversable#^3.0.0 which resolved to purescript-foldable-traversable#3.7.1
+    purescript-lists#4.12.0, purescript-nonempty#4.3.0, purescript-profunctor-lenses#3.8.0 depends on purescript-foldable-traversable#^3.4.0 which resolved to purescript-foldable-traversable#3.7.1
+    purescript-arrays#4.4.0, purescript-gen#1.3.1 depends on purescript-foldable-traversable#^3.3.0 which resolved to purescript-foldable-traversable#3.7.1
+    purescript-maps#3.6.0 depends on purescript-foldable-traversable#^3.6.1 which resolved to purescript-foldable-traversable#3.7.1
+    purescript-parallel#3.3.1 depends on purescript-foldable-traversable#^3.6.0 which resolved to purescript-foldable-traversable#3.7.1
+    purescript-arrays#5.0.0, purescript-catenable-lists#5.0.0, purescript-const#4.0.0, purescript-datetime#4.0.0, purescript-either#4.0.0, purescript-foreign-object#1.0.0, purescript-free#5.0.0, purescript-functors#3.0.0, purescript-gen#2.0.0, purescript-identity#4.0.0, purescript-lazy#4.0.0, purescript-lists#5.0.0, purescript-nonempty#5.0.0, purescript-ordered-collections#1.0.0, purescript-parallel#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-signal#10.1.0, purescript-strings#4.0.0, purescript-transformers#4.1.0, purescript-tuples#5.0.0, purescript-unfoldable#4.0.0 depends on purescript-foldable-traversable#^4.0.0 which resolved to purescript-foldable-traversable#4.0.0
+Resort to using purescript-foldable-traversable# which resolved to purescript-foldable-traversable#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-arrays#4.4.0, purescript-maps#3.6.0, purescript-record#0.2.6, purescript-tailrec#3.3.0 depends on purescript-st#^3.0.0 which resolved to purescript-st#3.0.0
+    purescript-arrays#5.0.0, purescript-foreign-object#1.0.0, purescript-ordered-collections#1.0.0, purescript-record#1.0.0 depends on purescript-st#^4.0.0 which resolved to purescript-st#4.0.0
+Resort to using purescript-st# which resolved to purescript-st#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-arrays#4.4.0, purescript-gen#1.3.1, purescript-monad-loops#0.4.0, purescript-sets#3.2.0 depends on purescript-tailrec#^3.0.0 which resolved to purescript-tailrec#3.3.0
+    purescript-lists#4.12.0 depends on purescript-tailrec#^3.3.0 which resolved to purescript-tailrec#3.3.0
+    purescript-argonaut-core#4.0.0, purescript-arrays#5.0.0, purescript-foreign-object#1.0.0, purescript-free#5.0.0, purescript-freet#4.0.0, purescript-gen#2.0.0, purescript-lists#5.0.0, purescript-ordered-collections#1.0.0, purescript-st#4.0.0, purescript-strings#4.0.0, purescript-transformers#4.1.0 depends on purescript-tailrec#^4.0.0 which resolved to purescript-tailrec#4.0.0
+Resort to using purescript-tailrec# which resolved to purescript-tailrec#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-arrays#4.4.0, purescript-catenable-lists#4.0.0, purescript-contravariant#3.3.0, purescript-gen#1.3.1, purescript-monad-loops#0.4.0, purescript-profunctor#3.2.0, purescript-these#3.1.0, purescript-transformers#3.6.0, purescript-unfoldable#3.2.0 depends on purescript-tuples#^4.0.0 which resolved to purescript-tuples#4.1.0
+    purescript-arrays#5.0.0, purescript-catenable-lists#5.0.0, purescript-contravariant#4.0.0, purescript-datetime#4.0.0, purescript-enums#4.0.0, purescript-foreign-object#1.0.0, purescript-form-urlencoded#4.0.0, purescript-free#5.0.0, purescript-functors#3.0.0, purescript-gen#2.0.0, purescript-halogen-vdom#3.0.0, purescript-lists#5.0.0, purescript-nonempty#5.0.0, purescript-ordered-collections#1.0.0, purescript-profunctor#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-strings#4.0.0, purescript-transformers#4.1.0, purescript-unfoldable#4.0.0 depends on purescript-tuples#^5.0.0 which resolved to purescript-tuples#5.0.0
+Resort to using purescript-tuples# which resolved to purescript-tuples#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-arrays#4.4.0, purescript-catenable-lists#4.0.0, purescript-enums#3.2.1, purescript-gen#1.3.1, purescript-lists#4.12.0, purescript-strings#3.5.0, purescript-uri#5.1.0 depends on purescript-unfoldable#^3.0.0 which resolved to purescript-unfoldable#3.2.0
+    purescript-nonempty#4.3.0 depends on purescript-unfoldable#^3.2.0 which resolved to purescript-unfoldable#3.2.0
+    purescript-arrays#5.0.0, purescript-catenable-lists#5.0.0, purescript-enums#4.0.0, purescript-foreign-object#1.0.0, purescript-gen#2.0.0, purescript-lists#5.0.0, purescript-nonempty#5.0.0, purescript-ordered-collections#1.0.0, purescript-strings#4.0.0, purescript-transformers#4.1.0 depends on purescript-unfoldable#^4.0.0 which resolved to purescript-unfoldable#4.0.0
+Resort to using purescript-unfoldable# which resolved to purescript-unfoldable#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-arrays#4.4.0, purescript-dom#4.16.0, purescript-exists#3.0.0, purescript-free#4.3.0, purescript-functors#2.2.0, purescript-profunctor-lenses#3.8.0, purescript-symbols#3.0.0 depends on purescript-unsafe-coerce#^3.0.0 which resolved to purescript-unsafe-coerce#3.0.0
+    purescript-aff#5.0.0, purescript-affjax#6.0.0, purescript-arrays#5.0.0, purescript-exists#4.0.0, purescript-free#5.0.0, purescript-functors#3.0.0, purescript-halogen#4.0.0, purescript-halogen-vdom#3.0.0, purescript-ordered-collections#1.0.0, purescript-record#1.0.0, purescript-strings#4.0.0 depends on purescript-unsafe-coerce#^4.0.0 which resolved to purescript-unsafe-coerce#4.0.0
+Resort to using purescript-unsafe-coerce# which resolved to purescript-unsafe-coerce#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-folds#3.1.0, purescript-profunctor-lenses#3.8.0 depends on purescript-profunctor#^3.0.0 which resolved to purescript-profunctor#3.2.0
+    purescript-coroutines#5.0.0, purescript-halogen#4.0.0, purescript-profunctor-lenses#4.0.0 depends on purescript-profunctor#^4.0.0 which resolved to purescript-profunctor#4.0.0
+Resort to using purescript-profunctor# which resolved to purescript-profunctor#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-signal#9.0.0 depends on purescript-js-timers#^3.0.0 which resolved to purescript-js-timers#3.0.0
+    purescript-signal#10.1.0 depends on purescript-js-timers#^4.0.0 which resolved to purescript-js-timers#4.0.0
+Resort to using purescript-js-timers# which resolved to purescript-js-timers#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-argonaut#3.1.0, purescript-argonaut-traversals#3.1.0 depends on purescript-argonaut-core#^3.1.0 which resolved to purescript-argonaut-core#3.1.1
+    purescript-argonaut-codecs#3.3.0 depends on purescript-argonaut-core#^3.0.0 which resolved to purescript-argonaut-core#3.1.1
+    purescript-affjax#6.0.0, purescript-argonaut-codecs#4.0.0 depends on purescript-argonaut-core#^4.0.0 which resolved to purescript-argonaut-core#4.0.0
+Resort to using purescript-argonaut-core# which resolved to purescript-argonaut-core#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-dom#4.16.0, purescript-dom-filereader#3.0.0 depends on purescript-arraybuffer-types#^1.0.0 which resolved to purescript-arraybuffer-types#1.0.0
+    purescript-affjax#6.0.0, purescript-web-xhr#2.0.0 depends on purescript-arraybuffer-types#^2.0.0 which resolved to purescript-arraybuffer-types#2.0.0
+Resort to using purescript-arraybuffer-types# which resolved to purescript-arraybuffer-types#2.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-dom#4.16.0, purescript-js-date#4.0.0 depends on purescript-foreign#^4.0.0 which resolved to purescript-foreign#4.0.1
+    purescript-foreign-generic#6.0.0 depends on purescript-foreign#^4.0.1 which resolved to purescript-foreign#4.0.1
+    purescript-ace#5.0.0, purescript-aff-promise#2.0.0, purescript-affjax#6.0.0, purescript-halogen#4.0.0, purescript-halogen-vdom#3.0.0, purescript-js-date#6.0.0, purescript-web-file#1.0.0 depends on purescript-foreign#^5.0.0 which resolved to purescript-foreign#5.0.0
+Resort to using purescript-foreign# which resolved to purescript-foreign#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-argonaut-codecs#3.3.0, purescript-datetime#3.4.1, purescript-foreign#4.0.1, purescript-gen#1.3.1, purescript-js-date#4.0.0, purescript-parsing#4.3.1, purescript-uri#5.1.0 depends on purescript-integers#^3.0.0 which resolved to purescript-integers#3.2.0
+    purescript-strings#3.5.0 depends on purescript-integers#^3.2.0 which resolved to purescript-integers#3.2.0
+    purescript-affjax#6.0.0, purescript-argonaut-codecs#4.0.0, purescript-datetime#4.0.0, purescript-foreign#5.0.0, purescript-js-date#6.0.0, purescript-strings#4.0.0 depends on purescript-integers#^4.0.0 which resolved to purescript-integers#4.0.0
+Resort to using purescript-integers# which resolved to purescript-integers#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-dom#4.16.0 depends on purescript-media-types#^3.0.0 which resolved to purescript-media-types#3.0.0
+    purescript-affjax#6.0.0, purescript-dom-indexed#6.0.0, purescript-halogen#4.0.0, purescript-web-file#1.0.0 depends on purescript-media-types#^4.0.0 which resolved to purescript-media-types#4.0.0
+Resort to using purescript-media-types# which resolved to purescript-media-types#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-parallel#3.3.1 depends on purescript-refs#^3.0.0 which resolved to purescript-refs#3.0.0
+    purescript-affjax#6.0.0, purescript-halogen-vdom#3.0.0 depends on purescript-refs#^4.1.0 which resolved to purescript-refs#4.1.0
+    purescript-parallel#4.0.0, purescript-tailrec#4.0.0 depends on purescript-refs#^4.0.0 which resolved to purescript-refs#4.1.0
+Resort to using purescript-refs# which resolved to purescript-refs#4.1.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-dom#4.16.0, purescript-foreign-generic#6.0.0 depends on purescript-nullable#^3.0.0 which resolved to purescript-nullable#3.0.0
+    purescript-ace#5.0.0, purescript-affjax#6.0.0, purescript-halogen#4.0.0, purescript-web-events#1.0.0, purescript-web-storage#2.0.0 depends on purescript-nullable#^4.0.0 which resolved to purescript-nullable#4.0.0
+Resort to using purescript-nullable# which resolved to purescript-nullable#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-catenable-lists#4.0.0, purescript-foreign#4.0.1, purescript-generics#4.0.0, purescript-maps#3.6.0, purescript-parsing#4.3.1 depends on purescript-lists#^4.0.0 which resolved to purescript-lists#4.12.0
+    purescript-monad-loops#0.4.0 depends on purescript-lists#^4.0.1 which resolved to purescript-lists#4.12.0
+    purescript-catenable-lists#5.0.0, purescript-datetime#4.0.0, purescript-foreign#5.0.0, purescript-foreign-object#1.0.0, purescript-freeap#5.0.1, purescript-ordered-collections#1.0.0, purescript-profunctor-lenses#4.0.0 depends on purescript-lists#^5.0.0 which resolved to purescript-lists#5.0.0
+Resort to using purescript-lists# which resolved to purescript-lists#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-maps#3.6.0, purescript-strings#3.5.0 depends on purescript-gen#^1.1.0 which resolved to purescript-gen#1.3.1
+    purescript-argonaut-core#3.1.1 depends on purescript-gen#^1.0.0 which resolved to purescript-gen#1.3.1
+    purescript-these#3.1.0 depends on purescript-gen#^1.3.1 which resolved to purescript-gen#1.3.1
+    purescript-argonaut-core#4.0.0, purescript-datetime#4.0.0, purescript-enums#4.0.0, purescript-foreign-object#1.0.0, purescript-freeap#5.0.1, purescript-ordered-collections#1.0.0, purescript-strings#4.0.0 depends on purescript-gen#^2.0.0 which resolved to purescript-gen#2.0.0
+Resort to using purescript-gen# which resolved to purescript-gen#2.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-argonaut-core#3.1.1, purescript-avar#2.0.1, purescript-datetime#3.4.1, purescript-foreign#4.0.1, purescript-maps#3.6.0, purescript-nullable#3.0.0, purescript-record#0.2.6 depends on purescript-functions#^3.0.0 which resolved to purescript-functions#3.0.0
+    purescript-aff#5.0.0, purescript-argonaut-core#4.0.0, purescript-avar#3.0.0, purescript-datetime#4.0.0, purescript-foreign#5.0.0, purescript-foreign-object#1.0.0, purescript-nullable#4.0.0, purescript-record#1.0.0 depends on purescript-functions#^4.0.0 which resolved to purescript-functions#4.0.0
+Resort to using purescript-functions# which resolved to purescript-functions#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1 depends on purescript-parallel#^3.0.0 which resolved to purescript-parallel#3.3.1
+    purescript-aff#5.0.0, purescript-coroutines#5.0.0, purescript-halogen#4.0.0 depends on purescript-parallel#^4.0.0 which resolved to purescript-parallel#4.0.0
+Resort to using purescript-parallel# which resolved to purescript-parallel#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-foreign#4.0.1, purescript-free#4.3.0, purescript-parallel#3.3.1, purescript-parsing#4.3.1, purescript-profunctor-lenses#3.8.0 depends on purescript-transformers#^3.0.0 which resolved to purescript-transformers#3.6.0
+    purescript-aff#5.0.0, purescript-foreign#5.0.0, purescript-free#5.0.0, purescript-freet#4.0.0, purescript-parallel#4.0.0, purescript-profunctor-lenses#4.0.0 depends on purescript-transformers#^4.0.0 which resolved to purescript-transformers#4.1.0
+    purescript-halogen#4.0.0 depends on purescript-transformers#^4.1.0 which resolved to purescript-transformers#4.1.0
+Resort to using purescript-transformers# which resolved to purescript-transformers#4.1.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1 depends on purescript-avar#^2.0.0 which resolved to purescript-avar#2.0.1
+    purescript-halogen#4.0.0 depends on purescript-avar#^3.0.0 which resolved to purescript-avar#3.0.0
+Resort to using purescript-avar# which resolved to purescript-avar#3.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-functors#2.2.0, purescript-profunctor-lenses#3.8.0 depends on purescript-const#^3.0.0 which resolved to purescript-const#3.2.0
+    purescript-freeap#5.0.1, purescript-functors#3.0.0, purescript-halogen#4.0.0, purescript-profunctor-lenses#4.0.0 depends on purescript-const#^4.0.0 which resolved to purescript-const#4.0.0
+Resort to using purescript-const# which resolved to purescript-const#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1 depends on purescript-free#^4.0.1 which resolved to purescript-free#4.3.0
+    purescript-halogen#4.0.0 depends on purescript-free#^5.0.0 which resolved to purescript-free#5.0.0
+Resort to using purescript-free# which resolved to purescript-free#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-uri#5.1.0 depends on purescript-profunctor-lenses#^3.7.0 which resolved to purescript-profunctor-lenses#3.8.0
+    purescript-argonaut-traversals#3.1.0 depends on purescript-profunctor-lenses#^3.0.0 which resolved to purescript-profunctor-lenses#3.8.0
+    purescript-halogen#4.0.0 depends on purescript-profunctor-lenses#^4.0.0 which resolved to purescript-profunctor-lenses#4.0.0
+Resort to using purescript-profunctor-lenses# which resolved to purescript-profunctor-lenses#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-distributive#3.0.0, purescript-generics#4.0.0, purescript-parsing#4.3.1, purescript-profunctor-lenses#3.8.0, purescript-tailrec#3.3.0 depends on purescript-identity#^3.0.0 which resolved to purescript-identity#3.1.0
+    purescript-distributive#4.0.0, purescript-foreign#5.0.0, purescript-gen#2.0.0, purescript-profunctor-lenses#4.0.0, purescript-tailrec#4.0.0, purescript-transformers#4.1.0 depends on purescript-identity#^4.0.0 which resolved to purescript-identity#4.0.0
+Resort to using purescript-identity# which resolved to purescript-identity#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-enums#3.2.1, purescript-foreign#4.0.1, purescript-generics#4.0.0, purescript-parsing#4.3.1, purescript-unicode#3.0.2 depends on purescript-strings#^3.0.0 which resolved to purescript-strings#3.5.0
+    purescript-argonaut-core#4.0.0, purescript-foreign#5.0.0, purescript-form-urlencoded#4.0.0, purescript-http-methods#4.0.0 depends on purescript-strings#^4.0.0 which resolved to purescript-strings#4.0.0
+Resort to using purescript-strings# which resolved to purescript-strings#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-foreign-generic#6.0.0, purescript-integers#3.2.0, purescript-uri#5.1.0 depends on purescript-globals#^3.0.0 which resolved to purescript-globals#3.0.0
+    purescript-form-urlencoded#4.0.0, purescript-integers#4.0.0, purescript-numbers#6.0.0 depends on purescript-globals#^4.0.0 which resolved to purescript-globals#4.0.0
+Resort to using purescript-globals# which resolved to purescript-globals#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-generics#4.0.0, purescript-typelevel-prelude#2.7.0 depends on purescript-proxy#^2.0.0 which resolved to purescript-proxy#2.1.0
+    purescript-foreign-generic#6.0.0 depends on purescript-proxy#^2.1.0 which resolved to purescript-proxy#2.1.0
+    purescript-typelevel-prelude#3.0.0 depends on purescript-proxy#^3.0.0 which resolved to purescript-proxy#3.0.0
+Resort to using purescript-proxy# which resolved to purescript-proxy#3.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-argonaut-core#3.1.1, purescript-dom#4.16.0 depends on purescript-enums#^3.0.0 which resolved to purescript-enums#3.2.1
+    purescript-generics-rep#5.4.0 depends on purescript-enums#^3.2.1 which resolved to purescript-enums#3.2.1
+    purescript-datetime#3.4.1 depends on purescript-enums#^3.1.0 which resolved to purescript-enums#3.2.1
+    purescript-datetime#4.0.0, purescript-strings#4.0.0, purescript-web-events#1.0.0 depends on purescript-enums#^4.0.0 which resolved to purescript-enums#4.0.0
+Resort to using purescript-enums# which resolved to purescript-enums#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-aff#4.1.1, purescript-tuples#4.1.0 depends on purescript-type-equality#^2.1.0 which resolved to purescript-type-equality#2.1.0
+    purescript-typelevel-prelude#2.7.0 depends on purescript-type-equality#^2.0.0 which resolved to purescript-type-equality#2.1.0
+    purescript-tuples#5.0.0, purescript-typelevel-prelude#3.0.0 depends on purescript-type-equality#^3.0.0 which resolved to purescript-type-equality#3.0.0
+Resort to using purescript-type-equality# which resolved to purescript-type-equality#3.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-const#3.2.0, purescript-profunctor#3.2.0 depends on purescript-contravariant#^3.0.0 which resolved to purescript-contravariant#3.3.0
+    purescript-const#4.0.0, purescript-profunctor#4.0.0 depends on purescript-contravariant#^4.0.0 which resolved to purescript-contravariant#4.0.0
+Resort to using purescript-contravariant# which resolved to purescript-contravariant#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-profunctor#3.2.0, purescript-transformers#3.6.0, purescript-tuples#4.1.0 depends on purescript-distributive#^3.0.0 which resolved to purescript-distributive#3.0.0
+    purescript-free#5.0.0, purescript-profunctor#4.0.0, purescript-profunctor-lenses#4.0.0, purescript-transformers#4.1.0, purescript-tuples#5.0.0 depends on purescript-distributive#^4.0.0 which resolved to purescript-distributive#4.0.0
+Resort to using purescript-distributive# which resolved to purescript-distributive#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-free#4.3.0, purescript-profunctor#3.2.0 depends on purescript-exists#^3.0.0 which resolved to purescript-exists#3.0.0
+    purescript-free#5.0.0, purescript-freeap#5.0.1, purescript-freet#4.0.0, purescript-profunctor#4.0.0 depends on purescript-exists#^4.0.0 which resolved to purescript-exists#4.0.0
+Resort to using purescript-exists# which resolved to purescript-exists#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-lists#4.12.0, purescript-transformers#3.6.0 depends on purescript-lazy#^3.0.0 which resolved to purescript-lazy#3.0.0
+    purescript-free#5.0.0, purescript-lists#5.0.0, purescript-transformers#4.1.0 depends on purescript-lazy#^4.0.0 which resolved to purescript-lazy#4.0.0
+Resort to using purescript-lazy# which resolved to purescript-lazy#4.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-parallel#3.3.1, purescript-profunctor-lenses#3.8.0 depends on purescript-functors#^2.0.0 which resolved to purescript-functors#2.2.0
+    purescript-parallel#4.0.0, purescript-profunctor-lenses#4.0.0 depends on purescript-functors#^3.0.0 which resolved to purescript-functors#3.0.0
+Resort to using purescript-functors# which resolved to purescript-functors#3.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-free#4.3.0 depends on purescript-catenable-lists#^4.0.0 which resolved to purescript-catenable-lists#4.0.0
+    purescript-free#5.0.0 depends on purescript-catenable-lists#^5.0.0 which resolved to purescript-catenable-lists#5.0.0
+Resort to using purescript-catenable-lists# which resolved to purescript-catenable-lists#5.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-profunctor-lenses#3.8.0 depends on purescript-record#^0.2.0 which resolved to purescript-record#0.2.6
+    purescript-profunctor-lenses#4.0.0 depends on purescript-record#^1.0.0 which resolved to purescript-record#1.0.0
+Resort to using purescript-record# which resolved to purescript-record#1.0.0
+Code incompatibilities may occur.
+
+
+Please note that,
+    purescript-record#0.2.6 depends on purescript-typelevel-prelude#^2.3.1 which resolved to purescript-typelevel-prelude#2.7.0
+    purescript-record#1.0.0 depends on purescript-typelevel-prelude#^3.0.0 which resolved to purescript-typelevel-prelude#3.0.0
+Resort to using purescript-typelevel-prelude# which resolved to purescript-typelevel-prelude#3.0.0
+Code incompatibilities may occur.
+
+bower purescript-console#^4.0.0                       install purescript-console#4.1.0
+bower purescript-maybe#^4.0.0                         install purescript-maybe#4.0.0
+bower purescript-exceptions#^4.0.0                    install purescript-exceptions#4.0.0
+bower purescript-prelude#^4.0.1                       install purescript-prelude#4.0.1
+bower purescript-arrays#^5.0.0                        install purescript-arrays#5.0.0
+bower purescript-folds#^3.1.0                         install purescript-folds#3.1.0
+bower purescript-signal#^10.0.1                       install purescript-signal#10.1.0
+bower purescript-affjax#^6.0.0                        install purescript-affjax#6.0.0
+bower purescript-maps#^3.3.1                          install purescript-maps#3.6.0
+bower purescript-aff#^5.0.0                           install purescript-aff#5.0.0
+bower purescript-argonaut-codecs#^4.0.0               install purescript-argonaut-codecs#4.0.0
+bower purescript-argonaut#^3.1.0                      install purescript-argonaut#3.1.0
+bower purescript-signal-loop#^2.0.0                   install purescript-signal-loop#2.0.0
+bower purescript-halogen#^4.0.0                       install purescript-halogen#4.0.0
+bower purescript-parsing#^4.3.1                       install purescript-parsing#4.3.1
+bower purescript-foreign-generic#^6.0.0               install purescript-foreign-generic#6.0.0
+bower purescript-ace#^5.0.0                           install purescript-ace#5.0.0
+bower purescript-dom-classy#^2.1.0                    install purescript-dom-classy#2.2.0
+bower purescript-dom-filereader#^3.0.0                install purescript-dom-filereader#3.0.0
+bower purescript-now#^4.0.0                           install purescript-now#4.0.0
+bower purescript-js-date#^6.0.0                       install purescript-js-date#6.0.0
+bower purescript-aff-promise#^2.0.0                   install purescript-aff-promise#2.0.0
+bower purescript-datetime#^4.0.0                      install purescript-datetime#4.0.0
+bower purescript-monad-loops#^0.4.0                   install purescript-monad-loops#0.4.0
+bower purescript-uri#^5.1.0                           install purescript-uri#5.1.0
+bower purescript-numbers#^6.0.0                       install purescript-numbers#6.0.0
+bower purescript-datetime-iso#^1.0.2                  install purescript-datetime-iso#1.0.2
+bower purescript-psci-support#^4.0.0                  install purescript-psci-support#4.0.0
+bower purescript-effect#^2.0.0                        install purescript-effect#2.0.0
+bower purescript-newtype#^3.0.0                       install purescript-newtype#3.0.0
+bower purescript-invariant#^4.0.0                     install purescript-invariant#4.0.0
+bower purescript-control#^4.0.0                       install purescript-control#4.0.0
+bower purescript-either#^4.0.0                        install purescript-either#4.0.0
+bower purescript-bifunctors#^4.0.0                    install purescript-bifunctors#4.0.0
+bower purescript-partial#^2.0.0                       install purescript-partial#2.0.0
+bower purescript-nonempty#^5.0.0                      install purescript-nonempty#5.0.0
+bower purescript-foldable-traversable#^4.0.0          install purescript-foldable-traversable#4.0.0
+bower purescript-st#^4.0.0                            install purescript-st#4.0.0
+bower purescript-tailrec#^4.0.0                       install purescript-tailrec#4.0.0
+bower purescript-tuples#^5.0.0                        install purescript-tuples#5.0.0
+bower purescript-unfoldable#^4.0.0                    install purescript-unfoldable#4.0.0
+bower purescript-unsafe-coerce#^4.0.0                 install purescript-unsafe-coerce#4.0.0
+bower purescript-profunctor#^4.0.0                    install purescript-profunctor#4.0.0
+bower purescript-js-timers#^4.0.0                     install purescript-js-timers#4.0.0
+bower purescript-argonaut-core#^4.0.0                 install purescript-argonaut-core#4.0.0
+bower purescript-web-xhr#^2.0.0                       install purescript-web-xhr#2.0.0
+bower purescript-arraybuffer-types#^2.0.0             install purescript-arraybuffer-types#2.0.0
+bower purescript-foreign#^5.0.0                       install purescript-foreign#5.0.0
+bower purescript-http-methods#^4.0.0                  install purescript-http-methods#4.0.0
+bower purescript-form-urlencoded#^4.0.0               install purescript-form-urlencoded#4.0.0
+bower purescript-integers#^4.0.0                      install purescript-integers#4.0.0
+bower purescript-media-types#^4.0.0                   install purescript-media-types#4.0.0
+bower purescript-math#^2.1.1                          install purescript-math#2.1.1
+bower purescript-refs#^4.0.0                          install purescript-refs#4.1.0
+bower purescript-nullable#^4.0.0                      install purescript-nullable#4.0.0
+bower purescript-lists#^5.0.0                         install purescript-lists#5.0.0
+bower purescript-gen#^2.0.0                           install purescript-gen#2.0.0
+bower purescript-functions#^4.0.0                     install purescript-functions#4.0.0
+bower purescript-parallel#^4.0.0                      install purescript-parallel#4.0.0
+bower purescript-transformers#^4.1.0                  install purescript-transformers#4.1.0
+bower purescript-ordered-collections#^1.0.0           install purescript-ordered-collections#1.0.0
+bower purescript-foreign-object#^1.0.0                install purescript-foreign-object#1.0.0
+bower purescript-argonaut-traversals#^3.0.0           install purescript-argonaut-traversals#3.1.0
+bower purescript-generics#^4.0.0                      install purescript-generics#4.0.0
+bower purescript-monoid#^3.0.0                        install purescript-monoid#3.3.0
+bower purescript-avar#^3.0.0                          install purescript-avar#3.0.0
+bower purescript-coroutines#^5.0.0                    install purescript-coroutines#5.0.0
+bower purescript-dom#^4.0.0                           install purescript-dom#4.16.0
+bower purescript-web-uievents#^1.0.0                  install purescript-web-uievents#1.0.0
+bower purescript-const#^4.0.0                         install purescript-const#4.0.0
+bower purescript-fork#^4.0.0                          install purescript-fork#4.0.0
+bower purescript-dom-indexed#^6.0.0                   install purescript-dom-indexed#6.0.0
+bower purescript-freeap#^5.0.0                        install purescript-freeap#5.0.1
+bower purescript-free#^5.0.0                          install purescript-free#5.0.0
+bower purescript-halogen-vdom#^3.0.0                  install purescript-halogen-vdom#3.0.0
+bower purescript-unsafe-reference#^3.0.0              install purescript-unsafe-reference#3.0.0
+bower purescript-profunctor-lenses#^4.0.0             install purescript-profunctor-lenses#4.0.0
+bower purescript-identity#^4.0.0                      install purescript-identity#4.0.0
+bower purescript-unicode#^3.0.0                       install purescript-unicode#3.0.2
+bower purescript-strings#^4.0.0                       install purescript-strings#4.0.0
+bower purescript-eff#^3.1.0                           install purescript-eff#3.2.1
+bower purescript-globals#^4.0.0                       install purescript-globals#4.0.0
+bower purescript-generics-rep#^5.1.0                  install purescript-generics-rep#5.4.0
+bower purescript-proxy#^3.0.0                         install purescript-proxy#3.0.0
+bower purescript-symbols#^3.0.0                       install purescript-symbols#3.0.0
+bower purescript-web-html#^1.0.0                      install purescript-web-html#1.0.0
+bower purescript-enums#^4.0.0                         install purescript-enums#4.0.0
+bower purescript-type-equality#^3.0.0                 install purescript-type-equality#3.0.0
+bower purescript-these#^3.0.0                         install purescript-these#3.1.0
+bower purescript-orders#^4.0.0                        install purescript-orders#4.0.0
+bower purescript-contravariant#^4.0.0                 install purescript-contravariant#4.0.0
+bower purescript-distributive#^4.0.0                  install purescript-distributive#4.0.0
+bower purescript-exists#^4.0.0                        install purescript-exists#4.0.0
+bower purescript-web-dom#^1.0.0                       install purescript-web-dom#1.0.0
+bower purescript-web-file#^1.0.0                      install purescript-web-file#1.0.0
+bower purescript-lazy#^4.0.0                          install purescript-lazy#4.0.0
+bower purescript-functors#^3.0.0                      install purescript-functors#3.0.0
+bower purescript-freet#^4.0.0                         install purescript-freet#4.0.0
+bower purescript-web-touchevents#^1.0.0               install purescript-web-touchevents#1.0.0
+bower purescript-web-clipboard#^1.0.0                 install purescript-web-clipboard#1.0.0
+bower purescript-catenable-lists#^5.0.0               install purescript-catenable-lists#5.0.0
+bower purescript-sets#^3.0.0                          install purescript-sets#3.2.0
+bower purescript-record#^1.0.0                        install purescript-record#1.0.0
+bower purescript-web-storage#^2.0.0                   install purescript-web-storage#2.0.0
+bower purescript-web-events#^1.0.0                    install purescript-web-events#1.0.0
+bower purescript-typelevel-prelude#^3.0.0             install purescript-typelevel-prelude#3.0.0
+
+purescript-console#4.1.0 bower_components/purescript-console
+├── purescript-effect#2.0.0
+└── purescript-prelude#4.0.1
+
+purescript-maybe#4.0.0 bower_components/purescript-maybe
+├── purescript-control#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-exceptions#4.0.0 bower_components/purescript-exceptions
+├── purescript-effect#2.0.0
+├── purescript-either#4.0.0
+├── purescript-maybe#4.0.0
+└── purescript-prelude#4.0.1
+
+purescript-prelude#4.0.1 bower_components/purescript-prelude
+
+purescript-arrays#5.0.0 bower_components/purescript-arrays
+├── purescript-bifunctors#4.0.0
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-nonempty#5.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+├── purescript-st#4.0.0
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+├── purescript-unfoldable#4.0.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-folds#3.1.0 bower_components/purescript-folds
+├── purescript-control#4.0.0
+└── purescript-profunctor#4.0.0
+
+purescript-signal#10.1.0 bower_components/purescript-signal
+├── purescript-aff#5.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-js-timers#4.0.0
+├── purescript-maybe#4.0.0
+└── purescript-prelude#4.0.1
+
+purescript-affjax#6.0.0 bower_components/purescript-affjax
+├── purescript-aff#5.0.0
+├── purescript-argonaut-core#4.0.0
+├── purescript-arraybuffer-types#2.0.0
+├── purescript-foreign#5.0.0
+├── purescript-form-urlencoded#4.0.0
+├── purescript-http-methods#4.0.0
+├── purescript-integers#4.0.0
+├── purescript-math#2.1.1
+├── purescript-media-types#4.0.0
+├── purescript-nullable#4.0.0
+├── purescript-refs#4.1.0
+├── purescript-unsafe-coerce#4.0.0
+└── purescript-web-xhr#2.0.0
+
+purescript-maps#3.6.0 bower_components/purescript-maps
+├── purescript-arrays#5.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-functions#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-lists#5.0.0
+└── purescript-st#4.0.0
+
+purescript-aff#5.0.0 bower_components/purescript-aff
+├── purescript-datetime#4.0.0
+├── purescript-effect#2.0.0
+├── purescript-exceptions#4.0.0
+├── purescript-functions#4.0.0
+├── purescript-parallel#4.0.0
+├── purescript-transformers#4.1.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-argonaut-codecs#4.0.0 bower_components/purescript-argonaut-codecs
+├── purescript-argonaut-core#4.0.0
+├── purescript-foreign-object#1.0.0
+├── purescript-integers#4.0.0
+├── purescript-maybe#4.0.0
+└── purescript-ordered-collections#1.0.0
+
+purescript-argonaut#3.1.0 bower_components/purescript-argonaut
+├── purescript-argonaut-codecs#4.0.0
+├── purescript-argonaut-core#4.0.0
+└── purescript-argonaut-traversals#3.1.0
+
+purescript-signal-loop#2.0.0 bower_components/purescript-signal-loop
+└── purescript-signal#10.1.0
+
+purescript-halogen#4.0.0 bower_components/purescript-halogen
+├── purescript-aff#5.0.0
+├── purescript-avar#3.0.0
+├── purescript-console#4.1.0
+├── purescript-const#4.0.0
+├── purescript-coroutines#5.0.0
+├── purescript-dom-indexed#6.0.0
+├── purescript-foreign#5.0.0
+├── purescript-fork#4.0.0
+├── purescript-free#5.0.0
+├── purescript-freeap#5.0.1
+├── purescript-halogen-vdom#3.0.0
+├── purescript-media-types#4.0.0
+├── purescript-nullable#4.0.0
+├── purescript-ordered-collections#1.0.0
+├── purescript-parallel#4.0.0
+├── purescript-profunctor#4.0.0
+├── purescript-profunctor-lenses#4.0.0
+├── purescript-transformers#4.1.0
+├── purescript-unsafe-coerce#4.0.0
+├── purescript-unsafe-reference#3.0.0
+└── purescript-web-uievents#1.0.0
+
+purescript-parsing#4.3.1 bower_components/purescript-parsing
+├── purescript-arrays#5.0.0
+├── purescript-either#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-identity#4.0.0
+├── purescript-integers#4.0.0
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-strings#4.0.0
+├── purescript-transformers#4.1.0
+└── purescript-unicode#3.0.2
+
+purescript-foreign-generic#6.0.0 bower_components/purescript-foreign-generic
+├── purescript-console#4.1.0
+├── purescript-eff#3.2.1
+├── purescript-exceptions#4.0.0
+├── purescript-foreign#5.0.0
+├── purescript-generics-rep#5.4.0
+├── purescript-globals#4.0.0
+├── purescript-maps#3.6.0
+├── purescript-nullable#4.0.0
+├── purescript-proxy#3.0.0
+└── purescript-symbols#3.0.0
+
+purescript-ace#5.0.0 bower_components/purescript-ace
+├── purescript-arrays#5.0.0
+├── purescript-effect#2.0.0
+├── purescript-foreign#5.0.0
+├── purescript-nullable#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-web-html#1.0.0
+└── purescript-web-uievents#1.0.0
+
+purescript-dom-classy#2.2.0 bower_components/purescript-dom-classy
+└── purescript-dom#4.16.0
+
+purescript-dom-filereader#3.0.0 bower_components/purescript-dom-filereader
+├── purescript-aff#5.0.0
+├── purescript-arraybuffer-types#2.0.0
+└── purescript-dom#4.16.0
+
+purescript-now#4.0.0 bower_components/purescript-now
+├── purescript-datetime#4.0.0
+└── purescript-effect#2.0.0
+
+purescript-js-date#6.0.0 bower_components/purescript-js-date
+├── purescript-datetime#4.0.0
+├── purescript-exceptions#4.0.0
+├── purescript-foreign#5.0.0
+├── purescript-integers#4.0.0
+└── purescript-now#4.0.0
+
+purescript-aff-promise#2.0.0 bower_components/purescript-aff-promise
+├── purescript-aff#5.0.0
+└── purescript-foreign#5.0.0
+
+purescript-datetime#4.0.0 bower_components/purescript-datetime
+├── purescript-bifunctors#4.0.0
+├── purescript-control#4.0.0
+├── purescript-either#4.0.0
+├── purescript-enums#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-functions#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-integers#4.0.0
+├── purescript-lists#5.0.0
+├── purescript-math#2.1.1
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-ordered-collections#1.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+└── purescript-tuples#5.0.0
+
+purescript-monad-loops#0.4.0 bower_components/purescript-monad-loops
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-monoid#3.3.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+└── purescript-tuples#5.0.0
+
+purescript-uri#5.1.0 bower_components/purescript-uri
+├── purescript-arrays#5.0.0
+├── purescript-generics-rep#5.4.0
+├── purescript-globals#4.0.0
+├── purescript-integers#4.0.0
+├── purescript-maps#3.6.0
+├── purescript-parsing#4.3.1
+├── purescript-profunctor-lenses#4.0.0
+├── purescript-these#3.1.0
+└── purescript-unfoldable#4.0.0
+
+purescript-numbers#6.0.0 bower_components/purescript-numbers
+├── purescript-globals#4.0.0
+├── purescript-math#2.1.1
+└── purescript-maybe#4.0.0
+
+purescript-datetime-iso#1.0.2 bower_components/purescript-datetime-iso
+├── purescript-argonaut-codecs#4.0.0
+├── purescript-datetime#4.0.0
+├── purescript-newtype#3.0.0
+└── purescript-parsing#4.3.1
+
+purescript-psci-support#4.0.0 bower_components/purescript-psci-support
+├── purescript-console#4.1.0
+├── purescript-effect#2.0.0
+└── purescript-prelude#4.0.1
+
+purescript-effect#2.0.0 bower_components/purescript-effect
+└── purescript-prelude#4.0.1
+
+purescript-newtype#3.0.0 bower_components/purescript-newtype
+└── purescript-prelude#4.0.1
+
+purescript-invariant#4.0.0 bower_components/purescript-invariant
+└── purescript-prelude#4.0.1
+
+purescript-control#4.0.0 bower_components/purescript-control
+└── purescript-prelude#4.0.1
+
+purescript-either#4.0.0 bower_components/purescript-either
+├── purescript-bifunctors#4.0.0
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-maybe#4.0.0
+└── purescript-prelude#4.0.1
+
+purescript-bifunctors#4.0.0 bower_components/purescript-bifunctors
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-partial#2.0.0 bower_components/purescript-partial
+
+purescript-nonempty#5.0.0 bower_components/purescript-nonempty
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-foldable-traversable#4.0.0 bower_components/purescript-foldable-traversable
+├── purescript-bifunctors#4.0.0
+├── purescript-control#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-orders#4.0.0
+└── purescript-prelude#4.0.1
+
+purescript-st#4.0.0 bower_components/purescript-st
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+└── purescript-tailrec#4.0.0
+
+purescript-tailrec#4.0.0 bower_components/purescript-tailrec
+├── purescript-bifunctors#4.0.0
+├── purescript-effect#2.0.0
+├── purescript-either#4.0.0
+├── purescript-identity#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+└── purescript-refs#4.1.0
+
+purescript-tuples#5.0.0 bower_components/purescript-tuples
+├── purescript-bifunctors#4.0.0
+├── purescript-control#4.0.0
+├── purescript-distributive#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+└── purescript-type-equality#3.0.0
+
+purescript-unfoldable#4.0.0 bower_components/purescript-unfoldable
+├── purescript-foldable-traversable#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+└── purescript-tuples#5.0.0
+
+purescript-unsafe-coerce#4.0.0 bower_components/purescript-unsafe-coerce
+
+purescript-profunctor#4.0.0 bower_components/purescript-profunctor
+├── purescript-contravariant#4.0.0
+├── purescript-control#4.0.0
+├── purescript-distributive#4.0.0
+├── purescript-either#4.0.0
+├── purescript-exists#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+└── purescript-tuples#5.0.0
+
+purescript-js-timers#4.0.0 bower_components/purescript-js-timers
+└── purescript-effect#2.0.0
+
+purescript-argonaut-core#4.0.0 bower_components/purescript-argonaut-core
+├── purescript-arrays#5.0.0
+├── purescript-control#4.0.0
+├── purescript-either#4.0.0
+├── purescript-foreign-object#1.0.0
+├── purescript-functions#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-maybe#4.0.0
+├── purescript-nonempty#5.0.0
+├── purescript-prelude#4.0.1
+├── purescript-strings#4.0.0
+└── purescript-tailrec#4.0.0
+
+purescript-web-xhr#2.0.0 bower_components/purescript-web-xhr
+├── purescript-arraybuffer-types#2.0.0
+├── purescript-datetime#4.0.0
+├── purescript-http-methods#4.0.0
+├── purescript-web-dom#1.0.0
+└── purescript-web-file#1.0.0
+
+purescript-arraybuffer-types#2.0.0 bower_components/purescript-arraybuffer-types
+
+purescript-foreign#5.0.0 bower_components/purescript-foreign
+├── purescript-either#4.0.0
+├── purescript-functions#4.0.0
+├── purescript-identity#4.0.0
+├── purescript-integers#4.0.0
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-strings#4.0.0
+└── purescript-transformers#4.1.0
+
+purescript-http-methods#4.0.0 bower_components/purescript-http-methods
+├── purescript-either#4.0.0
+├── purescript-prelude#4.0.1
+└── purescript-strings#4.0.0
+
+purescript-form-urlencoded#4.0.0 bower_components/purescript-form-urlencoded
+├── purescript-globals#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+├── purescript-strings#4.0.0
+└── purescript-tuples#5.0.0
+
+purescript-integers#4.0.0 bower_components/purescript-integers
+├── purescript-globals#4.0.0
+├── purescript-math#2.1.1
+├── purescript-maybe#4.0.0
+└── purescript-prelude#4.0.1
+
+purescript-media-types#4.0.0 bower_components/purescript-media-types
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-math#2.1.1 bower_components/purescript-math
+
+purescript-refs#4.1.0 bower_components/purescript-refs
+├── purescript-effect#2.0.0
+└── purescript-prelude#4.0.1
+
+purescript-nullable#4.0.0 bower_components/purescript-nullable
+├── purescript-functions#4.0.0
+└── purescript-maybe#4.0.0
+
+purescript-lists#5.0.0 bower_components/purescript-lists
+├── purescript-bifunctors#4.0.0
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-lazy#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-nonempty#5.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-gen#2.0.0 bower_components/purescript-gen
+├── purescript-either#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-identity#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-nonempty#5.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-functions#4.0.0 bower_components/purescript-functions
+└── purescript-prelude#4.0.1
+
+purescript-parallel#4.0.0 bower_components/purescript-parallel
+├── purescript-control#4.0.0
+├── purescript-effect#2.0.0
+├── purescript-either#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-functors#3.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+├── purescript-refs#4.1.0
+└── purescript-transformers#4.1.0
+
+purescript-transformers#4.1.0 bower_components/purescript-transformers
+├── purescript-control#4.0.0
+├── purescript-distributive#4.0.0
+├── purescript-effect#2.0.0
+├── purescript-either#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-identity#4.0.0
+├── purescript-lazy#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-ordered-collections#1.0.0 bower_components/purescript-ordered-collections
+├── purescript-arrays#5.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+├── purescript-st#4.0.0
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+├── purescript-unfoldable#4.0.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-foreign-object#1.0.0 bower_components/purescript-foreign-object
+├── purescript-arrays#5.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-functions#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-st#4.0.0
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-argonaut-traversals#3.1.0 bower_components/purescript-argonaut-traversals
+├── purescript-argonaut-codecs#4.0.0
+├── purescript-argonaut-core#4.0.0
+└── purescript-profunctor-lenses#4.0.0
+
+purescript-generics#4.0.0 bower_components/purescript-generics
+├── purescript-arrays#5.0.0
+├── purescript-either#4.0.0
+├── purescript-identity#4.0.0
+├── purescript-lists#5.0.0
+├── purescript-proxy#3.0.0
+└── purescript-strings#4.0.0
+
+purescript-monoid#3.3.0 bower_components/purescript-monoid
+├── purescript-control#4.0.0
+├── purescript-invariant#4.0.0
+└── purescript-newtype#3.0.0
+
+purescript-avar#3.0.0 bower_components/purescript-avar
+├── purescript-aff#5.0.0
+├── purescript-effect#2.0.0
+├── purescript-either#4.0.0
+├── purescript-exceptions#4.0.0
+├── purescript-functions#4.0.0
+└── purescript-maybe#4.0.0
+
+purescript-coroutines#5.0.0 bower_components/purescript-coroutines
+├── purescript-freet#4.0.0
+├── purescript-parallel#4.0.0
+└── purescript-profunctor#4.0.0
+
+purescript-dom#4.16.0 bower_components/purescript-dom
+├── purescript-arraybuffer-types#2.0.0
+├── purescript-datetime#4.0.0
+├── purescript-enums#4.0.0
+├── purescript-exceptions#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-foreign#5.0.0
+├── purescript-js-date#6.0.0
+├── purescript-media-types#4.0.0
+├── purescript-nullable#4.0.0
+├── purescript-prelude#4.0.1
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-web-uievents#1.0.0 bower_components/purescript-web-uievents
+└── purescript-web-html#1.0.0
+
+purescript-const#4.0.0 bower_components/purescript-const
+├── purescript-contravariant#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-fork#4.0.0 bower_components/purescript-fork
+└── purescript-aff#5.0.0
+
+purescript-dom-indexed#6.0.0 bower_components/purescript-dom-indexed
+├── purescript-media-types#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-web-clipboard#1.0.0
+└── purescript-web-touchevents#1.0.0
+
+purescript-freeap#5.0.1 bower_components/purescript-freeap
+├── purescript-const#4.0.0
+├── purescript-exists#4.0.0
+├── purescript-gen#2.0.0
+└── purescript-lists#5.0.0
+
+purescript-free#5.0.0 bower_components/purescript-free
+├── purescript-catenable-lists#5.0.0
+├── purescript-control#4.0.0
+├── purescript-distributive#4.0.0
+├── purescript-either#4.0.0
+├── purescript-exists#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-lazy#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+├── purescript-transformers#4.1.0
+├── purescript-tuples#5.0.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-halogen-vdom#3.0.0 bower_components/purescript-halogen-vdom
+├── purescript-bifunctors#4.0.0
+├── purescript-effect#2.0.0
+├── purescript-foreign#5.0.0
+├── purescript-foreign-object#1.0.0
+├── purescript-maybe#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-refs#4.1.0
+├── purescript-tuples#5.0.0
+├── purescript-unsafe-coerce#4.0.0
+└── purescript-web-html#1.0.0
+
+purescript-unsafe-reference#3.0.0 bower_components/purescript-unsafe-reference
+
+purescript-profunctor-lenses#4.0.0 bower_components/purescript-profunctor-lenses
+├── purescript-arrays#5.0.0
+├── purescript-bifunctors#4.0.0
+├── purescript-const#4.0.0
+├── purescript-control#4.0.0
+├── purescript-distributive#4.0.0
+├── purescript-either#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-foreign-object#1.0.0
+├── purescript-functors#3.0.0
+├── purescript-identity#4.0.0
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-ordered-collections#1.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+├── purescript-profunctor#4.0.0
+├── purescript-record#1.0.0
+├── purescript-transformers#4.1.0
+└── purescript-tuples#5.0.0
+
+purescript-identity#4.0.0 bower_components/purescript-identity
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-invariant#4.0.0
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-unicode#3.0.2 bower_components/purescript-unicode
+├── purescript-foldable-traversable#4.0.0
+├── purescript-maybe#4.0.0
+└── purescript-strings#4.0.0
+
+purescript-strings#4.0.0 bower_components/purescript-strings
+├── purescript-arrays#5.0.0
+├── purescript-control#4.0.0
+├── purescript-either#4.0.0
+├── purescript-enums#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-integers#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-nonempty#5.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+├── purescript-tuples#5.0.0
+├── purescript-unfoldable#4.0.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-eff#3.2.1 bower_components/purescript-eff
+├── purescript-monoid#3.3.0
+└── purescript-prelude#4.0.1
+
+purescript-globals#4.0.0 bower_components/purescript-globals
+
+purescript-generics-rep#5.4.0 bower_components/purescript-generics-rep
+├── purescript-enums#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-monoid#3.3.0
+├── purescript-prelude#4.0.1
+└── purescript-symbols#3.0.0
+
+purescript-proxy#3.0.0 bower_components/purescript-proxy
+└── purescript-prelude#4.0.1
+
+purescript-symbols#3.0.0 bower_components/purescript-symbols
+├── purescript-prelude#4.0.1
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-web-html#1.0.0 bower_components/purescript-web-html
+├── purescript-js-date#6.0.0
+├── purescript-web-dom#1.0.0
+├── purescript-web-file#1.0.0
+└── purescript-web-storage#2.0.0
+
+purescript-enums#4.0.0 bower_components/purescript-enums
+├── purescript-control#4.0.0
+├── purescript-either#4.0.0
+├── purescript-gen#2.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-nonempty#5.0.0
+├── purescript-partial#2.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-type-equality#3.0.0 bower_components/purescript-type-equality
+
+purescript-these#3.1.0 bower_components/purescript-these
+├── purescript-gen#2.0.0
+└── purescript-tuples#5.0.0
+
+purescript-orders#4.0.0 bower_components/purescript-orders
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-contravariant#4.0.0 bower_components/purescript-contravariant
+├── purescript-either#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+└── purescript-tuples#5.0.0
+
+purescript-distributive#4.0.0 bower_components/purescript-distributive
+├── purescript-identity#4.0.0
+├── purescript-newtype#3.0.0
+└── purescript-prelude#4.0.1
+
+purescript-exists#4.0.0 bower_components/purescript-exists
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-web-dom#1.0.0 bower_components/purescript-web-dom
+└── purescript-web-events#1.0.0
+
+purescript-web-file#1.0.0 bower_components/purescript-web-file
+├── purescript-foreign#5.0.0
+├── purescript-media-types#4.0.0
+└── purescript-web-dom#1.0.0
+
+purescript-lazy#4.0.0 bower_components/purescript-lazy
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-invariant#4.0.0
+└── purescript-prelude#4.0.1
+
+purescript-functors#3.0.0 bower_components/purescript-functors
+├── purescript-bifunctors#4.0.0
+├── purescript-const#4.0.0
+├── purescript-control#4.0.0
+├── purescript-either#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-maybe#4.0.0
+├── purescript-newtype#3.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tuples#5.0.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-freet#4.0.0 bower_components/purescript-freet
+├── purescript-bifunctors#4.0.0
+├── purescript-effect#2.0.0
+├── purescript-either#4.0.0
+├── purescript-exists#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tailrec#4.0.0
+└── purescript-transformers#4.1.0
+
+purescript-web-touchevents#1.0.0 bower_components/purescript-web-touchevents
+└── purescript-web-uievents#1.0.0
+
+purescript-web-clipboard#1.0.0 bower_components/purescript-web-clipboard
+└── purescript-web-html#1.0.0
+
+purescript-catenable-lists#5.0.0 bower_components/purescript-catenable-lists
+├── purescript-control#4.0.0
+├── purescript-foldable-traversable#4.0.0
+├── purescript-lists#5.0.0
+├── purescript-maybe#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-tuples#5.0.0
+└── purescript-unfoldable#4.0.0
+
+purescript-sets#3.2.0 bower_components/purescript-sets
+├── purescript-maps#3.6.0
+└── purescript-tailrec#4.0.0
+
+purescript-record#1.0.0 bower_components/purescript-record
+├── purescript-functions#4.0.0
+├── purescript-prelude#4.0.1
+├── purescript-st#4.0.0
+├── purescript-typelevel-prelude#3.0.0
+└── purescript-unsafe-coerce#4.0.0
+
+purescript-web-storage#2.0.0 bower_components/purescript-web-storage
+├── purescript-nullable#4.0.0
+└── purescript-web-events#1.0.0
+
+purescript-web-events#1.0.0 bower_components/purescript-web-events
+├── purescript-datetime#4.0.0
+├── purescript-enums#4.0.0
+└── purescript-nullable#4.0.0
+
+purescript-typelevel-prelude#3.0.0 bower_components/purescript-typelevel-prelude
+├── purescript-prelude#4.0.1
+├── purescript-proxy#3.0.0
+└── purescript-type-equality#3.0.0
