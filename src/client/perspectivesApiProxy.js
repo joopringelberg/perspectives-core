@@ -31,8 +31,8 @@ class PerspectivesProxy
   {
     const req = {
       request: "GetRolBinding",
-      contextID: contextID,
-      rolName: rolName,
+      subject: contextID,
+      predicate: rolName,
       // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
       reactStateSetter: function (arrString)
       {
@@ -48,8 +48,8 @@ class PerspectivesProxy
   {
     const req = {
       request: "GetRol",
-      contextID: contextID,
-      rolName: rolName,
+      subject: contextID,
+      predicate: rolName,
       // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
       reactStateSetter: function (arrString)
       {
@@ -60,6 +60,24 @@ class PerspectivesProxy
     this.setter(req)(this.request)();
     this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
   }
+
+  getProperty (rolID, propertyName, receiveValues, handleUnsubscriber)
+  {
+    const req = {
+      request: "GetProperty",
+      subject: rolID,
+      predicate: propertyName,
+      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
+      reactStateSetter: function (arrString)
+      {
+        receiveValues(arrString);
+        return function () {};
+      }
+    };
+    this.setter(req)(this.request)();
+    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+  }
+
 }
 // Capture Error responses.
 function handleChannelError(handleUnsubscriber)
@@ -80,7 +98,7 @@ function handleChannelError(handleUnsubscriber)
 // A proxy testing whether o is constructed with the ApiResponse Error data constructor.
 function isError(o)
 {
-  return o.constructor.toString().match(/function \$\$Error/)
+  return o.constructor.toString().match(/function \$\$Error/);
 }
 
 window.test = function (contextID, rolName)

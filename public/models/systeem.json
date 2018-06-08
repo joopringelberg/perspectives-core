@@ -1,0 +1,15 @@
+{
+  "model:Systeem": {
+    "Systeem": {
+      "rolInContext": {
+        "gebruiker": {
+          "rolProperty": ["achternaam", "voornaam"],
+          "viewInrol": {
+            "VolledigeNaam": ["voornaam", "achternaam"]
+          }
+        }
+      }
+    },
+    "TrustedCluster": {}
+  }
+}

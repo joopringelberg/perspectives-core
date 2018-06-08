@@ -10,13 +10,13 @@ import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (bindingM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolName)
+import Perspectives.EntiteitAndRDFAliases (ContextID, RolName, PropertyName, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.QueryEffect ((~>))
 import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructRolGetter)
+import Perspectives.TripleGetterConstructors (constructRolGetter, constructRolPropertyGetter)
 import Prelude (class Show, Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
@@ -25,12 +25,14 @@ import Prelude (class Show, Unit, bind, const, discard, flip, pure, unit, void, 
 data ApiRequest e =
   GetRolBinding ContextID RolName (ReactStateSetter e)
   | GetRol ContextID RolName (ReactStateSetter e)
+  | GetProperty RolName PropertyName (ReactStateSetter e)
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
 
 instance showApiRequest :: Show (ApiRequest e) where
   show (GetRolBinding cid rn _) = "{GetRolBinding " <> cid <> " " <> rn <> "}"
   show (GetRol cid rn _) = "{GetRol " <> cid <> " " <> rn <> "}"
+  show (GetProperty rn pn _) = "{GetProperty " <> rn <> " " <> pn <> "}"
   show ShutDown = "ShutDown"
   show WrongRequest = "WrongRequest"
 
@@ -39,12 +41,12 @@ data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
 
 type RequestRecord e =
   { request :: String
-  , contextID :: String
-  , rolName :: String
+  , subject :: String
+  , predicate :: String
   , reactStateSetter :: ReactStateSetter e}
 
 showRequestRecord :: forall e. RequestRecord e -> String
-showRequestRecord {request, contextID, rolName} = "{" <> request <> ", " <> contextID <> ", " <> rolName <> "}"
+showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
 
 type ApiChannel e =
   { request :: AVar (RequestRecord e)
@@ -71,8 +73,9 @@ foreign import connect :: forall e1 e2. ApiChannel e1 -> Eff (react:: REACT | e2
 -- | try to fit into ApiRequest.
 marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
 marshallRequestRecord r@{request} = case request of
-  "GetRolBinding" -> GetRolBinding r.contextID r.rolName r.reactStateSetter
-  "GetRol" -> GetRol r.contextID r.rolName r.reactStateSetter
+  "GetRolBinding" -> GetRolBinding r.subject r.predicate r.reactStateSetter
+  "GetRol" -> GetRol r.subject r.predicate r.reactStateSetter
+  "GetProperty" -> GetProperty r.subject r.predicate r.reactStateSetter
   "ShutDown" -> ShutDown
   otherwise -> WrongRequest
 
@@ -95,6 +98,9 @@ dispatch request response = do
           send (Unsubscriber unsubscriber)
         (GetRol cid rn setter) -> do
           unsubscriber <- getRol cid rn setter
+          send (Unsubscriber unsubscriber)
+        (GetProperty rid pn setter) -> do
+          unsubscriber <- getProperty rid pn setter
           send (Unsubscriber unsubscriber)
         WrongRequest -> send $ Error ("This request is invalid: " <> showRequestRecord reqr)
         ShutDown -> send $ Error "shutdown" -- ...this case will never occur!
@@ -132,3 +138,8 @@ getRolBinding cid rn setter = do
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRol cid rn setter = do
   getQuery cid (constructRolGetter rn) setter
+
+-- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
+getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getProperty rid pn setter = do
+  getQuery rid (constructRolPropertyGetter pn) setter

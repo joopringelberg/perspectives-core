@@ -5,7 +5,9 @@ import model:Systeem als sys:
 sys:Systeem usr:MijnSysteem
 	$gebruiker(1) => ()
 		$voornaam = "Joop"
+		$achternaam = "Ringelberg"
 	$trustedCluster =>
 		sys:TrustedCluster $MijnCluster
+			extern $naam = "Het cluster van Joop"
 			$clusterGenoot => $$gebruiker(1)
 				$url = "http://localhost"

@@ -38,6 +38,18 @@ psp:Context sys:Systeem
 
 arc:Zaak sys:TrustedCluster
 	prototype psp:ContextPrototype
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$viewInRol =>
+				psp:View $Kaartje
+					$propertyReferentie => $$naam
+						$volgNummer = 1
+			$rolProperty =>
+				psp:Property $naam
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
 	psp:Context$rolInContext =>
 		psp:Rol $clusterGenoot
 			extern $isFunctioneel = false
