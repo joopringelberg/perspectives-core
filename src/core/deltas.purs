@@ -58,7 +58,13 @@ instance encodeSerializableDateTime :: Encode SerializableDateTime where
   encode d = toForeign $ show d
 
 instance showSerializableDateTime :: Show SerializableDateTime where
-  show (SerializableDateTime d) = runPure (catchException (\err -> pure "Could not serialize DateTime") (toISOString (fromDateTime d)))
+  show (SerializableDateTime d) = "todo"
+
+-- instance showSerializableDateTime :: Show SerializableDateTime where
+--   show (SerializableDateTime d) = runPure (catchException handleError (toISOString (fromDateTime d)))
+--
+-- handleError :: forall eff. Error -> Eff eff String
+-- handleError e = pure "Could not serialize DateTime"
 
 -----------------------------------------------------------
 -- TRANSACTIE

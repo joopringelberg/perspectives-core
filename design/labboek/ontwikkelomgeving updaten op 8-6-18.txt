@@ -93,3 +93,8 @@ Hierbij moet ik erop letten dat mijn eigen aanpassingen van de Parser niet verlo
 
 {INTERMEZZO: ik heb geprobeerd alle Purescript libs te updaten naar hun laatste versie. Maar dat geeft een incompatibele verzameling libraries. zie voor een verslag: "update alle purescript libs.txt". Ik zal meer probleemgericht moeten werken. }
 
+
+	git difftool --tool=opendiff  6edca13:bower.json head:bower.json
+
+Maar dat lukt me niet. Ik concludeer dat ik voorlopig maar niet de laatste compiler moet gebruiken. Ik ga terugvallen naar de vorige versie. Dat is versie 0.11.7. Ik heb op dezelfde manier de binaries gedownload en in dezelfde directory als boven geplaatst.
+
