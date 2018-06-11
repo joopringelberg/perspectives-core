@@ -9,12 +9,12 @@ import Data.Array (elemIndex, foldMap)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TypedTripleGetter(..))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
+import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
-import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
-import Perspectives.DataTypeObjectGetters (rolType)
+import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (==))
 
@@ -31,6 +31,32 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
         Nothing -> do
           (object :: Array String) <- objectsGetter id
           lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+        (Just t) -> pure t
+    do
+      (object :: Array String) <- objectsGetter id
+      pure (Triple{ subject: id
+                , predicate: pn
+                , object: object
+                , dependencies: []
+                , supports : []
+                , tripleGetter: tripleGetter
+                })
+
+constructTripleGetterWithArbitrarySupport :: forall e.
+  PropertyName ->
+  (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)) ->
+  TypedTripleGetter e ->
+  TypedTripleGetter e
+constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter _ supportGetter) = TypedTripleGetter pn tripleGetter where
+  tripleGetter :: TripleGetter e
+  tripleGetter id = ifM memorizeQueryResults
+    do
+      mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
+      case mt of
+        Nothing -> do
+          (object :: Array String) <- objectsGetter id
+          (Triple{subject, predicate}) <- supportGetter id
+          lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [TripleRef {subject: subject, predicate: predicate}] tripleGetter)
         (Just t) -> pure t
     do
       (object :: Array String) <- objectsGetter id

@@ -53,7 +53,7 @@ psp:Context q:PropertyGetter
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
 			$mogelijkeBinding => psp:Property
--
+
 --------------------------------------------------------------------------------
 -- ROLGETTER
 --------------------------------------------------------------------------------
@@ -79,6 +79,26 @@ psp:Context q:RolGetter
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
 			$range => psp:Rol
+
+--------------------------------------------------------------------------------
+-- COMPUTEDROLGETTER
+--------------------------------------------------------------------------------
+-- Instances will be created by the QueryFunctionDescriptionCompiler, e.g.
+--	q:ComputedRolGetter q:r1
+-- 		extern $functionName = "modelsM"
+psp:Context q:ComputedRolGetter
+	$aspect => psp:Function
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		$mogelijkeBinding => psp:Rol
+		psp:Rol $buitenRolBeschrijving
+			$rolProperty =>
+				psp:Property $functionName
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
 
 --------------------------------------------------------------------------------
 -- UNARYCOMBINATOR

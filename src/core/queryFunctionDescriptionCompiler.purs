@@ -165,6 +165,11 @@ compileElementaryQueryStep s contextId = case s of
           (createRolGetterDescription contextId "constructRolGetter" rn)
           (createRolGetterDescription contextId "constructRolLookup" rn)))
         `thenPutQueryStepDomain` rn
+  ComputedRol rn -> do
+    dom <- getQueryStepDomain
+    ensureContextHasRol dom rn
+      (createRolGetterDescription contextId "computedRol" rn)
+        `thenPutQueryStepDomain` rn
   UnqualifiedRol ln -> ensureAspect (psp "Context")
     do
       contextType <- getQueryStepDomain

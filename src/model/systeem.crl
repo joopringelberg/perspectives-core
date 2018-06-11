@@ -5,14 +5,31 @@ import model:Perspectives als psp:
 
 import model:Arc als arc:
 
+import model:QueryAst als q:
+
 Section psp:Context$rolInContext
 
 psp:Context sys:Systeem
-	prototype psp:ContextPrototype
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $modelRetrievalCount
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Number
 	$rolInContext =>
 		psp:Rol $trustedCluster
 			extern $isFunctioneel = true
 			$mogelijkeBinding => sys:TrustedCluster
+	$rolInContext =>
+		q:ComputedRolGetter $models
+			extern $functionName = "modelsM"
 	$rolInContext =>
 		psp:Rol $gebruiker
 			-- wat is de mogelijkeBinding van gebruiker?
@@ -37,7 +54,6 @@ psp:Context sys:Systeem
 					$range => psp:String
 
 arc:Zaak sys:TrustedCluster
-	prototype psp:ContextPrototype
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
@@ -50,6 +66,10 @@ arc:Zaak sys:TrustedCluster
 					extern $isFunctioneel = true
 					extern $isVerplicht = true
 					$range => psp:String
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
 	psp:Context$rolInContext =>
 		psp:Rol $clusterGenoot
 			extern $isFunctioneel = false

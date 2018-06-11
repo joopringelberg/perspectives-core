@@ -21,6 +21,7 @@ data QueryStep
 data ElementaryQueryStep
   = UnqualifiedRol String
   | QualifiedRol String
+  | ComputedRol String
   | UnqualifiedProperty String
   | QualifiedProperty String
   | UnqualifiedExternalProperty String
