@@ -78,6 +78,40 @@ class PerspectivesProxy
     this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
   }
 
+  getBinding (rolID, receiveValues, handleUnsubscriber)
+  {
+    const req = {
+      request: "GetBinding",
+      subject: rolID,
+      predicate: "",
+      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
+      reactStateSetter: function (arrString)
+      {
+        receiveValues(arrString);
+        return function () {};
+      }
+    };
+    this.setter(req)(this.request)();
+    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+  }
+
+  getBindingType (rolID, receiveValues, handleUnsubscriber)
+  {
+    const req = {
+      request: "GetBindingType",
+      subject: rolID,
+      predicate: "",
+      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
+      reactStateSetter: function (arrString)
+      {
+        receiveValues(arrString);
+        return function () {};
+      }
+    };
+    this.setter(req)(this.request)();
+    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+  }
+
 }
 // Capture Error responses.
 function handleChannelError(handleUnsubscriber)

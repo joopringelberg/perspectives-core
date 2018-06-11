@@ -8,7 +8,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
-import Perspectives.DataTypeTripleGetters (bindingM)
+import Perspectives.DataTypeTripleGetters (bindingM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName, PropertyName, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
@@ -24,6 +24,8 @@ import Prelude (class Show, Unit, bind, const, discard, flip, pure, unit, void, 
 -----------------------------------------------------------
 data ApiRequest e =
   GetRolBinding ContextID RolName (ReactStateSetter e)
+  | GetBinding RolID String (ReactStateSetter e)
+  | GetBindingType RolID String (ReactStateSetter e)
   | GetRol ContextID RolName (ReactStateSetter e)
   | GetProperty RolName PropertyName (ReactStateSetter e)
   | ShutDown
@@ -31,6 +33,8 @@ data ApiRequest e =
 
 instance showApiRequest :: Show (ApiRequest e) where
   show (GetRolBinding cid rn _) = "{GetRolBinding " <> cid <> " " <> rn <> "}"
+  show (GetBinding rid _ _) = "{GetBinding" <> rid <> "}"
+  show (GetBindingType rid _ _) = "{GetBindingType" <> rid <> "}"
   show (GetRol cid rn _) = "{GetRol " <> cid <> " " <> rn <> "}"
   show (GetProperty rn pn _) = "{GetProperty " <> rn <> " " <> pn <> "}"
   show ShutDown = "ShutDown"
@@ -74,6 +78,8 @@ foreign import connect :: forall e1 e2. ApiChannel e1 -> Eff (react:: REACT | e2
 marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
 marshallRequestRecord r@{request} = case request of
   "GetRolBinding" -> GetRolBinding r.subject r.predicate r.reactStateSetter
+  "GetBinding" -> GetBinding r.subject "" r.reactStateSetter
+  "GetBindingType" -> GetBindingType r.subject "" r.reactStateSetter
   "GetRol" -> GetRol r.subject r.predicate r.reactStateSetter
   "GetProperty" -> GetProperty r.subject r.predicate r.reactStateSetter
   "ShutDown" -> ShutDown
@@ -95,6 +101,12 @@ dispatch request response = do
       case req of
         (GetRolBinding cid rn setter) -> do
           unsubscriber <- getRolBinding cid rn setter
+          send (Unsubscriber unsubscriber)
+        (GetBinding rid _ setter) -> do
+          unsubscriber <- getBinding rid setter
+          send (Unsubscriber unsubscriber)
+        (GetBindingType rid _ setter) -> do
+          unsubscriber <- getBindingType rid setter
           send (Unsubscriber unsubscriber)
         (GetRol cid rn setter) -> do
           unsubscriber <- getRol cid rn setter
@@ -133,6 +145,16 @@ getQuery cid query@(TypedTripleGetter qn _) setter = do
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRolBinding cid rn setter = do
   getQuery cid (constructRolGetter rn >-> bindingM) setter
+
+-- | Retrieve the binding of the rol that is passed in, subscribe to it.
+getBinding :: forall e. ContextID -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getBinding cid setter = do
+  getQuery cid bindingM setter
+
+-- | Retrieve the type of the binding of the rol that is passed in, subscribe to it.
+getBindingType :: forall e. ContextID -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getBindingType cid setter = do
+  getQuery cid (bindingM >-> rolTypeM) setter
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)

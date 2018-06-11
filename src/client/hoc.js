@@ -1,88 +1,90 @@
 import React, { Component } from "react";
 import { Perspectives } from "./perspectivesApiProxy";
 
-// Context -> Rol[] ->
-function contextComponent(contextType, rolNames, renderer)
+class Context extends Component
 {
+  // {instance: String}
+  constructor (props)
+  {
+    super(props);
+    const component = this;
+    component.state = {};
+    component.props.rollen.forEach(rn => component.state[rn] = undefined);
+    component.unsubscribers = {};
+  }
 
-  return class extends Component {
-    // {instance: String}
-    constructor (props)
-    {
-      super(props);
-      const component = this;
-      this.state = {};
-      rolNames.forEach( rn => component.state[rn] = undefined);
-      this.unsubscribers = {};
-    }
-
-    componentDidMount()
-    {
-      const component = this;
-      rolNames.forEach(
-        function(rolName)
-        {
-          Perspectives.then(
-            function(pproxy)
-            {
-              pproxy.getRol(
-                component.props.instance,
-                contextType + "$" + rolName,
-                function (rolIds)
-                {
-                  const updater = {};
-                  updater[rolName] = rolIds;
-                  component.setState(updater);
-                },
-                function (unsubscriber)
-                {
-                  component.unsubscribers[rolName] = unsubscriber;
-                });
-            }
-          );
-        }
-      );
-    }
-
-    componentWillUnmount ()
-    {
-      const unsubscribers = this.state.unsubscribers;
-      Object.keys( unsubscribers ).forEach(
-        unsubscriber => unsubscribers[unsubscriber]()
-      );
-    }
-
-    render ()
-    {
-      const component = this;
-
-      function stateIsComplete()
+  componentDidMount ()
+  {
+    const component = this;
+    component.props.rollen.forEach(
+      function (rolName)
       {
-        var isComplete = true;
-        Object.keys( component.state ).forEach(
-          function(prop)
+        Perspectives.then(
+          function (pproxy)
           {
-            if (!component.state[prop]) {isComplete = false;}
-          });
-
-        return isComplete;
+            pproxy.getRol(
+              component.props.instance,
+              component.props.type + "$" + rolName,
+              function (rolIds)
+              {
+                const updater = {};
+                updater[rolName] = rolIds;
+                component.setState(updater);
+              },
+              function (unsubscriber)
+              {
+                component.unsubscribers[rolName] = unsubscriber;
+              });
+          }
+        );
       }
+    );
+  }
 
-      if (stateIsComplete())
+  componentWillUnmount ()
+  {
+    const unsubscribers = this.state.unsubscribers;
+    Object.keys(unsubscribers).forEach(
+      unsubscriber => unsubscribers[unsubscriber]()
+    );
+  }
+
+  render ()
+  {
+    const component = this;
+
+    if (stateIsComplete(this))
+    {
+      if (Array.isArray(component.props.children))
       {
-        return renderer.call(component);
+        return React.Children.map(
+          component.props.children,
+          function (child)
+          {
+            return React.cloneElement(
+              child,
+              {
+                instance: component.state[child.props.rol],
+                namespace: component.props.type
+              });
+          });
       }
       else
       {
-        return <div/>;
+        return React.cloneElement(component.props.children, {instance: component.state.binding});
       }
     }
-  };
+    else
+    {
+      return <div />;
+    }
+  }
 }
 
-function viewComponent(c)
+function viewComponent (c)
 {
-  return class extends Component{
+  return class extends Component
+  {
     // {instance: String}
     constructor (props)
     {
@@ -90,21 +92,21 @@ function viewComponent(c)
       const component = this;
       this.state = {};
       this.unsubscribers = {};
-      Object.keys( c.propTypes ).forEach( rn => component.state[rn] = undefined);
+      Object.keys(c.propTypes).forEach(rn => component.state[rn] = undefined);
     }
 
-    componentDidMount()
+    componentDidMount ()
     {
       const component = this;
-      Object.keys( c.propTypes ).forEach(
-        function(propertyName)
+      Object.keys(c.propTypes).forEach(
+        function (propertyName)
         {
           Perspectives.then(
-            function(pproxy)
+            function (pproxy)
             {
               pproxy.getProperty(
                 component.props.instance,
-                c.rol + "$" + propertyName,
+                component.props.namespace + "$" + component.props.rol + "$" + propertyName,
                 function (propertyValues)
                 {
                   const updater = {};
@@ -124,7 +126,7 @@ function viewComponent(c)
     componentWillUnmount ()
     {
       const unsubscribers = this.state.unsubscribers;
-      Object.keys( unsubscribers ).forEach(
+      Object.keys(unsubscribers).forEach(
         unsubscriber => unsubscribers[unsubscriber]()
       );
     }
@@ -134,26 +136,14 @@ function viewComponent(c)
       const component = this;
       var props;
 
-      function stateIsComplete()
-      {
-        var isComplete = true;
-        Object.keys( component.state ).forEach(
-          function(prop)
-          {
-            if (!component.state[prop]) {isComplete = false;}
-          });
-
-        return isComplete;
-      }
-
-      if (stateIsComplete())
+      if (stateIsComplete(this))
       {
         props = Object.assign({instance: component.props.instance}, component.state);
         return c(props);
       }
       else
       {
-        return <div/>;
+        return <div />;
       }
     }
   };
@@ -161,25 +151,40 @@ function viewComponent(c)
 
 class Binding extends Component
 {
-  constructor(props)
+  constructor (props)
   {
     super(props);
+    this.state = {};
     this.state.binding = undefined;
     this.unsubscriber = undefined;
   }
-  componentDidMount()
+
+  componentDidMount ()
   {
     const component = this;
     Perspectives.then(
-      function(pproxy)
+      function (pproxy)
       {
+        // Retrieve the type of the binding.
+        // This will be the namespace that its properties are defined in.
         pproxy.getBinding(
           component.props.instance,
-          function(binding)
+          function (binding)
           {
-            component.setState({binding: binding});
+            component.setState({binding: binding[0]});
           },
-          function(unsubscriber)
+          function (unsubscriber)
+          {
+            component.unsubscriber = unsubscriber;
+          }
+        );
+        pproxy.getBindingType(
+          component.props.instance,
+          function (bindingType)
+          {
+            component.setState({bindingType: bindingType[0]});
+          },
+          function (unsubscriber)
           {
             component.unsubscriber = unsubscriber;
           }
@@ -196,21 +201,55 @@ class Binding extends Component
   // Render! props.children contains the nested elements.
   // These should be provided the retrieved binding value.
   // However, this can only be done after state is available.
-  render()
+  render ()
   {
     const component = this;
-    if ( component.state.binding )
+
+    if (component.state.binding)
     {
-      return component.props.children.map(
-        function(childComponent)
-        {
-          childComponent({instance: component.state.binding});
-        }
-      );
+      if (Array.isArray(component.props.children))
+      {
+        return React.Children.map(
+          component.props.children,
+          function (child)
+          {
+            return React.cloneElement(
+              child,
+              {
+                instance: component.state.binding,
+                namespace: component.state.bindingType
+              });
+          });
+      }
+      else
+      {
+        return React.cloneElement(
+          component.props.children,
+          {
+            instance: component.state.binding,
+            namespace: component.state.bindingType
+          });
+      }
     }
-    else {
-      return <div/>;
+    else
+    {
+      return <div />;
     }
   }
+
 }
-export {contextComponent, viewComponent, Binding};
+
+function stateIsComplete (comp)
+{
+  var isComplete = true;
+  Object.keys(comp.state).forEach(
+    function (prop)
+    {
+      if (!comp.state[prop])
+      {isComplete = false;}
+    });
+
+  return isComplete;
+}
+
+export { Context, viewComponent, Binding };
