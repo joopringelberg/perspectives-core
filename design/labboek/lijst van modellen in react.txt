@@ -1,0 +1,10 @@
+De modellenlijst in React
+
+1. Ik heb nu een mechanisme om een rol te berekenen en die berekening willekeurig te kunnen laten triggeren door het dependency systeem. Casu quo, sys:Systeem heeft nu een extra rol "models" en die wordt gevuld doordat we de lijst van documenten uit de couchdb 'perspect_models' halen.
+
+2. Volgende stap: zet die op het scherm.
+	a. Maak een lijst of een dropdown lijst in React.
+	b. Bed dat in een Rol component van een Context component in, zodat we via de API de betreffende rol kunnen opvragen.
+	
+INTERMEZZO
+Het is nodig om modelbestanden te kunnen parseren en in Couchdb op te kunnen slaan. Uiteraard is dat waar de editor voor bedoeld is, maar we zitten in een catch22 situatie.

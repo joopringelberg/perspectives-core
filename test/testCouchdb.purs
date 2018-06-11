@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Eff.AVar (AVAR, AVar)
-import Control.Monad.Eff.Ref (REF, Ref)
+import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Reader (ReaderT)
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.Couchdb.Databases (createDatabase, requestAuthentication)
@@ -20,7 +20,7 @@ import Perspectives.Syntax (PerspectContext, PerspectRol)
 -- test = runTest $ runPerspectives "admin" "admin" authenticate
 test :: forall t5.
       ReaderT
-        (Ref
+        (AVar
            { rolDefinitions :: GLStrMap (AVar PerspectRol)
            , contextDefinitions :: GLStrMap (AVar PerspectContext)
            , domeinCache :: GLStrMap (AVar DomeinFile)
