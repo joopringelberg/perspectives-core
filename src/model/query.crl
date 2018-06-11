@@ -67,8 +67,8 @@ psp:Context q:RolGetter
 		psp:Rol $binnenRolBeschrijving
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
-		$mogelijkeBinding => psp:Rol
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
 					extern $isFunctioneel = true
@@ -92,8 +92,8 @@ psp:Context q:ComputedRolGetter
 		psp:Rol $binnenRolBeschrijving
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
-		$mogelijkeBinding => psp:Rol
 		psp:Rol $buitenRolBeschrijving
+			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
 					extern $isFunctioneel = true
