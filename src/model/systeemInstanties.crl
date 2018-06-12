@@ -3,7 +3,7 @@ GebruikerGegevens
 import model:Systeem als sys:
 
 sys:Systeem usr:MijnSysteem
-	extern $modelRetrievalCount = 0
+	extern $modelOphaalTeller = 0
 	$gebruiker(1) => ()
 		$voornaam = "Joop"
 		$achternaam = "Ringelberg"

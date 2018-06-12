@@ -8,3 +8,40 @@ De modellenlijst in React
 	
 INTERMEZZO
 Het is nodig om modelbestanden te kunnen parseren en in Couchdb op te kunnen slaan. Uiteraard is dat waar de editor voor bedoeld is, maar we zitten in een catch22 situatie.
+Opgelost via een testfile.
+
+================================================================================
+Het mechanisme om een computedRol uit te rekenen, rammelt.
+Ik heb het uitgewerkt voor de queryCompiler. Die vertrekt echter uit de ID van een typebeschrijving zoals:
+	- model:QueryAst$DataTypeGetter
+	- model:QueryAst$PropertyGetter
+	- model:QueryAst$RolGetter
+	- etc.
+Een beschrijving van zo'n type wordt opgesteld door de functie compileElementaryQueryStep. Hij produceert uit de dataconstructor ComputedRol van het sum-type ElementaryQueryStep zo'n beschrijving, van het type model:QueryAst$RolGetter. De functienaam is in dat geval "computedRolGetter", in plaats van "constructRolGetter", "rolQuery", enz.
+
+ElementaryQueryStep-types moeten worden geproduceerd door de parser die een query-expressie ontleedt. Die is nog niet geschreven. Ik stel me voor dat hij zal werken met een lijst van gereserveerde rollen. Bij zo'n gereserveerde rol stelt hij een ComputedRol beschrijving op.
+
+Maar nu is de vraag: hoe kunnen we zo'n soort rol laten berekenen vanuit de React componenten?
+
+Er is dus een moment in de parser waarop een rolnaam bekend is en besloten moet worden of een
+	- rolQuery,
+	- constructRolLookup,
+	- constructInverseRolGetter, of
+	- computedRolGetter
+constructor moet worden ingezet om de rol op te halen.
+
+Dat proces, iets dergelijks, moet ook gevolgd worden als vanuit een React Context component een rol opgehaald wordt. Immers, ook daar kan het gaan om een 
+	- berekende rol (rolQuery)
+	- een rol die misschien niet direct bij de context is opgeslagen, maar bij een prototype (constructRolLookup)
+	- omgekeerde beweging over een rol (constructInverseRolGetter)
+	- of een rol die berekend wordt in een willekeurige functie, in plaats van door data-traversal.
+
+Hoe onderscheiden we die gevallen?
+Ten eerste, merk op dat de queryFunctionDescriptionCompiler een gevalsonderscheiding doet aan de hand van de test:
+	(lift $ rn `contextHasType` "model:Perspectives$Function")
+Oftewel: heeft de rol het type psp:Function? In dat geval stelt deze compiler een beschrijving op van een "rolQuery".
+Ten tweede: de parser moet al onderscheid maken naar een gekwalificeerde en ongekwalificeerde naam. Het gaat simpelweg om de vraag of een lokale naam is gebruikt, of een naam voorzien van een prefix of zelfs een volledige gekwalificeerde naam (als we dat al toestaan).
+Eigenlijk moet hier maar één geval aan toegevoegd worden, namelijk dat de (gekwalificeerde) naam een gereserveerde (want berekende) rol is.
+Dit kan ik toevoegen aan de queryFunctionDescriptionCompiler.
+
+In de React interface hebben we alleen maar gekwalificeerde namen. We zouden dus een beschrijving kunnen opstellen van een QualifiedRol. De queryFunctionDescriptionCompiler en de queryCompiler kunnen dan de rest doen.

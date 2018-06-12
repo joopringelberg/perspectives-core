@@ -65,9 +65,11 @@ psp:Context q:RolGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
@@ -78,7 +80,7 @@ psp:Context q:RolGetter
 		psp:Rol $rol
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$range => psp:Rol
+			$mogelijkeBinding => psp:Rol
 
 --------------------------------------------------------------------------------
 -- COMPUTEDROLGETTER
@@ -90,9 +92,11 @@ psp:Context q:ComputedRolGetter
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
@@ -111,9 +115,11 @@ psp:Context q:UnaryCombinator
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
@@ -124,7 +130,7 @@ psp:Context q:UnaryCombinator
 		psp:Rol $query
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$range => psp:Function
+			$mogelijkeBinding => psp:Function
 
 --------------------------------------------------------------------------------
 -- NARYCOMBINATOR
@@ -138,9 +144,11 @@ psp:Context q:nAryCombinator
 	$aspect => psp:Function
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
@@ -151,7 +159,7 @@ psp:Context q:nAryCombinator
 		psp:Rol $operand
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$range => psp:Function
+			$mogelijkeBinding => psp:Function
 
 --------------------------------------------------------------------------------
 -- COMBINATORS
@@ -199,6 +207,7 @@ psp:Context q:Constant
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $value
@@ -208,6 +217,7 @@ psp:Context q:Constant
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 
 --------------------------------------------------------------------------------
@@ -217,6 +227,7 @@ psp:Context q:Variable
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $name
 					extern $isFunctioneel = true
@@ -225,15 +236,18 @@ psp:Context q:Variable
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 
 psp:Context q:setVariable
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $name
 					extern $isFunctioneel = true
@@ -262,9 +276,11 @@ psp:Context q:setVariable
 psp:Context q:assignToRol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $operation
 					extern $isFunctioneel = true
@@ -308,9 +324,11 @@ psp:Context q:assignToRol
 psp:Context q:assignToProperty
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $operation
 					extern $isFunctioneel = true

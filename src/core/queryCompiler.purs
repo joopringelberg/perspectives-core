@@ -84,12 +84,10 @@ constructQueryFunction typeDescriptionID = do
         "rolQuery" -> rolQuery rol
         "constructRolLookup" -> pure $ constructRolLookup rol
         "constructInverseRolGetter" -> pure $ constructInverseRolGetter rol
+        "computedRolGetter" -> case rol of
+          "model:Systeem$Systeem$modellen" -> pure modelsM
+          otherwise -> throwError (error $ "constructQueryFunction: unknown function for computedRolGetter: '" <> functionName <> "'")
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for RolGetter: '" <> functionName <> "'")
-    "model:QueryAst$computedRolGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName"))
-      case functionName of
-        "modelsM" -> pure modelsM
-        otherwise -> throwError (error $ "constructQueryFunction: unknown function for computedRolGetter: '" <> functionName <> "'")
     "model:QueryAst$rolesOf" ->
       rolesOf <$> (onNothing
         (errorMessage "no context" queryStepType)

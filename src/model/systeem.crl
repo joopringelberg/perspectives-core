@@ -19,7 +19,7 @@ psp:Context sys:Systeem
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
-				psp:Property $modelRetrievalCount
+				psp:Property $modelOphaalTeller
 					extern $isFunctioneel = true
 					extern $isVerplicht = true
 					$range => psp:Number
@@ -28,7 +28,7 @@ psp:Context sys:Systeem
 			extern $isFunctioneel = true
 			$mogelijkeBinding => sys:TrustedCluster
 	$rolInContext =>
-		q:ComputedRolGetter $models
+		q:ComputedRolGetter $modellen
 			extern $functionName = "modelsM"
 	$rolInContext =>
 		psp:Rol $gebruiker
@@ -54,7 +54,7 @@ psp:Context sys:Systeem
 					$range => psp:String
 
 arc:Zaak sys:TrustedCluster
-	$buitenRolBeschrijving =>
+	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
 			$viewInRol =>
@@ -66,7 +66,8 @@ arc:Zaak sys:TrustedCluster
 					extern $isFunctioneel = true
 					extern $isVerplicht = true
 					$range => psp:String
-	$binnenRolBeschrijving =>
+			$mogelijkeBinding => psp:Rol
+	psp:Context$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol

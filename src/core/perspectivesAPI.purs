@@ -1,23 +1,27 @@
 module Perspectives.Api where
 
-import Control.Monad.Aff (launchAff_)
+import Control.Monad.Aff (launchAff_, throwError, error)
 import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, putVar, takeVar)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, fromAff) as Promise
+import Data.Either (Either(..))
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
-import Perspectives.CoreTypes (TypedTripleGetter(..), NamedFunction(..), Triple(..), TripleRef(..), MonadPerspectives)
-import Perspectives.DataTypeTripleGetters (bindingM, rolTypeM)
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), Triple(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
+import Perspectives.DataTypeTripleGetters (bindingM, contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolName, PropertyName, RolID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.QueryAST (ElementaryQueryStep(..))
+import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryEffect ((~>))
-import Perspectives.RunMonadPerspectivesQuery ((##))
+import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
+import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructRolGetter, constructRolPropertyGetter)
-import Prelude (class Show, Unit, bind, const, discard, flip, pure, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (class Show, Unit, bind, const, discard, flip, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -159,7 +163,15 @@ getBindingType cid setter = do
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRol cid rn setter = do
-  getQuery cid (constructRolGetter rn) setter
+  -- getQuery cid (constructRolGetter rn) setter
+  -- qf <- rolQuery rn
+  ctxtType <- cid ##>> contextTypeM
+  m <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
+  case m of
+    (Left message) -> throwError $ error (show message)
+    (Right id) -> do
+      qf <- constructQueryFunction id
+      getQuery cid qf setter
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
