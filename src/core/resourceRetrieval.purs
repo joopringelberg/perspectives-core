@@ -55,7 +55,7 @@ fetchEntiteit id = ensureAuthentication $ do
   ebase <- entitiesDatabase
   (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
   (res :: AffjaxResponse a) <- liftAff $ affjax $ rq {url = ebase <> id}
-  liftAff $ onAccepted res.status [200] "fetchEntiteit" $ putVar res.response v
+  liftAff $ onAccepted res.status [200, 304] "fetchEntiteit" $ putVar res.response v
   liftAff $ readVar v
 
 saveEntiteitPreservingVersion :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a

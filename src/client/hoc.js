@@ -52,6 +52,7 @@ class Context extends Component
   render ()
   {
     const component = this;
+    var child;
 
     if (stateIsComplete(this))
     {
@@ -71,7 +72,13 @@ class Context extends Component
       }
       else
       {
-        return React.cloneElement(component.props.children, {instance: component.state.binding});
+        child = component.props.children;
+        return React.cloneElement(
+          child,
+          {
+            instance: component.state[child.props.rol],
+            namespace: component.props.type
+          });
       }
     }
     else
