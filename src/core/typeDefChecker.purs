@@ -62,9 +62,10 @@ checkContext' cid = do
       checkAvailableRoles tp cid
       -- if this psp:ContextInstance represents a psp:Rol, and if it has an instance
       -- of $aspectRol, check whether its namespace giving context has that Aspect.
-      ifM (lift $ lift $ (cid `contextHasType` "model:Perspectives$Rol"))
-        (checkAspectOfRolType cid)
-        (pure unit)
+      b <- (lift $ lift $ (cid `contextHasType` "model:Perspectives$Rol"))
+      if b
+        then (checkAspectOfRolType cid)
+        else (pure unit)
       checkCyclicAspects cid
 
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`

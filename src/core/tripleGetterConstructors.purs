@@ -16,7 +16,7 @@ import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
-import Prelude (bind, const, ifM, pure, ($), (<<<), (<>), (>=>), (==))
+import Prelude (bind, const, pure, ($), (<<<), (<>), (>=>), (==))
 
 constructTripleGetterFromEffectExpression :: forall e.
   PropertyName ->
@@ -24,23 +24,25 @@ constructTripleGetterFromEffectExpression :: forall e.
   TypedTripleGetter e
 constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter pn tripleGetter where
   tripleGetter :: TripleGetter e
-  tripleGetter id = ifM memorizeQueryResults
-    do
-      mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
-      case mt of
-        Nothing -> do
-          (object :: Array String) <- objectsGetter id
-          lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
-        (Just t) -> pure t
-    do
-      (object :: Array String) <- objectsGetter id
-      pure (Triple{ subject: id
-                , predicate: pn
-                , object: object
-                , dependencies: []
-                , supports : []
-                , tripleGetter: tripleGetter
-                })
+  tripleGetter id = do
+    b <- memorizeQueryResults
+    if b
+      then do
+        mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
+        case mt of
+          Nothing -> do
+            (object :: Array String) <- objectsGetter id
+            lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [] tripleGetter)
+          (Just t) -> pure t
+      else do
+        (object :: Array String) <- objectsGetter id
+        pure (Triple{ subject: id
+                  , predicate: pn
+                  , object: object
+                  , dependencies: []
+                  , supports : []
+                  , tripleGetter: tripleGetter
+                  })
 
 constructTripleGetterWithArbitrarySupport :: forall e.
   PropertyName ->
@@ -49,24 +51,26 @@ constructTripleGetterWithArbitrarySupport :: forall e.
   TypedTripleGetter e
 constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter _ supportGetter) = TypedTripleGetter pn tripleGetter where
   tripleGetter :: TripleGetter e
-  tripleGetter id = ifM memorizeQueryResults
-    do
-      mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
-      case mt of
-        Nothing -> do
-          (object :: Array String) <- objectsGetter id
-          (Triple{subject, predicate}) <- supportGetter id
-          lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [TripleRef {subject: subject, predicate: predicate}] tripleGetter)
-        (Just t) -> pure t
-    do
-      (object :: Array String) <- objectsGetter id
-      pure (Triple{ subject: id
-                , predicate: pn
-                , object: object
-                , dependencies: []
-                , supports : []
-                , tripleGetter: tripleGetter
-                })
+  tripleGetter id = do
+    b <- memorizeQueryResults
+    if b
+      then do
+        mt <- lift $ liftAff $ liftEff (lookupInTripleIndex id pn)
+        case mt of
+          Nothing -> do
+            (object :: Array String) <- objectsGetter id
+            (Triple{subject, predicate}) <- supportGetter id
+            lift $ liftAff $ liftEff (addToTripleIndex id pn object [] [TripleRef {subject: subject, predicate: predicate}] tripleGetter)
+          (Just t) -> pure t
+      else do
+        (object :: Array String) <- objectsGetter id
+        pure (Triple{ subject: id
+                  , predicate: pn
+                  , object: object
+                  , dependencies: []
+                  , supports : []
+                  , tripleGetter: tripleGetter
+                  })
 
 -- | Construct a memorizing triple getter from an arbitrary ObjectsGetter. This function is used, a.o.,
 -- | to construct getters for the properties of contexts and roles that are not roles or properties, such as

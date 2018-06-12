@@ -59,13 +59,14 @@ compileElementaryQueryStep s contextId = case s of
   Identity -> createDataTypeGetterDescription contextId  "identityM"
   Type -> do
     dom <- getQueryStepDomain
-    ifM (lift $ dom `isOrHasAspect` (psp "Context"))
-      do
+    b <- (lift $ dom `isOrHasAspect` (psp "Context"))
+    if b
+      then (do
         tp <- lift (dom ##>> contextTypeM) >>= putQueryStepDomain
-        createDataTypeGetterDescription contextId "contextTypeM"
-      do
+        createDataTypeGetterDescription contextId "contextTypeM")
+      else (do
         tp <- lift (dom ##>> contextTypeM) >>= putQueryStepDomain
-        createDataTypeGetterDescription contextId "rolType"
+        createDataTypeGetterDescription contextId "rolType")
   BuitenRol -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "Rol") *> createDataTypeGetterDescription contextId "buitenRol")
   IedereRolInContext -> ensureAspect (psp "Context")
@@ -87,33 +88,45 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     -- TODO. Pas de constructie hieronder toe op de andere gevallen.
     ensureRolHasProperty dom p
-      ((ifM (lift $ p `contextHasType` "model:Perspectives$Function")
-          (createContextWithSingleRole contextId (q "propertyQuery") p)
-          (ifM (isInQueryStepDomain p)
-            (createPropertyGetterDescription contextId "constructRolPropertyGetter" p)
-            (createPropertyGetterDescription contextId "constructRolPropertyLookup" p)))
-        `thenPutQueryStepDomain` p)
+      ((do
+        b <- (lift $ p `contextHasType` "model:Perspectives$Function")
+        if b
+          then (createContextWithSingleRole contextId (q "propertyQuery") p)
+          else do
+            b' <- isInQueryStepDomain p
+            if b'
+              then (createPropertyGetterDescription contextId "constructRolPropertyGetter" p)
+              else (createPropertyGetterDescription contextId "constructRolPropertyLookup" p))
+      `thenPutQueryStepDomain` p)
   QualifiedInternalProperty p -> do
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
-      (ifM (lift $ p `contextHasType` "model:Perspectives$Function")
-          (createContextWithSingleRole contextId (q "propertyQuery") p)
-          (ifM (isInQueryStepDomain p)
-            (createPropertyGetterDescription contextId "constructInternalPropertyGetter" p)
-            (createPropertyGetterDescription contextId "constructInternalPropertyLookup" p)
+      ((do
+        b <- (lift $ p `contextHasType` "model:Perspectives$Function")
+        if b
+          then (createContextWithSingleRole contextId (q "propertyQuery") p)
+          else (do
+            b' <- (isInQueryStepDomain p)
+            if b'
+              then (createPropertyGetterDescription contextId "constructInternalPropertyGetter" p)
+              else (createPropertyGetterDescription contextId "constructInternalPropertyLookup" p)
             ))
-          `thenPutQueryStepDomain` p
+          `thenPutQueryStepDomain` p)
   QualifiedExternalProperty p -> do
     dom <- getQueryStepDomain
     -- TODO. Hier moet een controle komen op externe properties van een context.
     ensureRolHasProperty dom p
-      (ifM (lift $ p `contextHasType` "model:Perspectives$Function")
-          (createContextWithSingleRole contextId (q "propertyQuery") p)
-          (ifM (isInQueryStepDomain p)
-            (createPropertyGetterDescription contextId "constructExternalPropertyGetter" p)
-            (createPropertyGetterDescription contextId "constructExternalPropertyLookup" p)
+      ((do
+        b <- (lift $ p `contextHasType` "model:Perspectives$Function")
+        if b
+          then (createContextWithSingleRole contextId (q "propertyQuery") p)
+          else (do
+            b' <- (isInQueryStepDomain p)
+            if b'
+              then (createPropertyGetterDescription contextId "constructExternalPropertyGetter" p)
+              else (createPropertyGetterDescription contextId "constructExternalPropertyLookup" p)
             ))
-        `thenPutQueryStepDomain` p
+        `thenPutQueryStepDomain` p)
   UnqualifiedProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -122,11 +135,15 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          (ifM (lift $ qn `contextHasType` "model:Perspectives$Function")
-            (createPropertyGetterDescription contextId "propertyQuery" qn)
-            (ifM (isInQueryStepDomain aspect)
-              (createPropertyGetterDescription contextId "constructRolPropertyGetter" qn)
-              (createPropertyGetterDescription contextId "constructRolPropertyLookup" qn)))
+          (do
+            b <- (lift $ qn `contextHasType` "model:Perspectives$Function")
+            if b
+              then (createPropertyGetterDescription contextId "propertyQuery" qn)
+              else (do
+                b' <- (isInQueryStepDomain aspect)
+                if b'
+                  then (createPropertyGetterDescription contextId "constructRolPropertyGetter" qn)
+                  else (createPropertyGetterDescription contextId "constructRolPropertyLookup" qn)))
             `thenPutQueryStepDomain` qn
   UnqualifiedInternalProperty ln -> ensureAspect (psp "Rol")
     do
@@ -136,12 +153,16 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          (ifM (lift $ qn `contextHasType` "model:Perspectives$Function")
-            (createPropertyGetterDescription contextId "propertyQuery" qn)
-            (ifM (isInQueryStepDomain qn)
-              (createPropertyGetterDescription contextId "constructInternalPropertyGetter" qn)
-              (createPropertyGetterDescription contextId "constructInternalPropertyLookup" qn)))
-            `thenPutQueryStepDomain` qn
+          ((do
+            b <- (lift $ qn `contextHasType` "model:Perspectives$Function")
+            if b
+              then (createPropertyGetterDescription contextId "propertyQuery" qn)
+              else (do
+                b' <- (isInQueryStepDomain qn)
+                if b'
+                  then (createPropertyGetterDescription contextId "constructInternalPropertyGetter" qn)
+                  else (createPropertyGetterDescription contextId "constructInternalPropertyLookup" qn)))
+            `thenPutQueryStepDomain` qn)
   UnqualifiedExternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -150,26 +171,20 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          (ifM (lift $ qn `contextHasType` "model:Perspectives$Function")
-            (createPropertyGetterDescription contextId "propertyQuery" qn)
-            (ifM (isInQueryStepDomain qn)
-              (createPropertyGetterDescription contextId "constructExternalPropertyGetter" qn)
-              (createPropertyGetterDescription contextId "constructExternalPropertyLookup" qn)))
-            `thenPutQueryStepDomain` qn
+          ((do
+            b <- (lift $ qn `contextHasType` "model:Perspectives$Function")
+            if b
+              then (createPropertyGetterDescription contextId "propertyQuery" qn)
+              else (do
+                b' <- (isInQueryStepDomain qn)
+                if b'
+                  then (createPropertyGetterDescription contextId "constructExternalPropertyGetter" qn)
+                  else (createPropertyGetterDescription contextId "constructExternalPropertyLookup" qn)))
+            `thenPutQueryStepDomain` qn)
   QualifiedRol rn -> do
     dom <- getQueryStepDomain
     ensureContextHasRol dom rn
-      (ifM (lift $ rn `contextHasType` "model:Perspectives$Function")
-        (createRolGetterDescription contextId "rolQuery" rn)
-        (ifM (isInQueryStepDomain rn)
-          (createRolGetterDescription contextId "constructRolGetter" rn)
-          (createRolGetterDescription contextId "constructRolLookup" rn)))
-        `thenPutQueryStepDomain` rn
-  ComputedRol rn -> do
-    dom <- getQueryStepDomain
-    ensureContextHasRol dom rn
-      (createRolGetterDescription contextId "computedRol" rn)
-        `thenPutQueryStepDomain` rn
+      (qualifiedRol rn)
   UnqualifiedRol ln -> ensureAspect (psp "Context")
     do
       contextType <- getQueryStepDomain
@@ -178,12 +193,25 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          -- TODO: controleer ook hier op berekende Rollen.
-          (ifM (isInQueryStepDomain qn)
-            (createRolGetterDescription contextId "constructRolGetter" qn)
-            (createRolGetterDescription contextId "constructRolLookup" qn))
-            `thenPutQueryStepDomain` qn
+          (qualifiedRol qn)
   where
+
+  qualifiedRol :: String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+  qualifiedRol rn =
+    (do
+      b <- (lift $ rn `contextHasType` "model:QueryAst$ComputedRolGetter")
+      if b
+        then (createRolGetterDescription contextId "computedRolGetter" rn)
+        else (do
+          b' <- (lift $ rn `contextHasType` "model:Perspectives$Function")
+          if b'
+            then (createRolGetterDescription contextId "rolQuery" rn)
+            else (do
+              b'' <- (isInQueryStepDomain rn)
+              if b''
+                then (createRolGetterDescription contextId "constructRolGetter" rn)
+                else (createRolGetterDescription contextId "constructRolLookup" rn))))
+      `thenPutQueryStepDomain` rn
 
   thenPutQueryStepDomain :: MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD -> ID -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   thenPutQueryStepDomain m dom = do

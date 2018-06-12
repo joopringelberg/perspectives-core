@@ -27,7 +27,7 @@ import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.PerspectivesState (sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
-import Prelude (Unit, bind, const, ifM, pure, unit, void, ($), (*>), (/=), (<<<), (<>), (==), (>>=))
+import Prelude (Unit, bind, const, pure, unit, void, ($), (*>), (/=), (<<<), (<>), (==), (>>=))
 
 -----------------------------------------------------------
 -- QUALIFYREQUEST
@@ -58,12 +58,13 @@ defaultPerspectRequest = qualifyRequest
 -- See: http://127.0.0.1:5984/_utils/docs/api/server/authn.html#api-auth-cookie
 -----------------------------------------------------------
 authenticate :: forall e. MonadPerspectives (AjaxAvar e) Unit
-authenticate =
-  ifM (sessionCookie >>= lift <<< isEmptyVar)
+authenticate = do
+  b <- (sessionCookie >>= lift <<< isEmptyVar)
+  if b
     -- An authentication request is under way. Just wait till the AVar contains a value.
-    (sessionCookie >>= (void <<< lift <<< readVar))
+    then (sessionCookie >>= (void <<< lift <<< readVar))
     -- New authentication is necessary.
-    requestAuthentication
+    else requestAuthentication
 
 -- | To be called when the cookie is no longer valid.
 requestAuthentication :: forall e. MonadPerspectives (AjaxAvar e) Unit
@@ -97,10 +98,11 @@ requestAuthentication' usr pwd = do
       setSessionCookie $ responseHeaderValue h
 
 ensureAuthentication :: forall e a. MonadPerspectives (AjaxAvarCache e) a -> MonadPerspectives (AjaxAvarCache e) a
-ensureAuthentication a =
-  ifM (sessionCookie >>= lift <<< isEmptyVar)
-    (authenticate *> a)
-    (catchJust predicate a (const (authenticate *> a)))
+ensureAuthentication a = do
+  b <- (sessionCookie >>= lift <<< isEmptyVar)
+  if b
+    then (authenticate *> a)
+    else (catchJust predicate a (const (authenticate *> a)))
   where
     predicate :: Error -> Maybe Unit
     predicate e = if message e == "UNAUTHORIZED" then Just unit else Nothing
