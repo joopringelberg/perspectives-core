@@ -11,8 +11,8 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructTripleGetterWithArbitrarySupport)
 
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
-modelsM :: forall e1 e2. TypedTripleGetter e1
-modelsM = constructTripleGetterWithArbitrarySupport
+modellenM :: forall e1 e2. TypedTripleGetter e1
+modellenM = constructTripleGetterWithArbitrarySupport
   "model:Systeem$Systeem$modellen" getListOfModels (constructExternalPropertyGetter "model:Systeem$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller")
 
 getListOfModels :: forall e. (ID -> MonadPerspectivesQuery (ajax :: AJAX | e) (Array String))

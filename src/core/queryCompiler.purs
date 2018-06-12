@@ -5,7 +5,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Traversable (traverse)
-import Perspectives.ComputedTripleGetters (modelsM)
+import Perspectives.ComputedTripleGetters (modellenM)
 import Perspectives.CoreTypes (MonadPerspectives, TypeID, TypedTripleGetter(..), ObjectsGetter, (%%>), (%%>>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, contextM, contextTypeM, identityM, iedereRolInContextM, labelM, rolTypeM)
@@ -85,7 +85,7 @@ constructQueryFunction typeDescriptionID = do
         "constructRolLookup" -> pure $ constructRolLookup rol
         "constructInverseRolGetter" -> pure $ constructInverseRolGetter rol
         "computedRolGetter" -> case rol of
-          "model:Systeem$Systeem$modellen" -> pure modelsM
+          "model:Systeem$Systeem$modellen" -> pure modellenM
           otherwise -> throwError (error $ "constructQueryFunction: unknown function for computedRolGetter: '" <> functionName <> "'")
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for RolGetter: '" <> functionName <> "'")
     "model:QueryAst$rolesOf" ->
