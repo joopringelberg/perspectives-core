@@ -38,3 +38,8 @@ type MemberName = String
 type Comment = String
 type Value = String
 type Values = Array String
+
+-----------------------------------------------------------
+-- VIEW
+-----------------------------------------------------------
+type ViewName = String

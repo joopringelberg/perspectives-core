@@ -2,6 +2,7 @@ module Perspectives.Identifiers
 ( deconstructPrefix
 , deconstructLocalNameFromCurie
 , deconstructLocalNameFromDomeinURI
+, deconstructLocalNameFromDomeinURI_
 , deconstructModelName
 , deconstructNamespace
 , guardWellFormedNess
@@ -32,7 +33,7 @@ where
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (index, unsafeIndex)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
@@ -129,6 +130,9 @@ deconstructNamespace = getFirstMatch domeinURIRegex
 -- | Returns "localName" from "model:ModelName$localName" or Nothing
 deconstructLocalNameFromDomeinURI :: String -> Maybe String
 deconstructLocalNameFromDomeinURI = getSecondMatch domeinURIRegex
+
+deconstructLocalNameFromDomeinURI_ :: String -> String
+deconstructLocalNameFromDomeinURI_ s = unsafePartial (fromJust (deconstructLocalNameFromDomeinURI s))
 
 -----------------------------------------------------------
 -- CURIES

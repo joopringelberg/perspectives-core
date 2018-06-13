@@ -112,6 +112,22 @@ class PerspectivesProxy
     this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
   }
 
+  getViewProperties (viewName, receiveValues, handleUnsubscriber)
+  {
+    const req = {
+      request: "GetViewProperties",
+      subject: viewName,
+      predicate: "",
+      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
+      reactStateSetter: function (arrString)
+      {
+        receiveValues(arrString);
+        return function () {};
+      }
+    };
+    this.setter(req)(this.request)();
+    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+  }
 }
 // Capture Error responses.
 function handleChannelError(handleUnsubscriber)
@@ -126,7 +142,7 @@ function handleChannelError(handleUnsubscriber)
     {
       handleUnsubscriber( message.value0 );
     }
-  }
+  };
 }
 
 // A proxy testing whether o is constructed with the ApiResponse Error data constructor.
@@ -150,7 +166,7 @@ window.test = function (contextID, rolName)
     });
 };
 
-// exports.connect = connect;
+
 
 module.exports = {
   Perspectives: Perspectives,

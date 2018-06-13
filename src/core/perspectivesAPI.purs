@@ -9,10 +9,11 @@ import Control.Promise (Promise, fromAff) as Promise
 import Data.Either (Either(..))
 import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), Triple(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
-import Perspectives.DataTypeTripleGetters (bindingM, contextTypeM, rolTypeM)
+import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolName, PropertyName, RolID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryEffect ((~>))
@@ -20,7 +21,7 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructRolGetter, constructRolPropertyGetter)
+import Perspectives.TripleGetterConstructors (constructRolGetter)
 import Prelude (class Show, Unit, bind, const, discard, flip, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
@@ -32,6 +33,7 @@ data ApiRequest e =
   | GetBindingType RolID String (ReactStateSetter e)
   | GetRol ContextID RolName (ReactStateSetter e)
   | GetProperty RolName PropertyName (ReactStateSetter e)
+  | GetViewProperties ViewName (ReactStateSetter e)
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
 
@@ -41,6 +43,7 @@ instance showApiRequest :: Show (ApiRequest e) where
   show (GetBindingType rid _ _) = "{GetBindingType" <> rid <> "}"
   show (GetRol cid rn _) = "{GetRol " <> cid <> " " <> rn <> "}"
   show (GetProperty rn pn _) = "{GetProperty " <> rn <> " " <> pn <> "}"
+  show (GetViewProperties vn _) = "{getViewProperties " <> vn <> "}"
   show ShutDown = "ShutDown"
   show WrongRequest = "WrongRequest"
 
@@ -86,6 +89,7 @@ marshallRequestRecord r@{request} = case request of
   "GetBindingType" -> GetBindingType r.subject "" r.reactStateSetter
   "GetRol" -> GetRol r.subject r.predicate r.reactStateSetter
   "GetProperty" -> GetProperty r.subject r.predicate r.reactStateSetter
+  "GetViewProperties" -> GetViewProperties r.subject r.reactStateSetter
   "ShutDown" -> ShutDown
   otherwise -> WrongRequest
 
@@ -117,6 +121,9 @@ dispatch request response = do
           send (Unsubscriber unsubscriber)
         (GetProperty rid pn setter) -> do
           unsubscriber <- getProperty rid pn setter
+          send (Unsubscriber unsubscriber)
+        (GetViewProperties vn setter) -> do
+          unsubscriber <- getViewProperties vn setter
           send (Unsubscriber unsubscriber)
         WrongRequest -> send $ Error ("This request is invalid: " <> showRequestRecord reqr)
         ShutDown -> send $ Error "shutdown" -- ...this case will never occur!
@@ -173,7 +180,20 @@ getRol cid rn setter = do
       qf <- constructQueryFunction id
       getQuery cid qf setter
 
+getViewProperties :: forall e. ViewName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
+getViewProperties viewname setter = do
+  getQuery viewname (propertyReferentiesM >-> bindingM >-> contextM) setter
+
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getProperty rid pn setter = do
-  getQuery rid (constructRolPropertyGetter pn) setter
+  qf <- getPropertyFunction rid pn
+  getQuery rid qf setter
+
+getPropertyFunction :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+getPropertyFunction rid pn = do
+  rolType <- rid ##>> rolTypeM
+  m <- runMonadPerspectivesQueryCompiler rolType (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
+  case m of
+    (Left message) -> throwError $ error (show message)
+    (Right id) -> constructQueryFunction id
