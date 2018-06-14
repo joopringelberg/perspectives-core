@@ -1,7 +1,7 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR, AVar, makeEmptyVar, makeVar, putVar, readVar, takeVar, tryReadVar)
+import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, putVar, readVar, takeVar, tryReadVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Reader (ask, runReaderT)
@@ -30,7 +30,7 @@ newPerspectivesState uinfo av =
 runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR | e) a
   -> Aff (avar :: AVAR | e) a
 runPerspectives userName password mp = do
-  (av :: AVar String) <- makeEmptyVar
+  (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- makeVar $
     newPerspectivesState
       { userName: userName
