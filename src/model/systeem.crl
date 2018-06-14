@@ -84,6 +84,8 @@ arc:Zaak sys:TrustedCluster
 				psp:View $Adressering
 					$propertyReferentie => $$url
 						$volgNummer = 1
+					$propertyReferentie => sys:Systeem$gebruiker$voornaam
+						$volgNummer = 2
 			$objectRol => $$RaadpleegtClusterGenoot
 			$subjectRol => $$RaadpleegtClusterGenoot
 	$actie =>

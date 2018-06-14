@@ -4,7 +4,7 @@ import AceEditor from "react-ace";
 
 import "./App.css";
 import { main } from "./output/Main";
-import { Context, Binding, View } from "./client/hoc";
+import { Context, Binding, View, ContextVanRol, ExterneView } from "./client/hoc";
 
 main();
 
@@ -21,11 +21,21 @@ class App extends Component
           <View rol="gebruiker" viewnaam="VolledigeNaam">
             <GebruikerNaam/>
           </View>
+          <ExterneView rol="trustedCluster" viewnaam="Kaartje">
+            <TrustedCluster_BuitenRol_Kaartje/>
+          </ExterneView>
           <Binding rol="trustedCluster">
             <View viewnaam="Kaartje">
               <TrustedCluster_BuitenRol_Kaartje/>
             </View>
+            <ContextVanRol rollen={["clusterGenoot"]}>
+              <View rol="clusterGenoot" viewnaam="Adressering">
+                <ClusterGenoot/>
+              </View>
+            </ContextVanRol>
           </Binding>
+          <ModelId rol="modellen"/>
+
           {/*<View rol="modellen" viewnaam="AlleModellen">*/}
             {/*<Models/>*/}
           {/*</View>*/}
@@ -68,6 +78,16 @@ function TrustedCluster_BuitenRol_Kaartje(props)
 function Models(props)
 {
   return <p><label>Models:</label>{props.modellen}</p>;
+}
+
+function ModelId(props)
+{
+  return <li key={props.instance}>{props.instance}</li>;
+}
+
+function ClusterGenoot(props)
+{
+  return <p>Clustergenoot {props.voornaam} heeft url: {props.url}</p>;
 }
 
 export default App;

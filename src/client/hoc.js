@@ -81,45 +81,48 @@ class Context extends PerspectivesComponent
   render ()
   {
     const component = this;
-    let child;
+    let children;
 
     if (component.stateIsComplete())
     {
       if (Array.isArray(component.props.children))
       {
-        return React.Children.map(
-          component.props.children,
-          function (child)
-          {
-            const childRol = child.props.rol;
-            let instance;
-            if (!childRol)
-            {
-              throw "Context (" + component.props.type + ") finds child of type '" + child.type.name + "' that has no 'rol' on its props.";
-            }
-            instance = component.state[childRol];
-            if (!instance)
-            {
-              throw "Context (" + component.props.type + ") has no rol '" + childRol + "' while the child of type '" + child.type.name + "' asks for it.";
-            }
-            return React.cloneElement(
-              child,
-              {
-                instance: instance[0],
-                namespace: component.props.type
-              });
-          });
+        children = component.props.children;
       }
       else
       {
-        child = component.props.children;
-        return React.cloneElement(
-          child,
-          {
-            instance: component.state[child.props.rol][0],
-            namespace: component.props.type
-          });
+        children = [component.props.children];
       }
+      return React.Children.map(
+        children,
+        function (child)
+        {
+          const childRol = child.props.rol;
+          let instances;
+          if (!childRol)
+          {
+            console.error("Context (" + component.props.type + ") finds child of type '" + child.type.name + "' that has no 'rol' on its props.");
+            return <p className="error">Context ({component.props.type}) finds child of type '{child.type.name}' that has no 'rol' on its props.</p>;
+          }
+          instances = component.state[childRol];
+          if (!instances)
+          {
+            console.error( "Context (" + component.props.type + ") has no rol '" + childRol + "' while the child of type '" + child.type.name + "' asks for it." );
+            return <p className="error">Context ({component.props.type}) has no rol '{childRol}' while the child of type '{child.type.name}' asks for it.</p>;
+          }
+          return instances.map(
+            function(instance)
+            {
+              return React.cloneElement(
+                child,
+                {
+                  key: instance,
+                  instance: instance,
+                  namespace: component.props.type
+                });
+            }
+          );
+        });
     }
     else
     {
@@ -149,8 +152,6 @@ class Binding extends PerspectivesComponent
     Perspectives.then(
       function (pproxy)
       {
-        // Retrieve the type of the binding.
-        // This will be the namespace that its properties are defined in.
         pproxy.getBinding(
           component.props.instance,
           function (binding)
@@ -159,6 +160,8 @@ class Binding extends PerspectivesComponent
           },
           component.addUnsubscriber.bind(component)
         );
+        // Retrieve the type of the binding.
+        // This will be the namespace that its properties are defined in.
         pproxy.getBindingType(
           component.props.instance,
           function (bindingType)
@@ -220,11 +223,6 @@ Binding.propTypes = {
 
 class View extends PerspectivesComponent
 {
-  constructor (props)
-  {
-    super(props);
-  }
-
   componentDidMount ()
   {
     const component = this;
@@ -333,4 +331,80 @@ View.propTypes = {
   viewnaam: PropTypes.string.isRequired
 };
 
-export { Context, Binding, View };
+class ContextVanRol extends PerspectivesComponent
+{
+  constructor (props)
+  {
+    super(props);
+    this.state.instance = undefined;
+    this.state.type = undefined;
+  }
+
+  componentDidMount ()
+  {
+    const component = this;
+    Perspectives.then(
+      function (pproxy)
+      {
+        // The context of the rol will be bound to the state prop 'instance'.
+        pproxy.getRolContext(
+          component.props.instance,
+          function (contextId)
+          {
+            component.setState({instance: contextId[0]});
+            // The type of the context.
+            pproxy.getContextType(
+              contextId,
+              function (contextType)
+              {
+                component.setState({type: contextType[0]});
+              },
+              component.addUnsubscriber.bind(component)
+            );
+          },
+          component.addUnsubscriber.bind(component)
+        );
+      }
+    );
+  }
+
+  render ()
+  {
+    const component = this;
+
+    if (component.stateIsComplete())
+    {
+      return (<Context instance={component.state.instance} rollen={component.props.rollen} type={component.state.type}>
+        {component.props.children}
+      </Context>);
+    }
+    else
+    {
+      return <div />;
+    }
+  }
+
+}
+ContextVanRol.propTypes = {
+  rollen: PropTypes.array.isRequired
+};
+
+
+function ExterneView(props)
+{
+  return (<Binding rol={props.rol} instance={props.instance}>
+    <View viewnaam={props.viewnaam}>{props.children}</View>
+  </Binding>);
+}
+
+ExterneView.propTypes = {
+  rol: PropTypes.string.isRequired,
+  viewnaam: PropTypes.string.isRequired
+};
+
+// TODO
+// ExterneView
+// GebondenContext
+// InterneView
+
+export { Context, Binding, View, ContextVanRol, ExterneView };

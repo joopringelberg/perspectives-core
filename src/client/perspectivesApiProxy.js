@@ -27,126 +27,100 @@ class PerspectivesProxy
     this.setter = setter;
   }
 
-  getRolBinding (contextID, rolName, receiveValues, handleUnsubscriber)
+  send (req, receiveValues, handleUnsubscriber)
   {
-    const req = {
-      request: "GetRolBinding",
-      subject: contextID,
-      predicate: rolName,
-      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-      reactStateSetter: function (arrString)
-      {
-        receiveValues(arrString);
-        return function () {};
-      }
+    req.reactStateSetter = function (arrString)
+    {
+      receiveValues(arrString);
+      return function () {};
     };
     this.setter(req)(this.request)();
     this.getter(this.response)().then(handleChannelError(handleUnsubscriber)); // doe iets met Error.
   }
 
+  getRolBinding (contextID, rolName, receiveValues, handleUnsubscriber)
+  {
+    this.send(
+      {request: "GetRolBinding", subject: contextID, predicate: rolName},
+      receiveValues,
+      handleUnsubscriber);
+  }
+
   getRol (contextID, rolName, receiveValues, handleUnsubscriber)
   {
-    const req = {
-      request: "GetRol",
-      subject: contextID,
-      predicate: rolName,
-      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-      reactStateSetter: function (arrString)
-      {
-        receiveValues(arrString);
-        return function () {};
-      }
-    };
-    this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+    this.send(
+      {request: "GetRol", subject: contextID, predicate: rolName},
+      receiveValues,
+      handleUnsubscriber);
   }
 
   getProperty (rolID, propertyName, receiveValues, handleUnsubscriber)
   {
-    const req = {
-      request: "GetProperty",
-      subject: rolID,
-      predicate: propertyName,
-      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-      reactStateSetter: function (arrString)
-      {
-        receiveValues(arrString);
-        return function () {};
-      }
-    };
-    this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+    this.send(
+      {request: "GetProperty", subject: rolID, predicate: propertyName},
+      receiveValues,
+      handleUnsubscriber);
   }
 
   getBinding (rolID, receiveValues, handleUnsubscriber)
   {
-    const req = {
-      request: "GetBinding",
-      subject: rolID,
-      predicate: "",
-      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-      reactStateSetter: function (arrString)
-      {
-        receiveValues(arrString);
-        return function () {};
-      }
-    };
-    this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+    this.send(
+      {request: "GetBinding", subject: rolID, predicate: ""},
+      receiveValues,
+      handleUnsubscriber);
   }
 
   getBindingType (rolID, receiveValues, handleUnsubscriber)
   {
-    const req = {
-      request: "GetBindingType",
-      subject: rolID,
-      predicate: "",
-      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-      reactStateSetter: function (arrString)
-      {
-        receiveValues(arrString);
-        return function () {};
-      }
-    };
-    this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+    this.send(
+      {request: "GetBindingType", subject: rolID, predicate: ""},
+      receiveValues,
+      handleUnsubscriber);
   }
 
   getViewProperties (viewName, receiveValues, handleUnsubscriber)
   {
-    const req = {
-      request: "GetViewProperties",
-      subject: viewName,
-      predicate: "",
-      // receiveValues must have type: Array String -> Eff (AjaxAvarCache (ref :: REF | e)) Unit
-      reactStateSetter: function (arrString)
-      {
-        receiveValues(arrString);
-        return function () {};
-      }
-    };
-    this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleChannelError(handleUnsubscriber));
+    this.send(
+      {request: "GetViewProperties", subject: viewName, predicate: ""},
+      receiveValues,
+      handleUnsubscriber);
+  }
+
+  getRolContext (rolID, receiveValues, handleUnsubscriber)
+  {
+    this.send(
+      {request: "GetRolContext", subject: rolID, predicate: ""},
+      receiveValues,
+      handleUnsubscriber);
+  }
+
+  getContextType (contextID, receiveValues, handleUnsubscriber)
+  {
+    this.send(
+      {request: "GetContextType", subject: contextID, predicate: ""},
+      receiveValues,
+      handleUnsubscriber);
   }
 }
+
 // Capture Error responses.
-function handleChannelError(handleUnsubscriber)
+function handleChannelError (handleUnsubscriber)
 {
-  return function(message)
+  return function (message)
   {
     if (isError(message))
     {
-      console.error( message.value0 );
+      console.error(message.value0);
     }
     else
     {
-      handleUnsubscriber( message.value0 );
+      handleUnsubscriber(message.value0);
     }
   };
 }
 
 // A proxy testing whether o is constructed with the ApiResponse Error data constructor.
-function isError(o)
+function isError (o)
 {
   return o.constructor.toString().match(/function \$\$Error/);
 }
@@ -165,8 +139,6 @@ window.test = function (contextID, rolName)
       console.log("Received an unsubscriber");
     });
 };
-
-
 
 module.exports = {
   Perspectives: Perspectives,

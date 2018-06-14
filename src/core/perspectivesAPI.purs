@@ -21,31 +21,22 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructRolGetter)
-import Prelude (class Show, Unit, bind, const, discard, flip, pure, show, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (Unit, bind, const, discard, flip, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
 -----------------------------------------------------------
 data ApiRequest e =
   GetRolBinding ContextID RolName (ReactStateSetter e)
-  | GetBinding RolID String (ReactStateSetter e)
-  | GetBindingType RolID String (ReactStateSetter e)
+  | GetBinding RolID (ReactStateSetter e)
+  | GetBindingType RolID (ReactStateSetter e)
+  | GetRolContext RolID (ReactStateSetter e)
+  | GetContextType ContextID (ReactStateSetter e)
   | GetRol ContextID RolName (ReactStateSetter e)
   | GetProperty RolName PropertyName (ReactStateSetter e)
   | GetViewProperties ViewName (ReactStateSetter e)
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
-
-instance showApiRequest :: Show (ApiRequest e) where
-  show (GetRolBinding cid rn _) = "{GetRolBinding " <> cid <> " " <> rn <> "}"
-  show (GetBinding rid _ _) = "{GetBinding" <> rid <> "}"
-  show (GetBindingType rid _ _) = "{GetBindingType" <> rid <> "}"
-  show (GetRol cid rn _) = "{GetRol " <> cid <> " " <> rn <> "}"
-  show (GetProperty rn pn _) = "{GetProperty " <> rn <> " " <> pn <> "}"
-  show (GetViewProperties vn _) = "{getViewProperties " <> vn <> "}"
-  show ShutDown = "ShutDown"
-  show WrongRequest = "WrongRequest"
 
 data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
   | Error String
@@ -85,9 +76,11 @@ foreign import connect :: forall e1 e2. ApiChannel e1 -> Eff (react:: REACT | e2
 marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
 marshallRequestRecord r@{request} = case request of
   "GetRolBinding" -> GetRolBinding r.subject r.predicate r.reactStateSetter
-  "GetBinding" -> GetBinding r.subject "" r.reactStateSetter
-  "GetBindingType" -> GetBindingType r.subject "" r.reactStateSetter
+  "GetBinding" -> GetBinding r.subject r.reactStateSetter
+  "GetBindingType" -> GetBindingType r.subject r.reactStateSetter
   "GetRol" -> GetRol r.subject r.predicate r.reactStateSetter
+  "GetRolContext" -> GetRolContext r.subject r.reactStateSetter
+  "GetContextType" -> GetContextType r.subject r.reactStateSetter
   "GetProperty" -> GetProperty r.subject r.predicate r.reactStateSetter
   "GetViewProperties" -> GetViewProperties r.subject r.reactStateSetter
   "ShutDown" -> ShutDown
@@ -110,20 +103,26 @@ dispatch request response = do
         (GetRolBinding cid rn setter) -> do
           unsubscriber <- getRolBinding cid rn setter
           send (Unsubscriber unsubscriber)
-        (GetBinding rid _ setter) -> do
-          unsubscriber <- getBinding rid setter
+        (GetBinding rid setter) -> do
+          unsubscriber <- getQuery rid bindingM setter
           send (Unsubscriber unsubscriber)
-        (GetBindingType rid _ setter) -> do
-          unsubscriber <- getBindingType rid setter
+        (GetBindingType rid setter) -> do
+          unsubscriber <- getQuery rid (bindingM >-> rolTypeM) setter
           send (Unsubscriber unsubscriber)
         (GetRol cid rn setter) -> do
           unsubscriber <- getRol cid rn setter
+          send (Unsubscriber unsubscriber)
+        (GetRolContext rid setter) -> do
+          unsubscriber <- getQuery rid contextM setter
+          send (Unsubscriber unsubscriber)
+        (GetContextType rid setter) -> do
+          unsubscriber <- getQuery rid contextTypeM setter
           send (Unsubscriber unsubscriber)
         (GetProperty rid pn setter) -> do
           unsubscriber <- getProperty rid pn setter
           send (Unsubscriber unsubscriber)
         (GetViewProperties vn setter) -> do
-          unsubscriber <- getViewProperties vn setter
+          unsubscriber <- getQuery vn (propertyReferentiesM >-> bindingM >-> contextM) setter
           send (Unsubscriber unsubscriber)
         WrongRequest -> send $ Error ("This request is invalid: " <> showRequestRecord reqr)
         ShutDown -> send $ Error "shutdown" -- ...this case will never occur!
@@ -155,34 +154,23 @@ getQuery cid query@(TypedTripleGetter qn _) setter = do
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRolBinding cid rn setter = do
-  getQuery cid (constructRolGetter rn >-> bindingM) setter
-
--- | Retrieve the binding of the rol that is passed in, subscribe to it.
-getBinding :: forall e. ContextID -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getBinding cid setter = do
-  getQuery cid bindingM setter
-
--- | Retrieve the type of the binding of the rol that is passed in, subscribe to it.
-getBindingType :: forall e. ContextID -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getBindingType cid setter = do
-  getQuery cid (bindingM >-> rolTypeM) setter
+  rf <- getRolFunction cid rn
+  getQuery cid (rf >-> bindingM) setter
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
 getRol cid rn setter = do
-  -- getQuery cid (constructRolGetter rn) setter
-  -- qf <- rolQuery rn
+  qf <- getRolFunction cid rn
+  getQuery cid qf setter
+
+-- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
+getRolFunction :: forall e. ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e)  (TypedTripleGetter e)
+getRolFunction cid rn = do
   ctxtType <- cid ##>> contextTypeM
   m <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
   case m of
     (Left message) -> throwError $ error (show message)
-    (Right id) -> do
-      qf <- constructQueryFunction id
-      getQuery cid qf setter
-
-getViewProperties :: forall e. ViewName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
-getViewProperties viewname setter = do
-  getQuery viewname (propertyReferentiesM >-> bindingM >-> contextM) setter
+    (Right id) -> constructQueryFunction id
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> MonadPerspectives (ApiEffects e) (QueryUnsubscriber e)
