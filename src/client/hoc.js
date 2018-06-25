@@ -62,18 +62,17 @@ class Context extends PerspectivesComponent
         Perspectives.then(
           function (pproxy)
           {
-            pproxy.getRol(
-              component.props.instance,
-              component.props.type + "$" + rolName,
-              function (rolIds)
-              {
-                const updater = {};
-                updater[rolName] = rolIds;
-                component.setState(updater);
-              },
-              component.addUnsubscriber.bind(component));
-          }
-        );
+            component.addUnsubscriber(
+              pproxy.getRol(
+                component.props.instance,
+                component.props.type + "$" + rolName,
+                function (rolIds)
+                {
+                  const updater = {};
+                  updater[rolName] = rolIds;
+                  component.setState(updater);
+                }));
+          });
       }
     );
   }
@@ -152,24 +151,22 @@ class Binding extends PerspectivesComponent
     Perspectives.then(
       function (pproxy)
       {
-        pproxy.getBinding(
-          component.props.instance,
-          function (binding)
-          {
-            component.setState({binding: binding[0]});
-          },
-          component.addUnsubscriber.bind(component)
-        );
+        component.addUnsubscriber(
+          pproxy.getBinding(
+            component.props.instance,
+            function (binding)
+            {
+              component.setState({binding: binding[0]});
+            }));
         // Retrieve the type of the binding.
         // This will be the namespace that its properties are defined in.
-        pproxy.getBindingType(
-          component.props.instance,
-          function (bindingType)
-          {
-            component.setState({bindingType: bindingType[0]});
-          },
-          component.addUnsubscriber.bind(component)
-        );
+        component.addUnsubscriber(
+          pproxy.getBindingType(
+            component.props.instance,
+            function (bindingType)
+            {
+              component.setState({bindingType: bindingType[0]});
+            }));
       }
     );
   }
@@ -254,18 +251,19 @@ class View extends PerspectivesComponent
             propertyNames.forEach(
               function(propertyName)
               {
-                pproxy.getProperty(
-                  component.props.instance,
-                  propertyName,
-                  function(propertyValues)
-                  {
-                    const updater = {};
-                    const ln = localName(propertyName);
-                    updater[ln] = propertyValues;
-                    component.setState(updater);
-                  },
-                  component.addUnsubscriber.bind(component)
-                );
+                component.addUnsubscriber(
+                  pproxy.getProperty(
+                    component.props.instance,
+                    propertyName,
+                    function (propertyValues)
+                    {
+                      const updater = {};
+                      const ln = localName(propertyName);
+                      updater[ln] = propertyValues;
+                      component.setState(updater);
+                    },
+                    component.addUnsubscriber.bind(component)
+                  ));
               }
             );
           },
@@ -347,23 +345,25 @@ class ContextVanRol extends PerspectivesComponent
       function (pproxy)
       {
         // The context of the rol will be bound to the state prop 'instance'.
-        pproxy.getRolContext(
-          component.props.instance,
-          function (contextId)
-          {
-            component.setState({instance: contextId[0]});
-            // The type of the context.
-            pproxy.getContextType(
-              contextId,
-              function (contextType)
-              {
-                component.setState({type: contextType[0]});
-              },
-              component.addUnsubscriber.bind(component)
-            );
-          },
-          component.addUnsubscriber.bind(component)
-        );
+        component.addUnsubscriber(
+          pproxy.getRolContext(
+            component.props.instance,
+            function (contextId)
+            {
+              component.setState({instance: contextId[0]});
+              // The type of the context.
+              component.addUnsubscriber(
+                pproxy.getContextType(
+                  contextId,
+                  function (contextType)
+                  {
+                    component.setState({type: contextType[0]});
+                  },
+                  component.addUnsubscriber.bind(component)
+                ));
+            },
+            component.addUnsubscriber.bind(component)
+          ));
       }
     );
   }

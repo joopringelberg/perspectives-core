@@ -17,130 +17,126 @@ function connect ({request, response, getter, setter})
   };
 }
 
+function createRequestEmitterImpl (left, right, emit)
+{
+  window.pproxy = new PerspectivesProxy(left, right, emit);
+  // Now resolve the promise made above for the proxy.
+  resolver(window.pproxy);
+}
+
+
 class PerspectivesProxy
 {
-  constructor (request, response, getter, setter)
+  constructor (left, right, emit)
   {
-    this.request = request;
-    this.response = response;
-    this.getter = getter;
-    this.setter = setter;
+    this.left = left;
+    this.right = right;
+    this.emit = emit;
+    this.requestId = -1;
   }
 
-  send (req, receiveValues, handleUnsubscriber)
+  nextRequestId ()
   {
+    this.requestId = this.requestId + 1;
+    return this.requestId;
+  }
+
+  // Inform the server that this client shuts down.
+  // No other requests may follow this message.
+  close()
+  {
+    this.emit( this.right({}) )();
+    this.emit = function()
+    {
+      throw( "This client has shut down!");
+    };
+  }
+
+  send (req, receiveValues)
+  {
+    const proxy = this;
+    // Create a correlation identifier and store 'receiveValues' with it.
+    // Send the correlation identifier instead of reactStateSetter.
     req.reactStateSetter = function (arrString)
     {
       receiveValues(arrString);
       return function () {};
     };
-    this.setter(req)(this.request)();
-    this.getter(this.response)().then(handleChannelError(handleUnsubscriber)); // doe iets met Error.
+    req.setterId = this.nextRequestId();
+    this.emit( this.left(req) )();
+    // return the unsubscriber.
+    return function()
+    {
+      proxy.unsubscribe( req );
+    };
   }
 
-  getRolBinding (contextID, rolName, receiveValues, handleUnsubscriber)
+  unsubscribe(req)
+  {
+    this.send(
+      {request: "Unsubscribe", subject: req.subject, predicate: req.predicate, setterId: req.setterId}
+    );
+  }
+
+  getRolBinding (contextID, rolName, receiveValues)
   {
     this.send(
       {request: "GetRolBinding", subject: contextID, predicate: rolName},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getRol (contextID, rolName, receiveValues, handleUnsubscriber)
+  getRol (contextID, rolName, receiveValues)
   {
     this.send(
       {request: "GetRol", subject: contextID, predicate: rolName},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getProperty (rolID, propertyName, receiveValues, handleUnsubscriber)
+  getProperty (rolID, propertyName, receiveValues)
   {
     this.send(
       {request: "GetProperty", subject: rolID, predicate: propertyName},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getBinding (rolID, receiveValues, handleUnsubscriber)
+  getBinding (rolID, receiveValues)
   {
     this.send(
       {request: "GetBinding", subject: rolID, predicate: ""},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getBindingType (rolID, receiveValues, handleUnsubscriber)
+  getBindingType (rolID, receiveValues)
   {
     this.send(
       {request: "GetBindingType", subject: rolID, predicate: ""},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getViewProperties (viewName, receiveValues, handleUnsubscriber)
+  getViewProperties (viewName, receiveValues)
   {
     this.send(
       {request: "GetViewProperties", subject: viewName, predicate: ""},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getRolContext (rolID, receiveValues, handleUnsubscriber)
+  getRolContext (rolID, receiveValues)
   {
     this.send(
       {request: "GetRolContext", subject: rolID, predicate: ""},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 
-  getContextType (contextID, receiveValues, handleUnsubscriber)
+  getContextType (contextID, receiveValues)
   {
     this.send(
       {request: "GetContextType", subject: contextID, predicate: ""},
-      receiveValues,
-      handleUnsubscriber);
+      receiveValues);
   }
 }
 
-// Capture Error responses.
-function handleChannelError (handleUnsubscriber)
-{
-  return function (message)
-  {
-    if (isError(message))
-    {
-      console.error(message.value0);
-    }
-    else
-    {
-      handleUnsubscriber(message.value0);
-    }
-  };
-}
-
-// A proxy testing whether o is constructed with the ApiResponse Error data constructor.
-function isError (o)
-{
-  return o.constructor.toString().match(/function \$\$Error/);
-}
-
-window.test = function (contextID, rolName)
-{
-  window.pproxy.getRolBinding(
-    contextID, rolName,
-    function (rolIds)
-    {
-      console.log("The binding of " + rolName + " van context " + contextID + " is: " + rolIds);
-    },
-    function (unsubscriber)
-    {
-      // Save for later so you can unsubscribe.
-      console.log("Received an unsubscriber");
-    });
-};
-
 module.exports = {
   Perspectives: Perspectives,
-  connect: connect
+  connect: connect,
+  createRequestEmitterImpl: createRequestEmitterImpl
 };

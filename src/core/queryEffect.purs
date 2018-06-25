@@ -2,9 +2,8 @@ module Perspectives.QueryEffect where
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Ref (REF)
 import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery)
-import Perspectives.Effects (AjaxAvarCache, AjaxCache)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, const, pure, ($), (<>))
 
@@ -13,12 +12,12 @@ type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache e) Unit)
 -- | Make an effect function (QueryEffect) dependent on the objects of a tripleGetter.
 -- | The result of the function (a Triple) should be unsubscribed from the triple index in order to
 -- | make the effect function no longer dependent (using unRegisterTriple).
-addEffectToQuery :: forall e. TypedTripleGetter e -> QueryEffect e -> TypedTripleGetter e
-addEffectToQuery (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
-  TypedTripleGetter effectName addEffectToQuery' where
+pushesObjectsTo :: forall e. TypedTripleGetter e -> QueryEffect e -> TypedTripleGetter e
+pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
+  TypedTripleGetter effectName pushesObjectsTo' where
 
-    addEffectToQuery' :: TripleGetter e
-    addEffectToQuery' id = do
+    pushesObjectsTo' :: TripleGetter e
+    pushesObjectsTo' id = do
       t <- tg id
       et <- effectFun t
       liftEff $ registerTriple et
@@ -41,4 +40,4 @@ addEffectToQuery (TypedTripleGetter tgName tg) (NamedFunction effectName effect)
     name :: String
     name = "(" <>  tgName <> " ~> " <> effectName <> ")"
 
-infixl 9 addEffectToQuery as ~>
+infixl 9 pushesObjectsTo as ~>

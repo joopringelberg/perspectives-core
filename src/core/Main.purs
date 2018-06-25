@@ -20,7 +20,7 @@
 
 
 module Main where
-import Control.Monad.Aff (Aff, Error, error, forkAff, liftEff', runAff, throwError)
+import Control.Monad.Aff (Aff, Error, error, liftEff', runAff, throwError)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
@@ -33,7 +33,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable, lookup)
 import Data.Tuple (Tuple(..))
 import Data.URI.Query (Query(..), parser) as URI
-import Perspectives.Api (setUpApi)
+import Perspectives.Api (setupApi)
 import Perspectives.Couchdb (User, Password)
 import Perspectives.Effects (AjaxAvarCache, AvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
@@ -50,7 +50,7 @@ main = void $ runAff handleError do
       url <- pure "http://127.0.0.1:5984/"
       (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
       state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
-      forkAff $ runPerspectivesWithState setUpApi state
+      runPerspectivesWithState setupApi state
 
 -- TODO. Als geen waarde in usr beschikbaar is, moet de gebruiker een naam (opnieuw) invoeren!
 credentialsFromQueryString :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe (Tuple User Password))
