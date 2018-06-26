@@ -1,0 +1,16 @@
+CLIENT EN SERVER APPLICATIES DIE COMMUNICEREN VIA NODEJS NET SOCKETS
+
+Ambities:
+1. Zorg voor de communicatie tussen client en server.
+2. Start de server vanuit de client, als hij niet al draait.
+
+COMMUNICATIE
+1. Maak een Server applicatie in Purescript.
+2. Maak een nieuw Electron project.
+3. Maak in het Electron project een (javascript) client die de server aanroept.
+
+EEN SERVER APPLICATIE IN PURESCRIPT
+Er is geen Purescript voorbeeld. 
+Ja toch, gevonden in purescript-node-net.
+
+Stand van zaken: ik heb een werkende implementatie van een server en een client, die daadwerkelijk communiceren!

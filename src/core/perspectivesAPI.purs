@@ -1,9 +1,9 @@
 module Perspectives.Api where
 
-import Control.Aff.Sockets (EmitFunction, Left, Right, Emitter)
-import Control.Coroutine (Consumer, Producer, await, runProcess, transform, ($$), ($~))
+import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, SOCKETIO, connectionConsumer, connectionProducer, dataProducer_, defaultTCPOptions, writeData)
+import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (produce')
-import Control.Monad.Aff (error, throwError)
+import Control.Monad.Aff (error, launchAff_, throwError)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
@@ -11,11 +11,14 @@ import Control.Monad.Eff.Uncurried (EffFn3, runEffFn3)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
-import Data.Foreign.NullOrUndefined (NullOrUndefined)
+import Data.Foreign.Class (class Decode, class Encode)
+import Data.Foreign.Generic (defaultOptions, genericDecode)
+import Data.Foreign.Generic.Types (Options)
+import Data.Generic.Rep (class Generic)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
-import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, ViewName, Subject, Predicate)
+import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName, Object)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
@@ -46,6 +49,12 @@ data ApiRequest e =
 data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
   | Error String
 
+newtype Request = Request
+  { request :: String
+  , subject :: String
+  , predicate :: String
+  , setterId :: ReactStateSetterIdentifier}
+
 type RequestRecord e =
   { request :: String
   , subject :: String
@@ -53,10 +62,27 @@ type RequestRecord e =
   , reactStateSetter :: ReactStateSetter e
   , setterId :: ReactStateSetterIdentifier}
 
+derive instance genericRequest :: Generic Request _
+
+requestOptions :: Options
+requestOptions = defaultOptions { unwrapSingleConstructors = true }
+
+instance decodeRequest :: Decode Request where
+  decode = genericDecode requestOptions
+
 showRequestRecord :: forall e. RequestRecord e -> String
 showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
 
 foreign import createRequestEmitterImpl :: forall e eff. EffFn3 (avar :: AVAR | e) (Left (RequestRecord eff)) (Right (RequestRecord eff)) (EmitFunction (RequestRecord eff) Unit e) Unit
+
+newtype IdentifiableObjects = IdentifiableObjects {setterId :: ReactStateSetterIdentifier, objects :: Array Object}
+
+derive instance genericIdentifiableObjects :: Generic IdentifiableObjects _
+
+instance encodeIdentifiableObjects :: Encode IdentifiableObjects where
+  decode = genericDecode requestOptions
+
+identifiableObjects setterId objects = IdentifiableObjects {setterId, objects}
 
 createRequestEmitter :: forall e eff. Emitter (RequestRecord eff) Unit e
 createRequestEmitter = runEffFn3 createRequestEmitterImpl Left Right
@@ -68,6 +94,21 @@ requestProducer = produce' createRequestEmitter
 -- | Create a process that consumes requests from a producer fed by the user interface.
 setupApi :: forall e. MonadPerspectives (ApiEffects e) Unit
 setupApi = runProcess $ (requestProducer $~ (forever (transform marshallRequestRecord))) $$ consumeRequest
+
+-- | Create a process that consumes requests from a producer that connects to a source over TCP.
+setupTcpApi :: forall e. MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e)) Unit
+setupTcpApi = runProcess server
+  where
+
+    server :: Process (MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e))) Unit
+    server = (connectionProducer defaultTCPOptions) $$ (connectionConsumer connectionHandler)
+
+    connectionHandler :: ConnectionProcess (MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e)))
+    connectionHandler connection =
+      (dataProducer_ connection $~ (forever (transform marshallRequest))) $$ consumeRequest
+      where
+        marshallRequest :: Request -> ApiRequest (socketio :: SOCKETIO | e)
+        marshallRequest (Request r@{request, subject, predicate, setterId}) = marshallRequestRecord { request, subject, predicate, setterId, reactStateSetter: launchAff_ <<< writeData connection <<< identifiableObjects setterId}
 
 consumeRequest :: forall e. Consumer (ApiRequest e) (MonadPerspectives (ApiEffects e)) Unit
 consumeRequest = forever do
@@ -119,7 +160,7 @@ dispatchOnRequest req =
 -----------------------------------------------------------
 -- API FUNCTIONS
 -----------------------------------------------------------
-type ReactStateSetter e = Array String -> Eff (AjaxAvarCache (react :: REACT | e)) (NullOrUndefined Unit)
+type ReactStateSetter e = Array String -> Eff (ApiEffects e) Unit
 
 type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 
