@@ -33,6 +33,19 @@ Start het proces met:
 
 	npm run dev
 
+==========================================================================================
+AANPASSING PER 27 JUNI 2018
+==========================================================================================
+create-react-app produceert een WebPack configuratie met als target de browser. Dat betekent dat node modules zoals fs en, voor purescript-aff-sockets belangrijk, de net library niet beschikbaar zijn.
+
+Om 'net' aan te kunnen spreken heb ik twee aanpassingen uitgevoerd:
+	- https://github.com/cdaringe/electron-renderer-react-scripts-target gerund
+	(d.w.z. npm install --save-dev electron-renderer-react-scripts-target)
+	- in src/perspectives-starter.js de nodeIntegration in webPreferences van het mainWindow op true gezet.
+
+Toelichting
+1. Voor de browser zet WebPack een stub in voor 'net'.
+2. De oplossing berust op een hack. Het script maakt gebruik van een ander script om de gegenereerde WebPack configuratie te kunnen modificeren. De modificatie is dat een andere target wordt gezet.
 
 ==========================================================================================
 VERSLAG VAN DE INRICHTING HIERONDER

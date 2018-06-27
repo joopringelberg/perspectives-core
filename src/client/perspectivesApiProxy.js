@@ -10,8 +10,15 @@ const Perspectives = new Promise(
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
 function createRequestEmitterImpl (left, right, emit)
 {
-  // Resolve the Perspectives promise made above for the proxy.
-  resolver(new PerspectivesProxy(new InternalChannel(left, right, emit)));
+  try
+  {
+    // Resolve the Perspectives promise made above for the proxy.
+    resolver(new PerspectivesProxy(new InternalChannel(left, right, emit)));
+  }
+  catch(e)
+  {
+    rejecter(e);
+  }
 }
 
 // Top level entry function to set up a TCP channel with a Perspectives Core endpoint.
@@ -19,25 +26,58 @@ function createRequestEmitterImpl (left, right, emit)
 // type TCPOptions opts = {port :: Port, host :: Host, allowHalfOpen :: Boolean | opts}
 // type Port = Int
 // type Host = String
-function createTcpConnectionToPerspectives(options)
+function createTcpConnectionToPerspectives (options)
 {
   // Resolve the Perspectives promise made above for the proxy.
-  resolver(new PerspectivesProxy( new TcpChannel(options)));
+  resolver(new PerspectivesProxy(new TcpChannel(options)));
+  try
+  {
+    // Resolve the Perspectives promise made above for the proxy.
+    resolver(new PerspectivesProxy(new TcpChannel(options)));
+  }
+  catch (e)
+  {
+    rejecter(e);
+  }
 }
 
 class TcpChannel
 {
   constructor (options)
   {
+    let connection;
     const valueReceivers = {};
     this.connection = require("net").createConnection(
       options,
+      // message will be in base64. Appending a string to it converts it to a new string.
       function (message)
       {
-        const {setterId, objects} = JSON.parse(message);
+        const {setterId, objects} = JSON.parse(message + "");
         valueReceivers[setterId](objects);
       });
+    connection = this.connection;
     this.valueReceivers = valueReceivers;
+    this.connection.on(
+      "error",
+      function (error)
+      {
+        connection.close(
+          function ()
+          {
+            // We cannot signal the server, because the connection is in error.
+            window.log( "Connection to Perspectives server is closed because: " + error);
+          });
+      });
+    this.connection.on(
+      "end",
+      function ()
+      {
+        // Emitted when the other end of the socket sends a FIN packet.
+        // By default (allowHalfOpen == false) the socket will destroy its file
+        // descriptor once it has written out its pending write queue.
+        // Hence, we need not signal the server that this message emitter shuts down.
+      });
+
   }
 
   nextRequestId ()
@@ -47,8 +87,21 @@ class TcpChannel
   }
 
   close()
-  {}
+  {
+    this.connection.write("shutdown");
+    this.connection.end();
+    this.send = function()
+    {
+      throw( "This client has shut down!");
+    };
+  }
 
+  // req has the following format (taken from: module Perspectives.Api)
+  //   { request :: String
+  //   , subject :: String
+  //   , predicate :: String
+  //   , setterId :: ReactStateSetterIdentifier}
+  // type ReactStateSetterIdentifier = String
   send(req, receiveValues)
   {
     req.setterId = this.nextRequestId();
