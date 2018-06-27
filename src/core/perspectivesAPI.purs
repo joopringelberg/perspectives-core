@@ -12,7 +12,7 @@ import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Foreign.Class (class Decode, class Encode)
-import Data.Foreign.Generic (defaultOptions, genericDecode)
+import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Foreign.Generic.Types (Options)
 import Data.Generic.Rep (class Generic)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
@@ -80,8 +80,9 @@ newtype IdentifiableObjects = IdentifiableObjects {setterId :: ReactStateSetterI
 derive instance genericIdentifiableObjects :: Generic IdentifiableObjects _
 
 instance encodeIdentifiableObjects :: Encode IdentifiableObjects where
-  decode = genericDecode requestOptions
+  encode = genericEncode requestOptions
 
+identifiableObjects ::  ReactStateSetterIdentifier -> Array Object -> IdentifiableObjects
 identifiableObjects setterId objects = IdentifiableObjects {setterId, objects}
 
 createRequestEmitter :: forall e eff. Emitter (RequestRecord eff) Unit e

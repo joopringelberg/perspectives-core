@@ -1,0 +1,80 @@
+STUDIE: PURESCRIPT-IDE
+
+PROCES ARCHITECTUUR
+1. Er zijn drie manieren om meerdere clients (voor dezelfde gebruiker) te maken:
+	1. met één Perspectives middenlaag in een zelfstandig proces, die één couchdb gebruikt en meerdere clients bedient;
+	2. met meerdere combinaties van Perspectives met een client, waarbij elke combinatie dezelfde couchdb gebruikt (en waarbij we in het midden laten of de Perspectives middenlaag in hetzelfde proces draait als de client, of niet);
+	3. met meerdere, synchroniserende, couchdbs. Deze use case treedt alleen op bij meerdere devices. Overigens zijn meerdere devices geen voldoende voorwaarde om meerdere couchdbs in te zetten. Apps zouden een remote couchdb kunnen gebruiken (hoewel dat waarschijnlijk wel slecht is voor de performance).
+
+2. Zodra een gebruiker meer dan één device inzet, valt (1) af.
+
+3. Installaties van verschillende gebruikers sturen elkaar expliciete update berichten. Voor (2) en (3) 
+	- moeten we dat ook gaan doen, of:
+	- we moeten een listener maken voor changes van de entiteiten database. Een middenlaag vergelijkt dan de versies van changes met de in-memory versie (als er geen in-memory versie is, kan hij de verandering sowieso negeren). 
+	
+4. Voor het Atom Package moeten we sowieso een out-of-proces server versie van Perspectives maken.
+
+5. Een niet-browser versie stuit op het autorisatie probleem. Nee: opgelost!
+
+
+COOKIE AUTHORISATION VOOR AFFJAX
+AffJax is gebaseerd op XmlHttpRequest. Voor Node wordt gebruik gemaakt van XHR2. Dit is een emulatie van XmlHttpRequest. Helaas ondersteunt dat geen cookie processing en (dus) ook geen autorisatie. 
+Tenminste, de calls die een user entiteit op moeten halen, falen (stilletjes).
+
+Er is een andere NPM module, XHR, die wèl cookies ondersteunt. Ik zou kunnen proberen om de Affjax.js file te herschrijven in termen van deze module.
+NEEN: dit is fout. Dit is een module die XmlHttpRequest wrapt, zodat je het resultaat kunt beschouwen als Node Request.
+
+Opgelost. Het probleem bleek in de initalisatie van de PerspectivesState te zitten. runPerspectives gaf een lege AVar mee; Main vulde hem.
+
+
+PURESCRIPT DRAAIEN VANUIT DE SOURCES
+De volgende stap is het voor elkaar te krijgen dat ik zowel het Atom package (atom-ide-purescript) als de language server (purescript-language-server) vanuit de source code directories actief krijg in Atom.
+
+ATOM-IDE-PURESCRIPT -> ATOM-IDE-PERSPECTIVE-SARC
+Kopie gemaakt van atom-ide-purescript met 
+	- git archive master | tar -x -C ~/Code/atom-ide-perspectivesarc
+dan:
+	- psc-package install
+dan:
+	- npm install
+dan:
+	- npm run -s bundle
+dan:
+	- apm link
+
+Het package wordt zichtbaar in Atom.
+Nu verbinden met git.
+
+	- git init
+dan (in Atom) alles committen voor de eerste keer;
+dan de nieuwe remote toevoegen:
+	- git remote add origin https://github.com/joopringelberg/atom-ide-perspectives-arc.git
+en tenslotte alles naar de server pushen:
+	- git push -u origin master
+
+
+PURESCRIPT-LANGUAGESERVER -> PERSPECTIVES-ARC-LANGUAGESERVER
+Kopie gemaakt van purescript-languageserver met 
+	- git archive master | tar -x -C ~/Code/atom-ide-perspectivesarc
+Repository op github aangemaakt.
+	- git init
+nieuwe remote toevoegen:
+	- git remote add origin https://github.com/joopringelberg/perspectives-arc-languageserver.git
+in Atom alles committen voor de eerste keer.
+en tenslotte alles naar de server pushen:
+	- git push -u origin master
+
+Dan:
+	- npm install
+
+Vervolgens NPM linking.
+1. npm link in perspectives-arc-languageserver creert:
+/Users/joopringelberg/.nvm/versions/node/v6.14.2/lib/node_modules/perspectives-arc-language-server -> /Users/joopringelberg/Code/perspectives-arc-languageserver
+Dit is een symlink vanuit de 'globale' node 6.14.2 node_modules directory naar het package perspectives-arc-languageserver. Overigens ging npm eerst het package builden - het ging goed...
+
+2. in atom-ide-perspectivesarc:
+	npm link perspectives-arc-languageserver
+en dat maakt:
+/Users/joopringelberg/Code/atom-ide-perspectivesarc/node_modules/perspectives-arc-languageserver -> /Users/joopringelberg/.nvm/versions/node/v6.14.2/lib/node_modules/perspectives-arc-languageserver -> /Users/joopringelberg/Code/perspectives-arc-languageserver
+
+3. Nog maar eens bundelen in atom-ide-perspectivesarc

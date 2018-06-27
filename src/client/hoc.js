@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import { Perspectives } from "./perspectivesApiProxy";
 import PropTypes from "prop-types";
 import {deconstructLocalNameFromDomeinURI_ as localName} from "../output/Perspectives.Identifiers";
-
+//test
 class PerspectivesComponent extends Component
 {
   constructor(props)
