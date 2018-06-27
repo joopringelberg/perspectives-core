@@ -6,6 +6,7 @@ const BrowserWindow = electron.BrowserWindow;
 
 const path = require("path");
 const url = require("url");
+const net = require("net");
 
 // Keep a global reference of the window object, if you don"t, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -28,7 +29,7 @@ function createWindow ()
   mainWindow = new BrowserWindow(
     {
       webPreferences: {
-        nodeIntegration: false
+        nodeIntegration: true
         // preload: './preload.js'
       }
     });
