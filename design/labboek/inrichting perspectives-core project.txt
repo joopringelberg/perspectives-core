@@ -1,0 +1,93 @@
+DE GIT HISTORY OPSCHONEN
+Dit alles vindt plaats in ~Code/perspectives-core.
+
+===========================================================================================
+* 8e84854 (HEAD -> perspectives-electron, origin/perspectives-electron) Small changes in tests and the api.
+...
+*   57d64d6 Merge branch 'perspectives-electron' of https://github.com/joopringelberg/perspectives into perspectives-electron
+|\
+| * 8045a32 Model of AST of effects in Arc
+* | 07ba176 Start of statement compiler
+| | ...
+* | 6edfe43 Model of AST of effects in Arc
+|/
+* e2bf251 Final repair to perspectivesAPI.js
+...
+* 02ae1af Documentation
+| * 5359532 (origin/LocationIsFunctor) Last commit before closing the branch
+| * 6bc4a26 Property composition operators now handle functions of Location (Maybe Resource)
+| * 021ab9f StackedMemorizingGetter is now a function of Location(Maybe Resource)
+| * ed35f5e StartLocation
+| * e4f410b PropertyLinks
+|/
+* cce72ce Problem discovered
+...
+* 585e866 Memoizing works correctly
+| * b281634 (origin/WorkingQueries) Working version with LocationT
+|/
+* 10f479c Committing before creating new branch
+* 9155b84 Removed thawST'
+* db09f18 New LocationT bind
+* ea29d01 Moved git lore to WorkingQueries branch
+| * 290a4bd (origin/LocationTests) Location tests saved
+|/
+* 2563c26 GLStrMap as resourceIndex
+...
+* b935b9b Repaired and added the tests
+| * 4d90931 (origin/master, origin/locationT_Experiment, origin/HEAD, master) DomeinCache no longer operative
+| ...
+| * cc0b850 LocationT
+|/
+* 3489dd6 Filter query combinator
+...
+* 19ee6f4 Initial commit
+===========================================================================================
+
+De situatie is dat we in een branch zitten en dat op de master commits zijn gedaan (die ik kan missen). Ik wil terug naar de situatie dat de master wijst naar de huidige laatste commit van de perspectives-electron branch.
+
+In de eerste plaats heb ik de master uitgecheckt.
+Vervolgens de master teruggezet naar de ancestor van de master en de ontwikkelingsbranch, perspectives-electron:
+
+joopMac-2:perspectives-core joopringelberg$ git checkout master
+Switched to branch 'master'
+Your branch is up-to-date with 'origin/master'.
+joopMac-2:perspectives-core joopringelberg$ git reset --hard 3489dd6
+HEAD is now at 3489dd6 Filter query combinator
+
+Nu is de master een directe ancestor van perspectives-electron. Als ik een merge doe, wordt een fast forward uitgevoerd:
+
+joopMac-2:perspectives-core joopringelberg$ git merge perspectives-electron
+Updating 3489dd6..8e84854
+Fast-forward
+ .eslintrc.json                                                      |   36 +
+ .gitignore                                                          |   44 +
+...
+
+Nu kan ik perspectives-electron weggooien, want die wijst naar dezelfde commit als master.
+
+joopMac-2:perspectives-core joopringelberg$ git branch -d perspectives-electron
+Deleted branch perspectives-electron (was 8e84854).
+joopMac-2:perspectives-core joopringelberg$ git branch
+* master
+
+Ik zit nu op de master, geen branches meer die nog moeten mergen.
+
+PUSH NAAR GITHUB
+Onderstaande commandos stellen perspectives-core op github in als origin van dit lokale project.
+
+joopMac-2:perspectives-core joopringelberg$ git remote rm origin
+joopMac-2:perspectives-core joopringelberg$ git remote
+joopMac-2:perspectives-core joopringelberg$ git remote add origin https://github.com/joopringelberg/perspectives-core.git
+joopMac-2:perspectives-core joopringelberg$ git push -u origin master
+Counting objects: 5029, done.
+Delta compression using up to 8 threads.
+Compressing objects: 100% (1359/1359), done.
+Writing objects: 100% (5029/5029), 4.63 MiB | 1002.00 KiB/s, done.
+Total 5029 (delta 3685), reused 4990 (delta 3655)
+remote: Resolving deltas: 100% (3685/3685), done.
+To https://github.com/joopringelberg/perspectives-core.git
+ * [new branch]      master -> master
+Branch master set up to track remote branch master from origin.
+
+Nu kan ik de React code gaan verwijderen. Het andere project, perspectives-electron-app, heeft nog steeds perspectives	 als origin. Ik ga daar straks files uit overnemen voor perspectives-client en voor perspectives-react-testclient1.
+

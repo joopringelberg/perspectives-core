@@ -14,11 +14,11 @@ Zaken = "zaken" SingleLineComment? (indented ContextDeclaration)
 Activiteiten = "activiteiten" SingleLineComment? (indented ContextDeclaration)
 Toestanden = "toestanden" SingleLineComment? (indented ContextDeclaration)
 
-Properties = "properties" SingleLineComment? (indented comment? InterneProperties) (indented comment? ExterneProperties) 
+Properties = "properties" SingleLineComment? (indented comment? InterneProperties) (indented comment? ExterneProperties)
 InterneProperties = "intern" SingleLineComment? (indented (Property | comment)*)
 ExterneProperties = "extern" SingleLineComment? (indented (Property | comment)*)
 
-Property = PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")" SingleLineComment? 
+Property = PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")" SingleLineComment?
 PropertyType = "String" | "Boolean" | "Number" | "Date" | "Memo"
 IsVerplicht = "Verplicht" | "Niet verplicht"
 IsFunctioneel = "Functioneel" | "Niet functioneel"
@@ -38,10 +38,10 @@ RolViews = "views" SingleLineComment? (indented (View | comment)*)
 View = ViewIdentifier "met properties" SingleLineComment? (indented (PropertyIdentifier SingleLineComment? | comment*))
 
 Acties = "acties" SingleLineComment? (indented (Actie | comment)*)
-Actie = 
+Actie =
 	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) SingleLineComment? |
-	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) RolIdentifier SingleLineComment? 
-	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) ViewIdentifier "van" RolIdentifier SingleLineComment? 
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) RolIdentifier SingleLineComment?
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) ViewIdentifier "van" RolIdentifier SingleLineComment?
 InformatieWerkwoord = "beheert" | "raadpleegt" | "creeërt" | "verwijdert"
 
 comment = SingleLineComment | MultiLineComment
@@ -61,19 +61,19 @@ $rolInContext
 
 CapitalizedString = UpperChar AnyChar*
 LowerCaseString = lowerChar+
+Prefix = LowerCaseString ":"
 
 CapitalizedFragment = "$" CapitalizedString
 LowerCaseFragment = "$" LowerCaseString
 
 DomeinName = "model:" CapitalizedString
-Prefix = LowerCaseString ":"
 
-CapitalizedIdentifier = 
+CapitalizedIdentifier =
 	CapitalizedFragment+ |
 	DomeinName CapitalizedFragment* |
 	Prefix CapitalizedFragment+
-	
-LowerCaseIdentifier = 
+
+LowerCaseIdentifier =
 	LowerCaseFragment |
 	DomeinName LowerCaseFragment+
 	Prefix LowerCaseFragment+

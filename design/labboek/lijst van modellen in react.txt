@@ -5,7 +5,7 @@ De modellenlijst in React
 2. Volgende stap: zet die op het scherm.
 	a. Maak een lijst of een dropdown lijst in React.
 	b. Bed dat in een Rol component van een Context component in, zodat we via de API de betreffende rol kunnen opvragen.
-	
+
 ========================================INTERMEZZO========================================
 Het is nodig om modelbestanden te kunnen parseren en in Couchdb op te kunnen slaan. Uiteraard is dat waar de editor voor bedoeld is, maar we zitten in een catch22 situatie.
 Opgelost via een testfile.
@@ -30,7 +30,7 @@ Er is dus een moment in de parser waarop een rolnaam bekend is en besloten moet 
 	- computedRolGetter
 constructor moet worden ingezet om de rol op te halen.
 
-Dat proces, iets dergelijks, moet ook gevolgd worden als vanuit een React Context component een rol opgehaald wordt. Immers, ook daar kan het gaan om een 
+Dat proces, iets dergelijks, moet ook gevolgd worden als vanuit een React Context component een rol opgehaald wordt. Immers, ook daar kan het gaan om een
 	- berekende rol (rolQuery)
 	- een rol die misschien niet direct bij de context is opgeslagen, maar bij een prototype (constructRolLookup)
 	- omgekeerde beweging over een rol (constructInverseRolGetter)
@@ -56,10 +56,10 @@ Dus bijvoorbeeld:
 
 	<context rollen={["trustedCluster"]}>
 		<binding rol="trustedCluster">
-			<view naam="buitenRolKaartje" rol="trustedCluster">...</view>
+			<view viewnaam="buitenRolKaartje">...</view>
 			<contextVanRol rollen={...}>
 				<binnenRol>
-					<view="privePropertiesVanCluster">...</view>
+					<view viewnaam="privePropertiesVanCluster">...</view>
 				</binnenRol>
 			</contextVanRol>
 		</binding>
@@ -88,3 +88,17 @@ function MijnEigenView(props)
 {
 	return <p>En dit is de naam: {props.naam}</p>;
 }
+
+================================================================================
+DE LIJST VAN MODELLEN
+Wat je ophaalt, zijn de IDs van de contexten die de root vormen van een model. Die kun je laten zien zonder dat je de modellen zelf op hoeft te halen.
+Dan heeft de berekende rol een resultaat van Contexten.
+Maar ik zou er gemakkelijk in de functie "_buitenRol" aan vast kunnen plakken.
+Dan heeft de berekende rol een resultaat van (Buiten)Rollen.
+Als je de displayname wilt laten zien (en dat wordt belangrijk als we die kunnen veranderen terwijl de onderliggende filenaam/contextID niet verandert), dan *moet* je de modellen zelf ophalen.
+
+Dan speelt de cardinaliteit. Deze rol is niet functioneel.
+1. Moet Binding ook werken voor een niet-functionele rol?
+2. En View dan?
+
+06 10 85 55 89
