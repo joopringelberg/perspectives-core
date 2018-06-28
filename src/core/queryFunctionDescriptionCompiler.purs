@@ -22,7 +22,7 @@ import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter, (##>), (##>>), (##=))
-import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding, toRevision)
+import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.DataTypeObjectGetters (binding, context) as DTG
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=))
@@ -410,7 +410,7 @@ createContext name typeId roles properties = do
   lift $ cacheEntiteitPreservingVersion name
    (PerspectContext defaultContextRecord
       { _id = name
-      , _rev = toRevision Nothing
+      , _rev = Nothing
       , displayName = ln
       , pspType = typeId
       , buitenRol = (buitenRol name)

@@ -16,14 +16,14 @@ import Perspectives.ModelBasedTripleGetters (boundContextsM)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.Syntax (PerspectContext, PerspectRol, revision')
+import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const, (>>=))
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> MonadPerspectives (AjaxAvarCache e) DomeinFile
 domeinFileFromContext enclosingContext = do
   (DomeinFile df) <- execStateT (collect enclosingContext false) defaultDomeinFile
-  pure $ DomeinFile $ df {_rev = revision' (context_rev enclosingContext), _id = (context_id enclosingContext)}
+  pure $ DomeinFile $ df {_rev = (context_rev enclosingContext), _id = (context_id enclosingContext)}
   where
     collect :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Unit
     collect c definedAtToplevel =

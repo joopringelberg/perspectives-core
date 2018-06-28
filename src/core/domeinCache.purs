@@ -28,7 +28,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup)
-import Perspectives.Syntax (PerspectContext, PerspectRol, fromRevision, revision)
+import Perspectives.Syntax (PerspectContext, PerspectRol, revision)
 import Prelude (Unit, bind, discard, pure, ($), (*>), (<$>), (<>), (>>=), (==))
 
 type URL = String
@@ -133,7 +133,7 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
 modifyDomeinFileInCouchdb :: forall e. DomeinFile -> (AVar DomeinFile) -> MonadPerspectives (AjaxAvarCache e) Unit
 modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   (DomeinFile {_rev}) <- liftAff $ readVar av
-  originalRevision <- pure $ unsafePartial $ fromJust $ fromRevision _rev
+  originalRevision <- pure $ unsafePartial $ fromJust _rev
   oldDf <- liftAff $ takeVar av
   (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ put
     (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision)

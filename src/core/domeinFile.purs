@@ -7,7 +7,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
-import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision, noRevision, toRevision)
+import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision)
 import Prelude (($))
 
 newtype DomeinFile = DomeinFile
@@ -27,7 +27,7 @@ instance respondableDomeinFile :: Respondable DomeinFile where
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 defaultDomeinFile :: DomeinFile
-defaultDomeinFile = DomeinFile{ _rev: noRevision, _id: "", contexts: empty, roles: empty}
+defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, roles: empty}
 
 -- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
 type DomeinFileContexts = StrMap PerspectContext
@@ -42,4 +42,4 @@ addRolToDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
 addRolToDomeinFile c@(PerspectRol {_id}) (DomeinFile dff@{roles}) = DomeinFile dff {roles = insert _id c roles}
 
 setRevision :: String -> DomeinFile -> DomeinFile
-setRevision vs (DomeinFile dff) = DomeinFile $ dff {_rev = toRevision $ Just vs}
+setRevision vs (DomeinFile dff) = DomeinFile $ dff {_rev = Just vs}

@@ -3,7 +3,6 @@ module Perspectives.Syntax where
 import Perspectives.EntiteitAndRDFAliases
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
@@ -81,32 +80,17 @@ instance respondablePerspectRol :: Respondable PerspectRol where
 -----------------------------------------------------------
 -- REVISION, BINDING
 -----------------------------------------------------------
-type Revision = NullOrUndefined String
-
-fromRevision :: Revision -> Maybe String
-fromRevision = unNullOrUndefined
-
-toRevision :: Maybe String -> Revision
-toRevision = NullOrUndefined
+type Revision = Maybe String
 
 revision :: String -> Revision
-revision r = NullOrUndefined (Just r)
+revision = Just
 
-revision' :: Maybe String -> Revision
-revision' = NullOrUndefined
-
-noRevision :: Revision
-noRevision = NullOrUndefined Nothing
-
-type Binding = NullOrUndefined RolID
-
-fromBinding :: Binding -> Maybe RolID
-fromBinding = unNullOrUndefined
+type Binding = Maybe RolID
 
 binding :: RolID -> Binding
 binding id = case id of
-  "" -> NullOrUndefined Nothing
-  otherwise -> NullOrUndefined (Just id)
+  "" -> Nothing
+  otherwise -> (Just id)
 
 -----------------------------------------------------------
 -- COMMENTS

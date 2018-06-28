@@ -10,6 +10,7 @@ import Data.Foreign.Generic (defaultOptions, genericEncode)
 import Data.Foreign.Generic.Class (class GenericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Prelude (class Show, ($))
 

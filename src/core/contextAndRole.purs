@@ -8,7 +8,7 @@ import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty, lookup, insert)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
-import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, noRevision, toRevision)
+import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord)
 import Prelude (($))
 
 -- CONTEXT
@@ -26,7 +26,7 @@ context_rev :: PerspectContext -> Maybe String
 context_rev (PerspectContext{_rev}) = unNullOrUndefined _rev
 
 changeContext_rev :: String -> PerspectContext -> PerspectContext
-changeContext_rev rev (PerspectContext cr) = PerspectContext $ cr {_rev = toRevision $ Just rev}
+changeContext_rev rev (PerspectContext cr) = PerspectContext $ cr {_rev = Just rev}
 
 context_rev' :: PerspectContext -> Revision
 context_rev' (PerspectContext{_rev}) = _rev
@@ -83,7 +83,7 @@ context_comments (PerspectContext{comments})= comments
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
   { _id: ""
-  , _rev: noRevision
+  , _rev: Nothing
   , displayName: ""
   , pspType: ""
   , binnenRol: PerspectRol defaultRolRecord
@@ -100,7 +100,7 @@ defaultRolRecord =
   { _id: ""
   , pspType: ""
   , context: ""
-  , _rev: noRevision
+  , _rev: Nothing
   , binding: NullOrUndefined Nothing
   , properties: empty
   , gevuldeRollen: empty
@@ -117,7 +117,7 @@ rol_rev :: PerspectRol -> Maybe String
 rol_rev (PerspectRol{_rev}) = unNullOrUndefined _rev
 
 changeRol_rev :: String -> PerspectRol -> PerspectRol
-changeRol_rev rev (PerspectRol cr) = PerspectRol $ cr {_rev = toRevision $ Just rev}
+changeRol_rev rev (PerspectRol cr) = PerspectRol $ cr {_rev = Just rev}
 
 rol_rev' :: PerspectRol -> Revision
 rol_rev' (PerspectRol{_rev}) = _rev
