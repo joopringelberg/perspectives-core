@@ -5,7 +5,6 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
-import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
@@ -84,7 +83,7 @@ foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> 
 modifyTriple :: forall e1 e2. Delta -> Aff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
 modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
   do
-    value' <- pure (unsafePartial (fromJust (unNullOrUndefined value)))
+    value' <- pure (unsafePartial (fromJust value))
     mt <- liftEff $ lookupInTripleIndex rid pid
     case mt of
       Nothing -> pure Nothing

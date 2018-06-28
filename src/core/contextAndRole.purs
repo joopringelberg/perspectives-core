@@ -2,7 +2,6 @@ module Perspectives.ContextAndRole where
 
 import Perspectives.EntiteitAndRDFAliases
 import Data.Array (cons, delete, elemIndex)
-import Data.Foreign.NullOrUndefined (NullOrUndefined(..), unNullOrUndefined)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Ord (Ordering, compare)
 import Data.StrMap (StrMap, empty, lookup, insert)
@@ -23,7 +22,7 @@ changeContext_id :: ContextID -> PerspectContext -> PerspectContext
 changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}
 
 context_rev :: PerspectContext -> Maybe String
-context_rev (PerspectContext{_rev}) = unNullOrUndefined _rev
+context_rev (PerspectContext{_rev}) = _rev
 
 changeContext_rev :: String -> PerspectContext -> PerspectContext
 changeContext_rev rev (PerspectContext cr) = PerspectContext $ cr {_rev = Just rev}
@@ -101,7 +100,7 @@ defaultRolRecord =
   , pspType: ""
   , context: ""
   , _rev: Nothing
-  , binding: NullOrUndefined Nothing
+  , binding: Nothing
   , properties: empty
   , gevuldeRollen: empty
   , occurrence: 0
@@ -114,7 +113,7 @@ rol_id :: PerspectRol -> RolID
 rol_id (PerspectRol{_id}) = _id
 
 rol_rev :: PerspectRol -> Maybe String
-rol_rev (PerspectRol{_rev}) = unNullOrUndefined _rev
+rol_rev (PerspectRol{_rev}) = _rev
 
 changeRol_rev :: String -> PerspectRol -> PerspectRol
 changeRol_rev rev (PerspectRol cr) = PerspectRol $ cr {_rev = Just rev}
@@ -135,10 +134,10 @@ changeRol_type :: ContextID -> PerspectRol -> PerspectRol
 changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = tp}
 
 rol_binding :: PerspectRol -> Maybe RolID
-rol_binding (PerspectRol{binding}) = unNullOrUndefined binding
+rol_binding (PerspectRol{binding}) = binding
 
 changeRol_binding :: RolID -> PerspectRol -> PerspectRol
-changeRol_binding b (PerspectRol cr) = PerspectRol $ cr {binding = NullOrUndefined (Just b)}
+changeRol_binding b (PerspectRol cr) = PerspectRol $ cr {binding = (Just b)}
 
 rol_context :: PerspectRol -> ContextID
 rol_context (PerspectRol{context}) = context

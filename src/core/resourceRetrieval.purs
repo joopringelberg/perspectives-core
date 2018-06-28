@@ -15,7 +15,6 @@ import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
-import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
@@ -68,7 +67,7 @@ saveEntiteitPreservingVersion = saveEntiteit
 saveEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 saveEntiteit id = do
   pe <- readEntiteitFromCache id
-  case unNullOrUndefined $ getRevision' pe of
+  case getRevision' pe of
     Nothing -> saveUnversionedEntiteit id
     otherwise -> saveVersionedEntiteit id pe
 
@@ -87,12 +86,12 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion (ebase <> id) >>= pure <<< (flip setRevision pe) >>= void <<< saveVersionedEntiteit id
         else liftAff $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-          $ putVar (setRevision (unsafePartial $ fromJust $ unNullOrUndefined (unwrap res.response).rev) pe) avar
+          $ putVar (setRevision (unsafePartial $ fromJust (unwrap res.response).rev) pe) avar
       pure pe
 
 saveVersionedEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AjaxAvarCache e) a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
-  case (unNullOrUndefined (getRevision' entiteit)) of
+  case (getRevision' entiteit) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
     (Just rev) -> do
       ebase <- entitiesDatabase
@@ -100,4 +99,4 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
       (res :: AffjaxResponse PutCouchdbDocument) <- liftAff $ affjax $ rq {method = Left PUT, url = (ebase <> entId <> "?_rev=" <> rev), content = Just (encode entiteit)}
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion entId >>= pure <<< (flip setRevision entiteit) >>= saveVersionedEntiteit entId
-        else onAccepted res.status [200, 201] "saveVersionedEntiteit" $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust $ unNullOrUndefined (unwrap res.response).rev) entiteit)
+        else onAccepted res.status [200, 201] "saveVersionedEntiteit" $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust (unwrap res.response).rev) entiteit)

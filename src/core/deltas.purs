@@ -14,7 +14,6 @@ import Data.DateTime.Instant (toDateTime)
 import Data.Foreign (toForeign)
 import Data.Foreign.Class (class Encode)
 import Data.Foreign.Generic (encodeJSON)
-import Data.Foreign.NullOrUndefined (NullOrUndefined(..))
 import Data.Function (flip)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -357,7 +356,7 @@ updatePerspectEntiteit' changeEntity cid value = do
       addDomeinFileToTransactie dfId
       lift $ cacheInDomeinFile dfId (changeEntity value entity)
 
-  -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision' context))
+  -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (getRevision' context)
   -- -- Store the changed entity in couchdb.
   -- newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- -- Set the new revision in the entity.
@@ -370,7 +369,7 @@ setContextType = updatePerspectEntiteit
     { id : cid
     , memberName: "model:Perspectives$type"
     , deltaType: Change
-    , value: NullOrUndefined (Just theType)
+    , value:  (Just theType)
     , isContext: true
     })
 
@@ -381,7 +380,7 @@ setRolType = updatePerspectEntiteit
     { id : cid
     , memberName: "model:Perspectives$type"
     , deltaType: Change
-    , value: NullOrUndefined (Just theType)
+    , value:  (Just theType)
     , isContext: false
     })
 
@@ -392,7 +391,7 @@ setContextDisplayName = updatePerspectEntiteit
     { id : cid
     , memberName: "model:Perspectives$label"
     , deltaType: Change
-    , value: NullOrUndefined (Just displayName)
+    , value: (Just displayName)
     , isContext: true
     })
 
@@ -403,7 +402,7 @@ setContext = updatePerspectEntiteit
     { id : cid
     , memberName: "model:Perspectives$context"
     , deltaType: Change
-    , value: NullOrUndefined (Just rol)
+    , value: (Just rol)
     , isContext: false
     })
 
@@ -419,7 +418,7 @@ setBinding rid boundRol = do
     { id : rid
     , memberName: "model:Perspectives$binding"
     , deltaType: Change
-    , value: NullOrUndefined (Just boundRol)
+    , value: (Just boundRol)
     , isContext: false
     }
 
@@ -443,7 +442,7 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
   void $ lift $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
   void $ lift $ saveVersionedEntiteit cid context
 
-  -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (unNullOrUndefined (getRevision' context))
+  -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
   -- -- Store the changed entity in couchdb.
   -- newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
   -- -- Set the new revision in the entity.
@@ -460,7 +459,7 @@ addRol =
         { id : cid
         , memberName: rolName
         , deltaType: Add
-        , value: NullOrUndefined (Just rolId)
+        , value: (Just rolId)
         , isContext: true
         })
 
@@ -473,7 +472,7 @@ removeRol =
         { id : cid
         , memberName: rolName
         , deltaType: Remove
-        , value: NullOrUndefined (Just rolId)
+        , value: (Just rolId)
         , isContext: true
         })
 
@@ -486,7 +485,7 @@ setRol =
         { id : cid
         , memberName: rolName
         , deltaType: Change
-        , value: NullOrUndefined (Just rolId)
+        , value: (Just rolId)
         , isContext: true
         })
 
@@ -499,7 +498,7 @@ addProperty =
         { id : rid
         , memberName: propertyName
         , deltaType: Add
-        , value: NullOrUndefined (Just value)
+        , value: (Just value)
         , isContext: false
         })
 
@@ -512,7 +511,7 @@ removeProperty =
         { id : rid
         , memberName: propertyName
         , deltaType: Remove
-        , value: NullOrUndefined (Just value)
+        , value: (Just value)
         , isContext: false
         })
 
@@ -525,7 +524,7 @@ setProperty =
         { id : rid
         , memberName: propertyName
         , deltaType: Change
-        , value: NullOrUndefined (Just value)
+        , value: (Just value)
         , isContext: false
         })
 

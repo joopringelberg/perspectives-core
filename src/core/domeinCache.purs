@@ -11,7 +11,6 @@ import Control.Monad.Eff.Exception (error)
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
 import Data.Foreign.Generic (encodeJSON)
-import Data.Foreign.NullOrUndefined (unNullOrUndefined)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
@@ -125,7 +124,7 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
       setRevision rev ev
       updatedDomeinFile <- liftAff $ readVar ev
       modifyDomeinFileInCouchdb updatedDomeinFile ev
-    else onAccepted res.status [200, 201] "createDomeinFileInCouchdb" $ setRevision (unsafePartial $ fromJust $ unNullOrUndefined (unwrap res.response).rev) ev
+    else onAccepted res.status [200, 201] "createDomeinFileInCouchdb" $ setRevision (unsafePartial $ fromJust $ (unwrap res.response).rev) ev
   where
     setRevision :: String -> (AVar DomeinFile) -> MonadPerspectives (AjaxAvarCache e) Unit
     setRevision s av = liftAff $ putVar (DomeinFile (dfr {_rev = (revision s)})) av
@@ -144,7 +143,7 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
       setRevision rev
       updatedDomeinFile <- liftAff $ readVar av
       modifyDomeinFileInCouchdb updatedDomeinFile av
-    else onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb" $ setRevision (unsafePartial $ fromJust $ unNullOrUndefined (unwrap res.response).rev)
+    else onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb" $ setRevision (unsafePartial $ fromJust $ (unwrap res.response).rev)
   where
     setRevision :: String -> MonadPerspectives (AjaxAvarCache e) Unit
     setRevision s = liftAff $ putVar (DomeinFile (dfr {_rev = (revision s)})) av
