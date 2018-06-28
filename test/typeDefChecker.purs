@@ -10,9 +10,10 @@ import Data.Array (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe)
-import Perpectives.TypeChecker (checkRolForQualifiedProperty, contextHasType, importsAspect, isOrHasAspect, rolHasType)
-import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObjects)
-import Perspectives.DataTypeObjectGetters (binding, buitenRol, context, iedereRolInContext, typeVanIedereRolInContext)
+import Perpectives.TypeChecker (checkContextForQualifiedRol, checkRolForQualifiedProperty, contextHasType, importsAspect, isOrHasAspect, rolHasType)
+import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObjects, (%%>>))
+import Perspectives.DataTypeObjectGetters (binding, buitenRol, context, contextType, iedereRolInContext, typeVanIedereRolInContext)
+import Perspectives.DataTypeTripleGetters (contextTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, isInNamespace)
 import Perspectives.ModelBasedObjectGetters (binnenRolContextDef, contextDef, rolInContextContextDef)
@@ -21,10 +22,11 @@ import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAl
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCombinators (contains, toBoolean)
+import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##))
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##), (##>>))
 import Perspectives.Syntax (PerspectContext(..))
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructInverseRolGetter, constructRolGetter, constructRolPropertyGetter)
@@ -78,11 +80,11 @@ test = do
   -- messages14 <- checkContext "model:Test$Test11$rol"
   -- lift $ for_ messages14 logShow
 
-  messages15 <- checkModel "model:Systeem"
-  lift $ for_ messages15
-    \m -> do
-      logShow m
-      logShow "------"
+  -- messages15 <- checkModel "model:Systeem"
+  -- lift $ for_ messages15
+  --   \m -> do
+  --     logShow m
+  --     logShow "------"
 
 -- betrouwbaarheid <- "model:User$MijnAangifte" ## ((constructRolGetter "model:Politie$Aangifte$Verbalisant")
 -- >-> (constructExternalPropertyGetter "model:Politie$Aangifte$Verbalisant$betrouwbaarheid"))
@@ -100,8 +102,28 @@ test = do
   -- x <- "model:Test$Test11" ## aspectDef >-> rolDef
   -- lift $ logShow x
 
-  -- b <- ("model:Test$Test11$rol" `contextHasType` "model:Perspectives$Rol")
+  -- b <- ("model:Systeem$Systeem$gebruiker" `contextHasType` "model:QueryAst$ComputedRolGetter")
   -- lift $ logShow b
+  --
+  -- let cid = "model:User$MijnSysteem"
+  -- let rn = "model:Systeem$Systeem$gebruiker"
+  -- let ctxtType = "model:Systeem$Systeem"
+  --
+  -- b <- checkContextForQualifiedRol rn ctxtType
+  -- lift $ logShow b
+  --
+  -- r <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
+  -- case r of
+  --   (Right typeDescriptionID) -> do
+  --     (description :: PerspectContext) <- getPerspectEntiteit typeDescriptionID
+  --     lift $ logShow description
+  --     _ <- constructQueryFunction typeDescriptionID
+  --     lift $ logShow typeDescriptionID
+  --   otherwise -> lift $ logShow "Mislukt"
+
+  -- Je kunt geen user entiteiten ophalen...
+  -- t <- "model:User$MijnSysteem" %%>> contextType
+  -- lift $ logShow t
 
   -- let rn = "model:Perspectives$Property$buitenRolBeschrijving"
   -- let pn = "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
@@ -168,8 +190,8 @@ test = do
   -- isExternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$externalProperty") pn
   -- lift $ logShow $ head isExternal
 
-  -- (y :: Maybe PerspectContext) <- getPerspectEntiteit "model:Perspectives$View$propertyReferentie$volgNummer_getter"
-  -- lift $ logShow y
+  (y :: PerspectContext) <- getPerspectEntiteit "model:User$MijnSysteem"
+  lift $ logShow y
 
 
   -- b <- checkRolForQualifiedProperty pn rn

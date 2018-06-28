@@ -20,7 +20,8 @@
 
 
 module Main where
-import Control.Monad.Aff (Aff, Error, error, liftEff', runAff, throwError)
+import Control.Aff.Sockets (SOCKETIO)
+import Control.Monad.Aff (Aff, Error, error, forkAff, liftEff', runAff, throwError)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
@@ -33,14 +34,14 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable, lookup)
 import Data.Tuple (Tuple(..))
 import Data.URI.Query (Query(..), parser) as URI
-import Perspectives.Api (setupApi)
+import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.Couchdb (User, Password)
 import Perspectives.Effects (AjaxAvarCache, AvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
-import Prelude (Unit, bind, pure, ($), (<$>), (>>=), (<>), show, void)
+import Prelude (Unit, bind, pure, ($), (<$>), (>>=), (<>), show, void, discard)
 import Text.Parsing.StringParser (ParseError, runParser)
 
-main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT)) Unit
+main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO)) Unit
 main = void $ runAff handleError do
   mt <- credentialsFromQueryString
   case mt of
@@ -50,7 +51,8 @@ main = void $ runAff handleError do
       url <- pure "http://127.0.0.1:5984/"
       (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
       state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
-      runPerspectivesWithState setupApi state
+      void $ forkAff $ runPerspectivesWithState setupApi state
+      void $ forkAff $ runPerspectivesWithState setupTcpApi state
 
 -- TODO. Als geen waarde in usr beschikbaar is, moet de gebruiker een naam (opnieuw) invoeren!
 credentialsFromQueryString :: forall e. Aff (AvarCache (dom :: DOM | e)) (Maybe (Tuple User Password))

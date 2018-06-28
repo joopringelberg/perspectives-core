@@ -40,3 +40,5 @@ test.js
 /untracked
 
 /**/~*
+
+package-lock.json

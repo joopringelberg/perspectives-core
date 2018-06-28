@@ -4,7 +4,15 @@ import AceEditor from "react-ace";
 
 import "./App.css";
 import { main } from "./output/Main";
+
+// A internal connection from Perspectives Core will be set up on the initiative of the Core.
+// To connect instead through TCP, uncomment the next two lines:
+// import {createTcpConnectionToPerspectives} from "./client/perspectivesApiProxy";
+// createTcpConnectionToPerspectives({port: 7777, host: "localhost", allowHalfOpen: false});
+
 import { Context, Binding, View, ContextVanRol, ExterneView } from "./client/hoc";
+
+
 
 main();
 
@@ -41,13 +49,6 @@ class App extends Component
           {/*</View>*/}
         </Context>
 
-        <AceEditor
-          mode="perspectives"
-          theme="perspectives"
-          onChange={onChange}
-          name="aceEditor"
-          editorProps={{$blockScrolling: true}}
-        />
       </div>
     );
   }

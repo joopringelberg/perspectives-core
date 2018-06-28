@@ -86,6 +86,7 @@ class TcpChannel
     return this.requestId;
   }
 
+  // close will lead messageProducer to receive (Right unit).
   close()
   {
     this.connection.write("shutdown");

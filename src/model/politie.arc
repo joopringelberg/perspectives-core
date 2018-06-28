@@ -2,7 +2,7 @@ Tekst "representatief voorbeeld van ARC" -- Deze regel geeft de instantie van Ge
 {-
 Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
 -}
-Omhullende Context is Domein model:Politie$ --Commentaar achter de context declaratie.
+Domein model:Politie heeft --Commentaar achter de context declaratie.
 
 zaken
 
@@ -17,9 +17,9 @@ Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
 		extern
 			aantekening (String, Niet Verplicht, Functioneel)
 	rollen
-		UserRol (Functioneel) gevuld door per:Persoon heeft
+		UserRol (Functioneel, Verplicht) gevuld door per:Persoon heeft
 			properties
-				x§
+				naam (String, Verplicht, Functioneel)
 			views
 				adres met properties
 					-- hieronder alle properties van de view.
