@@ -5,7 +5,6 @@ import Control.Monad.Error.Class (class MonadError, throwError)
 import Data.Array (elemIndex)
 import Data.Foreign.Class (class Decode)
 import Data.Foreign.Generic (defaultOptions, genericDecode)
-import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map, fromFoldable, lookup)
 import Data.Maybe (Maybe(..))
@@ -30,11 +29,11 @@ type DatabaseName = String
 -----------------------------------------------------------
 
 newtype PutCouchdbDocument = PutCouchdbDocument
-  { ok :: NullOrUndefined Boolean
-  , id :: NullOrUndefined String
-  , rev :: NullOrUndefined String
-  , error :: NullOrUndefined String
-  , reason :: NullOrUndefined String}
+  { ok :: Maybe Boolean
+  , id :: Maybe String
+  , rev :: Maybe String
+  , error :: Maybe String
+  , reason :: Maybe String}
 
 derive instance genericPutCouchdbDocument :: Generic PutCouchdbDocument _
 
@@ -61,7 +60,7 @@ newtype GetCouchdbAllDocs = GetCouchdbAllDocs
   { offset :: Int
   , rows :: Array DocReference
   , total_rows :: Int
-  , update_seq :: NullOrUndefined Int
+  , update_seq :: Maybe Int
   }
 
 derive instance genericCouchdbAllDocs :: Generic GetCouchdbAllDocs _
@@ -90,7 +89,7 @@ instance decodeRev :: Decode Rev where
 -----------------------------------------------------------
 newtype PostCouchdb_session = PostCouchdb_session
   { ok :: Boolean
-  , name :: NullOrUndefined User
+  , name :: Maybe User
   , roles :: Array String
   }
 

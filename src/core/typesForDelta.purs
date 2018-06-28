@@ -8,7 +8,6 @@ import Data.Foreign (Foreign)
 import Data.Foreign.Class (class Encode)
 import Data.Foreign.Generic (defaultOptions, genericEncode)
 import Data.Foreign.Generic.Class (class GenericEncode)
-import Data.Foreign.NullOrUndefined (NullOrUndefined)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Perspectives.EntiteitAndRDFAliases (ID)
@@ -20,7 +19,7 @@ import Prelude (class Show, ($))
 newtype Delta = Delta
   { id :: ID
   , memberName :: String
-  , value :: NullOrUndefined String
+  , value :: Maybe String
   , deltaType :: DeltaType
   , isContext :: Boolean
   }

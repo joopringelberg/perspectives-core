@@ -15,6 +15,8 @@
     "aff-coroutines",
     "psci-support",
     "aff-sockets",
-    "datetime-iso"
+    "datetime-iso",
+    "uri",
+    "parsing"
   ]
 }

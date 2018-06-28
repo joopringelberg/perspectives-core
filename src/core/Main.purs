@@ -33,13 +33,13 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.StrMap (fromFoldable, lookup)
 import Data.Tuple (Tuple(..))
-import Data.URI.Query (Query(..), parser) as URI
+import URI.Query (Query(..), parser) as URI
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.Couchdb (User, Password)
 import Perspectives.Effects (AjaxAvarCache, AvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
 import Prelude (Unit, bind, pure, ($), (<$>), (>>=), (<>), show, void, discard)
-import Text.Parsing.StringParser (ParseError, runParser)
+import Text.Parsing.Parser.String (ParseError, runParser)
 
 main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO)) Unit
 main = void $ runAff handleError do
