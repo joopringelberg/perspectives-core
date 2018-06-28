@@ -1,0 +1,20 @@
+{
+  "name": "purescript-aff-sockets",
+  "set": "psc-0.11.7-perspectives-core",
+  "source": "https://github.com/joopringelberg/package-sets.git",
+  "depends": [
+    "prelude",
+    "aff",
+    "foreign-generic",
+    "affjax",
+    "argonaut",
+    "aff-promise",
+    "js-date",
+    "uri",
+    "numbers",
+    "aff-coroutines",
+    "psci-support",
+    "aff-sockets",
+    "datetime-iso"
+  ]
+}

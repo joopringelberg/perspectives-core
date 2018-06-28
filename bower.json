@@ -7,22 +7,7 @@
     "output"
   ],
   "dependencies": {
-    "purescript-affjax": "^5.0.0",
-    "purescript-argonaut": "^3.0.0",
-    "purescript-foreign-generic": "^5.0.0",
-    "purescript-aff-promise": "^1.0.0",
     "purescript-datetime-iso": "^1.0.2",
-    "purescript-now": "^3.0.0",
-    "purescript-js-date": "^5.1.0",
-    "purescript-uri": "^4.2.4",
-    "purescript-numbers": "^5.0.0",
-    "purescript-aff-sockets": "https://github.com/joopringelberg/purescript-aff-sockets.git",
-    "purescript-aff-coroutines": "6.0.0"
-  },
-  "devDependencies": {
-    "purescript-psci-support": "^3.0.0"
-  },
-  "resolutions": {
-    "purescript-js-date": "^4.0.0"
+    "purescript-aff-sockets": "https://github.com/joopringelberg/purescript-aff-sockets.git"
   }
 }

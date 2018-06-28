@@ -91,3 +91,4 @@ Branch master set up to track remote branch master from origin.
 
 Nu kan ik de React code gaan verwijderen. Het andere project, perspectives-electron-app, heeft nog steeds perspectives	 als origin. Ik ga daar straks files uit overnemen voor perspectives-client en voor perspectives-react-testclient1.
 
+PSC-PACKAGE IN PLAATS VAN BOWER
