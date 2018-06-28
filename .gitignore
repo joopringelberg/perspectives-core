@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/bower_components/
 
 # testing
 /coverage
@@ -20,7 +21,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-/bower_components/
 /.pulp-cache/
 /generated-docs/
 /.psc*
@@ -31,14 +31,9 @@ yarn-error.log*
 /testOutput.txt
 /dist/**
 /output/
-/src/output
 /test.json
-/public/Apache-CouchDB-2.1.1-1.zip
-README.md
 test.js
-
-/untracked
+bowerinstall.txt
+package-lock.json
 
 /**/~*
-
-package-lock.json
