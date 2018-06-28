@@ -1,38 +1,90 @@
-VOORBEELD
 ARC GRAMMATICA
 
-Text = TextDeclaration (ContextDeclaration | "properties" | "rollen" | "acties")*
-TextDeclaration = "Tekst" String
-ContextDeclaration = ContextType ContextIdentifier "heeft"
+indented p = NEWLINE INDENT p NEWLINE OUTDENT
+
+
+Text = TextDeclaration comment? NEWLINE ContextType ContextDeclaration comment?
+TextDeclaration = "Tekstnaam" String SingleLineComment?
+ContextDeclaration = ContextIdentifier "heeft" SingleLineComment? (Sectie | comment)*
 ContextType = "Domein" | "Partij" | "Zaak" | "Activiteit" | "Toestand"
-ContextDefinition = ContextDeclaration
-	Properties
-	Rollen
-	Acties
-Properties = "properties" Property+
-Property = ("intern" | "extern") PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")"
+Sectie = Partijen | Zaken | Activiteiten | Toestanden | Properties | Rollen | Acties | ContextViews
+
+Partijen = "partijen" SingleLineComment? (indented ContextDeclaration)
+Zaken = "zaken" SingleLineComment? (indented ContextDeclaration)
+Activiteiten = "activiteiten" SingleLineComment? (indented ContextDeclaration)
+Toestanden = "toestanden" SingleLineComment? (indented ContextDeclaration)
+
+Properties = "properties" SingleLineComment? (indented comment? InterneProperties) (indented comment? ExterneProperties) 
+InterneProperties = "intern" SingleLineComment? (indented (Property | comment)*)
+ExterneProperties = "extern" SingleLineComment? (indented (Property | comment)*)
+
+Property = PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")" SingleLineComment? 
 PropertyType = "String" | "Boolean" | "Number" | "Date" | "Memo"
-IsVerplicht = "verplicht" | "niet verplicht"
-IsFunctioneel = "functioneel" | "niet functioneel"
-Views = "views" View+
-View = ("intern" | "extern") ViewIdentifier "met properties" PropertyIdentifier+
-Rollen = "rollen" Rol+
-Rol = RolDeclaration "(" "Niet"? "Functioneel" ")" "heeft"
-	RolProperties
-	Views
-RolDeclaration =
-	RolType |
-	RolType "gevuld door" (RolIdentifier | ContextIdentifier | Query | ContextDeclaration)
-	RolIdentifier "gevuld door" (RolIdentifier | ContextIdentifier | Query | ContextDeclaration)
-RolProperties = "properties" RolProperty+
-RolProperty = PropertyIdentifier "(" PropertyType "," IsVerplicht, IsFunctioneel ")"
-RolType = "UserRol" | "DingRol"
-Acties = "acties" Actie+
+IsVerplicht = "Verplicht" | "Niet verplicht"
+IsFunctioneel = "Functioneel" | "Niet functioneel"
+
+Rollen = "rollen" SingleLineComment? (indented (Rol | comment)*)
+Rol = RolIdentifier "gevuld door" "(" "Niet"? "Functioneel" ")" "heeft" Binding (indented RolProperties)
+	(indented RolViews)
+Binding = RolIdentifier SingleLineComment? | ContextIdentifier SingleLineComment? | (indented (Query comment*)) | (indented (ContextDeclaration comment*))
+RolProperties = "properties" SingleLineComment? (indented (Property | comment)*)
+
+ContextViews = "views" SingleLineComment? (indented comment? InterneViews*) (indented comment? ExterneViews*)
+InterneViews = "intern" SingleLineComment? (indented (View | comment)*)
+ExterneViews = "extern" SingleLineComment? (indented (View | comment)*)
+
+RolViews = "views" SingleLineComment? (indented (View | comment)*)
+
+View = ViewIdentifier "met properties" SingleLineComment? (indented (PropertyIdentifier SingleLineComment? | comment*))
+
+Acties = "acties" SingleLineComment? (indented (Actie | comment)*)
 Actie = 
-	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) |
-	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) RolIdentifier
-	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) ViewIdentifier "van" RolIdentifier	
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) SingleLineComment? |
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) RolIdentifier SingleLineComment? 
+	(Actor | RolIdentifier) (InformatieWerkwoord | WerkwoordIdentifier) ViewIdentifier "van" RolIdentifier SingleLineComment? 
 InformatieWerkwoord = "beheert" | "raadpleegt" | "creeërt" | "verwijdert"
+
+comment = SingleLineComment | MultiLineComment
+SingleLineComment = "--" StringWithoutLineBreaks
+MultiLineComment = NEWLINE "{-" String "-}" NEWLINE
+
+LEXING
+model:Perspectives
+model:Perspectives$Context
+model:Perspectives$Context$rolInContext
+model:Systeem$Systeem$TrustedCluster
+psp:Context
+psp:Context$rolInContext
+sys:Systeem$TrustedCluster
+$TrustedCluster
+$rolInContext
+
+CapitalizedString = UpperChar AnyChar*
+LowerCaseString = lowerChar+
+
+CapitalizedFragment = "$" CapitalizedString
+LowerCaseFragment = "$" LowerCaseString
+
+DomeinName = "model:" CapitalizedString
+Prefix = LowerCaseString ":"
+
+CapitalizedIdentifier = 
+	CapitalizedFragment+ |
+	DomeinName CapitalizedFragment* |
+	Prefix CapitalizedFragment+
+	
+LowerCaseIdentifier = 
+	LowerCaseFragment |
+	DomeinName LowerCaseFragment+
+	Prefix LowerCaseFragment+
+
+ContextIdentifier = CapitalizedIdentifier
+RolIdentifier = LowerCaseIdentifier
+PropertyIdentifier = LowerCaseIdentifier
+ViewIdentifier = CapitalizedIdentifier
+
+WerkwoordIdentifier = LowerCaseString
+
 
 Opmerkingen
 1. Rol en Actie kunnen compacter opgeschreven worden met optionele componenten, maar deze presentatie geeft goed de verschillende stadia weer.

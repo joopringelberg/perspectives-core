@@ -1,0 +1,33 @@
+INFORMATIE OVER SOCKETS OP MOBILE
+
+https://www.raywenderlich.com/157128/real-time-communication-streams-tutorial-ios
+Zo te zien is dit geschreven in Go.
+
+https://github.com/swiftsocket/SwiftSocket. Geschreven in Swift. https://developer.apple.com/swift/
+
+NODE OP IOS EN ANDROID
+https://code.janeasystems.com/nodejs-mobile
+
+COUCHDB/COUCHBASE ON MOBILE
+
+https://github.com/couchbase/couchbase-lite-ios
+https://blog.couchbase.com/couchbase-lite-embedded-in-ios-app-part1/
+
+ionic is een alternatief voor React native. Maar het is gebaseerd op Angular.
+
+Xamarin is van Microsoft. Het lijkt of je als .Net programmeur een voorsprong hebt.
+
+Flutter is van Google. Taal: Dart
+
+VOORLOPIGE CONCLUSIES
+1. nodejs-mobile zou wel eens een manier kunnen zijn om een app te maken die alleen de Core draait. 
+	- open vraag: kan je een TCP listener ermee maken?
+	- andere open vraag: kun je sockets openen in React Native?
+		ANTWOORD:
+			https://www.npmjs.com/package/react-native-sockets
+			Dit is een native component voor react-native die je de gelegenheid geeft om een Socket te openen in javascript.
+		LET OP: je kunt ook een server maken.
+
+2. Open vraag: kan onze core draaien in react native? Je zou dan een app kunnen maken met een kleine user interface die de core draait, met een tcp listener. Dat zou een alternatief zijn voor nodejs-mobile.
+
+3. couchbase-lite lijkt de aangewezen database op mobile. Sync met couchdb lijkt mogelijk.

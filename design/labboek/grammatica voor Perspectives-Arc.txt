@@ -1,0 +1,45 @@
+GRAMMAR FILE VOOR ATOM EN PERSPECTIVES-ARC
+
+Pro Memori:
+	- ctrl-alt-cmd-l = reload window. Nodig na verandering van de grammatica.
+	- alt-cmd-p = toon Scopes at Cursor
+
+Het theme dat ik gebruik in Atom is "base16 tomorrow light". De file _base.less bevat de syntax sleutelwoorden:
+https://github.com/atom/base16-tomorrow-light-theme/blob/master/styles/syntax/_base.less
+
+Het template dat Atom verschaft: https://github.com/atom/template-syntax/blob/master/stylesheets/base.less
+
+Unicode character properties: https://en.wikipedia.org/wiki/Unicode_character_property
+
+Oniguruma regex engine cheat sheet: https://github.com/kkos/oniguruma/blob/master/doc/RE
+
+Coffeescript: https://coffeescript.org/#overview
+
+INVENTARISATIE VAN SCOPES IN PURESCRIPT
+! = komt niet voor in _base.less
+!! = komt niet voor in het template base.less
+
+"module Perspectives.CollectDomeinFile where"
+module	(lila)
+	source.purescript
+	meta.import(!,!!).purescript
+	keyword.other.purescript
+
+where (lila)
+	source.purescript
+	meta.declaration(!,!!).module(!,!!).purescript
+	keyword.other.purescript
+
+
+"import Control.Monad.Eff (kind Effect)"
+kind (lichtblauw)
+	source.purescript
+	meta.import(!,!!).purescript
+	meta.declaration(!,!!).exports(!,!!).purescript
+	entity.name.function.purescript
+
+Effect (Geel)
+	source.purescript
+	meta.import.purescript
+	meta.declaration.exports.purescript
+	entity.name.type.purescript

@@ -1,0 +1,22 @@
+VERGELIJKING PACKAGE-SETS PER 20-6 MET PURESCRIPT-ELECTRON-APP DEPENDENCIES
+
+ZIE https://github.com/purescript/package-sets/blob/master/packages.json.
+
+Gebruikt in Purescript-electron-app maar niet in deze packages set:
+- purescript-argonaut (want gebruikt purescript-argonaut-traversals)
+- purescript-argonaut-traversals
+- purescript-datetime-iso (want gebruikt purescript-parsing)
+- purescript-dom (wordt niet meer onderhouden, zie purescript-web en specifiek purescript-web-html)
+- purescript-eff (ongetwijfeld vervangen door Effect)
+- purescript-foreign-generic
+- purescript-generics (waarschijnlijk vervallen ten gunste van purescript-generics-rep. Ik gebruik alleen de laatste)
+- purescript-maps
+- purescript-parsing
+- purescript-pathy
+- purescript-sets
+- purescript-symbols
+- purescript-uri
+
+package-sets-psc-0.11.7-20180524 mist alleen:
+- purescript-datetime-iso
+Dit is het meest recente package dat niet voor Purescript 0.12.0 is (maar nog voor 0.11.7)

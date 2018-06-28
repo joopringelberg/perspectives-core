@@ -14,3 +14,46 @@ Er is geen Purescript voorbeeld.
 Ja toch, gevonden in purescript-node-net.
 
 Stand van zaken: ik heb een werkende implementatie van een server en een client, die daadwerkelijk communiceren!
+
+PROBLEEM
+De code in purescript-node-net is in Eff, terwijl perspectives-electron in MonadPerspectives, gebaseerd op Aff, draait.
+Dus: hoe lift ik de Eff code naar Aff?
+
+COROUTINES
+De oplossing ligt in de purescript-coroutines bibliotheek.
+De grote lijnen:
+- maak een producer van de Eff functie die de connection uitleest
+- transform die producer zodat hij (in Perspectives) een commando omzet in een resultaat.
+- maak een consumer die het resultaat weer in de connection schrijft
+- verbindt die drie in een proces en run dat.
+
+PRODUCER UIT CONNECTION
+git tag -a v1.1.0 -m "createMessageEmitterImpl now takes a callback function that takes a string argument instead of Either a r."
+
+
+{"request":"GetRol","subject":"model:User$MijnSysteem","predicate":"model:Systeem$Systeem$gebruiker", "setterId": "0"}
+
+MODULAIRE OPZET
+1. perspectivesApiProxy.js en hoc.js zijn nodig als requirements aan de client zijde.
+2. perspectivesApiProxy.js is (altijd) nodig aan de kant van de core (zolang de core standaard (ook) het interne kanaal opent).
+3. Het interne kanaal kan altijd door de core geopend worden.
+4. De languageServer heeft purescript-aff-sockets nodig, maar niet perspectivesApiProxy.
+5. Een client die met een andere technologie dan React schermen wil bouwen, heeft wel perspectivesApiProxy, maar niet hoc.js nodig.
+
+Andere naam voor hoc.js: perspectives-react-components.js
+
+6. Op te lossen: import {deconstructLocalNameFromDomeinURI_ as localName} from "../output/Perspectives.Identifiers";
+De simpelste manier is om de code te dupliceren in perspectives-react-components.js, met commentaar met wederzijdse afhankelijkheid in beide source files.
+
+EEN NIEUW PROJECT: PERSPECTIVES-CLIENT
+In dit project brengen we twee bestanden onder:
+
+	- perspectivesApiProxy.js
+	- perspectives-react-components.js
+
+We maken hier een github project van (private!).
+We voegen perspectives-client als dependency to aan de Core (vanwege het interne kanaal).
+
+We voegen perspectives-client óók als dependency toe aan elke client, of die nu via het interne kanaal of via TCP verbindt met de Core. 
+	- in geval van interne kanaal is de module fysiek maar eenmaal aanwezig (in de gecombineerde core-client);
+	- in geval van TCP is de module fysiek niet alleen in de Core aanwezig, maar óók in de client.
