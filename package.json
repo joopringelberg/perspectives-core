@@ -1,14 +1,20 @@
 {
   "name": "perspectives-core",
   "version": "1.0.0",
+  "description": "Core functionality of Perspectives",
   "private": true,
+  "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "license": "Copyright Perspect-IT 2018",
   "dependencies": {
     "xhr2": "^0.1.4",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joopringelberg/perspectives-core.git"
+  },
   "main": "perspectives-core.js",
-  "homepage": "http://perspect-it.com/",
+  "homepage": "https://github.com/joopringelberg/perspectives-core#readme",
   "scripts": {
     "umdbundle": "pulp --psc-package browserify --standalone perspectives-core --to perspectives-core.js"
   },
