@@ -5,7 +5,7 @@
   "license": "Copyright Perspect-IT 2018",
   "dependencies": {
     "xhr2": "^0.1.4",
-    "perspectives-client": "git+https://github.com/joopringelberg/perspectives-client.git"
+    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git"
   },
   "main": "perspectives-core.js",
   "homepage": "http://perspect-it.com/",
