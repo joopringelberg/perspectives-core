@@ -1,15 +1,14 @@
 {
   "name": "perspectives-core",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "license": "Copyright Perspect-IT 2018",
   "dependencies": {
-    "xhr2": "^0.1.4"
+    "xhr2": "^0.1.4",
+    "perspectives-client": "git+https://github.com/joopringelberg/perspectives-client.git"
   },
-  "main": "src/main.js",
+  "main": "perspectives-core.js",
   "homepage": "http://perspect-it.com/",
-  "scripts": {
-  },
-  "devDependencies": {
-  }
+  "scripts": {},
+  "devDependencies": {}
 }

@@ -2,5 +2,6 @@ if (exports === undefined)
 {
   exports = module.exports;
 }
-
-exports.createRequestEmitterImpl = require("client/perspectivesApiProxy.js").createRequestEmitterImpl
+const x = require( "object-assign");
+// exports.createRequestEmitterImpl = require("perspectives-client").createRequestEmitterImpl;
+exports.createRequestEmitterImpl = function(){};
