@@ -9,6 +9,8 @@
   },
   "main": "perspectives-core.js",
   "homepage": "http://perspect-it.com/",
-  "scripts": {},
+  "scripts": {
+    "umdbundle": "pulp --psc-package browserify --standalone perspectives-core --to perspectives-core.js"
+  },
   "devDependencies": {}
 }
