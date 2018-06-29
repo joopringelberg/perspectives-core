@@ -13,10 +13,11 @@
     "type": "git",
     "url": "git+https://github.com/joopringelberg/perspectives-core.git"
   },
-  "main": "perspectives-core.js",
+  "main": "output/Main/index.js",
   "homepage": "https://github.com/joopringelberg/perspectives-core#readme",
   "scripts": {
-    "umdbundle": "pulp --psc-package browserify --standalone perspectives-core --to perspectives-core.js"
+    "umdbundle": "pulp --psc-package browserify --standalone perspectives-core --to perspectives-core.js",
+    "bundle": "pulp build"
   },
   "devDependencies": {}
 }

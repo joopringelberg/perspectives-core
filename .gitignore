@@ -30,7 +30,7 @@ yarn-error.log*
 /output.js
 /testOutput.txt
 /dist/**
-/output/
+#/output/
 /test.json
 test.js
 bowerinstall.txt
