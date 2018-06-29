@@ -1,5 +1,5 @@
 {
-  "name": "purescript-aff-sockets",
+  "name": "perspectives-core",
   "set": "psc-0.11.7-perspectives-core2",
   "source": "https://github.com/joopringelberg/package-sets.git",
   "depends": [

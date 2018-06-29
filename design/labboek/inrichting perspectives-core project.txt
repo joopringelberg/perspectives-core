@@ -93,3 +93,5 @@ Nu kan ik de React code gaan verwijderen. Het andere project, perspectives-elect
 
 PSC-PACKAGE IN PLAATS VAN BOWER
 Als ik package-sets-psc-0.11.7-20180524 gebruik, mis ik alleen purescript-datetime-iso.
+
+Als package zet ik nu in: "psc-0.11.7-perspectives-core2"

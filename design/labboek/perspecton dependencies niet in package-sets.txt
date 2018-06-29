@@ -20,3 +20,8 @@ Gebruikt in Purescript-electron-app maar niet in deze packages set:
 package-sets-psc-0.11.7-20180524 mist alleen:
 - purescript-datetime-iso
 Dit is het meest recente package dat niet voor Purescript 0.12.0 is (maar nog voor 0.11.7)
+
+Ik heb een variant gemaakt van package-sets-psc-0.11.7-20180524 waarin ik heb toegevoegd:
+	- purescript-datetime-iso
+	- purescript-aff-sockets
+	- parsing, mijn eigen fork, versie 4.4.0
