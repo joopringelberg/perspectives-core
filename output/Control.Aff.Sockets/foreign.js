@@ -32,30 +32,49 @@ function createMessageEmitterImpl(connection, emit)
     {
       emit(a + "")();
     });
+
+  // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
+  // Emitted when an error occurs. The 'close' event will be called
+  // directly following this event.
   connection.on('error',
     function(error)
     {
-      // Show or log the error.
-      connection.close(function()
-        {
-          // show or log that the connection is fully closed.
-          // Finish the producer.
-          emit("shutdown")();
-        });
+      console.log( "Error on the connection: " + error );
+      // Half-closes the socket. i.e., it sends a FIN packet.
+      // It is possible the server will still send some data.
+      //
+      // Therefore we do not close the producer, but wait till the other
+      // side sends a FIN packet, too.
+      connection.end();
     });
+
+  // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_close
+  // Emitted once the socket is fully closed. The argument had_error is a boolean
+  // which says if the socket was closed due to a transmission error.
+  connection.on('close',
+    function(had_error)
+    {
+      if ( had_error )
+      {
+        console.log("The Perspectives Core has hung up because of an error.")
+      }
+      else
+      {
+        console.log("The Perspectives Core has hung up.")
+      }
+      // No data will come anymore. Finish the producer.
+      emit("shutdown")();
+    });
+
+  // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_end
+  // Emitted when the other end of the socket sends a FIN packet.
+  // By default (allowHalfOpen == false) the socket will destroy its file
+  // descriptor once it has written out its pending write queue.
   connection.on('end',
     function()
     {
-      // Emitted when the other end of the socket sends a FIN packet.
-      // By default (allowHalfOpen == false) the socket will destroy its file
-      // descriptor once it has written out its pending write queue.
-      // Hence, we need not signal the server that this message emitter shuts down.
-    });
-  connection.on('close',
-    function()
-    {
-      // Emitted once the socket is fully closed.
-      // Finish the producer.
+      // This means the other side will no longer send data, hence we
+      // finish the producer.
       emit("shutdown")();
     });
 }
