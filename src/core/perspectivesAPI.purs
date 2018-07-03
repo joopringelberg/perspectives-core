@@ -1,6 +1,6 @@
 module Perspectives.Api where
 
-import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, SOCKETIO, connectionConsumer, connectionProducer, dataProducer_, defaultTCPOptions, writeData)
+import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, SOCKETIO, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (produce')
 import Control.Monad.Aff (error, launchAff_, throwError)
@@ -11,6 +11,7 @@ import Control.Monad.Eff.Uncurried (EffFn3, runEffFn3)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
+import Data.Foreign (MultipleErrors)
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Foreign.Generic.Types (Options)
@@ -106,10 +107,11 @@ setupTcpApi = runProcess server
 
     connectionHandler :: ConnectionProcess (MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e)))
     connectionHandler connection =
-      (dataProducer_ connection $~ (forever (transform marshallRequest))) $$ consumeRequest
+      (dataProducer connection $~ (forever (transform marshallRequest))) $$ consumeRequest
       where
-        marshallRequest :: Request -> ApiRequest (socketio :: SOCKETIO | e)
-        marshallRequest (Request r@{request, subject, predicate, setterId}) = marshallRequestRecord { request, subject, predicate, setterId, reactStateSetter: launchAff_ <<< writeData connection <<< identifiableObjects setterId}
+        marshallRequest :: (Either MultipleErrors Request) -> ApiRequest (socketio :: SOCKETIO | e)
+        marshallRequest (Right (Request r@{request, subject, predicate, setterId})) = marshallRequestRecord { request, subject, predicate, setterId, reactStateSetter: launchAff_ <<< writeData connection <<< identifiableObjects setterId}
+        marshallRequest (Left e) = WrongRequest
 
 consumeRequest :: forall e. Consumer (ApiRequest e) (MonadPerspectives (ApiEffects e)) Unit
 consumeRequest = forever do
