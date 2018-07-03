@@ -25,14 +25,14 @@ var produceAff = function (recv) {
 };
 var produce = function (recv) {
     return produceAff(function (send) {
-        return Control_Monad_Eff_Class.liftEff(Control_Monad_Aff.monadEffAff)(recv(function ($4) {
-            return Data_Functor["void"](Control_Monad_Eff.functorEff)(Control_Monad_Aff.runAff(Data_Function["const"](Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit)))(send($4)));
+        return Control_Monad_Eff_Class.liftEff(Control_Monad_Aff.monadEffAff)(recv(function (ear) {
+            return Data_Functor["void"](Control_Monad_Eff.functorEff)(Control_Monad_Aff.runAff(Data_Function["const"](Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Unit.unit)))(send(ear)));
         }));
     });
 };
 var produce$prime = function (dictMonadAff) {
-    return function ($5) {
-        return Control_Monad_Free_Trans.hoistFreeT(Control_Coroutine.functorEmit)(((((dictMonadAff.MonadEff0()).Monad0()).Bind1()).Apply0()).Functor0())(Control_Monad_Aff_Class.liftAff(dictMonadAff))(produce($5));
+    return function ($4) {
+        return Control_Monad_Free_Trans.hoistFreeT(Control_Coroutine.functorEmit)(((((dictMonadAff.MonadEff0()).Monad0()).Bind1()).Apply0()).Functor0())(Control_Monad_Aff_Class.liftAff(dictMonadAff))(produce($4));
     };
 };
 module.exports = {

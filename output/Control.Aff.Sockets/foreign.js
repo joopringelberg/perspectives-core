@@ -30,7 +30,14 @@ function createMessageEmitterImpl(connection, emit)
   connection.on("data",
     function(a)
     {
-      emit(a + "")();
+      const messages = (a + "").split("\n");
+      messages.forEach( function(m)
+      {
+        if (m != "")
+        {
+          emit( m )();
+        }
+      });
     });
 
   // https://nodejs.org/docs/latest-v6.x/api/net.html#net_event_error
@@ -56,11 +63,11 @@ function createMessageEmitterImpl(connection, emit)
     {
       if ( had_error )
       {
-        console.log("The Perspectives Core has hung up because of an error.")
+        console.log("The other side has hung up because of an error.")
       }
       else
       {
-        console.log("The Perspectives Core has hung up.")
+        console.log("The other side has hung up.")
       }
       // No data will come anymore. Finish the producer.
       emit("shutdown")();
@@ -81,7 +88,7 @@ function createMessageEmitterImpl(connection, emit)
 exports.createMessageEmitterImpl = createMessageEmitterImpl;
 
 function writeMessageImpl(s,d) {
-  return function() { return s.write(d); };
+  return function() { return s.write(d + "\n"); };
 }
 exports.writeMessageImpl = writeMessageImpl;
 

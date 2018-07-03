@@ -21,6 +21,7 @@ var Control_Monad_Trans_Class = require("../Control.Monad.Trans.Class");
 var Control_Parallel_Class = require("../Control.Parallel.Class");
 var Control_Semigroupoid = require("../Control.Semigroupoid");
 var Data_Either = require("../Data.Either");
+var Data_Foreign = require("../Data.Foreign");
 var Data_Foreign_Class = require("../Data.Foreign.Class");
 var Data_Foreign_Generic = require("../Data.Foreign.Generic");
 var Data_Foreign_Generic_Class = require("../Data.Foreign.Generic.Class");
@@ -243,8 +244,8 @@ var subscribeToObjects = function (subject) {
     return function (v) {
         return function (setter) {
             return function (setterId) {
-                return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Aff.bindAff))(Control_Applicative.pure(Control_Monad_Reader_Trans.applicativeReaderT(Control_Monad_Aff.applicativeAff))(new Perspectives_CoreTypes.NamedFunction(setterId, Control_Bind.composeKleisli(Control_Monad_Eff.bindEff)(setter)(function ($106) {
-                    return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Function["const"](Data_Unit.unit)($106));
+                return Control_Bind.bind(Control_Monad_Reader_Trans.bindReaderT(Control_Monad_Aff.bindAff))(Control_Applicative.pure(Control_Monad_Reader_Trans.applicativeReaderT(Control_Monad_Aff.applicativeAff))(new Perspectives_CoreTypes.NamedFunction(setterId, Control_Bind.composeKleisli(Control_Monad_Eff.bindEff)(setter)(function ($108) {
+                    return Control_Applicative.pure(Control_Monad_Eff.applicativeEff)(Data_Function["const"](Data_Unit.unit)($108));
                 }))))(function (v1) {
                     return Data_Functor["void"](Control_Monad_Reader_Trans.functorReaderT(Control_Monad_Aff.functorAff))(Perspectives_RunMonadPerspectivesQuery.runQuery(subject)(Perspectives_QueryEffect.pushesObjectsTo(v)(v1)));
                 });
@@ -316,7 +317,7 @@ var getRolFunction = function (cid) {
                 if (v1 instanceof Data_Either.Right) {
                     return Perspectives_QueryCompiler.constructQueryFunction(v1.value0);
                 };
-                throw new Error("Failed pattern match at Perspectives.Api line 200, column 3 - line 202, column 44: " + [ v1.constructor.name ]);
+                throw new Error("Failed pattern match at Perspectives.Api line 202, column 3 - line 204, column 44: " + [ v1.constructor.name ]);
             });
         });
     };
@@ -353,7 +354,7 @@ var getPropertyFunction = function (rid) {
                 if (v1 instanceof Data_Either.Right) {
                     return Perspectives_QueryCompiler.constructQueryFunction(v1.value0);
                 };
-                throw new Error("Failed pattern match at Perspectives.Api line 214, column 3 - line 216, column 42: " + [ v1.constructor.name ]);
+                throw new Error("Failed pattern match at Perspectives.Api line 216, column 3 - line 218, column 42: " + [ v1.constructor.name ]);
             });
         });
     };
@@ -451,17 +452,23 @@ var setupApi = Control_Coroutine.runProcess(Control_Monad_Reader_Trans.monadRecR
 var setupTcpApi = (function () {
     var connectionHandler = function (connection) {
         var marshallRequest = function (v) {
-            return marshallRequestRecord({
-                request: v.request,
-                subject: v.subject,
-                predicate: v.predicate,
-                setterId: v.setterId,
-                reactStateSetter: function ($107) {
-                    return Control_Monad_Aff.launchAff_(Control_Aff_Sockets.writeData(encodeIdentifiableObjects)(Control_Monad_Aff_Class.monadAffAff)(connection)(identifiableObjects(v.setterId)($107)));
-                }
-            });
+            if (v instanceof Data_Either.Right) {
+                return marshallRequestRecord({
+                    request: v.value0.request,
+                    subject: v.value0.subject,
+                    predicate: v.value0.predicate,
+                    setterId: v.value0.setterId,
+                    reactStateSetter: function ($109) {
+                        return Control_Monad_Aff.launchAff_(Control_Aff_Sockets.writeData(encodeIdentifiableObjects)(Control_Monad_Aff_Class.monadAffAff)(connection)(identifiableObjects(v.value0.setterId)($109)));
+                    }
+                });
+            };
+            if (v instanceof Data_Either.Left) {
+                return WrongRequest.value;
+            };
+            throw new Error("Failed pattern match at Perspectives.Api line 112, column 9 - line 112, column 100: " + [ v.constructor.name ]);
         };
-        return Control_Coroutine.connect(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(Control_Coroutine.transformProducer(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(Control_Aff_Sockets.dataProducer_(decodeRequest)(Control_Monad_Aff_Class.monadAffReader(Control_Monad_Aff_Class.monadAffAff))(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(connection))(Control_Monad_Rec_Class.forever(Control_Monad_Free_Trans.monadRecFreeT(Control_Coroutine.functorTransform)(Control_Monad_Reader_Trans.monadReaderT(Control_Monad_Aff.monadAff)))(Control_Coroutine.transform(Control_Monad_Reader_Trans.monadReaderT(Control_Monad_Aff.monadAff))(marshallRequest))))(consumeRequest);
+        return Control_Coroutine.connect(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(Control_Coroutine.transformProducer(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(Control_Aff_Sockets.dataProducer(decodeRequest)(Control_Monad_Aff_Class.monadAffReader(Control_Monad_Aff_Class.monadAffAff))(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(connection))(Control_Monad_Rec_Class.forever(Control_Monad_Free_Trans.monadRecFreeT(Control_Coroutine.functorTransform)(Control_Monad_Reader_Trans.monadReaderT(Control_Monad_Aff.monadAff)))(Control_Coroutine.transform(Control_Monad_Reader_Trans.monadReaderT(Control_Monad_Aff.monadAff))(marshallRequest))))(consumeRequest);
     };
     var server = Control_Coroutine.connect(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(Control_Parallel_Class.monadParReaderT(Control_Monad_Aff.parallelAff))(Control_Aff_Sockets.connectionProducer(Control_Monad_Aff_Class.monadAffReader(Control_Monad_Aff_Class.monadAffAff))(Control_Aff_Sockets.defaultTCPOptions))(Control_Aff_Sockets.connectionConsumer(Control_Monad_Aff_Class.monadAffReader(Control_Monad_Aff_Class.monadAffAff))(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(connectionHandler));
     return Control_Coroutine.runProcess(Control_Monad_Reader_Trans.monadRecReaderT(Control_Monad_Aff.monadRecAff))(server);

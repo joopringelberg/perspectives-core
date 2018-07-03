@@ -4,7 +4,7 @@ import Control.Monad.Aff (Fiber, runAff)
 import Control.Monad.Eff (Eff)
 import Perspectives.PerspectivesState (runPerspectives)
 import Prelude (Unit)
-import Test.TypeDefChecker (test)
+import Test.Coroutines (test)
 import Test.TestEffects as TE
 import Node.FS (FS)
 

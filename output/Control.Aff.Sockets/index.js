@@ -85,9 +85,9 @@ var dataProducer = function (dictDecode) {
         return function (dictMonadRec) {
             return function (dictParallel) {
                 return function (connection) {
-                    return Control_Coroutine.transformProducer(dictMonadRec)(dictParallel)(messageProducer(dictMonadAff)(connection))(Control_Coroutine.transform(dictMonadRec.Monad0())(function ($27) {
+                    return Control_Coroutine.transformProducer(dictMonadRec)(dictParallel)(messageProducer(dictMonadAff)(connection))(Control_Monad_Rec_Class.forever(Control_Monad_Free_Trans.monadRecFreeT(Control_Coroutine.functorTransform)(dictMonadRec.Monad0()))(Control_Coroutine.transform(dictMonadRec.Monad0())(function ($27) {
                         return Control_Monad_Except.runExcept(Data_Foreign_Generic.decodeJSON(dictDecode)($27));
-                    }));
+                    })));
                 };
             };
         };
