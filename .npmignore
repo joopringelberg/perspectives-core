@@ -1,9 +1,9 @@
 .idea
 /design
+/output
 /quarantaine
 /research
 /src
 /test
 /testOUD
 projectsetup.txt
-perspectives-core.js
