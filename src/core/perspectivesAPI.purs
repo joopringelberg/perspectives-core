@@ -74,7 +74,9 @@ instance decodeRequest :: Decode Request where
 showRequestRecord :: forall e. RequestRecord e -> String
 showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
 
-foreign import createRequestEmitterImpl :: forall e eff. EffFn3 (avar :: AVAR | e) (Left (RequestRecord eff)) (Right (RequestRecord eff)) (EmitFunction (RequestRecord eff) Unit e) Unit
+type CreateRequestEmitter e eff = EffFn3 (avar :: AVAR | e) (Left (RequestRecord eff)) (Right (RequestRecord eff)) (EmitFunction (RequestRecord eff) Unit e) Unit
+
+foreign import createRequestEmitterImpl :: forall e eff. CreateRequestEmitter e eff
 
 newtype IdentifiableObjects = IdentifiableObjects {setterId :: ReactStateSetterIdentifier, objects :: Array Object}
 
@@ -93,9 +95,18 @@ createRequestEmitter = runEffFn3 createRequestEmitterImpl Left Right
 requestProducer :: forall e eff. Producer (RequestRecord eff) (MonadPerspectives (avar :: AVAR | e)) Unit
 requestProducer = produce' createRequestEmitter
 
+requestProducer_ :: forall e eff. CreateRequestEmitter e eff -> Producer (RequestRecord eff) (MonadPerspectives (avar :: AVAR | e)) Unit
+requestProducer_ createEmitter = produce' (runEffFn3 createEmitter Left Right)
+
 -- | Create a process that consumes requests from a producer fed by the user interface.
 setupApi :: forall e. MonadPerspectives (ApiEffects e) Unit
 setupApi = runProcess $ (requestProducer $~ (forever (transform marshallRequestRecord))) $$ consumeRequest
+
+setupApi_ :: forall e e1 eff. CreateRequestEmitter e eff ->  MonadPerspectives (ApiEffects e) Unit
+setupApi_ createEmitter = runProcess $ (requestProducer $~ (forever (transform marshallRequestRecord))) $$ consumeRequest
+  where
+    requestProducer :: Producer (RequestRecord eff) (MonadPerspectives ((avar :: AVAR | e))) Unit
+    requestProducer = requestProducer_ createEmitter
 
 -- | Create a process that consumes requests from a producer that connects to a source over TCP.
 setupTcpApi :: forall e. MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e)) Unit
