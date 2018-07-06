@@ -1,0 +1,71 @@
+TODO
+0. Aff-sockets: tag. 						KLAAR
+1. Core met WebPack bundelen.				KLAAR
+2. Core doorlopend bundelen?				KLAAR
+3. perspectives-proxy doorlopend builden.	KLAAR
+4. perspectives-react doorlopend builden.	KLAAR
+5. Maak tag voor perspectives-proxy. 		KLAAR
+6. Maak client zonder create-react-app		KLAAR
+
+Uitzoeken:
+- hoe gaat npm install om met versienummers? Als ik de tweede of derde digit ophoog, wordt dan automatisch overnieuw geinstalleerd? Is er een update command?
+- hetzelfde voor psc-package.
+
+npm update
+Een 'caret dependency' (^x.y.z) wordt opgehoogd tot de hoogste versie met x.
+Een 'tilde dependency' (~x.y.z) wordt opgehoogd tot de hoogste versie met x.y
+
+Conclusie: ik maak alle npm dependencies met een caret.
+
+Het lijkt erop dat psc-package geen semver gebruikt.
+
+========================= PERSPECTIVES PROMISE =========================
+De core moet een functie op zijn Api bieden, die ertoe leidt dat hij een intern kanaal opzet. 
+De proxy module moet een Promise voor Perspectives leveren aan de React module:
+
+	const Perspectives = require("perspectives-proxy").Perspectives;
+
+createTcpConnectionToPerspectives (van perspectives-proxy) kan model staan voor de gewenste functie. 
+Deze functie maakt namelijk een TCP kanaal en resolved de Perspectives promise.
+De aanroepende client weet dus dat na die aanroep de door perspectives-proxy geleverde Promise vervuld is.
+
+Kortom, we hebben createInternalChannelToPerspectives nodig.
+
+Deze functie heeft de Purescript Either data constructors nodig, alsmede de emit function. Dit drietal moet dus uit een call naar de bewuste core Api functie komen.
+
+Misschien is het simpel. Als ik vanuit de client de setupApi functie kan aanroepen, dan roept die indirect createRequestEmitterImpl aan. En die zorgt voor emit, Left en Right, voor een resolved promise. Maar: ik kan de Core niet met perspectives-proxy bundelen. Dus ik moet in de aanroep van setupApi op de een of andere manier de createRequestEmitterImpl functie meegeven.
+
+========================= PROBEREN ANDERS TE BUNDELEN =========================
+Ik heb nu perspectives-proxy als external gedefineerd voor perspectives-core. Maar het werkt nog steeds niet:
+	- de require vanuit perspectives-react haalt perspectives-proxy op via de development server.
+	- de require vanuit perspectives-core haalt perspectives-proxy op via het file systeem.
+In perspectives-react-integrated-app bundelt WebPack perspectives-proxy met perspectives-react (en perspectives-core). Ik vermoed dat als ik in perspectives-react-integrated-app perspectives-proxy óók als external definieer, beide files via het filesysteem worden opgehaald (of in elk geval op dezelfde manier).
+
+========================= OPRUIMEN =========================
+Deze projecten kunnen weg:
+drwxr-xr-x   3 joopringelberg  staff   102  1 jul 15:56 perspectives-client (is al weg van github)
+
+drwxr-xr-x  33 joopringelberg  staff  1122 28 jun 20:34 perspectives-electron-app (github: perspectives)
+drwxr-xr-x  28 joopringelberg  staff   952 15 mrt 15:59 perspectivesInPurescript (github: perspectives)
+drwxr-xr-x  25 joopringelberg  staff   850 19 mrt 16:57 perspectives-electron-app kopie (github: perspectives)
+
+drwxr-xr-x  16 joopringelberg  staff   544  6 jul 11:44 perspectives-react-integrated-app (github: react-integrated-app)
+drwxr-xr-x  15 joopringelberg  staff   510  2 jul 18:07 perspectives-react-testclient (github: react-testclient)
+
+
+Nog bewaren:
+drwxr-xr-x   7 joopringelberg  staff   238 21 jun  2017 perspectives2 (is geen git project; maar even bewaren nog).
+
+Actieve projecten:
+drwxr-xr-x  26 joopringelberg  staff   884  6 jul 15:45 perspectives-core
+drwxr-xr-x  13 joopringelberg  staff   442  6 jul 15:47 perspectives-proxy
+drwxr-xr-x  13 joopringelberg  staff   442  6 jul 15:22 perspectives-react
+drwxr-xr-x  14 joopringelberg  staff  476  6 jul 08:40 purescript-aff-sockets/
+drwxr-xr-x  14 joopringelberg  staff   476  5 jul 13:26 perspectives-development-client
+drwxr-xr-x  14 joopringelberg  staff   476  6 jul 15:50 perspectives-react-integrated-client (heeft geen remote)
+drwxr-xr-x  22 joopringelberg  staff  748 18 jun 15:41 atom-ide-perspectivesarc/
+drwxr-xr-x  13 joopringelberg  staff  442 18 jun 12:59 language-perspectives-arc/
+drwxr-xr-x  20 joopringelberg  staff   680 19 jun 13:53 perspectives-arc-languageserver
+
+Remote aanmaken:
+drwxr-xr-x  14 joopringelberg  staff   476  6 jul 15:50 perspectives-react-integrated-client (heeft geen remote)
