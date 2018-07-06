@@ -45,4 +45,4 @@ main = void $ runAff handleError do
 
 handleError :: forall e a. (Either Error a -> Eff (console :: CONSOLE | e) Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
-handleError (Right a) = log $ "Success!"
+handleError (Right a) = log $ "Perspectives-core has started!"

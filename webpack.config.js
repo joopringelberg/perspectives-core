@@ -4,7 +4,7 @@ module.exports = {
   entry: path.join(__dirname, "output/Main/index.js" ),
   output: {
     library: "perspectives-core",
-    libraryTarget: "umd",
+    libraryTarget: "commonjs2",
     filename: "perspectives-core.js",
     path: path.join(__dirname, "dist")
   },
@@ -13,5 +13,13 @@ module.exports = {
   target: "electron-renderer",
   module: {
     rules: []
+  },
+  externals: {
+    "perspectives-proxy": {
+      commonjs: 'perspectives-proxy',
+      commonjs2: 'perspectives-proxy',
+      amd: 'perspectives-proxy',
+      root: "perspectivesProxy"
+    }
   }
 };

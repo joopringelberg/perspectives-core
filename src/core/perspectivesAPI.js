@@ -1,6 +1,2 @@
-if (exports === undefined)
-{
-  exports = module.exports;
-}
-
-exports.createRequestEmitterImpl = require("perspectives-proxy").createRequestEmitterImpl;
+const createRequestEmitterImpl =  require("perspectives-proxy").createRequestEmitterImpl;
+exports.createRequestEmitterImpl = createRequestEmitterImpl;
