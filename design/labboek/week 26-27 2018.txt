@@ -43,21 +43,21 @@ In perspectives-react-integrated-app bundelt WebPack perspectives-proxy met pers
 
 ========================= OPRUIMEN =========================
 Deze projecten kunnen weg:
-drwxr-xr-x   3 joopringelberg  staff   102  1 jul 15:56 perspectives-client (is al weg van github)
+drwxr-xr-x   3 joopringelberg  staff   102  1 jul 15:56 perspectives-client (is al weg van github) KLAAR
 
-drwxr-xr-x  33 joopringelberg  staff  1122 28 jun 20:34 perspectives-electron-app (github: perspectives)
-drwxr-xr-x  28 joopringelberg  staff   952 15 mrt 15:59 perspectivesInPurescript (github: perspectives)
+drwxr-xr-x  28 joopringelberg  staff   952 15 mrt 15:59 perspectivesInPurescript (github: perspectives) NIET GELUKT
 drwxr-xr-x  25 joopringelberg  staff   850 19 mrt 16:57 perspectives-electron-app kopie (github: perspectives)
 
-drwxr-xr-x  16 joopringelberg  staff   544  6 jul 11:44 perspectives-react-integrated-app (github: react-integrated-app)
-drwxr-xr-x  15 joopringelberg  staff   510  2 jul 18:07 perspectives-react-testclient (github: react-testclient)
+drwxr-xr-x  16 joopringelberg  staff   544  6 jul 11:44 perspectives-react-integrated-app (github: react-integrated-app) KLAAR
+drwxr-xr-x  15 joopringelberg  staff   510  2 jul 18:07 perspectives-react-testclient (github: react-testclient) KLAAR
 
 
 Nog bewaren:
+drwxr-xr-x  33 joopringelberg  staff  1122 28 jun 20:34 perspectives-electron-app (github: perspectives. Bevat de geschiedenis).
 drwxr-xr-x   7 joopringelberg  staff   238 21 jun  2017 perspectives2 (is geen git project; maar even bewaren nog).
 
 Actieve projecten:
-drwxr-xr-x  26 joopringelberg  staff   884  6 jul 15:45 perspectives-core
+drwxr-xr-x  26 joopringelberg  staff   884  6 jul 15:45 perspectives-core (github: perspectives-core)
 drwxr-xr-x  13 joopringelberg  staff   442  6 jul 15:47 perspectives-proxy
 drwxr-xr-x  13 joopringelberg  staff   442  6 jul 15:22 perspectives-react
 drwxr-xr-x  14 joopringelberg  staff  476  6 jul 08:40 purescript-aff-sockets/
@@ -68,4 +68,4 @@ drwxr-xr-x  13 joopringelberg  staff  442 18 jun 12:59 language-perspectives-arc
 drwxr-xr-x  20 joopringelberg  staff   680 19 jun 13:53 perspectives-arc-languageserver
 
 Remote aanmaken:
-drwxr-xr-x  14 joopringelberg  staff   476  6 jul 15:50 perspectives-react-integrated-client (heeft geen remote)
+drwxr-xr-x  14 joopringelberg  staff   476  6 jul 15:50 perspectives-react-integrated-client (heeft geen remote) KLAAR

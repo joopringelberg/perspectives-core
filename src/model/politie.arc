@@ -1,19 +1,14 @@
-Tekst "representatief voorbeeld van ARC" -- Deze regel geeft de instantie van GepresenteerdContextType van de omhullende context zijn naam
-{-
-Deze tekst heeft alle mogelijke expressies die de ARC syntax toelaat.
--}
-Domein model:Politie heeft --Commentaar achter de context declaratie.
+Tekst "representatief voorbeeld van ARC"
+
+Domein model:Politie heeft
 
 zaken
 
--- Dit commentaar staat boven de zaak Aangifte.
-Zaak Aangifte heeft -- Dit commentaar staat op de regel die Aangifte declareert.
+Aangifte heeft
 	import model:PersoonlijkDomein als per:
 	properties
-		-- Dit commentaar staat boven de sectie intern van Aangifte.
-		intern -- Dit commentaar staat achter het sleutelwoord 'intern'.
+		intern
 			urgentie (String, Verplicht, Niet Functioneel)
-			-- Dit commentaar staat onderin de sectie 'intern' van Aangifte.
 		extern
 			aantekening (String, Niet Verplicht, Functioneel)
 	rollen

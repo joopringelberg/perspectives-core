@@ -1,0 +1,14 @@
+TERUGVERWIJZINGEN
+
+Een rol wordt gevuld. Bij de vullers houden we *terugverwijzingen* bij: welke rollen vult zo'n vuller? Vullers zijn zelf uiteraard ook rollen.
+
+1. Welke terugverwijzingen houden we bij?
+2. Wanneer brengen we terugverwijzingen aan?
+
+TERUGVERWIJZINGEN IN MODELLEN
+Een model kan alleen terugverwijzingen bijhouden voor rollen die rollen in hetzelfde model vullen. Immers: de auteur van een model G die een rol uit een model B gebruikt om één van de rollen van G te vullen, hoeft helemaal niet het recht te hebben model B te wijzigen (en kan dus geen terugverwijzing in B aanbrengen).
+
+Twee rollen maken deel uit van hetzelfde model, als hun contexten dezelfde *indirecteRootContext* hebben. 
+Een Context C1 is een indirecteRootContext van Context C2, als
+	- C2 een rol speelt in C1, of
+	- C2 een rol speelt in X en C1 een indirecteRootContext is van X
