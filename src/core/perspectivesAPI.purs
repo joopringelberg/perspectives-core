@@ -11,15 +11,13 @@ import Control.Monad.Eff.Uncurried (EffFn3, runEffFn3)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
-import Data.Foreign (MultipleErrors)
-import Data.Foreign.Class (class Decode, class Encode)
-import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Data.Foreign.Generic.Types (Options)
-import Data.Generic.Rep (class Generic)
+import Data.Foreign (MultipleErrors, unsafeFromForeign)
+import Data.Foreign.Class (encode)
+import Perspectives.ApiTypes (CorrelationIdentifier, Request(..), response)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
-import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName, Object)
+import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
@@ -35,56 +33,32 @@ import Prelude (Unit, bind, const, pure, show, unit, void, ($), (<<<), (<>), (>=
 -- REQUEST, RESPONSE AND CHANNEL
 -----------------------------------------------------------
 data ApiRequest e =
-  GetRolBinding ContextID RolName (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetBinding RolID (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetBindingType RolID (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetRolContext RolID (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetContextType ContextID (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetRol ContextID RolName (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetProperty RolName PropertyName (ReactStateSetter e) ReactStateSetterIdentifier
-  | GetViewProperties ViewName (ReactStateSetter e) ReactStateSetterIdentifier
+  GetRolBinding ContextID RolName (ReactStateSetter e) CorrelationIdentifier
+  | GetBinding RolID (ReactStateSetter e) CorrelationIdentifier
+  | GetBindingType RolID (ReactStateSetter e) CorrelationIdentifier
+  | GetRolContext RolID (ReactStateSetter e) CorrelationIdentifier
+  | GetContextType ContextID (ReactStateSetter e) CorrelationIdentifier
+  | GetRol ContextID RolName (ReactStateSetter e) CorrelationIdentifier
+  | GetProperty RolName PropertyName (ReactStateSetter e) CorrelationIdentifier
+  | GetViewProperties ViewName (ReactStateSetter e) CorrelationIdentifier
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
-  | Unsubscribe Subject Predicate ReactStateSetterIdentifier
+  | Unsubscribe Subject Predicate CorrelationIdentifier
 
 data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
   | Error String
-
-newtype Request = Request
-  { request :: String
-  , subject :: String
-  , predicate :: String
-  , setterId :: ReactStateSetterIdentifier}
 
 type RequestRecord e =
   { request :: String
   , subject :: String
   , predicate :: String
   , reactStateSetter :: ReactStateSetter e
-  , setterId :: ReactStateSetterIdentifier}
-
-derive instance genericRequest :: Generic Request _
-
-requestOptions :: Options
-requestOptions = defaultOptions { unwrapSingleConstructors = true }
-
-instance decodeRequest :: Decode Request where
-  decode = genericDecode requestOptions
+  , setterId :: CorrelationIdentifier}
 
 showRequestRecord :: forall e. RequestRecord e -> String
 showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
 
 foreign import createRequestEmitterImpl :: forall e eff. EffFn3 (avar :: AVAR | e) (Left (RequestRecord eff)) (Right (RequestRecord eff)) (EmitFunction (RequestRecord eff) Unit e) Unit
-
-newtype IdentifiableObjects = IdentifiableObjects {setterId :: ReactStateSetterIdentifier, objects :: Array Object}
-
-derive instance genericIdentifiableObjects :: Generic IdentifiableObjects _
-
-instance encodeIdentifiableObjects :: Encode IdentifiableObjects where
-  encode = genericEncode requestOptions
-
-identifiableObjects ::  ReactStateSetterIdentifier -> Array Object -> IdentifiableObjects
-identifiableObjects setterId objects = IdentifiableObjects {setterId, objects}
 
 createRequestEmitter :: forall e eff. Emitter (RequestRecord eff) Unit e
 createRequestEmitter = runEffFn3 createRequestEmitterImpl Left Right
@@ -110,7 +84,13 @@ setupTcpApi = runProcess server
       (dataProducer connection $~ (forever (transform marshallRequest))) $$ consumeRequest
       where
         marshallRequest :: (Either MultipleErrors Request) -> ApiRequest (socketio :: SOCKETIO | e)
-        marshallRequest (Right (Request r@{request, subject, predicate, setterId})) = marshallRequestRecord { request, subject, predicate, setterId, reactStateSetter: launchAff_ <<< writeData connection <<< identifiableObjects setterId}
+        marshallRequest (Right (Request r@{rtype, subject, predicate, setterId})) =
+          marshallRequestRecord
+            { request: (unsafeFromForeign (encode rtype))
+            , subject
+            , predicate
+            , setterId
+            , reactStateSetter: launchAff_ <<< writeData connection <<< response setterId}
         marshallRequest (Left e) = WrongRequest
 
 consumeRequest :: forall e. Consumer (ApiRequest e) (MonadPerspectives (ApiEffects e)) Unit
@@ -120,9 +100,6 @@ consumeRequest = forever do
 
 -- | The client of Perspectives sends a record of arbitrary form that we
 -- | try to fit into ApiRequest.
--- TODO. Instead of a ReactStateSetter, we will receive a correlation identifier.
--- Create a function from it that sends the new values, along with the correlation identifier,
--- into the channel.
 marshallRequestRecord :: forall e. RequestRecord e -> ApiRequest e
 marshallRequestRecord r@{request} = do
   case request of
@@ -167,29 +144,27 @@ type ReactStateSetter e = Array String -> Eff (ApiEffects e) Unit
 
 type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 
-type ReactStateSetterIdentifier = String
-
 -- | Runs a the query and adds the ReactStateSetter to the result.
 -- | Returns a function of no arguments that the external program can use to unsubscribe the ReactStateSetter.
-subscribeToObjects :: forall e. Subject -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> ReactStateSetterIdentifier -> MonadPerspectives (ApiEffects e) Unit
+subscribeToObjects :: forall e. Subject -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 subscribeToObjects subject query@(TypedTripleGetter qn _) setter setterId = do
   (effectInReact :: QueryEffect (react :: REACT | e)) <- pure $ NamedFunction setterId (setter >=> pure <<< const unit)
   void $ (subject ## query ~> effectInReact)
 
-unsubscribeFromObjects :: forall e. Subject -> Predicate -> ReactStateSetterIdentifier -> MonadPerspectives (ApiEffects e) Unit
+unsubscribeFromObjects :: forall e. Subject -> Predicate -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 unsubscribeFromObjects subject predicate setterId = lift $ liftEff $ unRegisterTriple $ TripleRef {subject, predicate: effectPredicate}
   where
     effectPredicate :: String
     effectPredicate = "(" <>  predicate <> " ~> " <> setterId <> ")"
 
 -- | Retrieve the binding of the rol from the context, subscribe to it.
-getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> ReactStateSetterIdentifier -> MonadPerspectives (ApiEffects e) Unit
+getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getRolBinding cid rn setter  setterId= do
   rf <- getRolFunction cid rn
   subscribeToObjects cid (rf >-> bindingM) setter setterId
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
-getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> ReactStateSetterIdentifier -> MonadPerspectives (ApiEffects e) Unit
+getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getRol cid rn setter setterId = do
   qf <- getRolFunction cid rn
   subscribeToObjects cid qf setter setterId
@@ -204,7 +179,7 @@ getRolFunction cid rn = do
     (Right id) -> constructQueryFunction id
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
-getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> ReactStateSetterIdentifier -> MonadPerspectives (ApiEffects e) Unit
+getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getProperty rid pn setter setterId = do
   qf <- getPropertyFunction rid pn
   subscribeToObjects rid qf setter setterId
