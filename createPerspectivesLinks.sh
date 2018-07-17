@@ -2,7 +2,7 @@
 
 # NOTE: this script should be adapted with each new tagged version of aff-sockets!
 
-cd .psc-package/psc-0.11.7-perspectives-core4/aff-sockets
+cd .psc-package/psc-0.11.7-perspectives-core/aff-sockets
 
 rm -Rf v1.1.1
 
@@ -14,5 +14,10 @@ rm -Rf v1.0.0
 
 ln -s ../../../../perspectives-apitypes v1.0.0
 
+cd ../avar-monadask/
+
+rm -Rf v1.0.0
+
+ln -s ../../../../avar-monadask v1.0.0
 
 cd ../../..
