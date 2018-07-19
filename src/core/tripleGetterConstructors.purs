@@ -44,6 +44,9 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
                   , tripleGetter: tripleGetter
                   })
 
+-- | Construct a TripleGetter from an ObjectsGetter, that is supported by a Triple returned by an arbitrary
+-- | TripleGetter. In this way we can insert a computed (rather than calculated by a query) Triple in the
+-- | dependency tracking store and have it recomputed when the support changes value.
 constructTripleGetterWithArbitrarySupport :: forall e.
   PropertyName ->
   (ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)) ->

@@ -21,16 +21,16 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
-import Perspectives.PerspectivesState (getsPerspectivesState, modifyPerspectivesState)
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Prelude (Unit, bind, discard, pure, unit, void, ($))
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
 memorizeQueryResults :: forall e. MonadPerspectivesQuery (avar :: AVAR | e) Boolean
-memorizeQueryResults = lift $ getsPerspectivesState _.memorizeQueryResults
+memorizeQueryResults = lift $ gets _.memorizeQueryResults
 
 setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery (avar :: AVAR | e) Unit
-setMemorizeQueryResults b = lift $ modifyPerspectivesState \ps -> ps {memorizeQueryResults = b}
+setMemorizeQueryResults b = lift $ modify \ps -> ps {memorizeQueryResults = b}
 
 getRef :: forall e. Triple e -> TripleRef
 getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}

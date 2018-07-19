@@ -29,7 +29,7 @@ psp:Context sys:Systeem
 			$mogelijkeBinding => sys:TrustedCluster
 	$rolInContext =>
 		q:ComputedRolGetter $modellen
-			extern $functionName = "modelsM"
+			extern $functionName = "modellenM"
 	$rolInContext =>
 		psp:Rol $gebruiker
 			-- wat is de mogelijkeBinding van gebruiker?

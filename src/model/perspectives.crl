@@ -31,13 +31,13 @@ psp:Context psp:Property
 			extern $isFunctioneel = true
 			$rolProperty =>
 				psp:Property $isFunctioneel
-					extern $isFunctioneel = true -- ziet ie niet (maar is er wel)
-					extern $isVerplicht = true -- ziet ie niet
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
 					$range => psp:Boolean
 			$rolProperty =>
 				psp:Property $isVerplicht
-					extern $isFunctioneel = true -- ziet ie niet
-					extern $isVerplicht = true -- ziet ie niet
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
 					$range => psp:Boolean
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>

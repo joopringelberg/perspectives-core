@@ -105,6 +105,27 @@ psp:Context q:ComputedRolGetter
 					$range => psp:String
 
 --------------------------------------------------------------------------------
+-- COMPUTEDROPROPERTYGETTER
+--------------------------------------------------------------------------------
+-- Instances will be created by the QueryFunctionDescriptionCompiler, e.g.
+--	q:ComputedPropertyGetter q:p1
+-- 		extern $functionName = "modelsM"
+psp:Context q:ComputedPropertyGetter
+	$aspect => psp:Function
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $functionName
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+--------------------------------------------------------------------------------
 -- UNARYCOMBINATOR
 --------------------------------------------------------------------------------
 -- Instances will be created by the QueryFunctionDescriptionCompiler, e.g.

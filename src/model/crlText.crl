@@ -1,0 +1,30 @@
+Context model:CrlText als ct:
+
+import model:Perspectives als psp:
+
+Section $rolInContext
+
+--------------------------------------------------------------------------------
+-- TEXT
+--------------------------------------------------------------------------------
+psp:Context ct:Text
+  $rolInContext =>
+    psp:Rol $binnenRolBeschrijving
+      extern $isFunctioneel = true
+      extern $isVerplicht = true
+      $mogelijkeBinding => psp:Rol
+      $rolProperty =>
+        psp:Property $parseState
+          extern $isFunctioneel = true
+          extern $isVerplicht = false
+          $range => psp:Boolean
+      $rolProperty =>
+        psp:Property $parseMessages
+          extern $isFunctioneel = true
+          extern $isVerplicht = false
+          $range => psp:String
+  $rolInContext =>
+    psp:Rol $buitenRolBeschrijving
+      extern $isFunctioneel = true
+      extern $isVerplicht = true
+      $mogelijkeBinding => psp:Rol

@@ -4,6 +4,7 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Perspectives.ComputedTripleGetters (modellenM)
 import Perspectives.CoreTypes (MonadPerspectives, TypeID, TypedTripleGetter(..), ObjectsGetter, (%%>), (%%>>))
@@ -73,6 +74,12 @@ constructQueryFunction typeDescriptionID = do
         "propertyQuery" -> propertyQuery property
         "constructInternalPropertyLookup" -> pure $ constructInternalPropertyLookup property
         "constructInternalPropertyGetter" -> pure $ constructInternalPropertyGetter property
+        "computedPropertyGetter" -> do
+          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (property %%> (getExternalProperty "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving$functionName"))
+          mcomputingFunction <- queryCacheLookup computingFunctionName
+          case mcomputingFunction of
+            (Just computingFunction) -> pure computingFunction
+            otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedPropertyGetter: '" <> computingFunctionName <> "'")
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for PropertyGetter: '" <> functionName <> "'")
     "model:QueryAst$RolGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName"))
@@ -84,10 +91,14 @@ constructQueryFunction typeDescriptionID = do
         "rolQuery" -> rolQuery rol
         "constructRolLookup" -> pure $ constructRolLookup rol
         "constructInverseRolGetter" -> pure $ constructInverseRolGetter rol
-        "computedRolGetter" -> case rol of
-          "model:Systeem$Systeem$modellen" -> pure modellenM
-          otherwise -> throwError (error $ "constructQueryFunction: unknown function for computedRolGetter: '" <> functionName <> "'")
+        "computedRolGetter" -> do
+          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (rol %%> (getExternalProperty "model:QueryAst$ComputedRolGetter$buitenRolBeschrijving$functionName"))
+          mcomputingFunction <- queryCacheLookup computingFunctionName
+          case mcomputingFunction of
+            (Just computingFunction) -> pure computingFunction
+            otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedRolGetter: '" <> computingFunctionName <> "'")
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for RolGetter: '" <> functionName <> "'")
+
     "model:QueryAst$rolesOf" ->
       rolesOf <$> (onNothing
         (errorMessage "no context" queryStepType)

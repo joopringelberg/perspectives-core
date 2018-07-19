@@ -28,6 +28,7 @@ import Control.Monad.Eff.Console (CONSOLE, log)
 import DOM (DOM)
 import Data.Either (Either(..))
 import Perspectives.Api (setupApi, setupTcpApi)
+import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.Effects (AjaxAvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
@@ -40,8 +41,12 @@ main = void $ runAff handleError do
   url <- pure "http://127.0.0.1:5984/"
   (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
   state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
-  void $ forkAff $ runPerspectivesWithState setupApi state
+  void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
+  where
+    f = do
+      addComputedTripleGetters
+      setupApi
 
 handleError :: forall e a. (Either Error a -> Eff (console :: CONSOLE | e) Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
