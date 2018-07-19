@@ -30,3 +30,17 @@ UITWERKING PARSESTATE
 
 COMPUTEDPROPERTYGETTER BESTAAT NOG NIET
 ComputedPropertyGetter zou de pendant van ComputedRolGetter zijn. 
+
+CATCH 22
+1. Ik moet query.crl veranderen (ComputedPropertyGetter toevoegen).
+2. Daarvoor moet ik een modelfile kunnen parseren en saven.
+3. Maar daar heb ik functionaliteit voor nodig die deze verandering vooronderstelt...
+
+Mogelijke aanpak:
+- maak ad hoc upload- en save functionaliteit.
+Wat is nodig:
+- lees file van disk
+- parseer de file
+- bij succes: sla op in couchdb.
+Kan dit in een test?
+Ja, sterker nog, ik heb al zo'n test gemaakt! Wel eerst de versie in couchdb weggooien.

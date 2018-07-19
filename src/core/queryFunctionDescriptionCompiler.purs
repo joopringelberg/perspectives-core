@@ -88,45 +88,16 @@ compileElementaryQueryStep s contextId = case s of
     dom <- getQueryStepDomain
     -- TODO. Pas de constructie hieronder toe op de andere gevallen.
     ensureRolHasProperty dom p
-      ((do
-        b <- (lift $ p `contextHasType` "model:Perspectives$Function")
-        if b
-          then (createContextWithSingleRole contextId (q "propertyQuery") p)
-          else do
-            b' <- isInQueryStepDomain p
-            if b'
-              then (createPropertyGetterDescription contextId "constructRolPropertyGetter" p)
-              else (createPropertyGetterDescription contextId "constructRolPropertyLookup" p))
-      `thenPutQueryStepDomain` p)
+      (qualifiedProperty p "constructRolPropertyGetter" "constructRolPropertyLookup")
   QualifiedInternalProperty p -> do
     dom <- getQueryStepDomain
     ensureRolHasProperty dom p
-      ((do
-        b <- (lift $ p `contextHasType` "model:Perspectives$Function")
-        if b
-          then (createContextWithSingleRole contextId (q "propertyQuery") p)
-          else (do
-            b' <- (isInQueryStepDomain p)
-            if b'
-              then (createPropertyGetterDescription contextId "constructInternalPropertyGetter" p)
-              else (createPropertyGetterDescription contextId "constructInternalPropertyLookup" p)
-            ))
-          `thenPutQueryStepDomain` p)
+      (qualifiedProperty p "constructInternalPropertyGetter" "constructInternalPropertyLookup")
   QualifiedExternalProperty p -> do
     dom <- getQueryStepDomain
     -- TODO. Hier moet een controle komen op externe properties van een context.
     ensureRolHasProperty dom p
-      ((do
-        b <- (lift $ p `contextHasType` "model:Perspectives$Function")
-        if b
-          then (createContextWithSingleRole contextId (q "propertyQuery") p)
-          else (do
-            b' <- (isInQueryStepDomain p)
-            if b'
-              then (createPropertyGetterDescription contextId "constructExternalPropertyGetter" p)
-              else (createPropertyGetterDescription contextId "constructExternalPropertyLookup" p)
-            ))
-        `thenPutQueryStepDomain` p)
+      (qualifiedProperty p "constructExternalPropertyGetter" "constructExternalPropertyLookup")
   UnqualifiedProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -135,16 +106,7 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          (do
-            b <- (lift $ qn `contextHasType` "model:Perspectives$Function")
-            if b
-              then (createPropertyGetterDescription contextId "propertyQuery" qn)
-              else (do
-                b' <- (isInQueryStepDomain aspect)
-                if b'
-                  then (createPropertyGetterDescription contextId "constructRolPropertyGetter" qn)
-                  else (createPropertyGetterDescription contextId "constructRolPropertyLookup" qn)))
-            `thenPutQueryStepDomain` qn
+          (qualifiedProperty qn "constructRolPropertyGetter" "constructRolPropertyLookup")
   UnqualifiedInternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -153,16 +115,7 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          ((do
-            b <- (lift $ qn `contextHasType` "model:Perspectives$Function")
-            if b
-              then (createPropertyGetterDescription contextId "propertyQuery" qn)
-              else (do
-                b' <- (isInQueryStepDomain qn)
-                if b'
-                  then (createPropertyGetterDescription contextId "constructInternalPropertyGetter" qn)
-                  else (createPropertyGetterDescription contextId "constructInternalPropertyLookup" qn)))
-            `thenPutQueryStepDomain` qn)
+          (qualifiedProperty qn "constructInternalPropertyGetter" "constructInternalPropertyLookup")
   UnqualifiedExternalProperty ln -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
@@ -171,16 +124,7 @@ compileElementaryQueryStep s contextId = case s of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
           let qn = aspect <> "$" <> ln
-          ((do
-            b <- (lift $ qn `contextHasType` "model:Perspectives$Function")
-            if b
-              then (createPropertyGetterDescription contextId "propertyQuery" qn)
-              else (do
-                b' <- (isInQueryStepDomain qn)
-                if b'
-                  then (createPropertyGetterDescription contextId "constructExternalPropertyGetter" qn)
-                  else (createPropertyGetterDescription contextId "constructExternalPropertyLookup" qn)))
-            `thenPutQueryStepDomain` qn)
+          (qualifiedProperty qn "constructExternalPropertyGetter" "constructExternalPropertyLookup")
   QualifiedRol rn -> do
     dom <- getQueryStepDomain
     ensureContextHasRol dom rn
@@ -195,6 +139,23 @@ compileElementaryQueryStep s contextId = case s of
           let qn = aspect <> "$" <> ln
           (qualifiedRol qn)
   where
+
+  qualifiedProperty :: String -> String -> String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
+  qualifiedProperty pn pgetter plookup =
+    (do
+      b <- (lift $ pn `contextHasType` "model:QueryAst$ComputedPropertyGetter")
+      if b
+        then (createPropertyGetterDescription contextId "computedPropertyGetter" pn)
+        else (do
+          b' <- (lift $ pn `contextHasType` "model:Perspectives$Function")
+          if b'
+            then (createPropertyGetterDescription contextId "propertyQuery" pn)
+            else (do
+              b'' <- (isInQueryStepDomain pn)
+              if b''
+                then (createPropertyGetterDescription contextId pgetter pn)
+                else (createPropertyGetterDescription contextId plookup pn))))
+      `thenPutQueryStepDomain` pn
 
   qualifiedRol :: String -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   qualifiedRol rn =

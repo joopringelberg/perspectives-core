@@ -24,12 +24,12 @@ import Perspectives.SaveUserData (saveUserData)
 import Perspectives.Syntax (PerspectContext)
 
 modelDirectory :: String
-modelDirectory = "/Users/joopringelberg/Code/perspectives-electron-app/src/model"
+modelDirectory = "/Users/joopringelberg/Code/perspectives-core/src/model"
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION | e)) Unit
 test = do
   lift $ log "=========================Parse a file==================="
-  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "systeem.crl"])
+  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "query.crl"])
   parseResult <- parseAndCache text
   case parseResult of
     (Right parseRoot) ->
