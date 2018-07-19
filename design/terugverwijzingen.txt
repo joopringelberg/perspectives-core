@@ -12,3 +12,17 @@ Twee rollen maken deel uit van hetzelfde model, als hun contexten dezelfde *indi
 Een Context C1 is een indirecteRootContext van Context C2, als
 	- C2 een rol speelt in C1, of
 	- C2 een rol speelt in X en C1 een indirecteRootContext is van X
+
+TERUGVERWIJZINGEN AANBRENGEN
+Zodra een Rol gebonden wordt, brengen we ook de terugverwijzing aan (waarbij voor rollen in modellen bovenstaande beperking geldt.
+
+WAAR WORDT EEN ROL- OF CONTEXTDEFINITIE GEBRUIKT?
+We willen dat de modelleeromgeving deze vraag kan beantwoorden. Uit bovenstaande blijkt dat de modelrepresentatie slechts beperkt antwoord kan geven. 
+
+Het is mogelijk om een query op couchdb op te stellen die voor elke rol de binding teruggeeft (modelrollen zijn immers onder de key "rollen" ondergebracht in modeldocumenten in couchdb). Dat is voldoende informatie om voor alle modellen een terugverwijzingstabel op te stellen. De core zou dit kunnen doen. 
+
+Hoe stellen we deze informatie ter beschikking in de vorm van een berekende rol of property?
+
+We kunnen een tweede omgekeerde-rolbinding rol invoeren, die berekend is.
+
+Zo kun je voor een modelrol opvragen waar hij gebruikt wordt, i.e. waar hij een andere rol vult.

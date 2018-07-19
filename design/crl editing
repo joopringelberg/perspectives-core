@@ -1,0 +1,23 @@
+CRL EDITING
+Wat hebben we minimaal nodig om een CRL model enigszins comfortabel in couchdb te krijgen?
+
+1. File upload gevolgd door parsing, gevolgd door semantic checking. 
+2. Parsing leidt tot interne representatie; dan moet nog worden geserialiseerd naar een modelbestand en dat moet worden opgeslagen.
+3. De core heeft nu alleen een query-interface. Hoe pers ik bovenstaande daarin?
+
+AANPAK
+1. Representeer een tekst.
+	- property text is een string
+	- calculated property parseState is een Boolean. Zodra 'text' veranderd, wordt parseState opnieuw berekend.
+	- calculated property parseMessages is een string die begint met "nog niet geparseerd". Zodra 'text' veranderd, wordt parseMessages opnieuw berekend door de parser toe te passen en de messages met show om te vormen tot een string.
+2. Calculated property semanticState is ook een string.
+	- het resultaat van semantic checking wordt middels show opgeslagen in semanticState.
+	- semanticState is "Semantische controle niet mogelijk" zolang parseState false is.
+3. We hebben een interface nodig met:
+	- een file select button en de weergave van de geselecteerde file.
+	- een upload button
+	- de weergave van parseMessages
+	- de weergave van semanticState
+	- een save button
+4. We hebben in het protocol naar de Core de mogelijkheid nodig om een property een waarde te geven.
+5. We hebben de mogelijkheid nodig om een calculated property af te laten hangen van twee andere (semanticState hangt namelijk af van parseState en text).
