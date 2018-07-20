@@ -51,15 +51,19 @@ test = do
       , interneProperties = PropertySerialization $
           singleton "model:CrlText$Text$binnenRolBeschrijving$sourceText" [text]
       }
+  lift $ log "=========================PARSE A TEXT==================="
   getParserMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$parserMessages" "model:CrlText$Text$binnenRolBeschrijving")
   parserMessages <- "model:User$Politie_text" ##= getParserMessages
   lift $ log $ show parserMessages
+  lift $ log "=========================SYNTACTIC STATE==================="
   getSyntacticState <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$syntacticState" "model:CrlText$Text$binnenRolBeschrijving")
   parseState <-  "model:User$Politie_text" ##= getSyntacticState
   lift $ log $ show parseState
+  lift $ log "=========================TYPE CHECKER MESSAGES==================="
   getTypeCheckerMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" "model:CrlText$Text$binnenRolBeschrijving")
   typeCheckerMessages <-  "model:User$Politie_text" ##= getTypeCheckerMessages
   lift $ log $ show typeCheckerMessages
+  lift $ log "=========================SEMANTIC STATE==================="    
   getSemanticState <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$semanticState" "model:CrlText$Text$binnenRolBeschrijving")
   semanticState <-  "model:User$Politie_text" ##= getSemanticState
   lift $ log $ show semanticState

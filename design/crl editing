@@ -20,7 +20,7 @@ AANPAK
 	- de weergave van semanticState
 	- een save button
 4. We hebben in het protocol naar de Core de mogelijkheid nodig om een property een waarde te geven.
-5. We hebben de mogelijkheid nodig om een calculated property af te laten hangen van twee andere (semanticState hangt namelijk af van parseState en text).
+5. We hebben de mogelijkheid nodig om een calculated property af te laten hangen van twee andere (semanticState hangt namelijk af van parseState en text). NEEN, overbodig.
 6. Als de upload button geklikt wordt, dan moet er een instantie gemaakt worden van ct:Text met de property sourceText gelijk aan de geuploade-file. Deze sourceText is client-side beschikbaar. We moeten dus in staat zijn om vanuit de client een context aan te maken en daar een property van te zetten.
 
 UITWERKING parseMessagesM
@@ -29,8 +29,19 @@ UITWERKING parseMessagesM
 2. Representatie van tekst. Ik gebruik een ad hoc model, niet TRL. KLAAR
 
 TEST VAN PARSEMESSAGESM
-1. In een testfile, maak een context S van type ct:Text. Lees een file in en maak de tekst de waarde van de sourceText property van S. Vraag dan de property parseMessages op.
+1. In een testfile, maak een context S van type ct:Text. Lees de file politie.crl in en maak de tekst de waarde van de sourceText property van S. Vraag dan de property parseMessages op.
 
+VOLTOOID:
+	- parserMessages
+	- syntacticState
+	- typeCheckerMessages
+	- semanticState
+
+MUTATIES
+1. Probeer de mutatieserialisatie die ik heb ontworpen voor delta's te hergebruiken voor mutatie over TCP en de interne API.
+
+
+================================================================================================
 Voorbereiding: maak handige functies om contexten en rollen te maken.
 1. We hebben een protocol nodig vanuit Javascript en vanuit purescript. KLAAR
 2. Vanuit javascript wil ik een json overdrachtsformat. KLAAR
@@ -50,13 +61,6 @@ IDEE:
 1. Maak de context en rollen
 2. Laat de typedefchecker erop los.
 KLAAR!
-
-MUTATIES
-1. Probeer de mutatieserialisatie die ik heb ontworpen voor delta's te hergebruiken voor mutatie over TCP en de interne API.
-
-
-
-
 
 ================================================================================================
 COMPUTEDPROPERTYGETTER BESTAAT NOG NIET

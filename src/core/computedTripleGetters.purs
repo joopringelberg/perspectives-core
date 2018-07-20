@@ -23,29 +23,30 @@ import Perspectives.QueryCache (queryCacheInsert)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructInternalPropertyGetter, constructTripleGetterWithArbitrarySupport)
-import Perspectives.TypeDefChecker (checkContext, checkDomeinFile)
+import Perspectives.TypeDefChecker (checkDomeinFile)
 
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
-modellenM :: forall e1. TypedTripleGetter e1
+modellenM :: forall e. TypedTripleGetter e
 modellenM = constructTripleGetterWithArbitrarySupport
   "model:Systeem$Systeem$modellen" getListOfModels (constructExternalPropertyGetter "model:Systeem$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller")
-
-getListOfModels :: forall e. ID -> MonadPerspectivesQuery (ajax :: AJAX | e) (Array String)
-getListOfModels id = lift $ lift $ catchError (documentNamesInDatabase "perspect_models") \_ -> pure []
+  where
+    getListOfModels :: forall e1. ID -> MonadPerspectivesQuery (ajax :: AJAX | e1) (Array String)
+    getListOfModels id = lift $ lift $ catchError (documentNamesInDatabase "perspect_models") \_ -> pure []
 
 parserMessagesM :: forall e. TypedTripleGetter e
 parserMessagesM = constructTripleGetterWithArbitrarySupport
   "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (constructInternalPropertyGetter "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+  where
 
-parseSourceText :: forall e. ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
-parseSourceText textId = do
-  sourceText <- lift (textId %%>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
-  parseResult <- lift $ parseAndCache sourceText
-  case parseResult of
-    (Right parseRoot) -> case parseRoot of
-      (RootContext rootId) -> pure [rootId]
-      (UserData buitenRollen) -> pure buitenRollen
-    (Left e) -> pure [(show e)]
+    parseSourceText :: ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
+    parseSourceText textId = do
+      sourceText <- lift (textId %%>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+      parseResult <- lift $ parseAndCache sourceText
+      case parseResult of
+        (Right parseRoot) -> case parseRoot of
+          (RootContext rootId) -> pure [rootId]
+          (UserData buitenRollen) -> pure buitenRollen
+        (Left e) -> pure [(show e)]
 
 syntacticStateM :: forall e. TypedTripleGetter e
 syntacticStateM = constructTripleGetterWithArbitrarySupport
@@ -61,20 +62,20 @@ syntacticStateM = constructTripleGetterWithArbitrarySupport
 typeCheckerMessagesM :: forall e. TypedTripleGetter e
 typeCheckerMessagesM = constructTripleGetterWithArbitrarySupport
   "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" checkModel_ (constructInternalPropertyGetter "model:CrlText$Text$binnenRolBeschrijving$sourceText")
-
-checkModel_ :: forall e. ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
-checkModel_ textId = do
-  syntacticState <- lift (textId ##>> syntacticStateM)
-  case syntacticState of
-    "false" -> pure ["The syntactic state does not allow type checking."]
-    otherwise -> do
-      contextId <- lift (textId ##>> parserMessagesM)
-      ctxt <- lift $ getPerspectEntiteit contextId
-      df <- lift $ domeinFileFromContext ctxt
-      um <- checkDomeinFile df
-      if null um
-        then pure []
-        else pure (map show um)
+  where
+    checkModel_ :: ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
+    checkModel_ textId = do
+      syntacticState <- lift (textId ##>> syntacticStateM)
+      case syntacticState of
+        "false" -> pure ["The syntactic state does not allow type checking."]
+        otherwise -> do
+          contextId <- lift (textId ##>> parserMessagesM)
+          ctxt <- lift $ getPerspectEntiteit contextId
+          df <- lift $ domeinFileFromContext ctxt
+          um <- checkDomeinFile df
+          if null um
+            then pure []
+            else pure (map show um)
 
 semanticStateM :: forall e. TypedTripleGetter e
 semanticStateM = constructTripleGetterWithArbitrarySupport
