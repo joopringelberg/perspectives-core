@@ -1,0 +1,38 @@
+{
+  "id": "usr:MijnContext",
+  "ctype": "pol:Aangifte",
+  "rollen": {
+    "psp:eenRol": [
+      {
+        "properties": {
+          "psp:eenProperty": [
+            1,
+            2
+          ],
+          "psp:nogEenProperty": [
+            "aap"
+          ]
+        },
+        "binding": "usr:eenHeelAndereRol"
+      }
+    ]
+  },
+  "interneProperties": {
+    "psp:eenProperty": [
+      1,
+      2
+    ],
+    "psp:nogEenProperty": [
+      "aap"
+    ]
+  },
+  "externeProperties": {
+    "psp:eenProperty": [
+      1,
+      2
+    ],
+    "psp:nogEenProperty": [
+      "aap"
+    ]
+  }
+}

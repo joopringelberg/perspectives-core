@@ -5,13 +5,14 @@ import Prelude
 import Control.Monad.Aff.AVar (AVar, readVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (kind Effect)
+import Control.Monad.Error.Class (catchError)
 import Data.Array (singleton)
 import Data.Maybe (Maybe(..), fromJust)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, retrieveInternally, getType)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, getType, removeInternally, retrieveInternally)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb)
 
 getPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
@@ -25,6 +26,12 @@ getPerspectEntiteit id =
       Nothing -> do
         (ent :: a) <- fetchPerspectEntiteitFromCouchdb id
         pure ent
+
+tryGetPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) (Maybe a)
+tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
+  \_ -> do
+    (_ :: Maybe (AVar a)) <- removeInternally id
+    pure Nothing
 
 getAVarRepresentingPerspectEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) (AVar a)
 getAVarRepresentingPerspectEntiteit id =

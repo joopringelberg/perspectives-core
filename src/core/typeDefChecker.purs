@@ -81,7 +81,7 @@ checkProperties typeId cid = do
 
   definedInternalProperties <- lift $ lift (typeId ##= internePropertiesDefM)
   availableInternalProperties <- lift $ lift $ internePropertyTypen cid
-  checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedExternalProperties cid
+  checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedInternalProperties cid
 
 get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
 get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects

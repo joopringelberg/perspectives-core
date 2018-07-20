@@ -1,6 +1,7 @@
 Context model:CrlText als ct:
 
 import model:Perspectives als psp:
+import model:QueryAst als q:
 
 Section $rolInContext
 
@@ -8,23 +9,28 @@ Section $rolInContext
 -- TEXT
 --------------------------------------------------------------------------------
 psp:Context ct:Text
-  $rolInContext =>
+  prototype psp:ContextPrototype
+  $binnenRolBeschrijving =>
     psp:Rol $binnenRolBeschrijving
       extern $isFunctioneel = true
       extern $isVerplicht = true
       $mogelijkeBinding => psp:Rol
       $rolProperty =>
-        psp:Property $parseState
-          extern $isFunctioneel = true
-          extern $isVerplicht = false
-          $range => psp:Boolean
-      $rolProperty =>
-        psp:Property $parseMessages
+        psp:Property $sourceText
           extern $isFunctioneel = true
           extern $isVerplicht = false
           $range => psp:String
-  $rolInContext =>
-    psp:Rol $buitenRolBeschrijving
-      extern $isFunctioneel = true
-      extern $isVerplicht = true
-      $mogelijkeBinding => psp:Rol
+      $rolProperty =>
+        q:ComputedPropertyGetter $parseState
+          prototype psp:ContextPrototype
+          extern $functionName = "parseStateM"
+          extern psp:Property$buitenRolBeschrijving$isFunctioneel = true
+          extern psp:Property$buitenRolBeschrijving$isVerplicht = false
+          psp:Property$range => psp:Boolean
+      $rolProperty =>
+        q:ComputedPropertyGetter $parseMessages
+          prototype psp:ContextPrototype
+          extern $functionName = "parseMessagesM"
+          extern psp:Property$buitenRolBeschrijving$isFunctioneel = true
+          extern psp:Property$buitenRolBeschrijving$isVerplicht = false
+          psp:Property$range => psp:String

@@ -17,7 +17,7 @@ import Perspectives.DomeinFile (addContextToDomeinFile, addRolToDomeinFile)
 import Perspectives.Effects (AvarCache, AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.PerspectivesState (contextDefinitionsInsert, contextDefinitionsLookup, rolDefinitionsInsert, rolDefinitionsLookup)
+import Perspectives.PerspectivesState (contextDefinitionsInsert, contextDefinitionsLookup, contextDefinitionsRemove, rolDefinitionsInsert, rolDefinitionsLookup, rolDefinitionsRemove)
 import Perspectives.Syntax (PerspectContext, PerspectRol, Revision)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (>>=))
 
@@ -31,6 +31,7 @@ class (Encode a, Decode a, Respondable a) <=  PerspectEntiteit a where
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: forall e. ID -> MonadPerspectives (AvarCache e) (AVar a)
   retrieveInternally :: forall e. ID -> MonadPerspectives (AvarCache e) (Maybe (AVar a))
+  removeInternally :: forall e. ID -> MonadPerspectives (AvarCache e) (Maybe (AVar a))
   -- | A default implementation for encode is encodeJSON.
   encode :: a -> String
   -- | A default implementation for decode is decodeJSON.
@@ -47,6 +48,7 @@ instance perspectEntiteitContext :: PerspectEntiteit PerspectContext where
   getId = context_id
   representInternally c = (liftAff makeEmptyVar) >>= contextDefinitionsInsert c
   retrieveInternally = contextDefinitionsLookup
+  removeInternally = contextDefinitionsRemove
   encode = encodeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveContextFromDomein
@@ -61,6 +63,7 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   getId = rol_id
   representInternally c = (liftAff makeEmptyVar) >>= rolDefinitionsInsert c
   retrieveInternally = rolDefinitionsLookup
+  removeInternally = rolDefinitionsRemove
   encode = encodeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveRolFromDomein

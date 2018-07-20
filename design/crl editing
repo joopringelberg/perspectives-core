@@ -21,15 +21,26 @@ AANPAK
 	- een save button
 4. We hebben in het protocol naar de Core de mogelijkheid nodig om een property een waarde te geven.
 5. We hebben de mogelijkheid nodig om een calculated property af te laten hangen van twee andere (semanticState hangt namelijk af van parseState en text).
+6. Als de upload button geklikt wordt, dan moet er een instantie gemaakt worden van ct:Text met de property sourceText gelijk aan de geuploade-file. Deze sourceText is client-side beschikbaar. We moeten dus in staat zijn om vanuit de client een context aan te maken en daar een property van te zetten.
 
-UITWERKING PARSESTATE
-1. De property parseState moet een computed triplegetter zijn. Zie module Perspectives.ComputedTripleGetters. We gebruiken daar de functie constructTripleGetterWithArbitrarySupport voor.
-2. Merk op dat deze computed triplegetter verwerkt moet worden in de queryCompiler, om ervoor te zorgen dat je hem in een query (calculated rol/property) kunt gebruiken!
-2. Representatie van tekst. Ik gebruik een ad hoc model, niet TRL.
+UITWERKING parseMessagesM
+1. De property parseMessages moet een computed triplegetter zijn. Zie module Perspectives.ComputedTripleGetters. We gebruiken daar de functie constructTripleGetterWithArbitrarySupport voor. KLAAR
+2. Merk op dat deze computed triplegetter meegenomen moet worden in addComputedTripleGetters. KLAAR
+2. Representatie van tekst. Ik gebruik een ad hoc model, niet TRL. KLAAR
+
+TEST VAN PARSEMESSAGESM
+1. In een testfile, maak een context S van type ct:Text. Lees een file in en maak de tekst de waarde van de sourceText property van S. Vraag dan de property parseMessages op.
+
+Voorbereiding: maak handige functies om contexten en rollen te maken.
 
 
+
+
+
+================================================================================================
 COMPUTEDPROPERTYGETTER BESTAAT NOG NIET
 ComputedPropertyGetter zou de pendant van ComputedRolGetter zijn. 
+VOLTOOID.
 
 CATCH 22
 1. Ik moet query.crl veranderen (ComputedPropertyGetter toevoegen).
@@ -44,3 +55,11 @@ Wat is nodig:
 - bij succes: sla op in couchdb.
 Kan dit in een test?
 Ja, sterker nog, ik heb al zo'n test gemaakt! Wel eerst de versie in couchdb weggooien.
+
+REFACTORING
+Is:
+	(createContextWithSingleRole contextId (q "propertyQuery") pn)
+hetzelfde als:
+	(createPropertyGetterDescription contextId "propertyQuery" qn)
+(waar qn en pn qualified names zijn)
+Neen.

@@ -260,6 +260,8 @@ data UserMessage =
   | AspectRolNotFromAspect RolName RolName ContextID
   | CycleInAspects ContextID (Array TypeID)
   | RolWithoutContext RolName
+  | ContextExists ID
+  | NotAValidIdentifier String
 
 type FD = Either UserMessage ID
 
@@ -285,3 +287,5 @@ instance showUserMessage :: Show UserMessage where
   show (CycleInAspects cid asps) = "(CycleInAspects) De Context '" <> cid <> "' heeft een Aspect dat (indirect) weer '" <> cid <> "' als Aspect heeft. De betrokken Aspecten zijn: " <> show asps <> "."
   show (RolWithoutContext cid) = "(RolWithoutContext) De Rol '" <> cid <> "' heeft geen definiërende Context."
   -- show _ = "This is a usermessage"
+  show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."
+  show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."

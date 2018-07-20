@@ -495,7 +495,7 @@ context = withRoleCounting context' where
             cacheRol (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = buitenRol (show instanceName)
-                , pspType = ""
+                , pspType = show typeName <> "$buitenRolBeschrijving"
                 , context = (show instanceName)
                 , binding = binding $ maybe "" buitenRol prototype
                 , properties = fromFoldable publicProps

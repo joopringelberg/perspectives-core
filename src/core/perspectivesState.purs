@@ -11,7 +11,7 @@ import Data.Maybe (Maybe)
 import Perspectives.CoreTypes (ContextDefinitions, MonadPerspectives, PerspectivesState, RolDefinitions, DomeinCache, UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke)
+import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke, delete)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
@@ -76,6 +76,9 @@ contextDefinitionsLookup = lookup contextDefinitions
 contextDefinitionsInsert :: forall e. String -> AVar PerspectContext -> MonadPerspectives (AvarCache e) (AVar PerspectContext)
 contextDefinitionsInsert = insert contextDefinitions
 
+contextDefinitionsRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar PerspectContext))
+contextDefinitionsRemove = remove contextDefinitions
+
 rolDefinitions :: forall e. MonadPerspectives (avar :: AVAR | e) RolDefinitions
 rolDefinitions = gets _.rolDefinitions
 
@@ -85,6 +88,9 @@ rolDefinitionsLookup = lookup rolDefinitions
 rolDefinitionsInsert :: forall e. String -> AVar PerspectRol -> MonadPerspectives (AvarCache e) (AVar PerspectRol)
 rolDefinitionsInsert = insert rolDefinitions
 
+rolDefinitionsRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar PerspectRol))
+rolDefinitionsRemove = remove rolDefinitions
+
 domeinCache :: forall e. MonadPerspectives (avar :: AVAR | e) DomeinCache
 domeinCache = gets _.domeinCache
 
@@ -93,6 +99,9 @@ domeinCacheLookup = lookup domeinCache
 
 domeinCacheInsert :: forall e. String -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
 domeinCacheInsert = insert domeinCache
+
+domeinCacheRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar DomeinFile))
+domeinCacheRemove = remove domeinCache
 
 insert :: forall eff a.
   MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
@@ -111,3 +120,13 @@ lookup :: forall e a.
 lookup g k = do
   dc <- g
   liftAff $ liftEff $ peek dc k
+
+remove :: forall eff a.
+  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
+  String ->
+  MonadPerspectives (gm :: GLOBALMAP | eff) (Maybe a)
+remove g k = do
+  (dc :: (GLStrMap a)) <- g
+  ma <- liftAff $ liftEff $ peek dc k
+  _ <- liftAff $ liftEff $ (delete dc k)
+  pure ma
