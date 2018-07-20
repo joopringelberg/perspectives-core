@@ -9,6 +9,7 @@ import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Node.Encoding (Encoding(..))
 import Node.FS (FS)
@@ -18,10 +19,12 @@ import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
+import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.SaveUserData (saveUserData)
 import Perspectives.Syntax (PerspectContext)
+import Perspectives.TypeDefChecker (checkModel)
 
 modelDirectory :: String
 modelDirectory = "/Users/joopringelberg/Code/perspectives-core/src/model"
@@ -29,7 +32,7 @@ modelDirectory = "/Users/joopringelberg/Code/perspectives-core/src/model"
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION | e)) Unit
 test = do
   lift $ log "=========================Parse a file==================="
-  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "query.crl"])
+  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "politie.crl"])
   parseResult <- parseAndCache text
   case parseResult of
     (Right parseRoot) ->
@@ -43,9 +46,15 @@ test = do
             Nothing -> do
               lift $ log ("Cannot find context " <> textName)
             (Just ctxt) -> do
-              df <- domeinFileFromContext ctxt
+              df@(DomeinFile {_id}) <- domeinFileFromContext ctxt
               storeDomeinFileInCouchdb df
-              lift $ log ("Saved " <> show textName)
+              lift $ log ("Saved, will attempt to run the typeDefChecker... " <> show textName)
+              messages <- checkModel _id
+              lift $ for_ messages
+                \m -> do
+                  log $ show m
+                  log "------"
+
         (UserData buitenRollen) -> do
           lift $ log  "Attempting to save..."
           saveUserData buitenRollen

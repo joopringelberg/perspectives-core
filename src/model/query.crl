@@ -90,14 +90,10 @@ psp:Context q:RolGetter
 -- 		extern $functionName = "modelsM"
 psp:Context q:ComputedRolGetter
 	$aspect => psp:Function
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
+	$aspect => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
+			$aspectRol => psp:Rol$buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $functionName
 					extern $isFunctioneel = true
@@ -105,21 +101,17 @@ psp:Context q:ComputedRolGetter
 					$range => psp:String
 
 --------------------------------------------------------------------------------
--- COMPUTEDROPROPERTYGETTER
+-- COMPUTEDPROPERTYGETTER
 --------------------------------------------------------------------------------
 -- Instances will be created by the QueryFunctionDescriptionCompiler, e.g.
 --	q:ComputedPropertyGetter q:p1
 -- 		extern $functionName = "modelsM"
 psp:Context q:ComputedPropertyGetter
+	$aspect => psp:Property
 	$aspect => psp:Function
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
+			$aspectRol => psp:Property$buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $functionName
 					extern $isFunctioneel = true

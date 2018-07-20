@@ -15,7 +15,7 @@ import Perspectives.CoreTypes (MonadPerspectives, runMonadPerspectivesQueryCompi
 import Perspectives.DataTypeObjectGetters (binding, buitenRol, context, contextType, iedereRolInContext, typeVanIedereRolInContext)
 import Perspectives.DataTypeTripleGetters (contextTypeM)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, isInNamespace)
+import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI, deconstructNamespace, guardWellFormedNess, isInNamespace)
 import Perspectives.ModelBasedObjectGetters (binnenRolContextDef, contextDef, rolInContextContextDef)
 import Perspectives.ModelBasedTripleGetters (aspectenDefM, aspectenDefMClosure, aspectRollenDefM, boundContextsM, buitenRolBeschrijvingM, contextDefM, ownExternePropertiesDefM, ownInternePropertiesDefM, ownPropertiesDefM, ownRollenDefM, propertiesDefM, propertyIsVerplichtM, rollenDefM, rolInContextDefM)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getRol, getRolByLocalName)
@@ -175,8 +175,8 @@ test = do
   -- pts <- "model:Perspectives$Rol" ## ownExternePropertyDef
   -- lift $ logShow pts
 
-  -- let pn = "model:Perspectives$Rol$buitenRol$isVerplicht"
-  -- let rn = "model:Perspectives$Rol$buitenRol"
+  let pn = "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
+  let rn = "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving"
   --
   -- r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedExternalProperty pn) (pn <> "_getter"))
   -- lift $ logShow r
@@ -190,12 +190,16 @@ test = do
   -- isExternal <- (getBuitenRol /-/ getGebondenAls "model:Perspectives$Context$externalProperty") pn
   -- lift $ logShow $ head isExternal
 
-  (y :: PerspectContext) <- getPerspectEntiteit "model:User$MijnSysteem"
-  lift $ logShow y
+  -- (y :: PerspectContext) <- getPerspectEntiteit "model:User$MijnSysteem"
+  -- lift $ logShow y
 
 
-  -- b <- checkRolForQualifiedProperty pn rn
-  -- lift $ logShow b
+  -- namespaceOfProperty <- guardWellFormedNess deconstructNamespace pn
+  -- b <- checkRolHasAspect rn namespaceOfProperty pn
+  -- b <- rn `importsAspect` namespaceOfProperty
+  -- aspecten <- rn ## aspectRollenDefM
+  b <- checkRolForQualifiedProperty pn rn
+  lift $ logShow b
 
   -- b <- runMonadPerspectivesQuery rn (toBoolean (contains pn propertyDef))
   -- lift $ logShow b

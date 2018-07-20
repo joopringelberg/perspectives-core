@@ -21,16 +21,30 @@ psp:Context ct:Text
           extern $isVerplicht = false
           $range => psp:String
       $rolProperty =>
-        q:ComputedPropertyGetter $parseState
+        q:ComputedPropertyGetter $syntacticState
           prototype psp:ContextPrototype
-          extern $functionName = "parseStateM"
+          extern $functionName = "syntacticStateM"
           extern psp:Property$buitenRolBeschrijving$isFunctioneel = true
           extern psp:Property$buitenRolBeschrijving$isVerplicht = false
           psp:Property$range => psp:Boolean
       $rolProperty =>
-        q:ComputedPropertyGetter $parseMessages
+        q:ComputedPropertyGetter $parserMessages
           prototype psp:ContextPrototype
-          extern $functionName = "parseMessagesM"
+          extern $functionName = "parserMessagesM"
+          extern psp:Property$buitenRolBeschrijving$isFunctioneel = false
+          extern psp:Property$buitenRolBeschrijving$isVerplicht = false
+          psp:Property$range => psp:String
+      $rolProperty =>
+        q:ComputedPropertyGetter $semanticState
+          prototype psp:ContextPrototype
+          extern $functionName = "semanticStateM"
           extern psp:Property$buitenRolBeschrijving$isFunctioneel = true
+          extern psp:Property$buitenRolBeschrijving$isVerplicht = false
+          psp:Property$range => psp:Boolean
+      $rolProperty =>
+        q:ComputedPropertyGetter $typeCheckerMessages
+          prototype psp:ContextPrototype
+          extern $functionName = "typeCheckerMessagesM"
+          extern psp:Property$buitenRolBeschrijving$isFunctioneel = false
           extern psp:Property$buitenRolBeschrijving$isVerplicht = false
           psp:Property$range => psp:String

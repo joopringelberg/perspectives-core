@@ -32,6 +32,27 @@ TEST VAN PARSEMESSAGESM
 1. In een testfile, maak een context S van type ct:Text. Lees een file in en maak de tekst de waarde van de sourceText property van S. Vraag dan de property parseMessages op.
 
 Voorbereiding: maak handige functies om contexten en rollen te maken.
+1. We hebben een protocol nodig vanuit Javascript en vanuit purescript. KLAAR
+2. Vanuit javascript wil ik een json overdrachtsformat. KLAAR
+3. Vanuit purescript wil ik een ADT. KLAAR
+
+CONSTRUCTORS
+ContextSerialization:
+1. Controleer of al een context met de gegeven id bestaat.
+2. Controleer of het type bestaat en een Context representeert.
+3. Controleer of elk type rol (de sleutel van de StrMap) een rol bij het context type is.
+4. Controleer of elk type property (de sleutel van de StrMap) van de interneProperties gedefinieerd is als property van de binnenrol van het contexttype.
+5. Idem voor de externe properties.
+
+RolSerialization
+
+IDEE:
+1. Maak de context en rollen
+2. Laat de typedefchecker erop los.
+KLAAR!
+
+MUTATIES
+1. Probeer de mutatieserialisatie die ik heb ontworpen voor delta's te hergebruiken voor mutatie over TCP en de interne API.
 
 
 

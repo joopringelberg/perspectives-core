@@ -19,6 +19,7 @@ import Node.Path as Path
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), defaultContextSerializationRecord)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
+import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives, (@@>))
 import Perspectives.DataTypeObjectGetters (internePropertyTypen)
@@ -28,22 +29,34 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (binnenRol)
 import Perspectives.ModelBasedTripleGetters (internePropertiesDefM, ownInternePropertiesDefM)
+import Perspectives.QueryCompiler (propertyQuery)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##), (##=))
 import Perspectives.SaveUserData (saveUserData)
 import Perspectives.Syntax (PerspectContext)
-import Perspectives.TypeDefChecker (checkModel)
+import Perspectives.TypeDefChecker (checkModel, getPropertyFunction)
+
+modelDirectory :: String
+modelDirectory = "/Users/joopringelberg/Code/perspectives-core/src/model"
 
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION | e)) Unit
 test = do
   lift $ log "=========================CREATE A CONTEXT==================="
-  cid <- pure "model:User$MijnEersteContext"
-  typeId <- pure "model:CrlText$Text"
+  addComputedTripleGetters
+  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "politie.crl"])
   r <- constructContext $
     ContextSerialization $ defaultContextSerializationRecord
-      { id = "model:User$MijnEersteContext"
+      { id = "model:User$Politie_text"
       , ctype = "model:CrlText$Text"
       , interneProperties = PropertySerialization $
-          singleton "model:CrlText$Text$binnenRolBeschrijving$sourceText" ["Hello world!"]
+          singleton "model:CrlText$Text$binnenRolBeschrijving$sourceText" [text]
       }
-  lift $ log $ show r
+  getParserMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$parserMessages" "model:CrlText$Text$binnenRolBeschrijving")
+  parserMessages <- "model:User$Politie_text" ##= getParserMessages
+  lift $ log $ show parserMessages
+  getSyntacticState <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$syntacticState" "model:CrlText$Text$binnenRolBeschrijving")
+  parseState <-  "model:User$Politie_text" ##= getSyntacticState
+  lift $ log $ show parseState
+  getTypeCheckerMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" "model:CrlText$Text$binnenRolBeschrijving")
+  typeCheckerMessages <-  "model:User$Politie_text" ##= getTypeCheckerMessages
+  lift $ log $ show typeCheckerMessages
