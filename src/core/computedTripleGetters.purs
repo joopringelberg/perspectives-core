@@ -10,6 +10,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AJAX)
+import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, TypedTripleGetter, MonadPerspectives, (%%>>))
 import Perspectives.DomeinCache (documentNamesInDatabase)
@@ -19,9 +20,10 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.ObjectGetterConstructors (getInternalProperty)
 import Perspectives.QueryCache (queryCacheInsert)
-import Perspectives.RunMonadPerspectivesQuery ((##=), (##>), (##>>))
+import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructInternalPropertyGetter, constructTripleGetterWithArbitrarySupport)
-import Perspectives.TypeDefChecker (checkContext, checkModel)
+import Perspectives.TypeDefChecker (checkContext, checkDomeinFile)
 
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
 modellenM :: forall e1. TypedTripleGetter e1
@@ -67,7 +69,9 @@ checkModel_ textId = do
     "false" -> pure ["The syntactic state does not allow type checking."]
     otherwise -> do
       contextId <- lift (textId ##>> parserMessagesM)
-      um <- lift $ checkContext contextId
+      ctxt <- lift $ getPerspectEntiteit contextId
+      df <- lift $ domeinFileFromContext ctxt
+      um <- checkDomeinFile df
       if null um
         then pure ["The model is valid"]
         else pure (map show um)

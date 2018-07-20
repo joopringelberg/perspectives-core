@@ -1,4 +1,4 @@
-module Perspectives.TypeDefChecker (checkContext, checkModel, getPropertyFunction)
+module Perspectives.TypeDefChecker (checkContext, checkModel, getPropertyFunction, checkDomeinFile)
 
 where
 
@@ -32,18 +32,15 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=), (##>))
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, const, discard, ifM, pure, show, unit, void, ($), (<), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, const, discard, ifM, pure, show, unit, void, ($), (<), (<<<), (<>), (>>=), (>=>))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery e)
 
-checkModel :: forall e. ContextID -> MP e (Array UserMessage)
-checkModel modelId = runMonadPerspectivesQuery modelId checkAllContexts
-  where
-    checkAllContexts :: ContextID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array UserMessage)
-    checkAllContexts x = execWriterT $ do
-      (DomeinFile{contexts}) <- lift $ lift $ retrieveDomeinFile modelId
-      for_ (keys contexts) checkContext'
+checkDomeinFile :: forall e. DomeinFile -> MonadPerspectivesQuery (AjaxAvarCache e) (Array UserMessage)
+checkDomeinFile (DomeinFile{contexts}) = execWriterT $ for_ (keys contexts) checkContext'
 
+checkModel :: forall e. ContextID -> MP e (Array UserMessage)
+checkModel modelId = runMonadPerspectivesQuery modelId (lift <<< retrieveDomeinFile >=> checkDomeinFile)
 
 -- | `psp:ContextInstance -> psp:ElkType`
 checkContext :: forall e. ContextID -> MP e (Array UserMessage)
