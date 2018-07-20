@@ -60,3 +60,6 @@ test = do
   getTypeCheckerMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" "model:CrlText$Text$binnenRolBeschrijving")
   typeCheckerMessages <-  "model:User$Politie_text" ##= getTypeCheckerMessages
   lift $ log $ show typeCheckerMessages
+  getSemanticState <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$semanticState" "model:CrlText$Text$binnenRolBeschrijving")
+  semanticState <-  "model:User$Politie_text" ##= getSemanticState
+  lift $ log $ show semanticState

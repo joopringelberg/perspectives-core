@@ -24,7 +24,7 @@ arc:Zaak $Aangifte
 				psp:Property $urgentie
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
-					$range => 
+					$range => psp:Number
 	psp:Context$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true

@@ -73,15 +73,27 @@ checkModel_ textId = do
       df <- lift $ domeinFileFromContext ctxt
       um <- checkDomeinFile df
       if null um
-        then pure ["The model is valid"]
+        then pure []
         else pure (map show um)
+
+semanticStateM :: forall e. TypedTripleGetter e
+semanticStateM = constructTripleGetterWithArbitrarySupport
+  "model:CrlText$Text$binnenRolBeschrijving$semanticState" f parserMessagesM
+  where
+    f :: ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
+    f textId = do
+      m <- lift (textId ##= typeCheckerMessagesM)
+      if null m
+        then pure ["true"]
+        else pure ["false"]
 
 computedTripleGetters :: forall e. Array (Tuple String (TypedTripleGetter e))
 computedTripleGetters = [
   Tuple "modellenM" modellenM,
   Tuple "parserMessagesM" parserMessagesM,
   Tuple "syntacticStateM" syntacticStateM,
-  Tuple "typeCheckerMessagesM" typeCheckerMessagesM
+  Tuple "typeCheckerMessagesM" typeCheckerMessagesM,
+  Tuple "semanticStateM" semanticStateM
 ]
 
 addComputedTripleGetters :: forall e. MonadPerspectives (gm :: GLOBALMAP | e) Unit
