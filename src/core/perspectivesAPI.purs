@@ -13,7 +13,8 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Foreign (MultipleErrors, unsafeFromForeign)
 import Data.Foreign.Class (encode)
-import Perspectives.ApiTypes (CorrelationIdentifier, Request(..), response)
+import Perspectives.ApiTypes (ContextSerialization, CorrelationIdentifier, Request(..), response)
+import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
@@ -27,7 +28,7 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Prelude (Unit, bind, const, pure, show, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (Unit, bind, const, map, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -44,16 +45,15 @@ data ApiRequest e =
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
   | Unsubscribe Subject Predicate CorrelationIdentifier
-
-data ApiResponse e = Unsubscriber (QueryUnsubscriber e)
-  | Error String
+  | CreateContext ContextSerialization (ReactStateSetter e) CorrelationIdentifier
 
 type RequestRecord e =
   { request :: String
   , subject :: String
   , predicate :: String
   , reactStateSetter :: ReactStateSetter e
-  , setterId :: CorrelationIdentifier}
+  , setterId :: CorrelationIdentifier
+  , contextDescription :: ContextSerialization}
 
 showRequestRecord :: forall e. RequestRecord e -> String
 showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
@@ -84,13 +84,14 @@ setupTcpApi = runProcess server
       (dataProducer connection $~ (forever (transform marshallRequest))) $$ consumeRequest
       where
         marshallRequest :: (Either MultipleErrors Request) -> ApiRequest (socketio :: SOCKETIO | e)
-        marshallRequest (Right (Request r@{rtype, subject, predicate, setterId})) =
+        marshallRequest (Right (Request r@{rtype, subject, predicate, setterId, contextDescription})) =
           marshallRequestRecord
             { request: (unsafeFromForeign (encode rtype))
             , subject
             , predicate
             , setterId
-            , reactStateSetter: launchAff_ <<< writeData connection <<< response setterId}
+            , reactStateSetter: launchAff_ <<< writeData connection <<< response setterId
+            , contextDescription}
         marshallRequest (Left e) = WrongRequest
 
 consumeRequest :: forall e. Consumer (ApiRequest e) (MonadPerspectives (ApiEffects e)) Unit
@@ -113,29 +114,29 @@ marshallRequestRecord r@{request} = do
     "GetViewProperties" -> GetViewProperties r.subject r.reactStateSetter r.setterId
     "Unsubscribe" -> Unsubscribe r.subject r.predicate r.setterId
     "ShutDown" -> ShutDown
+    "CreateContext" -> CreateContext r.contextDescription r.reactStateSetter r.setterId
     otherwise -> WrongRequest
 
 dispatchOnRequest :: forall e. ApiRequest e -> MonadPerspectives (ApiEffects e) Unit
 dispatchOnRequest req =
-  if (isShutDown req) -- Catch ShutDown here, so...
-    then pure unit
-    else do
-      case req of
-        (GetRolBinding cid rn setter setterId) -> do
-          getRolBinding cid rn setter setterId
-        (GetBinding rid setter setterId) -> subscribeToObjects rid bindingM setter setterId
-        (GetBindingType rid setter setterId) -> subscribeToObjects rid (bindingM >-> rolTypeM) setter setterId
-        (GetRol cid rn setter setterId) -> getRol cid rn setter setterId
-        (GetRolContext rid setter setterId) -> subscribeToObjects rid contextM setter setterId
-        (GetContextType rid setter setterId) -> subscribeToObjects rid contextTypeM setter setterId
-        (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
-        (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> bindingM >-> contextM) setter setterId
-        otherwise -> pure unit
-  where
-    isShutDown :: ApiRequest e -> Boolean
-    isShutDown req = case req of
-      ShutDown -> true
-      otherwise -> false
+  case req of
+    (GetRolBinding cid rn setter setterId) -> do
+      getRolBinding cid rn setter setterId
+    (GetBinding rid setter setterId) -> subscribeToObjects rid bindingM setter setterId
+    (GetBindingType rid setter setterId) -> subscribeToObjects rid (bindingM >-> rolTypeM) setter setterId
+    (GetRol cid rn setter setterId) -> getRol cid rn setter setterId
+    (GetRolContext rid setter setterId) -> subscribeToObjects rid contextM setter setterId
+    (GetContextType rid setter setterId) -> subscribeToObjects rid contextTypeM setter setterId
+    (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
+    (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> bindingM >-> contextM) setter setterId
+    (CreateContext cd setter setterId) -> do
+      r <- constructContext cd
+      case r of
+        (Left messages) -> liftEff $ setter (map show messages)
+        (Right id) -> liftEff $ setter [id]
+    -- Notice that a WrongRequest fails silently. No response is ever given.
+    -- A Shutdown has no effect.
+    otherwise -> pure unit
 
 -----------------------------------------------------------
 -- API FUNCTIONS
