@@ -13,6 +13,7 @@ import Data.Either (Either)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CouchdbState (CouchdbState, UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
@@ -28,24 +29,12 @@ type RolDefinitions = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 type QueryCache e = GLStrMap (TypedTripleGetter e)
 
-type PerspectivesState =
-  { rolDefinitions :: RolDefinitions
+type PerspectivesState = CouchdbState (
+  rolDefinitions :: RolDefinitions
   , contextDefinitions :: ContextDefinitions
   , domeinCache :: DomeinCache
-  , userInfo :: UserInfo
-  , couchdbSessionStarted :: Boolean
-  , sessionCookie :: AVar String
   , memorizeQueryResults :: Boolean
-  }
-
------------------------------------------------------------
--- USERINFO
------------------------------------------------------------
-type UserInfo =
-  { userName :: String
-  , couchdbPassword :: String
-  , couchdbBaseURL :: String
-  }
+  )
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVES

@@ -230,7 +230,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
 
 sendTransactieToUser :: forall e. ID -> Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
 sendTransactieToUser userId t = do
-  tripleUserIP <- userId ##> identityM
+  tripleUserIP <- userId ##> identityM -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
   (userIP :: String) <- onNothing' ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
   -- TODO controleer of hier authentication nodig is!
   (res :: AJ.AffjaxResponse String)  <- liftAff $ AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
