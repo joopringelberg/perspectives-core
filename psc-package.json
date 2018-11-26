@@ -19,6 +19,7 @@
     "uri",
     "parsing",
     "perpectives-apitypes",
-    "avar-monadask"
+    "avar-monadask",
+    "perspectives-couchdb"
   ]
 }
