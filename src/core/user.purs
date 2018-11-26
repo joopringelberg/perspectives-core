@@ -1,15 +1,9 @@
 module Perspectives.User where
 
-import Control.Monad.Aff.AVar (AVAR, AVar)
+import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Perspectives.CouchdbState (MonadCouchdb)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
-import Prelude (Unit, bind, unit, ($), pure, (<>), (>>>))
-
-type UserCache = GLStrMap (AVar String)
-
-userCache :: UserCache
-userCache = new unit
+import Prelude (Unit, bind, ($), pure, (<>), (>>>))
 
 getUser :: forall e f. MonadCouchdb (avar :: AVAR | e) f String
 getUser = gets $ _.userInfo >>> _.userName

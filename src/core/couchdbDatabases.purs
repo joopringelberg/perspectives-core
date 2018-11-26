@@ -1,11 +1,10 @@
 module Perspectives.Couchdb.Databases where
 
-import Control.Monad.Aff (Aff, message)
-import Control.Monad.Aff.AVar (AVAR, AVar, isEmptyVar, readVar)
+import Control.Monad.Aff (message)
+import Control.Monad.Aff.AVar (AVAR, isEmptyVar, readVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (throwError, catchJust)
-import Control.Monad.Reader (ReaderT(..))
 import Control.Monad.Trans.Class (lift)
 import Data.Argonaut (fromObject, fromString)
 import Data.Array (cons, find)
@@ -17,17 +16,18 @@ import Data.Newtype (unwrap)
 import Data.StrMap (fromFoldable) as StrMap
 import Data.String (Pattern(..), stripPrefix, stripSuffix)
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax (AffjaxRequest)
+import Network.HTTP.Affjax (AJAX, AffjaxRequest)
 import Network.HTTP.Affjax (AffjaxResponse, affjax, get) as AJ
 import Network.HTTP.RequestHeader (RequestHeader(..))
 import Network.HTTP.ResponseHeader (ResponseHeader, responseHeaderName, responseHeaderValue)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Perspectives.Couchdb (CouchdbStatusCodes, DatabaseName, PostCouchdb_session, User, Password, onAccepted', onAccepted, DBS)
-import Perspectives.Effects (AjaxAvar, AjaxAvarCache, AvarCache)
-import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.CouchdbState (MonadCouchdb, UserInfo, sessionCookie, setSessionCookie, takeSessionCookieValue, tryReadSessionCookieValue)
+import Perspectives.CouchdbState (MonadCouchdb, sessionCookie, setSessionCookie, takeSessionCookieValue)
 import Perspectives.User (getCouchdbBaseURL, getUser, getCouchdbPassword)
 import Prelude (Unit, bind, const, pure, unit, void, ($), (*>), (/=), (<<<), (<>), (==), (>>=))
+
+type ID = String
+type AjaxAvar e = (avar :: AVAR, ajax :: AJAX | e)
 
 -----------------------------------------------------------
 -- QUALIFYREQUEST
@@ -98,7 +98,7 @@ requestAuthentication' usr pwd = do
       -- NOTE. The Node implementation of Affjax depends on https://www.npmjs.com/package/xhr2. However, this emulation does not implement cookie authentication. Hence, we cannot use Perspectives from the command line.
       setSessionCookie $ responseHeaderValue h
 
-ensureAuthentication :: forall e f a. MonadCouchdb (AjaxAvarCache e) f a -> MonadCouchdb (AjaxAvarCache e) f a
+ensureAuthentication :: forall e f a. MonadCouchdb (AjaxAvar e) f a -> MonadCouchdb (AjaxAvar e) f a
 ensureAuthentication a = do
   b <- (sessionCookie >>= lift <<< isEmptyVar)
   if b
@@ -110,7 +110,7 @@ ensureAuthentication a = do
 
 -- | A logout is purely client side, as Couchdb keeps no session state.
 -- | (see: http://127.0.0.1:5984/_utils/docs/api/server/authn.html#api-auth-cookie)
-logout :: forall e f. MonadCouchdb (AvarCache e) f Unit
+logout :: forall e f. MonadCouchdb (AjaxAvar e) f Unit
 logout = void takeSessionCookieValue
 
 -----------------------------------------------------------
@@ -121,7 +121,7 @@ databaseStatusCodes = fromFoldable
   [ Tuple 400 "Bad Request. Invalid database name."
   , Tuple 401 "Unauthorized. CouchDB Server Administrator privileges required."]
 
-createDatabase :: forall e f. DatabaseName -> MonadCouchdb (AjaxAvarCache e) f Unit
+createDatabase :: forall e f. DatabaseName -> MonadCouchdb (AjaxAvar e) f Unit
 createDatabase dbname = ensureAuthentication do
   base <- getCouchdbBaseURL
   (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
@@ -132,7 +132,7 @@ createDatabase dbname = ensureAuthentication do
     createStatusCodes = insert 412 "Precondition failed. Database already exists."
       databaseStatusCodes
 
-deleteDatabase :: forall e f. DatabaseName -> MonadCouchdb (AjaxAvarCache e) f Unit
+deleteDatabase :: forall e f. DatabaseName -> MonadCouchdb (AjaxAvar e) f Unit
 deleteDatabase dbname = ensureAuthentication do
   base <- getCouchdbBaseURL
   (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
@@ -155,7 +155,7 @@ allDbs = do
 -----------------------------------------------------------
 -- DOCUMENT VERSION
 -----------------------------------------------------------
-retrieveDocumentVersion :: forall e f. ID -> MonadCouchdb (AjaxAvarCache e) f String
+retrieveDocumentVersion :: forall e f. ID -> MonadCouchdb (AjaxAvar e) f String
 retrieveDocumentVersion url = do
   (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
   (res :: AJ.AffjaxResponse Unit) <- liftAff $ AJ.affjax $ rq {method = Left HEAD, url = url}
@@ -163,12 +163,12 @@ retrieveDocumentVersion url = do
   liftAff $ onAccepted res.status [200, 304] "retrieveDocumentVersion" (pure vs)
 
   where
-    version :: Array ResponseHeader -> MonadCouchdb (AjaxAvarCache e) f String
+    version :: Array ResponseHeader -> MonadCouchdb (AjaxAvar e) f String
     version headers =  case find (\rh -> (responseHeaderName rh) == "ETag") headers of
       Nothing -> throwError $ error ("retrieveDocumentVersion: couchdb returns no ETag header holding a document version number for " <> url)
       (Just h) -> (pure $ responseHeaderValue h) >>= removeDoubleQuotes
 
-    removeDoubleQuotes :: String -> MonadCouchdb (AjaxAvarCache e) f String
+    removeDoubleQuotes :: String -> MonadCouchdb (AjaxAvar e) f String
     removeDoubleQuotes s = do
       ms1 <- pure $ stripPrefix (Pattern "\"") s
       case ms1 of
