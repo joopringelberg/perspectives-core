@@ -1,0 +1,74 @@
+ONTWERP VAN UITBREIDING VAN DE API MET MUTATIES
+module Perspectives.Api kent op dit moment alleen 'getters'. Ik moet hem uitbreiden met 'setters'. De functies om een Context of Rol te wijzigen, bestaan al in module Perspectives.Deltas. De opgave is om deze functies beschikbaar te maken via de API.
+
+
+VERKENNING
+* runInTransactie neemt een (MonadTransactie e Unit) waarde en maakt er een MonadPerspectives waarde van.
+* addRol, bijvoorbeeld, maakt een MonadTransactie waarde.
+* zie setupUser. Maar deze functie wordt nog nergens gebruikt...
+
+
+====================================================================================
+BIJ HET ARTIKEL "Coroutine Pipelines" in The Monad Reader, Issue 19
+
+* Iteratee is Consumer.
+* Trampoline is Process
+* Generator is Producer
+
+Is de Request functor de fuseWith? Het zou dan gaan om het combineren van de functors waarmee de Co's worden geparametriseerd.
+
+De pipe functies moet de connect zijn. Maar de signatuur lijkt anders: pipe1 produceert de monadische waarde, connect een Co Identity (=Process) daarvan.
+
+* transducer = enumeratees is Transformer.
+
+Het zou kunnen dat wat ik nodig heb, het stateful liften van een transducer functie is.
+
+Pas in runInTransactie worden de effecten van addProperty, addRol, enz. doorgevoerd op het netwerk en naar de database gestuurd.
+
+====================================================================================
+EXPERIMENT
+Maak een transformer die getallen accumuleert tot de som groter is dan n en pas dan het resultaat doorgeeft.
+
+BENADERINGEN
+1. Een accumulerende transformer of consumer.
+2. Een splitter die delta-producerende requests één kant opstuurt waar ze geaccumuleerd worden (denk aan het voorbeeld uit het artikel waarin regels met de string FIND ME opgespoord worden).
+3. Het hele proces in MonadTransactie uitvoeren. Maar wanneer wordt er dan gerund?
+
+fuseWith wordt gebruikt om joinProducers en joinConsumers te maken. Zou ik fuseWith kunnen gebruiken om een splitter te maken (de splitter lijkt niet aanwezig in de module)
+
+Er is ook een Aff package voor coroutines: https://pursuit.purescript.org/packages/purescript-aff-coroutines/5.0.0
+
+====================================================================================
+AANPAK
+Ik ga proberen om de consumer consumeRequest (module Perspectives.Api) als volgt te veranderen:
+* baseer deze consumer op MonadTransactie (NB: de producers en transformers moeten dezelfde onderliggende Monad hebben!)
+* De Transactie heeft een timestamp. Controleer bij elk request of de Transactie ouder is dan een drempel. 
+	- Zo nee, doe niets extra's. 
+	- Zo ja: haal met get de state op. Distribueer alle deltas en installeer een schone state. Het model hiervoor is runInTransactie (module Perspectives.Deltas).
+
+Bovendien ga ik de TripleAdministration op een andere manier bijwerken. In grote lijnen:
+	* bij elk commando (zoals addRol) verwerk ik de Delta onmiddelijk op het geraakte Triple;
+	* dat wordt opgeslagen in een queue in PerspectivesState;
+	* periodiek propageer ik de veranderingen op het netwerk, beginnend met de queue.
+
+====================================================================================
+TRANSACTIES, TIMING VAN AFHANDELING
+Na een modificatie van een Triple moeten drie verwerkingen plaatsvinden:
+* de delta moet op het dependency netwerk in cache worden doorgevoerd;
+* de gewijzigde entiteit moet worden opgeslagen in Couchdb;
+* de delta moet worden verstuurd aan andere betrokkenen (preciezer: de Transactie wordt gespecialiseerd voor elke betrokken gebruiker en dan worden die gespecialiseerde versies in zijn geheel verstuurd).
+
+Op dit moment
+* wordt de gewijzigde entiteit onmiddelijk opgeslagen;
+* worden de mutaties op het dependency netwerk en de berichten aan andere betrokkenen in een Transactie verzameld en gelijktijdig afgehandeld.
+
+Maar ik wil de mutaties op het dependency netwerk met een hogere frequentie uitvoeren dan dat ze naar de andere betrokkenen verstuurd worden.
+
+Desalniettemin wil ik niet elke mutatie afzonderlijk op het dependency netwerk uitvoeren. Ik heb een breadth-first strategie die efficiënter is als er meerdere, samenhangende mutaties gelijktijdig worden doorgevoerd.
+
+Een ander model: voer met modifyTriple elke Delta onmiddelijk door op het dependency netwerk, maar propageer de veranderingen nog niet. Sla de veranderde beginpunten op en zet een ander mechanisme op om periodiek veranderingen te propageren.
+
+Misschien zo: voeg een TripleQueue toe aan de state in MonadPerspectives. Push het beginpunt dat resulteert uit modifyTriple (Maybe Triple) in die queue. Zet dan een proces op dat periodiek propagateTheoryDeltas daarop uitvoert (en dan de queue leeg maakt).
+
+De Deltas in de Transactie worden dan alleen gebruikt voor het versturen aan de andere betrokkenen. De TripleQueue in PerspectivesState wordt gebruikt voor het updaten van het netwerk.
+

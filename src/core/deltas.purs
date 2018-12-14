@@ -99,6 +99,7 @@ transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
 type MonadTransactie e = StateT Transactie (MonadPerspectives (AjaxAvarCache e))
 
 -- TODO: kan het zo zijn dat er al een transactie loopt? En wat dan? Denk aan acties met effect.
+-- TODO: doe ook wat met de andere modificaties in de transactie!
 runInTransactie :: forall e.
   -- MonadTransactie (now :: NOW | e) Unit
   StateT Transactie (MonadPerspectives (TransactieEffects e)) Unit ->
@@ -440,6 +441,7 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
   (context :: a) <- lift $ getPerspectEntiteit cid
   -- Change the entity in cache:
   void $ lift $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
+  -- Save the entity to Couchdb.
   void $ lift $ saveVersionedEntiteit cid context
 
   -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
@@ -449,7 +451,7 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
   -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
 -- | Add a rol to a context (and inversely register the context with the rol)
--- | In a functional rol, remove an old
+-- | TODO In a functional rol, remove the old value if present.
 addRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
 addRol =
   updatePerspectEntiteitMember

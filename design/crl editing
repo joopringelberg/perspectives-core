@@ -37,9 +37,37 @@ VOLTOOID:
 	- typeCheckerMessages
 	- semanticState
 
-MUTATIES
+VERDER
 1. Probeer de mutatieserialisatie die ik heb ontworpen voor delta's te hergebruiken voor mutatie over TCP en de interne API.
+2. We hebben 'native' side effects nodig om een bestand op te kunnen slaan. Dit zijn purescript functies met Effect die niet een theorieverandering zijn.
+	- sla de file op in couchdb
+	- zet de timestamp 
+	Voeg een berekende property toe: is opgeslagen na de laatste verandering? Hiertoe moeten we nog een timestamp modelleren, namelijk het moment van wijzigen. Als we de tekst zetten, vanuit de client, moeten we ook deze timestamp zetten.
 
+MAAR: dit zou ook client side kunnen, met state in een component. Wat is beter? Het is client side wel eenvoudiger. Moet deze informatie bewaard blijven tussen sessies?
+	
+CONTEXTEN MAKEN VANUIT DE CLIENT
+1. Breid het protocol van de API uit.
+2. Maak functies aan de javascript kant.
+
+In de client heb ik nu een component nodig
+	- met state waaraan je kunt zien of er al een context gemaakt is voor een bepaalde tekst;
+	- met een file select button en weergave van de geselecteerde file
+	- met een upload button om opnieuw te parseren
+	- met een 
+
+3. Hoe kom je erachter of een context bestaat?
+4. Hoe kom je bij de interne properties van een context?
+
+================================================================================================
+NAMESPACE VAN REACT COMPONENTS
+De volgende componenten ontvangen een prop namespace:
+* View
+* Binding
+
+De volgende componenten geven een prop namespace door aan hun subelementen:
+* Context -> type van de Context
+* Binding -> type van de Binding (van de Rol van de Context)
 
 ================================================================================================
 Voorbereiding: maak handige functies om contexten en rollen te maken.

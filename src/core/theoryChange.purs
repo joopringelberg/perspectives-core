@@ -80,6 +80,7 @@ saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
 
 foreign import saveChangedObject_ :: forall e1 e2. Triple e2 -> Array String -> Eff e1 (Triple e2)
 
+-- | Actually modify the triple according to the Delta. Return the changed Triple.
 modifyTriple :: forall e1 e2. Delta -> Aff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
 modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
   do

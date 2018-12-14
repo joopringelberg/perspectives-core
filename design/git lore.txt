@@ -60,6 +60,8 @@ ATOM/GIT HANDIGHEID
 
 	git branch newbranch v1.0
 
+	git push origin <tagname>
+
 15. Sync a forc: https://help.github.com/articles/syncing-a-fork/
 
 15. List files being tracked:
