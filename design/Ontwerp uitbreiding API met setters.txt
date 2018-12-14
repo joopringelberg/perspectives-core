@@ -72,3 +72,20 @@ Misschien zo: voeg een TripleQueue toe aan de state in MonadPerspectives. Push h
 
 De Deltas in de Transactie worden dan alleen gebruikt voor het versturen aan de andere betrokkenen. De TripleQueue in PerspectivesState wordt gebruikt voor het updaten van het netwerk.
 
+1. Baseer de processen in de API op MonadTransactie.
+Dit stuit op een probleem: er is geen instantie van Parallel voor MonadTransactie.
+
+================================ ANDERE AANPAK ================================
+Ik stop de Transactie in de state van MonadPerspectives. Dan is er globaal maar één Transactie, die door de verschillende API's gedeeld wordt.
+
+1. Daartoe verhuis ik de definitie van Transactie en bijbehorende types naar coreTypes om cycli in modules te voorkomen.
+
+2. Nu kan ik Transactie opnemen in PerspectivesState. Dat is gelukt.
+
+3. MonadTransactie is nu overbodig. Het kan nu in MonadPerspectives
+	- alles in deltas.purs aangepast.
+	- MonadTransactie verwijderd.
+
+4. Voeg nu bij wijze van test addRol toe aan dispatchOnRequest van PerspectivesAPI.
+
+

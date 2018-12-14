@@ -30,3 +30,7 @@ van de core deed ie het ook nog steeds.
 
 BRANCH TERUGMERGEN
 Ik zit nu op de branch SplitOffCouchdb en die kan terug naar de trunk. Hoe doe ik dat?
+Met
+git checkout master
+git merge SplitOffCouchdb
+git branch -d SplitOffCouchdb

@@ -5,10 +5,11 @@ import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, putVar, readVar, takeVar, tr
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
-import Perspectives.CoreTypes (ContextDefinitions, MonadPerspectives, PerspectivesState, RolDefinitions, DomeinCache)
+import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, createTransactie)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
@@ -16,8 +17,8 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke, de
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
-newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
-newPerspectivesState uinfo av =
+newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
+newPerspectivesState uinfo tr av =
   { rolDefinitions: new unit
   , contextDefinitions: new unit
   , domeinCache: new unit
@@ -25,19 +26,22 @@ newPerspectivesState uinfo av =
   , couchdbSessionStarted: false
   , sessionCookie: av
   , memorizeQueryResults: true
+  , transactie: tr
   -- , queryCache: new unit
   }
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR | e) a
-  -> Aff (avar :: AVAR | e) a
+runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR, now :: NOW | e) a
+  -> Aff (avar :: AVAR, now :: NOW | e) a
 runPerspectives userName password mp = do
   (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
+  (tr :: Transactie) <- createTransactie userName
   (rf :: AVar PerspectivesState) <- makeVar $
     newPerspectivesState
       { userName: userName
       , couchdbPassword: password
       , couchdbBaseURL: "http://127.0.0.1:5984/"}
+      tr
       av
   runReaderT mp rf
 
@@ -67,6 +71,12 @@ tryReadSessionCookieValue = gets _.sessionCookie >>= lift <<< tryReadVar
 
 setSessionCookie :: forall e. String -> MonadPerspectives (avar :: AVAR | e) Unit
 setSessionCookie c = sessionCookie >>= (lift <<< putVar c)
+
+transactie :: forall e. MonadPerspectives (avar :: AVAR | e) Transactie
+transactie = gets _.transactie
+
+setTransactie :: forall e. Transactie -> MonadPerspectives (avar :: AVAR | e) Unit
+setTransactie t = modify \s -> s { transactie = t }
 
 contextDefinitions :: forall e. MonadPerspectives (avar :: AVAR | e) ContextDefinitions
 contextDefinitions = gets _.contextDefinitions

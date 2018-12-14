@@ -2,22 +2,13 @@ module Perspectives.Deltas where
 
 import Control.Monad.Aff (error, throwError)
 import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff (Eff, runPure)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (catchException, Error)
-import Control.Monad.Eff.Now (NOW, now)
+import Control.Monad.Eff.AVar (AVAR)
+import Control.Monad.Eff.Exception (Error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, foldr, head)
-import Data.DateTime (DateTime)
-import Data.DateTime.Instant (toDateTime)
-import Data.Foreign (toForeign)
-import Data.Foreign.Class (class Encode)
 import Data.Foreign.Generic (encodeJSON)
 import Data.Function (flip)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
-import Data.JSDate (fromDateTime, toISOString)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Data.Traversable (for_, traverse)
@@ -26,7 +17,8 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TypedTripleGetter, (%%>>))
+import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), TypedTripleGetter, createTransactie, transactieID, (%%>>))
+import Perspectives.DataTypeObjectGetters (binding, context)
 import Perspectives.DataTypeTripleGetters (identityM, rolTypeM)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
@@ -34,7 +26,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyNa
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (actiesInContextDefM, ownRollenDefM, rolInContextDefM, inverse_subjectRollenDefM, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDefM, objectRollenDefM, objectViewDefM, propertyReferentiesM, rolUserM, subjectRollenDefM)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.DataTypeObjectGetters (binding, context)
+import Perspectives.PerspectivesState (setTransactie, transactie)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
@@ -42,72 +34,17 @@ import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##), 
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TypesForDeltas (Delta(..), DeltaType(..), encodeDefault)
+import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (onNothing, onNothing') as Util
-import Prelude (class Show, type (~>), Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<<<), (<>), (==), (>>=), (||))
+import Prelude (type (~>), Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<<<), (<>), (==), (>>=), (||))
 
------------------------------------------------------------
--- DATETIME
--- We need a newtype for DateTime in order to be able to serialize and show it.
------------------------------------------------------------
-newtype SerializableDateTime = SerializableDateTime DateTime
-
-instance encodeSerializableDateTime :: Encode SerializableDateTime where
-  encode d = toForeign $ show d
-
-instance showSerializableDateTime :: Show SerializableDateTime where
-  show (SerializableDateTime d) = "todo"
-
--- instance showSerializableDateTime :: Show SerializableDateTime where
---   show (SerializableDateTime d) = runPure (catchException handleError (toISOString (fromDateTime d)))
---
--- handleError :: forall eff. Error -> Eff eff String
--- handleError e = pure "Could not serialize DateTime"
-
------------------------------------------------------------
--- TRANSACTIE
------------------------------------------------------------
-newtype Transactie = Transactie
-  { author :: String
-  , timeStamp :: SerializableDateTime
-  , deltas :: Array Delta
-  , createdContexts :: Array PerspectContext
-  , createdRoles :: Array PerspectRol
-  , deletedContexts :: Array ID
-  , deletedRoles :: Array ID
-  , changedDomeinFiles :: Array ID
-  }
-
-derive instance genericRepTransactie :: Generic Transactie _
-
-instance showTransactie :: Show Transactie where
-  show = genericShow
-
-instance encodeTransactie :: Encode Transactie where
-  encode = encodeDefault
-
-createTransactie :: forall e. String -> Eff (now :: NOW | e) Transactie
-createTransactie author =
-  do
-    n <- now
-    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: [], changedDomeinFiles: []}
-
-transactieID :: Transactie -> String
-transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
-
-type MonadTransactie e = StateT Transactie (MonadPerspectives (AjaxAvarCache e))
-
--- TODO: kan het zo zijn dat er al een transactie loopt? En wat dan? Denk aan acties met effect.
--- TODO: doe ook wat met de andere modificaties in de transactie!
-runInTransactie :: forall e.
-  -- MonadTransactie (now :: NOW | e) Unit
-  StateT Transactie (MonadPerspectives (TransactieEffects e)) Unit ->
-  MonadPerspectives (TransactieEffects e) Unit
-runInTransactie m = do
+-- TODO: doe ook wat met de andere modificaties in de transactie?
+runTransactie :: forall e. MonadPerspectives (TransactieEffects e) Unit
+runTransactie = do
   user <- getUser
-  s <- liftEff (createTransactie user)
-  t@(Transactie{deltas, changedDomeinFiles}) <- execStateT m s
+  s <- lift $ createTransactie user
+  t@(Transactie{deltas, changedDomeinFiles}) <- transactie
   -- register a triple for each delta, add it to the queue, run the queue.
   maybeTriples <- traverse (lift <<< modifyTriple) deltas
   modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
@@ -124,36 +61,36 @@ distributeTransactie t = do
   pure unit
 
 addContextToTransactie :: forall e. PerspectContext ->
-  -- MonadTransactie e Unit
-  MonadTransactie e Unit
+  MonadPerspectives (avar :: AVAR | e) Unit
 addContextToTransactie c = do
-  (Transactie tf@{createdContexts}) <- get
-  put $ Transactie tf {createdContexts = cons c createdContexts}
+  (Transactie tf@{createdContexts}) <- transactie
+  setTransactie $ Transactie tf {createdContexts = cons c createdContexts}
+  -- put $ Transactie tf {createdContexts = cons c createdContexts}
 
-addRolToTransactie :: forall e. PerspectRol -> MonadTransactie e Unit
+addRolToTransactie :: forall e. PerspectRol -> MonadPerspectives (avar :: AVAR | e) Unit
 addRolToTransactie c = do
-  (Transactie tf@{createdRoles}) <- get
-  put $ Transactie tf {createdRoles = cons c createdRoles}
+  (Transactie tf@{createdRoles}) <- transactie
+  setTransactie $ Transactie tf {createdRoles = cons c createdRoles}
 
-deleteContextFromTransactie :: forall e. PerspectContext -> MonadTransactie e Unit
+deleteContextFromTransactie :: forall e. PerspectContext -> MonadPerspectives (avar :: AVAR | e) Unit
 deleteContextFromTransactie c@(PerspectContext{_id}) = do
-  (Transactie tf@{createdContexts, deletedContexts}) <- get
+  (Transactie tf@{createdContexts, deletedContexts}) <- transactie
   case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
-    Nothing -> put (Transactie tf{deletedContexts = cons _id deletedContexts})
-    (Just i) -> put (Transactie tf{createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
+    Nothing -> setTransactie (Transactie tf{deletedContexts = cons _id deletedContexts})
+    (Just i) -> setTransactie (Transactie tf{createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
-deleteRolFromTransactie :: forall e. PerspectRol -> MonadTransactie e Unit
+deleteRolFromTransactie :: forall e. PerspectRol -> MonadPerspectives (avar :: AVAR | e) Unit
 deleteRolFromTransactie c@(PerspectRol{_id}) = do
-  (Transactie tf@{createdRoles, deletedRoles}) <- get
+  (Transactie tf@{createdRoles, deletedRoles}) <- transactie
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
-    Nothing -> put (Transactie tf{deletedRoles = cons _id deletedRoles})
-    (Just i) -> put (Transactie tf{createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
+    Nothing -> setTransactie (Transactie tf{deletedRoles = cons _id deletedRoles})
+    (Just i) -> setTransactie (Transactie tf{createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
-addDomeinFileToTransactie :: forall e. ID -> MonadTransactie e Unit
+addDomeinFileToTransactie :: forall e. ID -> MonadPerspectives (avar :: AVAR | e) Unit
 addDomeinFileToTransactie dfId = do
-  (Transactie tf@{changedDomeinFiles}) <- get
+  (Transactie tf@{changedDomeinFiles}) <- transactie
   case elemIndex dfId changedDomeinFiles of
-    Nothing -> put $ Transactie tf {changedDomeinFiles = cons dfId changedDomeinFiles}
+    Nothing -> setTransactie $ Transactie tf {changedDomeinFiles = cons dfId changedDomeinFiles}
     otherwise -> pure unit
 
 {-
@@ -173,35 +110,35 @@ ZO NEE:
 	Indien gevonden: verwijder de oude.
 	Anders: voeg de nieuwe toe.
 -}
-addDelta :: forall e. Delta -> MonadTransactie e Unit
+addDelta :: forall e. Delta -> MonadPerspectives (AjaxAvarCache e) Unit
 addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
-  t@(Transactie tf@{deltas}) <- get
+  t@(Transactie tf@{deltas}) <- transactie
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      (isfunc :: Boolean) <- lift $ runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
+      (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
       if isfunc
         then do
           x <- pure $ findIndex equalExceptRolID deltas
           case x of
-            (Just oldCD) -> put (replace oldCD newCD t)
+            (Just oldCD) -> setTransactie (replace oldCD newCD t)
             Nothing -> do
               mCdelta <- pure $ find equalIdRolName deltas
               case mCdelta of
-                Nothing -> put (add newCD t)
+                Nothing -> setTransactie (add newCD t)
                 (Just oldCD@(Delta oldF@{deltaType: d})) -> do
                   indexOld <- pure (unsafePartial (fromJust (elemIndex oldCD deltas)))
                   case d of
-                    Add | (deltaType == Remove) -> put (remove oldCD t)
-                    Remove | (deltaType == Add) -> put (remove oldCD t)
-                    Change | (deltaType == Remove) -> put (replace indexOld newCD t)
-                    Add | (deltaType == Change) -> put (replace indexOld (Delta oldF {value = value}) t)
-                    otherwise -> put (add newCD t)
+                    Add | (deltaType == Remove) -> setTransactie (remove oldCD t)
+                    Remove | (deltaType == Add) -> setTransactie (remove oldCD t)
+                    Change | (deltaType == Remove) -> setTransactie (replace indexOld newCD t)
+                    Add | (deltaType == Change) -> setTransactie (replace indexOld (Delta oldF {value = value}) t)
+                    otherwise -> setTransactie (add newCD t)
         else do
           x <- pure $ findIndex equalExceptDeltaType deltas
           case x of
-            Nothing -> put (add newCD t)
-            (Just i) -> put (replace i newCD t)
+            Nothing -> setTransactie (add newCD t)
+            (Just i) -> setTransactie (replace i newCD t)
   pure unit
   where
     equalExceptDeltaType :: Delta  -> Boolean
@@ -337,25 +274,25 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
-  ID -> Value -> MonadTransactie e Unit
+  ID -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 updatePerspectEntiteit changeEntity createDelta cid value = do
   updatePerspectEntiteit' changeEntity cid value
   addDelta $ createDelta cid value
 
 updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
-  ID -> Value -> MonadTransactie e Unit
+  ID -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 updatePerspectEntiteit' changeEntity cid value = do
-  (entity) <- lift $ (getPerspectEntiteit cid)
+  (entity) <- (getPerspectEntiteit cid)
   if (isUserEntiteitID cid)
     then do
       -- Change the entity in cache:
-      void $ lift $ cacheCachedEntiteit cid (changeEntity value entity)
-      void $ lift $ saveVersionedEntiteit cid entity
+      void $ cacheCachedEntiteit cid (changeEntity value entity)
+      void $ saveVersionedEntiteit cid entity
     else do
       let dfId = (unsafePartial (fromJust (deconstructModelName cid)))
       addDomeinFileToTransactie dfId
-      lift $ cacheInDomeinFile dfId (changeEntity value entity)
+      cacheInDomeinFile dfId (changeEntity value entity)
 
   -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (getRevision' context)
   -- -- Store the changed entity in couchdb.
@@ -363,7 +300,7 @@ updatePerspectEntiteit' changeEntity cid value = do
   -- -- Set the new revision in the entity.
   -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
-setContextType :: forall e. ID -> ID -> MonadTransactie e Unit
+setContextType :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setContextType = updatePerspectEntiteit
   changeContext_type
   (\cid theType -> Delta
@@ -374,7 +311,7 @@ setContextType = updatePerspectEntiteit
     , isContext: true
     })
 
-setRolType :: forall e. ID -> ID -> MonadTransactie e Unit
+setRolType :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setRolType = updatePerspectEntiteit
   changeRol_type
   (\cid theType -> Delta
@@ -385,7 +322,7 @@ setRolType = updatePerspectEntiteit
     , isContext: false
     })
 
-setContextDisplayName :: forall e. ID -> ID -> MonadTransactie e Unit
+setContextDisplayName :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setContextDisplayName = updatePerspectEntiteit
   changeContext_displayName
   (\cid displayName -> Delta
@@ -396,7 +333,7 @@ setContextDisplayName = updatePerspectEntiteit
     , isContext: true
     })
 
-setContext :: forall e. ID -> ID -> MonadTransactie e Unit
+setContext :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setContext = updatePerspectEntiteit
   changeRol_context
   (\cid rol -> Delta
@@ -407,9 +344,9 @@ setContext = updatePerspectEntiteit
     , isContext: false
     })
 
-setBinding :: forall e. ID -> ID -> MonadTransactie e Unit
+setBinding :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setBinding rid boundRol = do
-  oldBinding <- lift $ binding rid
+  oldBinding <- binding rid
   updatePerspectEntiteit' changeRol_binding rid boundRol
   case head oldBinding of
     Nothing -> pure unit
@@ -429,20 +366,20 @@ setBinding rid boundRol = do
 updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
-  ID -> MemberName -> Value -> MonadTransactie e Unit
+  ID -> MemberName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
   addDelta $ createDelta cid memberName value
 
 updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
-  ID -> MemberName -> Value -> MonadTransactie e Unit
+  ID -> MemberName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
-  (context :: a) <- lift $ getPerspectEntiteit cid
+  (context :: a) <- getPerspectEntiteit cid
   -- Change the entity in cache:
-  void $ lift $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
+  void $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
   -- Save the entity to Couchdb.
-  void $ lift $ saveVersionedEntiteit cid context
+  void $ saveVersionedEntiteit cid context
 
   -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
   -- -- Store the changed entity in couchdb.
@@ -452,7 +389,7 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
-addRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
+addRol :: forall e. ContextID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
 addRol =
   updatePerspectEntiteitMember
     addContext_rolInContext
@@ -465,7 +402,7 @@ addRol =
         , isContext: true
         })
 
-removeRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
+removeRol :: forall e. ContextID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
 removeRol =
   updatePerspectEntiteitMember
     removeContext_rolInContext
@@ -478,7 +415,7 @@ removeRol =
         , isContext: true
         })
 
-setRol :: forall e. ContextID -> RolName -> RolID -> MonadTransactie e Unit
+setRol :: forall e. ContextID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
 setRol =
   updatePerspectEntiteitMember
     setContext_rolInContext
@@ -491,7 +428,7 @@ setRol =
         , isContext: true
         })
 
-addProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
+addProperty :: forall e. RolID -> PropertyName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 addProperty =
   updatePerspectEntiteitMember
     addRol_property
@@ -504,7 +441,7 @@ addProperty =
         , isContext: false
         })
 
-removeProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
+removeProperty :: forall e. RolID -> PropertyName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 removeProperty =
   updatePerspectEntiteitMember
     removeRol_property
@@ -517,7 +454,7 @@ removeProperty =
         , isContext: false
         })
 
-setProperty :: forall e. RolID -> PropertyName -> Value -> MonadTransactie e Unit
+setProperty :: forall e. RolID -> PropertyName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
 setProperty =
   updatePerspectEntiteitMember
     setRol_property

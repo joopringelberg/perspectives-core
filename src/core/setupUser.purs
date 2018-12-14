@@ -4,7 +4,7 @@ import Control.Monad.Eff.Now (NOW)
 import Data.Unit (Unit)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Deltas (addRol, runInTransactie)
+import Perspectives.Deltas (addRol)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID)
 import Perspectives.Identifiers (Namespace, LocalName)
@@ -29,8 +29,7 @@ setupUser = do
   (_ :: PerspectRol) <- saveUnversionedEntiteit "model:User$Me"
   (_ :: PerspectContext) <- saveUnversionedEntiteit "model:User$TrustedCluster"
 
-  runInTransactie do
-    addRol "model:User$Systeem" "model:User$Systeem$gebruiker" "model:User$Me"
+  addRol "model:User$Systeem" "model:User$Systeem$gebruiker" "model:User$Me"
 
 contextRecord :: Namespace -> LocalName -> ContextID -> ContextRecord
 contextRecord ns ln tp = defaultContextRecord

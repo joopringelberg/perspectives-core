@@ -4,12 +4,21 @@ import Perspectives.EntiteitAndRDFAliases
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
+import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Reader (ReaderT)
+import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
 import Data.Array (head)
+import Data.DateTime (DateTime)
+import Data.DateTime.Instant (toDateTime)
 import Data.Either (Either)
+import Data.Foreign (toForeign)
+import Data.Foreign.Class (class Encode)
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
@@ -19,6 +28,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
+import Perspectives.TypesForDeltas (Delta, encodeDefault)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>>=), ($))
 
 -----------------------------------------------------------
@@ -34,6 +44,7 @@ type PerspectivesState = CouchdbState (
   , contextDefinitions :: ContextDefinitions
   , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean
+  , transactie :: Transactie
   )
 
 -----------------------------------------------------------
@@ -278,3 +289,52 @@ instance showUserMessage :: Show UserMessage where
   -- show _ = "This is a usermessage"
   show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."
   show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."
+
+-----------------------------------------------------------
+-- TRANSACTIE
+-----------------------------------------------------------
+newtype Transactie = Transactie
+  { author :: String
+  , timeStamp :: SerializableDateTime
+  , deltas :: Array Delta
+  , createdContexts :: Array PerspectContext
+  , createdRoles :: Array PerspectRol
+  , deletedContexts :: Array ID
+  , deletedRoles :: Array ID
+  , changedDomeinFiles :: Array ID
+  }
+
+derive instance genericRepTransactie :: Generic Transactie _
+
+instance showTransactie :: Show Transactie where
+  show = genericShow
+
+instance encodeTransactie :: Encode Transactie where
+  encode = encodeDefault
+
+createTransactie :: forall e. String -> Aff (now :: NOW | e) Transactie
+createTransactie author =
+  do
+    n <- liftEff $ now
+    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: [], changedDomeinFiles: []}
+
+transactieID :: Transactie -> String
+transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
+
+-----------------------------------------------------------
+-- DATETIME
+-- We need a newtype for DateTime in order to be able to serialize and show it.
+-----------------------------------------------------------
+newtype SerializableDateTime = SerializableDateTime DateTime
+
+instance encodeSerializableDateTime :: Encode SerializableDateTime where
+  encode d = toForeign $ show d
+
+instance showSerializableDateTime :: Show SerializableDateTime where
+  show (SerializableDateTime d) = "todo"
+
+-- instance showSerializableDateTime :: Show SerializableDateTime where
+--   show (SerializableDateTime d) = runPure (catchException handleError (toISOString (fromDateTime d)))
+--
+-- handleError :: forall eff. Error -> Eff eff String
+-- handleError e = pure "Could not serialize DateTime"

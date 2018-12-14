@@ -18,7 +18,7 @@ type AjaxCache e = (ajax :: AJAX, gm :: GLOBALMAP | e)
 
 type AvarCache e = (avar :: AVAR, gm :: GLOBALMAP | e)
 
-type TransactieEffects e = (avar :: AVAR, ajax :: AJAX, gm :: GLOBALMAP, now :: NOW | e)
+type TransactieEffects e = AjaxAvarCache( now :: NOW | e)
 
 type ApiEffects e = AjaxAvarCache (react :: REACT | e)
 

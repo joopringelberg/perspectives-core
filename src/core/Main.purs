@@ -25,22 +25,25 @@ import Control.Monad.Aff (Error, forkAff, runAff)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
+import Control.Monad.Eff.Now (NOW)
 import DOM (DOM)
 import Data.Either (Either(..))
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
+import Perspectives.CoreTypes (Transactie, createTransactie)
 import Perspectives.Effects (AjaxAvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
-main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO)) Unit
+main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO, now :: NOW)) Unit
 main = void $ runAff handleError do
   -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
   usr <- pure "cor"
   pwd <- pure "geheim"
   url <- pure "http://127.0.0.1:5984/"
   (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
-  state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
+  (tr :: Transactie) <- createTransactie usr
+  state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} tr av
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
   where
