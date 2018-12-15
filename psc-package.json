@@ -20,6 +20,7 @@
     "parsing",
     "perpectives-apitypes",
     "avar-monadask",
-    "perspectives-couchdb"
+    "perspectives-couchdb",
+    "js-timers"
   ]
 }

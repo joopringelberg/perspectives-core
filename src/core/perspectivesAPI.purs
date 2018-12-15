@@ -7,6 +7,7 @@ import Control.Monad.Aff (error, launchAff_, throwError)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
+import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Uncurried (EffFn3, runEffFn3)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
@@ -17,6 +18,7 @@ import Perspectives.ApiTypes (ContextSerialization, CorrelationIdentifier, Reque
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
+import Perspectives.Deltas (addRol, runTransactie)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
@@ -28,7 +30,7 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Prelude (Unit, bind, const, map, pure, show, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (Unit, bind, const, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), discard)
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -46,11 +48,13 @@ data ApiRequest e =
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
   | Unsubscribe Subject Predicate CorrelationIdentifier
   | CreateContext ContextSerialization (ReactStateSetter e) CorrelationIdentifier
+  | AddRol ContextID RolName RolID
 
 type RequestRecord e =
   { request :: String
   , subject :: String
   , predicate :: String
+  , object :: String
   , reactStateSetter :: ReactStateSetter e
   , setterId :: CorrelationIdentifier
   , contextDescription :: ContextSerialization}
@@ -68,35 +72,37 @@ requestProducer :: forall e eff. Producer (RequestRecord eff) (MonadPerspectives
 requestProducer = produce' createRequestEmitter
 
 -- | Create a process that consumes requests from a producer fed by the user interface.
-setupApi :: forall e. MonadPerspectives (ApiEffects e) Unit
+setupApi :: forall e. MonadPerspectives (ApiEffects (now :: NOW | e)) Unit
 setupApi = runProcess $ (requestProducer $~ (forever (transform marshallRequestRecord))) $$ consumeRequest
 
 -- | Create a process that consumes requests from a producer that connects to a source over TCP.
-setupTcpApi :: forall e. MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e)) Unit
+setupTcpApi :: forall e. MonadPerspectives (ApiEffects (socketio :: SOCKETIO, now :: NOW | e)) Unit
 setupTcpApi = runProcess server
   where
 
-    server :: Process (MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e))) Unit
+    server :: Process (MonadPerspectives (ApiEffects (socketio :: SOCKETIO, now :: NOW | e))) Unit
     server = (connectionProducer defaultTCPOptions) $$ (connectionConsumer connectionHandler)
 
-    connectionHandler :: ConnectionProcess (MonadPerspectives (ApiEffects (socketio :: SOCKETIO | e)))
+    connectionHandler :: ConnectionProcess (MonadPerspectives (ApiEffects (socketio :: SOCKETIO, now :: NOW | e)))
     connectionHandler connection =
       (dataProducer connection $~ (forever (transform marshallRequest))) $$ consumeRequest
       where
-        marshallRequest :: (Either MultipleErrors Request) -> ApiRequest (socketio :: SOCKETIO | e)
-        marshallRequest (Right (Request r@{rtype, subject, predicate, setterId, contextDescription})) =
+        marshallRequest :: (Either MultipleErrors Request) -> ApiRequest (socketio :: SOCKETIO, now :: NOW | e)
+        marshallRequest (Right (Request r@{rtype, subject, object, predicate, setterId, contextDescription})) =
           marshallRequestRecord
             { request: (unsafeFromForeign (encode rtype))
             , subject
             , predicate
+            , object
             , setterId
             , reactStateSetter: launchAff_ <<< writeData connection <<< response setterId
             , contextDescription}
         marshallRequest (Left e) = WrongRequest
 
-consumeRequest :: forall e. Consumer (ApiRequest e) (MonadPerspectives (ApiEffects e)) Unit
+consumeRequest :: forall e. Consumer (ApiRequest (now :: NOW | e)) (MonadPerspectives (ApiEffects (now :: NOW | e))) Unit
 consumeRequest = forever do
   request <- await
+  lift $ runTransactie
   lift $ dispatchOnRequest request
 
 -- | The client of Perspectives sends a record of arbitrary form that we
@@ -115,6 +121,7 @@ marshallRequestRecord r@{request} = do
     "Unsubscribe" -> Unsubscribe r.subject r.predicate r.setterId
     "ShutDown" -> ShutDown
     "CreateContext" -> CreateContext r.contextDescription r.reactStateSetter r.setterId
+    "AddRol" -> AddRol r.subject r.predicate r.object
     otherwise -> WrongRequest
 
 dispatchOnRequest :: forall e. ApiRequest e -> MonadPerspectives (ApiEffects e) Unit
@@ -134,6 +141,7 @@ dispatchOnRequest req =
       case r of
         (Left messages) -> liftEff $ setter (map show messages)
         (Right id) -> liftEff $ setter [id]
+    (AddRol cid rn rid) -> addRol cid rn rid
     -- Notice that a WrongRequest fails silently. No response is ever given.
     -- A Shutdown has no effect.
     otherwise -> pure unit

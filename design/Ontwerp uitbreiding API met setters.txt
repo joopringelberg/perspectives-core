@@ -86,6 +86,11 @@ Ik stop de Transactie in de state van MonadPerspectives. Dan is er globaal maar 
 	- alles in deltas.purs aangepast.
 	- MonadTransactie verwijderd.
 
-4. Voeg nu bij wijze van test addRol toe aan dispatchOnRequest van PerspectivesAPI.
+4. Voeg nu bij wijze van test addRol toe aan dispatchOnRequest van PerspectivesAPI. GELUKT!
+
+5. Voeg nu de andere functies uit de API toe.
+
+6. Maak een Aff die getimed de veranderingen in de triple-administration propageert.
+
 
 
