@@ -4,12 +4,11 @@ import Perspectives.EntiteitAndRDFAliases
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.AVar (AVar)
-import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Eff.Now (NOW, now)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Reader (ReaderT, lift)
+import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
 import Data.Array (head)
 import Data.DateTime (DateTime)
@@ -45,6 +44,7 @@ type PerspectivesState = CouchdbState (
   , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean
   , transactie :: Transactie
+  , tripleQueue :: TripleQueue
   )
 
 -----------------------------------------------------------
@@ -171,6 +171,17 @@ mtripleObject = head <<< tripleObjects
 
 tripleObject :: forall e. Triple e -> String
 tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
+
+-----------------------------------------------------------
+-- TRIPLEQUEUE
+-----------------------------------------------------------
+type TripleQueue = Array TripleQueueElement
+
+newtype TripleQueueElement = TripleQueueElement { subject :: Subject, predicate :: Predicate, dependencies :: Array TripleRef}
+
+instance eqTripleQueueElement :: Eq TripleQueueElement where
+  eq (TripleQueueElement({subject: s1, predicate: p1})) (TripleQueueElement({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
+
 -----------------------------------------------------------
 -- TRIPLEGETTER
 -----------------------------------------------------------

@@ -21,11 +21,12 @@
 
 module Main where
 import Control.Aff.Sockets (SOCKETIO)
-import Control.Monad.Aff (Error, forkAff, runAff)
+import Control.Monad.Aff (Error, Milliseconds(..), delay, forkAff, runAff)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 import Control.Monad.Eff.Now (NOW)
+import Control.Monad.Rec.Class (forever)
 import DOM (DOM)
 import Data.Either (Either(..))
 import Perspectives.Api (setupApi, setupTcpApi)
@@ -33,6 +34,7 @@ import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.CoreTypes (Transactie, createTransactie)
 import Perspectives.Effects (AjaxAvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
+import Perspectives.TheoryChange (propagate)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
 main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO, now :: NOW)) Unit
@@ -46,6 +48,10 @@ main = void $ runAff handleError do
   state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} tr av
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
+  void $ forkAff $ forever do
+    delay (Milliseconds 1000.0)
+    -- liftEff $ log "propagating"
+    runPerspectivesWithState propagate state
   where
     f = do
       addComputedTripleGetters

@@ -13,6 +13,7 @@ module Perspectives.TripleAdministration
   )
   where
 
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Eff (Eff, foreachE)
 import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
@@ -21,8 +22,8 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
-import Control.Monad.AvarMonadAsk (gets, modify)
 import Prelude (Unit, bind, discard, pure, unit, void, ($))
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
@@ -33,7 +34,7 @@ setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery (avar :: 
 setMemorizeQueryResults b = lift $ modify \ps -> ps {memorizeQueryResults = b}
 
 getRef :: forall e. Triple e -> TripleRef
-getRef (Triple{subject, predicate}) = TripleRef{subject: subject, predicate: predicate}
+getRef = unsafeCoerce
 
 -- | An index of Predicate-Object combinations, indexed by Subject.
 type TripleIndex e = GLStrMap (PredicateIndex e)

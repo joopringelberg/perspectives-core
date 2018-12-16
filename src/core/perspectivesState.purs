@@ -9,7 +9,7 @@ import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
-import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, createTransactie)
+import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, TripleQueue, createTransactie)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
@@ -27,6 +27,7 @@ newPerspectivesState uinfo tr av =
   , sessionCookie: av
   , memorizeQueryResults: true
   , transactie: tr
+  , tripleQueue: []
   -- , queryCache: new unit
   }
 
@@ -74,6 +75,12 @@ setSessionCookie c = sessionCookie >>= (lift <<< putVar c)
 
 transactie :: forall e. MonadPerspectives (avar :: AVAR | e) Transactie
 transactie = gets _.transactie
+
+setTripleQueue :: forall e. TripleQueue -> MonadPerspectives (avar :: AVAR | e) Unit
+setTripleQueue t = modify \s -> s { tripleQueue = t }
+
+tripleQueue :: forall e. MonadPerspectives (avar :: AVAR | e) TripleQueue
+tripleQueue = gets _.tripleQueue
 
 setTransactie :: forall e. Transactie -> MonadPerspectives (avar :: AVAR | e) Unit
 setTransactie t = modify \s -> s { transactie = t }
