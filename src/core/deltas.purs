@@ -32,10 +32,11 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##), (##>))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Perspectives.TheoryChange (modifyTriple, updateFromSeeds)
+import Perspectives.TheoryChange (addTripleToQueue, modifyTriple, updateFromSeeds)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
+import Perspectives.Utilities (maybeM)
 import Perspectives.Utilities (onNothing, onNothing') as Util
 import Prelude (type (~>), Unit, bind, discard, id, pure, show, unit, void, ($), (&&), (<<<), (<>), (==), (>>=), (||))
 
@@ -43,16 +44,16 @@ import Prelude (type (~>), Unit, bind, discard, id, pure, show, unit, void, ($),
 runTransactie :: forall e. MonadPerspectives (TransactieEffects e) Unit
 runTransactie = do
   user <- getUser
-  s <- lift $ createTransactie user
   t@(Transactie{deltas, changedDomeinFiles}) <- transactie
   -- register a triple for each delta, add it to the queue, run the queue.
-  maybeTriples <- traverse (lift <<< modifyTriple) deltas
-  modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
+  -- maybeTriples <- traverse (lift <<< modifyTriple) deltas
+  -- modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
   -- Propagate the triple changes.
-  _ <- updateFromSeeds modifiedTriples
+  -- _ <- updateFromSeeds modifiedTriples
   for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
   distributeTransactie t
+  (lift $ createTransactie user) >>= setTransactie
 
 distributeTransactie :: forall e. Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
 distributeTransactie t = do
@@ -116,6 +117,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
+      maybeM (pure unit) addTripleToQueue (lift $ modifyTriple newCD)
       (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
       if isfunc
         then do
@@ -379,7 +381,8 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
   -- Change the entity in cache:
   void $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
   -- Save the entity to Couchdb.
-  void $ saveVersionedEntiteit cid context
+  (changedContext :: a) <- getPerspectEntiteit cid
+  void $ saveVersionedEntiteit cid changedContext
 
   -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
   -- -- Store the changed entity in couchdb.

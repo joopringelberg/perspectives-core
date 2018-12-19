@@ -1,8 +1,9 @@
-module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate) where
+module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addTripleToQueue) where
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -30,6 +31,11 @@ tripleQueueElementToTriple = unsafeCoerce
 
 tripleRefToTripleQueueElement :: TripleRef -> TripleQueueElement
 tripleRefToTripleQueueElement = unsafeCoerce
+
+addTripleToQueue :: forall e. TripleQueueElement ->  MonadPerspectives (avar :: AVAR | e) Unit
+addTripleToQueue t = do
+  q <- tripleQueue
+  setTripleQueue $ cons t q
 
 pushIntoQueue :: forall a. Array a -> a -> Array a
 pushIntoQueue = snoc

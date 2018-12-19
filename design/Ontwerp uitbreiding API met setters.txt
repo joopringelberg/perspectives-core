@@ -70,6 +70,8 @@ Een ander model: voer met modifyTriple elke Delta onmiddelijk door op het depend
 
 Misschien zo: voeg een TripleQueue toe aan de state in MonadPerspectives. Push het beginpunt dat resulteert uit modifyTriple (Maybe Triple) in die queue. Zet dan een proces op dat periodiek propagateTheoryDeltas daarop uitvoert (en dan de queue leeg maakt).
 
+MAAR HIER IS EEN PROBLEEM MEE. In de Transactie worden Triples soms verwijderd of vervangen. Hoe gaan we dan om met direct uitvoeren? Ik denk dat we elke mutatie direct kunnen doorvoeren.
+
 De Deltas in de Transactie worden dan alleen gebruikt voor het versturen aan de andere betrokkenen. De TripleQueue in PerspectivesState wordt gebruikt voor het updaten van het netwerk.
 
 1. Baseer de processen in de API op MonadTransactie.

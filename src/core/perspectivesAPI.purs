@@ -14,11 +14,11 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Foreign (MultipleErrors, unsafeFromForeign)
 import Data.Foreign.Class (encode)
-import Perspectives.ApiTypes (ContextSerialization, CorrelationIdentifier, Request(..), response)
+import Perspectives.ApiTypes (ContextSerialization, CorrelationIdentifier, Request(..), Value, response)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
-import Perspectives.Deltas (addRol, runTransactie)
+import Perspectives.Deltas (addRol, runTransactie, setProperty)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
@@ -49,6 +49,7 @@ data ApiRequest e =
   | Unsubscribe Subject Predicate CorrelationIdentifier
   | CreateContext ContextSerialization (ReactStateSetter e) CorrelationIdentifier
   | AddRol ContextID RolName RolID
+  | SetProperty RolID PropertyName Value
 
 type RequestRecord e =
   { request :: String
@@ -102,8 +103,8 @@ setupTcpApi = runProcess server
 consumeRequest :: forall e. Consumer (ApiRequest (now :: NOW | e)) (MonadPerspectives (ApiEffects (now :: NOW | e))) Unit
 consumeRequest = forever do
   request <- await
-  lift $ runTransactie
   lift $ dispatchOnRequest request
+  lift $ runTransactie
 
 -- | The client of Perspectives sends a record of arbitrary form that we
 -- | try to fit into ApiRequest.
@@ -122,6 +123,7 @@ marshallRequestRecord r@{request} = do
     "ShutDown" -> ShutDown
     "CreateContext" -> CreateContext r.contextDescription r.reactStateSetter r.setterId
     "AddRol" -> AddRol r.subject r.predicate r.object
+    "SetProperty" -> SetProperty r.subject r.predicate r.object
     otherwise -> WrongRequest
 
 dispatchOnRequest :: forall e. ApiRequest e -> MonadPerspectives (ApiEffects e) Unit
@@ -142,6 +144,7 @@ dispatchOnRequest req =
         (Left messages) -> liftEff $ setter (map show messages)
         (Right id) -> liftEff $ setter [id]
     (AddRol cid rn rid) -> addRol cid rn rid
+    (SetProperty rid pn v) -> setProperty rid pn v
     -- Notice that a WrongRequest fails silently. No response is ever given.
     -- A Shutdown has no effect.
     otherwise -> pure unit
