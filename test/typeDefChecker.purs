@@ -80,11 +80,11 @@ test = do
   -- messages14 <- checkContext "model:Test$Test11$rol"
   -- lift $ for_ messages14 logShow
 
-  -- messages15 <- checkModel "model:Systeem"
-  -- lift $ for_ messages15
-  --   \m -> do
-  --     logShow m
-  --     logShow "------"
+  messages15 <- checkModel "model:Perspectives"
+  lift $ for_ messages15
+    \m -> do
+      logShow m
+      logShow "------"
 
 -- betrouwbaarheid <- "model:User$MijnAangifte" ## ((constructRolGetter "model:Politie$Aangifte$Verbalisant")
 -- >-> (constructExternalPropertyGetter "model:Politie$Aangifte$Verbalisant$betrouwbaarheid"))
@@ -175,8 +175,8 @@ test = do
   -- pts <- "model:Perspectives$Rol" ## ownExternePropertyDef
   -- lift $ logShow pts
 
-  let pn = "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
-  let rn = "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving"
+  -- let pn = "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
+  -- let rn = "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving"
   --
   -- r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedExternalProperty pn) (pn <> "_getter"))
   -- lift $ logShow r
@@ -198,8 +198,8 @@ test = do
   -- b <- checkRolHasAspect rn namespaceOfProperty pn
   -- b <- rn `importsAspect` namespaceOfProperty
   -- aspecten <- rn ## aspectRollenDefM
-  b <- checkRolForQualifiedProperty pn rn
-  lift $ logShow b
+  -- b <- checkRolForQualifiedProperty pn rn
+  -- lift $ logShow b
 
   -- b <- runMonadPerspectivesQuery rn (toBoolean (contains pn propertyDef))
   -- lift $ logShow b

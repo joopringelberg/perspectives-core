@@ -10,6 +10,7 @@ import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
+import Data.Foreign.Generic (encodeJSON)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (singleton)
 import Node.Encoding (Encoding(..))
@@ -44,13 +45,14 @@ test = do
   lift $ log "=========================CREATE A CONTEXT==================="
   addComputedTripleGetters
   text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "politie.crl"])
-  r <- constructContext $
-    ContextSerialization $ defaultContextSerializationRecord
-      { id = "model:User$Politie_text"
-      , ctype = "model:CrlText$Text"
-      , interneProperties = PropertySerialization $
-          singleton "model:CrlText$Text$binnenRolBeschrijving$sourceText" [text]
-      }
+  s <- pure $ ContextSerialization $ defaultContextSerializationRecord
+    { id = "model:User$Politie_text"
+    , ctype = "model:CrlText$Text"
+    , interneProperties = PropertySerialization $
+        singleton "model:CrlText$Text$binnenRolBeschrijving$sourceText" [text]
+    }
+  lift $ log $ encodeJSON s
+  r <- constructContext s
   lift $ log "=========================PARSE A TEXT==================="
   getParserMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$parserMessages" "model:CrlText$Text$binnenRolBeschrijving")
   parserMessages <- "model:User$Politie_text" ##= getParserMessages
@@ -63,7 +65,7 @@ test = do
   getTypeCheckerMessages <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" "model:CrlText$Text$binnenRolBeschrijving")
   typeCheckerMessages <-  "model:User$Politie_text" ##= getTypeCheckerMessages
   lift $ log $ show typeCheckerMessages
-  lift $ log "=========================SEMANTIC STATE==================="    
+  lift $ log "=========================SEMANTIC STATE==================="
   getSemanticState <- (getPropertyFunction "model:CrlText$Text$binnenRolBeschrijving$semanticState" "model:CrlText$Text$binnenRolBeschrijving")
   semanticState <-  "model:User$Politie_text" ##= getSemanticState
   lift $ log $ show semanticState

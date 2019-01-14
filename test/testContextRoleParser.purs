@@ -1,10 +1,12 @@
 module Test.ContextRoleParser where
 
 import Prelude
+
 import Control.Monad.Aff (runAff_)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Aff.Console (CONSOLE, log)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Eff.Ref (REF)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.PerspectivesState (runPerspectives)
@@ -23,7 +25,7 @@ import Perspectives.PerspectivesState (runPerspectives)
 
 -- runAff_ (\_->pure unit) ((runIndentParser test1 context) >>= (\r -> log (show r)))
 
-runTest :: forall e a. Show a => MonadPerspectives (avar :: AVAR, console :: CONSOLE, ref :: REF | e) a -> Eff (avar :: AVAR, ref :: REF, console :: CONSOLE | e) Unit
+runTest :: forall e a. Show a => MonadPerspectives (avar :: AVAR, console :: CONSOLE, ref :: REF, now :: NOW | e) a -> Eff (avar :: AVAR, ref :: REF, console :: CONSOLE, now :: NOW | e) Unit
 runTest t =
   runAff_ (\_->pure unit) (runPerspectives "admin" "admin" t >>= (\r -> log (show r)))
 

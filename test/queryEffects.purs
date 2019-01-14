@@ -1,15 +1,14 @@
 module Test.QueryEffects where
 
-import Perspectives.DataTypeTripleGetters (labelM)
-
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, logShow)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TypedTripleGetter)
-import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.Deltas (runInTransactie, setContextDisplayName)
+import Perspectives.DataTypeTripleGetters (labelM)
+import Perspectives.Deltas (runTransactie, setContextDisplayName)
 import Perspectives.Effects (TransactieEffects)
 import Perspectives.QueryEffect ((~>))
+import Perspectives.RunMonadPerspectivesQuery ((##))
 import Prelude (class Show, Unit, discard, void, ($))
 
 rolDef :: String
@@ -19,7 +18,8 @@ test :: forall e. MonadPerspectives (TransactieEffects (console :: CONSOLE | e))
 test = do
   void (rolDef ## (labelM ~> showOnConsole))
   void (liftEff (logShow "======================"))
-  runInTransactie $ setContextDisplayName rolDef "Rol"
+  setContextDisplayName rolDef "Rol"
+  runTransactie
   void (liftEff (logShow "======================"))
 
   -- void (liftEff (lookupInTripleIndex "user:xGebruiker" "rdfs:labelM"))
