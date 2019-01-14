@@ -210,6 +210,7 @@ compareRolInstancesToDefinition cid rolType' = do
 
       -- check the binding. Does the binding have the type given by bindingDefM, or has its type that Aspect?
       -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.
+      -- TODO: moeten we hier niet iets met de roltelescoop?
       theBinding <- lift (rolId @@ bindingM >-> contextM)
       mmb <- lift (rolType' @@> bindingDefM)
       case mmb of
