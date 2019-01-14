@@ -1,0 +1,46 @@
+LABBOEK WEEK 14-19 JANUARI
+
+TODO
+7. Maak het mogelijk om modellen in te lezen.
+
+8. Werk de modellering van TrustedCluster en RelayServer uit (zie modellering TrustedCluster).
+
+9. Drag and Drop.
+
+10. AddRol is een onderdeel van de API. Breid de API uit met de andere setters.
+
+11. Voeg een drempel voor Transactie-executie toe (verwerk slechts transacties die minimaal een bepaalde leeftijd hebben).
+
+12. Ik vind geen heldere beschrijving van de rollen op couchdb. Voor de RelayServer is dat goed uitgewerkt, maar niet beschreven. Is het voor een lokale couchdb hetzelfde, of niet? Voorlopig is het niet zo belangrijk omdat we alles via de RelayServer doen.
+
+13. Uitzoeken: kan ik betalen voor de Repository opnemen in InPlace? Per slot van rekening bestaat InPlace uit Html pagina's en kunnen we een betaalservice vanuit zo'n pagina ontsluiten. Je navigeert echter gewoonlijk naar een andere pagina zodra je gaat betalen. De vraag is hoe of dat loopt. Vermoedelijk moet er een geautoriseerde server tussen de app en de betaalserver zitten.
+
+14. Voeg command line parameters toe aan de electron app, zodat ik kan spelen met de frequentie van het verwerken van de TripleQueue en Transacties.
+
+15. Modelleer de context "Model", met de rollen *gemodelleerdeContext* en *onderscheidenContext*. Kan een onderdeel zijn van model:Perspectives. 
+
+
+IN UITVOERING
+Modellen inlezen.
+
+DONE
+1. Gelezen:
+	* minimale plek voor crowdfunding.
+	* modellering TrustedCluster
+	* Ontwerp van uitbreiding van de API met mutaties.
+	* modellering relayserver. Dit kan ik voorlopig negeren. Het is een model in pseudo-Arc en inmiddels heb ik een andere benadering voor het abonneren op de RelayServer, namelijk via een Plek met een handgemaakt scherm.
+	* Herorientatie op Sync. Dit gaat vooral over de RelayServer als zelfstandig proces/programma.
+
+2. Beschrijf in een Word document het proces/mechanisme waarmee een geserialiseerde context van buiten wordt opgenomen in de Bubble. Waarom hebben we dit nodig? Denk aan uitnodigen en aan websites waar je een dienst of product wilt afnemen, zoals de RelayServer.
+
+3. Een Model moet aangeven wat *onderscheiden plekken* zijn die je typisch aanmaakt om met het model te gaan starten. Beschrijf dit.
+
+4. Beschrijf in een Word document hoe de geïndexeerde identifiers tijdens sync vervangen worden door guids (dit is in de tekst "Context met uitnodiging" opgenomen).
+
+5. Maak een functie om meerdere contexten ineens in te lezen (zie Zie BasicConstructors en ContextSerialization in PerspectivesApiTypes).
+
+6. modifyTriple etc. Is dat klaar? Ja.
+
+
+==================================================================================================================
+MODELLEN INLEZEN

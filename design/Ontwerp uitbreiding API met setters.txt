@@ -95,4 +95,7 @@ Ik stop de Transactie in de state van MonadPerspectives. Dan is er globaal maar 
 6. Maak een Aff die getimed de veranderingen in de triple-administration propageert.
 
 
-
+================================ EN NU VERDER ================================
+1. Breid de API uit met de andere setters.
+2. Voeg command line parameters toe aan de electron app, zodat ik kan spelen met de frequentie van het verwerken van de TripleQueue en Transacties.
+3. Voeg een drempel voor Transactie-executie toe (verwerk slechts transacties die minimaal een bepaalde leeftijd hebben).
