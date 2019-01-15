@@ -275,8 +275,8 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
-  ID -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
-updatePerspectEntiteit changeEntity createDelta cid value = do
+  Value -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+updatePerspectEntiteit changeEntity createDelta value cid = do
   updatePerspectEntiteit' changeEntity cid value
   addDelta $ createDelta cid value
 
@@ -304,7 +304,7 @@ updatePerspectEntiteit' changeEntity cid value = do
 setContextType :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setContextType = updatePerspectEntiteit
   changeContext_type
-  (\cid theType -> Delta
+  (\theType cid -> Delta
     { id : cid
     , memberName: "model:Perspectives$type"
     , deltaType: Change
@@ -315,7 +315,7 @@ setContextType = updatePerspectEntiteit
 setRolType :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setRolType = updatePerspectEntiteit
   changeRol_type
-  (\cid theType -> Delta
+  (\theType cid -> Delta
     { id : cid
     , memberName: "model:Perspectives$type"
     , deltaType: Change
@@ -326,7 +326,7 @@ setRolType = updatePerspectEntiteit
 setContextDisplayName :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setContextDisplayName = updatePerspectEntiteit
   changeContext_displayName
-  (\cid displayName -> Delta
+  (\displayName cid -> Delta
     { id : cid
     , memberName: "model:Perspectives$label"
     , deltaType: Change
@@ -337,7 +337,7 @@ setContextDisplayName = updatePerspectEntiteit
 setContext :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
 setContext = updatePerspectEntiteit
   changeRol_context
-  (\cid rol -> Delta
+  (\rol cid -> Delta
     { id : cid
     , memberName: "model:Perspectives$context"
     , deltaType: Change
@@ -367,8 +367,8 @@ setBinding rid boundRol = do
 updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
-  ID -> MemberName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
-updatePerspectEntiteitMember changeEntityMember createDelta cid memberName value = do
+  MemberName -> Value -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
   addDelta $ createDelta cid memberName value
 
@@ -391,11 +391,11 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
-addRol :: forall e. ContextID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+addRol :: forall e. RolName -> RolID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 addRol =
   updatePerspectEntiteitMember
     addContext_rolInContext
-    (\cid rolName rolId ->
+    (\rolName rolId cid ->
       Delta
         { id : cid
         , memberName: rolName
@@ -404,11 +404,11 @@ addRol =
         , isContext: true
         })
 
-removeRol :: forall e. ContextID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+removeRol :: forall e. RolName -> RolID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 removeRol =
   updatePerspectEntiteitMember
     removeContext_rolInContext
-    (\cid rolName rolId ->
+    (\rolName rolId cid ->
       Delta
         { id : cid
         , memberName: rolName
@@ -417,11 +417,11 @@ removeRol =
         , isContext: true
         })
 
-setRol :: forall e. ContextID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+setRol :: forall e. RolName -> RolID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 setRol =
   updatePerspectEntiteitMember
     setContext_rolInContext
-    (\cid rolName rolId ->
+    (\rolName rolId cid ->
       Delta
         { id : cid
         , memberName: rolName
@@ -430,11 +430,11 @@ setRol =
         , isContext: true
         })
 
-addProperty :: forall e. RolID -> PropertyName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
+addProperty :: forall e. PropertyName -> Value -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
 addProperty =
   updatePerspectEntiteitMember
     addRol_property
-    (\rid propertyName value ->
+    (\propertyName value rid ->
       Delta
         { id : rid
         , memberName: propertyName
@@ -443,11 +443,11 @@ addProperty =
         , isContext: false
         })
 
-removeProperty :: forall e. RolID -> PropertyName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
+removeProperty :: forall e. PropertyName -> Value -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
 removeProperty =
   updatePerspectEntiteitMember
     removeRol_property
-    (\rid propertyName value ->
+    (\propertyName value rid ->
       Delta
         { id : rid
         , memberName: propertyName
@@ -456,11 +456,11 @@ removeProperty =
         , isContext: false
         })
 
-setProperty :: forall e. RolID -> PropertyName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
+setProperty :: forall e. PropertyName -> Value -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
 setProperty =
   updatePerspectEntiteitMember
     setRol_property
-    (\rid propertyName value ->
+    (\propertyName value rid ->
       Delta
         { id : rid
         , memberName: propertyName
