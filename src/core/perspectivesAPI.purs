@@ -145,6 +145,7 @@ dispatchOnRequest req =
         (Right id) -> liftEff $ setter [id]
     (AddRol cid rn rid) -> addRol cid rn rid
     (SetProperty rid pn v) -> setProperty rid pn v
+    (Unsubscribe subject predicate setterId) -> unsubscribeFromObjects subject predicate setterId
     -- Notice that a WrongRequest fails silently. No response is ever given.
     -- A Shutdown has no effect.
     otherwise -> pure unit
@@ -159,7 +160,7 @@ type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 -- | Runs a the query and adds the ReactStateSetter to the result.
 -- | Returns a function of no arguments that the external program can use to unsubscribe the ReactStateSetter.
 subscribeToObjects :: forall e. Subject -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
-subscribeToObjects subject query@(TypedTripleGetter qn _) setter setterId = do
+subscribeToObjects subject query setter setterId = do
   (effectInReact :: QueryEffect (react :: REACT | e)) <- pure $ NamedFunction setterId (setter >=> pure <<< const unit)
   void $ (subject ## query ~> effectInReact)
 
