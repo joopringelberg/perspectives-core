@@ -16,7 +16,7 @@ import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), TypedTripleGetter, createTransactie, transactieID, (%%>>))
+import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), TypedTripleGetter, ObjectsGetter, createTransactie, transactieID, (%%>>))
 import Perspectives.DataTypeObjectGetters (binding, context)
 import Perspectives.DataTypeTripleGetters (identityM, rolTypeM)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
@@ -272,13 +272,15 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
   - de gewijzigde context opslaan;
 -}
 -- | Create update functions on PerspectContext or PerspectRol.
+-- | The result is an ObjectsGetter that always returns the (ID of the) PerspectEntiteit.
 updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
-  Value -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+  Value -> ObjectsGetter e
 updatePerspectEntiteit changeEntity createDelta value cid = do
   updatePerspectEntiteit' changeEntity cid value
   addDelta $ createDelta cid value
+  pure [cid]
 
 updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
   (Value -> a -> a) ->
@@ -301,7 +303,7 @@ updatePerspectEntiteit' changeEntity cid value = do
   -- -- Set the new revision in the entity.
   -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
-setContextType :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+setContextType :: forall e. ID -> ObjectsGetter e
 setContextType = updatePerspectEntiteit
   changeContext_type
   (\theType cid -> Delta
@@ -312,7 +314,7 @@ setContextType = updatePerspectEntiteit
     , isContext: true
     })
 
-setRolType :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+setRolType :: forall e. ID -> ObjectsGetter e
 setRolType = updatePerspectEntiteit
   changeRol_type
   (\theType cid -> Delta
@@ -323,7 +325,7 @@ setRolType = updatePerspectEntiteit
     , isContext: false
     })
 
-setContextDisplayName :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+setContextDisplayName :: forall e. ID -> ObjectsGetter e
 setContextDisplayName = updatePerspectEntiteit
   changeContext_displayName
   (\displayName cid -> Delta
@@ -334,7 +336,7 @@ setContextDisplayName = updatePerspectEntiteit
     , isContext: true
     })
 
-setContext :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+setContext :: forall e. ID -> ObjectsGetter e
 setContext = updatePerspectEntiteit
   changeRol_context
   (\rol cid -> Delta
@@ -364,13 +366,16 @@ setBinding rid boundRol = do
 -----------------------------------------------------------
 -- UPDATEPERSPECTENTITEITMEMBER
 -----------------------------------------------------------
+-- | Create an ObjectsGetter from a function that modifies the member (such as a role or property) of a PerspectEntiteit (respectively a context or role).
+-- | The result of this ObjectsGetter is always the (ID of the) PerspectEntiteit that is passed in.
 updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
-  MemberName -> Value -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+  MemberName -> Value -> ObjectsGetter e
 updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
   addDelta $ createDelta cid memberName value
+  pure [cid]
 
 updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
@@ -391,7 +396,7 @@ updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
-addRol :: forall e. RolName -> RolID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
+addRol :: forall e. RolName -> RolID -> ObjectsGetter e
 addRol =
   updatePerspectEntiteitMember
     addContext_rolInContext
@@ -404,7 +409,7 @@ addRol =
         , isContext: true
         })
 
-removeRol :: forall e. RolName -> RolID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
+removeRol :: forall e. RolName -> RolID -> ObjectsGetter e
 removeRol =
   updatePerspectEntiteitMember
     removeContext_rolInContext
@@ -417,7 +422,7 @@ removeRol =
         , isContext: true
         })
 
-setRol :: forall e. RolName -> RolID -> ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
+setRol :: forall e. RolName -> RolID -> ObjectsGetter e
 setRol =
   updatePerspectEntiteitMember
     setContext_rolInContext
@@ -430,7 +435,7 @@ setRol =
         , isContext: true
         })
 
-addProperty :: forall e. PropertyName -> Value -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+addProperty :: forall e. PropertyName -> Value -> ObjectsGetter e
 addProperty =
   updatePerspectEntiteitMember
     addRol_property
@@ -443,7 +448,7 @@ addProperty =
         , isContext: false
         })
 
-removeProperty :: forall e. PropertyName -> Value -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+removeProperty :: forall e. PropertyName -> Value -> ObjectsGetter e
 removeProperty =
   updatePerspectEntiteitMember
     removeRol_property
@@ -456,7 +461,7 @@ removeProperty =
         , isContext: false
         })
 
-setProperty :: forall e. PropertyName -> Value -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+setProperty :: forall e. PropertyName -> Value -> ObjectsGetter e
 setProperty =
   updatePerspectEntiteitMember
     setRol_property
