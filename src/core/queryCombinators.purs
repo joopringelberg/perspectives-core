@@ -176,7 +176,7 @@ notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
   name :: String
   name = "(notEmpty " <> nameOfp <> ")"
 
--- | Construct a function that returns a bool in Aff, from a TypedTripleGetter.
+-- | Construct a function that returns a bool in MonadPerspectivesQuery, from a TypedTripleGetter.
 toBoolean :: forall e. TypedTripleGetter e -> RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 toBoolean tg = flip applyTypedTripleGetterToMaybeObject tg >=> pure <<< maybe false (eq "true")
 

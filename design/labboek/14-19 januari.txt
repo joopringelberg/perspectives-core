@@ -44,3 +44,52 @@ DONE
 
 ==================================================================================================================
 MODELLEN INLEZEN
+
+Er is een property die ik moet vullen met de sourcetekst van een model en dan zijn er computed properties voor de syntactische- en semantische fouten. Welke properties gaat het om?
+
+	* de interne contextproperty sourceText
+	* parserMessages: een array van strings (berekend door: parserMessagesM)
+	* de boolean syntacticState (berekend door: syntacticStateM)
+	* typeCheckerMessages: een array van strings (berekend door: typeCheckerMessagesM)
+	* de boolean semanticState (berekend door: semanticStateM)
+
+Er lijkt geen idee uitgewerkt te zijn in de core waardoor een geldig model direct opgeslagen wordt. Klopt dat? Er is iets met een aantal keren opslaan, dacht ik.
+
+In de Halogen interface kon ik modellen opslaan.
+
+Zie: "crl editing".
+
+Ingrediënten:
+	- timestamp van het zetten van de property sourceText;
+	- timestamp van het opslaan in couchdb;
+	- berekende property: 'opslag is nodig' is true als de sourceText recenter is dan de opslag.
+
+Hoofdlijnen:
+1. Abonneer een functie op een eindpunt van het dependency netwerk, analoog aan de manier waarop de API dat doet voor een getter.
+2. Deze functie ontvangt de waarde van een (boolean) property. Al naar gelang die waarde slaat hij het bestand op in couchdb (welk bestand? Hoe weet deze functie waar het over gaat???) en zet zelf een timestamp.
+3. De query die op dat punt eindigt, vergelijkt de timestamps and maakt een conjunctie met de geldigheidsbooleans.
+4. Het abonnement wordt genomen op het moment dat *iets* aan de context verandert die deze tekst representeert.
+5. De bot zou een rol bij de context kunnen zijn. Zijn acties vinden we dan door naar zijn subjectRollen te kijken.
+6. We moeten dan Actie uitbreiden met een conditie.
+7. Sowieso hebben we nog geen notie van het effect van een Actie. Acties gebruik ik tot nog toe alleen om te bepalen wie wat mag zien.
+
+Er is syntax, in query.crl, voor assignment. We kunnen Actie dus uitbreiden met een rol 'effect' die gevuld wordt door (de buitenrol van) een context q:assignToRol of q:assignToProperty. Maar, er is in de core nog geen functionaliteit die ook daadwerkelijk iets doet met zo'n beschreven zij-effect (zoals dat al wel bestaat voor getters, in Perspectives.QueryCompiler).
+
+Hier moet het mechanisme dat we in Perspectives I hadden, opnieuw worden gemaakt: bij aanmaak van een Actie-instantie moet het zij-effect van die Actie worden uitgevoerd. Dus dan moet de beschrijving, een instantie van q.assignToProperty, door een functie omgezet worden in de daadwerkelijke aanroep van setProperty. Uiteraard kan de rol 'effect' meerdere bindingen hebben.
+Maar: dit is voor het opslaan van modellen niet zo relevant. Dat is een ander type zij-effect dan assignment (de timestamp kan de functie gewoon rechtstreeks zetten).
+
+Oftewel, we moeten in de rol 'effect' óók een context accepteren die een speciale, effectvolle functie beschrijft (c.q. het bestand opslaat in couchdb en de timestamp zet). Dit zijn speciale functies, waarvan de implementatie in de core opgenomen is.
+
+De parameters van de speciale effectvolle functie zouden we kunnen beschrijven in termen van queries die vertrekken van de context waar de Actie bijhoort. In dit geval is dat de 'text' context en de relevante properties daarvan zijn:
+	* sourceText
+	* modelName (nog niet beschreven; klopt dit wel?)
+	* de computed property 'mustBePersisted'
+De laatste parameter is anders dan de anderen omdat het de enige trigger is: alleen als deze waarde verandert, moet de effectvolle functie uitgevoerd worden. Bij bot-acties is er altijd een trigger en dat is natuurlijk altijd een boolean functie. Het is niet nodig om die in de beschrijving van de speciale effectvolle functie op te nemen. Immers, hij is al beschreven als de conditie van de bot-actie. Per conventie maken we daar de eerste parameter van de purescript functie van.
+
+
+Er is ook syntax, in query.crl, voor n-ary combinators: q:nAryCombinator. Hiermee kan ik een 'and' beschrijven. Ik moet Perspectives.QueryCompiler nog wel uitbreiden voor de logische combinatoren.
+
+Alternatief:
+1. We introduceren een soort property-met-zij-effect. Zodra je die property een waarde geeft, wordt ook een functie uitgevoerd die het zij-effect realiseert.
+2. In dit geval zou de property tekst-in-de-database zijn en het zij-effect is dat de waarde ervan opgeslagen wordt in couchdb.
+3. Met zo'n property kunnen we de controle client-side houden: we kunnen het veranderen van de property onder een 'sla-op' button stoppen, of we kunnen een 'deamon' opzetten die de timestamps etc. vergelijkt.

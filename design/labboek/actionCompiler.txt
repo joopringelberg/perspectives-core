@@ -1,0 +1,44 @@
+ACTIONCOMPILER
+Schrijf, naar voorbeeld van de QueryCompiler, een functie die een beschrijving van een effect omzet in een ReactStateSetter. Dus voor q:assignToRol, q:assignToProperty en q:effectFullFunction.
+
+type ReactStateSetter e = Array String -> Eff (ApiEffects e) Unit
+
+type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache e) Unit)
+
+constructActionFunction :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) (ObjectsGetter e)
+
+Maak nu een functie die we toepassen als de Actie uitgevoerd moet worden. Die functie 
+	* wordt toegepast op de context waar de actie bij hoort
+	* ontstaat door:
+		* constructActionFunction toe te passen op het 'effect' deel van de Actie en daaruit een ObjectsGetter te verkrijgen
+		* een propertyQuery te construeren van het 'condition' deel van de Actie
+		* van de ObjectsGetter een TypedTripleGetter te maken en daarmee een compositie met het conditie-deel te maken. Dat is het resultaat.
+
+LET OP:  de actie moet al dan niet uitgevoerd worden, afhankelijk van de waarde van de conditie!
+
+1. Ik probeer om constructActionFunction een QueryEffect (of de functie daarin) te laten opleveren. Dat is:
+type QueryEffect e = NamedFunction (Array String -> MonadPerspectivesQuery (AjaxAvarCache e) Unit)
+
+2. Ik doe dat omdat ik dan pushesObjectsTo (~>) kan gebruiken om de conditie en de actie te verbinden op een zodanige manier dat herberekenen goed gaat. Het resultaat van ~> is overigens een TypedTripleGetter.
+
+3. Dan moet de functie in dat QueryEffect de boolean ontvangen, en op basis daarvan besluiten of de actie wordt uitgevoerd.
+
+4. Maar om de actie te kunnen uitvoeren, moet die functie óók over de contextID beschikken!
+
+KLAAR!
+Nu nog voor de andere operaties (KLAAR) en voor q:assignToProperty (KLAAR) en q:effectFullFunction (KLAAR).
+
+
+THE EFFECTFULL FUNCTION STOREDOMEINFILE
+storeDomeinFileInCouchdb neemt een DomeinFile als argument en dat is een record in een newtype.
+Maar wat is het startpunt voor onze opslagfunctie? Per slot van rekening is het bestand al geparseerd en gecontroleerd.
+Ik kan typeCheckerMessagesM als voorbeeld nemen. Deze functie vraagt, uitgaande van een ID die een text representeert (model:CrlText$Text), de syntacticStateM ervan op en haalt daar de contextId uit. Merk op dat, als de syntacticState al gecontroleerd is, het resultaat ervan gecached is in het dependency netwerk!
+Vanuit deze contextId construeert de functie vervolgens een DomeinFile. 
+
+Geheel volgens die lijnen kan ik storeDomeinFile uitwerken, die de identifier van een model:CrlText$Text krijgt en dan uiteindelijk storeDomeinFileInCouchdb toepast. De Text is dan de context met de bot rol en de actie die hem opslaat.
+
+Ik breng deze nieuwe functie onder in een nieuwe module, analoog aan ComputedTripleGetters: basicActions.
+KLAAR
+
+OPEN VRAAG
+Als er geen conditie is, moet dan het effect direct uitgevoerd worden?

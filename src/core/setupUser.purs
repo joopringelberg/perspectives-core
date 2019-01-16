@@ -6,14 +6,14 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Deltas (addRol)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.Identifiers (Namespace, LocalName)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit)
 import Perspectives.ResourceRetrieval (saveUnversionedEntiteit)
 import Perspectives.Syntax (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord, binding)
 import Prelude (discard, ($), (<>), bind)
 
-setupUser :: forall e. MonadPerspectives (AjaxAvarCache (now :: NOW | e)) Unit
+setupUser :: forall e. MonadPerspectives (AjaxAvarCache (now :: NOW | e)) (Array ID)
 setupUser = do
   cacheUncachedEntiteit "model:User$Systeem"
     (PerspectContext $ contextRecord "model:User" "Systeem" "model:Systeem$Systeem")
@@ -29,7 +29,7 @@ setupUser = do
   (_ :: PerspectRol) <- saveUnversionedEntiteit "model:User$Me"
   (_ :: PerspectContext) <- saveUnversionedEntiteit "model:User$TrustedCluster"
 
-  addRol "model:User$Systeem" "model:User$Systeem$gebruiker" "model:User$Me"
+  addRol "model:User$Systeem$gebruiker" "model:User$Me" "model:User$Systeem"
 
 contextRecord :: Namespace -> LocalName -> ContextID -> ContextRecord
 contextRecord ns ln tp = defaultContextRecord

@@ -48,6 +48,7 @@ runQuery :: forall e.
   -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
 runQuery = (flip runTypedTripleGetter)
 
+-- low precedence!
 infix 0 runQuery as ##
 
 ------------------------------------------------------------------------------------------------------------------------

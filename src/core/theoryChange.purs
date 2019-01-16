@@ -11,13 +11,12 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TripleQueue, TripleQueueElement(..), TripleRef(..))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (Subject, Predicate)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesState (setTripleQueue, tripleQueue)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
 import Perspectives.TripleAdministration (getRef, getTriple, lookupInTripleIndex, removeDependency_, setSupports_)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
-import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), (<<<), (>>=), discard, map)
+import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), discard, map)
 import Unsafe.Coerce (unsafeCoerce)
 
 tripleToTripleQueueElement :: forall e. Triple e -> TripleQueueElement
@@ -119,15 +118,3 @@ modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
           Change -> pure [value']
         changedTriple <- (saveChangedObject t changedObject)
         pure $ Just $ tripleToTripleQueueElement changedTriple
-
-
--- Destructively change the objects of an existing triple.
--- Returns a Triple that can be used as a seed for delta propagation, i.e. (wrapped in an array) as argument to updateFromSeeds.
--- NOTA BENE. This function is superceded by the functions in deltas.purs.
-setProperty :: forall e. Subject -> Predicate -> Array String -> (Aff (gm :: GLOBALMAP | e)) (Maybe (Triple e))
-setProperty rid pid object =
-  do
-    mt <- liftEff $ lookupInTripleIndex rid pid
-    case mt of
-      Nothing -> pure Nothing
-      (Just t) -> liftAff $ (saveChangedObject t object) >>= pure <<< Just

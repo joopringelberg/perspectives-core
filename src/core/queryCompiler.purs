@@ -38,6 +38,11 @@ propertyQuery  :: forall e.
   TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
 propertyQuery rn = rolQuery rn
 
+-- | An alias that generalises over roles and properties.
+memberQuery  :: forall e.
+  TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+memberQuery = rolQuery
+
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
@@ -138,7 +143,6 @@ constructQueryFunction typeDescriptionID = do
       valueQuery <- constructQueryFunction valueDescriptionID
       pure $ var variableName valueQuery
 
-    -- Any other argument will be passed as is, thus implementing that we can create arbitrary contexts.
     _ -> throwError (error $ "constructQueryFunction: unknown type description: '" <> typeDescriptionID <> "'")
 
   where

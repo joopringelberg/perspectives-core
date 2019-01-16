@@ -18,7 +18,7 @@ test :: forall e. MonadPerspectives (TransactieEffects (console :: CONSOLE | e))
 test = do
   void (rolDef ## (labelM ~> showOnConsole))
   void (liftEff (logShow "======================"))
-  setContextDisplayName rolDef "Rol"
+  setContextDisplayName "Rol" rolDef
   runTransactie
   void (liftEff (logShow "======================"))
 
