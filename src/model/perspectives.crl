@@ -76,7 +76,7 @@ psp:Context psp:Context
 			$mogelijkeBinding =>
 				psp:Sum $RolOrContext
 					$alternative => psp:Rol
-					-- Hier moet denk ik een query bij.
+					-- Hier moet denk ik een query bij: dat is een Function.
 					$alternative => psp:Context
 	$rolInContext =>
 		psp:Rol $interneView
