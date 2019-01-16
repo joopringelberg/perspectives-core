@@ -33,6 +33,9 @@ modellenM = constructTripleGetterWithArbitrarySupport
     getListOfModels :: forall e1. ID -> MonadPerspectivesQuery (ajax :: AJAX | e1) (Array String)
     getListOfModels id = lift $ lift $ catchError (documentNamesInDatabase "perspect_models") \_ -> pure []
 
+-- | Given the ID of a context of type model:CrlText$Text, computes an array of strings that are either the identifier
+-- | of the model, or the identifiers of the BuitenRollen of the userdata, or error messages from the attempt to parse
+-- | the file. Notice that the parseresult is stored automatically by the parser.
 parserMessagesM :: forall e. TypedTripleGetter e
 parserMessagesM = constructTripleGetterWithArbitrarySupport
   "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (constructInternalPropertyGetter "model:CrlText$Text$binnenRolBeschrijving$sourceText")

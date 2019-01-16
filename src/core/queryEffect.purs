@@ -1,17 +1,16 @@
 module Perspectives.QueryEffect where
 
-import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, const, pure, ($), (<>))
 
-type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache e) Unit)
+type QueryEffect e = NamedFunction (Array String -> MonadPerspectivesQuery (AjaxAvarCache e) Unit)
 
--- | Make an effect function (QueryEffect) dependent on the objects of a tripleGetter.
--- | The result of the function (a Triple) should be unsubscribed from the triple index in order to
--- | make the effect function no longer dependent (using unRegisterTriple).
+-- | Make an effect function (QueryEffect) dependent on the objects of a TypedTripleGetter.
+-- | Results in a TypedTripleGetter.
+-- | Remove the effect function's dependency on the tripleGetter by using unsubscribeFromObjects.
 pushesObjectsTo :: forall e. TypedTripleGetter e -> QueryEffect e -> TypedTripleGetter e
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
   TypedTripleGetter effectName pushesObjectsTo' where
@@ -29,7 +28,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     --  - copy its supports to the triple administration (in the old effect triple)
     effectFun :: Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
     effectFun queryResult@(Triple{subject, object}) = do
-      _ <- liftEff $ effect object
+      _ <- effect object
       pure $ Triple { subject: subject
                     , predicate : name
                     , object : object
@@ -40,4 +39,5 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     name :: String
     name = "(" <>  tgName <> " ~> " <> effectName <> ")"
 
+-- high precedence!
 infixl 9 pushesObjectsTo as ~>
