@@ -3,7 +3,7 @@ module Perspectives.QueryCombinators where
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, nub, null, singleton, union) as Arr
-import Data.HeytingAlgebra (not) as HA
+import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
@@ -13,7 +13,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, Object, RolID, Subject
 import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
-import Prelude (bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=))
+import Prelude (bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==))
 import Type.Data.Boolean (kind Boolean)
 
 -- | The recursive closure of a query, bottoming out when it has no results.
@@ -141,6 +141,66 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
                     , tripleGetter : getter}
 
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+
+-- Returns true iff the results of both TripleGetters applied to the same origin yield exactly the same values in the same order.
+-- | `psp:Function -> psp:Function -> psp:Function`
+equal :: forall e.
+  TypedTripleGetter e ->
+  TypedTripleGetter e ->
+  (TypedTripleGetter e)
+equal (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
+  memorize getter name
+  where
+    getter :: TripleGetter e
+    getter id = do
+      pt@(Triple{object : ps}) <- p id
+      qt@(Triple{object : qs}) <- q id
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : [show $ ps == qs]
+                    , dependencies : []
+                    , supports : map getRef [pt, qt]
+                    , tripleGetter : getter}
+
+    name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+
+-- Applies the logical binary operator (such as OR, AND and IMPLIES) to the results of two queries applied to the same origin.
+-- | `psp:Function -> psp:Function -> psp:Function`
+logicalBinaryOperator :: forall e.
+  (Boolean -> Boolean -> Boolean) ->
+  TypedTripleGetter e ->
+  TypedTripleGetter e ->
+  (TypedTripleGetter e)
+logicalBinaryOperator op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
+  memorize getter name
+  where
+    getter :: TripleGetter e
+    getter id = do
+      pt@(Triple{object : ps}) <- p id
+      qt@(Triple{object : qs}) <- q id
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : fromBool $ op (toBool ps) (toBool qs)
+                    , dependencies : []
+                    , supports : map getRef [pt, qt]
+                    , tripleGetter : getter}
+    name :: String
+    name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+
+    fromBool :: Boolean -> Array String
+    fromBool = Arr.singleton <<< show
+
+    toBool :: Array String -> Boolean
+    toBool s = maybe false ((==) "true") (Arr.head s)
+
+conj :: forall e. TypedTripleGetter e -> TypedTripleGetter e -> (TypedTripleGetter e)
+conj = logicalBinaryOperator HA.conj
+
+disj :: forall e. TypedTripleGetter e -> TypedTripleGetter e -> (TypedTripleGetter e)
+disj = logicalBinaryOperator HA.disj
+
+implies :: forall e. TypedTripleGetter e -> TypedTripleGetter e -> (TypedTripleGetter e)
+implies = logicalBinaryOperator HA.implies
 
 -- The intersection of the results of two queries applied to the same origin.
 -- | `psp:Function -> psp:Function -> psp:Function`

@@ -14,7 +14,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
-import Perspectives.QueryCombinators (closure, closure', concat, constant, filter, ignoreCache, lastElement, notEmpty, ref, rolesOf, useCache, var)
+import Perspectives.QueryCombinators (closure, closure', concat, conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
@@ -122,6 +122,10 @@ constructQueryFunction typeDescriptionID = do
       case functionName of
         "compose" -> applyBinaryCombinator (>->) queryStepType
         "concat" -> applyBinaryCombinator concat queryStepType
+        "and" -> applyBinaryCombinator conj queryStepType
+        "or" -> applyBinaryCombinator disj queryStepType
+        "implies" -> applyBinaryCombinator implies queryStepType
+        "equal" -> applyBinaryCombinator equal queryStepType
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for nAryCombinator: '" <> functionName <> "'")
     "model:QueryAst$filter" -> do
       criteriumId <- onNothing (errorMessage "no criterium" queryStepType)
