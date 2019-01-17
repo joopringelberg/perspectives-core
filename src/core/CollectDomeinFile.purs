@@ -1,5 +1,6 @@
 module Perspectives.CollectDomeinFile where
 
+import Control.Monad.Aff.Console (error)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify, get)
 import Data.Foldable (for_)
@@ -13,11 +14,10 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.ModelBasedTripleGetters (boundContextsM)
-import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.ResourceRetrieval (saveEntiteit)
+import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, (&&), void, const, (>>=))
+import Perspectives.Syntax (PerspectContext)
+import Prelude (Unit, flip, ifM, pure, unit, ($), (==), discard, (<<<), bind, const, (>>=))
 
 -- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
 domeinFileFromContext :: forall e. PerspectContext -> MonadPerspectives (AjaxAvarCache e) DomeinFile
@@ -33,6 +33,9 @@ domeinFileFromContext enclosingContext = do
           for_ boundContexts recursiveCollect
         (pure unit)
       where
+        -- On recursively collecting a bound context, it may happen that the binding is not available in cache
+        -- and neither is a DomeinFile available that holds a definition. We then accept an error
+        -- thrown by getPerspectEntiteit.
         recursiveCollect :: ContextID -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Unit
         recursiveCollect subContextId = (lift $ getPerspectEntiteit subContextId) >>= (flip collect ((context_id c) == (context_id enclosingContext)))
         saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives (AjaxAvarCache e)) Boolean
@@ -42,10 +45,12 @@ domeinFileFromContext enclosingContext = do
               (pure false)
               do
                 modify $ addContextToDomeinFile ctxt
+                -- As a context and its buitenRol are always created together, we can safely assume the latter exists.
                 (lift $ getPerspectEntiteit (context_buitenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
                 rollen <- lift $ ((context_id ctxt) ##= iedereRolInContextM)
                 for_ rollen
                   \rolID ->
+                    -- A context is constructed together with its roles. It seems reasonable to assume the rol will exist.
                     (lift $ getPerspectEntiteit rolID) >>= (modify <<< addRolToDomeinFile)
                 pure true
           else pure false

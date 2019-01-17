@@ -73,6 +73,7 @@ typeCheckerMessagesM = constructTripleGetterWithArbitrarySupport
         "false" -> pure ["The syntactic state does not allow type checking."]
         otherwise -> do
           contextId <- lift (textId ##>> parserMessagesM)
+          -- As the syntactic state is ok, we can assume safely its root context exists in the cache.
           ctxt <- lift $ getPerspectEntiteit contextId
           df <- lift $ domeinFileFromContext ctxt
           um <- checkDomeinFile df

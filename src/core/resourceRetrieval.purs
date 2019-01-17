@@ -13,7 +13,7 @@ import Prelude
 import Control.Monad.Aff.AVar (AVar, putVar, readVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Exception (error)
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
@@ -39,11 +39,13 @@ fetchPerspectEntiteitFromCouchdb id = if isUserURI id
   else if isQualifiedWithDomein id
     then case deconstructModelName id of
       Nothing -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: Cannot construct namespace out of id " <> id)
-      (Just ns) -> do
-        ent <- retrieveFromDomein id ns
-        v <- representInternally id
-        liftAff $ putVar ent v
-        pure ent
+      (Just ns) -> catchError
+        do
+          ent <- retrieveFromDomein id ns
+          v <- representInternally id
+          liftAff $ putVar ent v
+          pure ent
+        \e -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: cannot retrieve " <> id <> " from model. " <> show e)
     else throwError $ error ("fetchPerspectEntiteitFromCouchdb: Unknown URI structure for " <> id)
 
 -- | Fetch the definition of a resource asynchronously.

@@ -4,6 +4,7 @@ import Perspectives.EntiteitAndRDFAliases
 
 import Control.Alt (void, (<|>))
 import Control.Monad.Aff.AVar (AVar, putVar, takeVar)
+import Control.Monad.Error.Class (catchError)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable) as AR
@@ -32,7 +33,7 @@ import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingConte
 import Perspectives.Token (token)
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
-import Text.Parsing.Parser (ParseError, ParseState(..), fail)
+import Text.Parsing.Parser (ParseState(..), fail, ParseError(..))
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
@@ -646,19 +647,23 @@ rootParser = enclosingContext <|> userData
 -----------------------------------------------------------
 -- ParseAndCache
 -----------------------------------------------------------
+-- catchError :: forall a. m a -> (e -> m a) -> m a
+
 parseAndCache :: forall e. String -> MonadPerspectives (AjaxAvarCache e) (Either ParseError ParseRoot)
 parseAndCache text = do
   (Tuple parseResult {domeinFile}) <- runIndentParser' text rootParser
   case parseResult of
     (Left e) -> pure $ Left e
-    (Right r) -> do
-      let (DomeinFile{roles}) = domeinFile
-      void $ for (values roles) \rol -> do
-        case rol_binding rol of
-          Nothing -> pure unit
-          (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
-        setBuitenRolType rol
-      pure $ Right r
+    (Right r) -> catchError
+      do
+        let (DomeinFile{roles}) = domeinFile
+        void $ for (values roles) \rol -> do
+          case rol_binding rol of
+            Nothing -> pure unit
+            (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
+          setBuitenRolType rol
+        pure $ Right r
+      \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
     setBuitenRolType :: PerspectRol -> MonadPerspectives (AjaxAvarCache e) Unit
     setBuitenRolType buitenRol = do

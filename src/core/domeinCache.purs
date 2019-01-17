@@ -3,7 +3,7 @@ module Perspectives.DomeinCache
 
 where
 
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (Aff, catchError)
 import Control.Monad.Aff.AVar (AVar, makeEmptyVar, putVar, readVar, takeVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
@@ -28,7 +28,7 @@ import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision)
-import Prelude (Unit, bind, discard, pure, ($), (*>), (<$>), (<>), (>>=), (==))
+import Prelude (Unit, bind, discard, pure, show, ($), (*>), (<$>), (<>), (==), (>>=))
 
 type URL = String
 
@@ -77,7 +77,9 @@ retrieveDomeinFile ns = do
       ev <- (liftAff makeEmptyVar) >>= domeinCacheInsert ns
       -- forkAff hinders catchError.
       -- _ <- forkAff do
-      res <- liftAff $ affjax $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns}
+      res <- catchError
+        (liftAff $ affjax $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns})
+        \e -> throwError $ error $ "Failure in retrieveDomeinFile for: " <> ns <> ". " <> show e
       liftAff $ onAccepted res.status [200, 304] "retrieveDomeinFile" $ putVar res.response ev
       liftAff $ readVar ev
     (Just avar) -> liftAff $ readVar avar

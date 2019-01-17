@@ -9,6 +9,8 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (pure, (>=>), (<<<), (>>=))
 
+-- Can we safely assume that the PerspectContext will exist? If it does not because there is no model holding it,
+-- this function will break.
 getContextMember :: forall e. (PerspectContext -> Array String) -> ObjectsGetter e
 getContextMember f = getPerspectEntiteit >=> pure <<< f
 

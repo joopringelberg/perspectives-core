@@ -81,6 +81,7 @@ constructContext c@(ContextSerialization{id}) = do
 
     removeFromCache :: ContextID -> MP e Unit
     removeFromCache id = do
+      -- Here we know for sure that id is in the cache, as it has been just created (but did fail the tests).
       (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectEntiteit id
       (_ :: Maybe (AVar PerspectContext)) <- removeInternally id
       (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ buitenRol id
