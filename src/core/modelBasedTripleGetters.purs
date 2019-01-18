@@ -173,6 +173,16 @@ objectRollenDefM = constructRolGetter "model:Perspectives$Rol$objectRol" >-> bin
 inverse_subjectRollenDefM :: forall e. TypedTripleGetter e
 inverse_subjectRollenDefM = buitenRolM >-> constructInverseRolGetter "model:Perspectives$Rol$subjectRol" >-> contextM
 
+-- | The Acties that the SysteemBot is the subject (Actor) of. Thus, given a SysteemBot, returns its Acties.
+-- | `psp:SysteemBot -> psp:Actie`
+botSubjectRollenDefM :: forall e. TypedTripleGetter e
+botSubjectRollenDefM = constructRolGetter "model:Perspectives$SysteemBot$subjectRol" >-> bindingM >-> contextM
+
+-- | From the description of a Context, return the description of its contextBot (a SysteemBot).
+-- | `psp:Context -> psp:SysteemBot`
+contextBotDefM :: forall e. TypedTripleGetter e
+contextBotDefM = constructRolGetter "model:Perspectives$Context$contextBot"  >-> bindingM >-> contextM
+
 -- | `psp:Rol -> psp:Context`
 contextDefM :: forall e. TypedTripleGetter e
 contextDefM = constructTripleGetterFromObjectsGetter "model:Perspectives$getContextDef" contextDef

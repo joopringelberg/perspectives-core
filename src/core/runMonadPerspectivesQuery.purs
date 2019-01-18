@@ -39,7 +39,7 @@ runMonadPerspectivesQuery a f = do
 runTypedTripleGetter :: forall e.
   TypedTripleGetter e
   -> Subject
-  -> (MonadPerspectives (AjaxAvarCache e)) (Triple e)
+  -> MonadPerspectives (AjaxAvarCache e) (Triple e)
 runTypedTripleGetter (TypedTripleGetter _ f) a = runMonadPerspectivesQuery a f
 
 runQuery :: forall e.

@@ -8,7 +8,7 @@ import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
 
--- | Compose two queries like composing two function.
+-- | Compose two queries like composing two functions.
 -- | `psp:Function -> psp:Function -> psp:Function`
 composeTripleGetters :: forall e.
   TypedTripleGetter e ->

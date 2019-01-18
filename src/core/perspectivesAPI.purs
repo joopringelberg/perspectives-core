@@ -16,9 +16,10 @@ import Data.Foreign (MultipleErrors, unsafeFromForeign)
 import Data.Foreign.Class (encode)
 import Perspectives.ApiTypes (ContextSerialization, CorrelationIdentifier, Request(..), Value, response)
 import Perspectives.BasicConstructors (constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter(..), runMonadPerspectivesQueryCompiler)
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter, runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
-import Perspectives.Deltas (addRol, runTransactie, setProperty)
+import Perspectives.Deltas (runTransactie)
+import Perspectives.Actions (addRol, setProperty)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
@@ -30,7 +31,7 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Prelude (Unit, bind, const, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), discard)
+import Prelude (Unit, bind, map, pure, show, unit, void, ($), (<<<), (<>), discard)
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL

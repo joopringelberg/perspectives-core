@@ -1,10 +1,9 @@
 module Perspectives.SetupUser where
 
 import Control.Monad.Eff.Now (NOW)
-import Data.Unit (Unit)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Deltas (addRol)
+import Perspectives.Actions (addRol)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.Identifiers (Namespace, LocalName)
