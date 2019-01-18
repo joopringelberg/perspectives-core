@@ -18,6 +18,8 @@ storeDomeinFile textId = do
     "false" -> pure unit
     otherwise -> do
       contextId <- textId ##>> parserMessagesM
+      -- here, because the syntactic state is true, there must be a contextId in the cache.
       ctxt <- getPerspectEntiteit contextId
       df <- domeinFileFromContext ctxt
       storeDomeinFileInCouchdb df
+-- TODO: zet een timestamp!

@@ -2,8 +2,6 @@ Context model:ActionAst als a:
 
 import model:Perspectives als psp:
 
-import model:QueryAst als q:
-
 Section psp:Context$rolInContext
 
 --------------------------------------------------------------------------------

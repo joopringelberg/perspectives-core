@@ -15,7 +15,7 @@ psp:Context ct:Text
       extern $isFunctioneel = true
       extern $isVerplicht = true
       $mogelijkeBinding => psp:Rol
-      $rolProperty =>
+			$rolProperty =>
         psp:Property $sourceText
           extern $isFunctioneel = true
           extern $isVerplicht = false

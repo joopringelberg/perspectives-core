@@ -232,7 +232,7 @@ checkAspectOfRolType cid = do
     Nothing -> tell [RolWithoutContext cid]
     (Just ctype) -> do
       mar <- lift $ lift (cid ##= aspectRollenDefM)
-      case head mar of -- TODO: er kunnen er meer zijn!
+      case head mar of -- TODO: nu wordt gecontroleerd voor één aspectRol, maar er kunnen er meer zijn.
         Nothing -> pure unit
         (Just aspectRol) -> do
           aspectRollen <- lift $ lift $ (ctype ##= aspectenDefM >-> rollenDefM)

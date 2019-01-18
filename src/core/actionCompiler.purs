@@ -120,8 +120,8 @@ type ActionID = String
 
 -- | From the description of an Action, compile a TypedTripleGetter that should be applied to an instance of
 -- | the Context holding the Action, to conditionally execute it.
-compileAction :: forall e. ActionID -> ContextID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
-compileAction actionType contextId = do
+compileBotAction :: forall e. ActionID -> ContextID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+compileBotAction actionType contextId = do
   condition <- onNothing
     (errorMessage "no condition provided in Action" actionType)
     (actionType %%> getBindingOfRol "model:Perspectives$Actie$condition")
@@ -130,7 +130,9 @@ compileAction actionType contextId = do
     (actionType %%> getBindingOfRol "model:Perspectives$Actie$effect")
   (actionObjectsGetter :: (ContextID -> Action e)) <- constructActionFunction action
   (conditionQuery :: TypedTripleGetter e) <- propertyQuery condition
-  pure $ conditionQuery ~> NamedFunction "" (actionObjectsGetter contextId)
+  -- We can use the id of the Action to name the function. In the dependency network, the triple will
+  -- be identified by the combination of the TypedTripleGetter and this Action name. That gives an unique name.
+  pure $ conditionQuery ~> NamedFunction actionType (actionObjectsGetter contextId)
 
   where
     errorMessage :: String -> String -> Error
