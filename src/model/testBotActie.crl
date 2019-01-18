@@ -1,0 +1,68 @@
+Context model:TestBotActie als tba:
+
+import model:Perspectives als psp:
+import model:QueryAst als q:
+
+Section $rolInContext
+
+psp:Zaak tba:Test
+  prototype psp:ContextPrototype
+  psp:Context$binnenRolBeschrijving =>
+    psp:Rol $binnenRolBeschrijving
+      extern $isFunctioneel = true
+      extern $isVerplicht = true
+      $mogelijkeBinding => psp:Rol
+      $rolProperty =>
+        psp:Property $v1
+          extern $isFunctioneel = true
+          extern $isVerplicht = false
+          $range => psp:String
+      $rolProperty =>
+        psp:Property $v2
+          extern $isFunctioneel = true
+          extern $isVerplicht = false
+          $range => psp:String
+      $rolProperty =>
+        psp:Property $trigger
+          extern $isFunctioneel = true
+          extern $isVerplicht = false
+          $range => psp:Boolean
+      $rolProperty =>
+        q:nAryCombinator $propsEqual
+          prototype psp:ContextPrototype
+          extern $functionName = "equal"
+          $operand (1) =>
+            q:PropertyGetter $n1
+              prototype psp:ContextPrototype
+              extern $functionName = "constructInternalPropertyGetter"
+              $property => tba:Test$binnenRolBeschrijving$v1
+          $operand (2) =>
+            q:PropertyGetter $n2
+              prototype psp:ContextPrototype
+              extern $functionName = "constructInternalPropertyGetter"
+              $property => tba:Test$binnenRolBeschrijving$v2
+  $actieInContext =>
+    psp:Actie $botCopiesV1ToV2
+      $condition =>
+        q:nAryCombinator $propsEqualAndTrigger
+          prototype psp:ContextPrototype
+          extern $functionName = "conj"
+          $operand (1) =>
+            q:PropertyGetter $propsEqual1
+              prototype psp:ContextPrototype
+              extern $functionName = "propertyQuery"
+              $property => tba:Test$binnenRolBeschrijving$propsEqual
+          $operand (2) =>
+            q:PropertyGetter $trigger
+              prototype psp:ContextPrototype
+              extern $functionName = "constructInternalPropertyGetter"
+              $property => tba:Test$binnenRolBeschrijving$trigger
+      $effect =>
+        psp:assignToProperty $copyV1ToV2
+          extern $operation = "set"
+          $property => tba:Test$binnenRolBeschrijving$v2
+          $value =>
+            q:PropertyGetter $n1
+              prototype psp:ContextPrototype
+              extern $functionName = "constructInternalPropertyGetter"
+              $property => tba:Test$binnenRolBeschrijving$v1

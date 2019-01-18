@@ -41,4 +41,4 @@ Ik breng deze nieuwe functie onder in een nieuwe module, analoog aan ComputedTri
 KLAAR
 
 OPEN VRAAG
-Als er geen conditie is, moet dan het effect direct uitgevoerd worden?
+Als er geen conditie is, moet dan het effect direct uitgevoerd worden? Nu wordt een foutmelding gegenereerd.
