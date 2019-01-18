@@ -32,7 +32,7 @@ modelDirectory = "/Users/joopringelberg/Code/perspectives-core/src/model"
 test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION | e)) Unit
 test = do
   lift $ log "=========================Parse a file==================="
-  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "Perspectives.crl"])
+  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "TestBotActie.crl"])
   parseResult <- parseAndCache text
   case parseResult of
     (Right parseRoot) ->

@@ -1,0 +1,64 @@
+PROBLEEM
+
+In het compilaat van testBotActie.crl komt de volgende identifier voor:
+
+          "model:TestBotActie$Test$Context$contextBot_1"
+
+Die komt voort uit dit stuk model:
+
+  psp:Context$contextBot =>
+    psp:Rol $bot
+      prototype psp:ContextPrototype
+      $subjectRol => tba:Test$botCopiesV1ToV2
+
+tba:Test is een instantie van psp:Zaak. Die heeft psp:Context als Aspect en daarom kan ik in tba:Test een rol uit psp:Context inzetten. Die moet ik dan wel volledig kwalificeren, vandaar: psp:Context$contextBot.
+
+Voluit is dat natuurlijk model:Perspectives$Context$contextBot, dus ik verwacht in tba:Test een rol met die naam. En dat klopt. "model:TestBotActie$Test" heeft als rolInContext inderdaad een rol met die naam. Die Rol heeft als type ook weer die naam. De identifier van die rolInstantie is:
+
+	"model:TestBotActie$Test$Context$contextBot_1"
+
+en dat is bovenstaande naam.
+
+Deze rol wordt gevuld door "model:TestBotActie$Test$bot_buitenRol" en dat is dan weer de buitenRol van "model:TestBotActie$Test$bot", de beschrijving van $bot (tba:Test$bot).
+
+Kortom, die rare naam is de gegenereerde id van de rolInstantie van psp:Context$contextBot in tba:Test. En dat kan wel kloppen.
+
+DE FOUTMELDINGEN
+(MissingPropertyValue) De verplichte Property 'model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel' komt niet voor in de rol 'model:TestBotActie$Test$bot_buitenRol' van de context 'model:TestBotActie$Test$bot'.
+------
+(MissingRolInstance) De verplichte Rol 'model:Perspectives$Rol$mogelijkeBinding' komt niet voor in de context 'model:TestBotActie$Test$bot'.
+------
+(RolWithoutContext) De Rol 'model:TestBotActie$Test$bot' heeft geen definiërende Context.
+
+
+AD MISSENDE ISFUNCTIONEEL PROPERTY
+In de rol model:TestBotActie$Test$bot_buitenRol (die wel degelijk gemaakt is) komen geen properties voor. Maar deze buitenRol heeft wel als binding psp:ContextPrototype_buitenRol, wat volgens mij het gevolg is van het feit dat $bot als prototype psp:ContextPrototype heeft.
+
+We hebben hier dus een Context met een prototype (dus zijn buitenRol is gevuld door het prototype). Dat zou toch voldoende moeten zijn?
+
+AD ROLWITHOUTCONTEXT
+Wat al vreemd is, is dat de melding tba:Test$bot als een Rol beschouwt. Het is natuurlijk een context. NEEN. De melding is op het niveau van typebeschrijvingen. En dan klopt het: tba:Test$bot beschrijft een Rol(type).
+1. Waar wordt deze melding gegenereerd?
+
+show (RolWithoutContext cid) = "(RolWithoutContext) De Rol '" <> cid <> "' heeft geen definiërende Context."
+[RolWithoutContext cid]
+Perspectives.TypeDefChecker.checkAspectOfRolType
+cid = 'model:TestBotActie$Test$bot'
+The first parameter is bound to a psp:ContextInstance that represents a psp:Rol.
+Representeert 'model:TestBotActie$Test$bot' een psp:Rol? JA.
+
+psp:Context$contextBot is natuurlijk een rol van het aspect van psp:Zaak. Dus vandaar dat checkAspectOfRolType wordt ingezet?
+
+
+checkAspectOfRolType wordt aangeroepen op één plek en dat is checkContext'. Daarin lezen we:
+      -- if this psp:ContextInstance represents a psp:Rol, and if it has an instance
+      -- of $aspectRol, check whether its namespace giving context has that Aspect.
+'model:TestBotActie$Test$bot' heeft als type psp:Rol, dus daarom wordt checkAspectOfRolType aangeroepen.
+Overigens: de code controleert dus NIET of er een instantie van $aspectRol is.
+
+OPGELOST: deze $bot - een beschrijving van een Rol - is niet via 'rolInContext' onderdeel van de beschrijving van tba:Test, maar via de rol 'contextBot'. En navigeren over die rol was niet opgenomen in contextDef, waardoor de contextbeschrijving niet werd gevonden.
+
+BLIJFT OVER
+(MissingPropertyValue) De verplichte Property 'model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel' komt niet voor in de rol 'model:TestBotActie$Test$bot_buitenRol' van de context 'model:TestBotActie$Test$bot'.
+------
+(MissingRolInstance) De verplichte Rol 'model:Perspectives$Rol$mogelijkeBinding' komt niet voor in de context 'model:TestBotActie$Test$bot'.

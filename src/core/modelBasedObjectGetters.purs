@@ -6,6 +6,10 @@ import Perspectives.DataTypeObjectGetters (buitenRol, binding, context)
 import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, getRolFromPrototypeHierarchy, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 
+-- | NOTE. The functions in this module have a type defined in their comment. These types all refer to
+-- | *type-descriptions* in Perspectives. Hence, 'psp:Rol -> psp:Context' should be read: from the description
+-- | of a Rol, retrieve the description of the Context that holds this Rol-description.
+
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsVerplicht :: forall e. ObjectsGetter e
 rolIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspect"
@@ -41,7 +45,7 @@ binnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijving
 
 -- | `psp:Rol -> psp:Context`
 contextDef :: forall e. ObjectsGetter e
-contextDef rid = unlessNull rolInContextContextDef rid <|> unlessNull binnenRolContextDef rid <|> unlessNull buitenRolContextDef rid <|> bindingDef rid
+contextDef rid = unlessNull rolInContextContextDef rid <|> unlessNull binnenRolContextDef rid <|> unlessNull buitenRolContextDef rid <|> unlessNull bindingDef rid <|> unlessNull gebruikerRolContextDef rid <|> contextBotContextDef rid
 
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
@@ -52,6 +56,16 @@ bindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ binding /-/ co
 -- | `psp:Rol -> psp:Context`
 rolInContextContextDef :: forall e. ObjectsGetter e
 rolInContextContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$rolInContext" /-/ context
+
+-- | The Context of the gebruikerRol.
+-- | `psp:Rol -> psp:Context`
+gebruikerRolContextDef :: forall e. ObjectsGetter e
+gebruikerRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$gebruikerRol" /-/ context
+
+-- | The Context of the contextBot.
+-- | `psp:Rol -> psp:Context`
+contextBotContextDef :: forall e. ObjectsGetter e
+contextBotContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$contextBot" /-/ context
 
 -- | The Context of the BinnenRol.
 -- | `psp:Rol -> psp:Context`

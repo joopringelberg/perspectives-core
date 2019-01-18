@@ -8,11 +8,6 @@ ONTWERP BOT-ACTIES
 
 3. Context krijgt een een extra rol, namelijk Bot. Deze rol wordt niet gevuld, maar heeft wel bindingen voor subjectRol: dat zijn zijn Acties.
 
-4. Bij het doorvoeren van een verandering op een Context moeten de bot-acties opgezet worden. Daartoe moeten we de volgende functies uitbreiden:
-	* updatePerspectEntiteitMember
-	* updatePerspectEntiteit
-	* setBinding
-
 5. Bepaal de bot-acties voor een context-instantie door
 	- zijn type te bepalen
 	- de rol Bot (if any) te kiezen
@@ -26,15 +21,14 @@ ONTWERP BOT-ACTIES
 
 TODO
 
-5. Modelleer een actie en test compileBotAction. Eenmaal gecompileerd kan je het resulterende netwerk testen door een property te zetten. De actie zou kunnen zijn: kopieer een propertywaarde.
-
-6. Trigger het opzetten van Bot-Acties.
-
 7. Zet de timestamp in storeDomeinFile.
 
 IN UITVOERING
-4.a. Breid de modellering van Actie uit. KLAAR
-  b. Idem, Bot voor Context.
+6. Trigger het opzetten van Bot-Acties. Bij het doorvoeren van een verandering op een Context moeten de bot-acties opgezet worden. Daartoe moeten we de volgende functies uitbreiden:
+	* updatePerspectEntiteitMember
+	* updatePerspectEntiteit
+	* setBinding
+
 
 DONE
 0. Conformeert het gecompileerde resultaat van q:assignToRol en q:assignToProperty aan ReactStateSetter? 
@@ -45,4 +39,9 @@ DONE
 2. Vervang ReactStateSetter door een betere naam (b.v. EffectFullFunction). DOE IK TOCH NIET
 
 3. Ontwerp q:effectFullFunction
+
+4.a. Breid de modellering van Actie uit. KLAAR
+  b. Idem, Bot voor Context. KLAAR
+
+5. Modelleer een actie en test compileBotAction. Eenmaal gecompileerd kan je het resulterende netwerk testen door een property te zetten. De actie zou kunnen zijn: kopieer een propertywaarde.
 

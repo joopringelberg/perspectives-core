@@ -66,3 +66,6 @@ psp:Zaak tba:Test
               prototype psp:ContextPrototype
               extern $functionName = "constructInternalPropertyGetter"
               $property => tba:Test$binnenRolBeschrijving$v1
+  psp:Context$contextBot =>
+    psp:SysteemBot $bot
+      $subjectRol => tba:Test$botCopiesV1ToV2

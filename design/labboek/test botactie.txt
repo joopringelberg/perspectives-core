@@ -21,8 +21,6 @@ Test via user interface:
 
 
 TODO
-4. Trigger het aanleggen van de botacties.
-5. Neem de user interface op in de ontwikkelclient.
 
 DONE
 1. Maak het model model:TestBotActie

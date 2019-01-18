@@ -223,7 +223,10 @@ compareRolInstancesToDefinition cid rolType' = do
               (tell [IncorrectBinding cid rolId (tripleObject theBinding) (tripleObject typeOfTheBinding) toegestaneBinding]))
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?
--- | The first parameter is bound to a psp:ContextInstance that represents a psp:Rol.
+-- | The first parameter is bound to a psp:ContextInstance that represents (describes) a psp:Rol.
+-- | This function checks the eventual aspectRol instances given in that description.
+-- | If such an aspectRol is not a Rol of one of the Aspecten of the Description of the Context that holds
+-- | the psp:Rol description, it returns a warning.
 -- | psp:Rol -> psp:Context -> psp:ElkType`
 checkAspectOfRolType :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkAspectOfRolType cid = do
