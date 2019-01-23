@@ -2,9 +2,10 @@ module Test.QueryEffects where
 
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, logShow)
+import Perspectives.Actions (setContextDisplayName)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TypedTripleGetter, MonadPerspectivesQuery)
 import Perspectives.DataTypeTripleGetters (labelM)
-import Perspectives.Deltas (runTransactie, setContextDisplayName)
+import Perspectives.Deltas (runTransactie)
 import Perspectives.Effects (TransactieEffects)
 import Perspectives.QueryEffect ((~>))
 import Perspectives.RunMonadPerspectivesQuery ((##))

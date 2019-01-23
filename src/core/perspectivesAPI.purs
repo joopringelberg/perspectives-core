@@ -42,6 +42,7 @@ data ApiRequest e =
   | GetBindingType RolID (ReactStateSetter e) CorrelationIdentifier
   | GetRolContext RolID (ReactStateSetter e) CorrelationIdentifier
   | GetContextType ContextID (ReactStateSetter e) CorrelationIdentifier
+  | GetRolType RolID  (ReactStateSetter e) CorrelationIdentifier
   | GetRol ContextID RolName (ReactStateSetter e) CorrelationIdentifier
   | GetProperty RolName PropertyName (ReactStateSetter e) CorrelationIdentifier
   | GetViewProperties ViewName (ReactStateSetter e) CorrelationIdentifier
@@ -118,6 +119,7 @@ marshallRequestRecord r@{request} = do
     "GetRol" -> GetRol r.subject r.predicate r.reactStateSetter r.setterId
     "GetRolContext" -> GetRolContext r.subject r.reactStateSetter r.setterId
     "GetContextType" -> GetContextType r.subject r.reactStateSetter r.setterId
+    "GetRolType" -> GetRolType r.subject r.reactStateSetter r.setterId
     "GetProperty" -> GetProperty r.subject r.predicate r.reactStateSetter r.setterId
     "GetViewProperties" -> GetViewProperties r.subject r.reactStateSetter r.setterId
     "Unsubscribe" -> Unsubscribe r.subject r.predicate r.setterId
@@ -137,13 +139,14 @@ dispatchOnRequest req =
     (GetRol cid rn setter setterId) -> getRol cid rn setter setterId
     (GetRolContext rid setter setterId) -> subscribeToObjects rid contextM setter setterId
     (GetContextType rid setter setterId) -> subscribeToObjects rid contextTypeM setter setterId
+    (GetRolType rid setter setterId) -> subscribeToObjects rid rolTypeM setter setterId
     (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
     (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> bindingM >-> contextM) setter setterId
     (CreateContext cd setter setterId) -> do
       r <- constructContext cd
       case r of
         (Left messages) -> liftEff $ setter (map show messages)
-        (Right id) -> liftEff $ setter [id]
+        (Right id) -> liftEff $ setter ["ok", id]
     (AddRol cid rn rid) -> void $ addRol rn rid cid
     (SetProperty rid pn v) -> void $ setProperty pn v rid
     (Unsubscribe subject predicate setterId) -> unsubscribeFromObjects subject predicate setterId
@@ -161,7 +164,7 @@ type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 -- | Runs a the query and adds the ReactStateSetter to the result.
 subscribeToObjects :: forall e. Subject -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 subscribeToObjects subject query setter setterId = do
-  (effectInReact :: QueryEffect (react :: REACT | e)) <- pure $ NamedFunction setterId (liftEff <<< setter)
+  (effectInReact :: QueryEffect (react :: REACT | e)) <- pure $ NamedFunction setterId setter
   void $ (subject ## query ~> effectInReact)
 
 unsubscribeFromObjects :: forall e. Subject -> Predicate -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
@@ -191,7 +194,7 @@ getRolFunction cid rn = do
     (Left message) -> throwError $ error (show message)
     (Right id) -> constructQueryFunction id
 
--- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
+-- | Retrieve the property from the rol, subscribe to it.
 getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getProperty rid pn setter setterId = do
   qf <- getPropertyFunction rid pn

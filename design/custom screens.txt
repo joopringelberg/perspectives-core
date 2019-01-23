@@ -1,0 +1,106 @@
+CUSTOMIZED SCREENS
+
+Hoewel de PDR straks schermen on the fly kan genereren, zullen ontwikkelaars deze schermen met de hand willen kunnen aanpassen.
+
+1. Zodra een scherm aangepast is, moet in het model van het scherm aangegeven worden dat dit het geval is.
+
+2. Zodra een handgemaakt scherm beschikbaar is, moeten InPlace weten waar het gevonden kan worden.
+
+3. Een scherm is een artefact met een identifier. Een gegeven perspectief (van een gebruiker-rol in een context) kan met één of meerdere schermen worden weergegeven. Het is aan de UI om de gebruiker een keuze te laten maken uit deze schermen. (Derhalve) zullen schermen geïdentificeerd moeten kunnen worden. De modelleur moet een mnemonisch zinvolle naam voor elk scherm bedenken.
+
+4. De schermen van één model slaan we op in één directory met een naam die afgeleid is van het model.
+
+5. De API van de PDR heeft commando's voor:
+	- het ophalen van een scherm;
+	- het opslaan van een scherm;
+	- het aanmaken van een opslag van een model. Dit gebeurt in een standaard directory, relatief ten opzichte van het installatiepad van de Electron applicatie zelf: vermoedelijk is dat de *public* directory.
+We kunnen ervoor kiezen om de gekwalificeerde naam van een gebruikerrol te vertalen naar een directorystructuur.
+
+6. Deze API-commando's zullen worden gebruikt door de language clients voor Perspectives in de IDE's. We kunnen ook een ad-hoc interface maken in een Electron client. Laten we dit de development client noemen. Deze client kan ook functionaliteit hebben voor het uploaden van files.
+
+7. Als we InPlace gaan distribueren, moeten we waarschijnlijk toch uitgaan van de public directory.
+
+8. Nu we hebben vastgesteld waar resources worden opgeslagen, is het van belang te weten hoe we binnen InPlace navigeren.
+
+9. Ik bedenk ooit een oppervlaktesyntax die past bij de PDL. Nu kan ik de abstract syntax tree van de parser die ik daarvoor zal schrijven, al uitwerken in termen van contexten en rollen.
+
+10. Het is mogelijk een scherm in een scherm in te bedden. Denk aan het clusterscherm dat ingebed is in het systeemscherm. 
+	* heeft een scherm dan twee rollen: actie en subScherm?
+	* of kan een generieke rol onderdeel gebonden worden aan zowel een actie als een scherm?
+	In het tweede geval kunnen we de standaard volgorde nummers van rollen gebruiken om een ordening van zowel acties als subschermen af te dwingen. In het eerste geval moeten we expliciet een volgnummer modelleren bij beide rollen.  NB: alleen de AST treewalker heeft deze nummers nodig.
+
+11. Schermen en acties worden gecompileerd naar data- en displaycontainers. 
+
+12. Bij een scherm moet de modelleur aangeven voor welke context en gebruikerrol het is. 
+	* we kunnen het scherm inbedden in de rolbeschrijving, als een rol: $scherm
+	* we kunnen de gebruikerrol opnemen in het scherm, al een rol.
+	Ik heb voorkeur voor de eerste. De Def context van het scherm is dan de rol waar het bijhoort.
+	Cor wil het waarschijnlijk op meer afstand zetten. Dat kan prima in de PDL. Ik ontwerp nu de AST!
+	NEEN. De rol moet toch opgenomen worden in het scherm. Reden: anders kunnen we alleen inbedden door verwijzen. Terwijl we waarschijnlijk de vrijheid willen hebben om een ingebed scherm (voor een rol) anders te laten zijn dan het standalone scherm (voor diezelfde rol). Bovendien heb je daarmee (in de AST) beter zicht op het uiteindelijke scherm (omdat het één geneste expressie is).
+
+13. Semantische controle: heeft de in een scherm genoemde actie wel als subject de omhullende rol van het scherm?
+
+
+DE TREEWALKER
+1. Voor een scherm genereren we een container die de context levert. Als het gaat om de buitenste container, dan doen we dat met de Context container (en dus voor een Context waarvan de programmeur de naam weet; waarschijnlijk één van de geïndexeerde begrippen zoals Systeem).
+
+2. Als de walker bij een context komt
+	* via Context: neemt hij voor alle acties in het scherm die op een RolInContext van de Context werken, de betreffende rolnaam op in het 'rollen' attribuut
+	* via ContextOfRole of BoundContext: 
+		- neemt hij een Rollen container op
+		- en neemt hij in de 'rollen' property daarvan het object van elke ingebedde actie op (als dat een RolInContext is).
+
+3. Voor een subscherm, dat bedoeld is voor een bepaalde context, neemt hij de bindende rol in het hoofdscherm óók op in het 'rollen' attribuut van de hoofdcontainer.
+
+4. Voor een subscherm genereert de walker een BoundContext container waarvan het attribuut 'role' de naam is van de context-bindende-rol. Daarbinnen genereert hij een Rollen container. NB: het is onwaarschijnlijk dat we een use case vinden voor de treewalker voor de component ContextOfRole.
+
+5. Voor een Actie genereert de walker een container die een view representeert. Maar daar zijn vijf varianten van. We doen een gevalsonderscheiding op de rol die je vindt door $objectRol omgekeerd te volgen.
+
+	Is de psp:Rol die je vindt door $objectRol omgekeerd te volgen, een RolInContext? D.w.z. is die rolbeschrijving gebonden in een contextbeschrijving via psp:Rol$rolInContext? 
+	
+	a. Zo ja, gebruik dan View met attribuut 'role' gelijk aan het object van de Actie en 'viewname' gelijk aan de View op het object (de $objectView).
+	
+	b. zo nee, dan werkt hij op een binnen-of buitenrol. 
+	Werkt de Actie op de binnen- of buitenRol van zijn eigen context? D.w.z. is de context van de Actie (te vinden door omgekeerd te navigeren over psp:Zaak$actieInContext) gelijk aan het object van de Actie (te vinden door omgekeerd te navigeren over $objectRol en dan naar de context daarvan)?
+
+		- JA: bed één van deze twee containers rechtstreeks in de context-gevende component in (dat zal een BoundContext of een Context container zijn):
+			- is het de binnenRol, gebruik dan ViewOnInternalRole;
+			- is het de buitenRol, gebruik dan ViewOnExternalRole;
+		Het is de binnenRol, als de rolbeschrijving gebonden is in de contextbeschrijving via de rol psp:Rol$binnenRolBeschrijving.
+		De display binnen deze containers is ALTIJD VOOR ÉÉN ROL!
+
+		- NEEN: dan werkt de Actie op de context die gebonden is aan zijn directe object (zelfde onderscheidingsmethode):
+			- is het de binnenRol, gebruik dan InternalViewOfBoundContext;
+			- is het de buitenRol, gebruik dan ExternalViewOfBoundContext;
+
+6. De treewalker loopt door de geordende lijst acties. Hij houdt daarbij op elk moment een lijst van acties op rollen in context bij.
+	- Als de eerstvolgende actie als object de context van de actie zelf heeft, dan:
+		- als de lijst van acties op rollen leeg is, 
+			- dan schrijft hij een ViewOnInternalRole of ViewOnExternalRol weg;
+			- anders 
+				- schrijft hij eerst een Rollen component met daarin een component voor elke actie in de lijst
+				- maakt hij vervolgens de lijst leeg;
+				- en schrijft hij tenslotte een ViewOnInternalRole of ViewOnExternalRol weg;
+		- anders bewaart hij de actie in de lijst van acties op rollen
+	- Als alle acties in het scherm zijn behandeld, schrijft hij zoals boven een Rollen component.
+
+HET UITSCHRIJVEN VAN EEN ACTIE
+1. Voor een Actie schrijft de treewalker een View uit, die properties verschaft. Maar binnen die view moet hij display componenten opnemen. Van een property weten we 
+	- zijn gekwalificeerde naam
+	- zijn volgnummer in de View
+	- of hij functioneel is
+	- of hij verplicht is
+	- zijn type
+Bovendien geeft de Actie een werkwoord. Voor informatieacties bepaalt dat: create, read, delete of update. Delete en create als op zichzelf staande acties lijkt me vreemd. Die acties lijken me vooral van belang voor relationele (meerwaardige) properties.
+Bij verstek maak ik voor een meerwaardige property een komma-gescheiden lijst van waarden.
+
+2. Als het object van de Actie een meerwaardige Rol is, genereren we een tabel met een rij voor elke rolinstantie. 
+
+
+OPEN VRAAG
+Wat doen we met business acties? Zijn die samengesteld uit andere business acties en uiteindelijk informatie acties? We kunnen b.v. een treewalk van zo'n actie doen en de informatie-acties die we tegenkomen in die volgorde opnemen op het scherm. Maar we kunnen ook de hiërarchische indeling weerspiegelen op het scherm en zelfs de naam van de business acties gebruiken als sectie-hoofdjes.
+
+TODO
+1. Schrijf een voorbeeld van de AST uit.
+2. Maak een model van de AST van de schermentaal.
+3. Breidt de semantische controle van een model uit naar schermen.

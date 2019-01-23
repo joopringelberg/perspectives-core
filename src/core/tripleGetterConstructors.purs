@@ -13,9 +13,10 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..)
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
-import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getPropertyFromRolTelescope, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty)
+import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty, getRolWithPropertyFromRolTelescope)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
+import Perspectives.TripleGetterComposition ((>->))
 import Prelude (bind, const, pure, ($), (<<<), (<>), (>=>), (==))
 
 constructTripleGetterFromEffectExpression :: forall e.
@@ -124,7 +125,7 @@ constructRolPropertyGetter pn = constructTripleGetter getProperty pn
 constructRolPropertyLookup :: forall e.
   RolName ->
   TypedTripleGetter e
-constructRolPropertyLookup ln = constructTripleGetter getPropertyFromRolTelescope ln
+constructRolPropertyLookup qn = (constructTripleGetterFromObjectsGetter ("constructRolPropertyLookup" <> qn) (getRolWithPropertyFromRolTelescope qn)) >-> (constructRolPropertyGetter qn)
 
 constructRolGetter :: forall e.
   RolName ->

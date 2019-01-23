@@ -2,7 +2,7 @@ module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addT
 
 import Control.Monad.Aff (Aff)
 import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff (Eff, foreachE)
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
@@ -14,7 +14,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesState (setTripleQueue, tripleQueue)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
-import Perspectives.TripleAdministration (getRef, getTriple, lookupInTripleIndex, removeDependency_, setSupports_)
+import Perspectives.TripleAdministration (lookupInTripleIndex, setSupports_)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), discard, map)
 import Unsafe.Coerce (unsafeCoerce)
@@ -69,22 +69,13 @@ propagateTheoryDeltas :: forall e. TripleQueue -> MonadPerspectives (AjaxAvarCac
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do
-    tr <- pure $ tripleQueueElementToTriple head
-    t@(Triple{object, supports, dependencies} :: Triple e) <- recompute tr
+    tr@(Triple{dependencies}) <- pure $ tripleQueueElementToTriple head
+    -- Note: the recomputed triple will not have dependencies. These are computed on adding other triples,
+    -- from their supports. And when triples are removed, their supports should lose a depencency.
+    t@(Triple{object, supports} :: Triple e) <- recompute tr
     _ <- liftAff $ saveChangedObject tr object
-    _ <- liftAff $ liftEff $ updateDependencies tr t
     _ <- liftAff $ liftEff $ setSupports_ tr supports
     propagateTheoryDeltas (addToQueue tail (map tripleRefToTripleQueueElement dependencies))
-
-updateDependencies :: forall e e1. Triple e -> Triple e -> Eff (gm :: GLOBALMAP | e1) Unit
-updateDependencies t@(Triple{supports: old}) (Triple{supports: new}) =
-  foreachE (difference old new) remove where
-    remove :: TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
-    remove ref = void do
-      mt <- getTriple ref
-      case mt of
-        (Just supportingTriple) -> removeDependency_ supportingTriple (getRef t)
-        Nothing -> pure ref
 
 getDependencies :: forall e eff. Triple e ->  Eff (gm :: GLOBALMAP | eff) (Array (Triple e))
 getDependencies (Triple{dependencies}) = do

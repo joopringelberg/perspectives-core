@@ -18,6 +18,9 @@ ATOM/GIT HANDIGHEID
 
 	git diff WorkingQueries:src/domeinCache.purs master:src/domeinCache.purs
 
+	Alternatief, om de huidige versie te vergelijken met die van 10 commits eerder:
+	git diff HEAD~10 HEAD -- src/core/queryEffect.purs
+
 5. OpenDiff gebruiken:
 
 	git difftool --tool=opendiff

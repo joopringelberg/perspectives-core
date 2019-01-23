@@ -1,0 +1,13 @@
+LOCAL NAME FOR PROPERTY IN VIEW
+Een View kan een Property bevatten die op één van de mogelijke rolbindingen is gedefinieerd. Het is daarom heel goed mogelijk dat een View twee properties bevat met dezelfde lokale naam (maar in verschillende (rol)namespaces).
+
+In de user interface componenten gebruiken we de lokale naam om properties te selecteren en op het scherm van een label te voorzien. In die situatie is het lastig als twee properties dezelfde lokale naam hebben.
+
+Om die reden introduceren we de mogelijkheid om in een View een lokale naam - een alias - voor een property te definiëren. Dit modelleren we als een rolProperty van de rol $propertyReferentie van View, namelijk $lokaleNaam.
+
+	$rolProperty =>
+		psp:Property $lokaleNaam
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+			$range => psp:String
+

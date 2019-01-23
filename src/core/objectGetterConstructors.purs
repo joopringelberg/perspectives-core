@@ -5,15 +5,15 @@ import Control.Plus (empty)
 import Data.Array (foldl, null)
 import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup)
-import Perspectives.ContextAndRole (context_binnenRol, context_pspType, context_rolInContext, rol_properties)
+import Perspectives.ContextAndRole (context_binnenRol, context_pspType, context_rolInContext, rol_id, rol_properties)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (ObjectsGetter)
+import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', binding, context)
 import Perspectives.EntiteitAndRDFAliases (PropertyName, RolName, RolID)
 import Perspectives.Identifiers (LocalName, buitenRol) as Id
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', binding, context)
-import Prelude (bind, id, pure, show, ($), (<$>), (<>), (==), (||), (>>=))
+import Prelude (bind, const, id, pure, show, ($), (<$>), (<>), (==), (>>=), (||))
 
 getRol :: forall e. RolName -> ObjectsGetter e
 getRol rn = getContextMember \context -> maybe [] id (lookup rn (context_rolInContext context))
@@ -75,6 +75,17 @@ getPropertyFromRolTelescope qn rolId =
   unlessNull (getProperty qn) rolId
   <|>
   (binding /-/ getPropertyFromRolTelescope qn) rolId
+
+getRolHavingProperty :: forall e. PropertyName -> ObjectsGetter e
+getRolHavingProperty pn = getRolMember \rol -> maybe [] (const [rol_id rol]) (lookup pn (rol_properties rol))
+
+-- | In the roltelescope, find a rol that has a property with a given qualified name.
+-- | NOTE: This function will loop whenever a RolInstance binds to itself!
+getRolWithPropertyFromRolTelescope :: forall e. PropertyName -> ObjectsGetter e
+getRolWithPropertyFromRolTelescope qn rolId =
+  unlessNull (getRolHavingProperty qn) rolId
+  <|>
+  (binding /-/ getRolWithPropertyFromRolTelescope qn) rolId
 
 -- | Using either $aspect or $aspectProperty, climb the Aspect tree looking
 -- | for a Boolean Property bearing the given propertyName.

@@ -42,7 +42,6 @@ psp:Context psp:Property
 			$mogelijkeBinding => psp:ElkType
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
-			-- (RolWithoutContext) De Rol 'model:Perspectives$Property$binnenRolBeschrijving' heeft geen definiërende Context.
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
@@ -194,9 +193,14 @@ psp:Context psp:View
 			extern $isFunctioneel = false
 			$rolProperty =>
 				psp:Property $volgNummer
-					extern $isFunctioneel = true -- ziet ie niet
-					extern $isVerplicht = true -- ziet ie niet
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
 					$range => psp:Number
+			$rolProperty =>
+				psp:Property $lokaleNaam
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
 			$mogelijkeBinding => psp:Property
 
 --------------------------------------------------------------------------------

@@ -6,7 +6,6 @@ import Prelude
 
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Trans.Class (lift)
 import Data.Array (head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
@@ -14,23 +13,23 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
 import Perspectives.BasicActionFunctions (storeDomeinFile)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, NamedFunction(..), ObjectsGetter, TypedTripleGetter, (%%>), (%%), (%%>>))
+import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, TypedTripleGetter, (%%), (%%>), (%%>>))
 import Perspectives.DataTypeObjectGetters (binding, context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextTypeM)
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, RolID, RolName, PropertyName)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (contextBotDefM, botSubjectRollenDefM)
 import Perspectives.ObjectGetterConstructors (getExternalProperty, getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
-import Perspectives.QueryEffect ((~>))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
-import Perspectives.RunMonadPerspectivesQuery ((##>), (##))
+import Perspectives.RunMonadPerspectivesQuery ((##>), (##), (##=))
 import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.Utilities (onNothing)
 
@@ -166,7 +165,7 @@ updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   MemberName -> Value -> ObjectsGetter e
 updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
-  addDelta $ createDelta cid memberName value
+  addDelta $ createDelta memberName value cid
   -- setupBotActions cid
   pure [cid]
 
@@ -285,13 +284,13 @@ setProperty' =
         , isContext: false
         })
 
-setProperty :: forall e. RolName -> RolID -> ObjectsGetter e
+setProperty :: forall e. PropertyName -> Value -> ObjectsGetter e
 setProperty = setUpBotActionsAfter setProperty'
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
 -----------------------------------------------------------
-type Action e = (Array String -> MonadPerspectivesQuery (AjaxAvarCache e) Unit)
+type Action e = (Subject -> MonadPerspectives (AjaxAvarCache e) (Array Value))
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
@@ -314,15 +313,13 @@ constructActionFunction actionInstanceID = do
       -- The function that will compute the value from the context.
       valueComputer <- rolQuery value
 
-      action <- pure (\f contextId boolArr -> case head boolArr of
-        Nothing -> pure unit
-        (Just bool) -> case bool of
-          "true" -> do
-            value <- lift (contextId ##> valueComputer)
-            case value of
-              Nothing -> pure unit
-              (Just v) -> void $ lift $ f rol v contextId *> setupBotActions contextId
-          _ -> pure unit)
+      action <- pure (\f contextId bool -> case bool of
+        "true" -> do
+          value <- (contextId ##> valueComputer)
+          case value of
+            Nothing -> pure []
+            (Just v) -> f rol v contextId <* setupBotActions contextId
+        _ -> pure [])
 
       case operation of
         "add" -> pure $ action addRol'
@@ -344,15 +341,13 @@ constructActionFunction actionInstanceID = do
       -- The function that will compute the value from the context.
       valueComputer <- propertyQuery value
 
-      action <- pure (\f rolId boolArr -> case head boolArr of
-        Nothing -> pure unit
-        (Just bool) -> case bool of
-          "true" -> do
-            value <- lift (rolId ##> valueComputer)
-            case value of
-              Nothing -> pure unit
-              (Just v) -> void $ lift $ f property v rolId
-          _ -> pure unit)
+      action <- pure (\f rolId bool -> case bool of
+        "true" -> do
+          value <- (rolId ##> valueComputer)
+          case value of
+            Nothing -> pure []
+            (Just v) -> f property v rolId
+        _ -> pure [])
 
       case operation of
         "add" -> pure $ action addProperty'
@@ -369,11 +364,9 @@ constructActionFunction actionInstanceID = do
       case functionName of
         -- The Action is for the bot that plays a role in a model:CrlText$Text context.
         -- The contextId identifies this context, hence we need no parameters when calling this function.
-        "storeDomeinFileInCouchdb" -> pure $ \contextId boolArr -> case head boolArr of
-          Nothing -> pure unit
-          (Just bool) -> case bool of
-            "true" -> lift $ storeDomeinFile contextId
-            _ -> pure unit
+        "storeDomeinFileInCouchdb" -> pure $ \contextId bool -> case bool of
+          "true" -> storeDomeinFile contextId *> pure []
+          _ -> pure []
 
         _ -> throwError (error $ "constructActionFunction: unknown functionName for effectFullFunction: '" <> functionName <> "'")
 
@@ -401,7 +394,7 @@ compileBotAction actionType contextId = do
   (conditionQuery :: TypedTripleGetter e) <- propertyQuery condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the TypedTripleGetter and this Action name. That gives an unique name.
-  pure $ conditionQuery ~> NamedFunction actionType (actionObjectsGetter contextId)
+  pure $ conditionQuery >-> constructTripleGetterFromObjectsGetter actionType (actionObjectsGetter contextId)
 
   where
     errorMessage :: String -> String -> Error
@@ -409,6 +402,6 @@ compileBotAction actionType contextId = do
 
 setupBotActions :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 setupBotActions cid = do
-  actions <- cid ## contextTypeM >-> contextBotDefM >-> botSubjectRollenDefM
-  actions <- pure []
+  actions <- cid ##= contextTypeM >-> contextBotDefM >-> botSubjectRollenDefM
+  -- actions <- pure []
   for_ actions \a -> (compileBotAction a cid) >>= \tg -> cid ## tg

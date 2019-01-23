@@ -1,0 +1,89 @@
+PROPERTIES DIE DOORGEGEVEN WORDEN AAN REACT CHILD COMPONENTS
+
+COMPONENT					GEEFT DOOR
+Context						- instance
+							- namespace (= attribuut type)
+
+Rollen						- key
+							- instance
+							- namespace
+
+RolBinding					- instance
+							- namespace
+
+View						- value
+							- roleInstance
+							- namespace
+							- rolename
+
+ContextVanRol				- instance	als attributen van de Context component
+							- type (wordt prop namespace van children of Context)
+
+ExterneViewOfBoundContext	- rol
+							- instance
+							- viewnaam
+
+InterneViewOfBoundContext	- rol
+							- instance
+							- viewnaam
+
+ViewOnBuitenRol				- viewnaam
+							- namespace
+							- instance
+
+SetProperty					- defaultvalue
+							- setValue
+
+1. Een component ontvangt props doordat ze
+	- in JSX als attributen gezet worden door 
+		- de programmeur bij inzetten van een component op een pagina, of 
+		- door een component in zijn render-functie;
+	- doorgegeven bij cloneElement.
+	
+2. Dan worden er ook onderdelen van state berekend in de component en aan component.state toegevoegd. State onderdelen worden óók doorgegeven als props! Helaas worden state onderdelen niet gedeclareerd bij component.propTypes.
+
+2. Als een prop als attribuut gezet *moet* worden geldt de *isRequired* versiering (de semantische controle merkt niet op dat een prop in code is gezet of wordt berekend door de component).
+
+3. Het is belangrijk om in één oogopslag te kunnen zien welke props als attributen moeten worden gezet. Dit zijn dus de isRequired propTypes.
+
+4. Het is belangrijk om te weten welke props een component moet ontvangen van zijn omhullende, om te bepalen of een component in een omhullende past of niet (de matrix is hier natuurlijk op gebaseerd).
+Dit zijn de props die met propTypes zijn gedefinieerd, minus degenen die als attributen moeten worden gezet.
+
+Je zou dit willen kunnen zien van een component:
+IN: 
+* te ontvangen props
+* state properties die berekend worden
+UIT:
+alle props- en state-properties die als props worden doorgegeven aan child componenten. Daarbij kan een interne naam op een andere externe naam worden afgebeeld. 
+IS DAT WERKELIJK NODIG? 
+Antw: ja, en er zijn in elk geval props die doorgegeven worden die berekend worden uit andere props, of als data opgehaald worden, of uit state elementen.
+Een component kan 'namespace' ontvangen en 'namespace' doorgeven, maar dat is dan een andere waarde!
+
+Het is eigenlijk meer zo: een component heeft een verzameling props nodig. Zijn context geeft daarvan een bepaald deel door; het andere deel moet als attributen gezet worden.
+
+Wat gezet moet worden als attribuut, is dus afhankelijk van de relatie tussen context en component!
+
+
+
+NAAMGEVING
+1. Omdat props als attributen gezet kunnen worden en attributen lowercase zijn, gebruik ik voor props lowercase namen.
+
+2. Eenduidig zijn:
+	- namespace
+	- value
+	- key
+	- viewnaam -> moet viewname worden.
+	- defaultValue -> moet defaultvalue worden
+	- setValue -> moet setvalue worden.
+	- rollen
+
+Verwarrend zijn:
+	- instance
+	- rol
+	- rolInstance
+	- rolename
+	- type
+
+alle model-concepten zoals rol en view ga ik suffixen met 'name'
+alle instanties ga ik suffixen met 'instance'
+moet er een verschil tussen rolinstance en contextinstance gemaakt worden? of is het juist beter om één naam te gebruiken - en dan dus 'instance'?
