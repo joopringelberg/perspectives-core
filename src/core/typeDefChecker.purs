@@ -15,7 +15,7 @@ import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
 import Perpectives.TypeChecker (contextHasType)
-import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), MonadPerspectives, runMonadPerspectivesQueryCompiler, tripleObject, tripleObjects, (@@), (@@>), (%%>>), (@@=))
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), mtripleObject, runMonadPerspectivesQueryCompiler, tripleObject, tripleObjects, (%%>>), (@@), (@@=), (@@>))
 import Perspectives.DataTypeObjectGetters (internePropertyTypen, propertyTypen, rolType)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, typeVanIedereRolInContextM)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -211,16 +211,20 @@ compareRolInstancesToDefinition cid rolType' = do
       -- check the binding. Does the binding have the type given by bindingDefM, or has its type that Aspect?
       -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.
       -- TODO: moeten we hier niet iets met de roltelescoop?
-      theBinding <- lift (rolId @@ bindingM >-> contextM)
-      mmb <- lift (rolType' @@> bindingDefM)
-      case mmb of
+      -- Notice that the binding may not exist!
+      maybeBinding <- lift (rolId @@ bindingM >-> contextM)
+      case mtripleObject maybeBinding of
         Nothing -> pure unit
-        (Just toegestaneBinding) -> do
-          ifM (lift $ lift $ contextHasType (tripleObject theBinding) toegestaneBinding)
-            (pure unit)
-            (do
-              typeOfTheBinding <- lift ((tripleObject theBinding) @@ contextTypeM)
-              (tell [IncorrectBinding cid rolId (tripleObject theBinding) (tripleObject typeOfTheBinding) toegestaneBinding]))
+        (Just theBinding) -> do
+          mmb <- lift (rolType' @@> bindingDefM)
+          case mmb of
+            Nothing -> pure unit
+            (Just toegestaneBinding) -> do
+              ifM (lift $ lift $ contextHasType theBinding toegestaneBinding)
+                (pure unit)
+                (do
+                  typeOfTheBinding <- lift (theBinding @@ contextTypeM)
+                  (tell [IncorrectBinding cid rolId theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?
 -- | The first parameter is bound to a psp:ContextInstance that represents (describes) a psp:Rol.
