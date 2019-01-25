@@ -1,5 +1,7 @@
 Context model:Perspectives als psp:
 
+import model:QueryAst als q:
+
 Section $rolInContext
 
 --------------------------------------------------------------------------------
@@ -201,7 +203,10 @@ psp:Context psp:View
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
 					$range => psp:String
-			$mogelijkeBinding => psp:Property
+			$mogelijkeBinding =>
+				psp:Sum $PropOrFun
+					$alternative => psp:Property
+					$alternative => psp:Function
 
 --------------------------------------------------------------------------------
 -- ACTIES
@@ -299,90 +304,99 @@ psp:Context psp:Sum
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
 
-	--------------------------------------------------------------------------------
-	-- SYSTEEM
-	--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- SYSTEEM
+--------------------------------------------------------------------------------
 
-	psp:Context psp:Systeem
-		$binnenRolBeschrijving =>
-			psp:Rol $binnenRolBeschrijving
-				extern $isFunctioneel = true
-				$mogelijkeBinding => psp:Rol
-		$buitenRolBeschrijving =>
-			psp:Rol $buitenRolBeschrijving
-				extern $isFunctioneel = true
-				$mogelijkeBinding => psp:Rol
-				$rolProperty =>
-					psp:Property $modelOphaalTeller
-						extern $isFunctioneel = true
-						extern $isVerplicht = true
-						$range => psp:Number
-		$rolInContext =>
-			psp:Rol $trustedCluster
-				extern $isFunctioneel = true
-				$mogelijkeBinding => psp:TrustedCluster
-		$rolInContext =>
-			psp:Rol $gebruiker
-				-- wat is de mogelijkeBinding van gebruiker?
-				-- we gaan niets binden, dus elk type is goed.
-				extern $isFunctioneel = true
-				$mogelijkeBinding => psp:ElkType
-				$viewInRol =>
-					psp:View $VolledigeNaam
-						$propertyReferentie => $$voornaam
-							$volgNummer = 1
-						$propertyReferentie => $$achternaam
-							$volgNummer = 2
-				$rolProperty =>
-					psp:Property $achternaam
-						extern $isFunctioneel = false
-						extern $isVerplicht = true
-						$range => psp:String
-				$rolProperty =>
-					psp:Property $voornaam
-						extern $isFunctioneel = false
-						extern $isVerplicht = true
-						$range => psp:String
+psp:Context psp:Systeem
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $modelOphaalTeller
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Number
+	$rolInContext =>
+		psp:Rol $trustedCluster
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:TrustedCluster
+	$rolInContext =>
+		psp:Rol $gebruiker
+			-- wat is de mogelijkeBinding van gebruiker?
+			-- we gaan niets binden, dus elk type is goed.
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:ElkType
+			$viewInRol =>
+				psp:View $VolledigeNaam
+					$propertyReferentie => $$voornaam
+						$volgNummer = 1
+					$propertyReferentie => $$achternaam
+						$volgNummer = 2
+			$rolProperty =>
+				psp:Property $achternaam
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $voornaam
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
+	$rolInContext =>
+		psp:Rol $zaken
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Zaak
+	$rolInContext =>
+		q:ComputedRolGetter $modellen
+			prototype psp:ContextPrototype
+			extern psp:Rol$buitenRolBeschrijving$isFunctioneel = false
+			extern $functionName = "modellenM"
 
-	psp:Zaak psp:TrustedCluster
-		psp:Context$buitenRolBeschrijving =>
-			psp:Rol $buitenRolBeschrijving
-				extern $isFunctioneel = true
-				$viewInRol =>
-					psp:View $Kaartje
-						$propertyReferentie => $$naam
-							$volgNummer = 1
-				$rolProperty =>
-					psp:Property $naam
-						extern $isFunctioneel = true
-						extern $isVerplicht = true
-						$range => psp:String
-				$mogelijkeBinding => psp:Rol
-		psp:Context$binnenRolBeschrijving =>
-			psp:Rol $binnenRolBeschrijving
-				extern $isFunctioneel = true
-				$mogelijkeBinding => psp:Rol
-		psp:Context$rolInContext =>
-			psp:Rol $clusterGenoot
-				extern $isFunctioneel = false
-				$mogelijkeBinding => psp:Systeem$gebruiker
-				$rolProperty =>
-					psp:Property $url
-						extern $isFunctioneel = true
-						extern $isVerplicht = true
-						$range => psp:String
-				$viewInRol =>
-					psp:View $Adressering
-						$propertyReferentie => $$url
-							$volgNummer = 1
-						$propertyReferentie => psp:Systeem$gebruiker$voornaam
-							$volgNummer = 2
-				$objectRol => $$RaadpleegtClusterGenoot
-				$subjectRol => $$RaadpleegtClusterGenoot
-		$actieInContext =>
-			psp:Actie $RaadpleegtClusterGenoot
-				$werkwoord => psp:Raadpleegt
-				$objectView => $$clusterGenoot$Adressering
+psp:Zaak psp:TrustedCluster
+	psp:Context$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$viewInRol =>
+				psp:View $Kaartje
+					$propertyReferentie => $$naam
+						$volgNummer = 1
+			$rolProperty =>
+				psp:Property $naam
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+			$mogelijkeBinding => psp:Rol
+	psp:Context$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	psp:Context$rolInContext =>
+		psp:Rol $clusterGenoot
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Systeem$gebruiker
+			$rolProperty =>
+				psp:Property $url
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:String
+			$viewInRol =>
+				psp:View $Adressering
+					$propertyReferentie => $$url
+						$volgNummer = 1
+					$propertyReferentie => psp:Systeem$gebruiker$voornaam
+						$volgNummer = 2
+			$objectRol => $$RaadpleegtClusterGenoot
+			$subjectRol => $$RaadpleegtClusterGenoot
+	$actieInContext =>
+		psp:Actie $RaadpleegtClusterGenoot
+			$werkwoord => psp:Raadpleegt
+			$objectView => $$clusterGenoot$Adressering
 
 --------------------------------------------------------------------------------
 -- ASSIGNMENT

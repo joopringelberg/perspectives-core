@@ -25,19 +25,23 @@ import Control.Monad.Aff (Error, Milliseconds(..), delay, forkAff, runAff)
 import Control.Monad.Aff.AVar (AVar, makeVar)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
+import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Rec.Class (forever)
 import DOM (DOM)
 import Data.Either (Either(..))
+import Node.FS (FS)
+import Node.Process (PROCESS)
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.CoreTypes (Transactie, createTransactie)
 import Perspectives.Effects (AjaxAvarCache, REACT)
 import Perspectives.PerspectivesState (newPerspectivesState, runPerspectivesWithState)
+import Perspectives.SetupUser (setupUser)
 import Perspectives.TheoryChange (propagate)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
-main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO, now :: NOW)) Unit
+main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO, now :: NOW, fs :: FS, exception :: EXCEPTION, process :: PROCESS)) Unit
 main = void $ runAff handleError do
   -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
   usr <- pure "cor"
@@ -54,6 +58,7 @@ main = void $ runAff handleError do
     runPerspectivesWithState propagate state
   where
     f = do
+      void $ setupUser
       addComputedTripleGetters
       setupApi
 

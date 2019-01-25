@@ -14,3 +14,5 @@ exports.guid = function()
 			return v.toString( 16 );
 		} );
 };
+
+exports.show_ = function(x){return x};

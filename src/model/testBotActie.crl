@@ -41,6 +41,16 @@ psp:Zaak tba:Test
               prototype psp:ContextPrototype
               extern $functionName = "constructInternalPropertyGetter"
               $property => tba:Test$binnenRolBeschrijving$v2
+      $viewInRol =>
+        psp:View $allProps
+          $propertyReferentie => $$v1
+            $volgNummer = 1
+          $propertyReferentie => $$v2
+            $volgNummer = 2
+          $propertyReferentie => $$trigger
+            $volgNummer = 3
+          $propertyReferentie => $$propsEqual
+            $volgNummer = 4
   $actieInContext =>
     psp:Actie $botCopiesV1ToV2
       $condition =>

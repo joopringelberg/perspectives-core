@@ -21,6 +21,7 @@
     "perpectives-apitypes",
     "avar-monadask",
     "perspectives-couchdb",
-    "js-timers"
+    "js-timers",
+    "node-process"
   ]
 }

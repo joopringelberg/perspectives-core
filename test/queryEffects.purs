@@ -1,9 +1,10 @@
 module Test.QueryEffects where
 
+import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, logShow)
 import Perspectives.Actions (setContextDisplayName)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TypedTripleGetter, MonadPerspectivesQuery)
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TypedTripleGetter)
 import Perspectives.DataTypeTripleGetters (labelM)
 import Perspectives.Deltas (runTransactie)
 import Perspectives.Effects (TransactieEffects)
@@ -27,5 +28,5 @@ test = do
 showGebruikerLabel :: forall e. TypedTripleGetter (console :: CONSOLE | e)
 showGebruikerLabel = labelM ~> (NamedFunction "log" (liftEff <<< logShow))
 
-showOnConsole :: forall a e. Show a => NamedFunction (a -> MonadPerspectivesQuery (console :: CONSOLE | e) Unit)
-showOnConsole = NamedFunction "log" (liftEff <<< logShow)
+showOnConsole :: forall a e. Show a => NamedFunction (a -> Eff (console :: CONSOLE | e) Unit)
+showOnConsole = NamedFunction "log" logShow

@@ -62,5 +62,5 @@ saveUserData' buitenRollen = void $ for buitenRollen saveBuitenRol
 
     -- isBuitenRol id = do
     --   beschrevenBuitenRolType <- lift $ (id %%>> context /-/ contextType /-/ buitenRolBeschrijvingDef) -- "model:Perspectives$ContextPrototype$buitenRolBeschrijving"
-    --   buitenRolType <- lift $ (id %%>> rolType) -- TODO "model:Systeem$TrustedCluster$buitenRolBeschrijving"
+    --   buitenRolType <- lift $ (id %%>> rolType) -- TODO "model:Perspectives$TrustedCluster$buitenRolBeschrijving"
     --   pure $ beschrevenBuitenRolType == buitenRolType

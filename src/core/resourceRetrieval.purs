@@ -50,14 +50,16 @@ fetchPerspectEntiteitFromCouchdb id = if isUserURI id
 
 -- | Fetch the definition of a resource asynchronously.
 fetchEntiteit :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
-fetchEntiteit id = ensureAuthentication $ do
-  v <- representInternally id
-  -- _ <- forkAff do
-  ebase <- entitiesDatabase
-  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
-  (res :: AffjaxResponse a) <- liftAff $ affjax $ rq {url = ebase <> id}
-  liftAff $ onAccepted res.status [200, 304] "fetchEntiteit" $ putVar res.response v
-  liftAff $ readVar v
+fetchEntiteit id = ensureAuthentication $ catchError
+  do
+    v <- representInternally id
+    -- _ <- forkAff do
+    ebase <- entitiesDatabase
+    (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+    (res :: AffjaxResponse a) <- liftAff $ affjax $ rq {url = ebase <> id}
+    liftAff $ onAccepted res.status [200, 304] "fetchEntiteit" $ putVar res.response v
+    liftAff $ readVar v
+  \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> id <> " from couchdb. " <> show e)
 
 saveEntiteitPreservingVersion :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 -- saveEntiteitPreservingVersion id = catchError do

@@ -3,7 +3,7 @@ module Perspectives.Api where
 import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, SOCKETIO, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (produce')
-import Control.Monad.Aff (error, launchAff_, throwError)
+import Control.Monad.Aff (catchError, error, launchAff_, throwError)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
@@ -14,15 +14,16 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Foreign (MultipleErrors, unsafeFromForeign)
 import Data.Foreign.Class (encode)
-import Perspectives.ApiTypes (ContextSerialization, CorrelationIdentifier, Request(..), Value, response)
-import Perspectives.BasicConstructors (constructContext)
+import Perspectives.Actions (addRol, setBinding, setProperty)
+import Perspectives.ApiTypes (ContextSerialization(..), CorrelationIdentifier, Request(..), RolSerialization, Value, response)
+import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter, runMonadPerspectivesQueryCompiler)
 import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
 import Perspectives.Deltas (runTransactie)
-import Perspectives.Actions (addRol, setProperty)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
+import Perspectives.Guid (guid)
 import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCompiler (constructQueryFunction)
@@ -31,7 +32,7 @@ import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Prelude (Unit, bind, map, pure, show, unit, void, ($), (<<<), (<>), discard)
+import Prelude (Unit, bind, map, pure, show, unit, void, ($), (<<<), (<>), discard, (*>))
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -49,9 +50,11 @@ data ApiRequest e =
   | ShutDown
   | WrongRequest -- Represents a request from the client Perspectives does not recognize.
   | Unsubscribe Subject Predicate CorrelationIdentifier
-  | CreateContext ContextSerialization (ReactStateSetter e) CorrelationIdentifier
+  | CreateContext ContextSerialization (ReactStateSetter e)
+  | CreateRol ContextID RolName RolSerialization (ReactStateSetter e)
   | AddRol ContextID RolName RolID
-  | SetProperty RolID PropertyName Value
+  | SetBinding RolID RolID (ReactStateSetter e)
+  | SetProperty RolID PropertyName Value (ReactStateSetter e)
 
 type RequestRecord e =
   { request :: String
@@ -60,7 +63,8 @@ type RequestRecord e =
   , object :: String
   , reactStateSetter :: ReactStateSetter e
   , setterId :: CorrelationIdentifier
-  , contextDescription :: ContextSerialization}
+  , contextDescription :: ContextSerialization
+  , rolDescription :: RolSerialization}
 
 showRequestRecord :: forall e. RequestRecord e -> String
 showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
@@ -91,7 +95,7 @@ setupTcpApi = runProcess server
       (dataProducer connection $~ (forever (transform marshallRequest))) $$ consumeRequest
       where
         marshallRequest :: (Either MultipleErrors Request) -> ApiRequest (socketio :: SOCKETIO, now :: NOW | e)
-        marshallRequest (Right (Request r@{rtype, subject, object, predicate, setterId, contextDescription})) =
+        marshallRequest (Right (Request r@{rtype, subject, object, predicate, setterId, contextDescription, rolDescription})) =
           marshallRequestRecord
             { request: (unsafeFromForeign (encode rtype))
             , subject
@@ -99,7 +103,8 @@ setupTcpApi = runProcess server
             , object
             , setterId
             , reactStateSetter: launchAff_ <<< writeData connection <<< response setterId
-            , contextDescription}
+            , contextDescription
+            , rolDescription }
         marshallRequest (Left e) = WrongRequest
 
 consumeRequest :: forall e. Consumer (ApiRequest (now :: NOW | e)) (MonadPerspectives (ApiEffects (now :: NOW | e))) Unit
@@ -124,9 +129,11 @@ marshallRequestRecord r@{request} = do
     "GetViewProperties" -> GetViewProperties r.subject r.reactStateSetter r.setterId
     "Unsubscribe" -> Unsubscribe r.subject r.predicate r.setterId
     "ShutDown" -> ShutDown
-    "CreateContext" -> CreateContext r.contextDescription r.reactStateSetter r.setterId
+    "CreateContext" -> CreateContext r.contextDescription r.reactStateSetter
+    "CreateRol" -> CreateRol r.subject r.predicate r.rolDescription r.reactStateSetter
     "AddRol" -> AddRol r.subject r.predicate r.object
-    "SetProperty" -> SetProperty r.subject r.predicate r.object
+    "SetProperty" -> SetProperty r.subject r.predicate r.object r.reactStateSetter
+    "SetBinding" -> SetBinding r.subject r.object r.reactStateSetter
     otherwise -> WrongRequest
 
 dispatchOnRequest :: forall e. ApiRequest e -> MonadPerspectives (ApiEffects e) Unit
@@ -142,13 +149,19 @@ dispatchOnRequest req =
     (GetRolType rid setter setterId) -> subscribeToObjects rid rolTypeM setter setterId
     (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
     (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> bindingM >-> contextM) setter setterId
-    (CreateContext cd setter setterId) -> do
-      r <- constructContext cd
+    (CreateContext (ContextSerialization cd) setter) -> do
+      r <- constructContext (ContextSerialization cd {id = show $ guid unit})
+      case r of
+        (Left messages) -> liftEff $ setter (map show messages)
+        (Right id) -> liftEff $ setter ["ok", id]
+    (CreateRol cid rn rolSerialisation setter) -> do
+      r <- constructAnotherRol rn cid rolSerialisation
       case r of
         (Left messages) -> liftEff $ setter (map show messages)
         (Right id) -> liftEff $ setter ["ok", id]
     (AddRol cid rn rid) -> void $ addRol rn rid cid
-    (SetProperty rid pn v) -> void $ setProperty pn v rid
+    (SetProperty rid pn v setter) -> catchError ((setProperty pn v rid) *> (liftEff $ setter ["ok"])) (\e -> liftEff $ setter [show e])
+    (SetBinding rid bid setter) -> catchError ((setBinding rid bid) *> (liftEff $ setter ["ok"])) (\e -> liftEff $ setter [show e])
     (Unsubscribe subject predicate setterId) -> unsubscribeFromObjects subject predicate setterId
     -- Notice that a WrongRequest fails silently. No response is ever given.
     -- A Shutdown has no effect.

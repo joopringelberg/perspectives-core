@@ -315,8 +315,8 @@ constructActionFunction actionInstanceID = do
 
       action <- pure (\f contextId bool -> case bool of
         "true" -> do
-          value <- (contextId ##> valueComputer)
-          case value of
+          val <- (contextId ##> valueComputer)
+          case val of
             Nothing -> pure []
             (Just v) -> f rol v contextId <* setupBotActions contextId
         _ -> pure [])
@@ -343,8 +343,8 @@ constructActionFunction actionInstanceID = do
 
       action <- pure (\f rolId bool -> case bool of
         "true" -> do
-          value <- (rolId ##> valueComputer)
-          case value of
+          val <- (rolId ##> valueComputer)
+          case val of
             Nothing -> pure []
             (Just v) -> f property v rolId
         _ -> pure [])
