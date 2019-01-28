@@ -72,18 +72,68 @@ NAAMGEVING
 	- namespace
 	- value
 	- key
-	- viewnaam -> moet viewname worden.
-	- defaultValue -> moet defaultvalue worden
-	- setValue -> moet setvalue worden.
+	- viewnaam -> moet viewname worden. KLAAR
+	- defaultValue -> moet defaultvalue worden	KLAAR
+	- setValue -> moet setvalue worden.	KLAAR
 	- rollen
 
 Verwarrend zijn:
-	- instance
-	- rol
-	- rolInstance
-	- rolename
-	- type
+	- instance	-> rolinstance of contextinstance
+	- rol	-> rolname of rolinstance
+	- rolInstance -> rolinstance KLAAR
+	- rolename	-> rolname	KLAAR
+	- type	-> contextname?
 
 alle model-concepten zoals rol en view ga ik suffixen met 'name'
 alle instanties ga ik suffixen met 'instance'
 moet er een verschil tussen rolinstance en contextinstance gemaakt worden? of is het juist beter om één naam te gebruiken - en dan dus 'instance'?
+
+
+============
+CreateContext in rol
+
+Twee bij twee: create/use context X create/use role
+
+			create context			use context
+create rol	1. add					2. b.v. drop context in rol
+
+use rol		3. overschrijf/bind		4. overschrijf/bind
+
+Create context (in computed/calculated rol)
+B.v.: elke context zit in de computed rol inverse_type. Je kunt dus een context 'los' maken.
+
+ONTWERPBESLUIT: 
+De CreateContext Component is geen contextinstance provider. Je moet de aangemaakte context ophalen via een rol, al dan niet berekend.
+
+CreateContext
+* attribuut type
+
+CreateContextInRol
+props:
+	* contextinstance
+	* rolnaam (type van te maken rol bij contextinstance): meestal een attribuut
+	* contextnaam (type van te maken context): een attribuut, isRequired.
+
+Kun je inbedden in een Context component (die zorgt voor de contextinstance)
+
+CreateContextInBestaandeRol
+props:
+	* rolinstance (te vullen rol)
+	* rolnaam: (type van te selecteren rol) meestal een attribuut
+	* contextnaam (type van te maken context): een attribuut, isRequired.
+Kun je inbedden in een Rollen component
+
+Gevalsonderscheiding is goed mogelijk: als er een rolinstance is, bind je de context in de bestaande rol. Anders moet er een contextinstance zijn.
+
+Ik kies voor de naam CreateContextInRol. We kunnen dan CreateContext gebruiken voor het 'los' creeeren.
+
+Het kan ook in één component. Gevalsonderscheiding:
+	* rolinstance -> CreateContextInBestaandeRol
+	* contextinstance -> CreateContextInNieuweRol
+	* alleen contextnaam -> CreateContext
+
+Beide (gevallen) geven een prop 'create' door aan hun children. Dit is een functie waar je nog rollen en properties aan mee kunt geven.
+Het type wordt door de component toegevoegd.
+
+
+

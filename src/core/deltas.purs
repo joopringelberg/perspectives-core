@@ -4,7 +4,7 @@ import Control.Monad.Aff (error, throwError)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex)
+import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head)
 import Data.Foreign.Generic (encodeJSON)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.StrMap (StrMap, empty, insert, lookup)
@@ -13,12 +13,13 @@ import Data.TraversableWithIndex (forWithIndex)
 import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), TypedTripleGetter, createTransactie, transactieID, (%%>>))
+import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), TypedTripleGetter, ObjectsGetter, createTransactie, transactieID, (%%>>))
 import Perspectives.DataTypeObjectGetters (context)
 import Perspectives.DataTypeTripleGetters (identityM, rolTypeM)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
+import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, rolIsFunctioneel)
 import Perspectives.ModelBasedTripleGetters (actiesInContextDefM, ownRollenDefM, rolInContextDefM, inverse_subjectRollenDefM, propertyIsFunctioneelM, rolIsFunctioneelM, bindingDefM, objectRollenDefM, objectViewDefM, propertyReferentiesM, rolUserM, subjectRollenDefM)
 import Perspectives.PerspectivesState (setTransactie, transactie)
 import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty, rolesOf, toBoolean)
@@ -110,8 +111,10 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
     (Just _) -> pure unit
     Nothing -> do
       maybeM (pure unit) addTripleToQueue (lift $ modifyTriple newCD)
-      (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
-      if isfunc
+      (isFunctionalComputer :: ObjectsGetter e) <- if isContext then pure rolIsFunctioneel else pure propertyIsFunctioneel
+      isfunc <- isFunctionalComputer memberName -- hier komt ie niet uit.
+      -- (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
+      if (maybe false ((==) "true") (head isfunc))
         then do
           x <- pure $ findIndex equalExceptRolID deltas
           case x of

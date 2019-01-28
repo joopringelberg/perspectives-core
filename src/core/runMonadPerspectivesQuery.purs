@@ -1,10 +1,9 @@
 module Perspectives.RunMonadPerspectivesQuery where
 
-import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Exception (error)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.State (evalStateT, lift)
+import Control.Monad.State (evalStateT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.StrMap (singleton)
@@ -21,7 +20,7 @@ runMonadPerspectivesQuery :: forall e a.
   -> (Subject -> MonadPerspectivesQuery (gm :: GLOBALMAP | e) a)
   -> (MonadPerspectives (gm :: GLOBALMAP | e) a)
 runMonadPerspectivesQuery a f = do
-  _ <- lift $ liftAff $ liftEff $ addToTripleIndex a "model:Perspectives$start" [a] [] [] tripleGetter
+  _ <- liftEff $ addToTripleIndex a "model:Perspectives$start" [a] [] [] tripleGetter
   evalStateT (f a) (singleton "#start" tref)
   where
     tref :: TripleRef
@@ -30,7 +29,7 @@ runMonadPerspectivesQuery a f = do
           , predicate: "model:Perspectives$start"
         }
     tripleGetter :: TripleGetter e
-    tripleGetter id = lift $ liftAff $ liftEff (addToTripleIndex id "model:Perspectives$start" [a] [] [] tripleGetter)
+    tripleGetter id = liftEff (addToTripleIndex id "model:Perspectives$start" [a] [] [] tripleGetter)
 
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A TRIPLE

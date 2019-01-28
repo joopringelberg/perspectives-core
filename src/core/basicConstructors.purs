@@ -8,8 +8,9 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (StrMap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
+import Perspectives.Actions (addRol, removeRol)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.ContextAndRole (addContext_rolInContext, defaultContextRecord, defaultRolRecord)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
@@ -19,7 +20,7 @@ import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.TypeDefChecker (checkContext)
-import Prelude (Unit, bind, discard, map, pure, show, ($), (<>), unit, (<<<), id, const, (>=>))
+import Prelude (Unit, bind, const, discard, id, map, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
 -- | Construct contexts and roles from the serialisation.
 constructContexts :: forall e. ContextsSerialisation -> MonadPerspectives (AjaxAvarCache e) (Array UserMessage)
@@ -108,21 +109,22 @@ constructRol rolType id rolId i (RolSerialization {properties, binding: bnd}) = 
 
 -- | Construct and add a Rol instance to the Context instance, provided the construction process doesn't yield
 -- | exceptions and that the resulting context instance is semantically correct.
+-- | Saves the new Rol instance.
 constructAnotherRol :: forall e. RolName -> ContextID -> RolSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
 constructAnotherRol rolType id rolSerialisation = do
   rolInstances <- getRol rolType id
-  candidate <- runExceptT $ constructRol rolType id rolType (length rolInstances) rolSerialisation
+  candidate <- runExceptT $ constructRol rolType id (id <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (length rolInstances) rolSerialisation
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
+      void $ addRol rolType rolId id
       (m :: Array UserMessage) <- checkContext id
       case length m of
         0 -> do
-          (ctxt :: PerspectContext) <- getPerspectEntiteit id
-          _ <- pure $ addContext_rolInContext ctxt rolType rolId
-          pure $ Right id
-        otherwise -> pure $ Left m
-
+          pure $ Right rolId
+        otherwise -> do
+          void $ removeRol rolType rolId id
+          pure $ Left m
 
 constructProperties :: PropertySerialization -> StrMap PropertyValueWithComments
 constructProperties (PropertySerialization props) = map (\(v :: Array String) -> PropertyValueWithComments {commentBefore: [], commentAfter: [], value: v}) props

@@ -166,7 +166,6 @@ updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
 updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
   addDelta $ createDelta memberName value cid
-  -- setupBotActions cid
   pure [cid]
 
 updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
@@ -205,7 +204,12 @@ addRol :: forall e. RolName -> RolID -> ObjectsGetter e
 addRol = setUpBotActionsAfter addRol'
 
 setUpBotActionsAfter :: forall e. (ID -> ID -> ObjectsGetter e) -> ID -> ID -> (ObjectsGetter e)
-setUpBotActionsAfter g mn mid cid = g mn mid cid <* setupBotActions cid
+-- setUpBotActionsAfter g mn mid cid = g mn mid cid <* setupBotActions cid
+setUpBotActionsAfter g mn mid cid = do
+  r <- g mn mid cid
+  setupBotActions cid
+  pure r
+
 
 removeRol' :: forall e. RolName -> RolID -> ObjectsGetter e
 removeRol' =

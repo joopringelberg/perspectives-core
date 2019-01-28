@@ -1,1 +1,36 @@
 TESTBOTACTIE IN USER INTERFACE VAN PERSPECTIVES-REACT-INTEGRATED CLIENT
+
+De user interface moet de volgende velden bevatten:
+
+	* orgineel (v1): $v1 			[als invoerveld]
+	* kopie (v2): $v2				[readonly]
+	* kopiëren of niet?: $trigger	[als invoerveld, een checkbox of radiobuttons]
+	* v1 == v2?: $propsEqual		[readonly, string waarde]
+
+Maar er moet ook een nieuwe tba:Test context gegenereerd worden. 
+De (gegenereerde?) id van die context gebruiken we om de bovenstaande velden in te plaatsen.
+
+1. Wat voor container gebruiken we voor de instantie van tba:Test?
+	- als we uit het creeeren een id terugkrijgen, kan dat een Context container zijn.
+
+2. Hoe creeëren we een context? We moeten via de proxy de ApiRequest dataconstructor CreateContext aanmaken. De proxy bevat de functie createContext en die geven we een contextDescription mee (JSON) en een functie receiveResponse.
+
+Deze functie krijgt een array van strings terug. Indien succesvol, is er precies één string, namelijk de id van de gemaakte context. Anders zijn er één of meerdere foutmeldingen.
+
+
+de nieuwe instantie van de Rol $zaken zit in de model:Perspectives namespace maar moet in model:User zitten.
+Hij wordt nu namelijk in het model opgeslagen!
+
+  "rolInContext": {
+    "model:Perspectives$Systeem$trustedCluster": [
+      "model:User$MijnSysteem$trustedCluster_1"
+    ],
+    "model:Perspectives$Systeem$gebruiker": [
+      "model:User$MijnSysteem$gebruiker_1"
+    ],
+    "model:Perspectives$Systeem$zaken": [
+      "model:Perspectives$Systeem$zaken0"
+    ]
+  },
+
+De $trustedCluster en $gebruiker rollen gaan goed, maar $zaken (aangemaakt via createContext) niet.

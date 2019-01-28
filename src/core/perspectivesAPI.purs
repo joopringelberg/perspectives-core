@@ -24,12 +24,14 @@ import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Guid (guid)
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryEffect (QueryEffect, (~>))
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
+import Perspectives.SaveUserData (saveUserData)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Prelude (Unit, bind, map, pure, show, unit, void, ($), (<<<), (<>), discard, (*>))
@@ -150,10 +152,12 @@ dispatchOnRequest req =
     (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
     (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> bindingM >-> contextM) setter setterId
     (CreateContext (ContextSerialization cd) setter) -> do
-      r <- constructContext (ContextSerialization cd {id = show $ guid unit})
+      r <- constructContext (ContextSerialization cd {id = "model:User$c" <> (show $ guid unit)})
       case r of
         (Left messages) -> liftEff $ setter (map show messages)
-        (Right id) -> liftEff $ setter ["ok", id]
+        (Right id) -> do
+          saveUserData [buitenRol id]
+          liftEff $ setter ["ok", buitenRol id] -- saveUserData
     (CreateRol cid rn rolSerialisation setter) -> do
       r <- constructAnotherRol rn cid rolSerialisation
       case r of

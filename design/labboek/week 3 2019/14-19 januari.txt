@@ -75,8 +75,8 @@ Hoofdlijnen:
 
 Er is syntax, in query.crl, voor assignment. We kunnen Actie dus uitbreiden met een rol 'effect' die gevuld wordt door (de buitenrol van) een context q:assignToRol of q:assignToProperty. Maar, er is in de core nog geen functionaliteit die ook daadwerkelijk iets doet met zo'n beschreven zij-effect (zoals dat al wel bestaat voor getters, in Perspectives.QueryCompiler).
 
-Hier moet het mechanisme dat we in Perspectives I hadden, opnieuw worden gemaakt: bij aanmaak van een Actie-instantie moet het zij-effect van die Actie worden uitgevoerd. Dus dan moet de beschrijving, een instantie van q.assignToProperty, door een functie omgezet worden in de daadwerkelijke aanroep van setProperty. Uiteraard kan de rol 'effect' meerdere bindingen hebben.
-Maar: dit is voor het opslaan van modellen niet zo relevant. Dat is een ander type zij-effect dan assignment (de timestamp kan de functie gewoon rechtstreeks zetten).
+[Hier moet het mechanisme dat we in Perspectives I hadden, opnieuw worden gemaakt: bij aanmaak van een Actie-instantie moet het zij-effect van die Actie worden uitgevoerd. Dus dan moet de beschrijving, een instantie van q.assignToProperty, door een functie omgezet worden in de daadwerkelijke aanroep van setProperty. Uiteraard kan de rol 'effect' meerdere bindingen hebben.
+Maar: dit is voor het opslaan van modellen niet zo relevant. Dat is een ander type zij-effect dan assignment (de timestamp kan de functie gewoon rechtstreeks zetten).]
 
 Oftewel, we moeten in de rol 'effect' óók een context accepteren die een speciale, effectvolle functie beschrijft (c.q. het bestand opslaat in couchdb en de timestamp zet). Dit zijn speciale functies, waarvan de implementatie in de core opgenomen is.
 
@@ -86,6 +86,7 @@ De parameters van de speciale effectvolle functie zouden we kunnen beschrijven i
 	* de computed property 'mustBePersisted'
 De laatste parameter is anders dan de anderen omdat het de enige trigger is: alleen als deze waarde verandert, moet de effectvolle functie uitgevoerd worden. Bij bot-acties is er altijd een trigger en dat is natuurlijk altijd een boolean functie. Het is niet nodig om die in de beschrijving van de speciale effectvolle functie op te nemen. Immers, hij is al beschreven als de conditie van de bot-actie. Per conventie maken we daar de eerste parameter van de purescript functie van.
 
+En tenslotte nemen we in Actie ook de rol 'conditie' op, die gevuld wordt met een query met boolean resultaat.
 
 Er is ook syntax, in query.crl, voor n-ary combinators: q:nAryCombinator. Hiermee kan ik een 'and' beschrijven. Ik moet Perspectives.QueryCompiler nog wel uitbreiden voor de logische combinatoren.
 
