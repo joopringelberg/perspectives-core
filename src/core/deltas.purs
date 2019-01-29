@@ -29,8 +29,7 @@ import Perspectives.TheoryChange (addTripleToQueue, modifyTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
-import Perspectives.Utilities (maybeM)
-import Perspectives.Utilities (onNothing') as Util
+import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, id, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
@@ -166,7 +165,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
 sendTransactieToUser :: forall e. ID -> Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ##> identityM -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
-  (userIP :: String) <- (Util.onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
+  (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
   -- TODO controleer of hier authentication nodig is!
   (res :: AJ.AffjaxResponse String)  <- liftAff $ AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
   (StatusCode n) <- pure res.status
