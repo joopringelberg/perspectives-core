@@ -1,6 +1,7 @@
 module Perspectives.Syntax where
 
 import Perspectives.EntiteitAndRDFAliases
+
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
@@ -10,6 +11,7 @@ import Data.StrMap (StrMap)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
+import Perspectives.PerspectivesTypesInPurescript (Context, ContextDef, Rol(..), RolDef, Val(..))
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
@@ -18,13 +20,13 @@ import Prelude (class Show, ($))
 newtype PerspectContext = PerspectContext ContextRecord
 
 type ContextRecord =
-  { _id :: ID
+  { _id :: Context
   , _rev :: Revision
   , displayName :: String
-  , pspType :: ID
+  , pspType :: ContextDef
   , binnenRol :: PerspectRol
-  , buitenRol :: ID
-  , rolInContext :: StrMap (Array ID)
+  , buitenRol :: Rol
+  , rolInContext :: StrMap (Array Rol)
   , comments :: Comments
   }
 
@@ -49,15 +51,15 @@ instance respondablePerspectContext :: Respondable PerspectContext where
 newtype PerspectRol = PerspectRol RolRecord
 
 type RolRecord =
-  { _id :: ID
-  , pspType :: ID
-  , context :: ID
+  { _id :: Rol
+  , pspType :: RolDef
+  , context :: Context
   -- While the fields above occur in every role, those below do not.
   , _rev :: Revision
-  , binding :: Binding
+  , binding :: Rol
   -- The four fields below could also be modeled as Maybe values.
   , properties :: StrMap PropertyValueWithComments
-  , gevuldeRollen :: StrMap (Array RolID)
+  , gevuldeRollen :: StrMap (Array Rol)
   , occurrence :: Int
   , comments :: Comments
   }
@@ -85,12 +87,12 @@ type Revision = Maybe String
 revision :: String -> Revision
 revision = Just
 
-type Binding = Maybe RolID
+type Binding = Maybe Rol
 
-binding :: RolID -> Binding
-binding id = case id of
+binding :: Rol -> Binding
+binding (Rol id) = case id of
   "" -> Nothing
-  otherwise -> (Just id)
+  otherwise -> (Just (Rol id))
 
 -----------------------------------------------------------
 -- COMMENTS
@@ -117,7 +119,7 @@ instance decodeComments :: Decode Comments where
 newtype PropertyValueWithComments = PropertyValueWithComments
   { commentBefore :: Array Comment
   , commentAfter :: Array Comment
-  , value :: Array String
+  , value :: Array Val
   }
 
 derive instance genericRepPropertyValueWithComments :: Generic PropertyValueWithComments _
@@ -131,7 +133,7 @@ instance encodePropertyValueWithComments :: Encode PropertyValueWithComments whe
 instance decodePropertyValueWithComments :: Decode PropertyValueWithComments where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-propertyValue :: PropertyValueWithComments -> Array String
+propertyValue :: PropertyValueWithComments -> Array Val
 propertyValue (PropertyValueWithComments{value}) = value
 
 -----------------------------------------------------------
