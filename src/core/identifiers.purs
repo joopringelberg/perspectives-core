@@ -39,6 +39,7 @@ import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.PerspectivesTypesInPurescript (Context(..), Rol(..))
 import Perspectives.Utilities (onNothing')
 import Prelude (class Show, id, ($), (<>), (==), (||))
 
@@ -52,15 +53,15 @@ modelRegex = unsafeRegex "^model:(\\w*)$" noFlags
 isModelName :: String -> Boolean
 isModelName s = test modelRegex s
 
-binnenRol :: String -> String
-binnenRol s = if isModelName s
-  then s <> "$_binnenRol"
-  else s <> "_binnenRol"
+binnenRol :: Context -> Rol
+binnenRol (Context s) = if isModelName s
+  then Rol $ s <> "$_binnenRol"
+  else Rol $ s <> "_binnenRol"
 
-buitenRol :: String -> String
-buitenRol s = if isModelName s
-  then s <> "$_buitenRol"
-  else s <> "_buitenRol"
+buitenRol :: Context -> Rol
+buitenRol (Context s) = if isModelName s
+  then Rol $ s <> "$_buitenRol"
+  else Rol $ s <> "_buitenRol"
 
 type Namespace = String
 type LocalName = String
