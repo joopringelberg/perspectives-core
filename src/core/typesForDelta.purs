@@ -11,29 +11,29 @@ import Data.Foreign.Generic.Class (class GenericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
-import Perspectives.EntiteitAndRDFAliases (ID)
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
 -- DELTA
 -----------------------------------------------------------
-newtype Delta = Delta
-  { id :: ID
-  , memberName :: String
-  , value :: Maybe String
+-- | Type parameter s should be contstrained by Subject, p by Predicate and o by Object.
+newtype Delta s p o = Delta
+  { id :: s
+  , memberName :: p
+  , value :: Maybe o
   , deltaType :: DeltaType
   , isContext :: Boolean
   }
 
-derive instance genericDelta :: Generic Delta _
+derive instance genericDelta :: Generic (Delta s p o) _
 
-instance showDelta :: Show Delta where
+instance showDelta :: (Show s, Show p, Show o) => Show (Delta s p o) where
   show = genericShow
 
-instance encodeDelta :: Encode Delta where
+instance encodeDelta :: (Encode s, Encode p, Encode o) => Encode (Delta s p o) where
   encode = encodeDefault
 
-derive instance eqDelta :: Eq Delta
+derive instance eqDelta :: (Eq s, Eq p, Eq o) => Eq (Delta s p o)
 
 -----------------------------------------------------------
 -- DELTATYPE

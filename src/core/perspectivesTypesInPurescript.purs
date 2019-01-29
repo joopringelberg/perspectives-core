@@ -1,7 +1,5 @@
 module Perspectives.PerspectivesTypesInPurescript where
 
-
--- PRIMARY REPRESENTATION
 import Prelude
 
 import Data.Foreign.Class (class Decode, class Encode)
@@ -19,15 +17,54 @@ instance decodeContext :: Decode Context where
 instance encodeContext :: Encode Context where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
-newtype Rol = Rol String
+newtype RolInContext = RolInContext String
 
-derive instance genericRepRol :: Generic Rol _
-instance showRol :: Show Rol where
-  show (Rol s) = show s
-instance decodeRol :: Decode Rol where
+derive instance genericRepRolInContext :: Generic RolInContext _
+instance showRolInContext :: Show RolInContext where
+  show (RolInContext s) = show s
+instance decodeRolInContext :: Decode RolInContext where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeRol :: Encode Rol where
+instance encodeRolInContext :: Encode RolInContext where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+newtype BuitenRol = BuitenRol String
+
+derive instance genericRepBuitenRol :: Generic BuitenRol _
+instance showBuitenRol :: Show BuitenRol where
+  show (BuitenRol s) = show s
+instance decodeBuitenRol :: Decode BuitenRol where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance encodeBuitenRol :: Encode BuitenRol where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+-- | Class Binding should constrain all functions that manipulate a Rol.
+class Binding a
+
+instance bindingRol :: Binding RolInContext
+instance bindingBuitenRol :: Binding BuitenRol
+
+newtype BinnenRol = BinnenRol String
+
+derive instance genericRepBinnenRol :: Generic BinnenRol _
+instance showBinnenRol :: Show BinnenRol where
+  show (BinnenRol s) = show s
+instance decodeBinnenRol :: Decode BinnenRol where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance encodeBinnenRol :: Encode BinnenRol where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+class Rol a
+
+instance rolInContextRol :: Rol RolInContext
+instance buitenRolRol :: Rol BuitenRol
+instance binnenRol :: Rol BinnenRol
+
+class Subject a
+
+instance contextSubject :: Subject Context
+instance rolinContextSubject :: Subject RolInContext
+instance binnenRolSubject :: Subject BinnenRol
+instance buitenRolSubject :: Subject BuitenRol
 
 newtype Val = Val String
 
@@ -38,6 +75,15 @@ instance decodeVal :: Decode Val where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeVal :: Encode Val where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+class Object a
+
+instance rolinContextObject :: Object RolInContext
+instance binnenRolObject :: Object BinnenRol
+instance buitenRolObject :: Object BuitenRol
+instance valObject :: Object Val
+instance contextObject :: Object Context
+
 
 -- MODEL:PERSPECTIVES
 newtype SimpleValue = SimpleValue String
@@ -68,6 +114,19 @@ instance encodeRolDef :: Encode RolDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
 newtype PropertyDef = PropertyDef String
+
+derive instance genericRepPropertyDef :: Generic PropertyDef _
+instance showPropertyDef :: Show PropertyDef where
+  show (PropertyDef s) = show s
+instance decodePropertyDef :: Decode PropertyDef where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance encodePropertyDef :: Encode PropertyDef where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+
+class Predicate a
+
+instance rolDefPredicate :: Predicate RolDef
+instance propertyDefPredicate :: Predicate PropertyDef
 
 newtype SysteemBot = SysteemBot String
 

@@ -26,6 +26,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
+import Perspectives.PerspectivesTypesInPurescript (Context(..))
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.TypesForDeltas (Delta, encodeDefault)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>>=), ($))
@@ -75,19 +76,19 @@ readQueryVariable var = gets \env -> unsafePartial (fromJust (lookup var env))
 -----------------------------------------------------------
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-type Domain = String
+type Domain = Context
 type Range = String
 type VariableName = String
 
 type QueryCompilerEnvironment =
   { domain :: Domain
-  , declaredVariables :: StrMap ContextID
+  , declaredVariables :: StrMap Context
   }
 
 type MonadPerspectivesQueryCompiler e = StateT QueryCompilerEnvironment (MonadPerspectives e)
 
 runMonadPerspectivesQueryCompiler :: forall e a.
-  ContextID
+  Context
   -> (MonadPerspectivesQueryCompiler e a)
   -> MonadPerspectives e a
 runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: empty}
@@ -98,10 +99,10 @@ putQueryStepDomain d = modify \env -> env { domain = d}
 getQueryStepDomain :: forall e. MonadPerspectivesQueryCompiler e Domain
 getQueryStepDomain = gets \{domain} -> domain
 
-putQueryVariableType :: forall e. VariableName -> ContextID -> MonadPerspectivesQueryCompiler e Unit
+putQueryVariableType :: forall e. VariableName -> Context -> MonadPerspectivesQueryCompiler e Unit
 putQueryVariableType var typeId = modify \s@{declaredVariables} -> s { declaredVariables = insert var typeId declaredVariables }
 
-getQueryVariableType :: forall e. VariableName -> MonadPerspectivesQueryCompiler e (Maybe String)
+getQueryVariableType :: forall e. VariableName -> MonadPerspectivesQueryCompiler e (Maybe Context)
 getQueryVariableType var = gets \{declaredVariables} -> lookup var declaredVariables
 
 withQueryCompilerEnvironment :: forall e a. MonadPerspectivesQueryCompiler e a -> MonadPerspectivesQueryCompiler e a
@@ -114,28 +115,31 @@ withQueryCompilerEnvironment a = do
 -----------------------------------------------------------
 -- OBJECT(S)GETTER
 -----------------------------------------------------------
-type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+-- | Usage: contextType :: forall e. (Context ~~> ContextDef) e
+type ObjectsGetter s o e = s -> MonadPerspectives (AjaxAvarCache e) (Array o)
 
-type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
+type ObjectGetter s o e = s -> MonadPerspectives (AjaxAvarCache e) o
 
-applyObjectsGetter :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+infixr 4 type ObjectsGetter as ~~>
+
+applyObjectsGetter :: forall s o e. s -> ObjectsGetter s o e -> MonadPerspectives (AjaxAvarCache e) (Array o)
 applyObjectsGetter id g = g id
 
 infix 0 applyObjectsGetter as %%
 infix 0 applyObjectsGetter as %%=
 
-applyObjectsGetterToMaybeObject :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) (Maybe Value)
+applyObjectsGetterToMaybeObject :: forall s o e. s -> ObjectsGetter s o e -> MonadPerspectives (AjaxAvarCache e) (Maybe o)
 applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyObjectsGetterToMaybeObject as %%>
 
-applyObjectsGetterToObject :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) Value
-applyObjectsGetterToObject id g = g id >>= \objs ->
+applyObjectGetterToObject :: forall s o e. Show s => s -> ObjectsGetter s o e -> MonadPerspectives (AjaxAvarCache e) o
+applyObjectGetterToObject id g = g id >>= \objs ->
   case head objs of
-    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> id <> "'."
+    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> show id <> "'."
     (Just obj) -> pure obj
 
-infix 0 applyObjectsGetterToObject as %%>>
+infix 0 applyObjectGetterToObject as %%>>
 
 -----------------------------------------------------------
 -- NAMEDFUNCTION
@@ -146,10 +150,13 @@ data NamedFunction f = NamedFunction Name f
 -----------------------------------------------------------
 -- TRIPLE
 -----------------------------------------------------------
-newtype Triple e = Triple
-  { subject :: Subject
-  , predicate :: Predicate
-  , object :: Array ID
+-- | The type parameter s of Triple should be constrained by Class Subject in every function.
+-- | The type parameter p of Triple should be constrained by Class Predicate in every function.
+-- | The type parameter o of Triple should be constrained by Class Object in every function.
+newtype Triple s p o e = Triple
+  { subject :: s
+  , predicate :: p
+  , object :: Array o
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
   , tripleGetter :: TripleGetter e}
