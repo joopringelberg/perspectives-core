@@ -1,4 +1,4 @@
-module Perpectives.TypeChecker where
+module Perspectives.TypeChecker where
 
 import Control.Alt ((<|>))
 import Data.Array (foldM, head, length, union)
