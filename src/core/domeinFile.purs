@@ -7,6 +7,7 @@ import Data.Maybe (Maybe(..))
 import Data.StrMap (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
+import Perspectives.PerspectivesTypesInPurescript (Context(..), Rol(..))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision)
 import Prelude (($))
 
@@ -36,10 +37,10 @@ type DomeinFileRoles = StrMap PerspectRol
 
 -- The same context may be inserted multiple times without consequence; it is an idempotent operation.
 addContextToDomeinFile :: PerspectContext -> DomeinFile -> DomeinFile
-addContextToDomeinFile c@(PerspectContext {_id}) (DomeinFile dff@{contexts}) = DomeinFile dff {contexts = insert _id c contexts}
+addContextToDomeinFile c@(PerspectContext {_id:(Context id)}) (DomeinFile dff@{contexts}) = DomeinFile dff {contexts = insert id c contexts}
 
 addRolToDomeinFile :: PerspectRol -> DomeinFile -> DomeinFile
-addRolToDomeinFile c@(PerspectRol {_id}) (DomeinFile dff@{roles}) = DomeinFile dff {roles = insert _id c roles}
+addRolToDomeinFile c@(PerspectRol {_id:(Rol id)}) (DomeinFile dff@{roles}) = DomeinFile dff {roles = insert id c roles}
 
 setRevision :: String -> DomeinFile -> DomeinFile
 setRevision vs (DomeinFile dff) = DomeinFile $ dff {_rev = Just vs}
