@@ -11,38 +11,38 @@ import Data.StrMap (StrMap)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
-import Perspectives.PerspectivesTypesInPurescript (Context, ContextDef, BuitenRol, RolDef, RolInContext, Val)
+import Perspectives.PerspectivesTypesInPurescript (BinnenRol, BuitenRol, Context, ContextDef, RolDef, RolInContext, Val)
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
 -----------------------------------------------------------
 -- | The type parameter r must be constrained with class Rol wherever it PerspectContext is used and b must be constrained by Binding.
-newtype PerspectContext r b = PerspectContext (ContextRecord r b)
+newtype PerspectContext = PerspectContext ContextRecord
 
-type ContextRecord r b =
+type ContextRecord =
   { _id :: Context
   , _rev :: Revision
   , displayName :: String
   , pspType :: ContextDef
-  , binnenRol :: PerspectRol r b
+  , binnenRol :: PerspectRol BinnenRol BuitenRol
   , buitenRol :: BuitenRol
   , rolInContext :: StrMap (Array RolInContext)
   , comments :: Comments
   }
 
-derive instance genericRepPerspectContext :: Generic (PerspectContext r b) _
+derive instance genericRepPerspectContext :: Generic PerspectContext _
 
-instance showPerspectContext :: (Show r, Show b) => Show (PerspectContext r b) where
+instance showPerspectContext :: Show PerspectContext where
   show = genericShow
 
-instance encodePerspectContext :: (Encode r, Encode b) => Encode (PerspectContext r b) where
+instance encodePerspectContext :: Encode PerspectContext where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance decodePerspectContext :: (Decode r, Decode b) => Decode (PerspectContext r b) where
+instance decodePerspectContext :: Decode PerspectContext where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance respondablePerspectContext :: (Decode r, Decode b, Respondable r, Respondable b) => Respondable (PerspectContext r b) where
+instance respondablePerspectContext :: Respondable PerspectContext where
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
@@ -58,7 +58,7 @@ type RolRecord r b =
   , context :: Context
   -- While the fields above occur in every role, those below do not.
   , _rev :: Revision
-  , binding :: b
+  , binding :: Maybe b
   -- The four fields below could also be modeled as Maybe values.
   , properties :: StrMap PropertyValueWithComments
   , gevuldeRollen :: StrMap (Array r)

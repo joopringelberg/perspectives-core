@@ -1,6 +1,6 @@
 module Perspectives.DomeinFile where
 
-import Data.Foreign.Class (class Encode)
+import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
@@ -8,7 +8,7 @@ import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
-import Perspectives.PerspectivesTypesInPurescript (class Binding, Context(..))
+import Perspectives.PerspectivesTypesInPurescript (class Binding, class Rol, Context(..))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision)
 import Prelude (($))
 
@@ -20,31 +20,34 @@ newtype DomeinFile r b = DomeinFile
   , roles ::DomeinFileRoles r b
   }
 
-derive instance genericDomeinFile :: Generic (DomeinFile a) _
+derive instance genericDomeinFile :: Generic (DomeinFile r b) _
 
-instance encodeDomeinFile :: (Encode a) => Encode (DomeinFile a) where
+instance encodeDomeinFile :: (Encode r, Encode b) => Encode (DomeinFile r b) where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance respondableDomeinFile :: (Respondable a) => Respondable (DomeinFile a) where
+instance decodeDomeinFile :: (Decode r, Decode b) => Decode (DomeinFile r b) where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance respondableDomeinFile :: (Decode r, Decode b, Respondable r, Respondable b) => Respondable (DomeinFile r b) where
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-defaultDomeinFile :: Binding a => DomeinFile a
+defaultDomeinFile :: forall r b. Binding r => Binding b => DomeinFile r b
 defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, roles: empty}
 
 -- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
 -- | The type parameter r must be constrained with class Rol and b must be constrained by Binding.
-type DomeinFileContexts r b= StrMap (PerspectContext r b)
+type DomeinFileContexts = StrMap PerspectContext
 
 -- | The type parameter r must be constrained with class Rol and b must be constrained by Binding.
 type DomeinFileRoles r b = StrMap (PerspectRol r b)
 
 -- The same context may be inserted multiple times without consequence; it is an idempotent operation.
-addContextToDomeinFile :: Binding a => PerspectContext -> DomeinFile a -> DomeinFile a
+addContextToDomeinFile :: forall r b. Rol r => Binding b => PerspectContext -> DomeinFile r b -> DomeinFile r b
 addContextToDomeinFile c@(PerspectContext {_id:(Context id)}) (DomeinFile dff@{contexts}) = DomeinFile dff {contexts = insert id c contexts}
 
-addRolToDomeinFile :: Binding a => PerspectRol a -> DomeinFile a -> DomeinFile a
+addRolToDomeinFile :: forall r b. Rol r => Binding b => PerspectRol r b -> DomeinFile r b -> DomeinFile r b
 addRolToDomeinFile c@(PerspectRol {_id}) (DomeinFile dff@{roles}) = DomeinFile dff {roles = insert (unwrap _id) c roles}
 
-setRevision :: Binding a => String -> DomeinFile a -> DomeinFile a
+setRevision :: forall r b. Rol r => Binding b => String -> DomeinFile r b -> DomeinFile r b
 setRevision vs (DomeinFile dff) = DomeinFile $ dff {_rev = Just vs}

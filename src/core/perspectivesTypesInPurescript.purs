@@ -5,6 +5,7 @@ import Prelude
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
+import Data.Newtype (class Newtype)
 
 -- PRIMARY REPRESENTATION
 newtype Context = Context String
@@ -20,22 +21,28 @@ instance encodeContext :: Encode Context where
 newtype RolInContext = RolInContext String
 
 derive instance genericRepRolInContext :: Generic RolInContext _
+derive instance newtypeRolInContext :: Newtype RolInContext _
 instance showRolInContext :: Show RolInContext where
   show (RolInContext s) = show s
 instance decodeRolInContext :: Decode RolInContext where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeRolInContext :: Encode RolInContext where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqRolInContext :: Eq RolInContext where
+  eq (RolInContext r1) (RolInContext r2) = eq r1 r2
 
 newtype BuitenRol = BuitenRol String
 
 derive instance genericRepBuitenRol :: Generic BuitenRol _
+derive instance newtypeBuitenRol :: Newtype BuitenRol _
 instance showBuitenRol :: Show BuitenRol where
   show (BuitenRol s) = show s
 instance decodeBuitenRol :: Decode BuitenRol where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeBuitenRol :: Encode BuitenRol where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqBuitenRol :: Eq BuitenRol where
+  eq (BuitenRol r1) (BuitenRol r2) = eq r1 r2
 
 -- | Class Binding should constrain all functions that manipulate a Rol.
 class Binding a
@@ -46,14 +53,17 @@ instance bindingBuitenRol :: Binding BuitenRol
 newtype BinnenRol = BinnenRol String
 
 derive instance genericRepBinnenRol :: Generic BinnenRol _
+derive instance newtypeBinnenRol :: Newtype BinnenRol _
 instance showBinnenRol :: Show BinnenRol where
   show (BinnenRol s) = show s
 instance decodeBinnenRol :: Decode BinnenRol where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeBinnenRol :: Encode BinnenRol where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqBinnenRol :: Eq BinnenRol where
+  eq (BinnenRol r1) (BinnenRol r2) = eq r1 r2
 
-class Rol a
+class (Newtype a String, Eq a) <= Rol a
 
 instance rolInContextRol :: Rol RolInContext
 instance buitenRolRol :: Rol BuitenRol
@@ -75,6 +85,9 @@ instance decodeVal :: Decode Val where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeVal :: Encode Val where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqVal :: Eq Val where
+  eq (Val v1) (Val v2) = v1 == v2
+
 
 class Object a
 
