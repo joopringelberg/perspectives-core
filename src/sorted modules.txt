@@ -9,10 +9,11 @@ DomeinFile
 ContextAndRole
 CoreTypes
 IndentParser
+Token
+ObjectsGetterComposition
 
 =======
 
-ObjectsGetterComposition
 PerspectivesState
 DomeinCache
 
@@ -54,5 +55,4 @@ Deltas
 ContextRoleParser
 Guid
 Parser
-Token
 Api
