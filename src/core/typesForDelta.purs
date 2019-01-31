@@ -17,23 +17,23 @@ import Prelude (class Show, ($))
 -- DELTA
 -----------------------------------------------------------
 -- | Type parameter s should be contstrained by Subject, p by Predicate and o by Object.
-newtype Delta s p o = Delta
-  { id :: s
-  , memberName :: p
-  , value :: Maybe o
+newtype Delta = Delta
+  { id :: String
+  , memberName :: String
+  , value :: Maybe String
   , deltaType :: DeltaType
   , isContext :: Boolean
   }
 
-derive instance genericDelta :: Generic (Delta s p o) _
+derive instance genericDelta :: Generic Delta _
 
-instance showDelta :: (Show s, Show p, Show o) => Show (Delta s p o) where
+instance showDelta :: Show Delta where
   show = genericShow
 
-instance encodeDelta :: (Encode s, Encode p, Encode o) => Encode (Delta s p o) where
+instance encodeDelta :: Encode Delta where
   encode = encodeDefault
 
-derive instance eqDelta :: (Eq s, Eq p, Eq o) => Eq (Delta s p o)
+derive instance eqDelta :: Eq Delta
 
 -----------------------------------------------------------
 -- DELTATYPE
