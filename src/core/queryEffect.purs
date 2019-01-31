@@ -2,21 +2,28 @@ module Perspectives.QueryEffect where
 
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Data.Newtype (class Newtype, unwrap, wrap)
 import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.TripleAdministration (getRef, registerTriple)
-import Prelude (Unit, bind, const, pure, ($), (<>))
+import Prelude (Unit, bind, const, pure, ($), (<>), map)
 
 type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache e) Unit)
 
 -- | Make an effect function (QueryEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.
 -- | Remove the effect function's dependency on the tripleGetter by using unsubscribeFromObjects.
-pushesObjectsTo :: forall e. TypedTripleGetter e -> QueryEffect e -> TypedTripleGetter e
+pushesObjectsTo :: forall s p o c r b e.
+  Newtype s String =>
+  Newtype o String =>
+  Newtype p String =>
+  TypedTripleGetter s p o c r b e ->
+  QueryEffect e ->
+  TypedTripleGetter s p o c r b e
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
   TypedTripleGetter effectName pushesObjectsTo' where
 
-    pushesObjectsTo' :: TripleGetter e
+    pushesObjectsTo' :: TripleGetter s p o c r b e
     pushesObjectsTo' id = do
       t <- tg id
       et <- effectFun t
@@ -27,11 +34,11 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     -- i.e. to sort the effect again and it will use the resulting triple to
     --  - set new dependencies based on its supports;
     --  - copy its supports to the triple administration (in the old effect triple)
-    effectFun :: Triple e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+    effectFun :: Triple s p o c r b e -> MonadPerspectivesQuery c r b (AjaxAvarCache e) (Triple s p o c r b e)
     effectFun queryResult@(Triple{subject, object}) = do
-      _ <- liftEff $ effect object
+      _ <- liftEff $ effect (map unwrap object)
       pure $ Triple { subject: subject
-                    , predicate : name
+                    , predicate : (wrap name)
                     , object : object
                     , dependencies : []
                     , supports : [getRef queryResult]
