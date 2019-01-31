@@ -1,0 +1,158 @@
+TYPE-LEVEL REPRESENTATIE VAN PERSPECTIVES TYPES
+
+X is een beschrijving van een type met
+	* een beschrijving van een binnen- en buitenRol
+	* een rolInContext
+	* een aspect
+	* een gebruikerRol
+	* een contextBot
+	* een prototype
+
+Het is duidelijk dat X een context beschrijft, oftewel het *type* context beschrijft. We zouden X Dus ContextType kunnen noemen. 
+
+psp:View is een ContextType: d.w.z. het type van psp:View is ContextType. psp:View gebruikt de onderdelen die gedefinieerd zijn voor ContextType. psp:View is eenvoudig: alleen rolInContext wordt gebruikt, om psp:View een onderdeel propertyReferentie te geven.
+
+Y is een View, d.w.z. het type van Y is psp:View. Y heeft een aantal onderdelen die een propertyReferentie zijn.
+
+Y is dus een View, zoals psp:View een ContextType is. 
+
+Maar wat is het type van ContextType? De definitie van ContextType heeft precies één soort onderdeel, namelijk: rolInContext. En die is gedefinieerd voor - ContextType. Dat is geheel conform de hypothese dat het type van ContextType óók ContextType is.
+
+Nu kunnen we in bovenstaande 'onderdelen' vervangen door 'rolInContext'. Alle onderdelen van ContextType zijn beschreven als rollen - de beschrijving bestaat uit rollen.
+
+Is ContextType dan wel een goede naam? Per slot van rekening zeggen we 'View' en niet 'ViewType'. Gelijke monniken, gelijke kappen: we gebruiken daarom de naam psp:Context. Dus psp:Context geeft de beschrijving van contexten, is het type Context.
+
+PURESCRIPT REPRESENTATIE
+Nu representeren we al deze contexten ook in Purescript. We gebruiken daarvoor het newtype PerspectContext. PerspectContext heeft een member, pspType, die voor een elke instantie gebonden is de identifier van het type van de context die het type van die instantie beschrijft. Dat stelt ons in staat om reflectieve code te schrijven die kan bepalen wat het type is van een gerepresenteerde context.
+
+Neem de representatie van Y: pspType heeft daar de waarde 'psp:View'. We kunnen code schrijven die als antwoord op de vraag "wat is het type van Y" als antwoord geeft: 'psp:View'.
+
+Maar dat is dus op 'term-level', terwijl we óók willen dat de Purescript compiler onze functies controleert en daarbij let op Perspectives types, zodat we niet per ongeluk de identifier van een Context vastleggen als de waarde van de binding van een Rol (dat moet natuurlijk altijd via de BuitenRol). Oftewel, *hoe* krijgen we het type dat bij pspType is vastgelegd, óók beschikbaar op 'type-level'?
+
+Maar er is een tweede vraag. We kunnen eindeloos veel Perspectives types in modellen beschrijven. Welke van die types willen we op type-level in ons Purescript programma representeren? Dit is de vraag naar *wat*.
+
+Eerst het 'hoe'. We refereren aan contexten met identifiers, die in PerspectContext beschikbaar zijn als de waarde van het member _id. 
+Voor reflectie op type-level van Perspectives types geven we het member _id een newtype definitie die overeenkomt met het psp:Type dat in de member pspType vastligt.
+Dus, voor Y, waar pspType='psp:View', gebruiken we het newtype View (we laten de kwalificatie met namespace weg). Zo kan de Purescript compiler aan de identificatie van een context al zien wat zijn Perspect-type is.
+
+Kortom, overal waar we een functie hebben die als parameter of resultaat de _id van een PerspectContext heeft, moeten we die waarde typeren met een newtype dat het pspType van de bijbehorende PerspectContext representeert. Idem voor de _id van een PerspectRol.
+
+Dat geldt bijvoorbeeld voor het ophalen van een JSON document uit de database. Een functie die een document ophaalt en oplevert, dat een psp:View representeert (pspType = psp:View), moet een argument hebben dat is getypeerd als View (dat argument is runtime een string en het is de _id van het JSON document in de database). Zo ziet de Purescript compiler dat het argument een View identificeert. 
+
+Een functie die agnostisch is mbt het type van het JSON document dat hij ophaalt en oplevert, moet een type variabele gebruiken.
+
+TYPE VARIABLES OP PRIMAIRE REPRESENTATIE
+In de module waarin we de definitie van PerspectContext geven, weten we natuurlijk helemaal nog niet welk Perspectives type daarmee gerepresenteerd zal worden. Daarom gebruiken we daar type variabelen.
+
+Dit stelt ons voor een probleem. Want de member pspType kan niet geassocieerd worden met een willekeurige context. Het *moet* een context zijn waarvan het type psp:Context is. Dat zijn immers de contexten die types beschrijven. En, een verfijning: het mag bijvoorbeeld óók psp:Zaak zijn, want psp:Zaak heeft psp:Context als Aspect en daarom zijn instanties van psp:Zaak óók een instantie van psp:Context (vgl RDFS: psp:Zaak staat in een rdfs:subClass relatie tot psp:Context). Oftewel, als X een psp:Zaak is, is het ook een psp:Context en dus mogen pspType de waarde X geven.
+Oftewel: pspType moet als waarde een context zijn waarvan het type psp:Context ís of psp:Context als Aspect hééft.
+
+Hoe dwingen we dat af op type-level?
+
+Type Classes hebben superclasses. We zouden dus psp:Zaak als superclass psp:Context kunnen geven - maar dan moeten we beiden met Type Classes representeren. 
+
+Wat we kunnen doen, is elke functie die PerspectContext, met de type variable t voor pspType, gebruikt, die variabele laten beperken door een Type Class ContextDef. Context is een member van ContextDef; alle definities met type psp:Context zijn member van die Class. psp:Boolean, echter, is van het type psp:SimpleValue en mag dus niet voorkomen als waarde van pspType. En dat is helemaal terecht. er zijn geen contexten van het type psp:Boolean. Hetzelfde geldt voor psp:Beheert, psp:Raadpleegt, enz. 
+
+Maar psp:TrustedCluster zou ook niet toegelaten worden, want dat is een psp:Zaak. En dat is onterecht, want, zoals we hebben gezien, een psp:Zaak is altijd óók een psp:Context. Daarom introduceren we de Type Class ZaakDef en maken psp:TrustedCluster een instantie van die Class. Bovendien stellen we dat ContextDef een superClass is van ZaakDef.
+
+Class ContextDef a
+
+Class (ContextDef a) <= ZaakDef a
+
+Wanneer we nu TrustedCluster een instance van ZaakDef willen maken, waarschuwt de compiler dat Zaak éérst een instance van ContextDef moeten maken. Superclasses, bij Type Classes, zorgt niet voor automatische classificatie; het is een systeem van constraints.
+
+Dus:
+
+instance trustedClusterContextDef :: ContextDef TrustedCluster
+instance trustedClusterZaakDef :: ZaakDef TrustedCluster
+
+Nu is het vanzelfsprekend zo dat TrustedCluster de plek van pspType mag innemen. In principe kunnen we weglaten dat TrustedCluster een instance is van ZaakDef, maar omdat het type van TrustedCluster psp:Zaak is, ligt het voor de hand om dáár wel aan te denken, en niet aan ContextDef. Zo helpt de compiler toch een beetje.
+
+WELKE ONDERSTEUNING WILLEN WE?
+Het is niet realistisch te veronderstellen dat we het Purescript typesysteem kunnen gebruiken om de hele controle die de Perspectives typechecker uitvoert, te laten doen. Maar tot welk niveau gaan we? Welke constraints, die het Perspectives type-systeem oplegt, willen we laten afdwingen door Purescript?
+
+Oftewel, de *wat*-vraag.
+
+Hieronder heb ik een verkenning in de code uitgevoerd, die de volgende behoefte oplevert:
+	* Context
+	* Rol
+	* Val
+	* BuitenRol
+	* BinnenRol
+	* RolInContext
+	* ContextDef
+	* RolDef
+	* PropertyDef
+	* View
+	* Lokale rolnaam
+	* Lokale propertynaam
+	* Bool, Number, Date, String
+	* Function
+	* Zaak?
+
+Hoe doen we dit, concreet?
+
+Als we de laag-niveau functies, die PerspectContexten ophalen, zoals getEntiteit, met type-variabelen uitrusten, moeten we op een hoger niveau beslissen hoe we zo'n type concretiseren. En waarmee we concretiseren. Neem bijvoorbeeld retrieveContextFromDomein. Deze functie levert een PerspectContext op en zal dus een type hebben in termen van een variabele voor het type Context. Op dat niveau kunnen we nog niet concretiseren. Op het hogere niveau van getPerspectEntiteit weten we dat nog steeds niet (het kan dan zelfs ook nog een Rol zijn). Een stap hoger vinden we getContextMember. Deze functie is cruciaal voor DataTypeObjectGetters en ObjectGetterConstructors.
+DataTypeObjectGetters:
+	* contextType
+	* buitenRol
+	* iedereRolInContext
+	* typeVanIedereRolInContext
+	* internePropertyTypen
+	* label
+In elk van deze gevallen kunnen we bepalen welk van de hierboven gekozen types gevraagd en geleverd worden. Bijvoorbeeld:
+
+	contextType :: Context -> ContextDef
+
+Kunnen we, door hier types te geven, de variabelen van de lager gelegen functies invullen?
+
+EEN VERKENNING IN DE CODE
+Ik zou minstens de volgende zekerheden aan de Purescript compiler willen ontlenen:
+
+	* waar een rol gebruikt moet worden, kan geen context voorkomen en vv
+	* waar een type gebruikt moet worden, worden alleen contexten ingezet waarvan het pspType psp:Context is (of heeft).
+	
+Observaties van de code:
+1. De functies in modelBasedObjectGetters moeten zo getypeerd worden dat de Purescript compiler erop toeziet dat alleen type-definities als argument geaccepteerd worden (en dat de resultaten als type-definities geïnterpreteerd worden).
+
+2. DataTypeObjectGetters/DataTypeTripleGetters: hier moeten we kunnen typeren in termen van Context, BuitenRol, BinnenRol, RolInContext, RolDef, PropertyDef
+
+3. ModelBasedTripleGetters: GebruikerRol?, View.
+	Voorbeeld: ownPropertiesDefM = "All properties defined in the namespace of the Rol." Het type moet duidelijk maken dat dit een functie is van RolDef naar PropertyDef.
+	
+4. ObjectGetterConstructors. Voorbeelden: 
+	* getRolByLocalName. Is dit nu een functie van een willekeurige context, of van een ContextDef?
+Hier is ook de behoefte om een 'lokale rolnaam' te typeren.
+	* getRolFromPrototypeHierarchy. Ik wil een type dat duidelijk maakt dat dit gaat over willekeurige contexten en hun prototypes.
+Overigens moet de naamgeving hier ook verbeteren. We moeten namen hebben die duidelijk maken waar het over gaat:
+	* opzoeken langs de prototype hiërarchie?
+	* opzoeken langs de roltelescoop?
+	* zoeken met een lokale naam?
+	* opzoeken bij aspecten?
+Ik denk dat booleanPropertyGetter en getRolUsingAspects niet goed zijn geïmplementeerd. Het lijkt erop dat ik propertywaarden zoek in de Aspect hierarchie - maar die betreft typen. In de tekst over Aspecten staat uitgelegd waar Aspectproperties gedragen worden (en dit heeft te maken met het afbeelden van properties van aspecten).
+
+5. QueryCombinators. Hier moet de typering van TripleGetters helpen. Bijvoorbeeld:
+	* concat, intersect: de types van de twee te concateneren functies moeten kloppen, zo niet gelijk zijn. 
+	* filter: het criterium moet getypeerd zijn als een triplegetter die een psp:Boolean oplevert.
+	* equal, logicalBinaryOperator, notEmpty: moet een psp:Boolean opleveren (en dus zo getypeerd zijn).
+
+6. QueryFunctionDescriptionCompiler: Function. Dit is, net als Zaak, een specialisatie van Context - al heeft Function verder geen members. Function is speciaal in het leven geroepen om sommige rollen te kunnen typeren, zoals: psp:Rol heeft een $rolProperty en de mogelijke binding daarvan is psp:Property, of psp:Function.
+
+Het beeld begint zich af te tekenen. We willen de volgende types onderscheiden:
+
+	* Context
+	* Rol
+	* Val
+	* BuitenRol
+	* BinnenRol
+	* RolInContext
+	* ContextDef
+	* RolDef
+	* PropertyDef
+	* View
+	* Lokale rolnaam
+	* Lokale propertynaam
+	* Bool, Number, Date, String
+	* Function
+	* Zaak?
+

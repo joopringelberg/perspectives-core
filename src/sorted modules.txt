@@ -6,11 +6,16 @@ GlobalUnsafeStrMap
 EntiteitAndRDFAliases
 Effects
 DomeinFile
+ContextAndRole
 CoreTypes
+IndentParser
+
+=======
+
 ObjectsGetterComposition
 PerspectivesState
 DomeinCache
-ContextAndRole
+
 PerspectEntiteit
 ResourceRetrieval
 Resource
@@ -48,7 +53,6 @@ CollectDomeinFile
 Deltas
 ContextRoleParser
 Guid
-IndentParser
 Parser
 Token
 Api

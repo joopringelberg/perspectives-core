@@ -1,6 +1,6 @@
 module Perspectives.PerspectivesTypesInPurescript where
 
-import Prelude
+import Prelude (class Show, show, ($), class Eq, eq, (==))
 
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
@@ -63,13 +63,13 @@ instance encodeBinnenRol :: Encode BinnenRol where
 instance eqBinnenRol :: Eq BinnenRol where
   eq (BinnenRol r1) (BinnenRol r2) = eq r1 r2
 
-class (Newtype a String, Eq a) <= Rol a
+class (Newtype a String, Eq a) <= RolType a
 
-instance rolInContextRol :: Rol RolInContext
-instance buitenRolRol :: Rol BuitenRol
-instance binnenRol :: Rol BinnenRol
+instance rolInContextRol :: RolType RolInContext
+instance buitenRolRol :: RolType BuitenRol
+instance binnenRol :: RolType BinnenRol
 
-class Subject a
+class (Show a) <= Subject a
 
 instance contextSubject :: Subject Context
 instance rolinContextSubject :: Subject RolInContext
@@ -89,7 +89,7 @@ instance eqVal :: Eq Val where
   eq (Val v1) (Val v2) = v1 == v2
 
 
-class Object a
+class (Show a) <= Object a
 
 instance rolinContextObject :: Object RolInContext
 instance binnenRolObject :: Object BinnenRol
@@ -100,6 +100,7 @@ instance contextObject :: Object Context
 
 -- MODEL:PERSPECTIVES
 newtype SimpleValue = SimpleValue String
+derive instance newtypeSimpleValue :: Newtype SimpleValue _
 
 newtype PBool = PBool String
 newtype PString = PString String
@@ -115,6 +116,7 @@ instance decodeContextDef :: Decode ContextDef where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeContextDef :: Encode ContextDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+derive instance newtypeContextDef :: Newtype ContextDef _
 
 newtype RolDef = RolDef String
 
@@ -135,31 +137,64 @@ instance decodePropertyDef :: Decode PropertyDef where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodePropertyDef :: Encode PropertyDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+derive instance newtypePropertyDef :: Newtype PropertyDef _
 
-class Predicate a
+class (Show a) <= Predicate a
 
 instance rolDefPredicate :: Predicate RolDef
+derive instance newtypeRolDef :: Newtype RolDef _
+
 instance propertyDefPredicate :: Predicate PropertyDef
 
 newtype SysteemBot = SysteemBot String
+derive instance newtypeSysteemBot :: Newtype SysteemBot _
 
 newtype View = View String
+derive instance newtypeRolView :: Newtype View _
+
 newtype Actie = Actie String
+derive instance newtypeRolActie :: Newtype Actie _
 
 newtype Zaak = Zaak String
+derive instance newtypeZaak :: Newtype Zaak _
 
-newtype Function = Function String
+newtype QueryFunction = Function String
+derive instance newtypeQueryFunction :: Newtype QueryFunction _
+
 newtype ElkType = ElkType String
+derive instance newtypeElkType :: Newtype ElkType _
 
 newtype Systeem = Systeem String
+derive instance newtypeSysteem :: Newtype Systeem _
 
 newtype TrustedCluster = TrustedCluster String
+derive instance newtypeTrustedCluster :: Newtype TrustedCluster _
 
 newtype AssignToRol = AssignToRol String
+derive instance newtypeAssignToRol :: Newtype AssignToRol _
 
 newtype AssignToProperty = AssignToProperty String
+derive instance newtypeAssignToProperty :: Newtype AssignToProperty _
 
 newtype EffectFullFunction = EffectFullFunction String
+derive instance newtypeEffectFullFunction :: Newtype EffectFullFunction _
+
+class Newtype a String <= ContextType a
+instance contextDefSimpleValue :: ContextType SimpleValue
+instance contextDefContextType :: ContextType ContextDef
+instance contextTypeRolDef :: ContextType RolDef
+instance contextTypePropertyDef :: ContextType PropertyDef
+instance contextTypeSysteemBot :: ContextType SysteemBot
+instance contextTypeView :: ContextType View
+instance contextTypeActie :: ContextType Actie
+instance contextTypeZaak :: ContextType Zaak
+instance contextTypeQueryFunction :: ContextType QueryFunction
+instance contextTypeElkType :: ContextType ElkType
+instance contextTypeSysteem :: ContextType Systeem
+instance contextTypeTrustedCluster :: ContextType TrustedCluster
+instance contextTypeAssignToRol :: ContextType AssignToRol
+instance contextTypeAssignToProperty :: ContextType AssignToProperty
+instance contextTypeEffectFullFunction :: ContextType EffectFullFunction
 
 -- MODEL:QUERYAST
 newtype DataTypeGetter = DataTypeGetter String

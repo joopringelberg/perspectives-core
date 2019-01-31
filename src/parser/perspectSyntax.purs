@@ -17,11 +17,11 @@ import Prelude (class Show, ($))
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
 -----------------------------------------------------------
--- | The type parameter r must be constrained with class Rol wherever it PerspectContext is used and b must be constrained by Binding.
-newtype PerspectContext = PerspectContext ContextRecord
 
-type ContextRecord =
-  { _id :: Context
+newtype PerspectContext c = PerspectContext (ContextRecord c)
+
+type ContextRecord c =
+  { _id :: c
   , _rev :: Revision
   , displayName :: String
   , pspType :: ContextDef
@@ -30,19 +30,19 @@ type ContextRecord =
   , rolInContext :: StrMap (Array RolInContext)
   , comments :: Comments
   }
+ 
+derive instance genericRepPerspectContext :: Generic (PerspectContext c) _
 
-derive instance genericRepPerspectContext :: Generic PerspectContext _
-
-instance showPerspectContext :: Show PerspectContext where
+instance showPerspectContext :: Show c => Show (PerspectContext c) where
   show = genericShow
 
-instance encodePerspectContext :: Encode PerspectContext where
+instance encodePerspectContext :: Encode c => Encode (PerspectContext c) where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance decodePerspectContext :: Decode PerspectContext where
+instance decodePerspectContext :: Decode c => Decode (PerspectContext c) where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance respondablePerspectContext :: Respondable PerspectContext where
+instance respondablePerspectContext :: Decode c => Respondable (PerspectContext c) where
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
@@ -54,7 +54,7 @@ newtype PerspectRol r b = PerspectRol (RolRecord r b)
 
 type RolRecord r b =
   { _id :: r
-  , pspType :: RolDef
+  , pspType :: RolDef -- Hier mag alles staan dat gedefinieerd is met psp:Rol. Dus alles waarvan het type psp:Rol is, of waarvan het type psp:Rol als Aspect heeft. Dat zijn de members van de class RolDef.
   , context :: Context
   -- While the fields above occur in every role, those below do not.
   , _rev :: Revision
