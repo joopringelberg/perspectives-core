@@ -3,32 +3,38 @@ module Perspectives.TripleGetterComposition where
 
 import Data.Array (cons, difference, head, nub)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>))
+import Prelude (class Eq, Unit, bind, join, map, pure, unit, ($), (<>))
 
 -- | Compose two queries like composing two functions.
 -- | `psp:Function -> psp:Function -> psp:Function`
-composeTripleGetters :: forall e.
-  TypedTripleGetter e ->
-  TypedTripleGetter e ->
-  TypedTripleGetter e
+composeTripleGetters :: forall s p o t c r b e.
+  Eq t =>
+  Eq o =>
+  Newtype t String =>
+  Newtype s String =>
+  Newtype p String =>
+  TypedTripleGetter s p t c r b e ->
+  TypedTripleGetter t p o c r b e ->
+  TypedTripleGetter s p o c r b e
 composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   memorize getter name
     where
-    getter :: TripleGetter e
+    getter :: TripleGetter s p o c r b e
     getter id = do
       t@(Triple{object : objectsOfP}) <- p id
       -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-      (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
+      (triples :: Array (Triple t p o c r b e)) <- traverse q (difference objectsOfP [wrap $ unwrap id])
       -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
-      objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
+      (objects :: Array o) <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
-                    , predicate : name
+                    , predicate : (wrap name)
                     , object : objects
                     , dependencies : []
-                    , supports : map getRef (cons t triples)
+                    , supports : cons (getRef t) (map getRef triples)
                     , tripleGetter : getter}
 
     name :: String
@@ -40,30 +46,40 @@ infixl 9 composeTripleGetters as >->
 -- | (wrapped in a function). Useful for recursive queries that bottom out
 -- | when the first operator yields no results.
 -- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
-composeLazy :: forall e.
-  TypedTripleGetter e ->
-  (Unit -> TypedTripleGetter e) ->
+composeLazy :: forall s p o t c r b e.
+  Eq t =>
+  Eq o =>
+  Newtype t String =>
+  Newtype s String =>
+  Newtype p String =>
+  TypedTripleGetter s p t c r b e ->
+  (Unit -> TypedTripleGetter t p o c r b e) ->
   String ->
-  TypedTripleGetter e
+  TypedTripleGetter s p o c r b e
 composeLazy (TypedTripleGetter nameOfp p) g nameOfg =
   memorize getter name
     where
-    getter :: TripleGetter e
+    getter :: TripleGetter s p o c r b e
     getter id = do
-      t@(Triple{object : objectsOfP}) <- p id
+      t@(Triple tr@{object : objectsOfP}) <- p id
       case head objectsOfP of
-        Nothing -> pure t
+        Nothing -> pure $ Triple { subject: id
+                      , predicate : (wrap name)
+                      , object : []
+                      , dependencies : []
+                      , supports : [(getRef t)]
+                      , tripleGetter : getter}
         otherwise -> do
           (TypedTripleGetter nameOfq q) <- pure (g unit)
           -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-          (triples :: Array (Triple e)) <- traverse q (difference objectsOfP [id])
+          (triples :: Array (Triple t p o c r b e)) <- traverse q (difference objectsOfP [wrap $ unwrap id])
           -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
           objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
           pure $ Triple { subject: id
-                        , predicate : name
+                        , predicate : (wrap name)
                         , object : objects
                         , dependencies : []
-                        , supports : map getRef (cons t triples)
+                        , supports : cons (getRef t) (map getRef triples)
                         , tripleGetter : getter}
 
     name :: String
