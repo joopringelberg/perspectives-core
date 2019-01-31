@@ -17,7 +17,7 @@ import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke, de
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
-newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
+newPerspectivesState :: forall c r b. UserInfo -> (Transactie c r b) -> AVar String -> (PerspectivesState c r b)
 newPerspectivesState uinfo tr av =
   { rolDefinitions: new unit
   , contextDefinitions: new unit
@@ -32,12 +32,15 @@ newPerspectivesState uinfo tr av =
   }
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR, now :: NOW | e) a
-  -> Aff (avar :: AVAR, now :: NOW | e) a
+runPerspectives :: forall a c r b e.
+  String ->
+  String ->
+  MonadPerspectives c r b (avar :: AVAR, now :: NOW | e) a ->
+  Aff (avar :: AVAR, now :: NOW | e) a
 runPerspectives userName password mp = do
   (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
-  (tr :: Transactie) <- createTransactie userName
-  (rf :: AVar PerspectivesState) <- makeVar $
+  (tr :: (Transactie c r b)) <- createTransactie userName
+  (rf :: AVar (PerspectivesState c r b)) <- makeVar $
     newPerspectivesState
       { userName: userName
       , couchdbPassword: password
@@ -46,103 +49,108 @@ runPerspectives userName password mp = do
       av
   runReaderT mp rf
 
-runPerspectivesWithState :: forall e a. MonadPerspectives (avar :: AVAR | e) a -> (AVar PerspectivesState) -> Aff (avar :: AVAR | e) a
+runPerspectivesWithState :: forall c r b e a. MonadPerspectives c r b (avar :: AVAR | e) a -> (AVar (PerspectivesState c r b)) -> Aff (avar :: AVAR | e) a
 runPerspectivesWithState = runReaderT
 
 -----------------------------------------------------------
 -- FUNCTIONS THAT GET OR MODIFY PARTS OF PERSPECTIVESSTATE
 -----------------------------------------------------------
-couchdbSessionStarted :: forall e. MonadPerspectives (avar :: AVAR | e) Boolean
+couchdbSessionStarted :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) Boolean
 couchdbSessionStarted = gets _.couchdbSessionStarted
 
-setCouchdbSessionStarted :: forall e. Boolean -> MonadPerspectives (avar :: AVAR | e) Unit
+setCouchdbSessionStarted :: forall c r b e. Boolean -> MonadPerspectives c r b (avar :: AVAR | e) Unit
 setCouchdbSessionStarted b = modify \ps -> ps {couchdbSessionStarted = b}
 
-sessionCookie :: forall e. MonadPerspectives (avar :: AVAR | e) (AVar String)
+sessionCookie :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) (AVar String)
 sessionCookie = gets _.sessionCookie
 
-takeSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) String
+takeSessionCookieValue :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) String
 takeSessionCookieValue = gets _.sessionCookie >>= lift <<< takeVar
 
-readSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) String
+readSessionCookieValue :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) String
 readSessionCookieValue = gets _.sessionCookie >>= lift <<< readVar
 
-tryReadSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) (Maybe String)
+tryReadSessionCookieValue :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) (Maybe String)
 tryReadSessionCookieValue = gets _.sessionCookie >>= lift <<< tryReadVar
 
-setSessionCookie :: forall e. String -> MonadPerspectives (avar :: AVAR | e) Unit
+setSessionCookie :: forall c r b e. String -> MonadPerspectives c r b (avar :: AVAR | e) Unit
 setSessionCookie c = sessionCookie >>= (lift <<< putVar c)
 
-transactie :: forall e. MonadPerspectives (avar :: AVAR | e) Transactie
+transactie :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) (Transactie c r b)
 transactie = gets _.transactie
 
-setTripleQueue :: forall e. TripleQueue -> MonadPerspectives (avar :: AVAR | e) Unit
+setTripleQueue :: forall c r b e. TripleQueue -> MonadPerspectives c r b (avar :: AVAR | e) Unit
 setTripleQueue t = modify \s -> s { tripleQueue = t }
 
-tripleQueue :: forall e. MonadPerspectives (avar :: AVAR | e) TripleQueue
+tripleQueue :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) TripleQueue
 tripleQueue = gets _.tripleQueue
 
-setTransactie :: forall e. Transactie -> MonadPerspectives (avar :: AVAR | e) Unit
+setTransactie :: forall c r b e. (Transactie c r b) -> MonadPerspectives c r b (avar :: AVAR | e) Unit
 setTransactie t = modify \s -> s { transactie = t }
 
-contextDefinitions :: forall e. MonadPerspectives (avar :: AVAR | e) ContextDefinitions
+contextDefinitions :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) (ContextDefinitions c)
 contextDefinitions = gets _.contextDefinitions
 
-contextDefinitionsLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar PerspectContext))
+contextDefinitionsLookup :: forall c r b e. String -> MonadPerspectives c r b (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar (PerspectContext c)))
 contextDefinitionsLookup = lookup contextDefinitions
 
-contextDefinitionsInsert :: forall e. String -> AVar PerspectContext -> MonadPerspectives (AvarCache e) (AVar PerspectContext)
+contextDefinitionsInsert :: forall c r b e. String -> AVar (PerspectContext c) -> MonadPerspectives c r b (AvarCache e) (AVar (PerspectContext c))
 contextDefinitionsInsert = insert contextDefinitions
 
-contextDefinitionsRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar PerspectContext))
+contextDefinitionsRemove :: forall c r b e. String -> MonadPerspectives c r b (AvarCache e) (Maybe (AVar (PerspectContext c)))
 contextDefinitionsRemove = remove contextDefinitions
 
-rolDefinitions :: forall e. MonadPerspectives (avar :: AVAR | e) RolDefinitions
+rolDefinitions :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) (RolDefinitions r b)
 rolDefinitions = gets _.rolDefinitions
 
-rolDefinitionsLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar PerspectRol))
+rolDefinitionsLookup :: forall c r b e.
+  String ->
+  MonadPerspectives c r b (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar (PerspectRol r b)))
 rolDefinitionsLookup = lookup rolDefinitions
 
-rolDefinitionsInsert :: forall e. String -> AVar PerspectRol -> MonadPerspectives (AvarCache e) (AVar PerspectRol)
+rolDefinitionsInsert :: forall c r b e.
+  String ->
+  AVar (PerspectRol r b) ->
+  MonadPerspectives c r b (AvarCache e) (AVar (PerspectRol r b))
 rolDefinitionsInsert = insert rolDefinitions
 
-rolDefinitionsRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar PerspectRol))
+rolDefinitionsRemove :: forall c r b e. String -> MonadPerspectives c r b (AvarCache e) (Maybe (AVar (PerspectRol r b)))
 rolDefinitionsRemove = remove rolDefinitions
 
-domeinCache :: forall e. MonadPerspectives (avar :: AVAR | e) DomeinCache
+domeinCache :: forall c r b e. MonadPerspectives c r b (avar :: AVAR | e) (DomeinCache c r b)
 domeinCache = gets _.domeinCache
 
-domeinCacheLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar DomeinFile))
+domeinCacheLookup :: forall c r b e. String -> MonadPerspectives c r b (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar (DomeinFile c r b)))
 domeinCacheLookup = lookup domeinCache
 
-domeinCacheInsert :: forall e. String -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
+domeinCacheInsert :: forall c r b e. String -> AVar (DomeinFile c r b) -> MonadPerspectives c r b (AvarCache e) (AVar (DomeinFile c r b))
 domeinCacheInsert = insert domeinCache
 
-domeinCacheRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar DomeinFile))
+domeinCacheRemove :: forall c r b e. String -> MonadPerspectives c r b (AvarCache e) (Maybe (AVar (DomeinFile c r b)))
 domeinCacheRemove = remove domeinCache
 
-insert :: forall eff a.
-  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
+insert :: forall c r b e a.
+  MonadPerspectives c r b (gm :: GLOBALMAP | e) (GLStrMap a) ->
   String ->
   a ->
-  MonadPerspectives (gm :: GLOBALMAP | eff) a
+  MonadPerspectives c r b (gm :: GLOBALMAP | e) a
 insert g ns av = do
   (dc :: (GLStrMap a)) <- g
   _ <- liftAff $ liftEff $ (poke dc ns av)
   pure av
 
-lookup :: forall e a.
-  MonadPerspectives (gm :: GLOBALMAP | e) (GLStrMap a) ->
+lookup :: forall c r b e a.
+  MonadPerspectives c r b (gm :: GLOBALMAP | e) (GLStrMap a) ->
   String ->
-  MonadPerspectives (gm :: GLOBALMAP | e) (Maybe a)
+  MonadPerspectives c r b (gm :: GLOBALMAP | e) (Maybe a)
 lookup g k = do
   dc <- g
   liftAff $ liftEff $ peek dc k
 
-remove :: forall eff a.
-  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
+remove :: forall c r b e a.
+  MonadPerspectives c r b (gm :: GLOBALMAP | e) (GLStrMap a) ->
   String ->
-  MonadPerspectives (gm :: GLOBALMAP | eff) (Maybe a)
+  MonadPerspectives c r b (gm :: GLOBALMAP | e) (Maybe a)
 remove g k = do
   (dc :: (GLStrMap a)) <- g
   ma <- liftAff $ liftEff $ peek dc k

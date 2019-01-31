@@ -13,6 +13,7 @@ Token
 ObjectsGetterComposition
 TripleAdministration
 QueryCache
+TripleGetterComposition
 
 =======
 
@@ -25,7 +26,6 @@ ContextRolAccessors
 DataTypeObjectGetters
 ObjectGetterConstructors
 RunMonadPerspectivesQuery
-TripleGetterComposition
 TripleGetterConstructors
 DataTypeTripleGetters
 QueryCombinators
