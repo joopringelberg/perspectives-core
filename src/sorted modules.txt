@@ -11,12 +11,13 @@ CoreTypes
 IndentParser
 Token
 ObjectsGetterComposition
+TripleAdministration
+QueryCache
 
 =======
 
 PerspectivesState
 DomeinCache
-
 PerspectEntiteit
 ResourceRetrieval
 Resource
@@ -24,7 +25,6 @@ ContextRolAccessors
 DataTypeObjectGetters
 ObjectGetterConstructors
 RunMonadPerspectivesQuery
-TripleAdministration
 TripleGetterComposition
 TripleGetterConstructors
 DataTypeTripleGetters
@@ -33,7 +33,6 @@ ObjectGetterLookup
 ComputedTripleGetters
 PrettyPrinter
 QueryAST
-QueryCache
 Actions
 QueryCompiler
 QueryEffect
