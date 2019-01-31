@@ -35,7 +35,7 @@ instance respondableDomeinFile :: (Decode c, Decode r, Decode b, Respondable c, 
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-defaultDomeinFile :: forall c r b. ContextType c => Binding r => Binding b => DomeinFile c r b
+defaultDomeinFile :: forall c r b. ContextType c => RolType r => Binding b => DomeinFile c r b
 defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, roles: empty}
 
 -- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.

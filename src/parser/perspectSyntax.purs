@@ -30,7 +30,7 @@ type ContextRecord c =
   , rolInContext :: StrMap (Array RolInContext)
   , comments :: Comments
   }
- 
+
 derive instance genericRepPerspectContext :: Generic (PerspectContext c) _
 
 instance showPerspectContext :: Show c => Show (PerspectContext c) where
@@ -49,7 +49,9 @@ instance respondablePerspectContext :: Decode c => Respondable (PerspectContext 
 -----------------------------------------------------------
 -- PERSPECTROL
 -----------------------------------------------------------
--- | The type parameter r must be constrained with class Rol wherever it PerspectRol is used and b must be constrained by Binding.
+-- | Constrain
+-- |  * type parameter r with RolType
+-- |  * type parameter b with Binding.
 newtype PerspectRol r b = PerspectRol (RolRecord r b)
 
 type RolRecord r b =
