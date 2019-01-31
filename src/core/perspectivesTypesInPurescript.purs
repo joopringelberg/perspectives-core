@@ -11,6 +11,7 @@ import Data.Newtype (class Newtype)
 newtype Context = Context String
 
 derive instance genericRepContext :: Generic Context _
+derive instance newtypeContext :: Newtype Context _
 instance showContext :: Show Context where
   show (Context s) = show s
 instance decodeContext :: Decode Context where
@@ -69,7 +70,7 @@ instance rolInContextRol :: RolType RolInContext
 instance buitenRolRol :: RolType BuitenRol
 instance binnenRol :: RolType BinnenRol
 
-class (Show a) <= Subject a
+class (Show a, Newtype a String) <= Subject a
 
 instance contextSubject :: Subject Context
 instance rolinContextSubject :: Subject RolInContext
