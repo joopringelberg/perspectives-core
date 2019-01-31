@@ -8,17 +8,17 @@ import Text.Parsing.Parser.String (char, oneOf)
 import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, letter, makeTokenParser)
 
 -- type IndentTokenParser e = GenTokenParser String (StateT Position (Aff e))
-type IndentTokenParser e = GenTokenParser String (ContextRoleParserMonad e)
+type IndentTokenParser s p o c r b e = GenTokenParser String (ContextRoleParserMonad s p o c r b e)
 
-token :: forall e. IndentTokenParser e
+token :: forall s p o c r b e. IndentTokenParser s p o c r b e
 token = makeTokenParser perspectDef
 
 -- type LanguageDef = GenLanguageDef String Identity
 
 -- type IndentLanguageDef e = GenLanguageDef String (StateT Position (Aff e))
-type IndentLanguageDef e = GenLanguageDef String (ContextRoleParserMonad e)
+type IndentLanguageDef s p o c r b e = GenLanguageDef String (ContextRoleParserMonad s p o c r b e)
 
-perspectDef :: forall e. IndentLanguageDef e
+perspectDef :: forall s p o c r b e. IndentLanguageDef s p o c r b e
 -- perspectDef = LanguageDef (unGenLanguageDef haskellStyle)
 --                 { reservedOpNames = ["=", "=>"]
 --                 , reservedNames   = [ "intern","extern"]
