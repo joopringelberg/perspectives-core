@@ -13,17 +13,17 @@ type QueryEffect e = NamedFunction (Array String -> Eff (AjaxAvarCache e) Unit)
 -- | Make an effect function (QueryEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.
 -- | Remove the effect function's dependency on the tripleGetter by using unsubscribeFromObjects.
-pushesObjectsTo :: forall s p o c r b e.
+pushesObjectsTo :: forall s p o e.
   Newtype s String =>
   Newtype o String =>
   Newtype p String =>
-  TypedTripleGetter s p o c r b e ->
+  TypedTripleGetter s p o e ->
   QueryEffect e ->
-  TypedTripleGetter s p o c r b e
+  TypedTripleGetter s p o e
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
   TypedTripleGetter effectName pushesObjectsTo' where
 
-    pushesObjectsTo' :: TripleGetter s p o c r b e
+    pushesObjectsTo' :: TripleGetter s p o e
     pushesObjectsTo' id = do
       t <- tg id
       et <- effectFun t
@@ -34,7 +34,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     -- i.e. to sort the effect again and it will use the resulting triple to
     --  - set new dependencies based on its supports;
     --  - copy its supports to the triple administration (in the old effect triple)
-    effectFun :: Triple s p o c r b e -> MonadPerspectivesQuery c r b (AjaxAvarCache e) (Triple s p o c r b e)
+    effectFun :: Triple s p o e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple s p o e)
     effectFun queryResult@(Triple{subject, object}) = do
       _ <- liftEff $ effect (map unwrap object)
       pure $ Triple { subject: subject
