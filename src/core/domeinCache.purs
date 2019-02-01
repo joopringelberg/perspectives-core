@@ -13,7 +13,7 @@ import Data.Either (Either(..))
 import Data.Foreign.Generic (encodeJSON)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.StrMap (lookup)
 import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
@@ -23,12 +23,12 @@ import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdb
 import Perspectives.Couchdb.Databases (retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
+import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision)
-import Prelude (Unit, bind, discard, pure, show, ($), (*>), (<$>), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, pure, show, ($), (*>), (<$>), (<>), (==))
 
 type URL = String
 
@@ -48,25 +48,27 @@ modifyDomeinFileInCache ns modifier = do
       liftAff $ putVar (modifier df) avar
 
 -- | Fetch a PerspectContext asynchronously from its Domein, loading the Domein file if necessary.
-retrieveContextFromDomein :: forall e.
-  ContextID
+retrieveContextFromDomein :: forall s e.
+  Newtype s String =>
+  s
   -> Namespace
-  -> (MonadPerspectives (AjaxAvarCache e) PerspectContext)
+  -> (MonadPerspectives (AjaxAvarCache e) (PerspectContext String))
 retrieveContextFromDomein id ns = do
   (DomeinFile {contexts}) <- retrieveDomeinFile ns
-  case lookup id contexts of
-    Nothing -> throwError $ error ("retrieveContextFromDomein: cannot find definition of " <> id <> " in retrieveContextFromDomein for " <> ns)
+  case lookup (unwrap id) contexts of
+    Nothing -> throwError $ error ("retrieveContextFromDomein: cannot find definition of " <> (unwrap id) <> " in retrieveContextFromDomein for " <> ns)
     (Just context) -> pure context
 
 -- | Fetch a PerspectRol asynchronously from its Domein, loading the Domein file if necessary.
-retrieveRolFromDomein :: forall e.
-  RolID
+retrieveRolFromDomein :: forall s e.
+  Newtype s String =>
+  s
   -> Namespace
-  -> (MonadPerspectives (AjaxAvarCache e) PerspectRol)
+  -> (MonadPerspectives (AjaxAvarCache e) (PerspectRol String String))
 retrieveRolFromDomein id ns = do
   (DomeinFile {roles}) <- retrieveDomeinFile ns
-  case lookup id roles of
-    Nothing -> throwError $ error ("retrieveRolFromDomein: cannot find definition of " <> id <> " in retrieveRolFromDomein for " <> ns)
+  case lookup (unwrap id) roles of
+    Nothing -> throwError $ error ("retrieveRolFromDomein: cannot find definition of " <> (unwrap id) <> " in retrieveRolFromDomein for " <> ns)
     (Just rol) -> pure rol
 
 retrieveDomeinFile :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) DomeinFile
@@ -74,7 +76,8 @@ retrieveDomeinFile ns = do
   mAvar <- domeinCacheLookup ns
   case mAvar of
     Nothing -> do
-      ev <- (liftAff makeEmptyVar) >>= domeinCacheInsert ns
+      ev <- (liftAff makeEmptyVar)
+      _ <- domeinCacheInsert ns ev
       -- forkAff hinders catchError.
       -- _ <- forkAff do
       res <- catchError
@@ -118,7 +121,8 @@ storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
 
 createDomeinFileInCouchdb :: forall e. DomeinFile -> MonadPerspectives (AjaxAvarCache e) Unit
 createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
-  ev <- (liftAff makeEmptyVar) >>= domeinCacheInsert _id
+  ev <- (liftAff makeEmptyVar)
+  _ <- domeinCacheInsert _id ev
   (res :: AffjaxResponse PutCouchdbDocument)  <- liftAff $ put (modelsURL <> escapeCouchdbDocumentName _id) (encodeJSON df)
   if res.status == (StatusCode 409)
     then do

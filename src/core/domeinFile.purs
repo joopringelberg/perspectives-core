@@ -13,9 +13,6 @@ import Prelude (($))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Constrain:
--- |  * the type parameter c with class ContextType
--- |  * The type parameter r class RolType and
--- |  * the type parameter b with Binding.
 newtype DomeinFile = DomeinFile
   { _rev :: Revision
   , _id :: String
@@ -25,13 +22,13 @@ newtype DomeinFile = DomeinFile
 
 derive instance genericDomeinFile :: Generic DomeinFile _
 
-instance encodeDomeinFile :: (Encode c, Encode r, Encode b) => Encode DomeinFile where
+instance encodeDomeinFile :: Encode DomeinFile where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance decodeDomeinFile :: (Decode c, Decode r, Decode b) => Decode DomeinFile where
+instance decodeDomeinFile :: Decode DomeinFile where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance respondableDomeinFile :: (Decode c, Decode r, Decode b, Respondable c, Respondable r, Respondable b) => Respondable DomeinFile where
+instance respondableDomeinFile :: Respondable DomeinFile where
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
