@@ -14,10 +14,11 @@ ObjectsGetterComposition
 TripleAdministration
 QueryCache
 TripleGetterComposition
+PerspectivesState
+QueryEffect
 
 =======
 
-PerspectivesState
 DomeinCache
 PerspectEntiteit
 ResourceRetrieval
@@ -25,7 +26,7 @@ Resource
 ContextRolAccessors
 DataTypeObjectGetters
 ObjectGetterConstructors
-RunMonadPerspectivesQuery
+	RunMonadPerspectivesQuery
 TripleGetterConstructors
 DataTypeTripleGetters
 QueryCombinators
@@ -35,13 +36,12 @@ PrettyPrinter
 QueryAST
 Actions
 QueryCompiler
-QueryEffect
 QueryFunctionDescriptionCompiler
 BasicActionFunctions
 BasicConstructors
 LoadCRL
 SaveUserData
-SetupCouchdb
+	SetupCouchdb
 SetupUser
 TheoryChange
 Main
