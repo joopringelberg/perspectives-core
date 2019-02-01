@@ -34,17 +34,17 @@ import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, sh
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
 -----------------------------------------------------------
-type ContextDefinitions c = GLStrMap (AVar (PerspectContext c))
-type RolDefinitions r b = GLStrMap (AVar (PerspectRol r b))
-type DomeinCache c r b = GLStrMap (AVar (DomeinFile c r b))
-type QueryCache s p o c r b e = GLStrMap (TypedTripleGetter s p o c r b e )
+type ContextDefinitions = GLStrMap (AVar (PerspectContext String))
+type RolDefinitions = GLStrMap (AVar (PerspectRol String String))
+type DomeinCache = GLStrMap (AVar DomeinFile)
+type QueryCache s p o e = GLStrMap (TypedTripleGetter s p o e )
 
-type PerspectivesState c r b = CouchdbState (
-  rolDefinitions :: RolDefinitions r b
-  , contextDefinitions :: ContextDefinitions c
-  , domeinCache :: DomeinCache c r b
+type PerspectivesState = CouchdbState (
+  rolDefinitions :: RolDefinitions
+  , contextDefinitions :: ContextDefinitions
+  , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean
-  , transactie :: Transactie c r b
+  , transactie :: Transactie
   , tripleQueue :: TripleQueue
   )
 
@@ -53,23 +53,23 @@ type PerspectivesState c r b = CouchdbState (
 -----------------------------------------------------------
 -- | MonadPerspectives is an instance of MonadAff.
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
-type MonadPerspectives c r b e = ReaderT (AVar (PerspectivesState c r b)) (Aff e)
+type MonadPerspectives  e = ReaderT (AVar (PerspectivesState )) (Aff e)
 
-type MP c r b e = MonadPerspectives c r b (AjaxAvarCache e)
+type MP  e = MonadPerspectives  (AjaxAvarCache e)
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERY
 -----------------------------------------------------------
 -- | The QueryEnvironment is a set of bindings of variableNames (Strings) to references to Triples.
 type QueryEnvironment = StrMap TripleRef
 
-type MonadPerspectivesQuery c r b e =  StateT QueryEnvironment (MonadPerspectives c r b e)
+type MonadPerspectivesQuery  e =  StateT QueryEnvironment (MonadPerspectives  e)
 
-type MonadPerspectivesObjects c r b e = MonadPerspectives c r b e (Array ID)
+type MonadPerspectivesObjects  e = MonadPerspectives  e (Array ID)
 
-putQueryVariable :: forall c r b e. VariableName -> TripleRef -> MonadPerspectivesQuery c r b e Unit
+putQueryVariable :: forall  e. VariableName -> TripleRef -> MonadPerspectivesQuery  e Unit
 putQueryVariable var t = modify \env -> insert var t env
 
-readQueryVariable :: forall c r b e. VariableName -> MonadPerspectivesQuery c r b e TripleRef
+readQueryVariable :: forall  e. VariableName -> MonadPerspectivesQuery  e TripleRef
 readQueryVariable var = gets \env -> unsafePartial (fromJust (lookup var env))
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERYCOMPILER
@@ -85,27 +85,27 @@ type QueryCompilerEnvironment =
   , declaredVariables :: StrMap Context
   }
 
-type MonadPerspectivesQueryCompiler c r b e = StateT QueryCompilerEnvironment (MonadPerspectives c r b e)
+type MonadPerspectivesQueryCompiler  e = StateT QueryCompilerEnvironment (MonadPerspectives  e)
 
-runMonadPerspectivesQueryCompiler :: forall s p o c r b e a.
+runMonadPerspectivesQueryCompiler :: forall s p o e a.
   Context
-  -> (MonadPerspectivesQueryCompiler c r b e) a
-  -> (MonadPerspectives c r b e) a
+  -> (MonadPerspectivesQueryCompiler  e) a
+  -> (MonadPerspectives  e) a
 runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: empty}
 
-putQueryStepDomain :: forall s p o c r b e. Domain -> MonadPerspectivesQueryCompiler c r b e Unit
+putQueryStepDomain :: forall s p o e. Domain -> MonadPerspectivesQueryCompiler  e Unit
 putQueryStepDomain d = modify \env -> env { domain = d}
 
-getQueryStepDomain :: forall s p o c r b e. MonadPerspectivesQueryCompiler c r b e Domain
+getQueryStepDomain :: forall s p o e. MonadPerspectivesQueryCompiler  e Domain
 getQueryStepDomain = gets \{domain} -> domain
 
-putQueryVariableType :: forall s p o c r b e. VariableName -> Context -> MonadPerspectivesQueryCompiler c r b e Unit
+putQueryVariableType :: forall s p o e. VariableName -> Context -> MonadPerspectivesQueryCompiler  e Unit
 putQueryVariableType var typeId = modify \s@{declaredVariables} -> s { declaredVariables = insert var typeId declaredVariables }
 
-getQueryVariableType :: forall s p o c r b e. VariableName -> MonadPerspectivesQueryCompiler c r b e (Maybe Context)
+getQueryVariableType :: forall s p o e. VariableName -> MonadPerspectivesQueryCompiler  e (Maybe Context)
 getQueryVariableType var = gets \{declaredVariables} -> lookup var declaredVariables
 
-withQueryCompilerEnvironment :: forall s p o c r b e a. MonadPerspectivesQueryCompiler c r b e a -> MonadPerspectivesQueryCompiler c r b e a
+withQueryCompilerEnvironment :: forall s p o e a. MonadPerspectivesQueryCompiler  e a -> MonadPerspectivesQueryCompiler  e a
 withQueryCompilerEnvironment a = do
   env <- get
   result <- a
@@ -116,24 +116,24 @@ withQueryCompilerEnvironment a = do
 -- OBJECT(S)GETTER
 -----------------------------------------------------------
 -- | Usage: contextType :: forall e. (Context ~~> ContextDef) e
-type ObjectsGetter s o c r b e = s -> MonadPerspectives c r b (AjaxAvarCache e) (Array o)
+type ObjectsGetter s o  e = s -> MonadPerspectives  (AjaxAvarCache e) (Array o)
 
-type ObjectGetter s o c r b e = s -> MonadPerspectives c r b (AjaxAvarCache e) o
+type ObjectGetter s o  e = s -> MonadPerspectives  (AjaxAvarCache e) o
 
 infixr 4 type ObjectsGetter as ~~>
 
-applyObjectsGetter :: forall s o c r b e. s -> ObjectsGetter s o c r b e -> MonadPerspectives c r b (AjaxAvarCache e) (Array o)
+applyObjectsGetter :: forall s o  e. s -> ObjectsGetter s o  e -> MonadPerspectives  (AjaxAvarCache e) (Array o)
 applyObjectsGetter id g = g id
 
 infix 0 applyObjectsGetter as %%
 infix 0 applyObjectsGetter as %%=
 
-applyObjectsGetterToMaybeObject :: forall s o c r b e. s -> ObjectsGetter s o c r b e -> MonadPerspectives c r b (AjaxAvarCache e) (Maybe o)
+applyObjectsGetterToMaybeObject :: forall s o  e. s -> ObjectsGetter s o  e -> MonadPerspectives  (AjaxAvarCache e) (Maybe o)
 applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyObjectsGetterToMaybeObject as %%>
 
-applyObjectGetterToObject :: forall s o c r b e. Show s => s -> ObjectsGetter s o c r b e -> MonadPerspectives c r b (AjaxAvarCache e) o
+applyObjectGetterToObject :: forall s o  e. Show s => s -> ObjectsGetter s o  e -> MonadPerspectives  (AjaxAvarCache e) o
 applyObjectGetterToObject id g = g id >>= \objs ->
   case head objs of
     Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> show id <> "'."
@@ -153,30 +153,30 @@ data NamedFunction f = NamedFunction Name f
 -- | The type parameter s of Triple should be constrained by Class Subject in every function.
 -- | The type parameter p of Triple should be constrained by Class Predicate in every function.
 -- | The type parameter o of Triple should be constrained by Class Object in every function.
-newtype Triple s p o c r b e = Triple
+newtype Triple s p o e = Triple
   { subject :: s
   , predicate :: p
   , object :: Array o
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
-  , tripleGetter :: TripleGetter s p o c r b e}
+  , tripleGetter :: TripleGetter s p o e}
 
-instance showTriple :: (Subject s, Predicate p, Object o) => Show (Triple s p o c r b e) where
+instance showTriple :: (Subject s, Predicate p, Object o) => Show (Triple s p o e) where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
 
-instance eqTriple :: (Eq s, Eq p) => Eq (Triple s p o c r b e) where
+instance eqTriple :: (Eq s, Eq p) => Eq (Triple s p o e) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
-tripleObjects :: forall s p o c r b e. Triple s p o c r b e -> Array o
+tripleObjects :: forall s p o e. Triple s p o e -> Array o
 tripleObjects (Triple{object}) = object
 
-tripleObjects_  :: forall s p o c r b e m. Monad m => (Triple s p o c r b e) -> m (Array o)
+tripleObjects_  :: forall s p o e m. Monad m => (Triple s p o e) -> m (Array o)
 tripleObjects_ (Triple{object}) = pure object
 
-mtripleObject :: forall s p o c r b e. Triple s p o c r b e -> Maybe o
+mtripleObject :: forall s p o e. Triple s p o e -> Maybe o
 mtripleObject = head <<< tripleObjects
 
-tripleObject :: forall s p o c r b e. Triple s p o c r b e -> o
+tripleObject :: forall s p o e. Triple s p o e -> o
 tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
 
 -----------------------------------------------------------
@@ -192,47 +192,47 @@ instance eqTripleQueueElement :: Eq TripleQueueElement where
 -----------------------------------------------------------
 -- TRIPLEGETTER
 -----------------------------------------------------------
-type TripleGetter s p o c r b e = s -> MonadPerspectivesQuery c r b (AjaxAvarCache e) (Triple s p o c r b e)
+type TripleGetter s p o e = s -> MonadPerspectivesQuery  (AjaxAvarCache e) (Triple s p o e)
 
 -----------------------------------------------------------
 -- TYPED GETTERS
 -----------------------------------------------------------
 
-data TypedTripleGetter s p o c r b e = TypedTripleGetter Name (TripleGetter s p o c r b e)
+data TypedTripleGetter s p o e = TypedTripleGetter Name (TripleGetter s p o e)
 
-typedTripleGetterName :: forall s p o c r b e. TypedTripleGetter s p o c r b e -> String
+typedTripleGetterName :: forall s p o e. TypedTripleGetter s p o e -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
 
 -- | NB. If the TripleGetter uses the #start queryvariable, this will not work, because
 -- | it will only be bound in runMonadPerspectivesQuery.
-applyTypedTripleGetter :: forall s p o c r b e.
+applyTypedTripleGetter :: forall s p o e.
   s
-  -> TypedTripleGetter s p o c r b e
-  -> (MonadPerspectivesQuery c r b (AjaxAvarCache e)) (Triple s p o c r b e)
+  -> TypedTripleGetter s p o e
+  -> (MonadPerspectivesQuery  (AjaxAvarCache e)) (Triple s p o e)
 applyTypedTripleGetter a (TypedTripleGetter _ f) = f a
 
 infix 0 applyTypedTripleGetter as @@
 
-applyTypedTripleGetterToObjects :: forall s p o c r b e.
+applyTypedTripleGetterToObjects :: forall s p o e.
   s
-  -> TypedTripleGetter s p o c r b e
-  -> (MonadPerspectivesQuery c r b (AjaxAvarCache e)) (Array o)
+  -> TypedTripleGetter s p o e
+  -> (MonadPerspectivesQuery  (AjaxAvarCache e)) (Array o)
 applyTypedTripleGetterToObjects a (TypedTripleGetter _ f) = f a >>= pure <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToObjects as @@=
 
-applyTypedTripleGetterToMaybeObject :: forall s p o c r b e.
+applyTypedTripleGetterToMaybeObject :: forall s p o e.
   s
-  -> TypedTripleGetter s p o c r b e
-  -> (MonadPerspectivesQuery c r b (AjaxAvarCache e)) (Maybe o)
+  -> TypedTripleGetter s p o e
+  -> (MonadPerspectivesQuery  (AjaxAvarCache e)) (Maybe o)
 applyTypedTripleGetterToMaybeObject a (TypedTripleGetter _ f) = f a >>= pure <<< head <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToMaybeObject as @@>
 
-applyTypedTripleGetterToObject :: forall s p o c r b e. Show s =>
+applyTypedTripleGetterToObject :: forall s p o e. Show s =>
   s
-  -> TypedTripleGetter s p o c r b e
-  -> (MonadPerspectivesQuery c r b(AjaxAvarCache e)) o
+  -> TypedTripleGetter s p o e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) o
 applyTypedTripleGetterToObject a (TypedTripleGetter n f) = f a >>= \(Triple{object}) ->
   case head object of
     Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> show a <> "'."
@@ -311,32 +311,32 @@ instance showUserMessage :: Show UserMessage where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-newtype Transactie c r b = Transactie
+newtype Transactie = Transactie
   { author :: String
   , timeStamp :: SerializableDateTime
   , deltas :: Array Delta
-  , createdContexts :: Array (PerspectContext c)
-  , createdRoles :: Array (PerspectRol r b)
+  , createdContexts :: Array (PerspectContext String)
+  , createdRoles :: Array (PerspectRol String String)
   , deletedContexts :: Array Context
-  , deletedRoles :: Array r
+  , deletedRoles :: Array (PerspectRol String String)
   , changedDomeinFiles :: Array ID
   }
 
-derive instance genericRepTransactie :: Generic (Transactie c r b) _
+derive instance genericRepTransactie :: Generic (Transactie ) _
 
-instance showTransactie :: (Show c, Show r, Show b) => Show (Transactie c r b) where
+instance showTransactie :: (Show c, Show r, Show b) => Show (Transactie ) where
   show = genericShow
 
-instance encodeTransactie :: (Encode c, Encode r, Encode b) => Encode (Transactie c r b) where
+instance encodeTransactie :: (Encode c, Encode r, Encode b) => Encode (Transactie ) where
   encode = encodeDefault
 
-createTransactie :: forall c r b e. String -> Aff (now :: NOW | e) (Transactie c r b)
+createTransactie :: forall  e. String -> Aff (now :: NOW | e) (Transactie )
 createTransactie author =
   do
     n <- liftEff $ now
     pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: [], changedDomeinFiles: []}
 
-transactieID :: forall c r b. Transactie c r b -> String
+transactieID :: Transactie -> String
 transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
 
 -----------------------------------------------------------

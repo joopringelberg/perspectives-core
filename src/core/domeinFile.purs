@@ -8,7 +8,6 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.StrMap (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
-import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolType)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision)
 import Prelude (($))
 import Unsafe.Coerce (unsafeCoerce)
@@ -36,7 +35,7 @@ instance respondableDomeinFile :: (Decode c, Decode r, Decode b, Respondable c, 
   responseType = Tuple Nothing JSONResponse
   fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-defaultDomeinFile :: forall c r b. ContextType c => RolType r => Binding b => DomeinFile
+defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, roles: empty}
 
 -- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
