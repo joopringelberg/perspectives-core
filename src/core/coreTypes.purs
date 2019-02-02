@@ -138,6 +138,15 @@ applyObjectsGetterToObject id g = g id >>= \objs ->
 infix 0 applyObjectsGetterToObject as %%>>
 
 -----------------------------------------------------------
+-- TYPEDOBJECT(S)GETTER
+-----------------------------------------------------------
+type TypedObjectsGetter s o e = s -> MonadPerspectives (AjaxAvarCache e) (Array o)
+
+infixl 5 type TypedObjectsGetter as ~~>
+
+type TypedObjectGetter s o e = s -> MonadPerspectives (AjaxAvarCache e) o
+
+-----------------------------------------------------------
 -- NAMEDFUNCTION
 -----------------------------------------------------------
 type Name = String

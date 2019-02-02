@@ -3,21 +3,37 @@ module Perspectives.ObjectsGetterComposition where
 import Data.Array (foldM, foldMap, intersect, singleton, union)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF)
-import Perspectives.CoreTypes (ObjectsGetter)
+import Perspectives.CoreTypes (type (~~>), ObjectsGetter, MP)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Prelude (class Show, pure, show, (<<<), (==), (>=>), (>>=))
+import Prelude (class Eq, class Show, pure, show, (<<<), (==), (>=>), (>>=))
 
-unionOfObjects :: forall e.
-  ObjectsGetter e ->
-  ObjectsGetter e ->
-  ObjectsGetter e
+unionOfObjects :: forall s o t e.
+  Eq t =>
+  (s ~~> o) e ->
+  (o ~~> t) e ->
+  (s ~~> t) e
 unionOfObjects p q = p >=>
-  (\objectsOfP -> foldM
-      (\r objectOfP -> q objectOfP >>= pure <<< union r)
+  (\(objectsOfP :: Array o) -> foldM
+      (\(r :: Array t) (objectOfP :: o) -> q objectOfP >>= pure <<< union r)
       []
       objectsOfP)
 
 infixl 9 unionOfObjects as /-/
+
+unionOfObjects' :: forall s o t e.
+  Eq t =>
+  (s ~~> o) e ->
+  (o ~~> t) e ->
+  (s ~~> t) e
+unionOfObjects' p q = p >=> applyToAll q
+
+applyToAll :: forall s o t e. Eq t =>
+  (o ~~> t) e ->
+  (Array o -> MP e (Array t))
+applyToAll q objectsOfP = foldM
+  (\(r :: Array t) (objectOfP :: o) -> q objectOfP >>= pure <<< union r)
+  []
+  objectsOfP
 
 intersectionOfObjects :: forall e.
   ObjectsGetter e ->
