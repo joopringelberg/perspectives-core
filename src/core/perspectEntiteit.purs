@@ -31,7 +31,7 @@ class (Encode a, Decode a, Respondable a) <=  PerspectEntiteit a where
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: forall e. ID -> MonadPerspectives (AvarCache e) (AVar a)
   retrieveInternally :: forall e. ID -> MonadPerspectives (AvarCache e) (Maybe (AVar a))
-  removeInternally :: forall e. ID -> MonadPerspectives (AvarCache e) (Maybe (AVar a))
+  removeInternally :: forall e. ID -> MonadPerspectives (AvarCache e) Unit
   -- | A default implementation for encode is encodeJSON.
   encode :: a -> String
   -- | A default implementation for decode is decodeJSON.
