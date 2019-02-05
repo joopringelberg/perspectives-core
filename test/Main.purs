@@ -1,22 +1,17 @@
 module Test.Main where
 
-import Control.Monad.Aff (Fiber, runAff)
-import Control.Monad.Eff (Eff)
-import Perspectives.PerspectivesState (runPerspectives)
-import Prelude (Unit)
-import Test.SortModules (test)
-import Test.TestEffects as TE
-import Node.FS (FS)
+import Prelude
 
--- import Test.BoundContexts
+import Test.Unit (suite, test, timeout)
+import Test.Unit.Main (runTest)
+import Test.Unit.Assert as Assert
 
-main = test
--- main :: forall e. Eff (TE.TestEffects (fs :: FS | e)) (Fiber (TE.TestEffects (fs :: FS | e)) Unit)
--- main = runAff TE.handleError (runPerspectives "cor" "geheim" test)
+import Node.Encoding (Encoding(..))
 
--- runTest :: forall e a. Show a => Aff (console :: AC.CONSOLE | e) a -> Eff (console :: AC.CONSOLE | e) Unit
--- runTest t =
---   runAff_ (\_->pure unit) (t >>= (\r -> AC.log (show r)))
-
-
--- main = pure 1
+main = runTest do
+  suite "sync code" do
+    test "arithmetic" do
+      Assert.assert "2 + 2 should be 4" $ (2 + 2) == 4
+      Assert.assertFalse "2 + 2 shouldn't be 5" $ (2 + 2) == 5
+      Assert.equal 4 (2 + 2)
+      Assert.expectFailure "2 + 2 shouldn't be 5" $ Assert.equal 5 (2 + 2)
