@@ -4,8 +4,8 @@ import Data.Array (foldM, foldMap, intersect, singleton, union)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF)
 import Perspectives.CoreTypes (type (~~>), ObjectsGetter, MP)
-import Perspectives.EntiteitAndRDFAliases (ID)
-import Prelude (class Eq, class Show, pure, show, (<<<), (==), (>=>), (>>=))
+import Perspectives.PerspectivesTypesInPurescript (PBool(..))
+import Prelude (class Eq, pure, show, (<<<), (==), (>=>), (>>=), (>>>))
 
 unionOfObjects :: forall s o t e.
   Eq t =>
@@ -50,11 +50,11 @@ infixl 9 intersectionOfObjects as \-\
 -- | Compose an ObjectsGetter from an ObjectsGetter and a function
 -- | that maps an Array String value to a value that can be shown.
 -- | This function typically folds over a monoid.
-composeMonoidal :: forall e a. Show a =>
-  ObjectsGetter e
-  -> (Array String -> a)
-  -> ObjectsGetter e
-composeMonoidal p f = p >=> pure <<< singleton <<< show <<< f
+composeMonoidal :: forall s o e a.
+  (s ~~> o) e
+  -> (Array o -> a)
+  -> (s ~~> a) e
+composeMonoidal p f = p >=> pure <<< singleton <<< f
 
-contains :: forall e. ID -> ObjectsGetter e -> ObjectsGetter e
-contains obj p = p `composeMonoidal` (alaF Disj foldMap ((==) obj))
+contains :: forall s o e. Eq o => o -> (s ~~> o) e -> (s ~~> PBool) e
+contains obj p = p `composeMonoidal` (alaF Disj foldMap ((==) obj) >>> show >>> PBool)
