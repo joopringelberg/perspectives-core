@@ -13,6 +13,7 @@ typeWithPerspectivesTypes = unsafeCoerce
 -- PRIMARY REPRESENTATION
 newtype Context = Context String
 
+-- TODO: dit type is overbodig!
 derive instance genericRepContext :: Generic Context _
 derive instance newtypeContext :: Newtype Context _
 instance showContext :: Show Context where
@@ -51,7 +52,7 @@ instance eqBuitenRol :: Eq BuitenRol where
   eq (BuitenRol r1) (BuitenRol r2) = eq r1 r2
 
 -- | Class Binding should constrain all functions that manipulate a Rol.
-class RolType a <= Binding a
+class RolKind a <= Binding a
 
 instance bindingRol :: Binding RolInContext
 instance bindingBuitenRol :: Binding BuitenRol
@@ -69,50 +70,59 @@ instance encodeBinnenRol :: Encode BinnenRol where
 instance eqBinnenRol :: Eq BinnenRol where
   eq (BinnenRol r1) (BinnenRol r2) = eq r1 r2
 
-class (Newtype a String, Eq a) <= RolType a
+class (Newtype a String, Eq a) <= RolKind a
 
-instance rolInContextRol :: RolType RolInContext
-instance buitenRolRol :: RolType BuitenRol
-instance binnenRol :: RolType BinnenRol
+instance rolInContextRol :: RolKind RolInContext
+instance buitenRolRol :: RolKind BuitenRol
+instance binnenRol :: RolKind BinnenRol
 
 class (Show a, Newtype a String) <= Subject a
 
-instance contextSubject :: Subject Context
 instance rolinContextSubject :: Subject RolInContext
 instance binnenRolSubject :: Subject BinnenRol
 instance buitenRolSubject :: Subject BuitenRol
-
-newtype Val = Val String
-
-derive instance genericRepVal :: Generic Val _
-instance showVal :: Show Val where
-  show (Val s) = show s
-instance decodeVal :: Decode Val where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeVal :: Encode Val where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqVal :: Eq Val where
-  eq (Val v1) (Val v2) = v1 == v2
-
 
 class (Show a) <= Object a
 
 instance rolinContextObject :: Object RolInContext
 instance binnenRolObject :: Object BinnenRol
 instance buitenRolObject :: Object BuitenRol
-instance valObject :: Object Val
-instance contextObject :: Object Context
 
 
 -- MODEL:PERSPECTIVES
 newtype SimpleValue = SimpleValue String
 derive instance newtypeSimpleValue :: Newtype SimpleValue _
+instance eqSimpleValue :: Eq SimpleValue where
+  eq (SimpleValue c1) (SimpleValue c2) = c1 == c2
 
 newtype PBool = PBool String
-newtype PString = PString String
-newtype PDate = PDate String
-newtype PNumber = PNumber String
+derive instance newtypePBool :: Newtype PBool _
+instance eqPBool :: Eq PBool where
+  eq (PBool c1) (PBool c2) = c1 == c2
 
+newtype PString = PString String
+derive instance newtypePString :: Newtype PString _
+instance eqPString :: Eq PString where
+  eq (PString c1) (PString c2) = c1 == c2
+
+newtype PDate = PDate String
+derive instance newtypePDate :: Newtype PDate _
+instance eqPDate :: Eq PDate where
+  eq (PDate c1) (PDate c2) = c1 == c2
+
+newtype PNumber = PNumber String
+derive instance newtypePNumber :: Newtype PNumber _
+instance eqPNumber :: Eq PNumber where
+  eq (PNumber c1) (PNumber c2) = c1 == c2
+
+class (Eq a) <= Val a
+
+instance valPBool :: Val PBool
+instance valPNumber :: Val PNumber
+instance valPDate :: Val PDate
+instance valPString :: Val PString
+
+-- | The definition of Context.
 newtype ContextDef = ContextDef String
 
 derive instance genericRepContextDef :: Generic ContextDef _
@@ -123,6 +133,8 @@ instance decodeContextDef :: Decode ContextDef where
 instance encodeContextDef :: Encode ContextDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 derive instance newtypeContextDef :: Newtype ContextDef _
+instance eqContextDef :: Eq ContextDef where
+  eq (ContextDef c1) (ContextDef c2) = c1 == c2
 
 newtype RolDef = RolDef String
 
@@ -133,6 +145,8 @@ instance decodeRolDef :: Decode RolDef where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance encodeRolDef :: Encode RolDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqRolDef :: Eq RolDef where
+  eq (RolDef c1) (RolDef c2) = c1 == c2
 
 newtype PropertyDef = PropertyDef String
 
@@ -144,6 +158,8 @@ instance decodePropertyDef :: Decode PropertyDef where
 instance encodePropertyDef :: Encode PropertyDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 derive instance newtypePropertyDef :: Newtype PropertyDef _
+instance eqPropertyDef :: Eq PropertyDef where
+  eq (PropertyDef c1) (PropertyDef c2) = c1 == c2
 
 class (Show a) <= Predicate a
 
@@ -154,39 +170,67 @@ instance propertyDefPredicate :: Predicate PropertyDef
 
 newtype SysteemBot = SysteemBot String
 derive instance newtypeSysteemBot :: Newtype SysteemBot _
+instance eqSysteemBot :: Eq SysteemBot where
+  eq (SysteemBot c1) (SysteemBot c2) = c1 == c2
 
 newtype View = View String
-derive instance newtypeRolView :: Newtype View _
+derive instance newtypeView :: Newtype View _
+instance eqView :: Eq View where
+  eq (View c1) (View c2) = c1 == c2
 
 newtype Actie = Actie String
 derive instance newtypeRolActie :: Newtype Actie _
+instance eqActie :: Eq Actie where
+  eq (Actie c1) (Actie c2) = c1 == c2
 
 newtype Zaak = Zaak String
 derive instance newtypeZaak :: Newtype Zaak _
+instance eqZaak :: Eq Zaak where
+  eq (Zaak c1) (Zaak c2) = c1 == c2
 
-newtype QueryFunction = Function String
+newtype QueryFunction = QueryFunction String
 derive instance newtypeQueryFunction :: Newtype QueryFunction _
+instance eqQueryFunction :: Eq QueryFunction where
+  eq (QueryFunction c1) (QueryFunction c2) = c1 == c2
 
 newtype ElkType = ElkType String
 derive instance newtypeElkType :: Newtype ElkType _
+instance eqElkType :: Eq ElkType where
+  eq (ElkType c1) (ElkType c2) = c1 == c2
 
 newtype Systeem = Systeem String
 derive instance newtypeSysteem :: Newtype Systeem _
+instance eqSysteem :: Eq Systeem where
+  eq (Systeem c1) (Systeem c2) = c1 == c2
 
 newtype TrustedCluster = TrustedCluster String
 derive instance newtypeTrustedCluster :: Newtype TrustedCluster _
+instance eqTrustedCluster :: Eq TrustedCluster where
+  eq (TrustedCluster c1) (TrustedCluster c2) = c1 == c2
 
 newtype AssignToRol = AssignToRol String
 derive instance newtypeAssignToRol :: Newtype AssignToRol _
+instance eqAssignToRol :: Eq AssignToRol where
+  eq (AssignToRol c1) (AssignToRol c2) = c1 == c2
 
 newtype AssignToProperty = AssignToProperty String
 derive instance newtypeAssignToProperty :: Newtype AssignToProperty _
+instance eqAssignToProperty :: Eq AssignToProperty where
+  eq (AssignToProperty c1) (AssignToProperty c2) = c1 == c2
 
 newtype EffectFullFunction = EffectFullFunction String
 derive instance newtypeEffectFullFunction :: Newtype EffectFullFunction _
+instance eqEffectFullFunction :: Eq EffectFullFunction where
+  eq (EffectFullFunction c1) (EffectFullFunction c2) = c1 == c2
 
-class Newtype a String <= ContextType a
+-- | The class of all definitions of a Context (all Context types) in
+-- | the models model:Perspectives and model:QueryAST.
+class (Newtype a String, Eq a) <= ContextType a
 instance contextDefSimpleValue :: ContextType SimpleValue
+instance contextDefPBool :: ContextType PBool
+instance contextDefPNumber :: ContextType PNumber
+instance contextDefPDate :: ContextType PDate
+instance contextDefPString :: ContextType PString
 instance contextDefContextType :: ContextType ContextDef
 instance contextTypeRolDef :: ContextType RolDef
 instance contextTypePropertyDef :: ContextType PropertyDef
