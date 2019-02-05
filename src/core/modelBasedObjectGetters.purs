@@ -1,29 +1,32 @@
 module Perspectives.ModelBasedObjectGetters where
 
 import Control.Alt ((<|>))
-import Perspectives.CoreTypes (ObjectsGetter)
+import Perspectives.CoreTypes (ObjectsGetter, type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, binding, context)
-import Perspectives.ObjectGetterConstructors (booleanPropertyGetter, getGebondenAls, getRol, getRolFromPrototypeHierarchy, unlessNull)
+import Perspectives.ObjectGetterConstructors (closureOfAspectRol, concat, getGebondenAls, getRol, lookupExternalProperty, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
+import Perspectives.PerspectivesTypesInPurescript (class ContextType, class Val, PBool, PropertyDef(..), RolDef)
 
 -- | NOTE. The functions in this module have a type defined in their comment. These types all refer to
 -- | *type-descriptions* in Perspectives. Hence, 'psp:Rol -> psp:Context' should be read: from the description
 -- | of a Rol, retrieve the description of the Context that holds this Rol-description.
 
--- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
-rolIsVerplicht :: forall e. ObjectsGetter e
-rolIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspect"
-  "model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"
+-- | True iff the RolDef or one of its AspectRollen has given property "isVerplicht" the value "true".
+rolIsVerplicht :: forall e. (RolDef ~~> PBool) e
+rolIsVerplicht = some (concat isVerplicht (closureOfAspectRol /-/ isVerplicht))
+  where
+    isVerplicht :: (RolDef ~~> PBool) e
+    isVerplicht = lookupExternalProperty "isVerplicht"
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
-rolIsFunctioneel :: forall e. ObjectsGetter e
-rolIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspect"
-  "model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+rolIsFunctioneel :: forall e. (RolDef ~~> PBool) e
+rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol /-/ isFunctioneel))
+  where
+    isFunctioneel :: (RolDef ~~> PBool) e
+    isFunctioneel = lookupExternalProperty "isFunctioneel"
 
--- TODO. Dit is een functie naar voorbeeld van een ModelBasedTripleGetter.
 -- | The type of the range that has been defined for the Property.
--- | `psp:Property -> psp:SimpleValue`
-range :: forall e. ObjectsGetter e
+range :: forall v e. Val v => (PropertyDef ~~> v) e
 range = getRol "model:Perspectives$Property$range" /-/ binding /-/ context
 
 -- | Get the rol psp:Context$buitenRolBeschrijving.
