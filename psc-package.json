@@ -22,6 +22,7 @@
     "avar-monadask",
     "perspectives-couchdb",
     "js-timers",
-    "node-process"
+    "node-process",
+    "test-unit"
   ]
 }
