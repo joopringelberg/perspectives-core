@@ -3,7 +3,7 @@ module Perspectives.ObjectsGetterComposition where
 import Data.Array (foldM, foldMap, intersect, singleton, union)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF)
-import Perspectives.CoreTypes (type (~~>), ObjectsGetter, MP)
+import Perspectives.CoreTypes (type (~~>), MP)
 import Perspectives.PerspectivesTypesInPurescript (PBool(..))
 import Prelude (class Eq, pure, show, (<<<), (==), (>=>), (>>=), (>>>))
 
@@ -35,10 +35,11 @@ applyToAll q objectsOfP = foldM
   []
   objectsOfP
 
-intersectionOfObjects :: forall e.
-  ObjectsGetter e ->
-  ObjectsGetter e ->
-  ObjectsGetter e
+intersectionOfObjects :: forall s o t e.
+  Eq t =>
+  (s ~~> o) e ->
+  (o ~~> t) e ->
+  (s ~~> t) e
 intersectionOfObjects p q = p >=>
   (\objectsOfP -> foldM
       (\r objectOfP -> q objectOfP >>= pure <<< intersect r)
