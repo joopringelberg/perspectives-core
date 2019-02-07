@@ -53,7 +53,7 @@ label = typeWithPerspectivesTypes $ getContextMember \context -> [(context_displ
 rolType :: forall rt e. RolKind rt => (rt ~~> RolDef) e
 rolType = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_pspType rol]
 
-binding :: forall rt b e. RolKind rt => Binding b => (rt ~~> b) e
+binding :: forall s o e. RolKind s => RolKind o => (s ~~> o) e
 binding = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
 -- | Notice how this type is true for model:Perspectives and model:QueryAst, as all defined contexts in those models are types!
@@ -70,10 +70,10 @@ context = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_context rol]
 --  rolBindingDef :: forall c b rt e. Binding b => RolKind rt => ContextType c => (rt ~~> c) e
 --  rolBindingDef = (binding :: (rt ~~> b) e) /-/ context
 -- However, that exports the problem to any function that calls rolBindingDef.
--- I've now solved it with an arbitrary choice for the type of the subexpression 'binding'. 
+-- I've now solved it with an arbitrary choice for the type of the subexpression 'binding'.
 -- It seems to produce no problem when the result of applying 'binding' is not actually an instance of RolInContext.
-rolBindingDef :: forall c b rt e. RolKind rt => ContextType c => (rt ~~> c) e
-rolBindingDef = (binding :: (rt ~~> RolInContext) e) /-/ context
+rolBindingDef :: forall c b e. Binding b => ContextType c => (b ~~> c) e
+rolBindingDef = binding /-/ context
 
-binding' :: forall rt b e. RolKind rt => Binding b => TypedObjectGetter rt b e
+binding' :: forall b e. Binding b => TypedObjectGetter b b e
 binding' = toSingle binding

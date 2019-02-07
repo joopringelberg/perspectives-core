@@ -15,9 +15,9 @@ import Perspectives.CoreTypes (TypedObjectsGetter, type (~~>), MP)
 import Perspectives.DataTypeObjectGetters (binding, buitenRol, context)
 import Perspectives.Identifiers (LocalName) as Id
 import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/))
-import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolKind, BuitenRol, PBool(..), PropertyDef, RolDef(..), RolInContext, class Val, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolKind, BuitenRol, PBool(..), PropertyDef, RolDef(..), RolInContext, class Val, typeWithPerspectivesTypes, BuitenRol(..))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), propertyValue)
-import Prelude (class Eq, bind, id, pure, show, ($), (<>), (==), (>>=), join, (>=>), (>>>))
+import Prelude (class Eq, bind, id, join, otherwise, pure, show, ($), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- COMBINATORS
@@ -65,10 +65,10 @@ searchInAspectHierarchy getter contextId =
   ((directAspects :: (c ~~> c) e) /-/ searchInAspectHierarchy getter) contextId
 
 directAspects :: forall t e. ContextType t => (t ~~> t) e
-directAspects = getRol (RolDef "model:Perspectives$Context$aspect") /-/ (binding :: (RolInContext ~~> BuitenRol) e) /-/ (context :: (BuitenRol ~~> t) e)
+directAspects = getRol (RolDef "model:Perspectives$Context$aspect") /-/ binding /-/ context
 
 directAspectRoles :: forall e. (RolDef ~~> RolDef) e
-directAspectRoles = getRol (RolDef "model:Perspectives$Rol$aspectRol") /-/ (binding :: (RolInContext ~~> BuitenRol) e) /-/ (context :: (BuitenRol ~~> RolDef) e)
+directAspectRoles = getRol (RolDef "model:Perspectives$Rol$aspectRol") /-/ binding /-/ context
 
 concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e
 concat f p s = do
@@ -99,7 +99,7 @@ getUnqualifiedRol :: forall c e. ContextType c => Id.LocalName -> (c ~~> RolInCo
 getUnqualifiedRol ln = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] id (lookup (ln `qualifiedWith` context) (context_rolInContext context))
   where
     qualifiedWith :: Id.LocalName -> PerspectContext -> String
-    qualifiedWith ln (PerspectContext {_id}) = _id <> ln
+    qualifiedWith ln (PerspectContext {pspType}) = pspType <> "$" <> ln
 
 -- | Get the values for the property PropertyDef that are directly represented on the instance of a rol of type r
 -- | E.g. getProperty "model:Perspectives$Systeem$gebruiker$voornaam"
@@ -109,10 +109,10 @@ getProperty pn = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] prope
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r
 -- | E.g. getUnqualifiedProperty "voornaam"
 getUnqualifiedProperty :: forall r v e. RolKind r => Val v => Id.LocalName -> (r ~~> v) e
-getUnqualifiedProperty ln = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] propertyValue (lookup (ln `qualifiedWith` rol) (rol_properties rol))
+getUnqualifiedProperty ln = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] propertyValue (lookup (ln `qualifiedWith` rol) (rol_properties rol)) -- Moet gekwalificeerd zijn met het type van de rol!
   where
     qualifiedWith :: Id.LocalName -> PerspectRol -> String
-    qualifiedWith ln (PerspectRol {_id}) = _id <> ln
+    qualifiedWith ln (PerspectRol {pspType}) = pspType <> "$" <> ln
 
 -----------------------------------------------------------
 -- OTHER CONSTRUCTORS
@@ -150,7 +150,7 @@ closureOfPrototype = closure getPrototype
 -- | Look for the definition of a Rol by its local name, in the ContextType (not searching prototypes or Aspects).
 -- | If no Rol is defined with this local name, will return an empty result.
 searchRolDefinitionLocally ::	forall c e. ContextType c => Id.LocalName -> (c ~~> RolDef) e
-searchRolDefinitionLocally ln c = ((getRol (RolDef "model:Perspectives$Context$rolInContext") /-/ (binding :: (RolInContext ~~> BuitenRol) e) /-/ context) >=>
+searchRolDefinitionLocally ln c = ((getRol (RolDef "model:Perspectives$Context$rolInContext") /-/ binding /-/ context) >=>
   (\(definedRoles :: Array RolDef) -> case elemIndex (ln `qualifiedWith` c) definedRoles of
     Nothing -> pure []
     otherwise -> pure [(ln `qualifiedWith` c)])) c

@@ -10,7 +10,9 @@ import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Main (runTest)
 
 import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
+import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 
 main :: forall e. Eff (AjaxAvarCache (console :: CONSOLE, now :: NOW, testOutput :: TESTOUTPUT | e)) Unit
 main = runTest do
   DTO.theSuite
+  OGC.theSuite

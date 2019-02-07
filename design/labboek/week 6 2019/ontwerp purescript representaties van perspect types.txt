@@ -1,0 +1,139 @@
+CONTEXT
+Context - de basisrepresentatie - heeft de volgende leden:
+	- id
+	- displayName
+	- pspType
+	- rolInContext
+	- binnenRol
+	- buitenRol
+(comments laat ik weg, dat gaat eruit).
+
+Daarvan heb ik in psp:Context gemodelleerd:
+	- type, via de type declaratie
+	- rolInContext, als rolInContext
+	- binnenRol, als rolInContext
+	- buitenRol, als rolInContext
+
+Dus voor de definitie van de basisrepresentatie hoeft alleen de type declaratie en rolInContext verondersteld te worden. De type declaratie is op syntactisch niveau geregeld en rolInContext is onderdeel van psp:Context zelf. In die zin beschrijft hij zichzelf en is zijn type dus ook psp:Context.
+
+Maar ik heb meer gemodelleerd in psp:Context:
+	- interneView
+	- externeView
+	- prototype
+	- aspect
+	- gebruikerRol
+	- contextBot
+
+1. Ik twijfel over interneView en externeView. Ik zou ze kunnen weglaten. psp:Rol heeft al een viewInRol.
+
+2. gebruikerRol en contextBot horen misschien bij psp:Zaak.
+
+3. prototype hoort denk ik wel bij type. Een type, als constructor, kan partieel worden toegepast.
+
+Maar aspect introduceert de notie van subtypen. Vergelijk dit met rdfs, waar subClass voor het eerst naar voren komt. De semantiek van aspect is anders, maar speelt in dezelfde competitie.
+
+Ik zou daarom van psp:Context een psp:ContextType (of psp:ContextClass) kunnen afsplitsen.
+
+Vrijwel alle definities in model:Perspectives worden weer als type gebruikt (al dan niet in dat model zelf), met uitzondering van:
+	- de instanties van psp:SimpleValue: PBool, PString, PDate en PNumber
+	- de instanties van psp:Werkwoord
+	- psp:ElkType
+	- psp:ContextPrototype
+
+Overzicht van de hiërarchie:
+psp:Context
+	- psp:ContextPrototype
+	- psp:SimpleValue
+		- psp:PBool
+		...
+	- psp:Werkwoord
+		- psp:Beheert
+		...
+	- psp:View
+		- psp:Systeem$gebruiker$volledigeNaam
+		...
+	- psp:Zaak
+		- psp:TrustedCluster
+			- usr:MijnCluster
+		...
+			...
+	- psp:Function
+		- q:DataTypeGetter
+			- xyz
+			...
+		...
+Dieper dan psp:TrustedCluster en q:DataTypeGetter gaan we (voorlopig?) niet. Dan zijn er dus drie niveaus van types die instanties kunnen hebben:
+psp:Context - psp:Zaak - psp:TrustedCluster/q:DataTypeGetter.
+
+Type-niveaus worden geketend via de type declaratie.
+
+Een Type dat instantieerbare subtypes heeft, zoals psp:Zaak en psp:Function, is niet alleen een psp:Context maar heeft die ook als psp:Aspect. Op die manier kan in Zaak/Function elke rol gebruikt worden die ook in Context gebruikt mag worden. 
+De volgende definities hebben psp:Context als Aspect:
+	- psp:SimpleValue - maar dat is zeker niet nodig voor de definitie van zijn instanties
+	- psp:Werkwoord - zelfde kanttekening
+	- psp:Zaak
+	- psp:Function
+
+Ik heb PBool lid van de Type Class ContextType gemaakt in Purescript. Maar ik betwijfel of dat nodig is. Hij is instance van de Class Val en dat is denk ik voldoende. De werkwoorden heb ik niet eens instance van ContextType gemaakt.
+Mijn conclusie is: psp:SimpleValue en psp:Werkwoord hoeven psp:Context niet als Aspect te hebben.
+
+q:DataTypeGetter heeft als type psp:Context en als aspect psp:Function.
+Maar als ik hem als type psp:Function had gegeven, is hij óók een psp:Context (en kan dus rolInContext etc. gebruiken). Dat is dus beter.
+
+PURESCRIPT REPRESENTATIE
+Voor de leden van de basisrepresentatie heb ik ObjectsGetters gemaakt (pspType, iedereRolInContext, (binnenRol), buitenRol, label (=displayName).
+
+Maar ik heb ook ObjectsGetters voor andere gemodelleerde onderdelen, zoals:
+	- directAspects
+	- getPrototype
+en zo zou ik ook voor gebruikerRol en contextBot ObjectsGetters kunnen maken (en voor interneView en externeView als ik ze bij psp:Context laat).
+
+Ik zou de scheiding tussen psp:Context en psp:ContextDef kunnen doorvoeren. Dan zouden de ObjectsGetters op de basisrepresentatie gedefinieerd kunnen worden op het domein psp:Context, en directAspects en getPrototype op het domein psp:ContextDef.
+Hoe representeren we die domein als types in Purescript?
+En is het nuttig om ze te scheiden?
+
+====
+op psp:View, als instantie van psp:Context, kan ik de getters toepassen die voor de leden van psp:Context zijn gedefinieerd. Dat zijn getters voor rollen van psp:Context.
+op een instantie van psp:View kan ik de getters toepassen die voor de leden van psp:View zijn gedefinieerd. Dat zijn getters voor rollen van psp:View.
+Op psp:Context kan ik dezelfde getters toepassen als op psp:View, want psp:Context is óók een instantie van psp:Context.
+
+Hoe typeer ik de getters voor instanties van psp:View?
+Als ik een type View maak, kan dat het domein van die getters zijn.
+Dan moeten instanties van psp:View het type View hebben.
+
+Hoe typeer ik de getters voor instanties van psp:Context?
+Als ik een type Context maak, kan dat het domein van die getters zijn.
+Dan moeten instanties van psp:Context het type Context hebben.
+
+Maar ook psp:Context moet het type Context hebben, net als psp:View.
+
+===
+'aspect' onderscheidt ContextDef van Context. 
+In Purescript zou ik dat moeten modelleren met type classes.
+Context wordt een superclass van ContextDef.
+Nadeel: elke instantie van ContextDef moet ook tot een instantie van Context verklaard worden! Dat zijn vrijwel alle definities.
+Voordeel: de compiler verhindert me om op contexten die geen ContextDef zijn, de functie getDirectAspects toe te passen. Dat zijn: psp:SimpleValue en psp:Werkwoord en hun instanties, en psp:ContextPrototype.
+
+Als ik beiden samenvoeg, houd ik één type Class over, namelijk Context.
+Ik moet dan de functies op de basisrepresentatie en op de leden van Context definieren met die class als beperking op een type variabele - of de implementatie geven van elk van die functies voor elke instantie van de class!
+
+ROLLEN
+Moet ik Binding soms met een data type representeren, zodat je het verschil kunt zien?
+	- BuitenRol bindt alleen aan BuitenRol
+	- BinnenRol bindt alleen aan BuitenRol
+	- RolInContext bindt aan BuitenRol of RolInContext.
+
+data Binding = 
+	BuitenRol Rol
+	| RolInContext Rol
+	| NoRol
+
+newtype Rol = Rol { binding :: Binding, ... }
+
+Je kunt dan aan de member binding direct zien
+	- of hij wel gebonden is;
+	- of hij aan een BuitenRol is gebonden
+	- of hij aan een RolInContext is gebonden
+
+Het kan wel, maar wat schiet je ermee op?
+

@@ -8,7 +8,6 @@ import Perspectives.DataTypeObjectGetters (binding, binding', buitenRol, buitenR
 import Perspectives.PerspectivesTypesInPurescript (BuitenRol(..), ContextDef(..), PString(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Test.Perspectives.Utils (TestEffects, p, assertEqual)
 import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
--- import Test.Unit.Assert as Assert
 
 theSuite :: forall e. Free (TestF (TestEffects e)) Unit
 theSuite = suiteSkip "DataTypeObjectGetters" do

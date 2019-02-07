@@ -9,7 +9,7 @@ import Perspectives.CoreTypes (MonadPerspectives, (##>), (##>>), MP)
 import Perspectives.DataTypeObjectGetters (binding, context, iedereRolInContext)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.PerspectivesTypesInPurescript (class ContextType, BuitenRol(..), ContextDef, RolInContext)
+import Perspectives.PerspectivesTypesInPurescript (class ContextType, class RolKind, BinnenRol(..), BuitenRol(..), ContextDef, RolInContext(..))
 import Perspectives.ResourceRetrieval (saveEntiteitPreservingVersion)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, ifM, pure, unit, discard, (>>=), bind, ($), const, void)
@@ -41,10 +41,10 @@ saveUserData' buitenRollen = void $ for buitenRollen saveBuitenRol
         haveSeen contextId
         lift $ void (saveEntiteitPreservingVersion (unwrap contextId) :: MonadPerspectives (AjaxAvarCache e) PerspectContext)
         (rollen :: Array RolInContext) <- lift $ iedereRolInContext contextId
-        void $ for rollen \rol -> do
+        void $ for rollen \(rol :: RolInContext) -> do
           haveSeen rol
           lift $ void (saveEntiteitPreservingVersion (unwrap rol) :: MonadPerspectives (AjaxAvarCache e) PerspectRol)
-          mbnd <- lift (rol ##> binding)
+          (mbnd :: Maybe RolInContext) <- lift (rol ##> binding)
           case mbnd of
             (Just bnd@(BuitenRol _)) -> saveBuitenRol bnd
             otherwise -> pure unit)

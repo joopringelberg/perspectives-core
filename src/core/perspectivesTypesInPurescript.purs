@@ -76,19 +76,6 @@ instance rolInContextRol :: RolKind RolInContext
 instance buitenRolRol :: RolKind BuitenRol
 instance binnenRol :: RolKind BinnenRol
 
-class (Show a, Newtype a String) <= Subject a
-
-instance rolinContextSubject :: Subject RolInContext
-instance binnenRolSubject :: Subject BinnenRol
-instance buitenRolSubject :: Subject BuitenRol
-
-class (Show a) <= Object a
-
-instance rolinContextObject :: Object RolInContext
-instance binnenRolObject :: Object BinnenRol
-instance buitenRolObject :: Object BuitenRol
-
-
 -- MODEL:PERSPECTIVES
 newtype SimpleValue = SimpleValue String
 derive instance newtypeSimpleValue :: Newtype SimpleValue _
@@ -147,6 +134,7 @@ instance encodeRolDef :: Encode RolDef where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqRolDef :: Eq RolDef where
   eq (RolDef c1) (RolDef c2) = c1 == c2
+derive instance newtypeRolDef :: Newtype RolDef _
 
 newtype PropertyDef = PropertyDef String
 
@@ -160,13 +148,6 @@ instance encodePropertyDef :: Encode PropertyDef where
 derive instance newtypePropertyDef :: Newtype PropertyDef _
 instance eqPropertyDef :: Eq PropertyDef where
   eq (PropertyDef c1) (PropertyDef c2) = c1 == c2
-
-class (Show a) <= Predicate a
-
-instance rolDefPredicate :: Predicate RolDef
-derive instance newtypeRolDef :: Newtype RolDef _
-
-instance propertyDefPredicate :: Predicate PropertyDef
 
 newtype SysteemBot = SysteemBot String
 derive instance newtypeSysteemBot :: Newtype SysteemBot _

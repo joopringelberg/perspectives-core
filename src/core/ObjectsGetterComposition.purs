@@ -27,7 +27,7 @@ unionOfObjects' :: forall s o t e.
   (s ~~> t) e
 unionOfObjects' p q = p >=> applyToAll q
 
-applyToAll :: forall s o t e. Eq t =>
+applyToAll :: forall o t e. Eq t =>
   (o ~~> t) e ->
   (Array o -> MP e (Array t))
 applyToAll q objectsOfP = foldM

@@ -85,13 +85,31 @@ type Revision = Maybe String
 revision :: String -> Revision
 revision = Just
 
-type Binding = Maybe RolID
+-- type Binding = Maybe RolID
+
+data Binding = RolInContext RolID | BuitenRol RolID | NoBinding
+
+derive instance genericBinding :: Generic Binding _
+instance showBinding :: Show Binding where
+  show = genericShow
+instance decodeBinding :: Decode Binding where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance encodeBinding :: Encode Binding where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
 binding :: RolID -> Binding
+-- binding id = case id of
+  -- "" -> Nothing
+  -- otherwise -> (Just id)
 binding id = case id of
-  "" -> Nothing
-  otherwise -> (Just id)
+  "" -> NoBinding
+  -- perform match on id to see if it holds "_buitenRol"
+  otherwise -> RolInContext id
 
+bindingToRol :: Binding -> Array RolID
+bindingToRol NoBinding = []
+bindingToRol (RolInContext r) = [r]
+bindingToRol (BuitenRol r) = [r]
 -----------------------------------------------------------
 -- COMMENTS
 -----------------------------------------------------------

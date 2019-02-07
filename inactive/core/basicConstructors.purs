@@ -18,7 +18,7 @@ import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromD
 import Perspectives.ObjectGetterConstructors (getRol)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
-import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
+import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkContext)
 import Prelude (Unit, bind, const, discard, id, map, pure, show, unit, void, ($), (<<<), (<>), (>=>))
 
@@ -60,7 +60,7 @@ constructContext c@(ContextSerialization{id}) = do
             PerspectRol defaultRolRecord
               { _id = binnenRol id
               , pspType = ctype <> "$binnenRolBeschrijving"
-              , binding = binding $ buitenRol id
+              , binding = Just $ buitenRol id
               , properties = constructProperties interneProperties
               }
           , buitenRol = buitenRol id

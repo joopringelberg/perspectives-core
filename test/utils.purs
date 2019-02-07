@@ -21,6 +21,9 @@ runP t = runPerspectives "cor" "geheim" t
 p :: String -> String
 p s = "model:Perspectives$" <> s
 
+q :: String -> String
+q s = "model:QueryAst$" <> s
+
 shouldEqual :: forall a e. Eq a => a -> a -> Aff e Boolean
 shouldEqual a = \b -> pure (a == b)
 
