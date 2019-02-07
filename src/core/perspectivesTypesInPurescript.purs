@@ -4,79 +4,16 @@ import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
-import Prelude (class Show, show, ($), class Eq, eq, (==))
+import Prelude (class Show, show, ($), class Eq, (==))
 import Unsafe.Coerce (unsafeCoerce)
 
 typeWithPerspectivesTypes :: forall a b. a -> b
 typeWithPerspectivesTypes = unsafeCoerce
 
--- PRIMARY REPRESENTATION
-newtype Context = Context String
+-- MODEL:PERSPECTIVES : ROLES
+class RolType a
 
--- TODO: dit type is overbodig!
-derive instance genericRepContext :: Generic Context _
-derive instance newtypeContext :: Newtype Context _
-instance showContext :: Show Context where
-  show (Context s) = show s
-instance decodeContext :: Decode Context where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeContext :: Encode Context where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqContext :: Eq Context where
-  eq (Context c1) (Context c2) = c1 == c2
-
-newtype RolInContext = RolInContext String
-
-derive instance genericRepRolInContext :: Generic RolInContext _
-derive instance newtypeRolInContext :: Newtype RolInContext _
-instance showRolInContext :: Show RolInContext where
-  show (RolInContext s) = show s
-instance decodeRolInContext :: Decode RolInContext where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeRolInContext :: Encode RolInContext where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqRolInContext :: Eq RolInContext where
-  eq (RolInContext r1) (RolInContext r2) = eq r1 r2
-
-newtype BuitenRol = BuitenRol String
-
-derive instance genericRepBuitenRol :: Generic BuitenRol _
-derive instance newtypeBuitenRol :: Newtype BuitenRol _
-instance showBuitenRol :: Show BuitenRol where
-  show (BuitenRol s) = show s
-instance decodeBuitenRol :: Decode BuitenRol where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeBuitenRol :: Encode BuitenRol where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqBuitenRol :: Eq BuitenRol where
-  eq (BuitenRol r1) (BuitenRol r2) = eq r1 r2
-
--- | Class Binding should constrain all functions that manipulate a Rol.
-class RolKind a <= Binding a
-
-instance bindingRol :: Binding RolInContext
-instance bindingBuitenRol :: Binding BuitenRol
-
-newtype BinnenRol = BinnenRol String
-
-derive instance genericRepBinnenRol :: Generic BinnenRol _
-derive instance newtypeBinnenRol :: Newtype BinnenRol _
-instance showBinnenRol :: Show BinnenRol where
-  show (BinnenRol s) = show s
-instance decodeBinnenRol :: Decode BinnenRol where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeBinnenRol :: Encode BinnenRol where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqBinnenRol :: Eq BinnenRol where
-  eq (BinnenRol r1) (BinnenRol r2) = eq r1 r2
-
-class (Newtype a String, Eq a) <= RolKind a
-
-instance rolInContextRol :: RolKind RolInContext
-instance buitenRolRol :: RolKind BuitenRol
-instance binnenRol :: RolKind BinnenRol
-
--- MODEL:PERSPECTIVES
+-- MODEL:PERSPECTIVES : CONTEXTS
 newtype SimpleValue = SimpleValue String
 derive instance newtypeSimpleValue :: Newtype SimpleValue _
 instance eqSimpleValue :: Eq SimpleValue where
@@ -123,6 +60,17 @@ derive instance newtypeContextDef :: Newtype ContextDef _
 instance eqContextDef :: Eq ContextDef where
   eq (ContextDef c1) (ContextDef c2) = c1 == c2
 
+-- ROLES FOR CONTEXTDEF
+newtype RolInContext = RolInContext String
+instance rolTypeRolInContext :: RolType RolInContext
+
+newtype Prototype = Prototype String
+instance rolTypePrototype :: RolType Prototype
+
+newtype Aspect = Aspect String
+instance rolTypeAspect :: RolType Aspect
+
+
 newtype RolDef = RolDef String
 
 derive instance genericRepRolDef :: Generic RolDef _
@@ -136,6 +84,29 @@ instance eqRolDef :: Eq RolDef where
   eq (RolDef c1) (RolDef c2) = c1 == c2
 derive instance newtypeRolDef :: Newtype RolDef _
 
+-- ROLES FOR ROLDEF
+newtype RolProperty = RolProperty String
+instance rolTypeRolProperty :: RolType RolProperty
+
+newtype MogelijkeBinding = MogelijkeBinding String
+instance rolTypeMogelijkeBinding :: RolType MogelijkeBinding
+
+newtype ViewInRol = ViewInRol String
+instance rolTypeViewInRol :: RolType ViewInRol
+
+newtype AspectRol = AspectRol String
+instance roltypeAspectRol :: RolType AspectRol
+
+newtype Constraint = Constraint String
+instance roltypeConstraint :: RolType Constraint
+
+newtype ObjectRol = ObjectRol String
+instance roltypeObjectRol :: RolType ObjectRol
+
+newtype SubjectRol = SubjectRol String
+instance roltypeSubjectRol :: RolType SubjectRol
+
+
 newtype PropertyDef = PropertyDef String
 
 derive instance genericRepPropertyDef :: Generic PropertyDef _
@@ -148,6 +119,16 @@ instance encodePropertyDef :: Encode PropertyDef where
 derive instance newtypePropertyDef :: Newtype PropertyDef _
 instance eqPropertyDef :: Eq PropertyDef where
   eq (PropertyDef c1) (PropertyDef c2) = c1 == c2
+
+-- ROLES FOR PROPERTYDEF
+newtype Range = Range String
+instance rolTypeRange :: RolType Range
+
+newtype AspectProperty = AspectProperty String
+instance rolTypeAspectProperty :: RolType AspectProperty
+
+newtype BindingProperty = BindingProperty String
+instance rolTypeBindingProperty :: RolType BindingProperty
 
 newtype SysteemBot = SysteemBot String
 derive instance newtypeSysteemBot :: Newtype SysteemBot _
