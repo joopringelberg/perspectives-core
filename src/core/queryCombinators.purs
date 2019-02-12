@@ -75,6 +75,20 @@ closure' (TypedTripleGetter nameOfp p) =
     name :: String
     name = "(closure' " <>  nameOfp <> ")"
 
+-- | The closure of an ObjectsGetter.
+closure_ :: forall e.
+  ObjectsGetter e ->
+  ObjectsGetter e
+closure_ p = getter [] where
+  getter :: Array ID -> ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
+  getter cumulator id = do
+    objectsOfP <- p id
+    case Arr.elemIndex id cumulator of
+      Nothing -> do
+        (results :: Array (Array String)) <- traverse (getter (Arr.union cumulator objectsOfP)) (Arr.difference objectsOfP cumulator)
+        pure $ Arr.nub $ join (Arr.cons objectsOfP results)
+      otherwise -> pure objectsOfP
+
 mcons :: forall a. Maybe a -> Array a -> Array a
 mcons = maybe id Arr.cons
 

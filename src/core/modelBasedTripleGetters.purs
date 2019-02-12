@@ -36,7 +36,7 @@ propertyIsVerplichtM = constructTripleGetterFromObjectsGetter "model:Perspective
   -- 'own' property "model:Perspectives$Property$isVerplicht"
 
 -- | The type of the range that has been defined for the Property.
--- | `psp:Property -> psp:SimpleValueDef`
+-- | `psp:Property -> psp:SimpleValue`
 rangeDefM :: forall e. TypedTripleGetter e
 rangeDefM = constructRolGetter "model:Perspectives$Property$range" >-> bindingM >-> contextM
 
