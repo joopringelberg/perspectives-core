@@ -5,7 +5,7 @@ import Perspectives.CoreTypes (ObjectsGetter, type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, binding, context)
 import Perspectives.ObjectGetterConstructors (closureOfAspectRol, concat, getGebondenAls, getRol, lookupExternalProperty, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypesInPurescript (class ContextType, class Val, PBool, PropertyDef(..), RolDef)
+import Perspectives.PerspectivesTypesInPurescript (class ContextType, class SimpleValueType, PBool, PropertyDef(..), RolDef)
 
 -- | NOTE. The functions in this module have a type defined in their comment. These types all refer to
 -- | *type-descriptions* in Perspectives. Hence, 'psp:Rol -> psp:Context' should be read: from the description
@@ -26,7 +26,7 @@ rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol /-/ isFunction
     isFunctioneel = lookupExternalProperty "isFunctioneel"
 
 -- | The type of the range that has been defined for the Property.
-range :: forall v e. Val v => (PropertyDef ~~> v) e
+range :: forall v e. SimpleValueType v => (PropertyDef ~~> v) e
 range = getRol "model:Perspectives$Property$range" /-/ binding /-/ context
 
 -- | Get the rol psp:Context$buitenRolBeschrijving.

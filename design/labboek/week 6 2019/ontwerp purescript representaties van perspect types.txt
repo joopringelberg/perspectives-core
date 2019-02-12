@@ -137,3 +137,183 @@ Je kunt dan aan de member binding direct zien
 
 Het kan wel, maar wat schiet je ermee op?
 
+ONDERSCHEID BINNENROL, BUITENROL, ROLINCONTEXT IS OVERBODIG
+1. Het verschil bestaat alleen op het niveau van de basisrepresentatie.
+2. Ik gebruik de functies op dat niveau alleen om functies te maken die werken op instanties van ContextType en zijn subs.
+3. Dat zijn heel simpele functies: pak een rol in context, daarvan de binding, daarvan de context; of pak de binnen/buitenrol of een rolInContext en daarvan een property.
+Ik heb dus geen ondersteuning van de compiler nodig om die uit elkaar te houden.
+
+VERSCHILLENDE ROLTYPEN
+Voor ContextType View definieer ik een functie:
+	getPropertyReferentie :: View ~~> PropertyReferentie
+Een instantie van PropertyReferentie is een rol.
+Voor PropertyReferentie definieer ik ook een functie:
+	getVolgnummer :: PropertyReferentie ~~> PNumber
+Om te voorkomen dat ik getVolgnummer op een verkeerde rol toepas (b.v. psp:Context$prototype), typeer ik hem met het soort rol waar hij op kan worden toegepast. Nu ziet de Purescript compiler daarop toe.
+
+Nou implementeer ik getVolgnummer zo:
+	getVolgnummer = getUnqualifiedProperty "volgNummer"
+
+Wat is het type van getUnqualifiedProperty? Momenteel:
+
+	getUnqualifiedProperty :: forall r v e. RolKind r => Val v => Id.LocalName -> (r ~~> v) e
+
+Het tweede argument moet een type zijn dat óók een PropertyReferentie accepteert. RolKind is een type Class. Als PropertyReferentie een instantie is van die Class, is het goed. Op dit moment gebruik ik deze Class om BinnenRol, BuitenRol en RolInContext in te verenigen; dat gaat eruit.
+
+Kortom: de verschillende soorten rollen, zoals PropertyReferentie, moeten instanties worden van RolKind.
+
+Zijn er generieke functies die werken op RolKind? Dus, zijn er generieke functies die werken op een rol?
+Ja, getUnqualifiedProperty is een voorbeeld. Allemaal, waarin RolKind rk en ContextType ct en Val v
+	* getUnqualifiedProperty 
+	* view :: rk ~~> View
+	* aspectRol :: rk ~~> RolKind
+	* constraint :: rk ~~> Function
+	* objectRol :: rk ~~> Actie
+	* subjectRol :: rk ~~> Actie
+	* mogelijkeBinding :: rk ~~> ct
+
+Dan zijn er ook nog de ObjectsGetters die werken op de primaire representatie van Rol:
+	* pspType :: rk ~~> ct
+	* context :: rk ~~> ct
+	* binding :: rk ~~> RolKind
+	* propertyTypen :: rk ~~> Property
+	* gevuldeRollen :: rk ~~> rk
+en
+	* getProperty :: Property -> (rk ~~> v)
+	* getUnqualifiedProperty :: String -> (rk ~~> v)
+
+De vraag is: voor sommige rollen maak ik een type, zoals PropertyReferentie. Maar niet voor elke rol. Moet ik een type maken voor de rest van de rollen? Dat zou moeten als ik een functie zou maken voor een specifieke context die een algemene rol oplevert.
+Een voorbeeld leek de rol property_Range:
+
+	getProperty_Range :: Property ~~> XXX
+
+Wat moet bij XXX staan, als ik geen type Range maak? Het zou GenericRol kunnen zijn, waar GenericRol een instantie is van RolKind.
+Maar de bedoeling van deze functie is natuurlijk anders. We zijn natuurlijk geïnteresseerd in wat er *gebonden* is aan de range: 
+
+	getProperty_Range :: Property ~~> SimpleValue
+
+Het criterium is meer: maak je er een functie voor (dus een functie die het als domein neemt)? Dan moet je er een type voor maken. En voor een Rol maak je alleen maar functies die specifieke properties opleveren. Dus als een Rol geen Properties heeft, hoef je er geen type voor te maken.
+
+Je wilt soms ook de binding van een PropertyReferentie hebben:
+
+	getPropertyReferentie_Property :: PropertyReferentie ~~> Property
+
+Let op het verschil met getPropertyReferentie:
+
+	getPropertyReferentie :: View ~~> PropertyReferentie
+
+Als je een functie maakt voor een Rol zonder Properties, stap je vanaf de Context direct door naar de context van de binding van de rol (zoals bij getProperty_Range). 
+Heb je een rol met Properties, dan maak je een functie die eerst de Rol oplevert (zoals getView_PropertyReferentie).
+
+SAMENVATTING
+1. De typen BinnenRol, BuitenRol en RolInContext verdwijnen.
+2. Ik maak een type voor elke instantie van psp:Rol waar Properties voor zijn gedefinieerd.
+3. Elk van die types is een instantie van de type Class RolType.
+4. Ik maak een type voor elke instantie van psp:Context.
+5. Elk van die types is een instantie van de type Class ContextType.
+6. Voor de combinatie van van een ContextType en een bijbehorend RolType maak ik een functie (van ContextType naar RolType).
+7. Voor de combinatie van een ContextType en een erbij gedefinieerde rol zonder properties maak ik een functie van het ContextType naar de waarde van de mogelijkeBinding van de rol. Een voorbeeld is range:
+	range :: Property ~~> SimpleValue.
+Voor de rol die daarbij gepasseerd wordt, maak ik geen type in Purescript (casu quo: voor de rol psp:Property$range maak ik geen purescript type).
+8. Voor een rol met properties maak ik voor elke property een functie van het type van de rol naar de range van de property. Ik maak ook een functie voor de binding.
+9. psp:Rol representeren we dus min of meer met de type class RolType.
+10. psp:Context representeren we dus min of meer met de type class ContextType.
+
+OPEN VRAGEN
+1. Maak ik types voor specifieke properties, of is het altijd PropertyDef?
+	ANTWOORD: het is altijd PropertyDef. Dus een definitie met psp:Property als type heeft in Purescript het type PropertyDef.
+2. Wanneer gebruik je RolType en wanneer RolDef (bestaat RolDef nog wel)?
+3. Wanneer gebruik je ContextType en wanneer ContextDef?
+
+Ad 1. Een Property is dus een Context met als type psp:Property, bijvoorbeeld: psp:Property X. X is nooit het type van één of andere instantie, gerepresenteerd als context of rol, die we zouden willen bevragen. Er is dus geen behoefte aan functies met X als Domein. Daarom representeren we X niet als Purescript type.
+
+Ad 2. RolType gebruik je als Domein voor functies die op elk type Rol kunnen werken, zoals b.v. mogelijkeBinding.
+Bovendien: psp:Rol representeren we met RolType en mogelijkeBinding is een rol van psp:Rol zonder specifieke properties. We maken dus volgens punt 7 hierboven een functie van psp:Rol naar de binding van mogelijkeBinding. 
+
+De functie rolType werkt op de basisrepresentatie van Rol (PerspectRol). rolType kan wel het type op term level opleveren, maar nooit op type level. In zo'n geval gebruik je RolDef. RolDef is een instantie van RolType.
+Hetzelfde geldt voor binding.
+
+MEMBERS VOOR DE TYPE CLASSES CONTEXTTYPES, ZAAKTYPES, SIMPLEVALUETYPES, FUNCTIONTYPES, WERKWOORDTYPES
+Dit zijn de functies die op elke instantie van ContextType (en subclasses!) moeten kunnen werken:
+	* contextType
+	* buitenRol :: forall s e. ContextType s => (s -> BuitenRol) e
+	* binnenRol :: forall s e. ContextType s => (s -> BinnenRol) e
+	* label :: forall s e. ContextType s => (s -> PString) e
+Verder zijn er voor voor elke instantie eigen functies om voor dat type gedefinieerde rollen op te halen.
+Ik heb ook nog deze functies gemaakt (dataTypeObjectGetters)
+	* iedereRolInContext
+	* typeVanIedereRolInContext
+	* internePropertyTypen
+Maar elk van deze functies levert een heterogeen resultaat als we elke waarde maximaal zouden willen typeren. Immers, de rollen hebben - voor zover ze properties dragen - een eigen type. We zouden dan dus een Array krijgen met verschillende typen rollen erin en dat kan niet in Purescript.
+Dus ofwel we kunnen deze functies niet gebruiken, ofwel de resultaten zijn veel zwakker getypeerd. Zouden we een type variabele gebruiken, dan moeten we die ergens aan een type binden en daarmee verklaren we - ten onrechte - alle elementen van het array tot dat type.
+Kortom, we moeten een zwakker type gebruiken, zoals ContextDef.
+
+Terugkomend op de types die op elke instantie van ContextType moeten werken: we zouden hen als members van ContextType kunnen implementeren, maar dan moeten we ze voor elke instantie definiëren. Overigens, buitenRol, binnenRol en label hebben hetzelfde resultaattype voor alle instanties van ContextType. Hier kunnen we volstaan met functies met een type variable.
+
+Voor contextType ligt het wat genuanceerder:
+	* instanties van ContextType dienen 'psp:Context', getypeerd als ContextDef op te leveren
+	* instanties van Zaak dienen 'psp:Zaak', getypeerd als ZaakDef op te leveren;
+	* idem voor SimpleValue, Werkwoord en Function.
+Kortom, al de Perspectives types die we met een type class in Purescript representen, zouden we op term level de Perspectives type naam op moeten leveren en op type level een type.
+
+Hier komt heel duidelijk naar voren dat psp:Context, psp:Zaak, psp:SimpleValue, psp:Werkwoord en psp:Function in twee hoedanigheden voor moeten komen in het Purescript type systeem:
+	* als type class, waarin al hun instanties zijn verenigd;
+	* als type, om het type van hun instanties te representeren. De naam van zo'n type is de type class naam + 'Def'.
+Bijvoorbeeld: psp:View heeft Perspectives type psp:Context. Het type van *een* view is View; het type van de context die psp:View definieert, is ContextDef.
+
+Neem psp:View. We hebben functies die als domein View hebben, b.v. 
+	getPropertyReferentie :: View ~~> PropertyReferentie
+
+Wat is het resultaat van contextType toegepast op een view? Op term level moet dat psp:View zijn. Maar het type van psp:View is, zoals boven uitgelegd, ContextDef.
+'contextType' is *niet* de functie die het Purescript type level type van een View oplevert!
+Om het op term level goed te implementeren, moet het een specifieke implementatie voor View hebben. 
+Nee, dat is niet waar, want we kunnen het aflezen uit de primaire representatie (PerspectContext).
+En op type level? 
+Ik denk een member van ContextType, dat voor elke instantie hetzelfde is:
+
+	contextType :: forall a. ContextType a => a -> ContextDef
+	contextType = typeWithPerspectivesTypes $ getContextMember \context -> [context_pspType context]
+
+en voor psp:SimpleValue:
+
+	contextType :: forall a. ContextType a => a -> SimpleValueDef
+	contextType = typeWithPerspectivesTypes $ getContextMember \context -> [context_pspType context]
+
+MEMBERS VOOR DE TYPE CLASS ROLTYPES
+Dit zijn de functies die op elke instantie van RolTypes moeten kunnen werken:
+	* rolType
+	* context
+	* binding
+Verder zijn er voor voor elke instantie eigen functies om voor dat type gedefinieerde properties op te halen.
+We zouden deze drie als members van RolType kunnen implementeren.
+rolType is als voor contextType. Dus, een generieke implementatie voor elke instantie.
+
+context. Neem de rol PropertyReferentie als voorbeeld. De context is View. Voor `een` PropertyReferentie krijgen we op term level de bijbehorende Perspectives context-instantie, waarvan het type natuurlijk View moet zijn.
+
+Dat krijgen we alleen voor elkaar met een specifieke functie:
+
+	propertyReferentie_Context :: (PropertyReferentie ~~> View)
+
+Of met een type class met twee variabelen?
+
+	class (RolType rol, ContextType context) <= RolVanContext rol context | rol -> context where
+		context :: rol ~~> context
+	
+	instance propertyTypesView :: PropertyTypes PropertyReferentie View where
+		context = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_context rol]
+	
+Vanwege de functionele dependency zou de compiler genoeg moeten hebben aan een RolType om het ContextType te kunnen vaststellen.
+
+binding. Nemen we weer de rol PropertyReferentie als voorbeeld. Een instantie van PropertyReferentie is psp:Systeem$gebruiker$VolledigeNaam$propertyReferentie_1. De binding van deze rol is psp:Systeem$gebruiker$voornaam_buitenRol. Het type van die rol is psp:Property$buitenRolBeschrijving, 
+waarvan ik me ten zeerste afvraag of die wel klopt.
+Ja, dat klopt wel, omdat psp:Property zijn eigen definitie geeft voor de rol buitenRolBeschrijving.
+Dat lijkt me niet verboden.
+
+De functie binding, toegepast op psp:Systeem$gebruiker$VolledigeNaam$propertyReferentie_1, moet dus psp:Systeem$gebruiker$voornaam_buitenRol opleveren. De vraag is: hoe typeren we het resultaat van deze functie? Het type van die rol heeft geen specifieke afbeelding op een Purescript type.
+Het is een buitenRol.
+Het is een RolDef.
+Het zou ook een RolInContext kunnen zijn die wèl een specifieke afbeelding op een Purescript type heeft.
+Denk b.v. aan trustedCLuster, de clustergenoot, die Systeem$gebruiker als binding heeft. Voor gebruiker hebben we een type.
+
+
+

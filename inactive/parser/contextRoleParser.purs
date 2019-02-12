@@ -226,9 +226,9 @@ roleName = propertyName
 -----------------------------------------------------------
 -- Datatypes
 -----------------------------------------------------------
--- We need the "SimpleValue" 'type' because we want to specify psp:Property's range as precisely that.
+-- We need the "SimpleValueDef" 'type' because we want to specify psp:Property's range as precisely that.
 dataTypes :: Array String
-dataTypes = ["Number", "String", "Boolean", "Date", "SimpleValue"]
+dataTypes = ["Number", "String", "Boolean", "Date", "SimpleValueDef"]
 
 dataType :: forall e. IP String e
 dataType = try do

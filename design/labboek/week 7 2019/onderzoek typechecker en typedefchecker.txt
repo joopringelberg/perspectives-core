@@ -1,0 +1,126 @@
+TYPEDEFCHECKER
+
+1. checkDomeinFile doorloopt de contexten van een DomeinFile. Dat zijn PerspectContexten.
+Wat je weet is dat het definities zijn. Maar je weet niet of die Contexten, Rollen, of wat dan ook beschrijven. Immers, de typeDefChecker werkt óók voor model:Perspectives en die definieert op topniveau psp:Context, psp:Rol en psp:Property, om er een paar te noemen.
+Dus als je dit wil typeren, kom je niet verder dan iets als 'Definitie'. Niet ContextDefinitie, want dat is de definitie van een Context. Dit zijn definities //in de vorm van een context//.
+
+2. contextTypeM: een functie van een willekeurige context naar een type. Maar alle types hebben psp:Context als aspect, dus hier weten we dat het resultaat getypeerd mag worden als ContextType.
+
+3. checkProperties :: ContextType -> Definitie -> Unit
+
+4. ownInternePropertiesDefM en ownExternePropertiesDefM. Functies van ContextType, opgebouwd met buitenRol en binnenRol. Resulteren in de definitie van een Property. 
+
+	ownExterneProperties :: ContextType ~~> PropertyDef
+
+5. externePropertiesDefM: ContextType ~~> PropertyDef
+
+6. propertyTypen :: Definitie -> PropertyDef
+(eigenlijk van een rol).
+
+Dit is niet goed. In deze module speelt wel degelijk de notie van een Context - zonder dat ik gebruik maak van voorkennis dat het een definitie is. Hetzelfde geldt voor Rol. 
+Ik behandel de 'Definitie' als een vanilla Context.
+Wat heb ik dan tot nog toe gebruikt?
+
+	contextTypeM :: Context -> ContextDef
+	ownInterneProperties :: ContextDef -> PropertyDef
+		idem voor ownExterneProperties, externePropertiesDefM, internePropertiesDefM
+	propertyTypen :: Rol -> PropertyDef
+	buitenRol :: Context -> Rol
+	binnenRol :: Context -> Rol
+
+7. checkAvailableProperties :: Rol -> ContextDef -> Array PropertyDef -> Array PropertyDef -> Context -> Unit.
+
+	isDefined :: PropertyDef -> Unit
+
+8. CheckDefinedRoles :: ContextDef -> Context -> Unit
+
+	rollenDefM :: ContextDef -> RolDef
+		Idem voor ownRollenDefM 
+	aspectRollenDefM :: RolDef -> RolDef
+
+9. compareRolInstancesToDefinition :: Context -> RolDef
+
+	compareRolInstanceToDefinition :: RolInContext -> Unit
+	
+	DEZE ROL IS ALTIJD EEN ROLINCONTEXT.
+
+	10. getRolUsingAspects. De suggestie van het gebruik in compareRolInstancesToDefinition is dat we rolinstanties opzoeken met behulp van Aspecten. Maar rollen worden altijd lokaal gedragen (NAGEKEKEN: KLOPT!). getRolUsingAspects gebruikt een lokale naam en dan heeft het weer wel zin om Aspecten te gebruiken om gekwalificeerde namen te construreren en te kijken of die lokaal aanwezig zijn.
+Maar hier passen we 'm to op een gekwalificeerde naam.
+	We kunnen dus volstaan met getRol.
+	
+	getRol :: Context -> RolInContext
+	
+	compareRolInstanceToDefinition :: RolInContext -> Unit
+	
+	propertiesDefM :: RolDef -> PropertyDef
+
+11. comparePropertyInstanceToDefinition :: Context -> Rol -> PropertyDef
+
+	MAAR DEZE FUNCTIE WORDT GEBRUIKT VOOR EEN BUITENROL EN EEN ROLINCONTEXT.
+	EN HIJ MOET GEBRUIKT GAAN WORDEN VOOR EEN BINNENROL!
+	Dat kan prima, maar in de typering wil ik het wel terugzien. We hebben dan een class Rol nodig waar zowel BuitenRol als BinnenRol als RolInContext vallen.
+
+	rolType :: Rol -> RolDef
+	
+	getPropertyFunction :: PropertyDef -> RolDef -> (Rol -> Value)
+	
+	propertyIsVerplichtM :: PropertyDef -> PBool
+	
+	rangeDefM :: PropertyDef -> SimpleValueDef
+	
+	tryParseSimpleValue :: SimpleValueDef -> Value -> Bool
+	
+	Hier ontstaat dus de behoefte om, naast Context en Rol, ook Value te hebben - de typering van de waarde van een property zonder dat we weten of het om een PBool, PString, enz. gaat.
+	Daarnaast hebben we óók PBool nodig, maar dat is op een ander niveau (propertyIsVerplichtM). Daar wéten we dat het om een PBool gaat.
+	En tenslotte SimpleValueDef: de typering van het *type* van een PropertyDef, zonder dat we weten of het PBool, Pstring, etc. is.
+
+	checkAvailableProperties wordt hier toegepast op Rol en RolDef, maar heb ik boven getypeerd als Rol -> ContextDef. Nu wordt de parameter alleen maar gebruikt in een user message, maar het klopt niet. Beter om dit te unwrappen in de aanroep en een String parameter te gebruiken bij de functie.
+	
+	
+	(bindingM >-> contextM) :: Rol -> Context 
+	Maar let op. Ik ga er hier vanuit dat de Rol gebonden is aan een BuitenRol. Dus dat elke rol waarop deze functie (compareRolInstanceToDefinition) wordt toegepast, als mogelijkeBinding een Context heeft.
+	In CRL maak je een binding met de =>. De waarde van de binding staat achter de =>. De vraag is: kan daar een expressie staan waarvan de waarde een RolinContext is? Dat kan alleen met een query. Dus ik moet dan notatie hebben in CRL om achter => een query te schrijven.
+	Op dit moment bestaat dat niet (maar zie systeemInstance.crl voor experimentele syntax daarvoor).
+	Ik vermoed dat we dit nooit gaan toepassen in modellen.
+	De assumptie is dus veilig.
+	NEEN, TOCH NIET! Het geldt niet voor de binnenRol en buitenRol van een context. De binnenRol is altijd gebonden aan de buitenRol en de buitenRol is ongebonden of gebonden aan een BuitenRol.
+	Nu blijkt het zo te zijn dat compareRolInstancesToDefinition altijd wordt toegepast op een RolInContext. Dus dat moeten we ook zo typeren!
+	
+	bindingDefM :: RolDef -> Context
+	Het gaat hier om mogelijkeBinding. We weten niets meer dan dat dat een type moet zijn. In het model gebruiken we psp:ElkType om mogelijkeBinding te karakteriseren. Eigenlijk is elke context goed! Maar in de context van een model moet het wel een type zijn, want alle contexten die we hier definieren interpreteren we als type (en de meeste gebruiken we ook als type voor een rol of context, muv PBool enz).
+
+12. checkAvailableRoles :: ContextDef -> Context -> Unit
+
+13. typeVanIedereRolInContextM :: Context -> RolDef
+	isDefined :: RolDef -> Unit
+
+
+
+==========================================================================================
+TYPECHECKER
+
+1. checkRolForQualifiedProperty :: PropertyDef -> RolDef -> Bool
+
+deconstructNamespace: hier wil je uit PropertyDef een RolDef halen. Evt met een type class!
+Instances zijn PropertyDef en RolDef. Maar ook View, enz. Maar die heb je waarschijnlijk niet nodig.
+
+	checkRolHasAspect :: RolDef -> RolDef
+	klopt dat voor isOrHasAspectRol? Ja.
+	
+	checkMogelijkeBindingHasAspect :: RolDef -> RolDef -> Bool
+	
+	mogelijkeBinding :: RolDef -> RolDef
+
+IK GELOOF HET VERDER WEL.
+
+
+
+
+
+
+
+
+
+
+
+

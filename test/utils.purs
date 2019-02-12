@@ -24,6 +24,9 @@ p s = "model:Perspectives$" <> s
 q :: String -> String
 q s = "model:QueryAst$" <> s
 
+u :: String -> String
+u s = "model:User$" <> s
+
 shouldEqual :: forall a e. Eq a => a -> a -> Aff e Boolean
 shouldEqual a = \b -> pure (a == b)
 

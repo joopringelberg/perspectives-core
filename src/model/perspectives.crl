@@ -9,20 +9,29 @@ Section $rolInContext
 --------------------------------------------------------------------------------
 psp:Context psp:SimpleValue
 	prototype psp:ContextPrototype
-	--$aspect => psp:SimpleValue
 	$aspect => psp:Context
 
+psp:SimpleValue psp:SimpleValuePrototype
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+
 psp:SimpleValue psp:Boolean
-	prototype psp:ContextPrototype
+	prototype psp:SimpleValuePrototype
 
 psp:SimpleValue psp:String
-	prototype psp:ContextPrototype
+	prototype psp:SimpleValuePrototype
 
 psp:SimpleValue psp:Number
-	prototype psp:ContextPrototype
+	prototype psp:SimpleValuePrototype
 
 psp:SimpleValue psp:Date
-	prototype psp:ContextPrototype
+	prototype psp:SimpleValuePrototype
 
 --------------------------------------------------------------------------------
 -- SYSTEM BASE
@@ -251,20 +260,30 @@ psp:Context psp:Actie
 					$alternative (3) => psp:effectFullFunction
 
 psp:Context psp:Werkwoord
-	prototype psp:ContextPrototype
 	$aspect => psp:Context
+	prototype psp:ContextPrototype
+
+psp:Werkwoord psp:WerkwoordPrototype
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
 
 psp:Werkwoord psp:Beheert
-	prototype psp:ContextPrototype
+	prototype psp:WerkwoordPrototype
 
 psp:Werkwoord psp:Raadpleegt
-	prototype psp:ContextPrototype
+	prototype psp:WerkwoordPrototype
 
 psp:Werkwoord psp:Creëert
-	prototype psp:ContextPrototype
+	prototype psp:WerkwoordPrototype
 
 psp:Werkwoord psp:Verwijdert
-	prototype psp:ContextPrototype
+	prototype psp:WerkwoordPrototype
 
 --------------------------------------------------------------------------------
 -- ZAAK
@@ -354,7 +373,6 @@ psp:Context psp:Systeem
 			$mogelijkeBinding => psp:Zaak
 	$rolInContext =>
 		q:ComputedRolGetter $modellen
-			prototype psp:ContextPrototype
 			extern psp:Rol$buitenRolBeschrijving$isFunctioneel = false
 			extern $functionName = "modellenM"
 

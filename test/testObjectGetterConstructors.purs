@@ -13,7 +13,7 @@ import Test.Perspectives.Utils (TestEffects, p, q, assertEqual)
 import Test.Unit (TestF, suite, test, testSkip)
 
 theSuite :: forall e. Free (TestF (TestEffects e)) Unit
-theSuite = suite "DataTypeObjectGetters" do
+theSuite = suite "ObjectGetterConstructors" do
   test "directAspects" do
     assertEqual "psp:Function should have direct aspect psp:Context"
       (directAspects (ContextDef $ p "Function"))
@@ -40,12 +40,12 @@ theSuite = suite "DataTypeObjectGetters" do
   test "some" do
     assertEqual "Some roles defined to psp:Rol are functioneel"
       -- ((iedereRolInContext /-/ binding /-/ s5) (ContextDef $ p "Rol"))
-      (some (iedereRolInContext /-/ binding /-/ ((getUnqualifiedProperty "isFunctioneel") :: (RolInContext ~~> PBool) (now :: NOW |e))) (ContextDef $ p "Rol"))
+      (some (iedereRolInContext /-/ binding /-/ (getUnqualifiedProperty "isFunctioneel")) (ContextDef $ p "Rol"))
       [PBool "true"]
   test "all" do
     assertEqual "Some roles defined to psp:Rol are functioneel"
       -- ((iedereRolInContext /-/ binding /-/ s5) (ContextDef $ p "Rol"))
-      (all (iedereRolInContext /-/ binding /-/ ((getUnqualifiedProperty "isFunctioneel") :: (RolInContext ~~> PBool) (now :: NOW |e))) (ContextDef $ p "Rol"))
+      (all (iedereRolInContext /-/ binding /-/ (getUnqualifiedProperty "isFunctioneel")) (ContextDef $ p "Rol"))
       [PBool "false"]
   test "getRol" do
     assertEqual "psp:View has a single RolInContext: $propertyReferentie."
@@ -58,8 +58,8 @@ theSuite = suite "DataTypeObjectGetters" do
   test "closureOfBinding" do
     assertEqual "$mogelijkeBinding of $range of psp:Property is bound to psp:SimpleValue (its BuitenRol) and that is in turn bound to (the BuitenRol of) psp:ContextPrototype"
       ((getUnqualifiedRol "mogelijkeBinding" /-/ binding /-/ closureOfBinding) (RolDef (p "Property$range")) )
-      [BuitenRol $ p "ContextPrototype_buitenRol"]
+      [RolDef $ p "ContextPrototype_buitenRol"]
   test "searchQualifiedProperty" do
-    assertEqual "The BuitenRol of psp:SimpleValue is bound to the BuitenRol of psp:ContextPrototype, which in turn bears the property isFunctioneel ('true')."
-      (buitenRol /-/ (searchQualifiedProperty (PropertyDef $ p "isFunctioneel")) (ContextDef (p "SimpleValue")) )
-      [PBool "true"]
+    assertEqual "The BuitenRol of psp:SimpleValue is bound to the BuitenRol of psp:ContextPrototype, (but this has no properties!)which in turn bears the property isFunctioneel ('true')."
+      ((buitenRol /-/ (searchQualifiedProperty (PropertyDef $ p "isFunctioneel"))) (RolDef (p "SimpleValue")))
+      ([]:: Array PBool)

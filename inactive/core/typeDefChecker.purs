@@ -59,6 +59,7 @@ checkContext' cid = do
       checkAvailableRoles tp cid
       -- if this psp:ContextInstance represents a psp:Rol, and if it has an instance
       -- of $aspectRol, check whether its namespace giving context has that Aspect.
+      -- TODO: move to checkDefinedRoles. Each instance of psp:Rol (that is, each RolDef) is always defined in context.
       b <- (lift $ lift $ (cid `contextHasType` "model:Perspectives$Rol"))
       if b
         then (checkAspectOfRolType cid)
@@ -69,6 +70,7 @@ checkContext' cid = do
 checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkProperties typeId cid = do
   void $ (typeId ~> ownInternePropertiesDefM) >>= (traverse (checkInternalProperty cid))
+  -- TODO: PROBEER de binnenrol op dezelfde manier te checken als de buitenrol.
 
   void $ (typeId ~> ownExternePropertiesDefM) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
 
@@ -92,6 +94,7 @@ checkDefinedRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e
 checkDefinedRoles typeId cid = do
   definedRollen <- lift $ lift (typeId ##= rollenDefM)
   void $ traverse (compareRolInstancesToDefinition cid) definedRollen
+  -- TODO: add the check checkAspectOfRolType
 
 -- | For each RolInstance in the ContextInstance, is there a Rol defined with the Context?
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
@@ -188,7 +191,7 @@ getPropertyFunction pn rn = do
 -- | `psp:ContextInstance -> psp:Rol -> psp:ElkType`
 compareRolInstancesToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
 compareRolInstancesToDefinition cid rolType' = do
-  rolInstances <- lift $ lift $ getRolUsingAspects rolType' cid
+  rolInstances <- lift $ lift $ getRolUsingAspects rolType' cid -- TODO: rolType' is een gekwalificeerde naam. Je kunt hier volstaan met getRol.
   -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRollenDefMClosure!
   case head rolInstances of
     Nothing -> ifM (lift (rolIsMandatory rolType'))

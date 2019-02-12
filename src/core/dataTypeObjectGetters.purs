@@ -10,7 +10,7 @@ import Perspectives.ContextRolAccessors (getContextMember, getContextMember', ge
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, TypedObjectGetter, TypedObjectsGetter)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolKind, BuitenRol, PString, PropertyDef, RolDef, RolInContext, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolType, class RolVanContext, BuitenRol, ContextDef, PString, PropertyDef, RolDef, RolInContext, binding, context, contextType, typeWithPerspectivesTypes)
 import Prelude (bind, join, pure, ($))
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
@@ -21,26 +21,26 @@ toSingle og id = do
   (ar :: Array o) <- og id
   pure $ unsafePartial $ ArrayPartial.head ar
 
-contextType :: forall s o e. ContextType s => ContextType o => (s ~~> o) e
-contextType = typeWithPerspectivesTypes $ getContextMember \context -> [context_pspType context]
+-- contextType :: forall s o e. ContextType s => ContextType o => (s ~~> o) e
+-- contextType = typeWithPerspectivesTypes $ getContextMember \context -> [context_pspType context]
 
 -- Returns an empty array if the context does not exist.
-buitenRol :: forall s e. ContextType s => (s ~~> BuitenRol) e
+buitenRol :: forall r s e. ContextType s => (s ~~> BuitenRol) e
 buitenRol = typeWithPerspectivesTypes $ getContextMember \c -> [context_buitenRol c]
 
 -- Returns Nothing if the context does not exist.
-buitenRol' :: forall s e. ContextType s => s -> MonadPerspectives (AjaxAvarCache e) (Maybe BuitenRol)
+buitenRol' :: forall r s e. ContextType s => s -> MonadPerspectives (AjaxAvarCache e) (Maybe BuitenRol)
 buitenRol' = typeWithPerspectivesTypes $ getContextMember' \c -> context_buitenRol c
 
-iedereRolInContext :: forall s e. ContextType s => (s ~~> RolInContext) e
+iedereRolInContext :: forall r s e. ContextType s => (s ~~> RolInContext) e
 iedereRolInContext = typeWithPerspectivesTypes $ getContextMember \context -> nub $ join $ values (context_rolInContext context)
 
 -- | The names of every rol given to this context.
-typeVanIedereRolInContext :: forall s e. ContextType s => (s ~~> RolDef) e
+typeVanIedereRolInContext :: forall s o e. ContextType s => RolType o => (s ~~> o) e
 typeVanIedereRolInContext = typeWithPerspectivesTypes $ getContextMember \context -> keys (context_rolInContext context)
 
 -- | The names of every property given to this rol.
-propertyTypen :: forall rt e. RolKind rt => (rt ~~> PropertyDef) e
+propertyTypen :: forall rt e. RolType rt => (rt ~~> PropertyDef) e
 propertyTypen = typeWithPerspectivesTypes $ getRolMember \rol -> keys (rol_properties rol)
 
 -- | The names of every internal property given to this context.
@@ -50,30 +50,36 @@ internePropertyTypen = typeWithPerspectivesTypes $ getContextMember \context -> 
 label :: forall s e. ContextType s => (s ~~> PString) e
 label = typeWithPerspectivesTypes $ getContextMember \context -> [(context_displayName context)]
 
-rolType :: forall rt e. RolKind rt => (rt ~~> RolDef) e
+rolType :: forall s o e. RolType s => (s ~~> RolDef) e
 rolType = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_pspType rol]
 
-binding :: forall s o e. RolKind s => RolKind o => (s ~~> o) e
-binding = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] singleton (rol_binding rol)
+-- binding :: forall s o e. RolType s => (s ~~> RolDef) e
+-- binding = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] singleton (rol_binding rol)
+--
+-- binding_ :: forall s o e. RolType s => RolType o => (s ~~> o) e
+-- binding_ = typeWithPerspectivesTypes $ getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
 -- | Notice how this type is true for model:Perspectives and model:QueryAst, as all defined contexts in those models are types!
-context :: forall rt s e. RolKind rt => ContextType s => (rt ~~> s) e
-context = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_context rol]
+-- context :: forall rt s e. RolType rt => (rt ~~> ContextDef) e
+-- context = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_context rol]
+--
+-- context_ :: forall rt ct e. RolType rt => ContextType ct => (rt ~~> ct) e
+-- context_ = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_context rol]
 
--- | TODO. Oorspronkelijk definieerde ik dit als (rt ~~> ContextDef) e, maar dat klopt niet. Het kan zijn dat er semantische fouten zijn waar deze functie is gebruikt.
--- NOTE.
--- the definition:
---  rolBindingDef = binding /-/ context
--- will not do, as the compiler infers the existence of a type variable that is the result of 'binding', but
--- cannot infer a type for it.
--- Originally, I had solved this with:
---  rolBindingDef :: forall c b rt e. Binding b => RolKind rt => ContextType c => (rt ~~> c) e
---  rolBindingDef = (binding :: (rt ~~> b) e) /-/ context
--- However, that exports the problem to any function that calls rolBindingDef.
--- I've now solved it with an arbitrary choice for the type of the subexpression 'binding'.
--- It seems to produce no problem when the result of applying 'binding' is not actually an instance of RolInContext.
-rolBindingDef :: forall c b e. Binding b => ContextType c => (b ~~> c) e
+rolBindingDef :: forall b c d e.
+  Binding b c =>
+  RolType c =>
+  ContextType d =>
+  RolVanContext c d =>
+  (b ~~> d) e
 rolBindingDef = binding /-/ context
 
-binding' :: forall b e. Binding b => TypedObjectGetter b b e
+-- rolBindingDef_ :: forall b c e. RolType b => ContextType c => (b ~~> c) e
+-- rolBindingDef_ = binding /-/ context
+
+binding' :: forall bi bo e.
+  RolType bi =>
+  RolType bo =>
+  Binding bi bo =>
+  TypedObjectGetter bi bo e
 binding' = toSingle binding

@@ -7,7 +7,7 @@ import Perspectives.CoreTypes (type (~~>), MP)
 import Perspectives.DataTypeObjectGetters (binding, context, iedereRolInContext)
 import Perspectives.ObjectGetterConstructors (getUnqualifiedProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolKind, class Val, BuitenRol(..), ContextDef(..), PBool(..), RolInContext(..))
+import Perspectives.PerspectivesTypesInPurescript (class Binding, class ContextType, class RolKind, class SimpleValueType, BuitenRol(..), ContextDef(..), PBool(..), RolInContext(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- iedereRolInContext :: forall s e. ContextType s => (s ~~> RolInContext) e
@@ -21,20 +21,20 @@ s1 = iedereRolInContext /-/ binding
 s1' :: forall b e. Binding b => (ContextDef ~~> b) e
 s1' = iedereRolInContext /-/ binding
 
--- getUnqualifiedProperty :: forall r v e. RolKind r => Val v => Id.LocalName -> (r ~~> v) e
+-- getUnqualifiedProperty :: forall r v e. RolKind r => SimpleValueType v => Id.LocalName -> (r ~~> v) e
 
 -- Either provide a concrete type (PBool, here),
 s2 :: forall e. (ContextDef ~~> PBool) e
 s2 = s1 /-/ getUnqualifiedProperty "isFunctioneel"
 
--- or a type variable that is constrained to be a Val - just like in getUnqualifiedProperty itself.
-s2' :: forall v e. Val v => (ContextDef ~~> v) e
+-- or a type variable that is constrained to be a SimpleValueType - just like in getUnqualifiedProperty itself.
+s2' :: forall v e. SimpleValueType v => (ContextDef ~~> v) e
 s2' = s1 /-/ getUnqualifiedProperty "isFunctioneel"
 
 -- However, if we now compose with s', the compiler complains that it cannot find a class instance of Binding for the result of s1'. This type variable is uninstantiated.
 -- Notice that the second part of the composition, (getUnqualifiedProperty "isFunctioneel"), does
 -- not provide a concrete type either as its argument is a type variable, too.
--- s2'' :: forall v e. Val v => (ContextDef ~~> v) e
+-- s2'' :: forall v e. SimpleValueType v => (ContextDef ~~> v) e
 -- s2'' = s1' /-/ getUnqualifiedProperty "isFunctioneel"
 
 -- If, however, we compose s1' with a function that provides a concrete type as argument in its type,
@@ -46,13 +46,13 @@ isFunctioneel :: forall e. (BuitenRol ~~> PBool) e
 isFunctioneel = getUnqualifiedProperty "isFunctioneel"
 
 -- And we need not be concrete about the final result, either:
-s3' :: forall v e. Val v => (ContextDef ~~> v) e
+s3' :: forall v e. SimpleValueType v => (ContextDef ~~> v) e
 s3' = s1' /-/ isFunctioneel'
 
-isFunctioneel' :: forall v e. Val v => (BuitenRol ~~> v) e
+isFunctioneel' :: forall v e. SimpleValueType v => (BuitenRol ~~> v) e
 isFunctioneel' = getUnqualifiedProperty "isFunctioneel"
 
-s4 :: forall v e. Val v => (ContextDef ~~> v) e
+s4 :: forall v e. SimpleValueType v => (ContextDef ~~> v) e
 s4 = s1 /-/ getUnqualifiedProperty "isFunctioneel"
 
 -- This I find remarkable. Here context results in a ContextType constrained variable and
