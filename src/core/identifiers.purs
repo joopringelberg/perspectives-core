@@ -21,7 +21,9 @@ module Perspectives.Identifiers
 , pe_namespace
 , pe_localName
 , binnenRol
+, deconstructBinnenRol
 , buitenRol
+, deconstructBuitenRol
 , PEIdentifier
 , Prefix
 , isUserURI
@@ -57,10 +59,18 @@ binnenRol s = if isModelName s
   then s <> "$_binnenRol"
   else s <> "_binnenRol"
 
+-- | Returns the identifier minus the "_binnenRol" or "$_binnenRol" part.
+deconstructBinnenRol :: String -> String
+deconstructBinnenRol s = replaceAll (Pattern "_binnenRol") (Replacement "")(replaceAll (Pattern "$_binnenRol") (Replacement "") s)
+
 buitenRol :: String -> String
 buitenRol s = if isModelName s
   then s <> "$_buitenRol"
   else s <> "_buitenRol"
+
+-- | Returns the identifier minus the "_buitenRol" or "$_buitenRol" part.
+deconstructBuitenRol :: String -> String
+deconstructBuitenRol s = replaceAll (Pattern "_buitenRol") (Replacement "")(replaceAll (Pattern "$_buitenRol") (Replacement "") s)
 
 type Namespace = String
 type LocalName = String
