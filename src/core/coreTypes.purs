@@ -37,7 +37,7 @@ import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, sh
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
-type QueryCache e = GLStrMap (TypedTripleGetter e)
+type QueryCache e = GLStrMap (TypedTripleGetter String String e)
 
 type PerspectivesState = CouchdbState (
   rolDefinitions :: RolDefinitions
@@ -178,30 +178,30 @@ data NamedFunction f = NamedFunction Name f
 -----------------------------------------------------------
 -- TRIPLE
 -----------------------------------------------------------
-newtype Triple e = Triple
-  { subject :: Subject
+newtype Triple s o e = Triple
+  { subject :: s
   , predicate :: Predicate
-  , object :: Array ID
+  , object :: Array o
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
-  , tripleGetter :: TripleGetter e}
+  , tripleGetter :: TripleGetter s o e}
 
-instance showTriple :: Show (Triple e) where
+instance showTriple :: (Show s, Show o) => Show (Triple s o e) where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
 
-instance eqTriple :: Eq (Triple e) where
+instance eqTriple :: (Eq s, Eq o) => Eq (Triple s o e) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
-tripleObjects :: forall e. Triple e -> Array String
+tripleObjects :: forall s o e. Triple s o e -> Array o
 tripleObjects (Triple{object}) = object
 
-tripleObjects_  :: forall e m. Monad m => (Triple e) -> m (Array ID)
+tripleObjects_  :: forall s o e m. Monad m => (Triple s o e) -> m (Array o)
 tripleObjects_ (Triple{object}) = pure object
 
-mtripleObject :: forall e. Triple e -> Maybe String
+mtripleObject :: forall s o e. Triple s o e -> Maybe o
 mtripleObject = head <<< tripleObjects
 
-tripleObject :: forall e. Triple e -> String
+tripleObject :: forall s o e. Triple s o e -> o
 tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
 
 -----------------------------------------------------------
@@ -217,50 +217,51 @@ instance eqTripleQueueElement :: Eq TripleQueueElement where
 -----------------------------------------------------------
 -- TRIPLEGETTER
 -----------------------------------------------------------
-type TripleGetter e = Subject -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple e)
+type TripleGetter s o e = s -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple s o e)
 
 -----------------------------------------------------------
 -- TYPED GETTERS
 -----------------------------------------------------------
 
-data TypedTripleGetter e = TypedTripleGetter Name (TripleGetter e)
+data TypedTripleGetter s o e = TypedTripleGetter Name (TripleGetter s o e)
 
-typedTripleGetterName :: forall e. TypedTripleGetter e -> String
+typedTripleGetterName :: forall s o e. TypedTripleGetter s o e -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
 
 -- | NB. If the TripleGetter uses the #start queryvariable, this will not work, because
 -- | it will only be bound in runMonadPerspectivesQuery.
-applyTypedTripleGetter :: forall e.
-  Subject
-  -> TypedTripleGetter e
-  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Triple e)
+applyTypedTripleGetter :: forall s o e.
+  s
+  -> TypedTripleGetter s o e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Triple s o e)
 applyTypedTripleGetter a (TypedTripleGetter _ f) = f a
 
 infix 0 applyTypedTripleGetter as @@
 
-applyTypedTripleGetterToObjects :: forall e.
-  Subject
-  -> TypedTripleGetter e
-  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Array ID)
+applyTypedTripleGetterToObjects :: forall s o e.
+  s
+  -> TypedTripleGetter s o e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Array o)
 applyTypedTripleGetterToObjects a (TypedTripleGetter _ f) = f a >>= pure <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToObjects as @@=
 
-applyTypedTripleGetterToMaybeObject :: forall e.
-  Subject
-  -> TypedTripleGetter e
-  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Maybe ID)
+applyTypedTripleGetterToMaybeObject :: forall s o e.
+  s
+  -> TypedTripleGetter s o e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) (Maybe o)
 applyTypedTripleGetterToMaybeObject a (TypedTripleGetter _ f) = f a >>= pure <<< head <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToMaybeObject as @@>
 
-applyTypedTripleGetterToObject :: forall e.
-  Subject
-  -> TypedTripleGetter e
-  -> (MonadPerspectivesQuery (AjaxAvarCache e)) ID
+applyTypedTripleGetterToObject :: forall s o e.
+  Show s =>
+  s
+  -> TypedTripleGetter s o e
+  -> (MonadPerspectivesQuery (AjaxAvarCache e)) o
 applyTypedTripleGetterToObject a (TypedTripleGetter n f) = f a >>= \(Triple{object}) ->
   case head object of
-    Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> a <> "'."
+    Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> show a <> "'."
     (Just obj) -> pure obj
 
 infix 0 applyTypedTripleGetterToObject as @@>>

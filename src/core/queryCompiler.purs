@@ -17,7 +17,7 @@ import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructExternalPropertyGetter, constructExternalPropertyLookup, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
+import Perspectives.TripleGetterConstructors (constructExternalPropertySearch, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
 import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
@@ -71,8 +71,8 @@ constructQueryFunction typeDescriptionID = do
         (errorMessage "no property provided" queryStepType)
         (typeDescriptionID %%> getBindingOfRol "model:QueryAst$PropertyGetter$property")
       case functionName of
-        "constructExternalPropertyGetter" -> pure $ constructExternalPropertyGetter property
-        "constructExternalPropertyLookup" -> pure $ constructExternalPropertyLookup property
+        "constructExternalPropertyGetter" -> pure $ constructExternalPropertySearch property
+        "constructExternalPropertyLookup" -> pure $ constructExternalPropertySearch property
         "constructRolPropertyLookup" -> pure $ constructRolPropertyLookup property
         "constructRolPropertyGetter" -> pure $ constructRolPropertyGetter property
         "propertyQuery" -> propertyQuery property

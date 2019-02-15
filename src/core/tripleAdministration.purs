@@ -19,9 +19,11 @@ import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, unwrap)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
+import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Prelude (Unit, bind, discard, pure, unit, void, ($))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -33,21 +35,21 @@ memorizeQueryResults = lift $ gets _.memorizeQueryResults
 setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery (avar :: AVAR | e) Unit
 setMemorizeQueryResults b = lift $ modify \ps -> ps {memorizeQueryResults = b}
 
-getRef :: forall e. Triple e -> TripleRef
+getRef :: forall e. Triple String String e -> TripleRef
 getRef = unsafeCoerce
 
 -- | An index of Predicate-Object combinations, indexed by Subject.
 type TripleIndex e = GLStrMap (PredicateIndex e)
 
 -- An index of objects indexed by Predicate (for a single Subject).
-type PredicateIndex e = GLStrMap (Triple e)
+type PredicateIndex e = GLStrMap (Triple String String e)
 
 -- | A global store of triples, indexed by Subject and Predicate.
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 tripleIndex :: forall e. TripleIndex e
 tripleIndex = new unit
 
-lookupInTripleIndex :: forall e1 e2. Subject -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
+lookupInTripleIndex :: forall e1 e2. Subject -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple String String e2))
 lookupInTripleIndex rid pid = do
   preds <- peek tripleIndex rid
   case preds of
@@ -60,7 +62,7 @@ lookupInTripleIndex rid pid = do
           pure Nothing
         (Just o) -> pure (Just o)
 
-getTriple :: forall e1 e2. TripleRef -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple e2))
+getTriple :: forall e1 e2. TripleRef -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple String String e2))
 getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 -- | Construct a triple and add it to the index.
@@ -72,8 +74,8 @@ addToTripleIndex :: forall e1 e2.
   (Array String) ->
   Array TripleRef ->
   Array TripleRef ->
-  TripleGetter e2 ->
-  Eff (gm :: GLOBALMAP | e1) (Triple e2)
+  TripleGetter String String e2 ->
+  Eff (gm :: GLOBALMAP | e1) (Triple String String e2)
 addToTripleIndex rid pid val deps sups tripleGetter =
     do
       (m :: PredicateIndex e2) <- ensureResource rid
@@ -91,7 +93,7 @@ addToTripleIndex rid pid val deps sups tripleGetter =
 -- | Add the triple to the index.
 -- | Will add an entry for the Subject if it is not yet present.
 -- | Adds a dependency to each of the supports.
-registerTriple :: forall e1 e2. Triple e2 -> Eff (gm :: GLOBALMAP | e1) (Triple e2)
+registerTriple :: forall e1 e2. Triple String String e2 -> Eff (gm :: GLOBALMAP | e1) (Triple String String e2)
 registerTriple triple@(Triple{subject, predicate, supports}) = do
   (m :: PredicateIndex e2) <- ensureResource subject
   predIndex <- poke m predicate triple
@@ -126,26 +128,28 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
-memorize :: forall e. TripleGetter e -> String -> TypedTripleGetter e
+memorize :: forall s o e. Newtype s String => Newtype o String => TripleGetter s o e -> String -> TypedTripleGetter s o e
 memorize getter name = TypedTripleGetter name
-  \id -> do
+  \(id :: s) -> do
     remember <- memorizeQueryResults
     case remember of
       true -> do
-        mt <- lift $ liftEff (lookupInTripleIndex id name)
+        mt <- lift $ liftEff (lookupInTripleIndex (unwrap id) name)
         case mt of
           Nothing -> do
             t <- getter id
-            lift $ liftEff $ registerTriple t
-          (Just t) -> pure t
+            (stringTriple :: Triple String String e) <- pure $ typeWithPerspectivesTypes t
+            _ <- lift $ liftEff $ registerTriple stringTriple
+            pure t
+          (Just t) -> pure $ typeWithPerspectivesTypes t
       false -> getter id
 
 -- | Add the reference to the triple.
-foreign import addDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+foreign import addDependency_ :: forall e1 e2. Triple String String e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
 
 -- | Remove the reference from the triple.
-foreign import removeDependency_ :: forall e1 e2. Triple e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
-foreign import setSupports_ ::  forall e1 e2. Triple e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+foreign import removeDependency_ :: forall e1 e2. Triple String String e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+foreign import setSupports_ ::  forall e1 e2. Triple String String e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
 
 -- | Add the dependentRef (first argument) as a dependency to the triple identified by the supportingRef (second argument).
 addDependency :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
