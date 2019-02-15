@@ -233,5 +233,6 @@ instance bindingContextRol :: Binding ContextRol BuitenRol where
 newtype Value = Value String
 
 derive instance genericRepValue :: Generic Value _
+derive instance newtypeValue :: Newtype Value _
 instance eqValue :: Eq Value where
   eq (Value c1) (Value c2) = c1 == c2

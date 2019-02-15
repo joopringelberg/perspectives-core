@@ -82,14 +82,17 @@ directAspects = getContextRol (RolDef "model:Perspectives$Context$aspect") /-/ r
 directAspectRoles :: forall e. (RolDef ~~> RolDef) e
 directAspectRoles = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectRol") /-/ rolBindingDef
 
-concat :: forall e. ObjectsGetter e -> ObjectsGetter e -> ObjectsGetter e
+directAspectProperties :: forall e. (PropertyDef ~~> PropertyDef) e
+directAspectProperties = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectProperty") /-/ rolBindingDef
+
+concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e
 concat f p s = do
   fs <- f s
   ps <- p s
   pure $ union fs ps
 
 -- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
-some :: forall e. (String ~~> PBool) e -> (String ~~> PBool) e
+some :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e
 some f = f `composeMonoidal` (alaF Disj foldMap ((==) (PBool "true")) >>> show >>> PBool)
 
 -- | True iff at all of the boolean results of f is true (where true is represented as PBool "true").
@@ -113,6 +116,10 @@ closureOfAspect = closure directAspects
 -- | All AspectRollen of a RolDef, excluding the RolDef itself. A homogeneous collection of RolDefs.
 closureOfAspectRol :: forall e. (RolDef ~~> RolDef) e
 closureOfAspectRol = closure directAspectRoles
+
+-- | All AspectProperty of a PropertyDef, excluding the PropertyDef itself. A homogeneous collection of PropertyDefs.
+closureOfAspectProperty :: forall e. (PropertyDef ~~> PropertyDef) e
+closureOfAspectProperty = closure directAspectProperties
 
 -- | The prototype of a ContextType.
 getPrototype :: forall e. (AnyDefinition ~~> AnyDefinition) e
