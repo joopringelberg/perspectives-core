@@ -21,7 +21,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
 import Perspectives.ModelBasedTripleGetters (contextBotDefM, botSubjectRollenDefM)
-import Perspectives.ObjectGetterConstructors (getExternalProperty, getRol)
+import Perspectives.ObjectGetterConstructors (searchExternalProperty, getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.QueryCompiler (propertyQuery, rolQuery)
@@ -305,7 +305,7 @@ constructActionFunction actionInstanceID = do
   case actionType of
     "model:ActionAst$assignToRol" -> do
       -- The assignment operation to be executed. Possible values are: "add", "remove", "set"
-      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID %%> (getExternalProperty "model:ActionAst$assignToRol$buitenRolBeschrijving$operation") )
+      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID %%> (searchExternalProperty "model:ActionAst$assignToRol$buitenRolBeschrijving$operation") )
       -- The rol we will assign to. The qualified name is used!
       (rol :: String) <- onNothing
         (errorMessage "no rol provided to assign to" actionType)
@@ -333,7 +333,7 @@ constructActionFunction actionInstanceID = do
 
     "model:ActionAst$assignToProperty" -> do
       -- The assignment operation to be executed. Possible values are: "add", "remove", "set"
-      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID %%> (getExternalProperty "model:ActionAst$assignToRol$buitenRolBeschrijving$operation") )
+      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID %%> (searchExternalProperty "model:ActionAst$assignToRol$buitenRolBeschrijving$operation") )
       -- The property we will assign to.
       (property :: String) <- onNothing
         (errorMessage "no property provided to assign to" actionType)
@@ -361,7 +361,7 @@ constructActionFunction actionInstanceID = do
 
     "model:ActionAst$effectFullFunction" -> do
       -- The effectful function to be applied. NOTE: the syntax coloring goes mad when we write out the propertyname below in full...
-      functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID %%> (getExternalProperty $ "model:ActionAst$effectFullFunction$buitenRolBeschrijving$" <>
+      functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID %%> (searchExternalProperty $ "model:ActionAst$effectFullFunction$buitenRolBeschrijving$" <>
         "functionName"))
       -- The parameters
       (parameters :: Array String) <- (actionInstanceID %% getBindingOfRol "model:ActionAst$effectFullFunction$parameter")

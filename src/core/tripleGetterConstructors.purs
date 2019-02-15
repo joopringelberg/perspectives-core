@@ -13,7 +13,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery, ObjectsGetter, Triple(..)
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, deconstructLocalNameFromDomeinURI)
-import Perspectives.ObjectGetterConstructors (getExternalProperty, getGebondenAls, getInternalProperty, getProperty, getRol, getRolFromPrototypeHierarchy, lookupExternalProperty, lookupInternalProperty, getRolWithPropertyFromRolTelescope)
+import Perspectives.ObjectGetterConstructors (searchExternalProperty, getGebondenAls, getInternalProperty, getProperty, getRol, getRolFromPrototypeHierarchy, searchExternalProperty, searchInternalProperty, getRolWithPropertyFromRolTelescope)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Perspectives.TripleGetterComposition ((>->))
@@ -88,7 +88,7 @@ constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromE
 
 -- | Use this function to construct property getters that memorize in the triple administration. Use with:
 -- | - getRol
--- | - getExternalProperty
+-- | - searchExternalProperty
 -- | - getInternalProperty
 -- | - getProperty
 constructTripleGetter :: forall e.
@@ -100,12 +100,12 @@ constructTripleGetter objectsGetterConstructor pn = constructTripleGetterFromObj
 constructExternalPropertyGetter :: forall e.
   PropertyName ->
   TypedTripleGetter e
-constructExternalPropertyGetter pn = constructTripleGetter getExternalProperty pn
+constructExternalPropertyGetter pn = constructTripleGetter searchExternalProperty pn
 
 constructExternalPropertyLookup :: forall e.
   LocalName ->
   TypedTripleGetter e
-constructExternalPropertyLookup ln = constructTripleGetter lookupExternalProperty ln
+constructExternalPropertyLookup ln = constructTripleGetter searchExternalProperty ln
 
 constructInternalPropertyGetter :: forall e.
   PropertyName ->
@@ -115,7 +115,7 @@ constructInternalPropertyGetter pn = constructTripleGetter getInternalProperty p
 constructInternalPropertyLookup :: forall e.
   LocalName ->
   TypedTripleGetter e
-constructInternalPropertyLookup ln = constructTripleGetter lookupInternalProperty ln
+constructInternalPropertyLookup ln = constructTripleGetter searchInternalProperty ln
 
 constructRolPropertyGetter :: forall e.
   PropertyName ->

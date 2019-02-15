@@ -2,10 +2,12 @@ module Perspectives.ModelBasedObjectGetters where
 
 import Control.Alt ((<|>))
 import Perspectives.CoreTypes (ObjectsGetter, type (~~>))
-import Perspectives.DataTypeObjectGetters (buitenRol, binding, context)
-import Perspectives.ObjectGetterConstructors (closureOfAspectRol, concat, getGebondenAls, getRol, lookupExternalProperty, some, unlessNull)
+import Perspectives.DataTypeObjectGetters (buitenRol, context)
+import Perspectives.ObjectGetterConstructors (closureOfAspectRol, concat, getContextRol, getGebondenAls, searchExternalProperty, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypesInPurescript (class ContextType, class SimpleValueType, PBool, PropertyDef(..), RolDef)
+import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..), binding)
+import Prelude (($))
+
 
 -- | NOTE. The functions in this module have a type defined in their comment. These types all refer to
 -- | *type-descriptions* in Perspectives. Hence, 'psp:Rol -> psp:Context' should be read: from the description
@@ -16,35 +18,35 @@ rolIsVerplicht :: forall e. (RolDef ~~> PBool) e
 rolIsVerplicht = some (concat isVerplicht (closureOfAspectRol /-/ isVerplicht))
   where
     isVerplicht :: (RolDef ~~> PBool) e
-    isVerplicht = lookupExternalProperty "isVerplicht"
+    isVerplicht = searchExternalUnqualifiedProperty "isVerplicht"
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 rolIsFunctioneel :: forall e. (RolDef ~~> PBool) e
 rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol /-/ isFunctioneel))
   where
     isFunctioneel :: (RolDef ~~> PBool) e
-    isFunctioneel = lookupExternalProperty "isFunctioneel"
+    isFunctioneel = searchExternalUnqualifiedProperty "isFunctioneel"
 
 -- | The type of the range that has been defined for the Property.
-range :: forall v e. SimpleValueType v => (PropertyDef ~~> v) e
-range = getRol "model:Perspectives$Property$range" /-/ binding /-/ context
+range :: forall e. (PropertyDef ~~> SimpleValueDef) e
+range = getContextRol (RolDef "model:Perspectives$Property$range") /-/ binding /-/ context
 
 -- | Get the rol psp:Context$buitenRolBeschrijving.
 -- | `psp:Context -> psp:RolInstance`
-buitenRolBeschrijving :: forall e. ObjectsGetter e
-buitenRolBeschrijving = getRol "model:Perspectives$Context$buitenRolBeschrijving"
+buitenRolBeschrijving :: forall e. (AnyContext ~~> ContextRol) e
+buitenRolBeschrijving = getContextRol $ RolDef "model:Perspectives$Context$buitenRolBeschrijving"
 
 -- | Get the Context that describes the buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
 -- | `psp:Context -> psp:RolInstance`
-buitenRolBeschrijvingDef :: forall e. ObjectsGetter e
-buitenRolBeschrijvingDef = getRolFromPrototypeHierarchy "model:Perspectives$Context$buitenRolBeschrijving" /-/ binding /-/ context
+buitenRolBeschrijvingDef :: forall e. (AnyDefinition ~~> RolDef) e
+buitenRolBeschrijvingDef = searchUnqualifiedRolDefinition "model:Perspectives$Context$buitenRolBeschrijving" /-/ binding /-/ context
 
 -- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
 -- | `psp:Context -> psp:RolInstance`
-binnenRolBeschrijving :: forall e. ObjectsGetter e
-binnenRolBeschrijving = getRol "model:Perspectives$Context$binnenRolBeschrijving"
+binnenRolBeschrijving :: forall e. (AnyContext ~~> ContextRol) e
+binnenRolBeschrijving = getContextRol $ RolDef "model:Perspectives$Context$binnenRolBeschrijving"
 
 -- | `psp:Rol -> psp:Context`
 contextDef :: forall e. ObjectsGetter e
@@ -52,8 +54,8 @@ contextDef rid = unlessNull rolInContextContextDef rid <|> unlessNull binnenRolC
 
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
-bindingDef :: forall e. ObjectsGetter e
-bindingDef = getRol "model:Perspectives$Rol$mogelijkeBinding" /-/ binding /-/ context
+bindingDef :: forall e. (AnyContext ~~> AnyContext) e
+bindingDef = getContextRol $ RolDef "model:Perspectives$Rol$mogelijkeBinding" /-/ binding /-/ context
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`
@@ -81,11 +83,11 @@ binnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$b
 buitenRolContextDef :: forall e. ObjectsGetter e
 buitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
 
--- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
-propertyIsVerplicht :: forall e. ObjectsGetter e
-propertyIsVerplicht = booleanPropertyGetter "model:Perspectives$Context$aspectProperty"
-  "model:Perspectives$Property$buitenRolBeschrijving$isVerplicht"
-
--- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
-propertyIsFunctioneel :: forall e. ObjectsGetter e
-propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"
+-- -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+-- propertyIsVerplicht :: forall e. ObjectsGetter e
+-- propertyIsVerplicht = some booleanPropertyGetter "model:Perspectives$Context$aspectProperty"
+--   "model:Perspectives$Property$buitenRolBeschrijving$isVerplicht"
+--
+-- -- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
+-- propertyIsFunctioneel :: forall e. ObjectsGetter e
+-- propertyIsFunctioneel = booleanPropertyGetter "model:Perspectives$Context$aspectProperty" "model:Perspectives$Property$buitenRolBeschrijving$isFunctioneel"

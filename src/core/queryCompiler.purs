@@ -11,7 +11,7 @@ import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, contextM, contextTypeM, identityM, iedereRolInContextM, labelM, rolTypeM)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.ObjectGetterConstructors (getExternalProperty, getInternalProperty, getRol)
+import Perspectives.ObjectGetterConstructors (searchExternalProperty, getInternalProperty, getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
@@ -54,7 +54,7 @@ constructQueryFunction typeDescriptionID = do
     (typeDescriptionID %%> contextType)
   case queryStepType of
     "model:QueryAst$DataTypeGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName") )
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName") )
       case functionName of
         "binding" -> pure bindingM
         "context" -> pure contextM
@@ -66,7 +66,7 @@ constructQueryFunction typeDescriptionID = do
         "label" -> pure labelM
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")
     "model:QueryAst$PropertyGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") )
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") )
       property <- onNothing
         (errorMessage "no property provided" queryStepType)
         (typeDescriptionID %%> getBindingOfRol "model:QueryAst$PropertyGetter$property")
@@ -79,14 +79,14 @@ constructQueryFunction typeDescriptionID = do
         "constructInternalPropertyLookup" -> pure $ constructInternalPropertyLookup property
         "constructInternalPropertyGetter" -> pure $ constructInternalPropertyGetter property
         "computedPropertyGetter" -> do
-          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (property %%> (getExternalProperty "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving$functionName"))
+          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (property %%> (searchExternalProperty "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving$functionName"))
           mcomputingFunction <- queryCacheLookup computingFunctionName
           case mcomputingFunction of
             (Just computingFunction) -> pure computingFunction
             otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedPropertyGetter: '" <> computingFunctionName <> "'")
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for PropertyGetter: '" <> functionName <> "'")
     "model:QueryAst$RolGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName"))
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName"))
       rol <- onNothing
         (errorMessage "no rol provided" queryStepType)
         (typeDescriptionID %%> getBindingOfRol "model:QueryAst$RolGetter$rol")
@@ -96,7 +96,7 @@ constructQueryFunction typeDescriptionID = do
         "constructRolLookup" -> pure $ constructRolLookup rol
         "constructInverseRolGetter" -> pure $ constructInverseRolGetter rol
         "computedRolGetter" -> do
-          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (rol %%> (getExternalProperty "model:QueryAst$ComputedRolGetter$buitenRolBeschrijving$functionName"))
+          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (rol %%> (searchExternalProperty "model:QueryAst$ComputedRolGetter$buitenRolBeschrijving$functionName"))
           mcomputingFunction <- queryCacheLookup computingFunctionName
           case mcomputingFunction of
             (Just computingFunction) -> pure computingFunction
@@ -108,7 +108,7 @@ constructQueryFunction typeDescriptionID = do
         (errorMessage "no context" queryStepType)
         (queryStepType %%> getBindingOfRol "model:QueryAst$rolesOf$context"))
     "model:QueryAst$UnaryCombinator" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
       case functionName of
         "laatste" -> applyUnaryCombinator lastElement queryStepType
         "notEmpty" -> applyUnaryCombinator notEmpty queryStepType
@@ -118,7 +118,7 @@ constructQueryFunction typeDescriptionID = do
         "ignoreCache" -> applyUnaryCombinator ignoreCache queryStepType
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for UnaryCombinator: '" <> functionName <> "'")
     "model:QueryAst$nAryCombinator" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
       case functionName of
         "compose" -> applyBinaryCombinator (>->) queryStepType
         "concat" -> applyBinaryCombinator concat queryStepType
@@ -134,7 +134,7 @@ constructQueryFunction typeDescriptionID = do
         (typeDescriptionID %%> getBindingOfRol "model:QueryAST$filter$candidates")
       filter <$> (constructQueryFunction criteriumId) <*> constructQueryFunction candidateId
     "model:QueryAst$Constant" -> do
-      constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (typeDescriptionID %%> (getExternalProperty "model:QueryAst$Constant$value") )
+      constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$Constant$value") )
     "model:QueryAst$Variable" -> do
       variableName <- onNothing (errorMessage "no variable name found" queryStepType)
         (typeDescriptionID %%> (getInternalProperty "model:QueryAst$Variable$name"))

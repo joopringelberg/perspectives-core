@@ -96,7 +96,7 @@ instance eqPBool :: Eq PBool where
 -----------------------------------------------------------
 -- CONTEXT AS INSTANCE
 -----------------------------------------------------------
--- | An instance of Context.
+-- | An instance of Context. To be used if one knows the context not to be a definition.
 newtype Context = Context String
 
 derive instance genericRepContext :: Generic Context _
@@ -105,6 +105,8 @@ derive instance newtypeContext :: Newtype Context _
 -----------------------------------------------------------
 -- A CONVENIENT TYPE ALIAS FOR ANY CONTEXT
 -----------------------------------------------------------
+-- | To be used when all is known is that we deal with a context (the weakest form of typing; actually
+-- | no typing at all, just signalling to the programmer).
 type AnyContext = String
 
 -----------------------------------------------------------
