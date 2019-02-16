@@ -9,7 +9,14 @@ module Perspectives.ObjectGetterConstructors
   , searchExternalProperty
   , searchExternalUnqualifiedProperty
   , searchInternalProperty
-  , getGebondenAls)
+  , getGebondenAls
+
+  , some
+  , concat
+  , closureOfAspectRol
+  , closureOfAspectProperty
+  , getContextRol
+  , unlessNull)
   where
 
 import Control.Alt ((<|>))
