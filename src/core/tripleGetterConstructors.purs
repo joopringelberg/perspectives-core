@@ -3,7 +3,7 @@ module Perspectives.TripleGetterConstructors where
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), type (~~>))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Predicate)
@@ -14,7 +14,6 @@ import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex,
 import Prelude (bind, flip, pure, ($), (<<<), (<>))
 
 constructTripleGetterFromEffectExpression :: forall s o e.
-  Newtype o String =>
   Predicate ->
   (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array o)) ->
   TypedTripleGetter s o e
@@ -45,7 +44,6 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
 -- | TripleGetter. In this way we can insert a computed (rather than calculated by a query) Triple in the
 -- | dependency tracking store and have it recomputed when the support changes value.
 constructTripleGetterWithArbitrarySupport :: forall s o e.
-  Newtype o String =>
   Predicate ->
   (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array o)) ->
   TypedTripleGetter s o e ->
@@ -87,21 +85,18 @@ constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter _ 
 
 -- TODO: faseer deze functie uit tgv `trackedAs`
 constructTripleGetterFromObjectsGetter :: forall s o e.
-  Newtype o String =>
   Predicate ->
   (s ~~> o) e ->
   TypedTripleGetter s o e
 constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromEffectExpression pn (lift <<< objGetter)
 
 constructTripleGetter :: forall r s o e.
-  Newtype o String =>
   Predicate ->
   (s ~~> o) e ->
   TypedTripleGetter s o e
 constructTripleGetter pn objectsGetter = constructTripleGetterFromEffectExpression pn (lift <<< objectsGetter)
 
 trackedAs :: forall r s o e.
-  Newtype o String =>
   (s ~~> o) e ->
   Predicate ->
   TypedTripleGetter s o e

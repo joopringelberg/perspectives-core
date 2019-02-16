@@ -225,6 +225,8 @@ type TripleGetter s o e = s -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple 
 
 data TypedTripleGetter s o e = TypedTripleGetter Name (TripleGetter s o e)
 
+infixl 5 type TypedTripleGetter as **>
+
 typedTripleGetterName :: forall s o e. TypedTripleGetter s o e -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
 

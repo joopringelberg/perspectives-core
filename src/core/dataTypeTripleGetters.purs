@@ -1,54 +1,48 @@
 module Perspectives.DataTypeTripleGetters where
 
-import Perspectives.CoreTypes (ObjectsGetter, TypedTripleGetter)
-import Perspectives.DataTypeObjectGetters (buitenRol, contextType, label, binding, context, rolType, typeVanIedereRolInContext, iedereRolInContext)
-import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
+import Perspectives.CoreTypes (ObjectsGetter, type (**>))
+import Perspectives.DataTypeObjectGetters (buitenRol, contextType, label, context, rolType, typeVanIedereRolInContext, iedereRolInContext)
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, RolDef, binding)
+import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter, trackedAs)
 import Prelude (pure)
 
 identity :: forall e. ObjectsGetter e
 identity x = pure [x]
 
 -- | Identity for all values, contexts and roles.
--- | `forall a. a -> a`
-identityM :: forall e. TypedTripleGetter e
+identityM :: forall e. (String **> String) e
 identityM = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity
 
 -- | The type of the context instance.
--- | `psp:ContextInstance -> psp:Context`
-contextTypeM :: forall e. TypedTripleGetter e
-contextTypeM = constructTripleGetterFromObjectsGetter "model:Perspectives$type" contextType
+contextTypeM :: forall e. (AnyContext **> AnyDefinition) e
+contextTypeM = contextType `trackedAs` "model:Perspectives$type"
 
 -- | The type of the rol instance.
--- | `psp:RolInstance -> psp:Rol`
-rolTypeM :: forall e. TypedTripleGetter e
-rolTypeM = constructTripleGetterFromObjectsGetter "model:Perspectives$type" rolType
+rolTypeM :: forall r e. RolClass r => (r **> RolDef) e
+rolTypeM = rolType `trackedAs` "model:Perspectives$type"
 
--- | `psp:ContextInstance -> psp:BuitenRol`
-buitenRolM :: forall e. TypedTripleGetter e
-buitenRolM = constructTripleGetterFromObjectsGetter "model:Perspectives$buitenRol" buitenRol
+buitenRolM :: forall e. (AnyContext **> BuitenRol) e
+buitenRolM = buitenRol `trackedAs` "model:Perspectives$buitenRol"
 
 -- | Every rol instance belonging to the context instance.
--- | `psp:ContextInstance -> psp:RolInstance`
-iedereRolInContextM :: forall e. TypedTripleGetter e
-iedereRolInContextM =  constructTripleGetterFromObjectsGetter "model:Perspectives$iedereRolInContext" iedereRolInContext
+iedereRolInContextM :: forall e. (String **> String) e
+iedereRolInContextM = iedereRolInContext `trackedAs`  "model:Perspectives$iedereRolInContext"
 
 -- | The types of the rol instances given to this context instance. Note: non-mandatory
 -- | Rol types defined for the Context type may be missing!
--- | `psp:ContextInstance -> psp:Rol`
-typeVanIedereRolInContextM :: forall e. TypedTripleGetter e
-typeVanIedereRolInContextM =  constructTripleGetterFromObjectsGetter "model:Perspectives$typeVanIedereRolInContext" typeVanIedereRolInContext
+typeVanIedereRolInContextM :: forall e. (String **> String) e
+typeVanIedereRolInContextM =  typeVanIedereRolInContext `trackedAs` "model:Perspectives$typeVanIedereRolInContext"
 
 -- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
 -- | `psp:RolInstance -> psp:RolInstance`
-bindingM :: forall e. TypedTripleGetter e
-bindingM = constructTripleGetterFromObjectsGetter "model:Perspectives$binding" binding
+bindingM :: forall binder bound e. Binding binder bound => (binder **> bound) e
+bindingM = binding `trackedAs` "model:Perspectives$binding"
 
 -- | The context instance of the rol instance.
 -- | `psp:RolInstance -> psp:ContextInstance`
-contextM :: forall e. TypedTripleGetter e
-contextM = constructTripleGetterFromObjectsGetter "model:Perspectives$context" context
+contextM :: forall r e. RolClass r => (r **> String) e
+contextM = context `trackedAs` "model:Perspectives$context"
 
 -- | The string that labels the context instance.
--- | `psp:ContextInstance -> psp:String`
-labelM :: forall e. TypedTripleGetter e
-labelM = constructTripleGetterFromObjectsGetter "model:Perspectives$label" label
+labelM :: forall e. (AnyContext **> String) e
+labelM = label `trackedAs` "model:Perspectives$label"

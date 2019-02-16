@@ -11,7 +11,7 @@ import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, t
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (binnenRol) as PI
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), binding)
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), RolDef, binding, typeWithPerspectivesTypes)
 import Prelude (bind, join, pure, ($), (>=>), (<<<), map)
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
@@ -63,8 +63,8 @@ internePropertyTypen = getContextMember \context -> keys (rol_properties (contex
 label :: forall e. ObjectsGetter e
 label = getContextMember \context -> [(context_displayName context)]
 
-rolType :: forall e. ObjectsGetter e
-rolType = getRolMember \rol -> [rol_pspType rol]
+rolType :: forall r e. RolClass r => (r ~~> RolDef) e
+rolType = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_pspType rol]
 
 rolBindingDef :: forall r b e. Binding r b => (r ~~> AnyContext) e
 rolBindingDef = binding /-/ context
