@@ -17,7 +17,7 @@ import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructExternalPropertySearch, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertyLookup)
+import Perspectives.TripleGetterConstructors (constructExternalPropertySearch, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertySearch)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
 import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
@@ -73,7 +73,7 @@ constructQueryFunction typeDescriptionID = do
       case functionName of
         "constructExternalPropertyGetter" -> pure $ constructExternalPropertySearch property
         "constructExternalPropertyLookup" -> pure $ constructExternalPropertySearch property
-        "constructRolPropertyLookup" -> pure $ constructRolPropertyLookup property
+        "constructRolPropertyLookup" -> pure $ constructRolPropertySearch property
         "constructRolPropertyGetter" -> pure $ constructRolPropertyGetter property
         "propertyQuery" -> propertyQuery property
         "constructInternalPropertyLookup" -> pure $ constructInternalPropertyLookup property

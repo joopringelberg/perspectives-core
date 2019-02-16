@@ -1,4 +1,16 @@
-module Perspectives.ObjectGetterConstructors where
+module Perspectives.ObjectGetterConstructors
+  ( searchRol
+  , searchUnqualifiedRol
+  , searchUnqualifiedRolDefinition
+  , searchProperty
+  , searchUnqualifiedProperty
+  , searchPropertyOnContext
+  , searchUnqualifiedPropertyOnContext
+  , searchExternalProperty
+  , searchExternalUnqualifiedProperty
+  , searchInternalProperty
+  , getGebondenAls)
+  where
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
@@ -18,6 +30,9 @@ import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef, RolDef(..), RolInContext, Value, AnyDefinition, binding, genericBinding, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Prelude (class Eq, bind, id, join, pure, show, ($), (<>), (==), (>=>), (>>=), (>>>), (<<<), map)
+
+-- | This module only exports constructors that search roles or properties,
+-- | in the space of prototypes, Aspects, AspectRoles and AspectProperties.
 
 -----------------------------------------------------------
 -- COMBINATORS
@@ -162,12 +177,16 @@ getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 searchRol :: forall e. RolDef -> (ContextDef ~~> ContextRol) e
 searchRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ((getContextRol rn) :: (AnyContext ~~> ContextRol) e))
 
+-- TODO: hernoem naar searchContextRol en maak searchRolinContext.
+
 -- | Search for an unqualified rol both in the local context and all its prototypes.
 -- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
 -- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
 -- TODO: waarom alleen in ContextDef?
 searchUnqualifiedRol :: forall e. Id.LocalName -> (ContextDef ~~> ContextRol) e
 searchUnqualifiedRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ( (getUnqualifiedContextRol rn) :: (AnyContext ~~> ContextRol) e))
+
+-- TODO: hernoem naar searchUnqualfiedContextRol en maak searchUnqualfiedRolinContext.
 
 -----------------------------------------------------------
 -- GET A ROLDEFINITION FROM A CONTEXT DEFINITION
@@ -206,8 +225,8 @@ searchProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
 
 -- | The value of the unqualified property pd, wherever in the telescope it is represented.
 -- | NOTE: this function cannot be applied to a BinnenRol.
-searchUnQualifiedProperty :: forall b e. RolClass b => Id.LocalName -> (b ~~> Value) e
-searchUnQualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
+searchUnqualifiedProperty :: forall b e. RolClass b => Id.LocalName -> (b ~~> Value) e
+searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
   where
     g :: (b ~~> Value) e
     g = getUnqualifiedProperty pd
@@ -232,7 +251,7 @@ searchUnqualifiedPropertyOnContext :: forall r e. RolClass r => (AnyContext ~~> 
 searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
     f :: (BuitenRol ~~> Value) e
-    f = (context /-/ rolgetter /-/ ((searchUnQualifiedProperty p)))
+    f = (context /-/ rolgetter /-/ ((searchUnqualifiedProperty p)))
 
 -- | Look for the property PropertyDef on the buitenRol of the ContextType c and on its telescope, shadowing any values
 -- | on the prototypes.
@@ -244,7 +263,7 @@ searchExternalProperty pn = searchPropertyOnContext buitenRol pn
 -- | shadowing any values on the prototypes.
 searchExternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buitenRol ln
--- searchExternalUnqualifiedProperty ln = buitenRol /-/ searchUnQualifiedProperty ln
+-- searchExternalUnqualifiedProperty ln = buitenRol /-/ searchUnqualifiedProperty ln
 
 -- | Look for the property with the given local name on the binnenRol of the ContextType c.
 getInternalProperty :: forall e. PropertyDef -> (AnyContext ~~> Value) e
@@ -252,7 +271,7 @@ getInternalProperty pn = binnenRol /-/ getProperty pn
 
 -- | Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope.
 searchInternalProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
-searchInternalProperty ln = binnenRol /-/ searchUnQualifiedProperty ln
+searchInternalProperty ln = binnenRol /-/ searchUnqualifiedProperty ln
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
 -- | it as their binding).
