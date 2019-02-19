@@ -19,7 +19,6 @@ import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
@@ -49,7 +48,7 @@ type PredicateIndex e = GLStrMap (Triple String String e)
 tripleIndex :: forall e. TripleIndex e
 tripleIndex = new unit
 
-lookupInTripleIndex :: forall e1 e2. Subject -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple String String e2))
+lookupInTripleIndex :: forall s o e1 e2. Subject -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple s o e2))
 lookupInTripleIndex rid pid = do
   preds <- peek tripleIndex rid
   case preds of
@@ -60,7 +59,7 @@ lookupInTripleIndex rid pid = do
       case objls of
         Nothing ->
           pure Nothing
-        (Just o) -> pure (Just o)
+        (Just o) -> pure (Just (typeWithPerspectivesTypes o))
 
 getTriple :: forall e1 e2. TripleRef -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple String String e2))
 getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
@@ -128,13 +127,13 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
-memorize :: forall s o e. Newtype s String => Newtype o String => TripleGetter s o e -> String -> TypedTripleGetter s o e
+memorize :: forall s o e. TripleGetter s o e -> String -> TypedTripleGetter s o e
 memorize getter name = TypedTripleGetter name
   \(id :: s) -> do
     remember <- memorizeQueryResults
     case remember of
       true -> do
-        mt <- lift $ liftEff (lookupInTripleIndex (unwrap id) name)
+        mt <- lift $ liftEff (lookupInTripleIndex (typeWithPerspectivesTypes id) name)
         case mt of
           Nothing -> do
             t <- getter id

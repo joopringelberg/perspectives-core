@@ -1,5 +1,6 @@
 module Perspectives.ObjectGetterConstructors
-  ( searchRol
+  ( searchContextRol
+  , searchRolInContext
   , searchUnqualifiedRol
   , searchUnqualifiedRolDefinition
   , searchProperty
@@ -180,9 +181,13 @@ getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 -----------------------------------------------------------
 -- SEARCH A ROL IN A CONTEXT AND ITS PROTOTYPES
 -----------------------------------------------------------
--- | Search for a qualified rol both in the local context and all its prototypes.
-searchRol :: forall e. RolDef -> (ContextDef ~~> ContextRol) e
-searchRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ((getContextRol rn) :: (AnyContext ~~> ContextRol) e))
+-- | Search for a qualified ContextRol both in the local context and all its prototypes.
+searchContextRol :: forall e. RolDef -> (ContextDef ~~> ContextRol) e
+searchContextRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ((getContextRol rn) :: (AnyContext ~~> ContextRol) e))
+
+-- | Search for a qualified ContextRol both in the local context and all its prototypes.
+searchRolInContext :: forall e. RolDef -> (ContextDef ~~> RolInContext) e
+searchRolInContext rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ((getRolInContext rn) :: (AnyContext ~~> RolInContext) e))
 
 -- TODO: hernoem naar searchContextRol en maak searchRolinContext.
 
