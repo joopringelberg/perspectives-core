@@ -37,7 +37,7 @@ intersectionOfObjects p q = p >=>
 infixl 9 intersectionOfObjects as \-\
 
 -- | Compose an ObjectsGetter from an ObjectsGetter and a function
--- | that maps an Array String value to a value that can be shown.
+-- | that maps an Array o value to an aggregated value.
 -- | This function typically folds over a monoid.
 composeMonoidal :: forall s o e a.
   (s ~~> o) e

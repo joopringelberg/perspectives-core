@@ -1,48 +1,70 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, type (**>))
-import Perspectives.DataTypeObjectGetters (buitenRol, contextType, label, context, rolType, typeVanIedereRolInContext, iedereRolInContext)
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, RolDef, binding)
-import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter, trackedAs)
+import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolType, typeVanIedereRolInContext) as DTOG
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef)
+import Perspectives.PerspectivesTypes (genericBinding, binding) as PT
+import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter, trackedAs)
 import Prelude (pure)
 
-identity :: forall e. ObjectsGetter e
-identity x = pure [x]
+identity_ :: forall e. ObjectsGetter e
+identity_ x = pure [x]
 
 -- | Identity for all values, contexts and roles.
-identityM :: forall e. (String **> String) e
-identityM = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity
+identity :: forall e. (String **> String) e
+identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity_
 
 -- | The type of the context instance.
-contextTypeM :: forall e. (AnyContext **> AnyDefinition) e
-contextTypeM = contextType `trackedAs` "model:Perspectives$type"
+contextType :: forall e. (AnyContext **> AnyDefinition) e
+contextType = DTOG.contextType `trackedAs` "model:Perspectives$type"
 
--- | The type of the rol instance.
-rolTypeM :: forall r e. RolClass r => (r **> RolDef) e
-rolTypeM = rolType `trackedAs` "model:Perspectives$type"
+buitenRol :: forall e. (AnyContext **> BuitenRol) e
+buitenRol = DTOG.buitenRol `trackedAs` "model:Perspectives$buitenRol"
 
-buitenRolM :: forall e. (AnyContext **> BuitenRol) e
-buitenRolM = buitenRol `trackedAs` "model:Perspectives$buitenRol"
+-- buitenRol'
+
+binnenRol :: forall e. (AnyContext **> BinnenRol) e
+binnenRol = DTOG.binnenRol `trackedAs` "model:Perspectives$binnenRol"
 
 -- | Every rol instance belonging to the context instance.
-iedereRolInContextM :: forall e. (String **> String) e
-iedereRolInContextM = iedereRolInContext `trackedAs`  "model:Perspectives$iedereRolInContext"
+iedereRolInContext :: forall e. (String **> String) e
+iedereRolInContext = DTOG.iedereRolInContext `trackedAs`  "model:Perspectives$iedereRolInContext"
 
 -- | The types of the rol instances given to this context instance. Note: non-mandatory
 -- | Rol types defined for the Context type may be missing!
-typeVanIedereRolInContextM :: forall e. (String **> String) e
-typeVanIedereRolInContextM =  typeVanIedereRolInContext `trackedAs` "model:Perspectives$typeVanIedereRolInContext"
+typeVanIedereRolInContext :: forall e. (String **> String) e
+typeVanIedereRolInContext =  DTOG.typeVanIedereRolInContext `trackedAs` "model:Perspectives$typeVanIedereRolInContext"
+
+propertyTypen :: forall e. (String **> String) e
+propertyTypen = DTOG.propertyTypen `trackedAs` "model:Perspectives$typeVanIederePropertyVanRol"
+
+internePropertyTypen :: forall e. (String **> String) e
+internePropertyTypen = DTOG.internePropertyTypen `trackedAs` "model:Perspectives$typeVanIederePropertyVanBinnenRol"
+
+-- | The string that labels the context instance.
+label :: forall e. (AnyContext **> String) e
+label = DTOG.label `trackedAs` "model:Perspectives$label"
+
+-- | The type of the rol instance.
+rolType :: forall r e. RolClass r => (r **> RolDef) e
+rolType = DTOG.rolType `trackedAs` "model:Perspectives$type"
 
 -- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
 -- | `psp:RolInstance -> psp:RolInstance`
-bindingM :: forall binder bound e. Binding binder bound => (binder **> bound) e
-bindingM = binding `trackedAs` "model:Perspectives$binding"
+binding :: forall binder bound e. Binding binder bound => (binder **> bound) e
+binding = PT.binding `trackedAs` "model:Perspectives$binding"
+
+rolBindingDef :: forall r b e. Binding r b => (r **> AnyContext) e
+rolBindingDef = binding >-> context
 
 -- | The context instance of the rol instance.
 -- | `psp:RolInstance -> psp:ContextInstance`
-contextM :: forall r e. RolClass r => (r **> String) e
-contextM = context `trackedAs` "model:Perspectives$context"
+context :: forall r e. RolClass r => (r **> String) e
+context = DTOG.context `trackedAs` "model:Perspectives$context"
 
--- | The string that labels the context instance.
-labelM :: forall e. (AnyContext **> String) e
-labelM = label `trackedAs` "model:Perspectives$label"
+genericContext :: forall e. (String **> String) e
+genericContext = DTOG.genericContext `trackedAs` "model:Perspectives$context"
+
+genericBinding :: forall e. (String **> String) e
+genericBinding = PT.genericBinding `trackedAs` "model:Perspectives$binding"

@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MonadPerspectives, TypeID, TypedTripleGetter(..), ObjectsGetter, (%%>), (%%>>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef)
-import Perspectives.DataTypeTripleGetters (bindingM, buitenRolM, contextM, contextTypeM, identityM, iedereRolInContextM, labelM, rolTypeM)
+import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, contextType, identity, iedereRolInContext, label, rolType) as DTG
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.ObjectGetterConstructors (searchExternalProperty, getInternalProperty, getRol)
@@ -17,7 +17,7 @@ import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
 import Perspectives.QueryCombinators (closure, closure', concat, conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructExternalPropertySearch, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertySearch)
+import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertySearch)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
 import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
@@ -56,14 +56,14 @@ constructQueryFunction typeDescriptionID = do
     "model:QueryAst$DataTypeGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName") )
       case functionName of
-        "binding" -> pure bindingM
-        "context" -> pure contextM
-        "identity" -> pure identityM
-        "contextType" -> pure contextTypeM
-        "rolType" -> pure rolTypeM
-        "buitenRol" -> pure buitenRolM
-        "iedereRolInContext" -> pure iedereRolInContextM
-        "label" -> pure labelM
+        "binding" -> pure DTG.binding
+        "context" -> pure DTG.context
+        "identity" -> pure DTG.identity
+        "contextType" -> pure DTG.contextType
+        "rolType" -> pure DTG.rolType
+        "buitenRol" -> pure DTG.buitenRol
+        "iedereRolInContext" -> pure DTG.iedereRolInContext
+        "label" -> pure DTG.label
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")
     "model:QueryAst$PropertyGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") )

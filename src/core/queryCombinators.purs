@@ -1,49 +1,27 @@
 module Perspectives.QueryCombinators where
 
+import Control.Alt ((<|>))
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
+import Control.Plus (empty)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, union) as Arr
+import Data.Array (foldMap)
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Monoid.Conj (Conj(..))
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (class Newtype, alaF, unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>), type (~~>))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>), type (~~>), (@@))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.ObjectGetterConstructors (searchContextRol)
-import Perspectives.PerspectivesTypes (ContextDef, ContextRol, PBool(..), RolDef, typeWithPerspectivesTypes)
+import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, searchContextRol)
+import Perspectives.PerspectivesTypes (class Binding, AnyContext, BuitenRol(..), ContextDef, ContextRol, PBool(..), PropertyDef(..), RolDef, typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
-import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter, constructTripleGetterFromEffectExpression)
-import Prelude (class Eq, bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==))
+import Perspectives.TripleGetterComposition ((>->), composeMonoidal)
+import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, constructTripleGetterFromObjectsGetter, trackedAs)
+import Prelude (class Eq, bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==), (>>>))
 import Type.Data.Boolean (kind Boolean)
-
--- | The recursive closure of a query, bottoming out when it has no results.
--- | The result only contains the argument id if it can be obtained by applying p,
--- | never because it is the starting point of the computation.
-closure :: forall o e.
-  Eq o =>
-  (o **> o) e ->
-  (o **> o) e
-closure (TypedTripleGetter nameOfp p) =
-  memorize (getter []) name
-  where
-    getter :: Array o -> o -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple o o e)
-    getter cumulator id = do
-      t@(Triple{object : objectsOfP}) <- p id
-      case Arr.elemIndex id cumulator of
-        Nothing -> do
-          (triples :: Array (Triple o o e)) <- (traverse (getter (Arr.union cumulator objectsOfP))) (Arr.difference objectsOfP cumulator)
-          objects <- pure $ join $ map (\(Triple{object}) -> object) triples
-          pure $ Triple { subject: id
-                        , predicate : name
-                        , object: Arr.union objectsOfP objects
-                        , dependencies : []
-                        , supports : map (typeWithPerspectivesTypes getRef) (Arr.cons t triples)
-                        , tripleGetter : getter []}
-        otherwise -> pure t
-
-    name :: String
-    name = "(closure " <>  nameOfp <> ")"
 
 -- | Return the last element in the chain
 -- | `psp:SingularFunction -> psp:SingularFunction`
@@ -108,30 +86,6 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
 
     name :: String
     name = "(filter " <> nameOfc <> " " <> nameOfp <> ")"
-
--- The concatenation of the results of two queries applied to the same origin.
--- | `psp:Function -> psp:Function -> psp:Function`
-concat :: forall s o e.
-  Eq o =>
-  (s **> o) e ->
-  (s **> o) e ->
-  (s **> o) e
-concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
-  memorize getter name
-  where
-    getter :: TripleGetter s o e
-    getter id = do
-      pt@(Triple{object : ps}) <- p id
-      qt@(Triple{object : qs}) <- q id
-      pure $ Triple { subject: id
-                    , predicate : name
-                    , object : (Arr.union ps qs)
-                    , dependencies : []
-                    , supports : map (typeWithPerspectivesTypes getRef) [pt, qt]
-                    , tripleGetter : getter}
-
-    name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
-
 
 -- Returns true iff the results of both TripleGetters applied to the same origin yield exactly the same values in the same order.
 -- | `psp:Function -> psp:Function -> psp:Function`

@@ -1,23 +1,42 @@
 module Perspectives.TripleGetterComposition where
 
-
 import Data.Array (cons, difference, head, nub)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap, wrap)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq)
+import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>>), (>>=))
+
+after :: forall s o a e. (o -> a) -> TypedTripleGetter s o e -> TypedTripleGetter s a e
+after f (TypedTripleGetter n g) = TypedTripleGetter n fNag where
+  fNag :: TripleGetter s a e
+  fNag = g >=> \(Triple{subject, predicate, object, dependencies, supports, tripleGetter}) -> pure $ Triple
+    { subject: subject
+    , predicate: predicate
+    , object: map f object
+    , supports: supports
+    , dependencies: dependencies
+    , tripleGetter: fNag
+  }
+
+before :: forall s o a e. (a -> s) -> TypedTripleGetter s o e -> TypedTripleGetter a o e
+before f (TypedTripleGetter n g) = TypedTripleGetter n fVoorg where
+  fVoorg :: TripleGetter a o e
+  fVoorg a = g (f a) >>= \(Triple{subject, predicate, object, dependencies, supports, tripleGetter}) -> pure $ Triple
+    { subject: a
+    , predicate: predicate
+    , object: object
+    , supports: supports
+    , dependencies: dependencies
+    , tripleGetter: fVoorg
+  }
 
 -- | Compose two queries like composing two functions.
 -- | `psp:Function -> psp:Function -> psp:Function`
 composeTripleGetters :: forall s o t e.
   Eq t =>
   Eq o =>
-  Newtype s String =>
-  Newtype t String =>
-  Newtype o String =>
   TypedTripleGetter s t e ->
   TypedTripleGetter t o e ->
   TypedTripleGetter s o e
@@ -28,7 +47,7 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
     getter id = do
       (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
       -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-      (triples :: Array (Triple t o e)) <- traverse q (difference objectsOfP [wrap $ unwrap id])
+      (triples :: Array (Triple t o e)) <- traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
       -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
@@ -43,6 +62,26 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
 
 infixl 9 composeTripleGetters as >->
 
+composeMonoidal :: forall s o a e.
+  TypedTripleGetter s o e ->
+  (Array o -> a) ->
+  String ->
+  TypedTripleGetter s a e
+composeMonoidal (TypedTripleGetter nameOfp p) f n = memorize getter name where
+  getter :: TripleGetter s a e
+  getter id = do
+    (t@(Triple{object : objectsOfP}) :: Triple s o e) <- p id
+    a <- pure $ f objectsOfP
+    pure $ Triple { subject: id
+                  , predicate : name
+                  , object : [a]
+                  , dependencies : []
+                  , supports : [(getRef (typeWithPerspectivesTypes t))]
+                  , tripleGetter : getter}
+
+  name :: String
+  name = "(" <>  nameOfp <> " >-> " <> n <> ")"
+
 -- | TripleGetter composition where the second operand is treated as lazy
 -- | (wrapped in a function). Useful for recursive queries that bottom out
 -- | when the first operator yields no results.
@@ -50,9 +89,6 @@ infixl 9 composeTripleGetters as >->
 composeLazy :: forall s o t e.
   Eq t =>
   Eq o =>
-  Newtype s String =>
-  Newtype t String =>
-  Newtype o String =>
   TypedTripleGetter s t e ->
   (Unit -> TypedTripleGetter t o e) ->
   String ->
@@ -68,7 +104,7 @@ composeLazy (TypedTripleGetter nameOfp p) g nameOfg =
         otherwise -> do
           (TypedTripleGetter nameOfq q) <- pure (g unit)
           -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-          (triples :: Array (Triple t o e)) <- traverse q (difference objectsOfP [wrap $ unwrap id])
+          (triples :: Array (Triple t o e)) <- traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
           -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
           objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
           pure $ Triple { subject: id

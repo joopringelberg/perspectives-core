@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.StrMap (lookup)
 import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DataTypeTripleGetters (iedereRolInContextM)
+import Perspectives.DataTypeTripleGetters (iedereRolInContext) as DTG
 import Perspectives.DomeinFile (DomeinFile(..), addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
@@ -47,7 +47,7 @@ domeinFileFromContext enclosingContext = do
                 modify $ addContextToDomeinFile ctxt
                 -- As a context and its buitenRol are always created together, we can safely assume the latter exists.
                 (lift $ getPerspectEntiteit (context_buitenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
-                rollen <- lift $ ((context_id ctxt) ##= iedereRolInContextM)
+                rollen <- lift $ ((context_id ctxt) ##= DTG.iedereRolInContext)
                 for_ rollen
                   \rolID ->
                     -- A context is constructed together with its roles. It seems reasonable to assume the rol will exist.

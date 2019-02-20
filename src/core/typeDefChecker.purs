@@ -17,7 +17,7 @@ import Data.Traversable (for_, traverse)
 import Perspectives.TypeChecker (contextHasType)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), mtripleObject, runMonadPerspectivesQueryCompiler, tripleObject, tripleObjects, (%%>>), (@@), (@@=), (@@>))
 import Perspectives.DataTypeObjectGetters (internePropertyTypen, propertyTypen, rolType)
-import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, typeVanIedereRolInContextM)
+import Perspectives.DataTypeTripleGetters (binding, context, contextType, typeVanIedereRolInContext) as DTG
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -50,7 +50,7 @@ checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContex
 -- | `psp:ContextInstance -> psp:ElkType`
 checkContext' :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkContext' cid = do
-  ifNothing (lift (cid @@> contextTypeM))
+  ifNothing (lift (cid @@> DTG.contextType))
     (tell [MissingType cid])
     -- tp is psp:Context
     \tp -> do
@@ -100,7 +100,7 @@ checkDefinedRoles typeId cid = do
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
 checkAvailableRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
 checkAvailableRoles typeId cid = do
-  availableRoles <- lift (cid @@= typeVanIedereRolInContextM)
+  availableRoles <- lift (cid @@= DTG.typeVanIedereRolInContext)
   for_ availableRoles isDefined
   where
     -- `psp:Context -> psp:Rol -> Unit`
@@ -215,7 +215,7 @@ compareRolInstancesToDefinition cid rolType' = do
       -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.
       -- TODO: moeten we hier niet iets met de roltelescoop?
       -- Notice that the binding may not exist!
-      maybeBinding <- lift (rolId @@ bindingM >-> contextM)
+      maybeBinding <- lift (rolId @@ DTG.binding >-> DTG.context)
       case mtripleObject maybeBinding of
         Nothing -> pure unit
         (Just theBinding) -> do
@@ -226,7 +226,7 @@ compareRolInstancesToDefinition cid rolType' = do
               ifM (lift $ lift $ contextHasType theBinding toegestaneBinding)
                 (pure unit)
                 (do
-                  typeOfTheBinding <- lift (theBinding @@ contextTypeM)
+                  typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
                   (tell [IncorrectBinding cid rolId theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
 
 -- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?

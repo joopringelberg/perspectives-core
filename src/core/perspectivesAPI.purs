@@ -18,7 +18,7 @@ import Perspectives.Actions (addRol, setBinding, setProperty)
 import Perspectives.ApiTypes (ContextSerialization(..), CorrelationIdentifier, Request(..), RolSerialization, Value, response)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter, runMonadPerspectivesQueryCompiler)
-import Perspectives.DataTypeTripleGetters (bindingM, contextM, contextTypeM, rolTypeM)
+import Perspectives.DataTypeTripleGetters (binding, context, contextType, rolType) as DTG
 import Perspectives.Deltas (runTransactie)
 import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
@@ -143,14 +143,14 @@ dispatchOnRequest req =
   case req of
     (GetRolBinding cid rn setter setterId) -> do
       getRolBinding cid rn setter setterId
-    (GetBinding rid setter setterId) -> subscribeToObjects rid bindingM setter setterId
-    (GetBindingType rid setter setterId) -> subscribeToObjects rid (bindingM >-> rolTypeM) setter setterId
+    (GetBinding rid setter setterId) -> subscribeToObjects rid DTG.binding setter setterId
+    (GetBindingType rid setter setterId) -> subscribeToObjects rid (DTG.binding >-> DTG.rolType) setter setterId
     (GetRol cid rn setter setterId) -> getRol cid rn setter setterId
-    (GetRolContext rid setter setterId) -> subscribeToObjects rid contextM setter setterId
-    (GetContextType rid setter setterId) -> subscribeToObjects rid contextTypeM setter setterId
-    (GetRolType rid setter setterId) -> subscribeToObjects rid rolTypeM setter setterId
+    (GetRolContext rid setter setterId) -> subscribeToObjects rid DTG.context setter setterId
+    (GetContextType rid setter setterId) -> subscribeToObjects rid DTG.contextType setter setterId
+    (GetRolType rid setter setterId) -> subscribeToObjects rid DTG.rolType setter setterId
     (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
-    (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> bindingM >-> contextM) setter setterId
+    (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> DTG.binding >-> DTG.context) setter setterId
     (CreateContext (ContextSerialization cd) setter) -> do
       r <- constructContext (ContextSerialization cd {id = "model:User$c" <> (show $ guid unit)})
       case r of
@@ -194,7 +194,7 @@ unsubscribeFromObjects subject predicate setterId = lift $ liftEff $ unRegisterT
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getRolBinding cid rn setter  setterId= do
   rf <- getRolFunction cid rn
-  subscribeToObjects cid (rf >-> bindingM) setter setterId
+  subscribeToObjects cid (rf >-> DTG.binding) setter setterId
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
@@ -205,7 +205,7 @@ getRol cid rn setter setterId = do
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRolFunction :: forall e. ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e)  (TypedTripleGetter e)
 getRolFunction cid rn = do
-  ctxtType <- cid ##>> contextTypeM
+  ctxtType <- cid ##>> DTG.contextType
   m <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
   case m of
     (Left message) -> throwError $ error (show message)
@@ -219,7 +219,7 @@ getProperty rid pn setter setterId = do
 
 getPropertyFunction :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
 getPropertyFunction rid pn = do
-  rolType <- rid ##>> rolTypeM
+  rolType <- rid ##>> DTG.rolType
   m <- runMonadPerspectivesQueryCompiler rolType (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
   case m of
     (Left message) -> throwError $ error (show message)

@@ -23,8 +23,8 @@ import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Perspectives.DataTypeTripleGetters (bindingM, contextM, typeVanIedereRolInContextM) as DTG
-import Perspectives.TripleGetterConstructors (constructRolGetter)
+import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
+import Perspectives.TripleGetterFromObjectGetter (constructRolGetter)
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
 type IndentLevel = Int
@@ -194,7 +194,7 @@ enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
   withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
   newline
-  sectionIds <- lift $ lift ((context_id theText) ##= (ignoreCache DTG.typeVanIedereRolInContextM))
+  sectionIds <- lift $ lift ((context_id theText) ##= (ignoreCache DTG.typeVanIedereRolInContext))
   traverse_ section sectionIds
 
   where
@@ -204,8 +204,8 @@ enclosingContext theText = do
       identifier sectionId
       newline
       newline
-      definedContexts <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM)) -- These are all a buitenRol.
-      contextIds <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.bindingM >-> DTG.contextM)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      definedContexts <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.binding)) -- These are all a buitenRol.
+      contextIds <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.binding >-> DTG.context)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) contextIds
 
     ppContext :: Array ID -> ID -> PerspectText e

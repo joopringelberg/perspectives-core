@@ -15,7 +15,7 @@ import Perspectives.BasicActionFunctions (storeDomeinFile)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, TypedTripleGetter, (%%), (%%>), (%%>>))
 import Perspectives.DataTypeObjectGetters (binding, context, contextType, rolBindingDef)
-import Perspectives.DataTypeTripleGetters (contextTypeM)
+import Perspectives.DataTypeTripleGetters (contextTypeM) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject)
@@ -29,7 +29,7 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##>), (##), (##=))
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (constructTripleGetterFromObjectsGetter)
+import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.Utilities (onNothing)
 
@@ -406,6 +406,6 @@ compileBotAction actionType contextId = do
 
 setupBotActions :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 setupBotActions cid = do
-  actions <- cid ##= contextTypeM >-> contextBotDefM >-> botSubjectRollenDefM
+  actions <- cid ##= DTG.contextType >-> contextBotDefM >-> botSubjectRollenDefM
   -- actions <- pure []
   for_ actions \a -> (compileBotAction a cid) >>= \tg -> cid ## tg

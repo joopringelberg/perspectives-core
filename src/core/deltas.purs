@@ -15,7 +15,7 @@ import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), TypedTripleGetter, ObjectsGetter, createTransactie, transactieID, (%%>>))
 import Perspectives.DataTypeObjectGetters (context)
-import Perspectives.DataTypeTripleGetters (identityM, rolTypeM)
+import Perspectives.DataTypeTripleGetters (identity, rolType) as DTG
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
@@ -164,7 +164,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
 
 sendTransactieToUser :: forall e. ID -> Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
 sendTransactieToUser userId t = do
-  tripleUserIP <- userId ##> identityM -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
+  tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
   (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
   -- TODO controleer of hier authentication nodig is!
   (res :: AJ.AffjaxResponse String)  <- liftAff $ AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
@@ -190,7 +190,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
     do
       (contextId :: ContextID) <- id %%>> context
       (Triple {object}) <-
-        id ## rolTypeM >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUserM
+        id ## DTG.rolType >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUserM
       pure $ object
     where
       -- roles in context that play the subjectRol in the relevant acties
@@ -207,7 +207,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   usersInvolvedInContext :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array ID)
   usersInvolvedInContext (Delta{id, memberName}) =
     do
-      (Triple {object}) <- id ## rolTypeM >-> actorsForObject >-> (rolesOf id) >-> rolUserM
+      (Triple {object}) <- id ## DTG.rolType >-> actorsForObject >-> (rolesOf id) >-> rolUserM
       pure object
     where
       -- All Rollen that are the subject of Acties that have the Rol as object.

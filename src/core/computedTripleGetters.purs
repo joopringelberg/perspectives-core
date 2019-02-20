@@ -22,7 +22,7 @@ import Perspectives.ObjectGetterConstructors (getInternalProperty)
 import Perspectives.QueryCache (queryCacheInsert)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
-import Perspectives.TripleGetterConstructors (constructExternalPropertySearch, constructInternalPropertyGetter, constructTripleGetterWithArbitrarySupport)
+import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructInternalPropertyGetter, constructTripleGetterWithArbitrarySupport)
 import Perspectives.TypeDefChecker (checkDomeinFile)
 
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.

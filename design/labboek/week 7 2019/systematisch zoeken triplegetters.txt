@@ -1,0 +1,58 @@
+TYPEDTRIPLEGETTERS
+
+1. Maak een infix notatie, zoals voor ObjectsGetters
+2. Maak ofwel een evenknie functie voor de combinatoren in ObjectGetterConstructors, of bedenk een schema om deze gemakkelijk te hergebruiken als TripleGetters. B.v. <objectGetter> `trackedAs` "propnaam"
+3. Naamgeving van predicates:
+	* of je gebruikt altijd alleen de meest krachtige combinator (search)
+	* of je moet een schema van suffixes bedenken om een rol/propertynaam mee uit te rusten voor de verschillende combinatoren
+	* hoe om te gaan met lokale namen?
+	
+UITWERKING
+1. Ik kies ervoor om 'constructTripleGetter' te hernoemen naar 'trackedAs' en dan een aanroep als 
+	constructExternalPropertySearch prop
+te vervangen door:
+	searchExternalProperty prop `trackedAs` prop
+
+OVERZICHT VAN OBJECTCONSTRUCTORS
+
+getContextRol
+getRolinContext
+getUnqualifiedContextRol
+getUnqualifiedRolinContext
+searchRol
+searchUnqualifiedRol
+
+getUnqualfiedRolDefinition
+searchUnqualifiedRolDefinition
+
+getProperty
+getUnqualfiedProperty
+searchProperty
+searchUnqualfiedProperty
+
+searchPropertyOnContext
+searchUnqualfiedPropertyOnContext
+searchExternalProperty
+searchExternalUnqualfiedProperty
+getInternalProperty
+searchInternalProperty
+
+getGebondenAls
+
+getUnqualifiedPropertyDefinition
+searchUnqualifiedPropertyDefinition
+
+A PROPOS NAAMGEVING
+Het gaat erom dat de combinatie van subject en predicate uniek is.
+1. Qualified names zijn altijd uniek
+2. Search van een unqualified name op een subject levert altijd hetzelfde resultaat, dus in combinatie met een predicaat is een unqualified name uniek.
+3. Wat niet samen kan, is de combinatie van 
+	* getContextRol
+	* searchRol
+SearchRol zoekt ook in de prototypes. Als ik alleen de search varianten gebruik, is naamgeving uniek.
+4. Hetzelfde geldt voor 
+	* getUnqualfiedRolDefinition
+	* searchUnqualifiedRolDefinition
+5. Oplossing: exporteer constructors en dan alleen de search varianten. Re-export getProperty en getUnqualifiedProperty.
+5. Exporteer alleen searchProperty en searchUnqualfiedProperty.
+6. En searchExternalProperty,  searchExternalUnqualfiedProperty en searchInternalProperty.

@@ -12,7 +12,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.TypeChecker (checkContextForQualifiedRol, checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, contextHasType, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, tripleObjects, withQueryCompilerEnvironment)
-import Perspectives.DataTypeTripleGetters (contextTypeM)
+import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
@@ -62,10 +62,10 @@ compileElementaryQueryStep s contextId = case s of
     b <- (lift $ dom `isOrHasAspect` (psp "Context"))
     if b
       then (do
-        tp <- lift (dom ##>> contextTypeM) >>= putQueryStepDomain
-        createDataTypeGetterDescription contextId "contextTypeM")
+        tp <- lift (dom ##>> DTG.contextType) >>= putQueryStepDomain
+        createDataTypeGetterDescription contextId "DTG.contextType")
       else (do
-        tp <- lift (dom ##>> contextTypeM) >>= putQueryStepDomain
+        tp <- lift (dom ##>> DTG.contextType) >>= putQueryStepDomain
         createDataTypeGetterDescription contextId "rolType")
   BuitenRol -> ensureAspect (psp "Context")
     (putQueryStepDomain (psp "Rol") *> createDataTypeGetterDescription contextId "buitenRol")
