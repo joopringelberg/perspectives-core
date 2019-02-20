@@ -3,8 +3,8 @@ module Perspectives.ModelBasedObjectGetters where
 import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
-import Perspectives.DataTypeObjectGetters (buitenRol, context)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull)
+import Perspectives.DataTypeObjectGetters (buitenRol, context, rolBindingDef)
+import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull, bindingDef)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -43,8 +43,8 @@ propertyIsFunctioneel = some (concat isFunctioneel (closureOfAspectProperty /-/ 
     isFunctioneel = unwrap >>> searchExternalUnqualifiedProperty "isFunctioneel" >=> pure <<< map wrap <<< map unwrap
 
 -- | The type of the range that has been defined for the Property.
-range :: forall e. (PropertyDef ~~> SimpleValueDef) e
-range = unwrap >>> wrap >>> searchContextRol (RolDef "model:Perspectives$Property$range") /-/ binding /-/ context >=> pure <<< map SimpleValueDef
+rangeDef :: forall e. (PropertyDef ~~> SimpleValueDef) e
+rangeDef = unwrap >>> wrap >>> searchContextRol (RolDef "model:Perspectives$Property$range") /-/ binding /-/ context >=> pure <<< map SimpleValueDef
 
 -- | Get the rol psp:Context$buitenRolBeschrijving.
 -- | `psp:Context -> psp:RolInstance`
@@ -74,11 +74,6 @@ contextDef rid =
 -- | Get the ContextDef that holds the RolDef in the given Rol.
 rolDef2ContextDef :: forall e. RolDef -> (RolDef ~~> ContextDef) e
 rolDef2ContextDef rd = unwrap >>> buitenRol /-/ (getGebondenAls rd :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
-
--- | The type of Rol or Context that can be bound to the Rol.
--- | `psp:Rol -> psp:Context | psp:Rol`
-bindingDef :: forall e. (ContextDef ~~> AnyContext) e
-bindingDef = unwrap >>> getContextRol (RolDef "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`

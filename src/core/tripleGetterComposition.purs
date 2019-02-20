@@ -6,10 +6,10 @@ import Data.Traversable (traverse)
 import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>>), (>>=))
+import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>=))
 
-after :: forall s o a e. (o -> a) -> TypedTripleGetter s o e -> TypedTripleGetter s a e
-after f (TypedTripleGetter n g) = TypedTripleGetter n fNag where
+followedBy :: forall s o a e. TypedTripleGetter s o e -> (o -> a) -> TypedTripleGetter s a e
+followedBy (TypedTripleGetter n g) f = TypedTripleGetter n fNag where
   fNag :: TripleGetter s a e
   fNag = g >=> \(Triple{subject, predicate, object, dependencies, supports, tripleGetter}) -> pure $ Triple
     { subject: subject

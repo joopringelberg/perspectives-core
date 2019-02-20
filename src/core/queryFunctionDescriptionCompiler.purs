@@ -212,7 +212,7 @@ compileElementaryQueryStep s contextId = case s of
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
     -> MonadPerspectivesQueryCompiler (AjaxAvarCache e) FD
   ensureContextHasRol contextId' rolId mv =
-    ifM (lift $ checkContextForQualifiedRol rolId contextId')
+    ifM (lift $ hasRolDefinition rolId contextId')
       mv
       (pure $ Left $ MissingQualifiedRol rolId contextId')
 

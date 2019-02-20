@@ -1,16 +1,21 @@
 module Perspectives.ModelBasedTripleGetters where
 
-import Data.Newtype (unwrap, wrap)
+import Data.Foldable (foldMap)
+import Data.Maybe (maybe)
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (alaF, unwrap, wrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
-import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, buitenRol) as DTG
-import Perspectives.ModelBasedObjectGetters (binnenRolBeschrijving, buitenRolBeschrijving, contextDef, propertyIsFunctioneel, propertyIsVerplicht, rolIsFunctioneel, rolIsVerplicht)
-import Perspectives.ObjectGetterConstructors (searchContextRol)
-import Perspectives.PerspectivesTypes (PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..))
-import Perspectives.QueryCombinators (closure', filter, notEmpty, containedIn, not, ref) as QC
-import Perspectives.TripleGetterComposition (after, before, (>->), (>->>))
-import Perspectives.TripleGetterConstructors (closureOfAspectRol, concat, some, searchExternalUnqualifiedProperty)
-import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, constructTripleGetterFromObjectsGetter, trackedAs)
-import Prelude ((<<<), pure, map)
+import Perspectives.DataTypeObjectGetters (rolType)
+import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding) as DTG
+import Perspectives.Identifiers (LocalName) as ID
+import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
+import Perspectives.ObjectsGetterComposition (composeMonoidal)
+import Perspectives.PerspectivesTypes (class RolClass, AnyContext, ContextDef(..), ContextRol(..), PBool(..), PropertyDef, RolDef(..), RolInContext(..), SimpleValueDef(..))
+import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
+import Perspectives.TripleGetterComposition (followedBy, before, (>->))
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterFromObjectGetter (trackedAs)
+import Prelude (show, (<<<), (<>), (==), (>>>))
 
 -----------------------------------------------------------
 -- GETTERS BASED ON MODEL:PERSPECTIVES$
@@ -20,60 +25,70 @@ import Prelude ((<<<), pure, map)
 
 -- | True if the Rol has been defined as mandatory.
 rolIsVerplicht :: forall e. (RolDef **> PBool) e
--- rolIsVerplichtM = rolIsVerplicht `trackedAs` "model:Perspectives$Rol$isVerplichtR"
 rolIsVerplicht = some (concat isVerplicht (closureOfAspectRol >-> isVerplicht))
   where
     isVerplicht :: (RolDef **> PBool) e
-    isVerplicht = (wrap <<< unwrap) `after` (unwrap `before` (searchExternalUnqualifiedProperty "isVerplicht"))
+    isVerplicht = (unwrap `before` (searchExternalUnqualifiedProperty "isVerplicht")) `followedBy`(wrap <<< unwrap)
 
 -- | True if the Rol has been defined as functional.
-rolIsFunctioneelM :: forall e. (RolDef **> PBool) e
-rolIsFunctioneelM = rolIsFunctioneel `trackedAs` "model:Perspectives$Rol$isFunctioneelR"
+rolIsFunctioneel :: forall e. (RolDef **> PBool) e
+rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol >-> isFunctioneel))
+  where
+    isFunctioneel :: (RolDef **> PBool) e
+    isFunctioneel = (unwrap `before` (searchExternalUnqualifiedProperty "isFunctioneel")) `followedBy` (wrap <<< unwrap)
 
 -- | True if the Property has been defined as mandatory (possibly in an aspect).
-propertyIsVerplichtM :: forall e. (PropertyDef **> PBool) e
-propertyIsVerplichtM = propertyIsVerplicht `trackedAs` "model:Perspectives$Property$isVerplicht"
+propertyIsVerplicht :: forall e. (PropertyDef **> PBool) e
+propertyIsVerplicht = some (concat isVerplicht (closureOfAspectProperty >-> isVerplicht))
+  where
+    isVerplicht :: (PropertyDef **> PBool) e
+    isVerplicht = (unwrap `before` (searchExternalUnqualifiedProperty "isVerplicht")) `followedBy` (wrap <<< unwrap)
 
 -- | True if the Property has been defined as functional.
-propertyIsFunctioneelM :: forall e. (PropertyDef **> PBool) e
-propertyIsFunctioneelM = propertyIsFunctioneel `trackedAs` "model:Perspectives$Property$isFunctioneelR"
+propertyIsFunctioneel :: forall e. (PropertyDef **> PBool) e
+propertyIsFunctioneel = some (concat isFunctioneel (closureOfAspectProperty >-> isFunctioneel))
+  where
+    isFunctioneel :: (PropertyDef **> PBool) e
+    isFunctioneel = (unwrap `before` (searchExternalUnqualifiedProperty "isFunctioneel")) `followedBy` (wrap <<< unwrap)
 
-{-
--- | The type of the range that has been defined for the Property.
--- | `psp:Property -> psp:SimpleValue`
-rangeDefM :: forall e. (PropertyDef **> SimpleValueDef) e
-rangeDefM = searchContextRol (RolDef "model:Perspectives$Property$range") >-> DTG.binding >-> DTG.context
+rangeDef :: forall e. (PropertyDef **> SimpleValueDef) e
+rangeDef = ((unwrap >>> wrap) `before` (searchContextRol (RolDef "model:Perspectives$Property$range") >-> DTG.binding >-> DTG.context)) `followedBy` SimpleValueDef
 
 -- | True iff the context instance has a label.
--- | `psp:ContextInstance -> psp:Boolean`
-hasLabelM :: forall e. TypedTripleGetter e
-hasLabelM = QC.notEmpty DTG.label
+hasLabel :: forall e. (AnyContext **> PBool) e
+hasLabel = QC.notEmpty DTG.label
 
 -- | True if the rol instance has a binding.
--- | `psp:RolInstance -> psp:Boolean`
-hasBindingM :: forall e. TypedTripleGetter e
-hasBindingM = QC.notEmpty DTG.binding
+hasBinding :: forall r e. RolClass r => (r **> PBool) e
+hasBinding = QC.notEmpty (unwrap `before` DTG.genericBinding)
 
 -- | The role instance at the bottom of the telescope of the rol instance (that role instance will have no binding).
--- | `psp:RolInstance -> psp:RolInstance`
-rolUserM :: forall e. TypedTripleGetter e
-rolUserM = QC.closure' DTG.binding
+rolUser :: forall e. (RolInContext **> RolInContext) e
+rolUser = QC.closure' DTG.binding
 
--- | The view that is needed for the object of the Actie.
--- | `psp:Actie -> psp:View`
-objectViewDefM :: forall e. TypedTripleGetter e
-objectViewDefM = (constructRolGetter "model:Perspectives$Actie$objectView") >-> DTG.binding >-> DTG.context
+-- | The view that is needed for the object of the Actie. Notice that the typing is not precise: instead of Action we
+-- use ContextDef, instead of View we use Rol.
+-- | That is not correct, but we do not have a separate types for Action, nor View.
+objectViewDef :: forall e. (ContextDef **> RolDef) e
+objectViewDef = searchUnqualifiedRolDefinition "objectView"
 
--- | The PropertyReferences of the View.
--- | `psp:View -> psp:PropertyReferentie`
-propertyReferentiesM :: forall e. TypedTripleGetter e
-propertyReferentiesM = constructRolGetter "model:Perspectives$View$propertyReferentie"
+-- | The PropertyReferences of the View. Again, the typing is imprecise.
+propertyReferenties :: forall e. (ContextDef **> PropertyDef) e
+propertyReferenties = searchUnqualifiedRolDefinition "propertyReferentie" `followedBy` (unwrap >>> wrap)
+
+-- | Tests whether the type of the Rol has a specific local name. Used to test if a Rol is a BuitenRol type or a BinnenRol type.
+-- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
+rolHasTypeWithLocalName :: forall e. ID.LocalName -> TypedTripleGetter String PBool e
+rolHasTypeWithLocalName localName = ((RolInContext >>> rolType) `composeMonoidal` f) `trackedAs` ("model:Perspectives$rolHasTypeWithLocalName" <> "_" <> localName)
+  where
+    f :: Array RolDef -> PBool
+    f = PBool <<< show <<< alaF Disj foldMap (maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI <<< unwrap)
 
 -- | The context instances that are bound to a rol of the context instance.
--- | `psp:ContextInstance -> psp:ContextInstance`
-boundContextsM :: forall e. TypedTripleGetter e
-boundContextsM = (QC.filter (rolHasTypeWithLocalName "buitenRolBeschrijving") (DTG.iedereRolInContext >-> DTG.binding)) >-> DTG.context
+boundContexts :: forall e. (AnyContext **> ContextDef) e
+boundContexts = (QC.filter (rolHasTypeWithLocalName "buitenRolBeschrijving") (DTG.iedereRolInContext >-> DTG.genericBinding)) >-> ContextRol `before` DTG.context `followedBy` ContextDef
 
+{-
 -- | All properties defined in namespace of the Rol.
 -- | `psp:Rol -> psp:Property`
 ownPropertiesDefM :: forall e. TypedTripleGetter e

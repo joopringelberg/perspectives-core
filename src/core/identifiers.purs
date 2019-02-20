@@ -3,6 +3,7 @@ module Perspectives.Identifiers
 , deconstructLocalNameFromCurie
 , deconstructLocalNameFromDomeinURI
 , deconstructLocalNameFromDomeinURI_
+, hasLocalName
 , deconstructModelName
 , deconstructNamespace
 , guardWellFormedNess
@@ -144,6 +145,11 @@ deconstructLocalNameFromDomeinURI = getSecondMatch domeinURIRegex
 deconstructLocalNameFromDomeinURI_ :: String -> String
 deconstructLocalNameFromDomeinURI_ s = unsafePartial (fromJust (deconstructLocalNameFromDomeinURI s))
 
+-- | "model:Perspectives$Context" `hasLocalName` "Context"
+hasLocalName :: String -> String -> Boolean
+hasLocalName qn ln = case deconstructLocalNameFromDomeinURI qn of
+  Nothing -> false
+  (Just ln') -> ln == ln'
 -----------------------------------------------------------
 -- CURIES
 -----------------------------------------------------------

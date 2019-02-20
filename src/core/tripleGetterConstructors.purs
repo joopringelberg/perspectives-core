@@ -17,7 +17,7 @@ import Perspectives.Identifiers (LocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getGebondenAls) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef, RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Perspectives.TripleGetterComposition (after, before, composeMonoidal, (>->))
+import Perspectives.TripleGetterComposition (before, composeMonoidal, followedBy, (>->))
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), show)
 
@@ -232,7 +232,7 @@ searchUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef **> RolD
 searchUnqualifiedRolDefinition ln = typeWithPerspectivesTypes $ searchInAspectsAndPrototypes f
   where
     f :: (BuitenRol **> RolDef) e
-    f = (ContextDef `after` DTG.context) >-> getUnqualifiedRolDefinition ln
+    f = (DTG.context `followedBy` ContextDef) >-> getUnqualifiedRolDefinition ln
 
 -----------------------------------------------------------
 -- GET A PROPERTY FROM A ROLE TELESCOPE
@@ -316,4 +316,4 @@ searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> Pro
 searchUnqualifiedPropertyDefinition ln = unwrap `before` (searchInAspectsAndPrototypes f)
   where
     f :: (BuitenRol **> PropertyDef) e
-    f = (RolDef `after` DTG.context) >-> (getUnqualifiedPropertyDefinition ln)
+    f = (DTG.context `followedBy` RolDef) >-> (getUnqualifiedPropertyDefinition ln)

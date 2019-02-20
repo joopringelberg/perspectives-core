@@ -94,6 +94,19 @@ instance eqPBool :: Eq PBool where
   eq (PBool c1) (PBool c2) = c1 == c2
 
 -----------------------------------------------------------
+-- PSTRING AS TYPE
+-----------------------------------------------------------
+-- | The Purescript type of the value of a Boolean-typed property, in Perspectives.
+-- | Notice that in Purescript, all representations of Perspectives values are strings.
+-- | We need this because in large parts of the application code, Perspectives data are not typed.
+-- | There is (in terms of Purescript types) no formalised relation between SimpleValueDef and PBool.
+-- | However, in Perspectives the type of psp:PBool is psp:SimpleValue.
+newtype PString = PString String
+derive instance newtypePString :: Newtype PString _
+instance eqPString :: Eq PString where
+  eq (PString c1) (PString c2) = c1 == c2
+
+-----------------------------------------------------------
 -- CONTEXT AS INSTANCE
 -----------------------------------------------------------
 -- | An instance of Context. To be used if one knows the context not to be a definition.

@@ -24,10 +24,11 @@ applyToAll q objectsOfP = foldM
 
 infixl 9 unionOfObjects as /-/
 
-intersectionOfObjects :: forall e.
-  ObjectsGetter e ->
-  ObjectsGetter e ->
-  ObjectsGetter e
+intersectionOfObjects :: forall s o t e.
+  Eq t =>
+  (s ~~> o) e ->
+  (o ~~> t) e ->
+  (s ~~> t) e
 intersectionOfObjects p q = p >=>
   (\objectsOfP -> foldM
       (\r objectOfP -> q objectOfP >>= pure <<< intersect r)

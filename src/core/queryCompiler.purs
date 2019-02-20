@@ -6,25 +6,26 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (MonadPerspectives, TypeID, TypedTripleGetter(..), ObjectsGetter, (%%>), (%%>>))
+import Perspectives.CoreTypes (MonadPerspectives, TypeID, TypedTripleGetter(..), ObjectsGetter, (%%>), (%%>>), type (**>), type (~~>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, contextType, identity, iedereRolInContext, label, rolType) as DTG
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.ObjectGetterConstructors (searchExternalProperty, getInternalProperty, getRol)
+import Perspectives.ObjectGetterConstructors (getInternalProperty, searchContextRol, searchExternalProperty, searchInternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
+import Perspectives.PerspectivesTypes (class RolClass, Context(..), ContextDef(..), ContextRol(..), PropertyDef(..), RolDef(..), Value(..))
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
-import Perspectives.QueryCombinators (closure, closure', concat, conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
+import Perspectives.QueryCombinators (closure', conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructInternalPropertyGetter, constructInternalPropertyLookup, constructInverseRolGetter, constructRolGetter, constructRolLookup, constructRolPropertyGetter, constructRolPropertySearch)
+import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructInternalPropertyLookup, constructInverseRolGetter, constructRolPropertyGetter, constructRolPropertySearch)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
 import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
 
 -- | From a qualified name for a computed Rol or Property, construct a function that computes the instances of that Rol or the values of that Property for a given context.
 -- | This function caches its results in the QueryCache.
-rolQuery  :: forall e.
-  TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+rolQuery  :: forall s o e.
+  RolDef -> MonadPerspectives (AjaxAvarCache e) ((s **> o) e)
 rolQuery rn = ifNothing (queryCacheLookup rn)
   do
     -- We must run the resulting function in its own State.
@@ -34,21 +35,21 @@ rolQuery rn = ifNothing (queryCacheLookup rn)
     queryCacheInsert n $ TypedTripleGetter n (lift <<< (runTypedTripleGetter tg))
   (pure <<< id)
 
-propertyQuery  :: forall e.
-  TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+propertyQuery  :: forall r e. RolClass r =>
+  PropertyDef -> MonadPerspectives (AjaxAvarCache e) ((r **> Value) e)
 propertyQuery rn = rolQuery rn
 
 -- | An alias that generalises over roles and properties.
 memberQuery  :: forall e.
-  TypeID -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+  String -> MonadPerspectives (AjaxAvarCache e) ((String **> String) e)
 memberQuery = rolQuery
 
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
-constructQueryFunction :: forall e.
-  ContextID ->
-  MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+constructQueryFunction :: forall s o e.
+  Context ->
+  MonadPerspectives (AjaxAvarCache e) ((s **> o) e)
 constructQueryFunction typeDescriptionID = do
   queryStepType <- onNothing (errorMessage "no type found" "")
     (typeDescriptionID %%> contextType)
@@ -67,17 +68,18 @@ constructQueryFunction typeDescriptionID = do
         otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")
     "model:QueryAst$PropertyGetter" -> do
       functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") )
+      -- 'property' is either qualified or unqualified.
       property <- onNothing
         (errorMessage "no property provided" queryStepType)
         (typeDescriptionID %%> getBindingOfRol "model:QueryAst$PropertyGetter$property")
       case functionName of
         "constructExternalPropertyGetter" -> pure $ constructExternalPropertySearch property
-        "constructExternalPropertyLookup" -> pure $ constructExternalPropertySearch property
+        "constructExternalPropertyLookup" -> pure $ searchExternalProperty property
         "constructRolPropertyLookup" -> pure $ constructRolPropertySearch property
         "constructRolPropertyGetter" -> pure $ constructRolPropertyGetter property
         "propertyQuery" -> propertyQuery property
-        "constructInternalPropertyLookup" -> pure $ constructInternalPropertyLookup property
-        "constructInternalPropertyGetter" -> pure $ constructInternalPropertyGetter property
+        "constructInternalPropertyLookup" -> pure $ searchInternalProperty property
+        "constructInternalPropertyGetter" -> pure $ getInternalProperty property
         "computedPropertyGetter" -> do
           computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (property %%> (searchExternalProperty "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving$functionName"))
           mcomputingFunction <- queryCacheLookup computingFunctionName
@@ -150,8 +152,8 @@ constructQueryFunction typeDescriptionID = do
     _ -> throwError (error $ "constructQueryFunction: unknown type description: '" <> typeDescriptionID <> "'")
 
   where
-    getBindingOfRol :: ID -> ObjectsGetter e
-    getBindingOfRol rolName = getRol rolName /-/ rolBindingDef
+    getBindingOfRol :: RolDef -> (ContextDef ~~> ContextRol) e
+    getBindingOfRol rolName = searchContextRol rolName /-/ rolBindingDef
 
     applyUnaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e )
       -> ID
@@ -164,7 +166,7 @@ constructQueryFunction typeDescriptionID = do
       -> ID
       -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
     applyBinaryCombinator c queryStepType = do
-      (operandIds :: Array ID) <- (getRol "model:QueryAST$nAryCombinator$operand" /-/ rolBindingDef)  typeDescriptionID
+      (operandIds :: Array ID) <- (searchContextRol "model:QueryAST$nAryCombinator$operand" /-/ rolBindingDef)  typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
       {init, last} <- onNothing' (errorMessage "too few operands" queryStepType) (unsnoc operands)
       pure $ foldl c last init

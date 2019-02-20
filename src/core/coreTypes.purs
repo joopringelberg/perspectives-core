@@ -130,10 +130,10 @@ applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyObjectsGetterToMaybeObject as %%>
 
-applyObjectsGetterToObject :: forall e. ID -> ObjectsGetter e -> MonadPerspectives (AjaxAvarCache e) Value
+applyObjectsGetterToObject :: forall s o e. Newtype s String => s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
 applyObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
-    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> id <> "'."
+    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "'."
     (Just obj) -> pure obj
 
 infix 0 applyObjectsGetterToObject as %%>>

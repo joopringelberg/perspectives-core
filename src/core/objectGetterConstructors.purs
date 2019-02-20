@@ -2,7 +2,8 @@ module Perspectives.ObjectGetterConstructors where
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (null, elemIndex, union, difference, nub, cons, foldMap)
+import Data.Array (cons, difference, elemIndex, foldMap, head, nub, null, union)
+import Data.Array (filter) as Arr
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
@@ -13,11 +14,11 @@ import Perspectives.ContextAndRole (context_rolInContext)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), MP, ObjectsGetter)
 import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, rolBindingDef)
-import Perspectives.Identifiers (LocalName) as Id
-import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/))
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef, RolDef(..), RolInContext, Value, AnyDefinition, binding, genericBinding, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
+import Perspectives.Identifiers (LocalName, hasLocalName) as Id
+import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/), (\-\))
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, AnyDefinition, binding, genericBinding, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
-import Prelude (class Eq, bind, id, join, pure, show, ($), (<>), (==), (>=>), (>>=), (>>>), (<<<), map)
+import Prelude (class Eq, bind, flip, id, join, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -- | This module only exports constructors that search roles or properties,
 -- | in the space of prototypes, Aspects, AspectRoles and AspectProperties.
@@ -44,6 +45,22 @@ closure p = getter [] where
 -- | Useful in combination with computing alternatives using <|>
 unlessNull :: forall s o e. (s ~~> o) e -> (s ~~> o) e
 unlessNull og id = og id >>= \r -> if (null r) then empty else pure r
+
+contains :: forall s o e. Eq o => o -> (s ~~> o) e -> (s ~~> PBool) e
+contains o getter = getter >=> \(os :: Array o) -> case elemIndex o os of
+  Nothing -> pure [PBool "false"]
+  otherwise -> pure [PBool "true"]
+
+filter :: forall s o e.
+  (o -> Boolean) ->
+  (s ~~> o) e ->
+  (s ~~> o) e
+filter criterium getter = getter >=> pure <<< Arr.filter criterium
+
+toBoolean :: forall s e. (s ~~> PBool) e -> s -> MP e Boolean
+toBoolean g = g >=> \(bs :: Array PBool) -> case head bs of
+  Nothing -> pure true
+  (Just b) -> pure (b == PBool "true")
 
 searchInRolTelescope :: forall e. ObjectsGetter e -> ObjectsGetter e
 searchInRolTelescope getter rolId =
@@ -87,6 +104,22 @@ directAspectRoles = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Per
 
 directAspectProperties :: forall e. (PropertyDef ~~> PropertyDef) e
 directAspectProperties = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectProperty") /-/ rolBindingDef
+
+-- | The type of Rol or Context that can be bound to the Rol.
+bindingDef :: forall e. (RolDef ~~> AnyContext) e
+bindingDef = unwrap >>> getContextRol (RolDef "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
+
+-- | Get the alternatives of a Sum type, possibly none. I assume Sums have no prototypes, nor Aspects.
+alternatives :: forall e. (AnyContext ~~> AnyContext) e
+alternatives = (getContextRol (RolDef "model:Perspectives$Sum$alternative")) /-/ rolBindingDef
+
+-- | Traverse the acyclic directed graph of mogelijkeBinding until the function f yields a result.
+searchInMogelijkeBinding :: forall o e. Eq o => (RolDef ~~> o) e -> (RolDef ~~> o) e
+searchInMogelijkeBinding f roldef =
+  (unlessNull
+    (((bindingDef /-/ alternatives) >=> pure <<< map RolDef) \-\ f)) roldef -- sum type
+  <|>
+  ((bindingDef >=> pure <<< map RolDef) /-/ searchInMogelijkeBinding f) roldef -- single type
 
 concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e
 concat f p s = do
@@ -190,7 +223,10 @@ searchUnqualifiedRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (conte
 -- | Look for the definition of a Rol by its local name, in the ContextDef (not searching prototypes or Aspects).
 -- | If no Rol is defined with this local name, will return an empty result.
 getUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef ~~> RolDef) e
-getUnqualifiedRolDefinition ln = typeWithPerspectivesTypes$  getUnqualifiedContextRol ln /-/ binding /-/ context
+getUnqualifiedRolDefinition ln = unwrap >>> (filter
+  (flip Id.hasLocalName ln)
+  (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context))
+    >=> (pure <<< map RolDef)
 
 -- | Look for the definition of a Rol by its local name, in the ContextDef and its Aspects and in all their prototypes.
 -- | As the name of a RolDefinition on an Aspect will be scoped to that Aspect, we do not have to search once
@@ -203,6 +239,17 @@ searchUnqualifiedRolDefinition ln = unwrap >>> searchInAspectsAndPrototypes f
     f :: (BuitenRol ~~> RolDef) e
     f = context >=> pure <<< map ContextDef /-/ getUnqualifiedRolDefinition ln
 
+-----------------------------------------------------------
+-- CHECK IF A CONTEXT DEFINITION HAS A ROL DEFINITION
+-----------------------------------------------------------
+hasLocalRolDefinition :: forall e. RolDef -> (ContextDef ~~> PBool) e
+hasLocalRolDefinition qn = unwrap >>> contains (unwrap qn) (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context)
+
+hasRolDefinition :: forall e. RolDef -> (ContextDef ~~> PBool) e
+hasRolDefinition qn = unwrap >>> searchInAspectsAndPrototypes f
+  where
+    f :: (BuitenRol ~~> PBool) e
+    f = context >=> pure <<< map ContextDef /-/ hasLocalRolDefinition qn
 -----------------------------------------------------------
 -- GET A PROPERTY FROM A ROLE TELESCOPE
 -----------------------------------------------------------
@@ -280,11 +327,17 @@ getGebondenAls rname = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{ge
 -- | Look for the definition of a Property by its local name, in the RolDef (not searching prototypes or Aspects).
 -- | If no Property is defined with this local name, will return an empty result.
 getUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef ~~> PropertyDef) e
-getUnqualifiedPropertyDefinition ln = typeWithPerspectivesTypes$  getUnqualifiedContextRol ln /-/ binding /-/ context
+getUnqualifiedPropertyDefinition ln = unwrap >>> (filter
+  (flip Id.hasLocalName ln)
+  (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context))
+    >=> (pure <<< map PropertyDef)
 
 -- | Look for the definition of a Property by its local name, in the RolDef and its Aspects and in all their prototypes.
 searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef ~~> PropertyDef) e
-searchUnqualifiedPropertyDefinition ln = unwrap >>> searchInAspectsAndPrototypes f
-  where
-    f :: (BuitenRol ~~> PropertyDef) e
-    f = context >=> pure <<< map RolDef /-/ getUnqualifiedPropertyDefinition ln
+searchUnqualifiedPropertyDefinition ln = searchInMogelijkeBinding $ searchUnqualifiedPropertyDefinition' ln where
+
+  searchUnqualifiedPropertyDefinition' ::	Id.LocalName -> (RolDef ~~> PropertyDef) e
+  searchUnqualifiedPropertyDefinition' ln = unwrap >>> searchInAspectsAndPrototypes f
+    where
+      f :: (BuitenRol ~~> PropertyDef) e
+      f = context >=> pure <<< map RolDef /-/ getUnqualifiedPropertyDefinition ln

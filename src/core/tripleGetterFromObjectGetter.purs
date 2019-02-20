@@ -144,13 +144,3 @@ constructInverseRolGetter :: forall r b e.
   RolDef ->
   TypedTripleGetter r b e
 constructInverseRolGetter pn = getGebondenAls pn `trackedAs` ((unwrap pn) <> "_inverse")
-
--- -- | Tests whether the type of the Rol has a specific local name. Used to test if a Rol is a BuitenRol type or a BinnenRol type.
--- -- | `psp:Rol -> psp:RolInstance -> psp:Boolean`
--- rolHasTypeWithLocalName :: forall e. LocalName -> TypedTripleGetter String Boolean e
--- rolHasTypeWithLocalName localName = constructTripleGetter
---   ("model:Perspectives$rolHasTypeWithLocalName" <> "_" <> localName)
---   (rolType `composeMonoidal` f)
---   where
---     f :: Array String -> Boolean
---     f = alaF Disj foldMap (maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI)
