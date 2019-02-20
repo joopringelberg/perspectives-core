@@ -30,6 +30,7 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.TypesForDeltas (Delta, encodeDefault)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, (&&), (<<<), (<>), (==), (>>=), ($))
+import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -130,10 +131,10 @@ applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyObjectsGetterToMaybeObject as %%>
 
-applyObjectsGetterToObject :: forall s o e. Newtype s String => s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
+applyObjectsGetterToObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
 applyObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
-    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "'."
+    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unsafeCoerce id) <> "'."
     (Just obj) -> pure obj
 
 infix 0 applyObjectsGetterToObject as %%>>

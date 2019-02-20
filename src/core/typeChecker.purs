@@ -1,24 +1,19 @@
 module Perspectives.TypeChecker where
 
-import Control.Alt ((<|>))
-import Data.Array (foldM, head, length, union)
+import Data.Array (foldM, head, length)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (FD, MonadPerspectives, TypeID, TypedTripleGetter, UserMessage(..), ObjectsGetter, tripleObjects, tripleObjects_, (%%>>))
-import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef, rolType)
+import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>))
+import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolName)
-import Perspectives.Identifiers (LocalName, deconstructNamespace, guardWellFormedNess, LocalName)
-import Perspectives.ModelBasedObjectGetters (alternatives, bindingDef)
-import Perspectives.ObjectGetterConstructors (closureOfAspect, closureOfAspectRol, contains, getContextRol, getUnqualifiedContextRol, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean, unlessNull)
-import Perspectives.ObjectsGetterComposition ((/-/), (\-\))
-import Perspectives.PerspectivesTypes (class RolClass, AnyContext, Context(..), ContextDef(..), PropertyDef(..), RolDef(..), typeWithPerspectivesTypes)
-import Perspectives.QueryCombinators (containsMatching, filter)
-import Perspectives.RunMonadPerspectivesQuery ((##), runTypedTripleGetter, runMonadPerspectivesQuery)
-import Prelude (bind, flip, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||), (=<<), map)
+import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
+import Perspectives.ObjectGetterConstructors (closureOfAspect, closureOfAspectRol, contains, getUnqualifiedContextRol, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean, alternatives, bindingDef)
+import Perspectives.ObjectsGetterComposition ((/-/))
+import Perspectives.PerspectivesTypes (class RolClass, AnyContext, ContextDef(..), PropertyDef, RolDef(..), AnyDefinition, typeWithPerspectivesTypes)
+import Prelude (bind, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (||), (=<<), map)
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
 -- erft een context interne- of externe properties van aspecten? Ja, dat kan.
@@ -98,7 +93,7 @@ isOrHasAspect subtype aspect = if subtype == aspect
 -- | context `contextHasType` type
 contextHasType :: forall e. AnyContext -> ContextDef -> MonadPerspectives (AjaxAvarCache e) Boolean
 contextHasType ctxt tp = do
-  typeOfBinding <- ctxt %%>> contextType
+  (typeOfBinding :: AnyDefinition) <- ctxt %%>> contextType
   ContextDef typeOfBinding `isOrHasAspect` tp
 
 -- | True iff the type of the role equals the given type, or if its type has the given type as aspect.
@@ -108,10 +103,10 @@ rolHasType rol tp = do
   (typeOfBinding :: RolDef) <- rol %%>> rolType
   (ContextDef $ unwrap typeOfBinding) `isOrHasAspect` (ContextDef $ unwrap tp)
 
-{-
-mostSpecificCommonAspect :: forall e. Array TypeID -> MonadPerspectives (AjaxAvarCache e) TypeID
+mostSpecificCommonAspect :: forall e. Array AnyDefinition -> MonadPerspectives (AjaxAvarCache e) ContextDef
 mostSpecificCommonAspect types = do
-  x <- traverse (runTypedTripleGetter aspectenDefMClosure) types
-  aspects <- pure $ join (tripleObjects <$> x)
-  foldM (\msca t -> ifM (t `isOrHasAspect` msca) (pure msca) (pure t)) "model:Perspectives$ElkType" aspects
--}
+  x <- traverse closureOfAspect types
+  (aspects :: Array AnyContext) <- pure $ join x
+  foldM (\msca t -> ifM (t `isOrHasAspect` msca) (pure msca) (pure t))
+    (ContextDef "model:Perspectives$ElkType")
+    (map ContextDef aspects)
