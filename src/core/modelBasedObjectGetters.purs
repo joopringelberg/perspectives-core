@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, context, rolBindingDef)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull, bindingDef)
+import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull, mogelijkeBinding)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -44,7 +44,7 @@ propertyIsFunctioneel = some (concat isFunctioneel (closureOfAspectProperty /-/ 
 
 -- | The type of the range that has been defined for the Property.
 rangeDef :: forall e. (PropertyDef ~~> SimpleValueDef) e
-rangeDef = unwrap >>> wrap >>> searchContextRol (RolDef "model:Perspectives$Property$range") /-/ binding /-/ context >=> pure <<< map SimpleValueDef
+rangeDef = unwrap >>> searchContextRol (RolDef "model:Perspectives$Property$range") /-/ binding /-/ context >=> pure <<< map SimpleValueDef
 
 -- | Get the rol psp:Context$buitenRolBeschrijving.
 -- | `psp:Context -> psp:RolInstance`
@@ -67,7 +67,7 @@ contextDef rid =
   unlessNull rolInContextContextDef rid <|>
   unlessNull binnenRolContextDef rid <|>
   unlessNull buitenRolContextDef rid <|>
-  -- unlessNull bindingDef rid <|>
+  -- unlessNull mogelijkeBinding rid <|>
   unlessNull gebruikerRolContextDef rid <|>
   contextBotContextDef rid
 

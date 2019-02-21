@@ -37,6 +37,8 @@ derive instance newtypeContextDef :: Newtype ContextDef _
 instance eqContextDef :: Eq ContextDef where
   eq (ContextDef c1) (ContextDef c2) = c1 == c2
 
+type ZaakDef = ContextDef
+type ActieDef = ContextDef
 -----------------------------------------------------------
 -- ROL AS A TYPE
 -----------------------------------------------------------
@@ -54,6 +56,7 @@ instance eqRolDef :: Eq RolDef where
   eq (RolDef c1) (RolDef c2) = c1 == c2
 derive instance newtypeRolDef :: Newtype RolDef _
 
+type UserRolDef = RolDef
 -----------------------------------------------------------
 -- PROPERTY AS A TYPE
 -----------------------------------------------------------

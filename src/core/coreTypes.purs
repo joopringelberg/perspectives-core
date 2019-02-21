@@ -65,6 +65,8 @@ type QueryEnvironment = StrMap TripleRef
 
 type MonadPerspectivesQuery e =  StateT QueryEnvironment (MonadPerspectives e)
 
+type MPQ e = MonadPerspectivesQuery (AjaxAvarCache e)
+
 type MonadPerspectivesObjects e = MonadPerspectives e (Array ID)
 
 putQueryVariable :: forall e. VariableName -> TripleRef -> MonadPerspectivesQuery e Unit

@@ -10,7 +10,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
-import Perspectives.ObjectGetterConstructors (closureOfAspect, closureOfAspectRol, contains, getUnqualifiedContextRol, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean, alternatives, bindingDef)
+import Perspectives.ObjectGetterConstructors (closureOfAspect, closureOfAspectRol, contains, getUnqualifiedContextRol, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean, alternatives, mogelijkeBinding)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, ContextDef(..), PropertyDef, RolDef(..), AnyDefinition, typeWithPerspectivesTypes)
 import Prelude (bind, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (||), (=<<), map)
@@ -39,7 +39,7 @@ checkRolForQualifiedProperty pn rn = do
 
     checkMogelijkeBindingHasAspect :: RolDef -> RolDef -> MonadPerspectives (AjaxAvarCache e) Boolean
     checkMogelijkeBindingHasAspect rn' an = do
-      b <- typeWithPerspectivesTypes bindingDef rn'
+      b <- typeWithPerspectivesTypes mogelijkeBinding rn'
       case head b of
         Nothing -> pure false
         (Just bd) -> do

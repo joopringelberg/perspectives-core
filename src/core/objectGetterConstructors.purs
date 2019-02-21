@@ -51,11 +51,11 @@ contains o getter = getter >=> \(os :: Array o) -> case elemIndex o os of
   Nothing -> pure [PBool "false"]
   otherwise -> pure [PBool "true"]
 
-filter :: forall s o e.
+filter_ :: forall s o e.
   (o -> Boolean) ->
   (s ~~> o) e ->
   (s ~~> o) e
-filter criterium getter = getter >=> pure <<< Arr.filter criterium
+filter_ criterium getter = getter >=> pure <<< Arr.filter criterium
 
 toBoolean :: forall s e. (s ~~> PBool) e -> s -> MP e Boolean
 toBoolean g = g >=> \(bs :: Array PBool) -> case head bs of
@@ -106,8 +106,8 @@ directAspectProperties :: forall e. (PropertyDef ~~> PropertyDef) e
 directAspectProperties = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectProperty") /-/ rolBindingDef
 
 -- | The type of Rol or Context that can be bound to the Rol.
-bindingDef :: forall e. (RolDef ~~> AnyContext) e
-bindingDef = unwrap >>> getContextRol (RolDef "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
+mogelijkeBinding :: forall e. (RolDef ~~> AnyDefinition) e
+mogelijkeBinding = unwrap >>> getContextRol (RolDef "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
 
 -- | Get the alternatives of a Sum type, possibly none. I assume Sums have no prototypes, nor Aspects.
 alternatives :: forall e. (AnyContext ~~> AnyContext) e
@@ -117,9 +117,9 @@ alternatives = (getContextRol (RolDef "model:Perspectives$Sum$alternative")) /-/
 searchInMogelijkeBinding :: forall o e. Eq o => (RolDef ~~> o) e -> (RolDef ~~> o) e
 searchInMogelijkeBinding f roldef =
   (unlessNull
-    (((bindingDef /-/ alternatives) >=> pure <<< map RolDef) \-\ f)) roldef -- sum type
+    (((mogelijkeBinding /-/ alternatives) >=> pure <<< map RolDef) \-\ f)) roldef -- sum type
   <|>
-  ((bindingDef >=> pure <<< map RolDef) /-/ searchInMogelijkeBinding f) roldef -- single type
+  ((mogelijkeBinding >=> pure <<< map RolDef) /-/ searchInMogelijkeBinding f) roldef -- single type
 
 concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e
 concat f p s = do
@@ -195,19 +195,19 @@ getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 -- SEARCH A ROL IN A CONTEXT AND ITS PROTOTYPES
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
-searchContextRol :: forall e. RolDef -> (ContextDef ~~> ContextRol) e
-searchContextRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ((getContextRol rn) :: (AnyContext ~~> ContextRol) e))
+searchContextRol :: forall e. RolDef -> (AnyContext ~~> ContextRol) e
+searchContextRol rn = searchLocallyAndInPrototypeHierarchy (context /-/ ((getContextRol rn) :: (AnyContext ~~> ContextRol) e))
 
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
-searchRolInContext :: forall e. RolDef -> (ContextDef ~~> RolInContext) e
-searchRolInContext rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ((getRolInContext rn) :: (AnyContext ~~> RolInContext) e))
+searchRolInContext :: forall e. RolDef -> (AnyContext ~~> RolInContext) e
+searchRolInContext rn = searchLocallyAndInPrototypeHierarchy (context /-/ ((getRolInContext rn) :: (AnyContext ~~> RolInContext) e))
 
 -- | Search for an unqualified rol both in the local context and all its prototypes.
 -- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
 -- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
 -- TODO: waarom alleen in ContextDef?
-searchUnqualifiedRol :: forall e. Id.LocalName -> (ContextDef ~~> ContextRol) e
-searchUnqualifiedRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (context /-/ ( (getUnqualifiedContextRol rn) :: (AnyContext ~~> ContextRol) e))
+searchUnqualifiedRol :: forall e. Id.LocalName -> (AnyContext ~~> ContextRol) e
+searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (context /-/ ( (getUnqualifiedContextRol rn) :: (AnyContext ~~> ContextRol) e))
 
 -- TODO: hernoem naar searchUnqualfiedContextRol en maak searchUnqualfiedRolinContext.
 
@@ -223,7 +223,7 @@ searchUnqualifiedRol rn = unwrap >>> searchLocallyAndInPrototypeHierarchy (conte
 -- | Look for the definition of a Rol by its local name, in the ContextDef (not searching prototypes or Aspects).
 -- | If no Rol is defined with this local name, will return an empty result.
 getUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef ~~> RolDef) e
-getUnqualifiedRolDefinition ln = unwrap >>> (filter
+getUnqualifiedRolDefinition ln = unwrap >>> (filter_
   (flip Id.hasLocalName ln)
   (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context))
     >=> (pure <<< map RolDef)
@@ -327,7 +327,7 @@ getGebondenAls rname = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{ge
 -- | Look for the definition of a Property by its local name, in the RolDef (not searching prototypes or Aspects).
 -- | If no Property is defined with this local name, will return an empty result.
 getUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef ~~> PropertyDef) e
-getUnqualifiedPropertyDefinition ln = unwrap >>> (filter
+getUnqualifiedPropertyDefinition ln = unwrap >>> (filter_
   (flip Id.hasLocalName ln)
   (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context))
     >=> (pure <<< map PropertyDef)

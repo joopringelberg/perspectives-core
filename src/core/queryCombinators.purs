@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
-import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, union) as Arr
+import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, union, filter) as Arr
 import Data.Array (foldMap)
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -86,6 +86,26 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
 
     name :: String
     name = "(filter " <> nameOfc <> " " <> nameOfp <> ")"
+
+-- | A selection of the results of the query using a simple (boolean) function as a criterium.
+filter_ :: forall s o e.
+  (o -> Boolean) ->
+  String ->
+  (s **> o) e ->
+  (s **> o) e
+filter_ criterium criteriumName (TypedTripleGetter nameOfp p) =
+  memorize getter name where
+    getter :: TripleGetter s o e
+    getter id = do
+      t@(Triple{object}) <- p id
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : Arr.filter criterium object
+                    , dependencies : []
+                    , supports : [(typeWithPerspectivesTypes getRef t)]
+                    , tripleGetter : getter}
+    name :: String
+    name = "(filter_" <> nameOfp <> "_" <> criteriumName <> ")"
 
 -- Returns true iff the results of both TripleGetters applied to the same origin yield exactly the same values in the same order.
 -- | `psp:Function -> psp:Function -> psp:Function`
@@ -192,17 +212,6 @@ notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
 -- | Construct a function that returns a bool in MonadPerspectivesQuery, from a TypedTripleGetter.
 toBoolean :: forall s e. (s **> PBool) e -> s -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
 toBoolean tg = flip applyTypedTripleGetterToMaybeObject tg >=> pure <<< maybe false (eq (PBool "true"))
-
--- | This query constructor takes a context id as argument. The query step that results can be applied to a role id
--- | and will result in all instances of that role for the given context.
--- | For domain we just take psp:Context. Range can only be psp:Rol because we have no
--- | other knowledge on it.
--- | psp:ContextInstance -> psp:Function
-rolesOf :: forall e. ContextDef -> (RolDef **> ContextRol) e
-rolesOf cid = constructTripleGetterFromObjectsGetter
-  ("model:Perspectives$rolesOf" <> unwrap cid) f where
-  f :: (RolDef ~~> ContextRol) e
-  f rolName = searchContextRol rolName cid
 
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.

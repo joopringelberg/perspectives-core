@@ -9,17 +9,19 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), type (**>), (@@))
+import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), MPQ, (@@))
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, context) as DTG
 import Perspectives.DataTypeTripleGetters (binnenRol)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Identifiers (LocalName) as Id
+import Perspectives.Identifiers (LocalName, hasLocalName) as Id
+import Perspectives.Identifiers (hasLocalName)
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getGebondenAls) as OGC
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef, RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
+import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Perspectives.TripleGetterComposition (before, composeMonoidal, followedBy, (>->))
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
-import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), show)
+import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), show, flip, (<<<))
 
 -----------------------------------------------------------
 -- COMBINATORS
@@ -191,23 +193,33 @@ getUnqualifiedContextRol ln = OGC.getUnqualifiedContextRol ln `trackedAs` ln
 getUnqualifiedRolInContext :: forall e. Id.LocalName -> (AnyContext **> RolInContext) e
 getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 
+-- | This query constructor takes a context id as argument. The query step that results can be applied to a role definition
+-- | and will result in all instances of that role for the given context.
+-- | For domain we just take AnyContext. Range can only be psp:Rol because we have no
+-- | other knowledge on it.
+-- | psp:ContextInstance -> psp:Function
+rolesOf :: forall e. AnyContext -> (RolDef **> RolInContext) e
+rolesOf cid = TypedTripleGetter ("rolesOf_" <> cid) (typeWithPerspectivesTypes getter) where
+  getter :: RolDef -> MPQ e (Triple AnyContext RolInContext e)
+  getter rd = cid @@ searchRolInContext rd
+
 -----------------------------------------------------------
 -- SEARCH A ROL IN A CONTEXT AND ITS PROTOTYPES
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
-searchContextRol :: forall e. RolDef -> (ContextDef **> ContextRol) e
-searchContextRol rn = typeWithPerspectivesTypes $ searchLocallyAndInPrototypeHierarchy (DTG.context >-> ((getContextRol rn) :: (AnyContext **> ContextRol) e))
+searchContextRol :: forall e. RolDef -> (AnyContext **> ContextRol) e
+searchContextRol rn = searchLocallyAndInPrototypeHierarchy (DTG.context >-> ((getContextRol rn) :: (AnyContext **> ContextRol) e))
 
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
-searchRolInContext :: forall e. RolDef -> (ContextDef **> RolInContext) e
-searchRolInContext rn = typeWithPerspectivesTypes $ searchLocallyAndInPrototypeHierarchy (DTG.context >-> ((getRolInContext rn) :: (AnyContext **> RolInContext) e))
+searchRolInContext :: forall e. RolDef -> (AnyContext **> RolInContext) e
+searchRolInContext rn = searchLocallyAndInPrototypeHierarchy (DTG.context >-> ((getRolInContext rn) :: (AnyContext **> RolInContext) e))
 
 -- | Search for an unqualified rol both in the local context and all its prototypes.
 -- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
 -- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
 -- TODO: waarom alleen in ContextDef?
-searchUnqualifiedRol :: forall e. Id.LocalName -> (ContextDef **> ContextRol) e
-searchUnqualifiedRol rn = typeWithPerspectivesTypes $ searchLocallyAndInPrototypeHierarchy (DTG.context >-> ( (getUnqualifiedContextRol rn) :: (AnyContext **> ContextRol) e))
+searchUnqualifiedRol :: forall e. Id.LocalName -> (AnyContext **> ContextRol) e
+searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (DTG.context >-> ( (getUnqualifiedContextRol rn) :: (AnyContext **> ContextRol) e))
 
 -----------------------------------------------------------
 -- GET A ROLDEFINITION FROM A CONTEXT DEFINITION
@@ -221,7 +233,11 @@ searchUnqualifiedRol rn = typeWithPerspectivesTypes $ searchLocallyAndInPrototyp
 -- | Look for the definition of a Rol by its local name, in the ContextDef (not searching prototypes or Aspects).
 -- | If no Rol is defined with this local name, will return an empty result.
 getUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef **> RolDef) e
-getUnqualifiedRolDefinition ln = typeWithPerspectivesTypes $ getUnqualifiedContextRol ln >-> DTG.binding >-> DTG.context
+getUnqualifiedRolDefinition ln = unwrap `before` (filter_
+  (flip Id.hasLocalName ln)
+  ("hasLocalName_" <> ln)
+  (getUnqualifiedContextRol "rolInContext" >-> DTG.binding >-> DTG.context))
+    `followedBy` RolDef
 
 -- | Look for the definition of a Rol by its local name, in the ContextDef and its Aspects and in all their prototypes.
 -- | As the name of a RolDefinition on an Aspect will be scoped to that Aspect, we do not have to search once
@@ -309,7 +325,13 @@ getGebondenAls rname = OGC.getGebondenAls rname `trackedAs` (unwrap rname)
 -- | Look for the definition of a Property by its local name, in the RolDef (not searching prototypes or Aspects).
 -- | If no Property is defined with this local name, will return an empty result.
 getUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> PropertyDef) e
-getUnqualifiedPropertyDefinition ln = typeWithPerspectivesTypes $ getUnqualifiedContextRol ln >-> DTG.binding >-> DTG.context
+getUnqualifiedPropertyDefinition ln = unwrap `before` (filter_
+  (flip Id.hasLocalName ln)
+  ("hasLocalName_" <> ln)
+  (getUnqualifiedContextRol "rolInContext" >-> DTG.binding >-> DTG.context))
+    `followedBy` PropertyDef
+
+   -- typeWithPerspectivesTypes $ getUnqualifiedContextRol ln >-> DTG.binding >-> DTG.context
 
 -- | Look for the definition of a Property by its local name, in the RolDef and its Aspects and in all their prototypes.
 searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> PropertyDef) e
