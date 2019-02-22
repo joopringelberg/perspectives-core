@@ -3,8 +3,8 @@ module Perspectives.ModelBasedObjectGetters where
 import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
-import Perspectives.DataTypeObjectGetters (buitenRol, context, rolBindingDef)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull, mogelijkeBinding)
+import Perspectives.DataTypeObjectGetters (buitenRol, context)
+import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -105,3 +105,8 @@ binnenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$binn
 buitenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 buitenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$buitenRolBeschrijving")
 -- buitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
+
+-- | All Rollen defined for a Context type, excluding Aspects.
+-- | `psp:Context -> psp:Rol`
+ownRollenDef :: forall e. (AnyContext ~~> RolDef) e
+ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") /-/ binding /-/ context >=> pure <<< map RolDef

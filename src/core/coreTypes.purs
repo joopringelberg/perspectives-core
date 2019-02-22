@@ -19,7 +19,6 @@ import Data.Foreign.Class (class Encode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (class Newtype, unwrap)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CouchdbState (CouchdbState)
@@ -118,6 +117,7 @@ withQueryCompilerEnvironment a = do
 -----------------------------------------------------------
 -- OBJECT(S)GETTER
 -----------------------------------------------------------
+-- TODO: FASEER UIT.
 type ObjectsGetter e = ID -> MonadPerspectives (AjaxAvarCache e) (Array Value)
 
 type ObjectGetter e = ID -> MonadPerspectives (AjaxAvarCache e) String
@@ -151,23 +151,23 @@ infixl 5 type TypedObjectsGetter as ~~>
 type TypedObjectGetter s o e = s -> MonadPerspectives (AjaxAvarCache e) o
 
 -- | -- | Apply (s ~~> o) e to s to get an Array of o, possibly empty.
-applyTypedObjectsGetter :: forall s o e. Newtype s String => s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) (Array o)
+applyTypedObjectsGetter :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) (Array o)
 applyTypedObjectsGetter id g = g id
 
 infix 0 applyTypedObjectsGetter as ##
 infix 0 applyTypedObjectsGetter as ##=
 
 -- | Apply (s ~~> o) e to s to get (a single) o wrapped in Just, Nothing otherwise.
-applyTypedObjectsGetterToMaybeObject :: forall s o e. Newtype s String => s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) (Maybe o)
+applyTypedObjectsGetterToMaybeObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) (Maybe o)
 applyTypedObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyTypedObjectsGetterToMaybeObject as ##>
 
 -- | Apply (s ~~> o) e to s to get (a single) o. Throws an error of no o is available.
-applyTypedObjectsGetterToObject :: forall s o e. Newtype s String => s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
+applyTypedObjectsGetterToObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
 applyTypedObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
-    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> unwrap id <> "'."
+    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> unsafeCoerce id <> "'."
     (Just obj) -> pure obj
 
 infix 0 applyTypedObjectsGetterToObject as ##>>

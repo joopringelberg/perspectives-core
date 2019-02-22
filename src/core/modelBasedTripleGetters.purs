@@ -14,7 +14,7 @@ import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef, RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
 import Perspectives.TripleGetterComposition (followedBy, before, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some, getContextRol)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
@@ -118,12 +118,12 @@ inverse_subjectRollenDef = unwrap `before` DTG.buitenRol >-> constructInverseRol
 mogelijkeBinding :: forall e. (RolDef **> AnyDefinition) e
 mogelijkeBinding = unwrap `before` searchRolInContext (RolDef "model:Perspectives$Rol$mogelijkeBinding")  >-> DTG.binding >-> DTG.context
 
-{-
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`
-ownRollenDefM :: forall e. TypedTripleGetter e
-ownRollenDefM = constructRolGetter "model:Perspectives$Context$rolInContext" >-> DTG.binding >-> DTG.context
+ownRollenDef :: forall e. (AnyContext **> RolDef) e
+ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context `followedBy` RolDef
 
+{-
 -- | All Rollen defined for a Context type, including Aspects.
 -- | `psp:Context -> psp:Rol`
 rollenDefM :: forall e. TypedTripleGetter e
