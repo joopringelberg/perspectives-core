@@ -307,13 +307,16 @@ getInternalProperty :: forall e. PropertyDef -> (AnyContext ~~> Value) e
 getInternalProperty pn = binnenRol /-/ getProperty pn
 
 -- | Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope.
-searchInternalProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
-searchInternalProperty ln = binnenRol /-/ searchUnqualifiedProperty ln
+searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
+searchInternalUnqualifiedProperty ln = binnenRol /-/ searchUnqualifiedProperty ln
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
 -- | it as their binding).
 getGebondenAls :: forall r b e. RolClass r => RolClass b => RolDef -> (r ~~> b) e
 getGebondenAls rname = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup (unwrap rname) gevuldeRollen)
+
+genericGetGebondenAls :: forall e. String -> (String ~~> String) e
+genericGetGebondenAls rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)
 
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION

@@ -1,7 +1,7 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, type (**>))
-import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolType, typeVanIedereRolInContext) as DTOG
+import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef)
 import Perspectives.PerspectivesTypes (genericBinding, binding) as PT
 import Perspectives.TripleGetterComposition ((>->))
@@ -49,6 +49,9 @@ label = DTOG.label `trackedAs` "model:Perspectives$label"
 -- | The type of the rol instance.
 rolType :: forall r e. RolClass r => (r **> RolDef) e
 rolType = DTOG.rolType `trackedAs` "model:Perspectives$type"
+
+genericRolType :: forall e. (String **> String) e
+genericRolType = DTOG.genericRolType `trackedAs` "model:Perspectives$type"
 
 -- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
 -- | `psp:RolInstance -> psp:RolInstance`

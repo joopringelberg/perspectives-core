@@ -66,6 +66,9 @@ label = getContextMember \context -> [(context_displayName context)]
 rolType :: forall r e. RolClass r => (r ~~> RolDef) e
 rolType = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_pspType rol]
 
+genericRolType :: forall e. (String ~~> String) e
+genericRolType = getRolMember \rol -> [rol_pspType rol]
+
 rolBindingDef :: forall r b e. Binding r b => (r ~~> AnyContext) e
 rolBindingDef = binding /-/ context
 

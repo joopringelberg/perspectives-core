@@ -73,6 +73,7 @@ checkRolForUnQualifiedProperty ln rn = do
     1 -> pure $ Right $ unwrap $ unsafePartial $ fromJust $ head propdefs
     otherwise -> pure $ Left $ MultipleDefinitions ln (map unwrap propdefs)
 
+-- | Looks for the Aspect(s) that define an unqualified Rol with the given local name.
 checkContextForUnQualifiedRol :: forall e. LocalName -> ContextDef -> MonadPerspectives (AjaxAvarCache e) FD
 checkContextForUnQualifiedRol ln cn = do
   (roldefs :: Array RolDef) <- searchUnqualifiedRolDefinition ln cn

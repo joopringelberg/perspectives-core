@@ -8,7 +8,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter,
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Predicate)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.ObjectGetterConstructors (getGebondenAls, searchExternalProperty, searchInternalProperty, searchProperty)
+import Perspectives.ObjectGetterConstructors (getGebondenAls, searchExternalProperty, searchInternalUnqualifiedProperty, searchProperty)
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, PropertyDef, RolDef, Value, getProperty, typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (bind, flip, pure, ($), (<<<), (<>))
@@ -115,7 +115,7 @@ constructExternalPropertySearch ln = searchExternalProperty ln `trackedAs` unwra
 constructInternalPropertyLookup :: forall e.
   LocalName ->
   TypedTripleGetter AnyContext Value e
-constructInternalPropertyLookup ln = searchInternalProperty ln `trackedAs` ln
+constructInternalPropertyLookup ln = searchInternalUnqualifiedProperty ln `trackedAs` ln
 
 constructRolPropertyGetter :: forall r e. RolClass r =>
   PropertyDef ->

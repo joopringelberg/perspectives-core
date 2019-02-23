@@ -5,168 +5,171 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (MonadPerspectives, TypeID, TypedTripleGetter(..), ObjectsGetter, (%%>), (%%>>), type (**>), type (~~>))
-import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef)
-import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, contextType, identity, iedereRolInContext, label, rolType) as DTG
+import Perspectives.CoreTypes (MonadPerspectives,TypedTripleGetter(..), type (**>), type (~~>), (##>), (##>>), MP)
+import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, genericContext)
+import Perspectives.DataTypeTripleGetters (buitenRol, contextType, genericBinding, identity, iedereRolInContext, label, genericContext, genericRolType) as DTG
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
-import Perspectives.ObjectGetterConstructors (getInternalProperty, searchContextRol, searchExternalProperty, searchInternalProperty)
+import Perspectives.EntiteitAndRDFAliases (ID)
+import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty) as OGC
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (class RolClass, Context(..), ContextDef(..), ContextRol(..), PropertyDef(..), RolDef(..), Value(..))
+import Perspectives.PerspectivesTypes (AnyContext, PropertyDef(..), RolDef(..), Value, typeWithPerspectivesTypes, genericBinding)
 import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
-import Perspectives.QueryCombinators (closure', conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, rolesOf, useCache, var)
+import Perspectives.QueryCombinators (closure', conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, useCache, var)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
+import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, concat, constructInverseRolGetter, getInternalProperty, rolesOf, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructInternalPropertyLookup, constructInverseRolGetter, constructRolPropertyGetter, constructRolPropertySearch)
 import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=))
+import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), (>>>), map, (>=>))
 
 -- | From a qualified name for a computed Rol or Property, construct a function that computes the instances of that Rol or the values of that Property for a given context.
 -- | This function caches its results in the QueryCache.
-rolQuery  :: forall s o e.
-  RolDef -> MonadPerspectives (AjaxAvarCache e) ((s **> o) e)
-rolQuery rn = ifNothing (queryCacheLookup rn)
+rolQuery  :: forall e.
+  RolDef -> MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+rolQuery rn = ifNothing (queryCacheLookup $ unwrap rn)
   do
     -- We must run the resulting function in its own State.
     -- TODO. Dit ziet er beter uit als we ObjectsGetters gebruiken.
-    typeDescriptionID <- rn %%>> contextType
+    typeDescriptionID <- unwrap rn ##>> contextType
     tg@(TypedTripleGetter n _) <- constructQueryFunction typeDescriptionID
     queryCacheInsert n $ TypedTripleGetter n (lift <<< (runTypedTripleGetter tg))
   (pure <<< id)
 
-propertyQuery  :: forall r e. RolClass r =>
-  PropertyDef -> MonadPerspectives (AjaxAvarCache e) ((r **> Value) e)
-propertyQuery rn = rolQuery rn
+propertyQuery  :: forall e.
+  PropertyDef -> MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+propertyQuery rn = typeWithPerspectivesTypes rolQuery rn
 
 -- | An alias that generalises over roles and properties.
-memberQuery  :: forall e.
-  String -> MonadPerspectives (AjaxAvarCache e) ((String **> String) e)
-memberQuery = rolQuery
+memberQuery  :: forall e. String -> MonadPerspectives (AjaxAvarCache e) ((String **> String) e)
+memberQuery = RolDef >>> rolQuery
 
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
 constructQueryFunction :: forall s o e.
-  Context ->
-  MonadPerspectives (AjaxAvarCache e) ((s **> o) e)
+  AnyContext ->
+  MonadPerspectives (AjaxAvarCache e) ((String **> String) e)
 constructQueryFunction typeDescriptionID = do
   queryStepType <- onNothing (errorMessage "no type found" "")
-    (typeDescriptionID %%> contextType)
+    (typeDescriptionID ##> contextType)
   case queryStepType of
     "model:QueryAst$DataTypeGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName") )
-      case functionName of
-        "binding" -> pure DTG.binding
-        "context" -> pure DTG.context
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty (PropertyDef "model:QueryAst$DataTypeGetter$buitenRolBeschrijving$functionName")) )
+      case unwrap functionName of
+        "binding" -> pure $ typeWithPerspectivesTypes DTG.genericBinding
+        "context" -> pure $ typeWithPerspectivesTypes DTG.genericContext
         "identity" -> pure DTG.identity
         "contextType" -> pure DTG.contextType
-        "rolType" -> pure DTG.rolType
-        "buitenRol" -> pure DTG.buitenRol
+        "rolType" -> pure DTG.genericRolType
+        "buitenRol" -> pure $ typeWithPerspectivesTypes DTG.buitenRol
         "iedereRolInContext" -> pure DTG.iedereRolInContext
         "label" -> pure DTG.label
-        otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> functionName <> "'")
+        otherwise -> throwError (error $ "constructQueryFunction: unknown function for DataTypeGetter: '" <> unwrap functionName <> "'")
     "model:QueryAst$PropertyGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") )
+      (functionName :: Value) <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$PropertyGetter$buitenRolBeschrijving$functionName") )
       -- 'property' is either qualified or unqualified.
       property <- onNothing
         (errorMessage "no property provided" queryStepType)
-        (typeDescriptionID %%> getBindingOfRol "model:QueryAst$PropertyGetter$property")
-      case functionName of
-        "constructExternalPropertyGetter" -> pure $ constructExternalPropertySearch property
-        "constructExternalPropertyLookup" -> pure $ searchExternalProperty property
-        "constructRolPropertyLookup" -> pure $ constructRolPropertySearch property
-        "constructRolPropertyGetter" -> pure $ constructRolPropertyGetter property
-        "propertyQuery" -> propertyQuery property
-        "constructInternalPropertyLookup" -> pure $ searchInternalProperty property
-        "constructInternalPropertyGetter" -> pure $ getInternalProperty property
+        (typeDescriptionID ##> getBindingOfRol "model:QueryAst$PropertyGetter$property")
+      case unwrap functionName of
+        "searchProperty" -> pure $ typeWithPerspectivesTypes ((searchProperty property))
+        "getInternalPropery" -> pure $ typeWithPerspectivesTypes $ getInternalProperty property
+        "searchExternalProperty" -> pure $ typeWithPerspectivesTypes $ searchExternalProperty property
+        "searchUnqualifiedProperty" -> pure $ typeWithPerspectivesTypes $ ((searchUnqualifiedProperty property))
+        "searchInternalUnqualfiedProperty" -> pure $ typeWithPerspectivesTypes $ searchInternalUnqualifiedProperty property
+        "searchExternalUnqualifiedProperty" -> pure $ typeWithPerspectivesTypes $ searchExternalUnqualifiedProperty property
+        "propertyQuery" -> do
+          g <- propertyQuery $ PropertyDef property
+          pure (g)
         "computedPropertyGetter" -> do
-          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (property %%> (searchExternalProperty "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving$functionName"))
-          mcomputingFunction <- queryCacheLookup computingFunctionName
+          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (property ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$ComputedPropertyGetter$buitenRolBeschrijving$functionName"))
+          mcomputingFunction <- queryCacheLookup $ unwrap computingFunctionName
           case mcomputingFunction of
             (Just computingFunction) -> pure computingFunction
-            otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedPropertyGetter: '" <> computingFunctionName <> "'")
-        otherwise -> throwError (error $ "constructQueryFunction: unknown function for PropertyGetter: '" <> functionName <> "'")
+            otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedPropertyGetter: '" <> unwrap computingFunctionName <> "'")
+        otherwise -> throwError (error $ "constructQueryFunction: unknown function for PropertyGetter: '" <> unwrap functionName <> "'")
     "model:QueryAst$RolGetter" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName"))
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$RolGetter$buitenRolBeschrijving$functionName"))
       rol <- onNothing
         (errorMessage "no rol provided" queryStepType)
-        (typeDescriptionID %%> getBindingOfRol "model:QueryAst$RolGetter$rol")
-      case functionName of
-        "constructRolGetter" -> pure $ constructRolGetter rol
-        "rolQuery" -> rolQuery rol
-        "constructRolLookup" -> pure $ constructRolLookup rol
+        (typeDescriptionID ##> getBindingOfRol "model:QueryAst$RolGetter$rol")
+      case unwrap functionName of
+        "searchRol" -> pure $ typeWithPerspectivesTypes $ searchContextRol rol
+        "rolQuery" -> rolQuery $ RolDef rol
         "constructInverseRolGetter" -> pure $ constructInverseRolGetter rol
         "computedRolGetter" -> do
-          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (rol %%> (searchExternalProperty "model:QueryAst$ComputedRolGetter$buitenRolBeschrijving$functionName"))
-          mcomputingFunction <- queryCacheLookup computingFunctionName
+          computingFunctionName <- onNothing (errorMessage "no computing function name provided" queryStepType) (rol ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$ComputedRolGetter$buitenRolBeschrijving$functionName"))
+          mcomputingFunction <- queryCacheLookup $ unwrap computingFunctionName
           case mcomputingFunction of
             (Just computingFunction) -> pure computingFunction
-            otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedRolGetter: '" <> computingFunctionName <> "'")
-        otherwise -> throwError (error $ "constructQueryFunction: unknown function for RolGetter: '" <> functionName <> "'")
+            otherwise -> throwError (error $ "constructQueryFunction: unknown computing function for computedRolGetter: '" <> unwrap computingFunctionName <> "'")
+        otherwise -> throwError (error $ "constructQueryFunction: unknown function for RolGetter: '" <> unwrap functionName <> "'")
 
     "model:QueryAst$rolesOf" ->
-      rolesOf <$> (onNothing
+      typeWithPerspectivesTypes $ rolesOf <$> (onNothing
         (errorMessage "no context" queryStepType)
-        (queryStepType %%> getBindingOfRol "model:QueryAst$rolesOf$context"))
+        (queryStepType ##> getBindingOfRol "model:QueryAst$rolesOf$context"))
     "model:QueryAst$UnaryCombinator" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
-      case functionName of
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
+      case unwrap functionName of
         "laatste" -> applyUnaryCombinator lastElement queryStepType
-        "notEmpty" -> applyUnaryCombinator notEmpty queryStepType
+        "notEmpty" -> applyUnaryCombinator (typeWithPerspectivesTypes notEmpty) queryStepType
         "closure" -> applyUnaryCombinator closure queryStepType
         "closure'" -> applyUnaryCombinator closure' queryStepType
         "useCache" -> applyUnaryCombinator useCache queryStepType
         "ignoreCache" -> applyUnaryCombinator ignoreCache queryStepType
-        otherwise -> throwError (error $ "constructQueryFunction: unknown function for UnaryCombinator: '" <> functionName <> "'")
+        otherwise -> throwError (error $ "constructQueryFunction: unknown function for UnaryCombinator: '" <> unwrap functionName <> "'")
     "model:QueryAst$nAryCombinator" -> do
-      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
-      case functionName of
+      functionName <- onNothing (errorMessage "no function name provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$UnaryCombinator$buitenRolBeschrijving$functionName") )
+      case unwrap functionName of
         "compose" -> applyBinaryCombinator (>->) queryStepType
         "concat" -> applyBinaryCombinator concat queryStepType
-        "and" -> applyBinaryCombinator conj queryStepType
-        "or" -> applyBinaryCombinator disj queryStepType
-        "implies" -> applyBinaryCombinator implies queryStepType
-        "equal" -> applyBinaryCombinator equal queryStepType
-        otherwise -> throwError (error $ "constructQueryFunction: unknown function for nAryCombinator: '" <> functionName <> "'")
+        "and" -> applyBinaryCombinator (typeWithPerspectivesTypes conj) queryStepType
+        "or" -> applyBinaryCombinator (typeWithPerspectivesTypes disj) queryStepType
+        "implies" -> applyBinaryCombinator (typeWithPerspectivesTypes implies) queryStepType
+        -- "equal" -> applyBinaryCombinator (typeWithPerspectivesTypes equal) queryStepType
+        otherwise -> throwError (error $ "constructQueryFunction: unknown function for nAryCombinator: '" <> unwrap functionName <> "'")
     "model:QueryAst$filter" -> do
       criteriumId <- onNothing (errorMessage "no criterium" queryStepType)
-        (typeDescriptionID %%> getBindingOfRol "model:QueryAST$filter$criterium")
+        (typeDescriptionID ##> getBindingOfRol "model:QueryAST$filter$criterium")
       candidateId <- onNothing (errorMessage "no candidates" queryStepType)
-        (typeDescriptionID %%> getBindingOfRol "model:QueryAST$filter$candidates")
-      filter <$> (constructQueryFunction criteriumId) <*> constructQueryFunction candidateId
+        (typeDescriptionID ##> getBindingOfRol "model:QueryAST$filter$candidates")
+      typeWithPerspectivesTypes filter <$> (constructQueryFunction criteriumId) <*> (constructQueryFunction candidateId)
     "model:QueryAst$Constant" -> do
-      constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (typeDescriptionID %%> (searchExternalProperty "model:QueryAst$Constant$value") )
+      constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty (PropertyDef "model:QueryAst$Constant$value") >=> pure <<< map unwrap ))
     "model:QueryAst$Variable" -> do
       variableName <- onNothing (errorMessage "no variable name found" queryStepType)
-        (typeDescriptionID %%> (getInternalProperty "model:QueryAst$Variable$name"))
-      pure $ ref variableName
+        (typeDescriptionID ##> (OGC.getInternalProperty $ PropertyDef "model:QueryAst$Variable$name"))
+      pure $ ref $ unwrap variableName
     "model:QueryAst$setVariable" -> do
       variableName <- onNothing (errorMessage "no variable name found" queryStepType)
-        (typeDescriptionID %%> (getInternalProperty "model:QueryAst$Variable$name"))
+        (typeDescriptionID ##> (OGC.getInternalProperty $ PropertyDef "model:QueryAst$Variable$name"))
       valueDescriptionID <- onNothing (errorMessage "no value found" queryStepType)
-        (typeDescriptionID %%> getBindingOfRol "model:QueryAST$setVariable$value" /-/ rolBindingDef)
+        (typeDescriptionID ##> getBindingOfRol "model:QueryAST$setVariable$value" /-/ genericBinding /-/ genericContext)
       valueQuery <- constructQueryFunction valueDescriptionID
-      pure $ var variableName valueQuery
+      pure $ var (unwrap variableName) valueQuery
 
     _ -> throwError (error $ "constructQueryFunction: unknown type description: '" <> typeDescriptionID <> "'")
 
   where
-    getBindingOfRol :: RolDef -> (ContextDef ~~> ContextRol) e
-    getBindingOfRol rolName = searchContextRol rolName /-/ rolBindingDef
+    getBindingOfRol :: String -> (AnyContext ~~> AnyContext) e
+    getBindingOfRol rolName = OGC.searchContextRol (RolDef rolName) /-/ rolBindingDef
 
-    applyUnaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e )
-      -> ID
-      -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+    applyUnaryCombinator :: forall t.
+      ((String **> String) e -> (String **> String) e) ->
+      ID ->
+      MP e ((String **> String) e)
     applyUnaryCombinator c queryStepType = do
-      query <- onNothing (errorMessage "no query provided" queryStepType) (typeDescriptionID %%> getBindingOfRol "model:QueryAst$UnaryCombinator$query")
+      query <- onNothing (errorMessage "no query provided" queryStepType) (typeDescriptionID ##> getBindingOfRol "model:QueryAst$UnaryCombinator$query")
       constructQueryFunction query >>= pure <<< c
 
-    applyBinaryCombinator :: (TypedTripleGetter e -> TypedTripleGetter e -> TypedTripleGetter e)
-      -> ID
-      -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+    applyBinaryCombinator :: forall t1 t2.
+      ((String **> String) e -> (String **> String) e -> (String **> String) e) ->
+      ID ->
+      MP e ((String **> String) e)
     applyBinaryCombinator c queryStepType = do
-      (operandIds :: Array ID) <- (searchContextRol "model:QueryAST$nAryCombinator$operand" /-/ rolBindingDef)  typeDescriptionID
+      (operandIds :: Array AnyContext) <- (OGC.searchContextRol (RolDef "model:QueryAST$nAryCombinator$operand") /-/ rolBindingDef) typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
       {init, last} <- onNothing' (errorMessage "too few operands" queryStepType) (unsnoc operands)
       pure $ foldl c last init

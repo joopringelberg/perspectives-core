@@ -22,6 +22,7 @@ import Perspectives.TripleGetterComposition ((>->), composeMonoidal)
 import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, constructTripleGetterFromObjectsGetter, trackedAs)
 import Prelude (class Eq, bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==), (>>>))
 import Type.Data.Boolean (kind Boolean)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | Return the last element in the chain
 -- | `psp:SingularFunction -> psp:SingularFunction`
@@ -293,9 +294,9 @@ useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
       setMemorizeQueryResults remember
       pure result
 
-constant :: forall s e. Newtype s String => s -> TypedTripleGetter s s e
+constant :: forall s e. s -> TypedTripleGetter s s e
 constant subject = constructTripleGetterFromObjectsGetter
-  ("model:Perspectives$constant$_" <> unwrap subject)
+  ("model:Perspectives$constant$_" <> unsafeCoerce subject)
   (\_ -> pure [subject])
 
 -----------------------------------------------------------

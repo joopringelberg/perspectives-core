@@ -9,19 +9,18 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), MPQ, (@@))
+import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), MPQ, (@@))
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, context) as DTG
 import Perspectives.DataTypeTripleGetters (binnenRol)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
-import Perspectives.Identifiers (hasLocalName)
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getGebondenAls) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Perspectives.TripleGetterComposition (before, composeMonoidal, followedBy, (>->))
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
-import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), show, flip, (<<<))
+import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), show, flip)
 
 -----------------------------------------------------------
 -- COMBINATORS
@@ -280,7 +279,7 @@ searchPropertyOnContext :: forall r e. RolClass r => (AnyContext **> r) e -> Pro
 searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
     f :: (BuitenRol **> Value) e
-    f = (DTG.context >-> rolgetter >-> ((searchProperty p)))
+    f = (DTG.context >-> rolgetter >-> searchProperty p)
 
 -- | Searches the property with the local name first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
@@ -288,7 +287,7 @@ searchUnqualifiedPropertyOnContext :: forall r e. RolClass r => (AnyContext **> 
 searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
     f :: (BuitenRol **> Value) e
-    f = (DTG.context >-> rolgetter >-> ((searchUnqualifiedProperty p)))
+    f = (DTG.context >-> rolgetter >-> searchUnqualifiedProperty p)
 
 -- | Look for the property PropertyDef on the buitenRol of the ContextType c and on its telescope, shadowing any values
 -- | on the prototypes.
@@ -305,8 +304,8 @@ getInternalProperty :: forall e. PropertyDef -> (AnyContext **> Value) e
 getInternalProperty pn = binnenRol >-> getProperty pn `trackedAs` (unwrap pn)
 
 -- | Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope.
-searchInternalProperty :: forall e. Id.LocalName -> (AnyContext **> Value) e
-searchInternalProperty ln = binnenRol >-> searchUnqualifiedProperty ln
+searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext **> Value) e
+searchInternalUnqualifiedProperty ln = binnenRol >-> searchUnqualifiedProperty ln
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
 -- | it as their binding).

@@ -39,6 +39,7 @@ instance eqContextDef :: Eq ContextDef where
 
 type ZaakDef = ContextDef
 type ActieDef = ContextDef
+type FunctionDef = ContextDef
 -----------------------------------------------------------
 -- ROL AS A TYPE
 -----------------------------------------------------------
@@ -118,6 +119,7 @@ newtype Context = Context String
 derive instance genericRepContext :: Generic Context _
 derive instance newtypeContext :: Newtype Context _
 
+type FunctionInstance = Context
 -----------------------------------------------------------
 -- A CONVENIENT TYPE ALIAS FOR ANY CONTEXT
 -----------------------------------------------------------
