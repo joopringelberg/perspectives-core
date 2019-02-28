@@ -10,10 +10,12 @@ import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, c
 import Perspectives.DataTypeTripleGetters (rolBindingDef)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef) as MBOG
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
-import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef, RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
-import Perspectives.TripleGetterComposition (followedBy, before, (>->))
+import Perspectives.StringTripleGetterConstructors (searchInAspectsAndPrototypes)
+import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->), (>->>))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some, getContextRol)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
@@ -123,6 +125,54 @@ mogelijkeBinding = unwrap `before` searchRolInContext (RolDef "model:Perspective
 ownRollenDef :: forall e. (AnyContext **> RolDef) e
 ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context `followedBy` RolDef
 
+rollenDef :: forall e. (AnyContext **> RolDef) e
+rollenDef = searchInAspectsAndPrototypes (getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context)  `followedBy` RolDef
+
+-- | All properties defined in the namespace of the Rol.
+ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e
+ownPropertiesDef = unwrap `before` (getContextRol $ RolDef "model:Perspectives$Rol$rolProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
+
+-- | All defined for the Rol, in the same namespace, on aspects, or on the MogelijkeBinding.
+propertiesDef :: forall e. (RolDef **> PropertyDef) e
+propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding where
+
+  defsInAspectsAndPrototypes :: (RolDef **> PropertyDef) e
+  defsInAspectsAndPrototypes = (unwrap `before`
+    (searchInAspectsAndPrototypes (RolDef `before` ownPropertiesDef `followedBy` unwrap))
+    `followedBy` PropertyDef)
+
+  defsInMogelijkeBinding :: (RolDef **> PropertyDef) e
+  defsInMogelijkeBinding = composeLazy
+    (mogelijkeBinding `followedBy` RolDef)
+    (\_ -> propertiesDef)
+    "propertiesDef"
+
+buitenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
+buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"
+
+binnenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
+binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"
+
+-- propertiesDefM = QC.concat
+--   ownPropertiesDefM
+--   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownPropertiesDefM)))
+--     ((aspectRollenDefM >->> (\_ -> propertiesDefM)) "propertyDef"))
+--
+--
+-- -- | All properties defined on the BinnenRol of a Context type (own and derived from Aspects).
+-- -- | `psp:Context -> psp:Property`
+-- internePropertiesDefM :: forall e. TypedTripleGetter e
+-- internePropertiesDefM = QC.concat
+--   ownInternePropertiesDefM
+--   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownInternePropertiesDefM)))
+--     ((aspectenDefM >->> (\_ -> internePropertiesDefM)) "internePropertiesDefM"))
+--
+-- -- | All properties defined on the BinnenRol of a Context type.
+-- -- | `psp:Context -> psp:Property`
+-- ownInternePropertiesDefM :: forall e. TypedTripleGetter e
+-- ownInternePropertiesDefM = binnenRolBeschrijvingM >-> DTG.binding >-> DTG.context >-> propertiesDefM
+
+
 {-
 -- | All Rollen defined for a Context type, including Aspects.
 -- | `psp:Context -> psp:Rol`
@@ -132,32 +182,6 @@ rollenDefM = QC.concat
   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownRollenDefM >-> aspectRollenDefM)))
     ((aspectenDefM >->> (\_ -> rollenDefM)) "rolDef"))
 
--- | All properties defined in namespace of the Rol.
--- | `psp:Rol -> psp:Property`
-ownPropertiesDefM :: forall e. TypedTripleGetter e
-ownPropertiesDefM = constructRolGetter "model:Perspectives$Rol$rolProperty" >-> DTG.binding >-> DTG.context
-
--- | All properties stored with the rol instance (own and derived from Aspects).
--- | `psp:Rol -> psp:Property`
-propertiesDefM :: forall e. TypedTripleGetter e
-propertiesDefM = QC.concat
-  ownPropertiesDefM
-  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownPropertiesDefM)))
-    ((aspectRollenDefM >->> (\_ -> propertiesDefM)) "propertyDef"))
-
-
--- | All properties defined on the BinnenRol of a Context type.
--- | `psp:Context -> psp:Property`
-ownInternePropertiesDefM :: forall e. TypedTripleGetter e
-ownInternePropertiesDefM = binnenRolBeschrijvingM >-> DTG.binding >-> DTG.context >-> propertiesDefM
-
--- | All properties defined on the BinnenRol of a Context type (own and derived from Aspects).
--- | `psp:Context -> psp:Property`
-internePropertiesDefM :: forall e. TypedTripleGetter e
-internePropertiesDefM = QC.concat
-  ownInternePropertiesDefM
-  (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownInternePropertiesDefM)))
-    ((aspectenDefM >->> (\_ -> internePropertiesDefM)) "internePropertiesDefM"))
 
 -- | All properties defined on the BuitenRol of a Context type.
 -- | `psp:Context -> psp:Property`

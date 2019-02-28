@@ -1,9 +1,7 @@
-module Perspectives.TypeDefChecker (checkContext, checkModel, getPropertyFunction, checkDomeinFile)
+module Perspectives.TypeDefChecker (checkContext, checkModel, checkDomeinFile)
 
 where
 
-import Control.Monad.Eff.Exception (error)
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Data.Argonaut.Core (fromString)
 import Data.Argonaut.Decode (decodeJson)
@@ -11,158 +9,164 @@ import Data.Array (elemIndex, head, length)
 import Data.DateTime.ISO (ISO)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Newtype (unwrap)
 import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse)
-import Perspectives.TypeChecker (contextHasType)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesQuery, Triple(..), TypeID, TypedTripleGetter, UserMessage(..), mtripleObject, runMonadPerspectivesQueryCompiler, tripleObject, tripleObjects, (%%>>), (@@), (@@=), (@@>))
-import Perspectives.DataTypeObjectGetters (internePropertyTypen, propertyTypen, rolType)
-import Perspectives.DataTypeTripleGetters (binding, context, contextType, typeVanIedereRolInContext) as DTG
+import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), tripleObject, (%%>>), (@@), (@@=), (@@>), (##>))
+import Perspectives.DataTypeObjectGetters (rolType, propertyTypen)
+import Perspectives.DataTypeTripleGetters (propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen) as DTG
+import Perspectives.DataTypeTripleGetters (rolBindingDef)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName, PropertyName)
+import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (binnenRol, buitenRol)
-import Perspectives.ModelBasedTripleGetters (aspectenDefM, aspectRollenDefM, aspectenDefMClosure, externePropertiesDefM, internePropertiesDefM, ownExternePropertiesDefM, ownInternePropertiesDefM, rollenDefM, contextDefM, propertyIsFunctioneelM, bindingDefM, rolIsVerplichtM, rangeDefM, propertyIsVerplichtM, propertiesDefM)
-import Perspectives.ObjectGetterConstructors (getRolUsingAspects)
-import Perspectives.QueryAST (ElementaryQueryStep(..))
+import Perspectives.ModelBasedObjectGetters (contextDef)
+import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, mogelijkeBinding, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef)
+import Perspectives.ObjectGetterConstructors (getContextRol)
+import Perspectives.PerspectivesTypes (class RolClass, BinnenRol(..), BuitenRol(..), Context(..), ContextDef(..), ContextRol, PropertyDef(..), RolDef(..), SimpleValueDef)
 import Perspectives.QueryCombinators (toBoolean)
-import Perspectives.QueryCompiler (constructQueryFunction)
-import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=), (##>))
-import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.QueryCompiler (getPropertyFunction)
+import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=))
+import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closureOfAspect)
+import Perspectives.TripleGetterComposition (followedBy, (>->))
+import Perspectives.TripleGetterConstructors (directAspectRoles, directAspects)
+import Perspectives.TypeChecker (contextHasType)
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, const, discard, ifM, pure, show, unit, void, ($), (<), (<<<), (<>), (>>=), (>=>))
+import Prelude (Unit, bind, const, discard, ifM, pure, unit, void, ($), (<), (<<<), (>=>), (>>>))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery e)
 
 checkDomeinFile :: forall e. DomeinFile -> MonadPerspectivesQuery (AjaxAvarCache e) (Array UserMessage)
-checkDomeinFile (DomeinFile{contexts}) = execWriterT $ for_ (keys contexts) checkContext'
+checkDomeinFile (DomeinFile{contexts}) = execWriterT $ for_ (keys contexts) (Context >>> checkContext')
 
 checkModel :: forall e. ContextID -> MP e (Array UserMessage)
 checkModel modelId = runMonadPerspectivesQuery modelId (lift <<< retrieveDomeinFile >=> checkDomeinFile)
 
--- | `psp:ContextInstance -> psp:ElkType`
 checkContext :: forall e. ContextID -> MP e (Array UserMessage)
-checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContext' x
+checkContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkContext' $ Context x
 
 -- TODO. CONTROLEER RECURSIEF DE AAN ROLLEN GEBONDEN CONTEXTEN.
--- | `psp:ContextInstance -> psp:ElkType`
-checkContext' :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkContext' :: forall e. Context -> TDChecker (AjaxAvarCache e) Unit
 checkContext' cid = do
-  ifNothing (lift (cid @@> DTG.contextType))
-    (tell [MissingType cid])
+  ifNothing (lift (unwrap cid @@> DTG.contextType `followedBy` ContextDef))
+    (tell [MissingType $ unwrap cid])
     -- tp is psp:Context
     \tp -> do
-      checkProperties tp cid
+      checkContextProperties tp cid
       checkDefinedRoles tp cid
       checkAvailableRoles tp cid
       -- if this psp:ContextInstance represents a psp:Rol, and if it has an instance
       -- of $aspectRol, check whether its namespace giving context has that Aspect.
       -- TODO: move to checkDefinedRoles. Each instance of psp:Rol (that is, each RolDef) is always defined in context.
-      b <- (lift $ lift $ (cid `contextHasType` "model:Perspectives$Rol"))
+      b <- (lift $ lift $ (unwrap cid `contextHasType` ContextDef "model:Perspectives$Rol"))
       if b
-        then (checkAspectOfRolType cid)
+        then (checkAspectOfRolType $ RolDef $ unwrap cid)
         else (pure unit)
       checkCyclicAspects cid
 
--- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
-checkProperties :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkProperties typeId cid = do
-  void $ (typeId ~> ownInternePropertiesDefM) >>= (traverse (checkInternalProperty cid))
-  -- TODO: PROBEER de binnenrol op dezelfde manier te checken als de buitenrol.
+-- | Check the properties given on the instance of the Context to those defined on its type (the internal and external properties).
+-- | That is:
+-- |  * find all defined external properties and find all all properties on the instance
+-- |  * make sure all given properties have a definition
+-- | Do the same for the internal properties.
+checkContextProperties :: forall e. ContextDef -> Context -> TDChecker (AjaxAvarCache e) Unit
+checkContextProperties contextdef contextInstance = do
+  definedInternalProperties <- lift (unwrap contextdef @@= binnenRolBeschrijvingDef >-> propertiesDef)
+  void $ traverse (checkRangeAndAvailability contextInstance (BinnenRol $ binnenRol $ unwrap contextInstance)) definedInternalProperties
 
-  void $ (typeId ~> ownExternePropertiesDefM) >>= (traverse (comparePropertyInstanceToDefinition cid (buitenRol cid)))
+  definedExternalProperties <- lift (unwrap contextdef @@= buitenRolBeschrijvingDef >-> propertiesDef)
+  void $ traverse (checkRangeAndAvailability contextInstance (BuitenRol $ buitenRol $ unwrap contextInstance)) definedExternalProperties
 
-  definedExternalProperties <- lift $ lift (typeId ##= externePropertiesDefM)
-  availableExternalProperties <- lift $ lift $ propertyTypen (buitenRol cid)
-  checkAvailableProperties (buitenRol cid) typeId availableExternalProperties definedExternalProperties cid
+  availableExternalProperties <- lift (buitenRol $ unwrap contextInstance @@= DTG.propertyTypen)
+  checkAvailableProperties (BuitenRol $ buitenRol $ unwrap contextInstance) availableExternalProperties definedExternalProperties contextInstance
 
-  definedInternalProperties <- lift $ lift (typeId ##= internePropertiesDefM)
-  availableInternalProperties <- lift $ lift $ internePropertyTypen cid
-  checkAvailableProperties (binnenRol cid) typeId availableInternalProperties definedInternalProperties cid
+  availableInternalProperties <- lift (unwrap contextInstance @@= DTG.internePropertyTypen)
+  checkAvailableProperties (BinnenRol $ binnenRol $ unwrap contextInstance) availableInternalProperties definedInternalProperties contextInstance
 
-get :: forall e. TypeID -> TypedTripleGetter e -> TDChecker (AjaxAvarCache e) (Array ID)
-get typeId tg = lift $ (typeId @@ tg) >>= pure <<< tripleObjects
+-- | Does the rol type hold a definition for all properties given to the rol instance?
+-- | `psp:BinnenRolInstance -> psp:Context -> Array psp:Property -> Array psp:Property -> psp:ElkType`
+checkAvailableProperties :: forall r e. RolClass r =>
+  r ->
+  Array PropertyName ->
+  Array PropertyDef ->
+  Context ->
+  TDChecker (AjaxAvarCache e) Unit
+checkAvailableProperties rolInstance availableProperties definedProperties cid = do
+  ifNothing (lift $ lift (rolInstance ##> rolType))
+    (tell [MissingType $ unwrap rolInstance])
+    \roltype -> do
+      for_ availableProperties (isDefined roltype)
 
-infix 0 get as ~>
+    where
+
+      -- | Check if the PropertyDef is a member of the defined properties.
+      isDefined :: RolDef -> PropertyName -> TDChecker (AjaxAvarCache e) Unit
+      isDefined roltype propertyName =
+        case elemIndex (PropertyDef propertyName) definedProperties of
+          Nothing -> tell [PropertyNotDefined (unwrap cid) propertyName (unwrap rolInstance) (unwrap roltype)]
+          otherwise -> pure unit
 
 -- | For each Rol that is defined for this type of Context, is the instance of that Rol
 -- | in accordance to its definition?
--- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
-checkDefinedRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkDefinedRoles :: forall e. ContextDef -> Context -> TDChecker (AjaxAvarCache e) Unit
 checkDefinedRoles typeId cid = do
-  definedRollen <- lift $ lift (typeId ##= rollenDefM)
+  definedRollen <- lift $ lift (unwrap typeId ##= rollenDef)
   void $ traverse (compareRolInstancesToDefinition cid) definedRollen
   -- TODO: add the check checkAspectOfRolType
 
 -- | For each RolInstance in the ContextInstance, is there a Rol defined with the Context?
 -- | `psp:Context -> psp:ContextInstance -> psp:ElkType`
-checkAvailableRoles :: forall e. TypeID -> ContextID -> TDChecker (AjaxAvarCache e) Unit
+checkAvailableRoles :: forall e. ContextDef -> Context -> TDChecker (AjaxAvarCache e) Unit
 checkAvailableRoles typeId cid = do
-  availableRoles <- lift (cid @@= DTG.typeVanIedereRolInContext)
-  for_ availableRoles isDefined
+  availableRoles <- lift (unwrap cid @@= DTG.typeVanIedereRolInContext)
+  for_ availableRoles (isDefined <<< RolDef)
   where
-    -- `psp:Context -> psp:Rol -> Unit`
-    isDefined :: RolName -> TDChecker (AjaxAvarCache e) Unit
+
+    definedRollen :: TDChecker (AjaxAvarCache e) (Array RolDef)
+    definedRollen = lift $ lift (unwrap typeId ##= rollenDef)
+
+    isDefined :: RolDef -> TDChecker (AjaxAvarCache e) Unit
     isDefined rolType = do
-      definedRollen <- lift $ lift $ (typeId ##= rollenDefM)
-      case elemIndex rolType definedRollen of
-        Nothing -> tell [RolNotDefined rolType cid typeId]
+      rollen <- definedRollen
+      case elemIndex rolType rollen of
+        Nothing -> tell [RolNotDefined (unwrap rolType) (unwrap cid) (unwrap typeId)]
         otherwise -> pure unit
 
--- | Does the type hold a definition for all properties given to the RolInstantie?
--- | `psp:BinnenRolInstance -> psp:Context -> Array psp:Property -> Array psp:Property -> psp:ElkType`
-checkAvailableProperties :: forall e. RolID -> TypeID -> Array PropertyName -> Array PropertyName -> ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkAvailableProperties rolId contextId availableProperties definedProperties cid = do
-  for_ availableProperties isDefined
-  where
-    isDefined :: PropertyName -> TDChecker (AjaxAvarCache e) Unit
-    isDefined propertyName =
-      case elemIndex propertyName definedProperties of
-        Nothing -> tell [PropertyNotDefined cid propertyName rolId contextId]
-        otherwise -> pure unit
-
--- To check:
---  * if the property is mandatory, is it present?
---  * guess the type of the property value of the given name. Does it have the range as Aspect?
---  * if the property is functional, not more than one value may be present.
--- `psp:ContextInstance -> psp:Property -> psp:ElkType`
-checkInternalProperty :: forall e. ContextID -> TypeID -> TDChecker e Unit
--- TODO: schrijf deze functie!
-checkInternalProperty cid propertyType = pure unit
-
--- | If the Property is mandatory and missing, adds a message.
 -- | Checks the value of the Property with the range that has been defined.
+-- | If the Property is mandatory and missing, adds a message.
 -- | If the Property is functional and more than one value has been given, adds a message.
--- | `psp:ContextInstance -> psp:RolInstance -> psp:Property -> psp:ElkType`
-comparePropertyInstanceToDefinition :: forall e. ContextID -> RolID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
-comparePropertyInstanceToDefinition cid rid propertyType = do
-  rolType <- lift $ lift (rid %%>> rolType)
-  (propertyGetter :: TypedTripleGetter e) <- lift $ lift $ getPropertyFunction propertyType rolType
-  (Triple {object}) <- lift (rid @@ propertyGetter)
+-- | If the string-valued value of the property cannot be parsed into its declared type,
+-- | adds a message.
+checkRangeAndAvailability :: forall r e. RolClass r => Context -> r -> PropertyDef -> TDChecker (AjaxAvarCache e) Unit
+checkRangeAndAvailability cid rid propertyType = do
+  (rolType :: RolDef) <- lift $ lift (rid %%>> rolType)
+  (propertyGetter :: StringTypedTripleGetter e) <- lift $ lift $ getPropertyFunction (unwrap propertyType)
+  -- Read the property on the rol instance.
+  (Triple {object}) <- lift (unwrap rid @@ propertyGetter)
   pure unit
   case head object of
     Nothing -> ifM (lift $ propertyIsMandatory propertyType)
-      (tell [MissingPropertyValue cid propertyType rid])
+      (tell [MissingPropertyValue (unwrap cid) (unwrap propertyType) (unwrap rid)])
       (pure unit)
     (Just propertyValue) -> do
-      mrange <- lift (propertyType @@> rangeDefM)
+      mrange <- lift (propertyType @@> rangeDef)
       case mrange of
         Nothing -> pure unit -- There should be a range, however, we protect this function from failing on it.
-        (Just sv) -> ifM (tryParseSimpleValue sv propertyValue)
+        (Just (sv :: SimpleValueDef)) -> ifM (tryParseSimpleValue sv propertyValue)
           (pure unit)
-          (tell [IncorrectPropertyValue cid propertyType sv propertyValue])
+          (tell [IncorrectPropertyValue (unwrap cid) (unwrap propertyType) (unwrap sv) propertyValue])
       if length object < 2
         then pure unit
         else ifM (lift $ propertyIsFunctional propertyType)
-          (tell [TooManyPropertyValues cid propertyType])
+          (tell [TooManyPropertyValues (unwrap cid) (unwrap propertyType)])
           (pure unit)
 
   where
 
-    tryParseSimpleValue :: TypeID -> String -> TDChecker (AjaxAvarCache e) Boolean
-    tryParseSimpleValue sv propertyValue = case sv of
+    tryParseSimpleValue :: SimpleValueDef -> String -> TDChecker (AjaxAvarCache e) Boolean
+    tryParseSimpleValue sv propertyValue = case unwrap sv of
       "model:Perspectives$Number" -> pure $ maybe false (const true) (Nmb.fromString propertyValue)
       "model:Perspectives$Boolean" -> case propertyValue of
         "true" -> pure true
@@ -174,95 +178,79 @@ comparePropertyInstanceToDefinition cid rid propertyType = do
           (Right iso :: Either String ISO) -> pure true
       otherwise -> pure true
 
--- Returns a getter, lookup function or compiled query.
--- `Property -> Rol -> (RolInstance -> PropertyValue)`
-getPropertyFunction :: forall e. PropertyName -> RolName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
-getPropertyFunction pn rn = do
-  r <- runMonadPerspectivesQueryCompiler rn (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
-  case r of
-    (Left m) -> throwError $ error $ show m
-    (Right descriptionId) -> constructQueryFunction descriptionId
-
--- | For this Rol (definition), looks for an instance of it in the ContextInstance.
+-- | For this Rol (definition), looks for its instances in the ContextInstance.
 -- | Compares that RolInstance to its definition:
 -- |  1. Checks each defined property with the instance of the rol.
 -- |  2. Checks the type of the binding, if given.
--- | Finally, ff the Rol is mandatory and missing, adds a message.
--- | `psp:ContextInstance -> psp:Rol -> psp:ElkType`
-compareRolInstancesToDefinition :: forall e. ContextID -> TypeID -> TDChecker (AjaxAvarCache e) Unit
-compareRolInstancesToDefinition cid rolType' = do
-  rolInstances <- lift $ lift $ getRolUsingAspects rolType' cid -- TODO: rolType' is een gekwalificeerde naam. Je kunt hier volstaan met getRol.
-  -- (Triple {object:rolInstances}) <- lift (cid @@ rolGetter) -- TODO: kijk ook bij de aspectRollenDefMClosure!
+-- | Finally, if the Rol is mandatory and missing, adds a message.
+compareRolInstancesToDefinition :: forall e. Context -> RolDef -> TDChecker (AjaxAvarCache e) Unit
+compareRolInstancesToDefinition contextInstance rolType = do
+  (rolInstances :: Array ContextRol) <- lift $ lift $ getContextRol rolType (unwrap contextInstance)
   case head rolInstances of
-    Nothing -> ifM (lift (rolIsMandatory rolType'))
-      (tell [MissingRolInstance rolType' cid])
+    Nothing -> ifM (lift (rolIsMandatory rolType))
+      (tell [MissingRolInstance (unwrap rolType) (unwrap contextInstance)])
       (pure unit)
     otherwise -> void $ traverse compareRolInstanceToDefinition rolInstances
+
   where
-    -- `psp:RolInstance -> Unit`
-    compareRolInstanceToDefinition :: RolID -> TDChecker (AjaxAvarCache e) Unit
-    compareRolInstanceToDefinition rolId = do
+
+    compareRolInstanceToDefinition :: ContextRol -> TDChecker (AjaxAvarCache e) Unit
+    compareRolInstanceToDefinition rolInstance = do
       -- Check the properties.
-      propertyDef' <- lift $ (rolType' @@= propertiesDefM)
-      void $ (traverse (comparePropertyInstanceToDefinition cid rolId)) propertyDef'
+      (definedRolProperties :: Array PropertyDef) <- lift $ (rolType @@= propertiesDef)
+
+      void $ (traverse (checkRangeAndAvailability contextInstance rolInstance)) definedRolProperties
 
       -- Detect used but undefined properties.
-      definedRolProperties <- lift $ lift $ (rolType' ##= propertiesDefM)
-      availableProperties <- lift $ lift $ propertyTypen rolId
-      checkAvailableProperties rolId rolType' availableProperties definedRolProperties cid
+      (availableProperties :: Array String) <- lift $ lift $ propertyTypen $ unwrap rolInstance
+      checkAvailableProperties rolInstance availableProperties definedRolProperties contextInstance
 
-      -- check the binding. Does the binding have the type given by bindingDefM, or has its type that Aspect?
-      -- Note that we work on type level. So the theBinding is a Context describing a type of Rol.
-      -- TODO: moeten we hier niet iets met de roltelescoop?
-      -- Notice that the binding may not exist!
-      maybeBinding <- lift (rolId @@ DTG.binding >-> DTG.context)
-      case mtripleObject maybeBinding of
+      -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
+      -- Note that rolInstance is a ContextRol. `rolBindingDef` retrieves the context of the binding.
+      maybeBinding <- lift (rolInstance @@> rolBindingDef)
+      case maybeBinding of
         Nothing -> pure unit
-        (Just theBinding) -> do
-          mmb <- lift (rolType' @@> bindingDefM)
+        (Just (theBinding :: String)) -> do
+          mmb <- lift (rolType @@> mogelijkeBinding)
           case mmb of
             Nothing -> pure unit
-            (Just toegestaneBinding) -> do
-              ifM (lift $ lift $ contextHasType theBinding toegestaneBinding)
+            (Just (toegestaneBinding :: String)) -> do
+              ifM (lift $ lift $ contextHasType theBinding (ContextDef toegestaneBinding))
                 (pure unit)
                 (do
                   typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
-                  (tell [IncorrectBinding cid rolId theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
+                  (tell [IncorrectBinding (unwrap contextInstance) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
 
--- Check the aspectRol, if any. Is it bound to a Rol of an Aspect?
--- | The first parameter is bound to a psp:ContextInstance that represents (describes) a psp:Rol.
--- | This function checks the eventual aspectRol instances given in that description.
--- | If such an aspectRol is not a Rol of one of the Aspecten of the Description of the Context that holds
--- | the psp:Rol description, it returns a warning.
--- | psp:Rol -> psp:Context -> psp:ElkType`
-checkAspectOfRolType :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
-checkAspectOfRolType cid = do
-  ctypeArr <- lift $ lift (cid ##> contextDefM)
-  case ctypeArr of
-    Nothing -> tell [RolWithoutContext cid]
-    (Just ctype) -> do
-      mar <- lift $ lift (cid ##= aspectRollenDefM)
-      case head mar of -- TODO: nu wordt gecontroleerd voor één aspectRol, maar er kunnen er meer zijn.
-        Nothing -> pure unit
-        (Just aspectRol) -> do
-          aspectRollen <- lift $ lift $ (ctype ##= aspectenDefM >-> rollenDefM)
-          if isJust $ elemIndex aspectRol aspectRollen
+-- | Checks the aspectRollen of the RolDefinition.
+-- | If such an aspectRol is not a Rol of one of the Aspecten of Context definition
+-- | that holds the Rol definition, it returns a warning.
+checkAspectOfRolType :: forall e. RolDef -> TDChecker (AjaxAvarCache e) Unit
+checkAspectOfRolType roldef = do
+  ifNothing (lift $ lift (roldef ##> contextDef))
+    (tell [RolWithoutContext $ unwrap roldef])
+    \(contextdef :: ContextDef) -> do
+      rollenVanAspecten <- lift $ lift $ (unwrap contextdef ##= directAspects >-> rollenDef)
+      (aspectrollen :: Array RolDef) <- lift $ lift (roldef ##= directAspectRoles)
+      void $ traverse
+        (\(aspectRol :: RolDef) -> do
+          if isJust $ elemIndex aspectRol rollenVanAspecten
             then pure unit
-            else tell [AspectRolNotFromAspect cid aspectRol ctype]
+            else tell [AspectRolNotFromAspect (unwrap roldef) (unwrap aspectRol) (unwrap contextdef)])
+        aspectrollen
 
--- | `psp:ContextInstance -> psp:ElkType`
-checkCyclicAspects :: forall e. ContextID -> TDChecker (AjaxAvarCache e) Unit
+-- | Returns a warning if the Aspecten of the Context definition include the definition itself.
+checkCyclicAspects :: forall e. Context -> TDChecker (AjaxAvarCache e) Unit
 checkCyclicAspects cid = do
-  aspects <- lift $ lift (cid ##= aspectenDefMClosure)
-  case elemIndex cid aspects of
+  aspects <- lift $ lift (unwrap cid ##= closureOfAspect)
+  case elemIndex (unwrap cid) aspects of
     Nothing -> pure unit
-    otherwise -> tell [CycleInAspects cid aspects]
+    otherwise -> tell [CycleInAspects (unwrap cid) aspects]
 
-rolIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
-rolIsMandatory = toBoolean rolIsVerplichtM
+rolIsMandatory :: forall e. RolDef -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
+rolIsMandatory = toBoolean rolIsVerplicht
 
-propertyIsMandatory :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
-propertyIsMandatory = toBoolean propertyIsVerplichtM
+propertyIsMandatory :: forall e. PropertyDef -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
+propertyIsMandatory = toBoolean propertyIsVerplicht
 
-propertyIsFunctional :: forall e. RolID -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
-propertyIsFunctional = toBoolean propertyIsFunctioneelM
+propertyIsFunctional :: forall e. PropertyDef -> MonadPerspectivesQuery (AjaxAvarCache e) Boolean
+propertyIsFunctional = toBoolean propertyIsFunctioneel

@@ -61,6 +61,10 @@ buitenRolBeschrijvingDef = wrap >>> searchUnqualifiedRolDefinition "buitenRolBes
 binnenRolBeschrijving :: forall e. (AnyContext ~~> ContextRol) e
 binnenRolBeschrijving = getContextRol $ RolDef "model:Perspectives$Context$binnenRolBeschrijving"
 
+-- | From a context that is a definition, get the definition of its BuitenRol.
+binnenRolBeschrijvingDef :: forall e. (AnyDefinition ~~> RolDef) e
+binnenRolBeschrijvingDef = wrap >>> searchUnqualifiedRolDefinition "binnenRolBeschrijving"
+
 -- | `psp:Rol -> psp:Context`
 contextDef :: forall e. (RolDef ~~> ContextDef) e
 contextDef rid =

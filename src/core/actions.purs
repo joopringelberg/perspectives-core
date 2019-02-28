@@ -24,7 +24,7 @@ import Perspectives.ModelBasedTripleGetters (contextBotDefM, botSubjectRollenDef
 import Perspectives.ObjectGetterConstructors (searchExternalProperty, getRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.QueryCompiler (propertyQuery, rolQuery)
+import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##>), (##), (##=))
@@ -315,7 +315,7 @@ constructActionFunction actionInstanceID = do
         (errorMessage "no value provided to assign" actionType)
         (actionInstanceID %%> getBindingOfRol "model:ActionAst$assignToRol$value")
       -- The function that will compute the value from the context.
-      valueComputer <- rolQuery value
+      valueComputer <- getRolFunction value
 
       action <- pure (\f contextId bool -> case bool of
         "true" -> do
@@ -343,7 +343,7 @@ constructActionFunction actionInstanceID = do
         (errorMessage "no value provided to assign" actionType)
         (actionInstanceID %%> getBindingOfRol "model:ActionAst$assignToRol$value")
       -- The function that will compute the value from the context.
-      valueComputer <- propertyQuery value
+      valueComputer <- getPropertyFunction value
 
       action <- pure (\f rolId bool -> case bool of
         "true" -> do
@@ -395,7 +395,7 @@ compileBotAction actionType contextId = do
     (errorMessage "no effect provided in Action" actionType)
     (actionType %%> getBindingOfRol "model:Perspectives$Actie$effect")
   (actionObjectsGetter :: (ContextID -> Action e)) <- constructActionFunction action
-  (conditionQuery :: TypedTripleGetter e) <- propertyQuery condition
+  (conditionQuery :: TypedTripleGetter e) <- getPropertyFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the TypedTripleGetter and this Action name. That gives an unique name.
   pure $ conditionQuery >-> constructTripleGetterFromObjectsGetter actionType (actionObjectsGetter contextId)

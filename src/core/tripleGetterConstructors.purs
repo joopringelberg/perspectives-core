@@ -315,6 +315,7 @@ getGebondenAls rname = OGC.getGebondenAls rname `trackedAs` (unwrap rname)
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION
 -----------------------------------------------------------
+-- TODO: OOK DE BINDING DRAAGT PROPERTIES BIJ!
 -- When looking for a Property (value) on a Rol, we can use both its local and qualified name. Either way we have to
 -- look in the index of properties in that role.
 -- However, when looking for a Property **definition**, once we have a qualified name, we have the definition itself,

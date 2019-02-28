@@ -14,7 +14,7 @@ import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
 
--- | Run the function in a QueryEnvironment that has Subject as the value of "#start".
+-- | Run the function in a QueryEnvironment that has s as the value of "#start".
 runMonadPerspectivesQuery :: forall s o e.
   s
   -> (s -> MonadPerspectivesQuery (gm :: GLOBALMAP | e) o)

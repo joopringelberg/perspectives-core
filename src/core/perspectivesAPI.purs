@@ -27,7 +27,7 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
-import Perspectives.QueryCompiler (constructQueryFunction)
+import Perspectives.QueryCompiler (constructQueryFunction, getPropertyFunction)
 import Perspectives.QueryEffect (QueryEffect, (~>))
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
@@ -217,10 +217,10 @@ getProperty rid pn setter setterId = do
   qf <- getPropertyFunction rid pn
   subscribeToObjects rid qf setter setterId
 
-getPropertyFunction :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
-getPropertyFunction rid pn = do
-  rolType <- rid ##>> DTG.rolType
-  m <- runMonadPerspectivesQueryCompiler rolType (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
-  case m of
-    (Left message) -> throwError $ error (show message)
-    (Right id) -> constructQueryFunction id
+-- getPropertyFunction :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)
+-- getPropertyFunction rid pn = do
+--   rolType <- rid ##>> DTG.rolType
+--   m <- runMonadPerspectivesQueryCompiler rolType (compileElementaryQueryStep (QualifiedProperty pn) (pn <> "_getter"))
+--   case m of
+--     (Left message) -> throwError $ error (show message)
+--     (Right id) -> constructQueryFunction id
