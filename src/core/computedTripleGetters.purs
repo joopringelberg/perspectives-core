@@ -8,27 +8,30 @@ import Data.Array (head, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Network.HTTP.Affjax (AJAX)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, TypedTripleGetter, MonadPerspectives, (%%>>))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives, (@@>>))
 import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Identifiers (isQualifiedWithDomein)
-import Perspectives.ObjectGetterConstructors (getInternalProperty)
+import Perspectives.PerspectivesTypes (PropertyDef(..))
 import Perspectives.QueryCache (queryCacheInsert)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
-import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructInternalPropertyGetter, constructTripleGetterWithArbitrarySupport)
+import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, getInternalProperty)
+import Perspectives.TripleGetterComposition (followedBy)
+import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructTripleGetterWithArbitrarySupport)
 import Perspectives.TypeDefChecker (checkDomeinFile)
 
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
-modellenM :: forall e. TypedTripleGetter e
+modellenM :: forall e. StringTypedTripleGetter e
 modellenM = constructTripleGetterWithArbitrarySupport
-  "model:Perspectives$Systeem$modellen" getListOfModels (constructExternalPropertySearch "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller")
+  "model:Perspectives$Systeem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller") `followedBy` unwrap)
   where
     getListOfModels :: forall e1. ID -> MonadPerspectivesQuery (ajax :: AJAX | e1) (Array String)
     getListOfModels id = lift $ lift $ catchError (documentNamesInDatabase "perspect_models") \_ -> pure []
@@ -36,14 +39,14 @@ modellenM = constructTripleGetterWithArbitrarySupport
 -- | Given the ID of a context of type model:CrlText$Text, computes an array of strings that are either the identifier
 -- | of the model, or the identifiers of the BuitenRollen of the userdata, or error messages from the attempt to parse
 -- | the file. Notice that the parseresult is stored automatically by the parser.
-parserMessagesM :: forall e. TypedTripleGetter e
+parserMessagesM :: forall e. StringTypedTripleGetter e
 parserMessagesM = constructTripleGetterWithArbitrarySupport
-  "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (constructInternalPropertyGetter "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+  "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
   where
 
     parseSourceText :: ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
     parseSourceText textId = do
-      sourceText <- lift (textId %%>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+      sourceText <- (textId @@>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
       parseResult <- lift $ parseAndCache sourceText
       case parseResult of
         (Right parseRoot) -> case parseRoot of
@@ -51,7 +54,7 @@ parserMessagesM = constructTripleGetterWithArbitrarySupport
           (UserData buitenRollen) -> pure buitenRollen
         (Left e) -> pure [(show e)]
 
-syntacticStateM :: forall e. TypedTripleGetter e
+syntacticStateM :: forall e. StringTypedTripleGetter e
 syntacticStateM = constructTripleGetterWithArbitrarySupport
   "model:CrlText$Text$binnenRolBeschrijving$syntacticState" f parserMessagesM
   where
@@ -62,9 +65,9 @@ syntacticStateM = constructTripleGetterWithArbitrarySupport
         (Just mid) | isQualifiedWithDomein mid -> pure ["true"]
         otherwise -> pure ["false"]
 
-typeCheckerMessagesM :: forall e. TypedTripleGetter e
+typeCheckerMessagesM :: forall e. StringTypedTripleGetter e
 typeCheckerMessagesM = constructTripleGetterWithArbitrarySupport
-  "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" checkModel_ (constructInternalPropertyGetter "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+  "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" checkModel_ (getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
   where
     checkModel_ :: ID -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String)
     checkModel_ textId = do
@@ -81,7 +84,7 @@ typeCheckerMessagesM = constructTripleGetterWithArbitrarySupport
             then pure []
             else pure (map show um)
 
-semanticStateM :: forall e. TypedTripleGetter e
+semanticStateM :: forall e. StringTypedTripleGetter e
 semanticStateM = constructTripleGetterWithArbitrarySupport
   "model:CrlText$Text$binnenRolBeschrijving$semanticState" f parserMessagesM
   where
@@ -92,7 +95,7 @@ semanticStateM = constructTripleGetterWithArbitrarySupport
         then pure ["true"]
         else pure ["false"]
 
-computedTripleGetters :: forall e. Array (Tuple String (TypedTripleGetter e))
+computedTripleGetters :: forall e. Array (Tuple String (StringTypedTripleGetter e))
 computedTripleGetters = [
   Tuple "modellenM" modellenM,
   Tuple "parserMessagesM" parserMessagesM,
