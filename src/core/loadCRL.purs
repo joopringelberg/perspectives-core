@@ -22,6 +22,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.PerspectivesTypes (BuitenRol(..))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.SaveUserData (saveUserData)
 import Perspectives.Syntax (PerspectContext)
@@ -63,6 +64,6 @@ loadCRLFile file = do
 
         (UserData buitenRollen) -> do
           lift $ log  "Attempting to save..."
-          saveUserData buitenRollen
+          saveUserData (map BuitenRol buitenRollen)
           lift $ log $ show buitenRollen
     (Left e) -> lift $ log (show e)
