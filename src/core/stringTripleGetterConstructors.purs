@@ -174,3 +174,7 @@ constructInverseRolGetter :: forall e.
   String ->
   StringTypedTripleGetter e
 constructInverseRolGetter pn = (OGC.genericGetGebondenAls pn) `trackedAs` (pn <> "_inverse")
+
+-- | The PropertyReferences of the View. Again, the typing is imprecise.
+propertyReferenties :: forall e. StringTypedTripleGetter e
+propertyReferenties = typeWithPerspectivesTypes searchUnqualifiedRolDefinition "propertyReferentie"

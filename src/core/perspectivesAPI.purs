@@ -3,7 +3,7 @@ module Perspectives.Api where
 import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, SOCKETIO, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (produce')
-import Control.Monad.Aff (catchError, error, launchAff_, throwError)
+import Control.Monad.Aff (catchError, launchAff_)
 import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
@@ -17,21 +17,20 @@ import Data.Foreign.Class (encode)
 import Perspectives.Actions (addRol, setBinding, setProperty)
 import Perspectives.ApiTypes (ContextSerialization(..), CorrelationIdentifier, Request(..), RolSerialization, Value, response)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), TypedTripleGetter, runMonadPerspectivesQueryCompiler)
-import Perspectives.DataTypeTripleGetters (binding, context, contextType, rolType) as DTG
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..))
+import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
 import Perspectives.Deltas (runTransactie)
-import Perspectives.Effects (AjaxAvarCache, ApiEffects, REACT)
+import Perspectives.Effects (ApiEffects, REACT)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.ModelBasedTripleGetters (propertyReferentiesM)
-import Perspectives.QueryAST (ElementaryQueryStep(..))
-import Perspectives.QueryCompiler (constructQueryFunction, getPropertyFunction)
+import Perspectives.PerspectivesTypes (BuitenRol(..)) as PT
+import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
 import Perspectives.QueryEffect (QueryEffect, (~>))
-import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
-import Perspectives.RunMonadPerspectivesQuery ((##), (##>>))
+import Perspectives.RunMonadPerspectivesQuery ((##))
 import Perspectives.SaveUserData (saveUserData)
+import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Prelude (Unit, bind, map, pure, show, unit, void, ($), (<<<), (<>), discard, (*>))
@@ -143,20 +142,20 @@ dispatchOnRequest req =
   case req of
     (GetRolBinding cid rn setter setterId) -> do
       getRolBinding cid rn setter setterId
-    (GetBinding rid setter setterId) -> subscribeToObjects rid DTG.binding setter setterId
-    (GetBindingType rid setter setterId) -> subscribeToObjects rid (DTG.binding >-> DTG.rolType) setter setterId
+    (GetBinding rid setter setterId) -> subscribeToObjects rid DTG.genericBinding setter setterId
+    (GetBindingType rid setter setterId) -> subscribeToObjects rid (DTG.genericBinding >-> DTG.genericRolType) setter setterId
     (GetRol cid rn setter setterId) -> getRol cid rn setter setterId
-    (GetRolContext rid setter setterId) -> subscribeToObjects rid DTG.context setter setterId
+    (GetRolContext rid setter setterId) -> subscribeToObjects rid DTG.genericContext setter setterId
     (GetContextType rid setter setterId) -> subscribeToObjects rid DTG.contextType setter setterId
-    (GetRolType rid setter setterId) -> subscribeToObjects rid DTG.rolType setter setterId
+    (GetRolType rid setter setterId) -> subscribeToObjects rid DTG.genericRolType setter setterId
     (GetProperty rid pn setter setterId) -> getProperty rid pn setter setterId
-    (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferentiesM >-> DTG.binding >-> DTG.context) setter setterId
+    (GetViewProperties vn setter setterId) -> subscribeToObjects vn (propertyReferenties >-> DTG.genericBinding >-> DTG.genericContext) setter setterId
     (CreateContext (ContextSerialization cd) setter) -> do
       r <- constructContext (ContextSerialization cd {id = "model:User$c" <> (show $ guid unit)})
       case r of
         (Left messages) -> liftEff $ setter (map show messages)
         (Right id) -> do
-          saveUserData [buitenRol id]
+          saveUserData [PT.BuitenRol $ buitenRol id]
           liftEff $ setter ["ok", buitenRol id] -- saveUserData
     (CreateRol cid rn rolSerialisation setter) -> do
       r <- constructAnotherRol rn cid rolSerialisation
@@ -179,7 +178,7 @@ type ReactStateSetter e = Array String -> Eff (ApiEffects e) Unit
 type QueryUnsubscriber e = Eff (gm :: GLOBALMAP | e) Unit
 
 -- | Runs a the query and adds the ReactStateSetter to the result.
-subscribeToObjects :: forall e. Subject -> TypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
+subscribeToObjects :: forall e. Subject -> StringTypedTripleGetter (react :: REACT | e) -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 subscribeToObjects subject query setter setterId = do
   (effectInReact :: QueryEffect (react :: REACT | e)) <- pure $ NamedFunction setterId setter
   void $ (subject ## query ~> effectInReact)
@@ -193,28 +192,28 @@ unsubscribeFromObjects subject predicate setterId = lift $ liftEff $ unRegisterT
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: forall e. ContextID -> RolName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getRolBinding cid rn setter  setterId= do
-  rf <- getRolFunction cid rn
-  subscribeToObjects cid (rf >-> DTG.binding) setter setterId
+  rf <- getRolFunction rn
+  subscribeToObjects cid (rf >-> DTG.genericBinding) setter setterId
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
 getRol :: forall e. ContextID -> RolName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getRol cid rn setter setterId = do
-  qf <- getRolFunction cid rn
+  qf <- getRolFunction rn
   subscribeToObjects cid qf setter setterId
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
-getRolFunction :: forall e. ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e)  (TypedTripleGetter e)
-getRolFunction cid rn = do
-  ctxtType <- cid ##>> DTG.contextType
-  m <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
-  case m of
-    (Left message) -> throwError $ error (show message)
-    (Right id) -> constructQueryFunction id
+-- getRolFunction :: forall e. ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e)  (StringTypedTripleGetter e)
+-- getRolFunction cid rn = do
+--   ctxtType <- cid ##>> DTG.contextType
+--   m <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
+--   case m of
+--     (Left message) -> throwError $ error (show message)
+--     (Right id) -> constructQueryFunction id
 
 -- | Retrieve the property from the rol, subscribe to it.
 getProperty :: forall e. RolID -> PropertyName -> ReactStateSetter e -> CorrelationIdentifier -> MonadPerspectives (ApiEffects e) Unit
 getProperty rid pn setter setterId = do
-  qf <- getPropertyFunction rid pn
+  qf <- getPropertyFunction pn
   subscribeToObjects rid qf setter setterId
 
 -- getPropertyFunction :: forall e. RolID -> PropertyName -> MonadPerspectives (AjaxAvarCache e) (TypedTripleGetter e)

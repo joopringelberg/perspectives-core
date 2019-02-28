@@ -15,8 +15,9 @@ import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI)
-import Perspectives.ObjectGetterConstructors (getRol)
+import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
+import Perspectives.PerspectivesTypes (RolDef(..))
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkContext)
@@ -112,7 +113,7 @@ constructRol rolType id rolId i (RolSerialization {properties, binding: bnd}) = 
 -- | Saves the new Rol instance.
 constructAnotherRol :: forall e. RolName -> ContextID -> RolSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
 constructAnotherRol rolType id rolSerialisation = do
-  rolInstances <- getRol rolType id
+  rolInstances <- getRolInContext (RolDef rolType) id
   candidate <- runExceptT $ constructRol rolType id (id <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (length rolInstances) rolSerialisation
   case candidate of
     (Left messages) -> pure $ Left messages

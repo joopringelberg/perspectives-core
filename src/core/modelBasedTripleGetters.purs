@@ -153,6 +153,16 @@ buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "buitenRolB
 binnenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
 binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"
 
+-- | From the description of a Context, return the description of its contextBot (a SysteemBot).
+contextBotDef :: forall e. (AnyContext **> AnyContext)e
+contextBotDef = getContextRol (RolDef "model:Perspectives$Context$contextBot")  >-> DTG.binding >-> DTG.context
+
+-- | The Acties that the SysteemBot is the subject (Actor) of. Thus, given a SysteemBot, returns its Acties.
+-- | `psp:SysteemBot -> psp:Actie`
+botSubjectRollenDef :: forall e. (AnyContext **> AnyContext) e
+botSubjectRollenDef = getContextRol (RolDef "model:Perspectives$SysteemBot$subjectRol") >-> DTG.binding >-> DTG.context
+
+
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM
 --   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownPropertiesDefM)))
@@ -221,16 +231,6 @@ aspectRollenDefMClosure = QC.closure aspectRollenDefM
 -- | `psp:Context -> psp:Context`
 aspectenDefMClosure :: forall e. TypedTripleGetter e
 aspectenDefMClosure = QC.closure aspectenDefM
-
--- | The Acties that the SysteemBot is the subject (Actor) of. Thus, given a SysteemBot, returns its Acties.
--- | `psp:SysteemBot -> psp:Actie`
-botSubjectRollenDefM :: forall e. TypedTripleGetter e
-botSubjectRollenDefM = constructRolGetter "model:Perspectives$SysteemBot$subjectRol" >-> DTG.binding >-> DTG.context
-
--- | From the description of a Context, return the description of its contextBot (a SysteemBot).
--- | `psp:Context -> psp:SysteemBot`
-contextBotDefM :: forall e. TypedTripleGetter e
-contextBotDefM = constructRolGetter "model:Perspectives$Context$contextBot"  >-> DTG.binding >-> DTG.context
 
 -- | `psp:Rol -> psp:Context`
 contextDefM :: forall e. TypedTripleGetter e
