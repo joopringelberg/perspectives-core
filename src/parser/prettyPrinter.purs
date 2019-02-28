@@ -8,6 +8,7 @@ import Control.Monad.Writer.Trans (runWriterT, tell)
 import Data.Array (elemIndex, replicate, sortBy)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, foldM, values)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
@@ -15,16 +16,17 @@ import Data.Tuple (snd)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.RunMonadPerspectivesQuery ((##=))
+import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
-import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
-import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
-import Perspectives.TripleGetterFromObjectGetter (constructRolGetter)
+import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.TripleGetterConstructors (getContextRol)
 import Prelude (Unit, bind, discard, id, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
 
 type IndentLevel = Int
@@ -137,7 +139,7 @@ contextDeclaration x = identifier (context_pspType x) *> identifier' ("$" <> (co
 fullContextDeclaration :: forall e. PerspectContext -> PerspectText e
 fullContextDeclaration x = identifier (context_pspType x) *> identifier' (context_Namespace x <> "$" <> (context_displayName x))
 
-context :: forall e. Array ID -> PrettyPrinter PerspectContext e
+context :: forall e. Array BuitenRol -> PrettyPrinter PerspectContext e
 context definedResources c = do
   withComments context_comments contextDeclaration c
   publicProperties
@@ -159,7 +161,7 @@ context definedResources c = do
       -- NB: This is the role of the context - not yet its binding!
       let (binding :: ID) = (unsafePartial $ fromJust (rol_binding role))
       let (occurrence :: String) = maybe "" id (roleIndexNr (rol_id role))
-      case elemIndex binding definedResources of
+      case elemIndex (BuitenRol binding) definedResources of
         -- binding is NOT a BuitenRol of a context defined at top level in the Text.
         Nothing -> do
               boundRol@(PerspectRol bindingProperties) <- lift $ lift $ getPerspectEntiteit binding
@@ -195,20 +197,20 @@ enclosingContext theText = do
   withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
   newline
   sectionIds <- lift $ lift ((context_id theText) ##= (ignoreCache DTG.typeVanIedereRolInContext))
-  traverse_ section sectionIds
+  traverse_ (section <<< RolDef) sectionIds
 
   where
-    section :: ID -> PerspectText e
+    section :: RolDef -> PerspectText e
     section sectionId = do
       identifier' "Section"
-      identifier sectionId
+      identifier $ unwrap sectionId
       newline
       newline
-      definedContexts <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.binding)) -- These are all a buitenRol.
-      contextIds <- lift $ lift ((context_id theText) ##= ignoreCache ((constructRolGetter sectionId) >-> DTG.binding >-> DTG.context)) -- For each of these buitenRollen, this is the ID of the context represented by it.
+      (definedContexts :: Array BuitenRol) <- lift $ lift ((context_id theText) ##= ignoreCache ((getContextRol sectionId) >-> DTG.binding))
+      contextIds <- lift $ lift ((context_id theText) ##= ignoreCache ((getContextRol sectionId) >-> DTG.binding >-> DTG.context)) -- For each of these buitenRollen, this is the ID of the context represented by it.
       traverse_ (ppContext definedContexts) contextIds
 
-    ppContext :: Array ID -> ID -> PerspectText e
+    ppContext :: Array BuitenRol -> ID -> PerspectText e
     ppContext definedContexts id = do
       c <- lift $ lift $ getPerspectEntiteit id
       if id `isInNamespace` (context_id theText) || id `isInNamespace` "model:User"

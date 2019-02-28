@@ -14,6 +14,7 @@ import Data.Either (Either(..))
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, values)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Traversable (for)
@@ -28,6 +29,7 @@ import Perspectives.IndentParser (IP, addContext, addRol, getNamespace, getPrefi
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheCachedEntiteit, cacheEntiteitPreservingVersion)
+import Perspectives.PerspectivesTypes (RolDef)
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
@@ -668,10 +670,10 @@ parseAndCache text = do
     setBuitenRolType :: PerspectRol -> MonadPerspectives (AjaxAvarCache e) Unit
     setBuitenRolType buitenRol = do
       br <- (rol_context buitenRol) %%>> DTOG.buitenRol
-      if (rol_id buitenRol) == br
+      if (rol_id buitenRol) == unwrap br
         then do
-        buitenRolType <- rol_context buitenRol %%>> DTOG.contextType /-/ buitenRolBeschrijvingDef
-        void $ cacheCachedEntiteit (rol_id buitenRol) (changeRol_type buitenRolType buitenRol)
+        (buitenRolType :: RolDef) <- rol_context buitenRol %%>> DTOG.contextType /-/ buitenRolBeschrijvingDef
+        void $ cacheCachedEntiteit (rol_id buitenRol) (changeRol_type (unwrap buitenRolType) buitenRol)
         else pure unit
 
     -- Ensure we have an AVar for the RolInstance that is represented by vuller.
