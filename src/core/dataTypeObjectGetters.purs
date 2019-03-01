@@ -77,6 +77,3 @@ context = pure <<< unwrap >=> getRolMember \rol -> [rol_context rol]
 
 genericContext :: forall e. ObjectsGetter e
 genericContext = getRolMember \rol -> [rol_context rol]
-
--- binding' :: forall e. ObjectGetter e
--- binding' = unsafePartial $ toSingle binding
