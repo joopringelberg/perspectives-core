@@ -21,6 +21,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ApiTypes (ContextSerialization(..))
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
@@ -311,6 +312,7 @@ data UserMessage =
   | RolWithoutContext RolName
   | ContextExists ID
   | NotAValidIdentifier String
+  | NotWellFormedContextSerialization String
 
 type FD = Either UserMessage ID
 
@@ -338,6 +340,7 @@ instance showUserMessage :: Show UserMessage where
   -- show _ = "This is a usermessage"
   show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."
   show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."
+  show (NotWellFormedContextSerialization m) = "(NotWellFormedContextSerialization) De string '" <> m <> "' is geen geldige ContextSerialization."
 
 -----------------------------------------------------------
 -- TRANSACTIE

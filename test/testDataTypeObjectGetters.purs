@@ -7,11 +7,20 @@ import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextRol(..), RolDef(..), RolInContext(..), binding)
-import Test.Perspectives.Utils (TestEffects, p, assertEqual, u)
+import Test.Perspectives.Utils (TestEffects, addTestContext, assertEqual, p, u)
 import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
 
+t1 :: String
+t1 = """{ "id": "u:myContext"
+  , "ctype": "psp:Context"
+  , "rollen": { "psp:rolInContext":  [ { "properties": {}, "binding": "psp:Context_buitenRol" }]}
+  , "interneProperties": {}
+  , "externeProperties": {}
+  }"""
+
 theSuite :: forall e. Free (TestF (TestEffects e)) Unit
-theSuite = suiteSkip "DataTypeObjectGetters" do
+theSuite = suite "DataTypeObjectGetters" do
+  test "Setting up" (addTestContext t1)
   test "contextType" do
     assertEqual "The View 'Systeem$gebruiker$volledigeNaam' should have contextDef psp:View as contextType."
       (contextType (p "Systeem$gebruiker$VolledigeNaam"))
@@ -55,6 +64,9 @@ theSuite = suiteSkip "DataTypeObjectGetters" do
     assertEqual "psp:SimpleValue has label 'SimpleValue'"
       (label (p "SimpleValue"))
       ["SimpleValue"]
+    assertEqual "u:myContext has label 'myContext'"
+      (label (u "myContext"))
+      ["myContext"]
   test "rolType" do
     assertEqual "Context$rolInContext_1 should have type 'psp:Context$RolInContext'"
       (rolType (RolInContext $ p "Context$rolInContext_1"))

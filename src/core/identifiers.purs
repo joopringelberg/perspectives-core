@@ -29,7 +29,9 @@ module Perspectives.Identifiers
 , Prefix
 , isUserURI
 , isUserEntiteitID
+, isBinnenRol
 , isModelName
+, expandDefaultNamespaces
   )
 
 where
@@ -37,7 +39,7 @@ import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (index, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.String (Pattern(..), Replacement(..), contains, replaceAll)
+import Data.String (Pattern(..), Replacement(..), contains, indexOf, replace, replaceAll)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -150,6 +152,7 @@ hasLocalName :: String -> String -> Boolean
 hasLocalName qn ln = case deconstructLocalNameFromDomeinURI qn of
   Nothing -> false
   (Just ln') -> ln == ln'
+
 -----------------------------------------------------------
 -- CURIES
 -----------------------------------------------------------
@@ -183,6 +186,16 @@ isUserURI = test userUriRegEx
 
 isUserEntiteitID :: String -> Boolean
 isUserEntiteitID id = isUserURI id || isUserURI id
+
+-----------------------------------------------------------
+-- BINNENROL
+-----------------------------------------------------------
+binnenRolRegEx :: Regex
+binnenRolRegEx = unsafeRegex "binnenRol$" noFlags
+
+-- | True iff the string ends on "binnenRol"
+isBinnenRol :: String -> Boolean
+isBinnenRol = test binnenRolRegEx
 
 -----------------------------------------------------------
 -- ROLNAMES
@@ -229,3 +242,19 @@ getSecondMatch :: Regex -> String -> Maybe String
 getSecondMatch regex s = case match regex s of
   (Just matches) -> unsafePartial unsafeIndex matches 2
   _ -> Nothing
+
+-----------------------------------------------------------
+-- EXPAND DEFAULT NAMESPACES
+-----------------------------------------------------------
+-- | Expand:
+-- |  - psp: to model:Perspectives$,
+-- |  - q: to model:QueryAst$,
+-- |  - u: to model:User$.
+expandDefaultNamespaces :: String -> String
+expandDefaultNamespaces s = if (indexOf (Pattern "psp:") s) == Just 0 then
+  replace (Pattern "psp:") (Replacement "model:Perspectives$") s
+  else if (indexOf (Pattern "q:") s) == Just 0 then
+    replace (Pattern "q:") (Replacement "model:QueryAst$") s
+    else if (indexOf (Pattern "u:") s) == Just 0 then
+      replace (Pattern "u:") (Replacement "model:User$") s
+      else s

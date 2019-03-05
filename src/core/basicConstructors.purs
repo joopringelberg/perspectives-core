@@ -2,26 +2,27 @@ module Perspectives.BasicConstructors where
 
 import Control.Monad.Eff.AVar (AVar)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Data.Array (length, concat)
+import Data.Array (concat, length)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (StrMap)
+import Data.StrMap (StrMap, fromFoldable, toUnfoldable)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
+import Data.Tuple (Tuple(..))
 import Perspectives.Actions (addRol, removeRol)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
-import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI)
+import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
 import Perspectives.PerspectivesTypes (RolDef(..))
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkContext)
-import Prelude (Unit, bind, const, discard, id, map, pure, show, unit, void, ($), (<<<), (<>), (>=>))
+import Prelude (Unit, bind, const, discard, id, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 
 -- | Construct contexts and roles from the serialisation.
 constructContexts :: forall e. ContextsSerialisation -> MonadPerspectives (AjaxAvarCache e) (Array UserMessage)
@@ -31,60 +32,58 @@ constructContexts (ContextsSerialisation contexts) = (traverse (constructContext
 -- | Type checks the context and returns any semantic problems as UserMessages. If there are no problems, returns the ID.
 constructContext :: forall e. ContextSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
 constructContext c@(ContextSerialization{id}) = do
-  (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit id
+  ident <- pure $ expandDefaultNamespaces id
+  (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit ident
   case mc of
     Nothing -> do
       candidate <- runExceptT $ constructContext_ c
       case candidate of
         (Left messages) -> do
-          removeFromCache id
+          removeFromCache ident
           pure $ Left messages
         (Right _) -> do
-          (m :: Array UserMessage) <- checkContext id
+          (m :: Array UserMessage) <- checkContext ident
           case length m of
-            0 -> pure $ Right id
+            0 -> pure $ Right ident
             otherwise -> do
-              removeFromCache id
+              removeFromCache ident
               pure $ Left m
-    otherwise -> pure $ Left $ [ContextExists id]
+          -- pure $ Right ident
+    otherwise -> pure $ Left $ [ContextExists ident]
 
   where
     constructContext_ :: ContextSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) ID
     constructContext_ (ContextSerialization{id, ctype, rollen, interneProperties, externeProperties}) = do
-      rolIds <- traverseWithIndex constructRolInstances rollen
-      lift $ cacheUncachedEntiteit id
+      ident <- pure $ expandDefaultNamespaces id
+      localName <- maybe (throwError [(NotAValidIdentifier ident)]) pure (deconstructLocalNameFromDomeinURI ident)
+      -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
+      (rolIds :: StrMap (Array RolID)) <-constructRollen rollen
+      lift $ cacheUncachedEntiteit ident
         (PerspectContext defaultContextRecord
-          { _id = id
-          , displayName  = id
-          , pspType = ctype
+          { _id = ident
+          , displayName  = localName
+          , pspType = expandDefaultNamespaces ctype
           , binnenRol =
             PerspectRol defaultRolRecord
-              { _id = binnenRol id
-              , pspType = ctype <> "$binnenRolBeschrijving"
-              , binding = Just $ buitenRol id
+              { _id = binnenRol ident
+              , pspType = expandDefaultNamespaces ctype <> "$binnenRolBeschrijving"
+              , binding = Just $ buitenRol ident
+              , context = ident
               , properties = constructProperties interneProperties
               }
-          , buitenRol = buitenRol id
+          , buitenRol = buitenRol ident
           , rolInContext = rolIds
           , comments = Comments { commentBefore: [], commentAfter: []}
         })
-      lift$ cacheUncachedEntiteit (buitenRol id)
+      lift$ cacheUncachedEntiteit (buitenRol ident)
         (PerspectRol defaultRolRecord
-          { _id = buitenRol id
-          , pspType = ctype <> "$buitenRolBeschrijving"
-          , context = id
+          { _id = buitenRol ident
+          , pspType = expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"
+          , context = ident
           , binding = Nothing
           , properties = constructProperties externeProperties
           })
-      pure id
-
-    constructRolInstances :: RolID -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (Array RolID)
-    constructRolInstances rolType rollen = do
-        localName <- maybe (throwError [(NotAValidIdentifier rolType)]) pure (deconstructLocalNameFromDomeinURI rolType)
-        -- The id without the numeric index.
-        rolId <- pure (id  <> "$" <> localName <> "_")
-        rolIds <- traverseWithIndex (constructRol id rolType rolId) rollen
-        pure rolIds
+      pure ident
 
     removeFromCache :: ContextID -> MP e Unit
     removeFromCache id = do
@@ -95,15 +94,37 @@ constructContext c@(ContextSerialization{id}) = do
       (_ :: StrMap (Array (Maybe (AVar PerspectRol)))) <- traverse (traverse removeInternally) rolInContext
       pure unit
 
+    constructRollen :: StrMap (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (StrMap (Array ID))
+    constructRollen rollen = do
+      (ts :: Array (Tuple String (Array RolSerialization))) <- pure $ toUnfoldable rollen
+      (x :: Array (Tuple String (Array ID))) <- traverse keyRolInstances ts
+      pure $ fromFoldable x
+
+      where
+        keyRolInstances :: Tuple String (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (Tuple String (Array ID))
+        keyRolInstances (Tuple rol rolSerialisations) = do
+          expandedRol <- pure $ expandDefaultNamespaces rol
+          instances <- constructRolInstances expandedRol rolSerialisations
+          pure $ Tuple expandedRol instances
+
+        constructRolInstances :: String -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (Array RolID)
+        constructRolInstances rolType rollen = do
+            contextId <- pure $ expandDefaultNamespaces id
+            localName <- maybe (throwError [(NotAValidIdentifier rolType)]) pure (deconstructLocalNameFromDomeinURI rolType)
+            -- The id without the numeric index.
+            rolId <- pure (contextId  <> "$" <> localName <> "_")
+            rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen
+            pure rolIds
+
 constructRol :: forall e. RolName -> ContextID -> RolID -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) RolID
-constructRol rolType id rolId i (RolSerialization {properties, binding: bnd}) = do
-  rolInstanceId <- pure (rolId <> (show i))
+constructRol rolType contextId rolId i (RolSerialization {properties, binding: bnd}) = do
+  rolInstanceId <- pure (expandDefaultNamespaces rolId <> (show i))
   lift$ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
-      , pspType = rolType <> "$buitenRolBeschrijving"
-      , context = id
-      , binding = Just bnd
+      , pspType = rolType -- TODO: dit is verkeerd: hier wordt de context id gebruikt
+      , context = contextId
+      , binding = Just $ expandDefaultNamespaces bnd
       , properties = constructProperties properties
       })
   pure rolInstanceId
@@ -113,19 +134,26 @@ constructRol rolType id rolId i (RolSerialization {properties, binding: bnd}) = 
 -- | Saves the new Rol instance.
 constructAnotherRol :: forall e. RolName -> ContextID -> RolSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
 constructAnotherRol rolType id rolSerialisation = do
-  rolInstances <- getRolInContext (RolDef rolType) id
-  candidate <- runExceptT $ constructRol rolType id (id <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (length rolInstances) rolSerialisation
+  ident <- pure $ expandDefaultNamespaces id
+  rolInstances <- getRolInContext (RolDef rolType) ident
+  candidate <- runExceptT $ constructRol rolType ident (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (length rolInstances) rolSerialisation
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
-      void $ addRol rolType rolId id
-      (m :: Array UserMessage) <- checkContext id
+      void $ addRol rolType rolId ident
+      (m :: Array UserMessage) <- checkContext ident
       case length m of
         0 -> do
           pure $ Right rolId
         otherwise -> do
-          void $ removeRol rolType rolId id
+          void $ removeRol rolType rolId ident
           pure $ Left m
 
 constructProperties :: PropertySerialization -> StrMap PropertyValueWithComments
-constructProperties (PropertySerialization props) = map (\(v :: Array String) -> PropertyValueWithComments {commentBefore: [], commentAfter: [], value: v}) props
+constructProperties (PropertySerialization props) = ((toUnfoldable :: StrMap (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> fromFoldable >>> map f) props
+  where
+    keyValuePair :: Tuple String (Array String) -> (Tuple String (Array String))
+    keyValuePair (Tuple key values) = Tuple (expandDefaultNamespaces key) values
+
+    f :: Array String -> PropertyValueWithComments
+    f v = PropertyValueWithComments {commentBefore: [], commentAfter: [], value: v}

@@ -2,12 +2,21 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
-import Control.Monad.Aff (Aff)
+import Control.Monad.Aff (Aff, error, throwError)
 import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Now (NOW)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Control.Monad.Except (runExcept)
+import Data.Either (Either(..))
+import Data.Foreign (MultipleErrors)
+import Data.Foreign.Generic (decodeJSON)
+import Perspectives.ApiTypes (ContextSerialization)
+import Perspectives.BasicConstructors (constructContext)
+import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.PerspectivesState (runPerspectives)
+import Perspectives.PerspectivesTypes (BuitenRol(..))
+import Perspectives.SaveUserData (saveUserData)
 import Test.Unit.Assert as Assert
 
 type TestEffects e = AjaxAvarCache (now :: NOW | e)
@@ -41,3 +50,19 @@ assertEqual message test result = do
   (Assert.assert message) =<<
     (runP test >>=
       (shouldEqual result))
+
+addTestContext :: forall e. String -> Aff (TestEffects e) Unit
+addTestContext s = void $ runP $ addTestContext' s
+  where
+    addTestContext' :: forall eff. String -> MonadPerspectives (AjaxAvarCache eff) Unit
+    addTestContext' s = do
+      (r :: Either MultipleErrors ContextSerialization) <- pure $ runExcept $ decodeJSON s
+      case r of
+        (Left m) -> throwError $ error $ show [NotWellFormedContextSerialization $ show m]
+        (Right cs) -> do
+          r <- constructContext cs
+          case r of
+            (Left messages) -> throwError (error (show messages))
+            (Right id) -> do
+              _ <- saveUserData [BuitenRol $ buitenRol id]
+              pure unit
