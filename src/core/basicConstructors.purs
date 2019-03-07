@@ -53,7 +53,7 @@ constructContext c@(ContextSerialization{id}) = do
 
   where
     constructContext_ :: ContextSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) ID
-    constructContext_ (ContextSerialization{id, ctype, rollen, interneProperties, externeProperties}) = do
+    constructContext_ (ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
       ident <- pure $ expandDefaultNamespaces id
       localName <- maybe (throwError [(NotAValidIdentifier ident)]) pure (deconstructLocalNameFromDomeinURI ident)
       -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
@@ -75,12 +75,15 @@ constructContext c@(ContextSerialization{id}) = do
           , rolInContext = rolIds
           , comments = Comments { commentBefore: [], commentAfter: []}
         })
+      (b :: Maybe String) <- case prototype of
+        Nothing -> pure Nothing
+        (Just p) -> pure (Just (buitenRol (expandDefaultNamespaces p)))
       lift$ cacheUncachedEntiteit (buitenRol ident)
         (PerspectRol defaultRolRecord
           { _id = buitenRol ident
           , pspType = expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"
           , context = ident
-          , binding = Nothing
+          , binding = b
           , properties = constructProperties externeProperties
           })
       pure ident

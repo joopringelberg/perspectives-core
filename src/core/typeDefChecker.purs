@@ -25,7 +25,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.ModelBasedObjectGetters (contextDef)
 import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, mogelijkeBinding, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef)
-import Perspectives.ObjectGetterConstructors (getContextRol)
+import Perspectives.ObjectGetterConstructors (getContextRol, searchContextRol)
 import Perspectives.PerspectivesTypes (Context(..), ContextDef(..), ContextRol, PropertyDef(..), RolDef(..), SimpleValueDef)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (getPropertyFunction)
@@ -187,7 +187,7 @@ checkRangeAndAvailability cid rol propertyType = do
 -- | Finally, if the Rol is mandatory and missing, adds a message.
 compareRolInstancesToDefinition :: forall e. Context -> RolDef -> TDChecker (AjaxAvarCache e) Unit
 compareRolInstancesToDefinition contextInstance rolType = do
-  (rolInstances :: Array ContextRol) <- lift $ lift $ getContextRol rolType (unwrap contextInstance)
+  (rolInstances :: Array ContextRol) <- lift $ lift $ searchContextRol rolType (unwrap contextInstance)
   case head rolInstances of
     Nothing -> ifM (lift (rolIsMandatory rolType))
       (tell [MissingRolInstance (unwrap rolType) (unwrap contextInstance)])
