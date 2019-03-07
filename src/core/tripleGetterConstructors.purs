@@ -74,22 +74,21 @@ searchInPrototypeHierarchy :: forall o e.
   (AnyContext **> o) e
 searchInPrototypeHierarchy getter = DTG.buitenRol >-> typeWithPerspectivesTypes searchInRolTelescope getter
 
--- | Applies the getter (BuitenRol ~~> o) e to any context and all its prototypes.
 searchLocallyAndInPrototypeHierarchy :: forall o e.
   Eq o =>
-  (BuitenRol **> o) e ->
+  (AnyContext **> o) e ->
   (AnyContext **> o) e
 searchLocallyAndInPrototypeHierarchy getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
   f :: TripleGetter AnyContext o e
-  f c =
-    unlessNull (DTG.buitenRol >-> getter) c
+  f (cid :: AnyContext) =
+    unlessNull getter cid
     <|>
-    (c @@ (searchInPrototypeHierarchy getter))
+    (cid @@ (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter))
 
 -- | Applies the getter (s ~~> o) e to the ContextType and all its prototypes and recursively to all its aspects.
 searchInAspectsAndPrototypes :: forall o e.
   Eq o =>
-  (BuitenRol **> o) e ->
+  (AnyContext **> o) e ->
   (AnyContext **> o) e
 searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
   f :: TripleGetter AnyContext o e
@@ -207,18 +206,18 @@ rolesOf cid = TypedTripleGetter ("rolesOf_" <> cid) (typeWithPerspectivesTypes g
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
 searchContextRol :: forall e. RolDef -> (AnyContext **> ContextRol) e
-searchContextRol rn = searchLocallyAndInPrototypeHierarchy (DTG.context >-> ((getContextRol rn) :: (AnyContext **> ContextRol) e))
+searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getContextRol rn) :: (AnyContext **> ContextRol) e)
 
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
 searchRolInContext :: forall e. RolDef -> (AnyContext **> RolInContext) e
-searchRolInContext rn = searchLocallyAndInPrototypeHierarchy (DTG.context >-> ((getRolInContext rn) :: (AnyContext **> RolInContext) e))
+searchRolInContext rn = searchLocallyAndInPrototypeHierarchy ((getRolInContext rn) :: (AnyContext **> RolInContext) e)
 
 -- | Search for an unqualified rol both in the local context and all its prototypes.
 -- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
 -- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
 -- TODO: waarom alleen in ContextDef?
 searchUnqualifiedRol :: forall e. Id.LocalName -> (AnyContext **> ContextRol) e
-searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (DTG.context >-> ( (getUnqualifiedContextRol rn) :: (AnyContext **> ContextRol) e))
+searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualifiedContextRol rn) :: (AnyContext **> ContextRol) e)
 
 -----------------------------------------------------------
 -- GET A ROLDEFINITION FROM A CONTEXT DEFINITION
@@ -246,8 +245,8 @@ getUnqualifiedRolDefinition ln = unwrap `before` (filter_
 searchUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef **> RolDef) e
 searchUnqualifiedRolDefinition ln = typeWithPerspectivesTypes $ searchInAspectsAndPrototypes f
   where
-    f :: (BuitenRol **> RolDef) e
-    f = (DTG.context `followedBy` ContextDef) >-> getUnqualifiedRolDefinition ln
+    f :: (AnyContext **> RolDef) e
+    f = ContextDef `before` getUnqualifiedRolDefinition ln
 
 -----------------------------------------------------------
 -- GET A PROPERTY FROM A ROLE TELESCOPE
@@ -278,16 +277,16 @@ searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
 searchPropertyOnContext :: forall r e. RolClass r => (AnyContext **> r) e -> PropertyDef -> (AnyContext **> Value) e
 searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
-    f :: (BuitenRol **> Value) e
-    f = (DTG.context >-> rolgetter >-> searchProperty p)
+    f :: (AnyContext **> Value) e
+    f = (rolgetter >-> searchProperty p)
 
 -- | Searches the property with the local name first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
 searchUnqualifiedPropertyOnContext :: forall r e. RolClass r => (AnyContext **> r) e  -> Id.LocalName -> (AnyContext **> Value) e
 searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
-    f :: (BuitenRol **> Value) e
-    f = (DTG.context >-> rolgetter >-> searchUnqualifiedProperty p)
+    f :: (AnyContext **> Value) e
+    f = (rolgetter >-> searchUnqualifiedProperty p)
 
 -- | Look for the property PropertyDef on the buitenRol of the ContextType c and on its telescope, shadowing any values
 -- | on the prototypes.
@@ -337,5 +336,5 @@ getUnqualifiedPropertyDefinition ln = unwrap `before` (filter_
 searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> PropertyDef) e
 searchUnqualifiedPropertyDefinition ln = unwrap `before` (searchInAspectsAndPrototypes f)
   where
-    f :: (BuitenRol **> PropertyDef) e
-    f = (DTG.context `followedBy` RolDef) >-> (getUnqualifiedPropertyDefinition ln)
+    f :: (AnyContext **> PropertyDef) e
+    f = (RolDef `before` getUnqualifiedPropertyDefinition ln)

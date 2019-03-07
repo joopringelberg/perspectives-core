@@ -6,7 +6,7 @@ where
 
 import Control.Alt ((<|>))
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@), MPQ, Triple)
-import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext) as DTG
+import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext, binding, context) as DTG
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetGebondenAls) as OGC
 import Perspectives.PerspectivesTypes (genericGetProperty, genericGetUnqualifiedProperty, typeWithPerspectivesTypes)
@@ -28,10 +28,10 @@ searchInPrototypeHierarchy getter = typeWithPerspectivesTypes DTG.buitenRol >-> 
 searchLocallyAndInPrototypeHierarchy :: forall e. StringTypedTripleGetter e -> StringTypedTripleGetter e
 searchLocallyAndInPrototypeHierarchy getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
   f :: StringTripleGetter e
-  f c =
-    TGC.unlessNull (typeWithPerspectivesTypes DTG.buitenRol >-> getter) c
+  f (cid :: String) =
+    TGC.unlessNull getter cid
     <|>
-    (c @@ (searchInPrototypeHierarchy getter))
+    (cid @@ (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter))
 
 searchInAspectsAndPrototypes :: forall e. StringTypedTripleGetter e -> StringTypedTripleGetter e
 searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where

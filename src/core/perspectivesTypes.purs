@@ -118,6 +118,8 @@ newtype Context = Context String
 
 derive instance genericRepContext :: Generic Context _
 derive instance newtypeContext :: Newtype Context _
+instance eqContext :: Eq Context where
+  eq (Context c1) (Context c2) = c1 == c2
 
 type FunctionInstance = Context
 -----------------------------------------------------------

@@ -13,7 +13,7 @@ import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
 t1 :: String
 t1 = """{ "id": "u:myContext"
   , "ctype": "psp:Context"
-  , "rollen": { "psp:rolInContext":  [ { "properties": {}, "binding": "psp:Context_buitenRol" }]}
+  , "rollen": { "psp:Context$rolInContext":  [ { "properties": {}, "binding": "psp:Context_buitenRol" }]}
   , "interneProperties": {}
   , "externeProperties": {}
   }"""

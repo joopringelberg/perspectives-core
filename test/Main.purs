@@ -11,15 +11,21 @@ import Perspectives.Effects (AjaxAvarCache)
 import Test.BasicConstructors (test)
 import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
+import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
+import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
 import Test.Perspectives.Utils (runP)
 import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Main (runTest)
 
--- main = runAff handleError (runP test)
 main :: forall e. Eff (AjaxAvarCache (console :: CONSOLE, now :: NOW, testOutput :: TESTOUTPUT | e)) Unit
 main = runTest do
   DTO.theSuite
   OGC.theSuite
+  MBTG.theSuite
+  TGC.theSuite
+
+-- Running other tests:
+-- main = runAff handleError (runP test)
 
 -- handleError :: forall e a. (Either Error a -> Eff (console :: CONSOLE | e) Unit)
 -- handleError (Left e) = log $ "An error condition: " <> (show e)
