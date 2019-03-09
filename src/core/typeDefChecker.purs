@@ -5,7 +5,7 @@ where
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Data.Argonaut.Core (fromString)
 import Data.Argonaut.Decode (decodeJson)
-import Data.Array (elemIndex, head, length)
+import Data.Array (elemIndex, foldM, head, length)
 import Data.DateTime.ISO (ISO)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe)
@@ -25,8 +25,8 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.ModelBasedObjectGetters (contextDef)
 import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, mogelijkeBinding, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef)
-import Perspectives.ObjectGetterConstructors (getContextRol, searchContextRol)
-import Perspectives.PerspectivesTypes (Context(..), ContextDef(..), ContextRol, PropertyDef(..), RolDef(..), SimpleValueDef)
+import Perspectives.ObjectGetterConstructors (alternatives, searchContextRol)
+import Perspectives.PerspectivesTypes (Context(..), ContextDef(..), ContextRol, PropertyDef(..), RolDef(..), SimpleValueDef, AnyContext)
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (getPropertyFunction)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -37,7 +37,7 @@ import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Perspectives.TripleGetterConstructors (directAspectRoles, directAspects)
 import Perspectives.TypeChecker (contextHasType)
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, const, discard, ifM, pure, unit, void, ($), (<), (<<<), (>=>), (>>>), (>>=))
+import Prelude (Unit, bind, const, discard, ifM, map, pure, unit, void, ($), (<), (<<<), (>=>), (>>=), (>>>), (||))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery e)
 
@@ -217,11 +217,18 @@ compareRolInstancesToDefinition contextInstance rolType = do
           case mmb of
             Nothing -> pure unit
             (Just (toegestaneBinding :: String)) -> do
-              ifM (lift $ lift $ contextHasType theBinding (ContextDef toegestaneBinding))
-                (pure unit)
-                (do
-                  typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
-                  (tell [IncorrectBinding (unwrap contextInstance) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
+              (alts :: Array AnyContext) <- lift $ lift $ alternatives toegestaneBinding
+              case head alts of
+                Nothing -> ifM (lift $ lift $ contextHasType theBinding (ContextDef toegestaneBinding))
+                  (pure unit)
+                  (do
+                    typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
+                    (tell [IncorrectBinding (unwrap contextInstance) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
+                otherwise -> ifM (foldM (\r alt -> (lift $ lift $ contextHasType theBinding alt) >>= pure <<< (||) r) false (map ContextDef alts))
+                  (pure unit)
+                  (do
+                    typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
+                    (tell [IncorrectBinding (unwrap contextInstance) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
 
 -- | Checks the aspectRollen of the RolDefinition.
 -- | If such an aspectRol is not a Rol of one of the Aspecten of Context definition
