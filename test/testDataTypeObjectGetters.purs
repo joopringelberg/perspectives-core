@@ -7,7 +7,7 @@ import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextRol(..), RolDef(..), RolInContext(..), binding)
-import Test.Perspectives.Utils (TestEffects, addTestContext, assertEqual, p, u)
+import Test.Perspectives.Utils (TestEffects, addTestContext, assertEqual, p, removeTestContext, u)
 import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
 
 t1 :: String
@@ -101,3 +101,5 @@ theSuite = suite "DataTypeObjectGetters" do
     assertEqual "The instance of the rol RolProperty called 'psp:Systeem$gebruiker$rolProperty_1' should have 'psp:Systeem$gebruiker' as context."
       (context (ContextRol $ p "Systeem$gebruiker$rolProperty_1"))
       [p "Systeem$gebruiker"]
+  test "Tearing down" do
+    removeTestContext (u "myContext")

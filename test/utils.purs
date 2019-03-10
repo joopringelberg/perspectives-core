@@ -15,8 +15,11 @@ import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.PerspectivesState (runPerspectives)
-import Perspectives.PerspectivesTypes (BuitenRol(..))
+import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
+import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.ResourceRetrieval (removeEntiteit)
 import Perspectives.SaveUserData (saveUserData)
+import Perspectives.Syntax (PerspectContext)
 import Test.Unit.Assert as Assert
 
 type TestEffects e = AjaxAvarCache (now :: NOW | e)
@@ -66,3 +69,8 @@ addTestContext s = void $ runP $ addTestContext' s
             (Right id) -> do
               _ <- saveUserData [BuitenRol $ buitenRol id]
               pure unit
+
+removeTestContext :: forall e. AnyContext -> Aff (TestEffects e) Unit
+removeTestContext cid = void $ runP $ f cid where
+
+  f = (getPerspectEntiteit :: AnyContext -> MonadPerspectives (AjaxAvarCache (now :: NOW | e)) PerspectContext) >=> removeEntiteit cid

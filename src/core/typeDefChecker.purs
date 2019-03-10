@@ -219,11 +219,13 @@ compareRolInstancesToDefinition contextInstance rolType = do
             (Just (toegestaneBinding :: String)) -> do
               (alts :: Array AnyContext) <- lift $ lift $ alternatives toegestaneBinding
               case head alts of
+                -- Single type.
                 Nothing -> ifM (lift $ lift $ contextHasType theBinding (ContextDef toegestaneBinding))
                   (pure unit)
                   (do
                     typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
                     (tell [IncorrectBinding (unwrap contextInstance) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
+                -- Sum type.
                 otherwise -> ifM (foldM (\r alt -> (lift $ lift $ contextHasType theBinding alt) >>= pure <<< (||) r) false (map ContextDef alts))
                   (pure unit)
                   (do

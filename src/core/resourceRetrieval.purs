@@ -5,6 +5,7 @@ module Perspectives.ResourceRetrieval
 , saveEntiteit
 , saveEntiteitPreservingVersion
 , fetchEntiteit
+, removeEntiteit
   )
 where
 
@@ -21,13 +22,13 @@ import Data.Newtype (unwrap)
 import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (PutCouchdbDocument, onAccepted)
+import Perspectives.CoreTypes (MonadPerspectives, MP)
+import Perspectives.Couchdb (DeleteCouchdbDocument, PutCouchdbDocument, onAccepted)
 import Perspectives.Couchdb.Databases (ensureAuthentication, defaultPerspectRequest, retrieveDocumentVersion)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, removeInternally, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
 import Perspectives.User (entitiesDatabase)
 
 
@@ -104,3 +105,13 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion entId >>= pure <<< (flip setRevision entiteit) >>= saveVersionedEntiteit entId
         else onAccepted res.status [200, 201] "saveVersionedEntiteit" $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust (unwrap res.response).rev) entiteit)
+
+removeEntiteit :: forall e a. PerspectEntiteit a => ID -> a -> MonadPerspectives (AjaxAvarCache e) a
+removeEntiteit entId entiteit = ensureAuthentication $ do
+  case (getRevision' entiteit) of
+    Nothing -> throwError $ error ("removeEntiteit: entiteit has no revision, removal is impossible: " <> entId)
+    (Just rev) -> do
+      ebase <- entitiesDatabase
+      (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+      (res :: AffjaxResponse DeleteCouchdbDocument) <- liftAff $ affjax $ rq {method = Left DELETE, url = (ebase <> entId <> "?rev=" <> rev)}
+      onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP e (Maybe (AVar a))) *> pure entiteit
