@@ -19,9 +19,11 @@ import Node.Process (PROCESS, cwd)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
+import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
+import Perspectives.Identifiers (Namespace)
+import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.PerspectivesTypes (BuitenRol(..))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.SaveUserData (saveUserData)
@@ -35,6 +37,7 @@ type FileName = String
 
 -- | Loads a file from the directory "src/model" relative to the directory of the
 -- | active process.
+-- | All definitions are loaded into the cache. The file is parsed and stored in Couchdb.
 loadCRLFile :: forall e. FileName -> MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION, process :: PROCESS | e)) Unit
 loadCRLFile file = do
   lift $ log ("=========================Parse the file " <> file <> "===================")
@@ -67,3 +70,11 @@ loadCRLFile file = do
           saveUserData (map BuitenRol buitenRollen)
           lift $ log $ show buitenRollen
     (Left e) -> lift $ log (show e)
+
+-- | Remove the model from the model cache
+unloadModel :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) Unit
+unloadModel = void <<< domeinCacheRemove
+
+-- | Remove the file from Couchdb and the model from the cache.
+unLoadCRLFile :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) Unit
+unLoadCRLFile = removeDomeinFileFromCouchdb

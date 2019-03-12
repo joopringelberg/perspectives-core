@@ -19,16 +19,16 @@ import Network.HTTP.Affjax (AJAX, AffjaxRequest, AffjaxResponse, affjax, put)
 import Network.HTTP.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
-import Perspectives.Couchdb.Databases (retrieveDocumentVersion)
+import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
+import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache, AvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup)
+import Perspectives.PerspectivesState (domeinCache, domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision)
-import Prelude (Unit, bind, discard, pure, show, ($), (*>), (<$>), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), (*>), (<$>), (<>), (==), (>>=))
 
 type URL = String
 
@@ -149,6 +149,14 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   where
     setRevision :: String -> MonadPerspectives (AjaxAvarCache e) Unit
     setRevision s = liftAff $ putVar (DomeinFile (dfr {_rev = (revision s)})) av
+
+-- | Remove the file from couchb. Removes the model from cache.
+removeDomeinFileFromCouchdb :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) Unit
+removeDomeinFileFromCouchdb ns = do
+  rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName ns)
+  (rq :: (AffjaxRequest Unit)) <- defaultPerspectRequest
+  (res :: AffjaxResponse DeleteCouchdbDocument) <- liftAff $ affjax $ rq {method = Left DELETE, url = (modelsURL <> escapeCouchdbDocumentName ns <> "?rev=" <> rev)}
+  onAccepted res.status [200, 202] "removeDomeinFileFromCouchdb" $ domeinCacheRemove ns *> pure unit
 
 modelsURL :: URL
 modelsURL = "http://localhost:5984/perspect_models/"
