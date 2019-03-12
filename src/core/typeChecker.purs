@@ -86,9 +86,12 @@ checkContextForUnQualifiedRol ln cn = do
 -- | If the aspect is a sum type, tries each of the alternatives.
 -- | subtype `isOrHasAspect` aspect
 isOrHasAspect :: forall e. ContextDef -> ContextDef -> MonadPerspectives (AjaxAvarCache e) Boolean
-isOrHasAspect subtype aspect = if subtype == aspect
-  then pure true
-  else toBoolean (contains (unwrap aspect) closureOfAspect) (unwrap subtype)
+isOrHasAspect subtype aspect =
+  if subtype == aspect
+    then pure true
+    else if aspect == ContextDef "model:Perspectives$ElkType"
+      then pure true
+      else toBoolean (contains (unwrap aspect) closureOfAspect) (unwrap subtype)
 
 -- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
 -- | context `contextHasType` type
