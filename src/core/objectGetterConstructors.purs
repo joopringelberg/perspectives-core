@@ -27,6 +27,7 @@ import Prelude (class Eq, bind, flip, id, join, map, pure, show, ($), (<<<), (<>
 -- COMBINATORS
 -----------------------------------------------------------
 -- | The closure of an ObjectsGetter (cumulates results, excluding the root).
+-- Test.Perspectives.ObjectGetterConstructors, via closureOfBinding.
 closure :: forall o e.
   Eq o =>
   (o ~~> o) e ->
@@ -37,7 +38,7 @@ closure p = getter [] where
     (objectsOfP :: Array o) <- p id
     case elemIndex id cumulator of
       Nothing -> do
-        (results :: Array (Array o)) <- traverse (getter (union cumulator objectsOfP)) (difference objectsOfP cumulator)
+        (results :: Array (Array o)) <- traverse (getter (cons id cumulator)) (difference objectsOfP cumulator)
         pure $ nub $ join (cons objectsOfP results)
       otherwise -> pure objectsOfP
 
@@ -46,11 +47,13 @@ closure p = getter [] where
 unlessNull :: forall s o e. (s ~~> o) e -> (s ~~> o) e
 unlessNull og id = og id >>= \r -> if (null r) then empty else pure r
 
+-- Test.Perspectives.ObjectGetterConstructors
 contains :: forall s o e. Eq o => o -> (s ~~> o) e -> (s ~~> PBool) e
 contains o getter = getter >=> \(os :: Array o) -> case elemIndex o os of
   Nothing -> pure [PBool "false"]
   otherwise -> pure [PBool "true"]
 
+-- Test.Perspectives.ObjectGetterConstructors, via getUnqualifiedRolDefinition
 filter_ :: forall s o e.
   (o -> Boolean) ->
   (s ~~> o) e ->
@@ -62,6 +65,7 @@ toBoolean g = g >=> \(bs :: Array PBool) -> case head bs of
   Nothing -> pure true
   (Just b) -> pure (b == PBool "true")
 
+-- Test.Perspectives.ObjectGetterConstructors, via searchProperty
 searchInRolTelescope :: forall e. ObjectsGetter e -> ObjectsGetter e
 searchInRolTelescope getter rolId =
   unlessNull getter rolId
@@ -76,7 +80,8 @@ searchInPrototypeHierarchy :: forall o e.
   (AnyContext ~~> o) e
 searchInPrototypeHierarchy getter = buitenRol /-/ typeWithPerspectivesTypes searchInRolTelescope getter
 
--- | Applies the getter (BuitenRol ~~> o) e to any context and all its prototypes.
+-- | Applies the getter (AnyContext ~~> o) e to any context and all its prototypes.
+-- Test.Perspectives.ObjectGetterConstructors, via buitenRolBeschrijvingDef
 searchLocallyAndInPrototypeHierarchy :: forall o e.
   Eq o =>
   (AnyContext ~~> o) e ->
@@ -87,6 +92,7 @@ searchLocallyAndInPrototypeHierarchy getter c =
   (buitenRol /-/ binding /-/ context /-/ searchLocallyAndInPrototypeHierarchy getter) c
 
 -- | Applies the getter (s ~~> o) e to the ContextType and all its prototypes and recursively to all its aspects.
+-- Test.Perspectives.ObjectGetterConstructors, via buitenRolBeschrijvingDef
 searchInAspectsAndPrototypes :: forall o e.
   Eq o =>
   (AnyContext ~~> o) e ->
@@ -232,6 +238,7 @@ searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualified
 
 -- | Look for the definition of a Rol by its local name, in the ContextDef (not searching prototypes or Aspects).
 -- | If no Rol is defined with this local name, will return an empty result.
+-- Test.Perspectives.ObjectGetterConstructors
 getUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef ~~> RolDef) e
 getUnqualifiedRolDefinition ln = unwrap >>> (filter_
   (flip Id.hasLocalName ln)
@@ -264,6 +271,7 @@ hasRolDefinition qn = unwrap >>> searchInAspectsAndPrototypes f
 -- GET A PROPERTY FROM A ROLE TELESCOPE
 -----------------------------------------------------------
 -- | The value of the property pd, wherever in the telescope it is represented.
+-- Test.Perspectives.ObjectGetterConstructors
 searchProperty :: forall b e. RolClass b => PropertyDef -> (b ~~> Value) e
 searchProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
   where

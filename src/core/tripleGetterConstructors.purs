@@ -40,7 +40,7 @@ closure (TypedTripleGetter nameOfp p) =
       t@(Triple{object : objectsOfP}) <- p id
       case Arr.elemIndex id cumulator of
         Nothing -> do
-          (triples :: Array (Triple o o e)) <- (traverse (getter (Arr.union cumulator objectsOfP))) (Arr.difference objectsOfP cumulator)
+          (triples :: Array (Triple o o e)) <- (traverse (getter (Arr.cons id cumulator))) (Arr.difference objectsOfP cumulator)
           objects <- pure $ join $ map (\(Triple{object}) -> object) triples
           pure $ Triple { subject: id
                         , predicate : name
