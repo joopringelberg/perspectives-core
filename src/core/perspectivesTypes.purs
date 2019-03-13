@@ -96,6 +96,8 @@ newtype PBool = PBool String
 derive instance newtypePBool :: Newtype PBool _
 instance eqPBool :: Eq PBool where
   eq (PBool c1) (PBool c2) = c1 == c2
+instance showPBool :: Show PBool where
+  show (PBool b) = show b
 
 -----------------------------------------------------------
 -- PSTRING AS TYPE
@@ -218,6 +220,8 @@ derive instance genericRepRolInContext :: Generic RolInContext _
 derive instance newtypeRolInContext :: Newtype RolInContext _
 instance eqRolInContext :: Eq RolInContext where
   eq (RolInContext c1) (RolInContext c2) = c1 == c2
+instance showRolInContext :: Show RolInContext where
+  show (RolInContext r) = show r
 
 instance rolClassRolInContext :: RolClass RolInContext where
   getProperty = typeWithPerspectivesTypes genericGetProperty
@@ -236,6 +240,8 @@ derive instance genericRepContextRol :: Generic ContextRol _
 derive instance newtypeContextRol :: Newtype ContextRol _
 instance eqContextRol :: Eq ContextRol where
   eq (ContextRol c1) (ContextRol c2) = c1 == c2
+instance showBuitenRol :: Show BuitenRol where
+  show (BuitenRol b) = show b
 
 instance rolClassContextRol :: RolClass ContextRol where
   getProperty = typeWithPerspectivesTypes genericGetProperty
@@ -256,3 +262,5 @@ derive instance genericRepValue :: Generic Value _
 derive instance newtypeValue :: Newtype Value _
 instance eqValue :: Eq Value where
   eq (Value c1) (Value c2) = c1 == c2
+instance showValue :: Show Value where
+  show (Value c) = show c

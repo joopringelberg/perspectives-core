@@ -4,17 +4,22 @@ import Prelude
 
 import Control.Monad.Aff (Aff, error, throwError)
 import Control.Monad.Eff.AVar (AVAR)
+import Control.Monad.Eff.Console (CONSOLE)
+import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Except (runExcept)
 import Data.Array (singleton)
 import Data.Either (Either(..))
 import Data.Foreign (MultipleErrors)
 import Data.Foreign.Generic (decodeJSON)
+import Node.FS (FS)
+import Node.Process (PROCESS)
 import Perspectives.ApiTypes (ContextSerialization)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (buitenRol)
+import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile)
 import Perspectives.PerspectivesState (runPerspectives)
 import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
 import Perspectives.SaveUserData (removeUserData, saveUserData)
@@ -42,15 +47,23 @@ shouldEqual a = \b -> pure (a == b)
 
 type Message = String
 
-assertEqual :: forall a e. Eq a =>
+assertEqual :: forall a e. Eq a => Show a =>
   Message ->
   MonadPerspectives (RunEffects e) a ->
   a ->
   Aff (RunEffects e) Unit
+-- assertEqual message test result = do
+--   (Assert.assert message) =<<
+--     (runP test >>=
+--       (shouldEqual result))
 assertEqual message test result = do
-  (Assert.assert message) =<<
-    (runP test >>=
-      (shouldEqual result))
+  r <- runP test
+  case result == r of
+    true -> Assert.assert message true
+    false -> Assert.assert (message <> "\nExpected: " <>
+      show result <> "\nReceived: " <>
+      show r)
+      false
 
 addTestContext :: forall e. String -> Aff (TestEffects e) Unit
 addTestContext s = void $ runP $ addTestContext' s
@@ -74,3 +87,11 @@ removeTestContext cid = void $ runP $ removeTestContext' (buitenRol cid)
 
   removeTestContext' :: forall eff. AnyContext -> MonadPerspectives (AjaxAvarCache eff) Unit
   removeTestContext' = void <<< removeUserData <<< singleton <<< BuitenRol
+
+type TestModelLoadEffects e = (console :: CONSOLE, exception :: EXCEPTION, fs :: FS, process :: PROCESS | e)
+
+loadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
+loadTestModel ns = void $ runP $ loadCRLFile ns
+
+unLoadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
+unLoadTestModel ns = void $ runP $ unLoadCRLFile ns

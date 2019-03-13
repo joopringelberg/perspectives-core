@@ -21,7 +21,6 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.StrMap (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (ContextSerialization(..))
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AjaxAvarCache)
@@ -137,7 +136,7 @@ infix 0 applyObjectsGetterToMaybeObject as %%>
 applyObjectsGetterToObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
 applyObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
-    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unsafeCoerce id) <> "'."
+    Nothing -> throwError $ error $ "applyObjectsGetterToObject: no values for '" <> (unsafeCoerce id) <> "'."
     (Just obj) -> pure obj
 
 infix 0 applyObjectsGetterToObject as %%>>
@@ -168,7 +167,7 @@ infix 0 applyTypedObjectsGetterToMaybeObject as ##>
 applyTypedObjectsGetterToObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (AjaxAvarCache e) o
 applyTypedObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
-    Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> unsafeCoerce id <> "'."
+    Nothing -> throwError $ error $ "applyTypedObjectsGetterToObject: no values for '" <> unsafeCoerce id <> "'."
     (Just obj) -> pure obj
 
 infix 0 applyTypedObjectsGetterToObject as ##>>
