@@ -36,6 +36,7 @@ iedereRolInContext = DTOG.iedereRolInContext `trackedAs`  "model:Perspectives$ie
 typeVanIedereRolInContext :: forall e. (String **> String) e
 typeVanIedereRolInContext =  DTOG.typeVanIedereRolInContext `trackedAs` "model:Perspectives$typeVanIedereRolInContext"
 
+-- | The types of every property for which this rol has a value.
 propertyTypen :: forall e. (String **> String) e
 propertyTypen = DTOG.propertyTypen `trackedAs` "model:Perspectives$typeVanIederePropertyVanRol"
 

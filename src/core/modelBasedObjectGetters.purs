@@ -4,9 +4,9 @@ import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, context)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchUnqualifiedRolDefinition, some, unlessNull)
+import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, searchUnqualifiedRolDefinition, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding)
+import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
 
 
@@ -53,7 +53,10 @@ buitenRolBeschrijving = getContextRol $ RolDef "model:Perspectives$Context$buite
 
 -- | From a context that is a definition, get the definition of its BuitenRol.
 buitenRolBeschrijvingDef :: forall e. (AnyDefinition ~~> RolDef) e
-buitenRolBeschrijvingDef = wrap >>> searchUnqualifiedRolDefinition "buitenRolBeschrijving"
+buitenRolBeschrijvingDef = searchInAspectsAndPrototypes f
+  where
+    f :: (AnyContext ~~> RolDef) e
+    f = typeWithPerspectivesTypes $ buitenRolBeschrijving /-/ binding /-/ context
 
 -- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
 -- | are defined on that Rol.
