@@ -96,6 +96,16 @@ searchInAspectsAndPrototypes getter contextId =
   <|>
   (directAspects /-/ searchInAspectsAndPrototypes getter) contextId
 
+-- | Applies the getter (s ~~> o) e to the RolDef and all its prototypes and recursively to all its aspects.
+searchInAspectRolesAndPrototypes :: forall o e.
+  Eq o =>
+  (AnyContext ~~> o) e ->
+  (AnyContext ~~> o) e
+searchInAspectRolesAndPrototypes getter contextId =
+  unlessNull (searchLocallyAndInPrototypeHierarchy getter) contextId
+  <|>
+  (directAspects /-/ searchInAspectRolesAndPrototypes getter) contextId
+
 directAspects :: forall e. (AnyContext ~~> AnyContext) e
 directAspects = getContextRol (RolDef "model:Perspectives$Context$aspect") /-/ rolBindingDef
 
