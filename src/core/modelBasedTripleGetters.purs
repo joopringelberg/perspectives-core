@@ -7,15 +7,14 @@ import Data.Newtype (alaF, unwrap, wrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
-import Perspectives.DataTypeTripleGetters (rolBindingDef)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef) as MBOG
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
-import Perspectives.StringTripleGetterConstructors (searchInAspectsAndPrototypes)
-import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->), (>->>))
+import Perspectives.StringTripleGetterConstructors (searchInAspectsAndPrototypes, searchInAspectRolesAndPrototypes)
+import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some, getContextRol)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
@@ -138,7 +137,7 @@ propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding where
 
   defsInAspectsAndPrototypes :: (RolDef **> PropertyDef) e
   defsInAspectsAndPrototypes = (unwrap `before`
-    (searchInAspectsAndPrototypes (RolDef `before` ownPropertiesDef `followedBy` unwrap))
+    (searchInAspectRolesAndPrototypes (RolDef `before` ownPropertiesDef `followedBy` unwrap))
     `followedBy` PropertyDef)
 
   defsInMogelijkeBinding :: (RolDef **> PropertyDef) e
@@ -151,7 +150,7 @@ buitenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
 buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"
 
 binnenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
-binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"
+binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "binnenRolBeschrijving"
 
 -- | From the description of a Context, return the description of its contextBot (a SysteemBot).
 contextBotDef :: forall e. (AnyContext **> AnyContext)e

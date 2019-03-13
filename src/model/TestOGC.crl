@@ -1,0 +1,38 @@
+Context model:TestOGC als t:
+
+import model:Perspectives als psp:
+
+Section $rolInContext
+
+--------------------------------------------------------------------------------
+--
+--------------------------------------------------------------------------------
+psp:Context t:myAspect
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $myAspectRol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $myAspectRol1Property
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+	$rolInContext =>
+		psp:Rol $myAspectRol2
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Rol
+
+psp:Context t:myContextDef
+	prototype psp:ContextPrototype
+	$aspect => t:myAspect
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$aspectRol => t:myAspect$myAspectRol1
+
+t:myContextDef t:myContext
+	$rol1 => ()
+		t:myAspect$myAspectRol1$myAspectRol1Property = false

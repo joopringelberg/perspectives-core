@@ -10,14 +10,14 @@ import Data.Either (Either(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Test.BasicConstructors (test)
 import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
-import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
+import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
-import Test.Perspectives.Utils (runP)
+import Test.Perspectives.Utils (TestModelLoadEffects, runP)
 import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Main (runTest)
 
-main :: forall e. Eff (AjaxAvarCache (console :: CONSOLE, now :: NOW, testOutput :: TESTOUTPUT | e)) Unit
+main :: forall e. Eff (AjaxAvarCache (now :: NOW, testOutput :: TESTOUTPUT | (TestModelLoadEffects e))) Unit
 main = runTest do
   DTO.theSuite
   OGC.theSuite
