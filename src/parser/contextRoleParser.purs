@@ -14,22 +14,17 @@ import Data.Either (Either(..))
 import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, values)
 import Data.String (Pattern(..), fromCharArray, split)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_type, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, (%%>>))
-import Perspectives.DataTypeObjectGetters (contextType, buitenRol) as DTOG
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, defaultContextRecord, defaultRolRecord, rol_binding, rol_id, rol_pspType)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, addContext, addRol, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
-import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectEntiteit (cacheCachedEntiteit, cacheEntiteitPreservingVersion)
-import Perspectives.PerspectivesTypes (RolDef)
+import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
@@ -663,18 +658,9 @@ parseAndCache text = do
           case rol_binding rol of
             Nothing -> pure unit
             (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
-          setBuitenRolType rol
         pure $ Right r
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
-    setBuitenRolType :: PerspectRol -> MonadPerspectives (AjaxAvarCache e) Unit
-    setBuitenRolType buitenRol = do
-      br <- (rol_context buitenRol) %%>> DTOG.buitenRol
-      if (rol_id buitenRol) == unwrap br
-        then do
-        (buitenRolType :: RolDef) <- rol_context buitenRol %%>> DTOG.contextType /-/ buitenRolBeschrijvingDef
-        void $ cacheCachedEntiteit (rol_id buitenRol) (changeRol_type (unwrap buitenRolType) buitenRol)
-        else pure unit
 
     -- Ensure we have an AVar for the RolInstance that is represented by vuller.
     -- Take the Rol out of that AVar in a Forked Aff and add rolId to its gevuldeRollen.
