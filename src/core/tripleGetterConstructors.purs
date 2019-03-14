@@ -2,8 +2,7 @@ module Perspectives.TripleGetterConstructors where
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (elemIndex, union, difference, cons, null) as Arr
-import Data.Array (foldMap)
+import Data.Array (elemIndex, union, difference, cons, null, nub, foldMap) as Arr
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
@@ -41,7 +40,7 @@ closure (TypedTripleGetter nameOfp p) =
       case Arr.elemIndex id cumulator of
         Nothing -> do
           (triples :: Array (Triple o o e)) <- (traverse (getter (Arr.cons id cumulator))) (Arr.difference objectsOfP cumulator)
-          objects <- pure $ join $ map (\(Triple{object}) -> object) triples
+          objects <- pure $ Arr.nub $ join $ map (\(Triple{object}) -> object) triples
           pure $ Triple { subject: id
                         , predicate : name
                         , object: Arr.union objectsOfP objects
@@ -152,11 +151,11 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
 
 -- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
 some :: forall s e. (s **> PBool) e -> (s **> PBool) e
-some f = composeMonoidal f (alaF Disj foldMap ((==) (PBool "true")) >>> show >>> PBool) "some"
+some f = composeMonoidal f (alaF Disj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "some"
 
 -- | True iff at all of the boolean results of f is true (where true is represented as PBool "true").
 all :: forall s e. (s **> PBool) e -> (s **> PBool) e
-all f = composeMonoidal f (alaF Conj foldMap ((==) (PBool "true")) >>> show >>> PBool) "all"
+all f = composeMonoidal f (alaF Conj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "all"
 
 -----------------------------------------------------------
 -- CLOSURES

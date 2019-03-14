@@ -46,9 +46,7 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
     getter :: TripleGetter s o e
     getter id = do
       (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
-      -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-      (triples :: Array (Triple t o e)) <- traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
-      -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
+      (triples :: Array (Triple t o e)) <- traverse q objectsOfP
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
                     , predicate : name
