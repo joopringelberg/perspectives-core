@@ -10,7 +10,7 @@ import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), 
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext, binding, context) as DTG
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetGebondenAls) as OGC
-import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedProperty, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleGetterComposition (before, (>->))
 import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles) as TGC
@@ -43,6 +43,7 @@ searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter 
     (contextId @@ (TGC.directAspects >-> searchInAspectsAndPrototypes getter))
 
 -- | Applies the StringTypedTripleGetter e to the RolDef and all its prototypes and recursively to all its aspects.
+-- Test.Perspectives.ModelBasedTripleGetters, via propertiesDef
 searchInAspectRolesAndPrototypes :: forall e. StringTypedTripleGetter e -> StringTypedTripleGetter e
 searchInAspectRolesAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
   f :: StringTripleGetter e
@@ -130,7 +131,7 @@ searchUnqualifiedProperty :: forall e. Id.LocalName -> StringTypedTripleGetter e
 searchUnqualifiedProperty pd = TGC.searchInRolTelescope g
   where
     g :: StringTypedTripleGetter e
-    g = genericGetUnqualifiedProperty pd `trackedAs` pd
+    g = genericGetUnqualifiedLocalProperty pd `trackedAs` pd
 
 -----------------------------------------------------------
 -- GET A PROPERTY FROM A CONTEXT

@@ -1,12 +1,16 @@
 module Perspectives.PerspectivesTypes where
 
-import Data.Array (singleton)
+import Data.Array (findIndex, index, singleton)
 import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Data.StrMap (lookup)
+import Data.StrMap (keys, lookup)
+import Data.String.Regex (test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_binnenRol, rol_binding, rol_properties)
 import Perspectives.ContextRolAccessors (getRolMember, getContextMember')
 import Perspectives.CoreTypes (type (~~>), ObjectsGetter)
@@ -147,13 +151,23 @@ class (Newtype rol String, Eq rol) <= RolClass rol where
 genericGetProperty :: forall e. String -> (String ~~> String) e
 genericGetProperty pn = getRolMember \(rol :: PerspectRol) -> maybe [] propertyValue (lookup pn (rol_properties rol))
 
--- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r
+-- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r.
+-- | NOTICE that this does not return AspectProperties! These are not qualified with
+-- | The name of the rol.
 -- | E.g. getUnqualifiedProperty "voornaam"
-genericGetUnqualifiedProperty :: forall e. LocalName -> (String ~~> String) e
-genericGetUnqualifiedProperty ln = getRolMember \rol -> maybe [] propertyValue (lookup (ln `qualifiedWith` rol) (rol_properties rol))
+genericGetUnqualifiedLocalProperty :: forall e. LocalName -> (String ~~> String) e
+genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] propertyValue (lookup (ln `qualifiedWith` rol) (rol_properties rol))
   where
     qualifiedWith :: LocalName -> PerspectRol -> String
     qualifiedWith ln (PerspectRol {pspType}) = pspType <> "$" <> ln
+
+-- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
+-- | E.g. getUnqualifiedProperty "voornaam"
+genericGetUnqualifiedProperty :: forall e. LocalName -> (String ~~> String) e
+genericGetUnqualifiedProperty ln = getRolMember \rol ->
+  case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
+    Nothing -> []
+    (Just i) -> maybe [] propertyValue (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
 
 -----------------------------------------------------------
 -- THE CLASS BINDING
