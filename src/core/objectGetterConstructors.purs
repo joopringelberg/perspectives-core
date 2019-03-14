@@ -232,6 +232,7 @@ getRolInContext = typeWithPerspectivesTypes getContextRol
 -- E.g. getUnqualifiedContextRol "rolProperty" will return the same result as getContextRol
 -- "model:Perspectives$View$rolProperty".
 -- Test.Perspectives.ObjectGetterConstructors via getUnqualifiedRolInContext
+-- TODO: WAARSCHIJNLIJK HAALT DEZE FUNCTIE GEEN ROLLEN OP IN EEN ASPECT NAMESPACE!!
 getUnqualifiedContextRol :: forall e. Id.LocalName -> (AnyContext ~~> ContextRol) e
 getUnqualifiedContextRol ln = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] id (lookup (ln `qualifiedWith` context) (context_rolInContext context))
   where
@@ -364,17 +365,28 @@ searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buiten
 -- searchExternalUnqualifiedProperty ln = buitenRol /-/ searchUnqualifiedProperty ln
 
 -- | Look for the property with the given qualified name on the binnenRol of the ContextType c.
+-- Test.Perspectives.ObjectGetterConstructors
 getInternalProperty :: forall e. PropertyDef -> (AnyContext ~~> Value) e
 getInternalProperty pn = binnenRol /-/ getProperty pn
 
+-- Test.Perspectives.ObjectGetterConstructors via searchInternalUnqualifiedProperty
+getInternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
+getInternalUnqualifiedProperty ln = binnenRol /-/ getUnqualifiedProperty ln
+
 -- | Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope.
+-- Test.Perspectives.ObjectGetterConstructors
 searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
-searchInternalUnqualifiedProperty ln = binnenRol /-/ searchUnqualifiedProperty ln
+searchInternalUnqualifiedProperty ln cid = unlessNull (getInternalUnqualifiedProperty ln) cid
+  <|>
+  (searchExternalUnqualifiedProperty ln cid)
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
--- | it as their binding).
+-- | it as their binding). The type of rname (RolDef) can be a BuitenRol.
 getGebondenAls :: forall r b e. RolClass r => RolClass b => RolDef -> (r ~~> b) e
 getGebondenAls rname = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup (unwrap rname) gevuldeRollen)
+
+-- getGebondenAlsUnqualifiedRol :: forall r b e. RolClass r => RolClass b => Id.LocalName -> (r ~~> b) e
+-- getGebondenAlsUnqualifiedRol ln =
 
 genericGetGebondenAls :: forall e. String -> (String ~~> String) e
 genericGetGebondenAls rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)

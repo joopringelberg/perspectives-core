@@ -164,7 +164,15 @@ genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] propertyVa
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"
 genericGetUnqualifiedProperty :: forall e. LocalName -> (String ~~> String) e
-genericGetUnqualifiedProperty ln = getRolMember \rol ->
+genericGetUnqualifiedProperty ln = getRolMember $ getUnQualifiedPropertyFromPerspectRol ln
+
+-- genericGetUnqualifiedProperty ln = getRolMember \rol ->
+--   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
+--     Nothing -> []
+--     (Just i) -> maybe [] propertyValue (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
+
+getUnQualifiedPropertyFromPerspectRol :: forall e. LocalName -> PerspectRol -> Array String
+getUnQualifiedPropertyFromPerspectRol ln rol =
   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
     Nothing -> []
     (Just i) -> maybe [] propertyValue (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
@@ -198,10 +206,15 @@ instance rolClassBinnenRol :: RolClass BinnenRol where
     (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol cid
     case mbr of
       Nothing -> pure []
-      -- TODO: vervang de pattern matching zodra binnenRol een 'echte' rol is.
       (Just rol) -> pure $ (maybe [] propertyValue) (lookup (unwrap pn) (rol_properties rol))
 
-  getUnqualifiedProperty = typeWithPerspectivesTypes genericGetUnqualifiedProperty
+  -- getUnqualifiedProperty = typeWithPerspectivesTypes genericGetUnqualifiedProperty
+  getUnqualifiedProperty ln rn = typeWithPerspectivesTypes $ do
+    cid <- pure $ deconstructBinnenRol (unwrap rn)
+    (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol cid
+    case mbr of
+      Nothing -> pure []
+      (Just rol) -> pure $ getUnQualifiedPropertyFromPerspectRol ln rol
 
 instance bindingBinnenRol :: Binding BinnenRol BuitenRol where
   binding = typeWithPerspectivesTypes genericBinding

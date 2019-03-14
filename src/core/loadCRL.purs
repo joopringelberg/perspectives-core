@@ -8,6 +8,7 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
+import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
@@ -18,7 +19,7 @@ import Node.Path as Path
 import Node.Process (PROCESS, cwd)
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, UserMessage)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -58,12 +59,16 @@ loadCRLFile file = do
             (Just ctxt) -> do
               df@(DomeinFile {_id}) <- domeinFileFromContext ctxt
               storeDomeinFileInCouchdb df
-              lift $ log ("Saved, will attempt to run the typeDefChecker... " <> show textName)
-              messages <- checkModel _id
-              lift $ for_ messages
-                \m -> do
-                  log $ show m
-                  log "------"
+              lift $ log ("Saved, will attempt to run the typeDefChecker... " <> show textName <> "\n")
+              (messages :: Array UserMessage) <- checkModel _id
+              case null messages of
+                true -> lift $ log $ "Model " <> textName <> " is OK!\n"
+                false -> do
+                  lift $ for_ messages
+                    \m -> do
+                      log $ show m
+                      log "------"
+                  lift $ log "\n"
 
         (UserData buitenRollen) -> do
           lift $ log  "Attempting to save..."
