@@ -16,7 +16,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ModelBasedTripleGetters" do
+theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rollenDef" do
@@ -33,6 +33,7 @@ theSuite = suite "ModelBasedTripleGetters" do
   test "propertiesDef" do
     assertEqual "De roldefinitie t:myContextDef$rol1 ontleent property $myAspectRol1Property aan zijn aspectRol."
       (RolDef (t "myContextDef$rol1") ##= propertiesDef)
-      [PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"]
+      [PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property",
+      PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
   test "Tearing down" do
     unLoadTestModel "model:TestOGC"

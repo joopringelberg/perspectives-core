@@ -17,7 +17,7 @@ import Test.Perspectives.Utils (TestEffects, addTestContext, assertEqual, p, u)
 import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
 
 theSuite :: forall e. Free (TestF (TestEffects e)) Unit
-theSuite = suite "TripleGetterConstructors" do
+theSuite = suiteSkip "TripleGetterConstructors" do
   test "getContextRol" do
     assertEqual "The Context 'psp:Property' has three rolInContext roles."
       (((p "Property") ##= (getContextRol ( "model:Perspectives$Context$rolInContext"))) >>= (pure <<< length))

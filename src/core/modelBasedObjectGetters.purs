@@ -47,26 +47,27 @@ rangeDef :: forall e. (PropertyDef ~~> SimpleValueDef) e
 rangeDef = unwrap >>> searchContextRol (RolDef "model:Perspectives$Property$range") /-/ binding /-/ context >=> pure <<< map SimpleValueDef
 
 -- | Get the rol psp:Context$buitenRolBeschrijving.
--- | `psp:Context -> psp:RolInstance`
 buitenRolBeschrijving :: forall e. (AnyContext ~~> ContextRol) e
 buitenRolBeschrijving = getContextRol $ RolDef "model:Perspectives$Context$buitenRolBeschrijving"
 
 -- | From a context that is a definition, get the definition of its BuitenRol.
+-- Test.Perspectives.ObjectGetterConstructors
 buitenRolBeschrijvingDef :: forall e. (AnyDefinition ~~> RolDef) e
 buitenRolBeschrijvingDef = searchInAspectsAndPrototypes f
   where
     f :: (AnyContext ~~> RolDef) e
     f = typeWithPerspectivesTypes $ buitenRolBeschrijving /-/ binding /-/ context
 
--- | Get the psp:Context$buitenRol of a Context that is a definition. External properties of that Context
--- | are defined on that Rol.
--- | `psp:Context -> psp:RolInstance`
+-- | Get the rol psp:Context$binnenRolBeschrijving.
 binnenRolBeschrijving :: forall e. (AnyContext ~~> ContextRol) e
 binnenRolBeschrijving = getContextRol $ RolDef "model:Perspectives$Context$binnenRolBeschrijving"
 
--- | From a context that is a definition, get the definition of its BuitenRol.
+-- | From a context that is a definition, get the definition of its BinnenRol.
 binnenRolBeschrijvingDef :: forall e. (AnyDefinition ~~> RolDef) e
-binnenRolBeschrijvingDef = wrap >>> searchUnqualifiedRolDefinition "binnenRolBeschrijving"
+binnenRolBeschrijvingDef = searchInAspectsAndPrototypes f
+  where
+    f :: (AnyContext ~~> RolDef) e
+    f = typeWithPerspectivesTypes $ binnenRolBeschrijving /-/ binding /-/ context
 
 -- | `psp:Rol -> psp:Context`
 contextDef :: forall e. (RolDef ~~> ContextDef) e

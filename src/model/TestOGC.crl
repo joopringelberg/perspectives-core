@@ -7,12 +7,26 @@ Section $rolInContext
 --------------------------------------------------------------------------------
 --
 --------------------------------------------------------------------------------
-psp:Context t:myAspect
+psp:Context t:myUrAspect
 	prototype psp:ContextPrototype
 	$aspect => psp:Context
 	$rolInContext =>
+		psp:Rol $myUrAspectRol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $myUrAspectRol1Property
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+
+psp:Context t:myAspect
+	prototype psp:ContextPrototype
+	$aspect => t:myUrAspect
+	$rolInContext =>
 		psp:Rol $myAspectRol1
 			extern $isFunctioneel = true
+			$aspectRol => t:myUrAspect$myUrAspectRol1
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $myAspectRol1Property
@@ -33,6 +47,64 @@ psp:Context t:myContextDef
 			$mogelijkeBinding => psp:Rol
 			$aspectRol => t:myAspect$myAspectRol1
 
-t:myContextDef t:myContext
+t:myContextDef t:myContextPrototype
 	$rol1 => ()
 		t:myAspect$myAspectRol1$myAspectRol1Property = false
+
+t:myContextDef t:myContext
+	prototype t:myContextPrototype
+
+psp:Context t:myContextDef2
+	prototype psp:ContextPrototype
+	$aspect => t:myAspect
+
+psp:Context t:myContextDef3
+	prototype t:myContextDef
+
+psp:Context t:myContextDefWithExternalProperty
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $extProp1
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+
+t:myContextDefWithExternalProperty t:myContextWithExternalPropertyPrototype
+	prototype psp:ContextPrototype
+	extern $extProp1 = "hello world!"
+
+t:myContextDefWithExternalProperty t:myContextWithExternalProperty
+	prototype t:myContextWithExternalPropertyPrototype
+
+t:myContextDefWithExternalProperty t:myContextWithShadowedExternalProperty
+	prototype t:myContextWithExternalPropertyPrototype
+	extern $extProp1 = "Rain on the roof"
+
+psp:Context t:myContextDefWithInternalProperty
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $intProp1
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+
+t:myContextDefWithInternalProperty t:myContextWithInternalPropertyPrototype
+	prototype psp:ContextPrototype
+	intern $intProp1 = "hello world!"
+
+t:myContextDefWithInternalProperty t:myContextWithInternalProperty
+	prototype t:myContextWithInternalPropertyPrototype
+
+t:myContextDefWithInternalProperty t:myContextWithShadowedInternalProperty
+	prototype t:myContextWithInternalPropertyPrototype
+	intern $intProp1 = "Rain on the roof"
