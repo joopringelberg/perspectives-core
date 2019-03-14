@@ -13,9 +13,9 @@ import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRol
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
-import Perspectives.StringTripleGetterConstructors (searchInAspectsAndPrototypes, searchInAspectRolesAndPrototypes)
+import Perspectives.StringTripleGetterConstructors (getPrototype, searchInAspectRolesAndPrototypes, searchInAspectsAndPrototypes)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some, getContextRol)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closureOfPrototype, closure_, concat, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
@@ -131,14 +131,16 @@ rollenDef = searchInAspectsAndPrototypes (getContextRol (RolDef "model:Perspecti
 ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e
 ownPropertiesDef = unwrap `before` (getContextRol $ RolDef "model:Perspectives$Rol$rolProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
 
--- | All defined for the Rol, in the same namespace, on aspects, or on the MogelijkeBinding.
+-- | All properties defined for the Rol, in the same namespace, or on aspects, or on the MogelijkeBinding.
+-- Test.Perspectives.ModelBasedTripleGetters
 propertiesDef :: forall e. (RolDef **> PropertyDef) e
-propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding where
+propertiesDef = concat defsInAspectsAndPrototypes
+    (concat defsInMogelijkeBinding
+      (concat ownPropertiesDef (unwrap `before` closureOfPrototype >-> RolDef `before` ownPropertiesDef)))
+  where
 
   defsInAspectsAndPrototypes :: (RolDef **> PropertyDef) e
-  defsInAspectsAndPrototypes = (unwrap `before`
-    (searchInAspectRolesAndPrototypes (RolDef `before` ownPropertiesDef `followedBy` unwrap))
-    `followedBy` PropertyDef)
+  defsInAspectsAndPrototypes = closure_ directAspectRoles >-> unwrap `before` (closure_ getPrototype) `followedBy` RolDef >-> ownPropertiesDef
 
   defsInMogelijkeBinding :: (RolDef **> PropertyDef) e
   defsInMogelijkeBinding = composeLazy
