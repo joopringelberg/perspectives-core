@@ -13,7 +13,7 @@ import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRol
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
-import Perspectives.StringTripleGetterConstructors (getPrototype, searchInAspectRolesAndPrototypes, searchInAspectsAndPrototypes)
+import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype, searchInAspectRolesAndPrototypes, searchInAspectsAndPrototypes)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closureOfPrototype, closure_, concat, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
@@ -125,7 +125,7 @@ ownRollenDef :: forall e. (AnyContext **> RolDef) e
 ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context `followedBy` RolDef
 
 rollenDef :: forall e. (AnyContext **> RolDef) e
-rollenDef = searchInAspectsAndPrototypes (getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context)  `followedBy` RolDef
+rollenDef = closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef
 
 -- | All properties defined in the namespace of the Rol.
 ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e
@@ -134,9 +134,7 @@ ownPropertiesDef = unwrap `before` (getContextRol $ RolDef "model:Perspectives$R
 -- | All properties defined for the Rol, in the same namespace, or on aspects, or on the MogelijkeBinding.
 -- Test.Perspectives.ModelBasedTripleGetters
 propertiesDef :: forall e. (RolDef **> PropertyDef) e
-propertiesDef = concat defsInAspectsAndPrototypes
-    (concat defsInMogelijkeBinding
-      (concat ownPropertiesDef (unwrap `before` closureOfPrototype >-> RolDef `before` ownPropertiesDef)))
+propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
   where
 
   defsInAspectsAndPrototypes :: (RolDef **> PropertyDef) e
