@@ -42,10 +42,26 @@ closure p = getter [] where
         pure $ nub $ join (cons objectsOfP results)
       otherwise -> pure objectsOfP
 
+-- | The closure of an ObjectsGetter including the root.
+
+-- Test.Perspectives.ObjectGetterConstructors
+closure_ :: forall o e.
+  Eq o =>
+  (o ~~> o) e ->
+  (o ~~> o) e
+closure_ p id = closure p id >>= pure <<< cons id
+
 -- | Combinator to make an ObjectsGetter fail if it returns an empty result.
 -- | Useful in combination with computing alternatives using <|>
 unlessNull :: forall s o e. (s ~~> o) e -> (s ~~> o) e
 unlessNull og id = og id >>= \r -> if (null r) then empty else pure r
+
+-- | Combinator to make an ObjectsGetter fail if it returns PBool "false".
+-- | Useful in combination with computing alternatives using <|>
+unlessFalse :: forall s o e. (s ~~> PBool) e -> (s ~~> PBool) e
+unlessFalse og id = og id >>= \r -> case (elemIndex (PBool "false") r) of
+  Nothing -> pure r
+  otherwise -> empty
 
 -- Test.Perspectives.ObjectGetterConstructors
 contains :: forall s o e. Eq o => o -> (s ~~> o) e -> (s ~~> PBool) e
@@ -74,6 +90,7 @@ searchInRolTelescope getter rolId =
 
 -- | Applies the ObjectsGetter to each higher prototype until it succeeds or there is no prototype.
 -- | Does *not* apply the getter to the ContextType that is passed in!
+-- Test.Perspectives.ObjectGetterConstructors
 searchInPrototypeHierarchy :: forall o e.
   Eq o =>
   (BuitenRol ~~> o) e ->
@@ -102,7 +119,17 @@ searchInAspectsAndPrototypes getter contextId =
   <|>
   (directAspects /-/ searchInAspectsAndPrototypes getter) contextId
 
+checkInAspectsAndPrototypes :: forall e.
+  (AnyContext ~~> PBool) e ->
+  (AnyContext ~~> PBool) e
+-- Test.Perspectives.ObjectGetterConstructors, via hasRolDefinition
+checkInAspectsAndPrototypes getter contextId =
+  unlessFalse (searchLocallyAndInPrototypeHierarchy getter) contextId
+  <|>
+  (directAspects /-/ checkInAspectsAndPrototypes getter) contextId
+
 -- | Applies the getter (s ~~> o) e to the RolDef and all its prototypes and recursively to all its aspects.
+-- Test.Perspectives.ObjectGetterConstructors via searchUnqualifiedPropertyDefinition.
 searchInAspectRolesAndPrototypes :: forall o e.
   Eq o =>
   (AnyContext ~~> o) e ->
@@ -110,11 +137,13 @@ searchInAspectRolesAndPrototypes :: forall o e.
 searchInAspectRolesAndPrototypes getter contextId =
   unlessNull (searchLocallyAndInPrototypeHierarchy getter) contextId
   <|>
-  (directAspects /-/ searchInAspectRolesAndPrototypes getter) contextId
+  (directAspectRoles /-/ (unwrap >>> searchInAspectRolesAndPrototypes getter)) (RolDef contextId)
 
+-- Test.Perspectives.ObjectGetterConstructors
 directAspects :: forall e. (AnyContext ~~> AnyContext) e
 directAspects = getContextRol (RolDef "model:Perspectives$Context$aspect") /-/ rolBindingDef
 
+-- Test.Perspectives.ObjectGetterConstructors
 directAspectRoles :: forall e. (RolDef ~~> RolDef) e
 directAspectRoles = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectRol") /-/ rolBindingDef
 
@@ -122,6 +151,7 @@ directAspectProperties :: forall e. (PropertyDef ~~> PropertyDef) e
 directAspectProperties = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectProperty") /-/ rolBindingDef
 
 -- | The type of Rol or Context that can be bound to the Rol.
+-- Test.Perspectives.ObjectGetterConstructors
 mogelijkeBinding :: forall e. (RolDef ~~> AnyDefinition) e
 mogelijkeBinding = unwrap >>> getContextRol (RolDef "model:Perspectives$Rol$mogelijkeBinding") /-/ binding /-/ context
 
@@ -137,6 +167,7 @@ searchInMogelijkeBinding f roldef =
   <|>
   ((mogelijkeBinding >=> pure <<< map RolDef) /-/ searchInMogelijkeBinding f) roldef -- single type
 
+-- Test.Perspectives.ObjectGetterConstructors
 concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e
 concat f p s = do
   fs <- f s
@@ -144,10 +175,12 @@ concat f p s = do
   pure $ union fs ps
 
 -- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
+-- Test.Perspectives.ObjectGetterConstructors
 some :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e
 some f = f `composeMonoidal` (alaF Disj foldMap ((==) (PBool "true")) >>> show >>> PBool)
 
 -- | True iff at all of the boolean results of f is true (where true is represented as PBool "true").
+-- Test.Perspectives.ObjectGetterConstructors
 all :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e
 all f = f `composeMonoidal` (alaF Conj foldMap ((==) (PBool "true")) >>> show >>> PBool)
 
@@ -186,17 +219,19 @@ closureOfPrototype = closure getPrototype
 -----------------------------------------------------------
 -- | Get the ContextRol instances with the given rol name (RolDef) directly from the Context definition (not searching prototypes or Aspects).
 -- | E.g. getRol "model:Perspectives$View$rolProperty" will return all rol instances that bind a PropertyDef on an instance of psp:View.
+-- Test.Perspectives.ObjectGetterConstructors via getRolinContext
 getContextRol :: forall e. RolDef -> (AnyContext ~~> ContextRol) e
 getContextRol rn = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] id (lookup (unwrap rn) (context_rolInContext context))
 
 -- | As getContextRol, but for RolinContext (same function, differently typed).
+-- Test.Perspectives.ObjectGetterConstructors
 getRolInContext :: forall e. RolDef -> (AnyContext ~~> RolInContext) e
 getRolInContext = typeWithPerspectivesTypes getContextRol
 
 -- | Get the ContextRol instances with the given local name directly from the Context.
 -- E.g. getUnqualifiedContextRol "rolProperty" will return the same result as getContextRol
 -- "model:Perspectives$View$rolProperty".
--- TODO: rename getRolByLocalName to getUnqualifiedRol.
+-- Test.Perspectives.ObjectGetterConstructors via getUnqualifiedRolInContext
 getUnqualifiedContextRol :: forall e. Id.LocalName -> (AnyContext ~~> ContextRol) e
 getUnqualifiedContextRol ln = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] id (lookup (ln `qualifiedWith` context) (context_rolInContext context))
   where
@@ -204,6 +239,7 @@ getUnqualifiedContextRol ln = typeWithPerspectivesTypes $ getContextMember \cont
     qualifiedWith ln (PerspectContext {pspType}) = pspType <> "$" <> ln
 
 -- | As getUnqualifiedContextRol, but for RolinContext (same function, differently typed).
+-- Test.Perspectives.ObjectGetterConstructors
 getUnqualifiedRolInContext :: forall e. Id.LocalName -> (AnyContext ~~> RolInContext) e
 getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 
@@ -211,17 +247,17 @@ getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 -- SEARCH A ROL IN A CONTEXT AND ITS PROTOTYPES
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
+-- searchLocallyAndInPrototypeHierarchy and getContextRol are tested.
 searchContextRol :: forall e. RolDef -> (AnyContext ~~> ContextRol) e
 searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getContextRol rn) :: (AnyContext ~~> ContextRol) e)
 
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
+-- searchLocallyAndInPrototypeHierarchy and getContextRol are tested.
 searchRolInContext :: forall e. RolDef -> (AnyContext ~~> RolInContext) e
 searchRolInContext rn = searchLocallyAndInPrototypeHierarchy ((getRolInContext rn) :: (AnyContext ~~> RolInContext) e)
 
 -- | Search for an unqualified rol both in the local context and all its prototypes.
--- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
--- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
--- TODO: waarom alleen in ContextDef?
+-- Test.Perspectives.ObjectGetterConstructors
 searchUnqualifiedRol :: forall e. Id.LocalName -> (AnyContext ~~> ContextRol) e
 searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualifiedContextRol rn) :: (AnyContext ~~> ContextRol) e)
 
@@ -248,8 +284,7 @@ getUnqualifiedRolDefinition ln = unwrap >>> (filter_
 -- | Look for the definition of a Rol by its local name, in the ContextDef and its Aspects and in all their prototypes.
 -- | As the name of a RolDefinition on an Aspect will be scoped to that Aspect, we do not have to search once
 -- | we have the qualified name of the Rol. Hence there is no version that searches qualified roles!
--- TODO: replace uses of 'getRolUsingAspects' by this function.
--- getRolUsingAspects `psp:Rol -> ObjectsGetter`
+-- Test.Perspectives.ObjectGetterConstructors
 searchUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef ~~> RolDef) e
 searchUnqualifiedRolDefinition ln = unwrap >>> searchInAspectsAndPrototypes f
   where
@@ -259,11 +294,13 @@ searchUnqualifiedRolDefinition ln = unwrap >>> searchInAspectsAndPrototypes f
 -----------------------------------------------------------
 -- CHECK IF A CONTEXT DEFINITION HAS A ROL DEFINITION
 -----------------------------------------------------------
+-- Test.Perspectives.ObjectGetterConstructors
 hasLocalRolDefinition :: forall e. RolDef -> (ContextDef ~~> PBool) e
 hasLocalRolDefinition qn = unwrap >>> contains (unwrap qn) (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context)
 
+-- Test.Perspectives.ObjectGetterConstructors
 hasRolDefinition :: forall e. RolDef -> (ContextDef ~~> PBool) e
-hasRolDefinition qn = unwrap >>> searchInAspectsAndPrototypes f
+hasRolDefinition qn = unwrap >>> checkInAspectsAndPrototypes f
   where
     f :: (AnyContext ~~> PBool) e
     f = pure <<< ContextDef >=> hasLocalRolDefinition qn
@@ -280,6 +317,7 @@ searchProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
 
 -- | The value of the unqualified property pd, wherever in the telescope it is represented.
 -- | NOTE: this function cannot be applied to a BinnenRol.
+-- Test.Perspectives.ObjectGetterConstructors
 searchUnqualifiedProperty :: forall b e. RolClass b => Id.LocalName -> (b ~~> Value) e
 searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
   where
@@ -294,6 +332,7 @@ searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
 
 -- | Searches the qualified property first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
+-- Test.Perspectives.ObjectGetterConstructors via searchExternalProperty
 searchPropertyOnContext :: forall r e. RolClass r => (AnyContext ~~> r) e -> PropertyDef -> (AnyContext ~~> Value) e
 searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
@@ -302,6 +341,7 @@ searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
 
 -- | Searches the property with the local name first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
+-- Test.Perspectives.ObjectGetterConstructors via searchExternalUnqualifiedProperty
 searchUnqualifiedPropertyOnContext :: forall r e. RolClass r => (AnyContext ~~> r) e  -> Id.LocalName -> (AnyContext ~~> Value) e
 searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
@@ -309,13 +349,16 @@ searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHier
     f = (rolgetter /-/ ((searchUnqualifiedProperty p)))
 
 -- | Look for the property PropertyDef on the buitenRol of the ContextType c and on its telescope, shadowing any values
--- | on the prototypes.
+-- | on the prototypes. This function is cumbersome to use, because the full name of an external
+-- | property includes 'buitenRolBeschrijving'.
+-- Test.Perspectives.ObjectGetterConstructors
 searchExternalProperty :: forall e. PropertyDef -> (AnyContext ~~> Value) e
 searchExternalProperty pn = searchPropertyOnContext buitenRol pn
 -- searchExternalProperty pn = buitenRol /-/ searchProperty pn
 
 -- | Look for the property with the given local name on the buitenRol of the ContextType c and on its telescope,
 -- | shadowing any values on the prototypes.
+-- Test.Perspectives.ObjectGetterConstructors
 searchExternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buitenRol ln
 -- searchExternalUnqualifiedProperty ln = buitenRol /-/ searchUnqualifiedProperty ln
@@ -347,18 +390,20 @@ genericGetGebondenAls rname = getRolMember \(PerspectRol{gevuldeRollen}) -> mayb
 
 -- | Look for the definition of a Property by its local name, in the RolDef (not searching prototypes or Aspects).
 -- | If no Property is defined with this local name, will return an empty result.
+-- Test.Perspectives.ObjectGetterConstructors
 getUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef ~~> PropertyDef) e
 getUnqualifiedPropertyDefinition ln = unwrap >>> (filter_
   (flip Id.hasLocalName ln)
-  (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context))
+  (getUnqualifiedContextRol "rolProperty" /-/ binding /-/ context))
     >=> (pure <<< map PropertyDef)
 
--- | Look for the definition of a Property by its local name, in the RolDef and its Aspects and in all their prototypes.
+-- | Look for the definition of a Property by its local name, in the RolDef and its AspectRoles and in all their prototypes.
+-- Test.Perspectives.ObjectGetterConstructors
 searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef ~~> PropertyDef) e
-searchUnqualifiedPropertyDefinition ln = searchInMogelijkeBinding $ searchUnqualifiedPropertyDefinition' ln where
+searchUnqualifiedPropertyDefinition ln = searchUnqualifiedPropertyDefinition' ln where
 
   searchUnqualifiedPropertyDefinition' ::	Id.LocalName -> (RolDef ~~> PropertyDef) e
-  searchUnqualifiedPropertyDefinition' ln = unwrap >>> searchInAspectsAndPrototypes f
+  searchUnqualifiedPropertyDefinition' ln = unwrap >>> searchInAspectRolesAndPrototypes f
     where
       f :: (AnyContext ~~> PropertyDef) e
       f = pure <<< RolDef >=> getUnqualifiedPropertyDefinition ln

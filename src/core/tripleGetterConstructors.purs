@@ -11,7 +11,7 @@ import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), MPQ, (@@))
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, context) as DTG
-import Perspectives.DataTypeTripleGetters (binnenRol)
+import Perspectives.DataTypeTripleGetters (binnenRol, identity)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getGebondenAls) as OGC
@@ -27,7 +27,7 @@ import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), 
 -----------------------------------------------------------
 -- | The recursive closure of a query, bottoming out when it has no results.
 -- | The result only contains the argument id if it can be obtained by applying p,
--- | never because it is the starting point of the computation.
+-- | never because it is the root of the computation.
 closure :: forall o e.
   Eq o =>
   (o **> o) e ->
@@ -52,6 +52,15 @@ closure (TypedTripleGetter nameOfp p) =
 
     name :: String
     name = "(closure " <>  nameOfp <> ")"
+
+-- | The recursive closure of a query, bottoming out when it has no results.
+-- | The result contains the root.
+-- Test.Perspectives.ModelBasedTripleGetters, via propertiesDef.
+closure_ :: forall o e.
+  Eq o =>
+  (o **> o) e ->
+  (o **> o) e
+closure_ tg = concat identity (closure tg)
 
 -- | Combinator to make an ObjectsGetter fail if it returns an empty result.
 -- | Useful in combination with computing alternatives using <|>
