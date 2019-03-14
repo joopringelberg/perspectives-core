@@ -363,7 +363,7 @@ searchExternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> V
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buitenRol ln
 -- searchExternalUnqualifiedProperty ln = buitenRol /-/ searchUnqualifiedProperty ln
 
--- | Look for the property with the given local name on the binnenRol of the ContextType c.
+-- | Look for the property with the given qualified name on the binnenRol of the ContextType c.
 getInternalProperty :: forall e. PropertyDef -> (AnyContext ~~> Value) e
 getInternalProperty pn = binnenRol /-/ getProperty pn
 

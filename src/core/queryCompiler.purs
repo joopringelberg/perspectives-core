@@ -32,6 +32,11 @@ getPropertyFunction :: forall e.
   MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
 getPropertyFunction = constructGetter QualifiedProperty
 
+getInternalPropertyFunction :: forall e.
+  String ->
+  MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+getInternalPropertyFunction = constructGetter QualifiedInternalProperty
+
 getRolFunction :: forall e.
   String ->
   MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)

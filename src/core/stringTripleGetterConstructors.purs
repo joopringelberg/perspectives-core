@@ -13,7 +13,7 @@ import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspe
 import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleGetterComposition (before, (>->))
-import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles) as TGC
+import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles, getInternalProperty) as TGC
 import Perspectives.TripleGetterConstructors (closure, unlessNull, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (flip, (<>))
@@ -155,7 +155,8 @@ searchExternalUnqualifiedProperty :: forall e. Id.LocalName -> StringTypedTriple
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext (typeWithPerspectivesTypes DTG.buitenRol) ln
 
 getInternalProperty :: forall e. String -> StringTypedTripleGetter e
-getInternalProperty pn = typeWithPerspectivesTypes DTG.binnenRol >-> genericGetProperty pn `trackedAs` pn
+-- getInternalProperty pn = typeWithPerspectivesTypes DTG.binnenRol >-> genericGetProperty pn `trackedAs` pn
+getInternalProperty = typeWithPerspectivesTypes TGC.getInternalProperty
 
 searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> StringTypedTripleGetter e
 searchInternalUnqualifiedProperty ln = typeWithPerspectivesTypes DTG.binnenRol >-> searchUnqualifiedProperty ln

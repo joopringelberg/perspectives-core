@@ -26,9 +26,9 @@ import Perspectives.Identifiers (buitenRol)
 import Perspectives.ModelBasedObjectGetters (contextDef)
 import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, mogelijkeBinding, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef)
 import Perspectives.ObjectGetterConstructors (alternatives, searchContextRol)
-import Perspectives.PerspectivesTypes (Context(..), ContextDef(..), ContextRol, PropertyDef(..), RolDef(..), SimpleValueDef, AnyContext)
+import Perspectives.PerspectivesTypes (AnyContext, Context(..), ContextDef(..), ContextRol, PropertyDef(..), RolDef(..), SimpleValueDef)
 import Perspectives.QueryCombinators (toBoolean)
-import Perspectives.QueryCompiler (getPropertyFunction)
+import Perspectives.QueryCompiler (getPropertyFunction, getInternalPropertyFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closureOfAspect)
@@ -79,10 +79,10 @@ checkContextProperties contextdef contextInstance = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap contextInstance
   (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap contextInstance) >>= pure <<< context_binnenRol
   definedInternalProperties <- lift (unwrap contextdef @@= binnenRolBeschrijvingDef >-> propertiesDef)
-  void $ traverse (checkRangeAndAvailability contextInstance binnenrol) definedInternalProperties
+  void $ traverse (checkRangeAndAvailability contextInstance binnenrol (getBinnenRolPropertyValues contextInstance binnenrol)) definedInternalProperties
 
   definedExternalProperties <- lift (unwrap contextdef @@= buitenRolBeschrijvingDef >-> propertiesDef)
-  void $ traverse (checkRangeAndAvailability contextInstance buitenrol) definedExternalProperties
+  void $ traverse (checkRangeAndAvailability contextInstance buitenrol (getPropertyValues contextInstance buitenrol)) definedExternalProperties
 
   availableExternalProperties <- lift (buitenRol $ unwrap contextInstance @@= DTG.propertyTypen)
   checkAvailableProperties buitenrol availableExternalProperties definedExternalProperties contextInstance
@@ -136,19 +136,36 @@ checkAvailableRoles typeId cid = do
         Nothing -> tell [RolNotDefined (unwrap rolType) (unwrap cid) (unwrap typeId)]
         otherwise -> pure unit
 
+-- | Get the property values of a BuitenRol or a RolInContext.
+getPropertyValues :: forall e. Context -> PerspectRol -> PropertyDef -> TDChecker (AjaxAvarCache e) (Array String)
+getPropertyValues cid rol propertyType = do
+  (propertyGetter :: StringTypedTripleGetter e) <- lift $ lift $ getPropertyFunction (unwrap propertyType)
+  -- Read the property on the rol instance.
+  (Triple {object}) <- lift (rol_id rol @@ propertyGetter) -- Dit gaat fout bij een BinnenRol!
+  pure object
+
+-- | Get the property values of a BinnenRol.
+getBinnenRolPropertyValues :: forall e. Context -> PerspectRol -> PropertyDef -> TDChecker (AjaxAvarCache e) (Array String)
+getBinnenRolPropertyValues cid rol propertyType = do
+  (propertyGetter :: StringTypedTripleGetter e) <- lift $ lift $ getInternalPropertyFunction (unwrap propertyType)
+  -- Read the property on the context instance.
+  (Triple {object}) <- lift (unwrap cid @@ propertyGetter)
+  pure object
+
 -- | Checks the value of the Property with the range that has been defined.
 -- | If the Property is mandatory and missing, adds a message.
 -- | If the Property is functional and more than one value has been given, adds a message.
 -- | If the string-valued value of the property cannot be parsed into its declared type,
 -- | adds a message.
-checkRangeAndAvailability :: forall e. Context -> PerspectRol -> PropertyDef -> TDChecker (AjaxAvarCache e) Unit
-checkRangeAndAvailability cid rol propertyType = do
-  (rolType :: RolDef) <- pure $ RolDef $ rol_pspType rol
-  (propertyGetter :: StringTypedTripleGetter e) <- lift $ lift $ getPropertyFunction (unwrap propertyType)
-  -- Read the property on the rol instance.
-  (Triple {object}) <- lift (rol_id rol @@ propertyGetter)
-  pure unit
-  case head object of
+checkRangeAndAvailability :: forall e.
+  Context ->
+  PerspectRol ->
+  (PropertyDef -> TDChecker (AjaxAvarCache e) (Array String)) ->
+  PropertyDef ->
+  TDChecker (AjaxAvarCache e) Unit
+checkRangeAndAvailability cid rol getter propertyType = do
+  object <- getter propertyType
+  case (head object) of
     Nothing -> ifM (lift $ propertyIsMandatory propertyType)
       (tell [MissingPropertyValue (unwrap cid) (unwrap propertyType) (rol_id rol)])
       (pure unit)
@@ -201,7 +218,7 @@ compareRolInstancesToDefinition contextInstance rolType = do
       -- Check the properties.
       (definedRolProperties :: Array PropertyDef) <- lift $ (rolType @@= propertiesDef)
       (rol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap rolInstance)
-      void $ (traverse (checkRangeAndAvailability contextInstance rol)) definedRolProperties
+      void $ traverse (checkRangeAndAvailability contextInstance rol (getPropertyValues contextInstance rol)) definedRolProperties
 
       -- Detect used but undefined properties.
       (availableProperties :: Array String) <- lift $ lift $ propertyTypen $ unwrap rolInstance
