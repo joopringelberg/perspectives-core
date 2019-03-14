@@ -7,7 +7,7 @@ import Data.Newtype (unwrap)
 import Perspectives.DataTypeObjectGetters (buitenRol, context, iedereRolInContext)
 import Perspectives.DataTypeTripleGetters (propertyTypen) as DTG
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
-import Perspectives.ObjectGetterConstructors (all, closureOfAspect, closureOfBinding, closure_, concat, contains, directAspectRoles, directAspects, getInternalProperty, getRolInContext, getUnqualifiedContextRol, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, hasLocalRolDefinition, hasRolDefinition, mogelijkeBinding, searchExternalProperty, searchExternalUnqualifiedProperty, searchInPrototypeHierarchy, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some)
+import Perspectives.ObjectGetterConstructors (all, closureOfAspect, closureOfBinding, closure_, concat, contains, directAspectRoles, directAspects, getGebondenAls, getInternalProperty, getRolInContext, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, hasLocalRolDefinition, hasRolDefinition, mogelijkeBinding, searchExternalProperty, searchExternalUnqualifiedProperty, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), Value(..), binding, genericBinding, getProperty, getUnqualifiedProperty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
@@ -18,7 +18,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ObjectGetterConstructors" do
+theSuite = suiteSkip "ObjectGetterConstructors" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "closure_" do
@@ -76,10 +76,14 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       (getRolInContext (RolDef (p "Context$rolInContext")) (t "myContextDef"))
       [RolInContext $ t "myContextDef$rolInContext_1"]
+
   test "getUnqualifiedRol" do
+    loadTestModel "TestOGC.crl"
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       (getUnqualifiedRolInContext "rolInContext" (t "myContextDef"))
       [RolInContext $ t "myContextDef$rolInContext_1"]
+    unLoadTestModel "model:TestOGC"
+
   test "closureOfBinding" do
     -- TODO: als het nieuwe model is opgeslagen, deze test mee laten draaien.
     -- assertEqual "$range of t:myAspect$myAspectRol1$myAspectRol1Property is bound to psp:Boolean (its BuitenRol) and that is in turn bound to (the BuitenRol of) psp:SimpleValuePrototype"
@@ -154,18 +158,36 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "t:myContextWithShadowedExternalProperty shadows the value for $extProp1 of its prototype"
       ((searchExternalUnqualifiedProperty "extProp1") (t "myContextWithShadowedExternalProperty"))
       ([Value "Rain on the roof"]:: Array Value)
+  test "getInternalProperty (Look for the property with the given local name on the binnenRol of the ContextType c)" do
+    assertEqual "t:myContextWithInternalPropertyPrototype gives a value to $intProp1"
+      ((getInternalProperty $ PropertyDef $ t "myContextDefWithInternalProperty$binnenRolBeschrijving$intProp1") (t "myContextWithInternalPropertyPrototype"))
+      [Value "hello world!"]
+  test "searchInternalUnqualifiedProperty (Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope)" do
+    assertEqual "t:myContextWithInternalProperty has no value for $intProp1 through its prototype"
+      ((searchInternalUnqualifiedProperty "intProp1") (t "myContextWithInternalProperty"))
+      ([]:: Array Value)
+    assertEqual "t:myContextWithInternalProperty has a value for $someProp through its buitenRol"
+      ((searchInternalUnqualifiedProperty "someProp") (t "myContextWithInternalProperty"))
+      ([Value "hello again."]:: Array Value)
+    assertEqual "t:myContextWithShadowedInternalProperty has a value for its internal $someProp that shadows the value of its external $someProp"
+      ((searchInternalUnqualifiedProperty "someProp") (t "myContextWithShadowedInternalProperty"))
+      ([Value "Sun on the roof"]:: Array Value)
+    assertEqual "t:myContextWithShadowedInternalProperty has a value for its external $someProp."
+      ((searchExternalUnqualifiedProperty "someProp") (t "myContextWithShadowedInternalProperty"))
+      ([Value "Rain on the roof"]:: Array Value)
 
-  testOnly "getInternalProperty" do
+  test "getBebondenAls (From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have it as their binding))" do
     loadTestModel "TestOGC.crl"
-    assertEqual ""
-      ((getInternalProperty $ PropertyDef "") (t ""))
-      [Value ""]
+    assertEqual "The buitenRol of t:myContextWithExternalPropertyPrototype is bound to two Contexts that have declared it as their prototype"
+      ((buitenRol /-/ getGebondenAls (RolDef $ t "myContextDefWithExternalProperty$buitenRolBeschrijving")) (t "myContextWithExternalPropertyPrototype"))
+      ([BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol", BuitenRol $ t "myContextWithExternalProperty_buitenRol"])
     unLoadTestModel "model:TestOGC"
 
   -- testOnly "Add a test!" do
   --   loadTestModel "TestOGC.crl"
   --
   --   unLoadTestModel "model:TestOGC"
+
   test "Tearing down" do
     unLoadTestModel "model:TestOGC"
   pure unit

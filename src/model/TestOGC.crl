@@ -50,6 +50,7 @@ psp:Context t:myContextDef
 t:myContextDef t:myContextPrototype
 	$rol1 => ()
 		t:myAspect$myAspectRol1$myAspectRol1Property = false
+	t:myAspect$myAspectRol2 => ()
 
 t:myContextDef t:myContext
 	prototype t:myContextPrototype
@@ -86,7 +87,6 @@ t:myContextDefWithExternalProperty t:myContextWithShadowedExternalProperty
 	extern $extProp1 = "Rain on the roof"
 
 psp:Context t:myContextDefWithInternalProperty
-	prototype psp:ContextPrototype
 	$aspect => psp:Context
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
@@ -97,6 +97,20 @@ psp:Context t:myContextDefWithInternalProperty
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
 					$range => psp:String
+			$rolProperty =>
+				psp:Property $someProp
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $someProp
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
 
 t:myContextDefWithInternalProperty t:myContextWithInternalPropertyPrototype
 	prototype psp:ContextPrototype
@@ -104,7 +118,9 @@ t:myContextDefWithInternalProperty t:myContextWithInternalPropertyPrototype
 
 t:myContextDefWithInternalProperty t:myContextWithInternalProperty
 	prototype t:myContextWithInternalPropertyPrototype
+	extern $someProp = "hello again."
 
 t:myContextDefWithInternalProperty t:myContextWithShadowedInternalProperty
 	prototype t:myContextWithInternalPropertyPrototype
-	intern $intProp1 = "Rain on the roof"
+	extern $someProp = "Rain on the roof"
+	intern $someProp = "Sun on the roof"

@@ -3,20 +3,17 @@ module Test.Perspectives.ModelBasedTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (length)
-import Data.Maybe (Maybe(..))
-import Partial.Unsafe (unsafePartial)
 import Perspectives.ModelBasedTripleGetters (ownPropertiesDef, propertiesDef, rollenDef)
-import Perspectives.PerspectivesTypes (BuitenRol(..), ContextRol(..), PropertyDef(..), RolDef(..), RolInContext(..), binding)
+import Perspectives.PerspectivesTypes (PropertyDef(..), RolDef(..))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, addTestContext, assertEqual, loadTestModel, p, u, unLoadTestModel)
-import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suiteSkip "ModelBasedTripleGetters" do
+theSuite = suite "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rollenDef" do
@@ -26,6 +23,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       [ RolDef (p "Property$range")
       , RolDef (p "Property$aspectProperty")
       , RolDef (p "Property$bindingProperty")]
+    assertEqual "myContextDef defines three roles"
+      ((t "myContextDef") ##= rollenDef)
+      (map RolDef ["model:TestOGC$myContextDef$rol1","model:TestOGC$myAspect$myAspectRol1","model:TestOGC$myAspect$myAspectRol2","model:TestOGC$myUrAspect$myUrAspectRol1","model:Perspectives$Context$binnenRolBeschrijving","model:Perspectives$Context$buitenRolBeschrijving","model:Perspectives$Context$rolInContext","model:Perspectives$Context$interneView","model:Perspectives$Context$externeView","model:Perspectives$Context$prototype","model:Perspectives$Context$aspect","model:Perspectives$Context$gebruikerRol","model:Perspectives$Context$contextBot"])
   test "ownPropertiesDef" do
     assertEqual "De roldefinitie t:myAspect$myAspectRol1 definieert de property $myAspectRol1Property."
       (RolDef (t "myAspect$myAspectRol1") ##= ownPropertiesDef)
