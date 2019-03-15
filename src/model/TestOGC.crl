@@ -48,6 +48,7 @@ psp:Context t:myContextDef
 			$aspectRol => t:myAspect$myAspectRol1
 
 t:myContextDef t:myContextPrototype
+	prototype psp:ContextPrototype
 	$rol1 => ()
 		t:myAspect$myAspectRol1$myAspectRol1Property = false
 	t:myAspect$myAspectRol2 => ()
