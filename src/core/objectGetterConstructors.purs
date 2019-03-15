@@ -3,13 +3,17 @@ module Perspectives.ObjectGetterConstructors where
 import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Array (cons, difference, elemIndex, foldMap, head, nub, null, union)
-import Data.Array (filter) as Arr
-import Data.Maybe (Maybe(..), maybe)
+import Data.Array (filter, findIndex, index) as Arr
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap)
-import Data.StrMap (lookup)
+import Data.StrMap (keys, lookup)
+import Data.String.Regex (test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_rolInContext)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), MP, ObjectsGetter)
@@ -17,7 +21,7 @@ import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, rolBin
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/), (\-\))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, AnyDefinition, binding, genericBinding, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
-import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
+import Perspectives.Syntax (PerspectContext(), PerspectRol(..))
 import Prelude (class Eq, bind, flip, id, join, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -- | This module only exports constructors that search roles or properties,
@@ -232,12 +236,14 @@ getRolInContext = typeWithPerspectivesTypes getContextRol
 -- E.g. getUnqualifiedContextRol "rolProperty" will return the same result as getContextRol
 -- "model:Perspectives$View$rolProperty".
 -- Test.Perspectives.ObjectGetterConstructors via getUnqualifiedRolInContext
--- TODO: WAARSCHIJNLIJK HAALT DEZE FUNCTIE GEEN ROLLEN OP IN EEN ASPECT NAMESPACE!!
 getUnqualifiedContextRol :: forall e. Id.LocalName -> (AnyContext ~~> ContextRol) e
-getUnqualifiedContextRol ln = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] id (lookup (ln `qualifiedWith` context) (context_rolInContext context))
+getUnqualifiedContextRol ln = typeWithPerspectivesTypes (getContextMember $ getUnQualifiedRolFromPerspectContext ln)
   where
-    qualifiedWith :: Id.LocalName -> PerspectContext -> String
-    qualifiedWith ln (PerspectContext {pspType}) = pspType <> "$" <> ln
+  getUnQualifiedRolFromPerspectContext :: Id.LocalName -> PerspectContext -> Array String
+  getUnQualifiedRolFromPerspectContext ln ctxt =
+    case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ context_rolInContext ctxt) of
+      Nothing -> []
+      (Just i) -> maybe [] id (lookup (unsafePartial $ fromJust (Arr.index (keys $ context_rolInContext ctxt) i)) (context_rolInContext ctxt))
 
 -- | As getUnqualifiedContextRol, but for RolinContext (same function, differently typed).
 -- Test.Perspectives.ObjectGetterConstructors
@@ -249,6 +255,7 @@ getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
 -- searchLocallyAndInPrototypeHierarchy and getContextRol are tested.
+-- Test.Perspectives.ObjectGetterConstructors
 searchContextRol :: forall e. RolDef -> (AnyContext ~~> ContextRol) e
 searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getContextRol rn) :: (AnyContext ~~> ContextRol) e)
 

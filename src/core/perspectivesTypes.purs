@@ -166,12 +166,6 @@ genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] propertyVa
 genericGetUnqualifiedProperty :: forall e. LocalName -> (String ~~> String) e
 genericGetUnqualifiedProperty ln = getRolMember $ getUnQualifiedPropertyFromPerspectRol ln
 
--- genericGetUnqualifiedProperty ln = getRolMember \rol ->
---   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
---     Nothing -> []
---     (Just i) -> maybe [] propertyValue (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
-
--- TODO: verplaats naar de file met de definitie PerspectRol?
 getUnQualifiedPropertyFromPerspectRol :: forall e. LocalName -> PerspectRol -> Array String
 getUnQualifiedPropertyFromPerspectRol ln rol =
   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
@@ -209,7 +203,6 @@ instance rolClassBinnenRol :: RolClass BinnenRol where
       Nothing -> pure []
       (Just rol) -> pure $ (maybe [] propertyValue) (lookup (unwrap pn) (rol_properties rol))
 
-  -- getUnqualifiedProperty = typeWithPerspectivesTypes genericGetUnqualifiedProperty
   getUnqualifiedProperty ln rn = typeWithPerspectivesTypes $ do
     cid <- pure $ deconstructBinnenRol (unwrap rn)
     (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol cid
