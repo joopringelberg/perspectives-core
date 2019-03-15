@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, context)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getGebondenAls, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, searchUnqualifiedRolDefinition, some, unlessNull)
+import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, searchUnqualifiedRolDefinition, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -81,38 +81,38 @@ contextDef rid =
 
 -- | Get the ContextDef that holds the RolDef in the given Rol.
 rolDef2ContextDef :: forall e. RolDef -> (RolDef ~~> ContextDef) e
-rolDef2ContextDef rd = unwrap >>> buitenRol /-/ (getGebondenAls rd :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
+rolDef2ContextDef rd = unwrap >>> buitenRol /-/ (getRoleBinders rd :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
 
 -- | The Context of the RolInContext.
 -- | `psp:Rol -> psp:Context`
 rolInContextContextDef :: forall e. (RolDef ~~> ContextDef) e
 rolInContextContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$rolInContext")
--- rolInContextContextDef = unwrap >>> buitenRol /-/ (getGebondenAls (RolDef "model:Perspectives$Context$rolInContext") :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
+-- rolInContextContextDef = unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Context$rolInContext") :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
 
 -- | The Context of the gebruikerRol.
 -- | `psp:Rol -> psp:Context`
 gebruikerRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 gebruikerRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$gebruikerRol")
--- gebruikerRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$gebruikerRol" /-/ context
+-- gebruikerRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$gebruikerRol" /-/ context
 
 -- | The Context of the contextBot.
 -- | `psp:Rol -> psp:Context`
 contextBotContextDef :: forall e. (RolDef ~~> ContextDef) e
 contextBotContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$contextBot")
--- contextBotContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$contextBot" /-/ context
+-- contextBotContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$contextBot" /-/ context
 
 -- | The Context of the BinnenRol.
 -- | `psp:Rol -> psp:Context`
 binnenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 binnenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$binnenRolBeschrijving")
--- binnenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$binnenRolBeschrijving" /-/ context
+-- binnenRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$binnenRolBeschrijving" /-/ context
 
 -- | The Context of the buitenRolBeschrijving. I.e. starting from a Context that is a BuitenRolBeschrijving, returns
 -- | the Context that describes the type that the BuitenRolBeschrijving belongs to.
 -- | `psp:Context -> psp:Context`
 buitenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 buitenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$buitenRolBeschrijving")
--- buitenRolContextDef = buitenRol /-/ getGebondenAls "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
+-- buitenRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`

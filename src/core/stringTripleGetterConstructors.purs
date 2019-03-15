@@ -161,8 +161,8 @@ getInternalProperty = typeWithPerspectivesTypes TGC.getInternalProperty
 searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> StringTypedTripleGetter e
 searchInternalUnqualifiedProperty ln = typeWithPerspectivesTypes DTG.binnenRol >-> searchUnqualifiedProperty ln
 
-getGebondenAls :: forall e. String -> StringTypedTripleGetter e
-getGebondenAls rname = OGC.genericGetGebondenAls rname `trackedAs` rname
+getRoleBinders :: forall e. String -> StringTypedTripleGetter e
+getRoleBinders rname = OGC.genericGetGebondenAls rname `trackedAs` rname
 
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION

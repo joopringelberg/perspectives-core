@@ -13,7 +13,7 @@ import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, c
 import Perspectives.DataTypeTripleGetters (binnenRol, identity)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
-import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getGebondenAls) as OGC
+import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getRoleBinders) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
@@ -328,8 +328,8 @@ searchInternalUnqualifiedProperty ln = binnenRol >-> searchUnqualifiedProperty l
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
 -- | it as their binding).
-getGebondenAls :: forall r b e. RolClass r => RolClass b => RolDef -> (r **> b) e
-getGebondenAls rname = OGC.getGebondenAls rname `trackedAs` (unwrap rname)
+getRoleBinders :: forall r b e. RolClass r => RolClass b => RolDef -> (r **> b) e
+getRoleBinders rname = OGC.getRoleBinders rname `trackedAs` (unwrap rname)
 
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION

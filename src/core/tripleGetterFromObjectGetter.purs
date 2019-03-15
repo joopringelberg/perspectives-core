@@ -8,7 +8,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter,
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (Predicate)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.ObjectGetterConstructors (getGebondenAls, searchExternalProperty, searchInternalUnqualifiedProperty, searchProperty)
+import Perspectives.ObjectGetterConstructors (getRoleBinders, searchExternalProperty, searchInternalUnqualifiedProperty, searchProperty)
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, PropertyDef, RolDef, Value, getProperty, typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (bind, flip, pure, ($), (<<<), (<>))
@@ -143,4 +143,4 @@ constructInverseRolGetter :: forall r b e.
   RolClass b =>
   RolDef ->
   TypedTripleGetter r b e
-constructInverseRolGetter pn = getGebondenAls pn `trackedAs` ((unwrap pn) <> "_inverse")
+constructInverseRolGetter pn = getRoleBinders pn `trackedAs` ((unwrap pn) <> "_inverse")
