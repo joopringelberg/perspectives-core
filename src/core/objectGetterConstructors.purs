@@ -396,8 +396,8 @@ getRoleBinders rname = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{ge
 -- getRoleBindersUnqualifiedRol :: forall r b e. RolClass r => RolClass b => Id.LocalName -> (r ~~> b) e
 -- getRoleBindersUnqualifiedRol ln =
 
-genericGetGebondenAls :: forall e. String -> (String ~~> String) e
-genericGetGebondenAls rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)
+genericGetRoleBinders :: forall e. String -> (String ~~> String) e
+genericGetRoleBinders rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)
 
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION

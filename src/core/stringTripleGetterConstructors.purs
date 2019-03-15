@@ -9,7 +9,7 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@), MPQ, Triple)
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext, binding, context) as DTG
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
-import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetGebondenAls) as OGC
+import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetRoleBinders) as OGC
 import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleGetterComposition (before, (>->))
@@ -162,7 +162,7 @@ searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> StringTypedTriple
 searchInternalUnqualifiedProperty ln = typeWithPerspectivesTypes DTG.binnenRol >-> searchUnqualifiedProperty ln
 
 getRoleBinders :: forall e. String -> StringTypedTripleGetter e
-getRoleBinders rname = OGC.genericGetGebondenAls rname `trackedAs` rname
+getRoleBinders rname = OGC.genericGetRoleBinders rname `trackedAs` rname
 
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION
@@ -185,7 +185,7 @@ searchUnqualifiedPropertyDefinition ln = searchInAspectsAndPrototypes f
 constructInverseRolGetter :: forall e.
   String ->
   StringTypedTripleGetter e
-constructInverseRolGetter pn = (OGC.genericGetGebondenAls pn) `trackedAs` (pn <> "_inverse")
+constructInverseRolGetter pn = (OGC.genericGetRoleBinders pn) `trackedAs` (pn <> "_inverse")
 
 -- | The PropertyReferences of the View. Again, the typing is imprecise.
 propertyReferenties :: forall e. StringTypedTripleGetter e
