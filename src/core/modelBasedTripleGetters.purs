@@ -12,10 +12,10 @@ import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef) as MBOG
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
-import Perspectives.QueryCombinators (closure', filter, notEmpty) as QC
-import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype, searchInAspectRolesAndPrototypes, searchInAspectsAndPrototypes)
+import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as QC
+import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closureOfPrototype, closure_, concat, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
@@ -127,11 +127,18 @@ ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") 
 rollenDef :: forall e. (AnyContext **> RolDef) e
 rollenDef = closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef
 
+-- | All mandatory roles defined for a Context in Aspects and prototypes, that are not used as AspectRol in one of the others.
+mandatoryRollen :: forall e. (AnyContext **> RolDef) e
+mandatoryRollen = QC.difference f (f >-> directAspectRoles)
+  where
+    f :: (AnyContext **> RolDef) e
+    f = QC.filter rolIsVerplicht (closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef)
+
 -- | All properties defined in the namespace of the Rol.
 ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e
 ownPropertiesDef = unwrap `before` (getContextRol $ RolDef "model:Perspectives$Rol$rolProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
 
--- | All properties defined for the Rol, in the same namespace, or on aspects, or on the MogelijkeBinding.
+-- | All properties defined for the Rol, in the same namespace, or on aspects, or on the MogelijkeBinding. Note that some of these may be an AspectProperty of others.
 -- Test.Perspectives.ModelBasedTripleGetters
 propertiesDef :: forall e. (RolDef **> PropertyDef) e
 propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
@@ -145,6 +152,13 @@ propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
     (mogelijkeBinding `followedBy` RolDef)
     (\_ -> propertiesDef)
     "propertiesDef"
+
+-- | All mandatory properties defined for a Rol in Aspects and prototypes, that are not used as AspectProperty in one of the others.
+mandatoryProperties :: forall e. (RolDef **> PropertyDef) e
+mandatoryProperties = QC.difference f (f >-> directAspectProperties)
+  where
+    f :: (RolDef **> PropertyDef) e
+    f = QC.filter propertyIsVerplicht (closure_ directAspectRoles >-> (unwrap `before` closure_ getPrototype) >-> RolDef `before` ownPropertiesDef)
 
 buitenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
 buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"

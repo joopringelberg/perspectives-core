@@ -1,26 +1,19 @@
 module Perspectives.QueryCombinators where
 
-import Control.Alt ((<|>))
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
-import Control.Plus (empty)
-import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, union, filter) as Arr
-import Data.Array (foldMap)
+import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter) as Arr
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Monoid.Conj (Conj(..))
-import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (class Newtype, alaF, unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>), type (~~>), (@@))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, searchContextRol)
-import Perspectives.PerspectivesTypes (class Binding, AnyContext, BuitenRol(..), ContextDef, ContextRol, PBool(..), PropertyDef(..), RolDef, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (PBool(..), typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
-import Perspectives.TripleGetterComposition ((>->), composeMonoidal)
-import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, constructTripleGetterFromObjectsGetter, trackedAs)
-import Prelude (class Eq, bind, const, discard, eq, flip, id, join, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==), (>>>))
+import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, constructTripleGetterFromObjectsGetter)
+import Prelude (class Eq, bind, const, discard, eq, flip, id, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==))
 import Type.Data.Boolean (kind Boolean)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -169,10 +162,14 @@ disj = logicalBinaryOperator HA.disj
 implies :: forall s e. (s **> PBool) e -> (s **> PBool) e -> ((s **> PBool) e)
 implies = logicalBinaryOperator HA.implies
 
--- The intersection of the results of two queries applied to the same origin.
+-- A set operation applied to the results of two queries applied to the same origin.
 -- | `psp:Function -> psp:Function -> psp:Function`
-intersect :: forall s o e. Eq o => (s **> o) e -> (s **> o) e -> (s **> o) e
-intersect (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
+setOperation :: forall s o e. Eq o =>
+  (Array o -> Array o -> Array o) ->
+  (s **> o) e ->
+  (s **> o) e ->
+  (s **> o) e
+setOperation op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   memorize getter name where
     getter :: TripleGetter s o e
     getter id = do
@@ -180,11 +177,23 @@ intersect (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
       qt@(Triple{object : qs}) <- q id
       pure $ Triple { subject: id
                     , predicate : name
-                    , object : (Arr.intersect ps qs)
+                    , object : (op ps qs)
                     , dependencies : []
                     , supports : map (typeWithPerspectivesTypes getRef) [pt, qt]
                     , tripleGetter : getter}
     name = "(intersect " <> nameOfp <> " " <> nameOfq <> ")"
+
+intersect :: forall s o e. Eq o =>
+  (s **> o) e ->
+  (s **> o) e ->
+  (s **> o) e
+intersect = setOperation Arr.intersect
+
+difference :: forall s o e. Eq o =>
+  (s **> o) e ->
+  (s **> o) e ->
+  (s **> o) e
+difference = setOperation Arr.difference
 
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,

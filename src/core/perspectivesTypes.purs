@@ -171,6 +171,7 @@ genericGetUnqualifiedProperty ln = getRolMember $ getUnQualifiedPropertyFromPers
 --     Nothing -> []
 --     (Just i) -> maybe [] propertyValue (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
 
+-- TODO: verplaats naar de file met de definitie PerspectRol?
 getUnQualifiedPropertyFromPerspectRol :: forall e. LocalName -> PerspectRol -> Array String
 getUnQualifiedPropertyFromPerspectRol ln rol =
   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
@@ -237,6 +238,9 @@ instance rolClassBuitenRol :: RolClass BuitenRol where
 instance bindingBuitenRol :: Binding BuitenRol BuitenRol where
   binding = typeWithPerspectivesTypes genericBinding
 
+instance showBuitenRol :: Show BuitenRol where
+  show (BuitenRol b) = show b
+
 -----------------------------------------------------------
 -- ROLINCONTEXT AS INSTANCE
 -----------------------------------------------------------
@@ -267,8 +271,8 @@ derive instance genericRepContextRol :: Generic ContextRol _
 derive instance newtypeContextRol :: Newtype ContextRol _
 instance eqContextRol :: Eq ContextRol where
   eq (ContextRol c1) (ContextRol c2) = c1 == c2
-instance showBuitenRol :: Show BuitenRol where
-  show (BuitenRol b) = show b
+instance showContextRol :: Show ContextRol where
+  show (ContextRol b) = show b
 
 instance rolClassContextRol :: RolClass ContextRol where
   getProperty = typeWithPerspectivesTypes genericGetProperty
