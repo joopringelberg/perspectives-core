@@ -393,8 +393,14 @@ searchInternalUnqualifiedProperty ln cid = unlessNull (getInternalUnqualifiedPro
 getRoleBinders :: forall r b e. RolClass r => RolClass b => RolDef -> (r ~~> b) e
 getRoleBinders rname = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup (unwrap rname) gevuldeRollen)
 
--- getRoleBindersUnqualifiedRol :: forall r b e. RolClass r => RolClass b => Id.LocalName -> (r ~~> b) e
--- getRoleBindersUnqualifiedRol ln =
+-- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
+-- | that bind it (that have it as their binding). The type of ln can be 'buitenRolBeschrijving'.
+-- Test.Perspectives.ObjectGetterConstructors
+getUnqualifiedRoleBinders :: forall r b e. RolClass r => RolClass b => Id.LocalName -> (r ~~> b) e
+getUnqualifiedRoleBinders ln = typeWithPerspectivesTypes $ getRolMember \(PerspectRol{gevuldeRollen}) ->
+    case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys gevuldeRollen) of
+      Nothing -> []
+      (Just i) -> maybe [] id (lookup (unsafePartial $ fromJust (Arr.index (keys gevuldeRollen) i)) gevuldeRollen)
 
 genericGetRoleBinders :: forall e. String -> (String ~~> String) e
 genericGetRoleBinders rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] id (lookup rname gevuldeRollen)
