@@ -19,7 +19,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "TripleGetterConstructors" do
+theSuite = suiteSkip "TripleGetterConstructors" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "getContextRol" do

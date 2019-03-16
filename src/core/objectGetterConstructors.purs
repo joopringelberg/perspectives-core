@@ -152,7 +152,7 @@ directAspectRoles :: forall e. (RolDef ~~> RolDef) e
 directAspectRoles = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectRol") /-/ rolBindingDef
 
 directAspectProperties :: forall e. (PropertyDef ~~> PropertyDef) e
-directAspectProperties = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Rol$aspectProperty") /-/ rolBindingDef
+directAspectProperties = typeWithPerspectivesTypes $ getContextRol (RolDef "model:Perspectives$Property$aspectProperty") /-/ rolBindingDef
 
 -- | The type of Rol or Context that can be bound to the Rol.
 -- Test.Perspectives.ObjectGetterConstructors

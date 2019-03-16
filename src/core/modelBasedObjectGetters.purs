@@ -4,17 +4,14 @@ import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, context)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, concat, getContextRol, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, searchUnqualifiedRolDefinition, some, unlessNull)
+import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, getContextRol, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
 
 
--- | NOTE. The functions in this module have a type defined in their comment. These types all refer to
--- | *type-descriptions* in Perspectives. Hence, 'psp:Rol -> psp:Context' should be read: from the description
--- | of a Rol, retrieve the description of the Context that holds this Rol-description.
-
 -- | True iff the RolDef or one of its AspectRollen has given property "isVerplicht" the value "true".
+-- Test.Perspectives.ModelBasedObjectGetters
 rolIsVerplicht :: forall e. (RolDef ~~> PBool) e
 rolIsVerplicht = some (concat isVerplicht (closureOfAspectRol /-/ isVerplicht))
   where
@@ -30,7 +27,7 @@ rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol /-/ isFunction
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
 propertyIsVerplicht :: forall e. (PropertyDef ~~> PBool) e
-propertyIsVerplicht = some (concat isVerplicht (closureOfAspectProperty /-/ isVerplicht))
+propertyIsVerplicht = some ((closure_ directAspectProperties) /-/ isVerplicht)
   where
     isVerplicht :: (PropertyDef ~~> PBool) e
     isVerplicht = unwrap >>> searchExternalUnqualifiedProperty "isVerplicht" >=> pure <<< map wrap <<< map unwrap

@@ -26,6 +26,7 @@ psp:Context t:myAspect
 	$rolInContext =>
 		psp:Rol $myAspectRol1
 			extern $isFunctioneel = true
+			extern $isVerplicht = true
 			$aspectRol => t:myUrAspect$myUrAspectRol1
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
@@ -46,6 +47,9 @@ psp:Context t:myContextDef
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$aspectRol => t:myAspect$myAspectRol1
+			$rolProperty =>
+				psp:Property $rol1Property
+					$aspectProperty => t:myAspect$myAspectRol1$myAspectRol1Property
 
 t:myContextDef t:myContextPrototype
 	prototype psp:ContextPrototype

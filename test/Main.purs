@@ -10,6 +10,7 @@ import Data.Either (Either(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Test.BasicConstructors (test)
 import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
+import Test.Perspectives.ModelBasedObjectGetters (theSuite) as MBOG
 import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
@@ -23,6 +24,7 @@ main = runTest do
   OGC.theSuite
   MBTG.theSuite
   TGC.theSuite
+  MBOG.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP test)
