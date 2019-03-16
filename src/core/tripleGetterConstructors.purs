@@ -27,6 +27,7 @@ import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), 
 -- | The recursive closure of a query, bottoming out when it has no results.
 -- | The result only contains the argument id if it can be obtained by applying p,
 -- | never because it is the root of the computation.
+-- Test.Perspectives.TripleGetterConstructors, via closureOfBinding.
 closure :: forall o e.
   Eq o =>
   (o **> o) e ->
@@ -55,6 +56,7 @@ closure (TypedTripleGetter nameOfp p) =
 -- | The recursive closure of a query, bottoming out when it has no results.
 -- | The result contains the root.
 -- Test.Perspectives.ModelBasedTripleGetters, via propertiesDef.
+-- Test.Perspectives.TripleGetterConstructors
 closure_ :: forall o e.
   Eq o =>
   (o **> o) e ->
@@ -67,6 +69,7 @@ unlessNull :: forall s o e. (s **> o) e -> TripleGetter s o e
 unlessNull tg id = (id @@ tg) >>= \r@(Triple{object}) -> if (Arr.null object) then empty else pure r
 
 searchInRolTelescope :: forall e. (String **> String) e -> (String **> String) e
+-- Test.Perspectives.TripleGetterConstructors, via searchProperty
 searchInRolTelescope getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
   f :: TripleGetter String String e
   f rolId =
@@ -76,12 +79,14 @@ searchInRolTelescope getter@(TypedTripleGetter n _) = TypedTripleGetter n f wher
 
 -- | Applies the TypedTripleGetter to each higher prototype until it succeeds or there is no prototype.
 -- | Does *not* apply the getter to the ContextType that is passed in!
+-- Test.Perspectives.TripleGetterConstructors
 searchInPrototypeHierarchy :: forall o e.
   Eq o =>
   (BuitenRol **> o) e ->
   (AnyContext **> o) e
 searchInPrototypeHierarchy getter = DTG.buitenRol >-> typeWithPerspectivesTypes searchInRolTelescope getter
 
+-- Test.Perspectives.ModelBasedTripleGetters, via buitenRolBeschrijvingDef
 searchLocallyAndInPrototypeHierarchy :: forall o e.
   Eq o =>
   (AnyContext **> o) e ->
@@ -94,6 +99,7 @@ searchLocallyAndInPrototypeHierarchy getter@(TypedTripleGetter n _) = TypedTripl
     (cid @@ (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter))
 
 -- | Applies the getter (s ~~> o) e to the ContextType and all its prototypes and recursively to all its aspects.
+-- Test.Perspectives.ModelBasedTripleGetters, via buitenRolBeschrijvingDef
 searchInAspectsAndPrototypes :: forall o e.
   Eq o =>
   (AnyContext **> o) e ->
@@ -106,6 +112,7 @@ searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter 
     (contextId @@ (directAspects >-> searchInAspectsAndPrototypes getter))
 
 -- | Applies the getter (s **> o) e to the RolDef and all its prototypes and recursively to all its aspects.
+-- Test.Perspectives.TripleGetterConstructors via searchUnqualifiedPropertyDefinition.
 searchInAspectRolesAndPrototypes :: forall o e.
   Eq o =>
   (AnyContext **> o) e ->
@@ -117,9 +124,11 @@ searchInAspectRolesAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGet
     <|>
     (rolDefId @@ (RolDef `before` directAspectRoles >-> unwrap `before` searchInAspectRolesAndPrototypes getter))
 
+-- Test.Perspectives.TripleGetterConstructors
 directAspects :: forall e. (AnyContext **> AnyContext) e
 directAspects = OGC.directAspects `trackedAs` "model:Perspectives$Context$directAspects"
 
+-- Test.Perspectives.TripleGetterConstructors
 directAspectRoles :: forall e. (RolDef **> RolDef) e
 directAspectRoles = OGC.directAspectRoles `trackedAs` "model:Perspectives$Rol$directAspectRoles"
 
@@ -127,7 +136,7 @@ directAspectProperties :: forall e. (PropertyDef **> PropertyDef) e
 directAspectProperties = OGC.directAspectProperties `trackedAs` "model:Perspectives$Property$directAspectProperties"
 
 -- The concatenation of the results of two queries applied to the same origin.
--- | `psp:Function -> psp:Function -> psp:Function`
+-- Test.Perspectives.TripleGetterConstructors
 concat :: forall s o e.
   Eq o =>
   (s **> o) e ->
@@ -150,10 +159,12 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
 
 -- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
+-- Test.Perspectives.TripleGetterConstructors
 some :: forall s e. (s **> PBool) e -> (s **> PBool) e
 some f = composeMonoidal f (alaF Disj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "some"
 
 -- | True iff at all of the boolean results of f is true (where true is represented as PBool "true").
+-- Test.Perspectives.TripleGetterConstructors
 all :: forall s e. (s **> PBool) e -> (s **> PBool) e
 all f = composeMonoidal f (alaF Conj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "all"
 
@@ -192,10 +203,12 @@ closureOfPrototype = closure getPrototype
 -----------------------------------------------------------
 -- | Get the ContextRol instances with the given rol name (RolDef) directly from the Context definition (not searching prototypes or Aspects).
 -- | E.g. getRol "model:Perspectives$View$rolProperty" will return all rol instances that bind a PropertyDef on an instance of psp:View.
+-- Test.Perspectives.TripleGetterConstructors via getRolinContext
 getContextRol :: forall e. RolDef -> (AnyContext **> ContextRol) e
 getContextRol rn = OGC.getContextRol rn `trackedAs` unwrap rn
 
 -- | As getContextRol, but for RolinContext (same function, differently typed).
+-- Test.Perspectives.TripleGetterConstructors
 getRolInContext :: forall e. RolDef -> (AnyContext **> RolInContext) e
 getRolInContext = typeWithPerspectivesTypes getContextRol
 
@@ -203,11 +216,12 @@ getRolInContext = typeWithPerspectivesTypes getContextRol
 -- | Get the ContextRol instances with the given local name directly from the Context.
 -- E.g. getUnqualifiedContextRol "rolProperty" will return the same result as getContextRol
 -- "model:Perspectives$View$rolProperty".
--- TODO: rename getRolByLocalName to getUnqualifiedRol.
+-- Test.Perspectives.TripleGetterConstructors via getUnqualifiedRolInContext
 getUnqualifiedContextRol :: forall e. Id.LocalName -> (AnyContext **> ContextRol) e
 getUnqualifiedContextRol ln = OGC.getUnqualifiedContextRol ln `trackedAs` ln
 
 -- | As getUnqualifiedContextRol, but for RolinContext (same function, differently typed).
+-- Test.Perspectives.TripleGetterConstructors
 getUnqualifiedRolInContext :: forall e. Id.LocalName -> (AnyContext **> RolInContext) e
 getUnqualifiedRolInContext = typeWithPerspectivesTypes getUnqualifiedContextRol
 
@@ -225,6 +239,7 @@ rolesOf cid = TypedTripleGetter ("rolesOf_" <> cid) (typeWithPerspectivesTypes g
 -- SEARCH A ROL IN A CONTEXT AND ITS PROTOTYPES
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
+-- Test.Perspectives.TripleGetterConstructors
 searchContextRol :: forall e. RolDef -> (AnyContext **> ContextRol) e
 searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getContextRol rn) :: (AnyContext **> ContextRol) e)
 
@@ -236,6 +251,7 @@ searchRolInContext rn = searchLocallyAndInPrototypeHierarchy ((getRolInContext r
 -- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
 -- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
 -- TODO: waarom alleen in ContextDef?
+-- Test.Perspectives.TripleGetterConstructors
 searchUnqualifiedRol :: forall e. Id.LocalName -> (AnyContext **> ContextRol) e
 searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualifiedContextRol rn) :: (AnyContext **> ContextRol) e)
 
@@ -250,6 +266,7 @@ searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualified
 
 -- | Look for the definition of a Rol by its local name, in the ContextDef (not searching prototypes or Aspects).
 -- | If no Rol is defined with this local name, will return an empty result.
+-- Test.Perspectives.TripleGetterConstructors
 getUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef **> RolDef) e
 getUnqualifiedRolDefinition ln = unwrap `before` (filter_
   (flip Id.hasLocalName ln)
@@ -260,8 +277,7 @@ getUnqualifiedRolDefinition ln = unwrap `before` (filter_
 -- | Look for the definition of a Rol by its local name, in the ContextDef and its Aspects and in all their prototypes.
 -- | As the name of a RolDefinition on an Aspect will be scoped to that Aspect, we do not have to search once
 -- | we have the qualified name of the Rol. Hence there is no version that searches qualified roles!
--- TODO: replace uses of 'getRolUsingAspects' by this function.
--- getRolUsingAspects `psp:Rol -> ObjectsGetter`
+-- Test.Perspectives.TripleGetterConstructors
 searchUnqualifiedRolDefinition ::	forall e. Id.LocalName -> (ContextDef **> RolDef) e
 searchUnqualifiedRolDefinition ln = typeWithPerspectivesTypes $ searchInAspectsAndPrototypes f
   where
@@ -272,6 +288,7 @@ searchUnqualifiedRolDefinition ln = typeWithPerspectivesTypes $ searchInAspectsA
 -- GET A PROPERTY FROM A ROLE TELESCOPE
 -----------------------------------------------------------
 -- | The value of the property pd, wherever in the telescope it is represented.
+-- Test.Perspectives.TripleGetterConstructors
 searchProperty :: forall b e. RolClass b => PropertyDef -> (b **> Value) e
 searchProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
   where
@@ -280,6 +297,7 @@ searchProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
 
 -- | The value of the unqualified property pd, wherever in the telescope it is represented.
 -- | NOTE: this function cannot be applied to a BinnenRol.
+-- Test.Perspectives.TripleGetterConstructors
 searchUnqualifiedProperty :: forall b e. RolClass b => Id.LocalName -> (b **> Value) e
 searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
   where
@@ -294,6 +312,7 @@ searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
 
 -- | Searches the qualified property first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
+-- Test.Perspectives.TripleGetterConstructors via searchExternalProperty
 searchPropertyOnContext :: forall r e. RolClass r => (AnyContext **> r) e -> PropertyDef -> (AnyContext **> Value) e
 searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
@@ -302,6 +321,7 @@ searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
 
 -- | Searches the property with the local name first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
+-- Test.Perspectives.TripleGetterConstructors via searchExternalUnqualifiedProperty
 searchUnqualifiedPropertyOnContext :: forall r e. RolClass r => (AnyContext **> r) e  -> Id.LocalName -> (AnyContext **> Value) e
 searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
@@ -310,24 +330,39 @@ searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHier
 
 -- | Look for the property PropertyDef on the buitenRol of the ContextType c and on its telescope, shadowing any values
 -- | on the prototypes.
+-- Test.Perspectives.TripleGetterConstructors
 searchExternalProperty :: forall e. PropertyDef -> (AnyContext **> Value) e
 searchExternalProperty pn = searchPropertyOnContext DTG.buitenRol pn
 
 -- | Look for the property with the given local name on the buitenRol of the ContextType c and on its telescope,
 -- | shadowing any values on the prototypes.
+-- Test.Perspectives.TripleGetterConstructors
 searchExternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext **> Value) e
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext DTG.buitenRol ln
 
 -- | Look for the property with the given local name on the binnenRol of the ContextType c.
+-- Test.Perspectives.TripleGetterConstructors
 getInternalProperty :: forall e. PropertyDef -> (AnyContext **> Value) e
 getInternalProperty pn = binnenRol >-> getProperty pn `trackedAs` (unwrap pn)
 
+-- Test.Perspectives.TripleGetterConstructors via searchInternalUnqualifiedProperty
+getInternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext **> Value) e
+getInternalUnqualifiedProperty ln = binnenRol >-> getUnqualifiedProperty ln `trackedAs` ln
+
 -- | Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope.
+-- Test.Perspectives.TripleGetterConstructors
 searchInternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext **> Value) e
-searchInternalUnqualifiedProperty ln = binnenRol >-> searchUnqualifiedProperty ln
+searchInternalUnqualifiedProperty ln = TypedTripleGetter ln f
+  where
+  f :: TripleGetter AnyContext Value e
+  f cid =
+      unlessNull (getInternalUnqualifiedProperty ln) cid
+      <|>
+      (cid @@ (searchExternalUnqualifiedProperty ln))
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
 -- | it as their binding).
+-- Test.Perspectives.TripleGetterConstructors
 getRoleBinders :: forall r b e. RolClass r => RolClass b => RolDef -> (r **> b) e
 getRoleBinders rname = OGC.getRoleBinders rname `trackedAs` (unwrap rname)
 

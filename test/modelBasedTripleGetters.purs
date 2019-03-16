@@ -3,7 +3,7 @@ module Test.Perspectives.ModelBasedTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Perspectives.ModelBasedTripleGetters (ownPropertiesDef, propertiesDef, rollenDef)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, ownPropertiesDef, propertiesDef, rollenDef)
 import Perspectives.PerspectivesTypes (PropertyDef(..), RolDef(..))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
@@ -35,5 +35,19 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       (RolDef (t "myContextDef$rol1") ##= propertiesDef)
       [PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property",
       PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
+  test "buitenRolBeschrijvingDef" do
+    loadTestModel "TestOGC.crl"
+    assertEqual "From a context that is a definition, get the definition of its BuitenRol."
+      ((t "myContextDef") ##= buitenRolBeschrijvingDef)
+      [RolDef $ p "ContextPrototype$buitenRolBeschrijving"]
+    assertEqual "Found through three layers."
+      ((t "myContextDef3") ##= buitenRolBeschrijvingDef)
+      [RolDef $ p "ContextPrototype$buitenRolBeschrijving"]
+
+  -- testOnly "" do
+  --   loadTestModel "TestOGC.crl"
+  --
+  --   unLoadTestModel "model:TestOGC"
+
   test "Tearing down" do
     unLoadTestModel "model:TestOGC"

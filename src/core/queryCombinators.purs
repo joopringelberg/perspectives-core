@@ -5,7 +5,6 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter) as Arr
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>))
@@ -82,6 +81,7 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
     name = "(filter " <> nameOfc <> " " <> nameOfp <> ")"
 
 -- | A selection of the results of the query using a simple (boolean) function as a criterium.
+-- Test.Perspectives.TripleGetterConstructors, via getUnqualifiedRolDefinition
 filter_ :: forall s o e.
   (o -> Boolean) ->
   String ->
@@ -227,11 +227,11 @@ toBoolean tg = flip applyTypedTripleGetterToMaybeObject tg >=> pure <<< maybe fa
 -- | a triple whose object is boolean value.
 contains :: forall s o e.
   Eq o =>
-  Newtype o String =>
   o ->
   TypedTripleGetter s o e ->
   TypedTripleGetter s PBool e
-contains id' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains_" <> unwrap id') f where
+-- Test.Perspectives.TripleGetterConstructors
+contains id' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains_" <> typeWithPerspectivesTypes id') f where
   f :: (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array PBool))
   f id = do
     (Triple{object}) <- p id

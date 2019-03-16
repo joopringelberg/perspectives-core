@@ -369,7 +369,6 @@ searchExternalProperty pn = searchPropertyOnContext buitenRol pn
 -- Test.Perspectives.ObjectGetterConstructors
 searchExternalUnqualifiedProperty :: forall e. Id.LocalName -> (AnyContext ~~> Value) e
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buitenRol ln
--- searchExternalUnqualifiedProperty ln = buitenRol /-/ searchUnqualifiedProperty ln
 
 -- | Look for the property with the given qualified name on the binnenRol of the ContextType c.
 -- Test.Perspectives.ObjectGetterConstructors

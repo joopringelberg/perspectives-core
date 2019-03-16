@@ -18,7 +18,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ObjectGetterConstructors" do
+theSuite = suiteSkip "ObjectGetterConstructors" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "closure_" do
@@ -60,6 +60,13 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "The rolproperty $myAspectRol1Property of t:myContextPrototype should be false"
       ((searchUnqualifiedRol "rol1" /-/ getUnqualifiedProperty "myAspectRol1Property") (t "myContextPrototype"))
       [Value "false"]
+  test "searchUnqualifiedRol" do
+    assertEqual "t:myContext has $rol1 through its prototype"
+      ((searchUnqualifiedRol "rol1") (t "myContext"))
+      [ContextRol $ t "myContextPrototype$rol1_1"]
+    assertEqual "t:myContextPrototype has $binnenRolBeschrijving through its prototype"
+      ((searchUnqualifiedRol "binnenRolBeschrijving") (t "myContextPrototype"))
+      [ContextRol $ p "ContextPrototype$binnenRolBeschrijving_1"]
   test "propertyTypen (The types of every property for which this rol has a value)" do
     assertEqual "The buitenrol of t:myAspect$myAspectRol1 has one external property"
       (t "myAspect$myAspectRol1_buitenRol" ##= DTG.propertyTypen)
@@ -76,7 +83,7 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       (getRolInContext (RolDef (p "Context$rolInContext")) (t "myContextDef"))
       [RolInContext $ t "myContextDef$rolInContext_1"]
-  test "getUnqualifiedRol" do
+  test "getUnqualifiedRolInContext" do
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       (getUnqualifiedRolInContext "rolInContext" (t "myContextDef"))
       [RolInContext $ t "myContextDef$rolInContext_1"]
@@ -191,7 +198,7 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "myAspectRol1 has a local definition for the property myAspectRol1Property."
       (getUnqualifiedPropertyDefinition "myAspectRol1Property" (RolDef $ t "myAspect$myAspectRol1"))
       [PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"]
-  testOnly "searchUnqualifiedPropertyDefinition" do
+  test "searchUnqualifiedPropertyDefinition" do
     assertEqual "myAspectRol1 obtains a definition for the property myUrAspectRol1Property from its AspectRol."
       (searchUnqualifiedPropertyDefinition "myUrAspectRol1Property" (RolDef $ t "myAspect$myAspectRol1"))
       [PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
