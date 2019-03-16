@@ -13,7 +13,7 @@ import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, c
 import Perspectives.DataTypeTripleGetters (binnenRol, identity)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
-import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getRoleBinders) as OGC
+import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
@@ -366,6 +366,11 @@ searchInternalUnqualifiedProperty ln = TypedTripleGetter ln f
 getRoleBinders :: forall r b e. RolClass r => RolClass b => RolDef -> (r **> b) e
 getRoleBinders rname = OGC.getRoleBinders rname `trackedAs` (unwrap rname)
 
+-- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
+-- | that bind it (that have it as their binding). The type of ln can be 'buitenRolBeschrijving'.
+-- Test.Perspectives.TripleGetterConstructors
+getUnqualifiedRoleBinders :: forall r b e. RolClass r => RolClass b => Id.LocalName -> (r **> b) e
+getUnqualifiedRoleBinders rname = OGC.getUnqualifiedRoleBinders rname `trackedAs` rname
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION
 -----------------------------------------------------------
@@ -378,18 +383,19 @@ getRoleBinders rname = OGC.getRoleBinders rname `trackedAs` (unwrap rname)
 
 -- | Look for the definition of a Property by its local name, in the RolDef (not searching prototypes or Aspects).
 -- | If no Property is defined with this local name, will return an empty result.
+-- Test.Perspectives.TripleGetterConstructors
 getUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> PropertyDef) e
 getUnqualifiedPropertyDefinition ln = unwrap `before` (filter_
   (flip Id.hasLocalName ln)
   ("hasLocalName_" <> ln)
-  (getUnqualifiedContextRol "rolInContext" >-> DTG.binding >-> DTG.context))
+  (getUnqualifiedContextRol "rolProperty" >-> DTG.binding >-> DTG.context))
     `followedBy` PropertyDef
 
    -- typeWithPerspectivesTypes $ getUnqualifiedContextRol ln >-> DTG.binding >-> DTG.context
 
 -- | Look for the definition of a Property by its local name, in the RolDef and its Aspects and in all their prototypes.
 searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> PropertyDef) e
-searchUnqualifiedPropertyDefinition ln = unwrap `before` (searchInAspectsAndPrototypes f)
+searchUnqualifiedPropertyDefinition ln = unwrap `before` (searchInAspectRolesAndPrototypes f)
   where
     f :: (AnyContext **> PropertyDef) e
     f = (RolDef `before` getUnqualifiedPropertyDefinition ln)

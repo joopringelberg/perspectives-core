@@ -11,7 +11,7 @@ import Perspectives.QueryCombinators (contains)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.StringTripleGetterConstructors (all, directAspects, getContextRol, searchInAspectsAndPrototypes, searchLocallyAndInPrototypeHierarchy, some)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closure_, concat, directAspectRoles, getInternalProperty, getRolInContext, getRoleBinders, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedRol, searchUnqualifiedRolDefinition)
+import Perspectives.TripleGetterConstructors (closure_, concat, directAspectRoles, getInternalProperty, getRolInContext, getRoleBinders, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, getUnqualifiedRoleBinders, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -149,12 +149,23 @@ theSuite = suite "TripleGetterConstructors" do
     assertEqual "t:myContextWithShadowedInternalProperty has a value for its external $someProp."
       ((t "myContextWithShadowedInternalProperty") ##= (searchExternalUnqualifiedProperty "someProp"))
       ([Value "Rain on the roof"]:: Array Value)
-  testOnly "getRoleBinders (From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have it as their binding))" do
-    loadTestModel "TestOGC.crl"
+  test "getRoleBinders (From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have it as their binding))" do
     assertEqual "The buitenRol of t:myContextWithExternalPropertyPrototype is bound to two Contexts that have declared it as their prototype"
       ((t "myContextWithExternalPropertyPrototype") ##= (buitenRol >-> getRoleBinders (RolDef $ t "myContextDefWithExternalProperty$buitenRolBeschrijving")) )
       ([BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol", BuitenRol $ t "myContextWithExternalProperty_buitenRol"])
-    unLoadTestModel "model:TestOGC"
+  test "getUnqualifiedRoleBinders (From the instance of a Rol of any kind, find the instances of the Rol with the given local name that bind it (that have it as their binding). The type of ln can be buitenRolBeschrijving)"
+    do
+      assertEqual "The buitenRol of t:myContextWithExternalPropertyPrototype is bound to two Contexts that have declared it as their prototype"
+        ((t "myContextWithExternalPropertyPrototype") ##= (buitenRol >-> getUnqualifiedRoleBinders "buitenRolBeschrijving"))
+        ([BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol", BuitenRol $ t "myContextWithExternalProperty_buitenRol"])
+  test "getUnqualifiedPropertyDefinition" do
+    assertEqual "myAspectRol1 has a local definition for the property myAspectRol1Property."
+      ((RolDef $ t "myAspect$myAspectRol1") ##= getUnqualifiedPropertyDefinition "myAspectRol1Property")
+      [PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"]
+  test "searchUnqualifiedPropertyDefinition" do
+    assertEqual "myAspectRol1 obtains a definition for the property myUrAspectRol1Property from its AspectRol."
+      ((RolDef $ t "myAspect$myAspectRol1") ##= searchUnqualifiedPropertyDefinition "myUrAspectRol1Property")
+      [PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"
