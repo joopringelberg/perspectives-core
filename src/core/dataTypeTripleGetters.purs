@@ -2,8 +2,9 @@ module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, type (**>))
 import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, typeWithPerspectivesTypes)
-import Perspectives.PerspectivesTypes (genericBinding, binding) as PT
+import Perspectives.Identifiers (LocalName)
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value(..), getUnqualifiedProperty, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (genericBinding, binding, getUnqualifiedProperty) as PT
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter, trackedAs)
 import Prelude (pure)
@@ -72,3 +73,6 @@ genericContext = DTOG.genericContext `trackedAs` "model:Perspectives$context"
 
 genericBinding :: forall e. (String **> String) e
 genericBinding = PT.genericBinding `trackedAs` "model:Perspectives$binding"
+
+getUnqualifiedProperty :: forall r e. RolClass r => LocalName -> (r **> Value) e
+getUnqualifiedProperty ln = (PT.getUnqualifiedProperty ln) `trackedAs` "model:Perspectives$getUnqualifiedProperty"
