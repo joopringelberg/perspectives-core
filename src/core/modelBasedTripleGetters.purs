@@ -9,10 +9,11 @@ import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef) as MBOG
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef) as MBOG
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as QC
+import Perspectives.QueryCombinators (contains)
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
@@ -41,7 +42,7 @@ rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol >-> isFunction
 
 -- | True if the Property has been defined as mandatory (possibly in an aspect).
 propertyIsVerplicht :: forall e. (PropertyDef **> PBool) e
-propertyIsVerplicht = some (concat isVerplicht (closureOfAspectProperty >-> isVerplicht))
+propertyIsVerplicht = some ((closure_ directAspectProperties) >-> isVerplicht)
   where
     isVerplicht :: (PropertyDef **> PBool) e
     isVerplicht = (unwrap `before` (searchExternalUnqualifiedProperty "isVerplicht")) `followedBy` (wrap <<< unwrap)
@@ -134,6 +135,11 @@ mandatoryRollen = QC.difference f (f >-> directAspectRoles)
     f :: (AnyContext **> RolDef) e
     f = QC.filter rolIsVerplicht (closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef)
 
+nonQueryRollen :: forall e. (AnyContext **> RolDef) e
+nonQueryRollen = QC.filter isNotAQuery rollenDef where
+  isNotAQuery :: (RolDef **> PBool) e
+  isNotAQuery = contains (RolDef "model:Perspectives$Rol") (unwrap `before` (closure_ directAspects) `followedBy` RolDef)
+
 -- | All properties defined in the namespace of the Rol.
 ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e
 ownPropertiesDef = unwrap `before` (getContextRol $ RolDef "model:Perspectives$Rol$rolProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
@@ -175,6 +181,8 @@ contextBotDef = getContextRol (RolDef "model:Perspectives$Context$contextBot")  
 botSubjectRollenDef :: forall e. (AnyContext **> AnyContext) e
 botSubjectRollenDef = getContextRol (RolDef "model:Perspectives$SysteemBot$subjectRol") >-> DTG.binding >-> DTG.context
 
+contextDef :: forall e. (RolDef **> ContextDef) e
+contextDef = MBOG.contextDef `trackedAs` "contextDef"
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

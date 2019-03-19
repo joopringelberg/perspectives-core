@@ -12,16 +12,17 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Actions (addRol, removeRol)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
+import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP, (##>))
+import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
-import Perspectives.PerspectivesTypes (RolDef(..))
+import Perspectives.PerspectivesTypes (Context(..), ContextDef(..), RolDef(..))
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
-import Perspectives.TypeDefChecker (checkContext)
+import Perspectives.TypeDefChecker (checkAContext)
 import Prelude (Unit, bind, const, discard, id, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 
 -- | Construct contexts and roles from the serialisation.
@@ -42,7 +43,7 @@ constructContext c@(ContextSerialization{id}) = do
           removeFromCache ident
           pure $ Left messages
         (Right _) -> do
-          (m :: Array UserMessage) <- checkContext ident
+          (m :: Array UserMessage) <- checkAContext $ Context ident
           case length m of
             0 -> pure $ Right ident
             otherwise -> do
@@ -144,7 +145,7 @@ constructAnotherRol rolType id rolSerialisation = do
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
       void $ addRol rolType rolId ident
-      (m :: Array UserMessage) <- checkContext ident
+      (m :: Array UserMessage) <- checkAContext $ Context ident
       case length m of
         0 -> do
           pure $ Right rolId

@@ -312,6 +312,7 @@ data UserMessage =
   | ContextExists ID
   | NotAValidIdentifier String
   | NotWellFormedContextSerialization String
+  | CannotOverrideBooleanAspectProperty PropertyName PropertyName
 
 type FD = Either UserMessage ID
 
@@ -340,6 +341,7 @@ instance showUserMessage :: Show UserMessage where
   show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."
   show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."
   show (NotWellFormedContextSerialization m) = "(NotWellFormedContextSerialization) De string '" <> m <> "' is geen geldige ContextSerialization."
+  show (CannotOverrideBooleanAspectProperty pn pp) = "(CannotOverrideBooleanAspectProperty) Er is een aspect van property '" <> pn <> "' dat aan '" <> pp <> "' al de waarde 'true' heeft gegeven."
 
 -----------------------------------------------------------
 -- TRANSACTIE

@@ -12,6 +12,7 @@ import Prelude (($), (>=>), (<<<), pure, map, (>>>))
 
 -- | True iff the RolDef or one of its AspectRollen has given property "isVerplicht" the value "true".
 -- Test.Perspectives.ModelBasedObjectGetters
+-- | Defaults to false. So if no value is given, this function returns "false".
 rolIsVerplicht :: forall e. (RolDef ~~> PBool) e
 rolIsVerplicht = some (concat isVerplicht (closureOfAspectRol /-/ isVerplicht))
   where
@@ -19,6 +20,7 @@ rolIsVerplicht = some (concat isVerplicht (closureOfAspectRol /-/ isVerplicht))
     isVerplicht = unwrap >>> searchExternalUnqualifiedProperty "isVerplicht" >=> pure <<< map wrap <<< map unwrap
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+-- | Defaults to false. So if no value is given, this function returns "false".
 rolIsFunctioneel :: forall e. (RolDef ~~> PBool) e
 rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol /-/ isFunctioneel))
   where
@@ -26,6 +28,8 @@ rolIsFunctioneel = some (concat isFunctioneel (closureOfAspectRol /-/ isFunction
     isFunctioneel = unwrap >>> searchExternalUnqualifiedProperty "isFunctioneel" >=> pure <<< map wrap <<< map unwrap
 
 -- | Equal to the 'own' $isVerplicht value; otherwise the logical or of the #aspectProperty values.
+-- | Defaults to false. So if no value is given, this function returns "false".
+-- Test.Perspectives.ModelBasedObjectGetters
 propertyIsVerplicht :: forall e. (PropertyDef ~~> PBool) e
 propertyIsVerplicht = some ((closure_ directAspectProperties) /-/ isVerplicht)
   where
@@ -33,6 +37,7 @@ propertyIsVerplicht = some ((closure_ directAspectProperties) /-/ isVerplicht)
     isVerplicht = unwrap >>> searchExternalUnqualifiedProperty "isVerplicht" >=> pure <<< map wrap <<< map unwrap
 
 -- | Equal to the 'own' $isFunctioneel value; otherwise the logical or of the #aspectProperty values.
+-- | Defaults to false. So if no value is given, this function returns "false".
 propertyIsFunctioneel :: forall e. (PropertyDef ~~> PBool) e
 propertyIsFunctioneel = some (concat isFunctioneel (closureOfAspectProperty /-/ isFunctioneel))
   where
