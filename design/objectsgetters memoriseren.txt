@@ -1,0 +1,60 @@
+OBJECTSGETTERS MEMORISEREN
+
+DataTypeObjectGetters kunnen simpelweg gememoriseerd worden met `trackedAs`.
+Maar dat geldt niet voor ModelBasedObjectGetters, die berekend worden met meerdere dataTypeObjectGetter-stappen. Elk van die stappen moet gememoriseerd worden en hun samenhang ook.
+
+Dat betekent dat ik b.v. rolIsVerplicht moet herschrijven om een gememoriseerde versie te krijgen waarvan het resultaat meeverandert als een tussenstap verandert.
+Anders heb ik alleen maar een gememoriseerd resultaat, dat niet meer zal veranderen.
+
+Maar dat betekent dat constructors zoals 'some', 'concat'  en 'searchExternalUnqualifiedProperty' óók een gememoriseerde tegenhanger moeten krijgen!
+
+STAND VAN ZAKEN
+ObjectGetter				TripleGetter
+dataType					dataType 		KLAAR
+modelBased					modelBased
+objectGetterConstructors	queryCombinators
+
+===================================================
+NIEUWE MAPPING DATA CONSTRUCTORS QUERY AST OP ZOEKFUNCTIES
+
+    UnqualifiedRol String					- searchUnqualifiedRol				- NIET IN QUERYBUILDER
+  | QualifiedRol String						- searchContextRol					- IN QUERYBUILDER
+  | UnqualifiedProperty String				- searchUnqualifiedProperty			- KLAAR
+  | QualifiedProperty String				- searchProperty					- KLAAR
+  | UnqualifiedExternalProperty String		- searchExternalUnqualifiedProperty	- KLAAR
+  | QualifiedExternalProperty String		- searchExternalProperty			- KLAAR
+  | UnqualifiedInternalProperty String		- searchInternalUnqualfiedProperty	- KLAAR
+  | QualifiedInternalProperty String		- getInternalPropery				- KLAAR
+
+Drie onafhankelijke dimensies:
+	* qualified - unqualified
+	* Rol - Property
+	* Internal - External
+
+Aan de functiekant heb ik de volgende triplegetters (en die hebben we nodig, want het gaat om dependency tracking en memoriseren van queries van de modelleur):
+
+	* getContextRol / getRolInContext
+	
+	* getUnqualifiedContextRol / getUnqualifiedRolInContext
+	
+	* searchContextRol / searchRolInContext
+	
+	* searchUnqualifiedRol (is eigenlijk searchUnqualifiedContextRol en we missen searchUnqualifiedRolInContext)
+	
+	
+	* searchProperty
+	
+	* searchUnqualifiedProperty
+	
+	* searchExternalProperty
+	
+	* searchExternalUnqualifiedProperty
+	
+	* getInternalPropery
+	
+	* searchInternalUnqualfiedProperty
+
+1. Voor de queryCompiler maakt het verschil tussen RolInContext en ContextRol niets uit.
+
+2. Het verschil tussen get- en search is voor Properties onbelangrijk omdat de laatste begint met de eerste.
+

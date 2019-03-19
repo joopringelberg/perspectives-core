@@ -12,7 +12,7 @@ Value
 
 Dus, om instanties te kunnen typeren:
 	Context			*
-	Rol
+	Rol				-
 	Value
 	RolInContext	*
 	ContextRol 		*
@@ -38,6 +38,6 @@ Classes:
 		BuitenRol
 		RolInContext (eigenlijk overbodig voor model controle)
 		ContextRol (in het model is elke rolinstantie die geen binnen-of buitenrol is, een ContextRol).
-	member: binding, kan specifiek zijn voor elke instantie.
+	member: binding, kan specifiek zijn voor elke instantie. Nee natuurlijk, daar heb je een type class met twee vars voor nodig.
 	
 Hebben we dan ook nog Rol nodig?
