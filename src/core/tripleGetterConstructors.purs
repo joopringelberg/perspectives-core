@@ -124,6 +124,19 @@ searchInAspectRolesAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGet
     <|>
     (rolDefId @@ (RolDef `before` directAspectRoles >-> unwrap `before` searchInAspectRolesAndPrototypes getter))
 
+-- | Applies the getter (s **> o) e to the RolDef and all its prototypes and recursively to all its aspects.
+-- Test.Perspectives.TripleGetterConstructors via searchUnqualifiedPropertyDefinition.
+searchInAspectPropertiesAndPrototypes :: forall o e.
+  Eq o =>
+  (AnyContext **> o) e ->
+  (AnyContext **> o) e
+searchInAspectPropertiesAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
+  f :: TripleGetter AnyContext o e
+  f rolDefId =
+    unlessNull (searchLocallyAndInPrototypeHierarchy getter) rolDefId
+    <|>
+    (rolDefId @@ (PropertyDef `before` directAspectProperties >-> unwrap `before` searchInAspectPropertiesAndPrototypes getter))
+
 -- Test.Perspectives.TripleGetterConstructors
 directAspects :: forall e. (AnyContext **> AnyContext) e
 directAspects = OGC.directAspects `trackedAs` "model:Perspectives$Context$directAspects"

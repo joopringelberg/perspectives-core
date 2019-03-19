@@ -16,7 +16,7 @@ import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as
 import Perspectives.QueryCombinators (contains)
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchRolInContext, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
@@ -54,8 +54,12 @@ propertyIsFunctioneel = some (concat isFunctioneel (closureOfAspectProperty >-> 
     isFunctioneel :: (PropertyDef **> PBool) e
     isFunctioneel = (unwrap `before` (searchExternalUnqualifiedProperty "isFunctioneel")) `followedBy` (wrap <<< unwrap)
 
+ownRangeDef :: forall e. (PropertyDef **> SimpleValueDef) e
+ownRangeDef = (unwrap `before` (searchContextRol (RolDef "model:Perspectives$Property$range") >-> DTG.binding >-> DTG.context)) `followedBy` SimpleValueDef
+
+-- | For a PropertyDef, find its range locally, on prototypes or on AspectProperties.
 rangeDef :: forall e. (PropertyDef **> SimpleValueDef) e
-rangeDef = (unwrap `before` (searchContextRol (RolDef "model:Perspectives$Property$range") >-> DTG.binding >-> DTG.context)) `followedBy` SimpleValueDef
+rangeDef = unwrap `before` searchInAspectPropertiesAndPrototypes (PropertyDef `before` ownRangeDef)
 
 -- | True iff the context instance has a label.
 hasLabel :: forall e. (AnyContext **> PBool) e
