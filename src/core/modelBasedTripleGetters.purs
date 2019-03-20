@@ -16,7 +16,7 @@ import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as
 import Perspectives.QueryCombinators (contains)
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
@@ -121,8 +121,17 @@ inverse_subjectRollenDef = unwrap `before` DTG.buitenRol >-> constructInverseRol
 
 -- | The type of Rol or Context that can be bound to the Rol.
 -- | `psp:Rol -> psp:Context | psp:Rol`
+ownMogelijkeBinding :: forall e. (RolDef **> AnyDefinition) e
+ownMogelijkeBinding = unwrap `before` searchRolInContext (RolDef "model:Perspectives$Rol$mogelijkeBinding")  >-> DTG.binding >-> DTG.context
+
+-- | The type of Rol or Context that can be bound to the Rol, taken
+-- | from the RolDef itself or any aspectRol or prototype.
+-- | `psp:Rol -> psp:Context | psp:Rol`
 mogelijkeBinding :: forall e. (RolDef **> AnyDefinition) e
-mogelijkeBinding = unwrap `before` searchRolInContext (RolDef "model:Perspectives$Rol$mogelijkeBinding")  >-> DTG.binding >-> DTG.context
+mogelijkeBinding = unwrap `before` mbinding
+  where
+    mbinding :: (String **> String) e
+    mbinding = searchRolInContext (RolDef "model:Perspectives$Rol$mogelijkeBinding")  >-> DTG.binding >-> DTG.context
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`

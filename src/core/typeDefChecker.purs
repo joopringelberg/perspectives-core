@@ -23,9 +23,9 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, ownPropertiesDef, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef, nonQueryRollen, contextDef)
+import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownPropertiesDef, ownRangeDef, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef)
 import Perspectives.ObjectGetterConstructors (alternatives, searchContextRol)
-import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef, Value(..))
+import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (getPropertyFunction, getInternalPropertyFunction)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -33,9 +33,9 @@ import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=),
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, some)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (directAspectProperties, directAspectRoles, searchExternalUnqualifiedProperty)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, searchExternalUnqualifiedProperty)
 import Perspectives.TypeChecker (contextHasType, isOrHasAspect)
-import Perspectives.Utilities (ifNothing)
+import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (Unit, bind, const, discard, ifM, map, pure, unit, ($), (<), (<<<), (>=>), (>>=), (>>>), (||), (*>))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery (AjaxAvarCache e))
@@ -137,9 +137,21 @@ checkAspectOfRolType def = do
             else tell [AspectRolNotFromAspect (unwrap def) (unwrap aspectRol) (unwrap contextdef)])
         aspectrollen
 
--- TODO. Controleer of de mogelijkeBinding van de rol de mogelijkeBinding van zijn AspectRol als aspect heeft! En let op het verschil tussen ContextRol en RolInContext.
 checkMogelijkeBinding :: forall e. RolDef -> TDChecker e Unit
-checkMogelijkeBinding def = pure unit
+checkMogelijkeBinding def = do
+  mmbinding <- lift (def @@> mogelijkeBinding)
+  case mmbinding of
+    Nothing -> tell [MissingMogelijkeBinding $ unwrap def]
+    (Just mbinding) -> do
+      mlocalMbinding <- lift (def @@> ownMogelijkeBinding)
+      case mlocalMbinding of
+        Nothing -> pure unit
+        (Just localMbinding) -> lift (def @@= closureOfAspectRol) >>= traverse_
+          \aspectRol -> ifNothing (lift (aspectRol @@> ownMogelijkeBinding))
+            (pure unit)
+            (\aspectMbinding -> ifM (lift $ lift $ (ContextDef localMbinding) `isOrHasAspect` (ContextDef aspectMbinding))
+              (pure unit)
+              (tell [MogelijkeBindingNotSubsumed mbinding (unwrap aspectRol) aspectMbinding (unwrap def)]))
 
 -- | Does the RolDef assign a value to the mandatory internal and external properties of the type of the
 -- | RolDef? These values can be assigned to the RolDef itself (on its binnen- or buitenrol), or
@@ -157,11 +169,11 @@ checkRolDefPropertyValues def = pure unit
 -- | AspectProperties may assign true to them!
 -- | Is the range of the Property given with the PropertyDef, or one of its AspectProperties?
 -- | Is the range of the Property subsumed by the ranges of its AspectProperties?
--- TODO: both range checks of CheckPropertyDef
 checkPropertyDef :: forall e. PropertyDef -> ContextDef -> TDChecker e Unit
 checkPropertyDef def deftype = do
   checkBooleanFacetOfProperty "isVerplicht"
   checkBooleanFacetOfProperty "isFunctioneel"
+  checkRangeDef
   where
     checkBooleanFacetOfProperty :: LocalName ->  TDChecker e Unit
     checkBooleanFacetOfProperty ln = do
@@ -179,6 +191,24 @@ checkPropertyDef def deftype = do
           where
             isVerplicht :: (PropertyDef **> PBool) e
             isVerplicht = (unwrap `before` (searchExternalUnqualifiedProperty ln)) `followedBy` (wrap <<< unwrap)
+    -- Checks if a range has been defined, somewhere.
+    -- If so, checks if that range is subsumed by the range of each AspectProperty.
+    checkRangeDef :: TDChecker e Unit
+    checkRangeDef = do
+      mrange <- lift (def @@> rangeDef)
+      case mrange of
+        Nothing -> tell [MissingRange $ unwrap def]
+        (Just range) -> do
+          mlocalRange <- lift (def @@> ownRangeDef)
+          case mlocalRange of
+            Nothing -> pure unit
+            (Just (SimpleValueDef localRangeDef)) -> lift (def @@= closureOfAspectProperty) >>= traverse_
+              \aspectProp -> ifNothing (lift (aspectProp @@> ownRangeDef))
+                (pure unit)
+                (\(SimpleValueDef aspectRange) -> ifM (lift $ lift $ (ContextDef localRangeDef) `isOrHasAspect` (ContextDef aspectRange))
+                  (pure unit)
+                  (tell [RangeNotSubsumed localRangeDef (unwrap aspectProp) aspectRange (unwrap def)]))
+
 
 -----------------------------------------------------------
 -- CHECKCONTEXT
@@ -214,6 +244,8 @@ checkContext def deftype = do
   checkCyclicAspects def
 
   (lift $ lift (unwrap deftype ##= mandatoryRollen)) >>= traverse_ (checkRolAvailable def)
+
+  (lift $ lift (unwrap deftype ##= nonQueryRollen)) >>= traverse_ (compareRolInstancesToDefinition def)
 
 -- | Does the rol type hold a definition for all properties given to the rol instance?
 checkPropertyIsDefined :: forall e.
@@ -311,6 +343,56 @@ checkCyclicAspects cid = do
 -- | A Query is defined with psp:Function, which is a psp:Context and not a
 -- | psp:Rol. Hence it does not have $isVerplicht as a Property.
 checkRolAvailable :: forall e. Context -> RolDef -> TDChecker e Unit
-checkRolAvailable contextInstance rolType = ifM (lift $ lift $ searchContextRol rolType (unwrap contextInstance) >>= pure <<< null)
-  (tell [MissingRolInstance (unwrap rolType) (unwrap contextInstance)])
+checkRolAvailable def rolType = ifM (lift $ lift $ searchContextRol rolType (unwrap def) >>= pure <<< null)
+  (tell [MissingRolInstance (unwrap rolType) (unwrap def)])
   (pure unit)
+
+-- | For this Rol (definition), looks for its instances in the ContextInstance.
+-- | Compares that RolInstance to its definition:
+-- |  1. Checks each defined property with the instance of the rol.
+-- |  2. Checks the type of the binding, if given.
+-- | Finally, if the Rol is mandatory and missing, adds a message.
+-- | Note that RolDef will never be a query, i.e. it does not have psp:Function
+-- | as Aspect.
+compareRolInstancesToDefinition :: forall e. Context -> RolDef -> TDChecker e Unit
+compareRolInstancesToDefinition def rolType =
+  (lift $ lift $ searchContextRol rolType (unwrap def)) >>= traverse_ compareRolInstanceToDefinition
+
+  where
+
+    compareRolInstanceToDefinition :: ContextRol -> TDChecker e Unit
+    compareRolInstanceToDefinition rolInstance = do
+      -- Check the properties.
+      (definedRolProperties :: Array PropertyDef) <- lift (rolType @@= propertiesDef)
+      (rol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap rolInstance)
+      traverse_ (checkRange def rol (getPropertyValues def rol)) definedRolProperties
+      lift (rolType @@= mandatoryProperties) >>= traverse_ (checkPropertyAvailable (ContextDef $ unwrap def) rol (getPropertyValues def rol))
+
+      -- Detect used but undefined properties.
+      (availableProperties :: Array String) <- lift $ lift $ propertyTypen $ unwrap rolInstance
+      checkPropertyIsDefined rol availableProperties definedRolProperties def
+
+      -- check the binding. Does the binding have the type given by mogelijkeBinding, or has its type that Aspect?
+      -- Note that rolInstance is a ContextRol. `rolBindingDef` retrieves the context of the binding.
+      maybeBinding <- lift (rolInstance @@> DTTG.rolBindingDef)
+      case maybeBinding of
+        Nothing -> pure unit
+        (Just (theBinding :: String)) -> do
+          mmb <- lift (rolType @@> mogelijkeBinding)
+          case mmb of
+            Nothing -> pure unit
+            (Just (toegestaneBinding :: String)) -> do
+              (alts :: Array AnyContext) <- lift $ lift $ alternatives toegestaneBinding
+              case head alts of
+                -- Single type.
+                Nothing -> ifM (lift $ lift $ contextHasType theBinding (ContextDef toegestaneBinding))
+                  (pure unit)
+                  (do
+                    typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
+                    (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
+                -- Sum type.
+                otherwise -> ifM (foldM (\r alt -> (lift $ lift $ contextHasType theBinding alt) >>= pure <<< (||) r) false (map ContextDef alts))
+                  (pure unit)
+                  (do
+                    typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
+                    (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))

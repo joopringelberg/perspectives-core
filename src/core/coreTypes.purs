@@ -287,6 +287,7 @@ instance showTripleRef :: Show TripleRef where
 -----------------------------------------------------------
 type Aspect = String
 type TypeID = String
+type SimpleValueName = String
 
 data UserMessage =
     MissingVariableDeclaration String
@@ -313,6 +314,9 @@ data UserMessage =
   | NotAValidIdentifier String
   | NotWellFormedContextSerialization String
   | CannotOverrideBooleanAspectProperty PropertyName PropertyName
+  | MissingRange PropertyName
+  | RangeNotSubsumed SimpleValueName PropertyName SimpleValueName PropertyName
+  | MogelijkeBindingNotSubsumed String RolName String RolName
 
 type FD = Either UserMessage ID
 
@@ -342,6 +346,9 @@ instance showUserMessage :: Show UserMessage where
   show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."
   show (NotWellFormedContextSerialization m) = "(NotWellFormedContextSerialization) De string '" <> m <> "' is geen geldige ContextSerialization."
   show (CannotOverrideBooleanAspectProperty pn pp) = "(CannotOverrideBooleanAspectProperty) Er is een aspect van property '" <> pn <> "' dat aan '" <> pp <> "' al de waarde 'true' heeft gegeven."
+  show (MissingRange pn) = "(MissingRange) Propery '" <> pn <> "' has not been given a range."
+  show (RangeNotSubsumed ownRange aspect aspectRange property) = "(RangeNotSubsumed) De range '" <> aspectRange <> "' van de AspectProperty '" <> aspect <> "' is geen aspect van de range '" <> ownRange <> "' van de property '" <> property <> "'!"
+  show (MogelijkeBindingNotSubsumed ownBinding aspect aspectBinding rol) = "(MogelijkeBindingNotSubsumed) De mogelijke binding '" <> aspectBinding <> "' van de AspectRol '" <> aspect <> "' is geen aspect van de mogelijke binding '" <> ownBinding <> "' van de rol '" <> rol <> "'!"
 
 -----------------------------------------------------------
 -- TRANSACTIE
