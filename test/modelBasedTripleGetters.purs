@@ -3,7 +3,7 @@ module Test.Perspectives.ModelBasedTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, ownPropertiesDef, propertiesDef, rollenDef)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, mogelijkeBinding, ownPropertiesDef, propertiesDef, rollenDef)
 import Perspectives.PerspectivesTypes (PropertyDef(..), RolDef(..))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
@@ -13,7 +13,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suiteSkip "ModelBasedTripleGetters" do
+theSuite = suite "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rollenDef" do
@@ -43,6 +43,13 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "Found through three layers."
       ((t "myContextDef3") ##= buitenRolBeschrijvingDef)
       [RolDef $ p "ContextPrototype$buitenRolBeschrijving"]
+
+  testOnly "mogelijkeBinding" do
+    loadTestModel "TestOGC.crl"
+    assertEqual "$myAspectRol1 has mogelijkeBinding psp:Rol through its $aspectRol"
+      ((RolDef $ t "myAspect$myAspectRol1") ##= mogelijkeBinding)
+      [p "Rol"]
+    unLoadTestModel "model:TestOGC"
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

@@ -131,7 +131,10 @@ mogelijkeBinding :: forall e. (RolDef **> AnyDefinition) e
 mogelijkeBinding = unwrap `before` mbinding
   where
     mbinding :: (String **> String) e
-    mbinding = searchRolInContext (RolDef "model:Perspectives$Rol$mogelijkeBinding")  >-> DTG.binding >-> DTG.context
+    mbinding = searchInAspectRolesAndPrototypes f
+
+    f :: (String **> AnyDefinition) e
+    f = searchRolInContext (RolDef "model:Perspectives$Rol$mogelijkeBinding")  >-> DTG.binding >-> DTG.context
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`
