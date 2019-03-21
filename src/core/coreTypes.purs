@@ -304,11 +304,15 @@ data UserMessage =
   | IncorrectBinding ContextID RolName TypeID TypeID TypeID
   | RolNotDefined RolName ContextID TypeID
   | MissingPropertyValue ContextID PropertyName RolName
+  | MissingExternalPropertyValue PropertyName ContextID
+  | MissingInternalPropertyValue PropertyName ContextID
   | IncorrectPropertyValue ContextID PropertyName TypeID String
   | TooManyPropertyValues ContextID PropertyName
   | PropertyNotDefined ContextID PropertyName RolID RolName
   | AspectRolNotFromAspect RolName RolName ContextID
   | CycleInAspects ContextID (Array TypeID)
+  | CycleInAspectRoles RolName (Array TypeID)
+  | CycleInAspectProperties PropertyName (Array TypeID)
   | RolWithoutContext RolName
   | ContextExists ID
   | NotAValidIdentifier String
@@ -335,11 +339,15 @@ instance showUserMessage :: Show UserMessage where
   show (IncorrectBinding cid rn bd tp mb) = "(IncorrectBinding) In de context '" <> cid <> "' is de Rol '" <> rn <> "' gebonden aan '" <> bd <> "'(type: '" <> tp <> "') maar moet worden gebonden aan een instantie van type '" <> mb <> "'."
   show (RolNotDefined rn cid tp) = "(RolNotDefined) De context '" <> cid <> "' heeft een instantie van rol '" <> rn <> "' maar die is niet gedefinieerd voor '" <> tp <> "'."
   show (MissingPropertyValue cid pn rid) = "(MissingPropertyValue) De verplichte Property '" <> pn <> "' komt niet voor in de rol '" <> rid <> "' van de context '" <> cid <> "'."
+  show (MissingExternalPropertyValue pn cid) = "(MissingExternalPropertyValue) De verplichte externe Property '" <> pn <> "' komt niet voor in de context '" <> cid <> "'."
+  show (MissingInternalPropertyValue pn cid) = "(MissingInternalPropertyValue) De verplichte interne Property '" <> pn <> "' komt niet voor in de context '" <> cid <> "'."
   show (IncorrectPropertyValue cid pn sv val) = "(IncorrectPropertyValue) De Property '" <> pn <> "' is gebonden aan de waarde '" <> val <> "' maar moet worden gebonden aan een waarde van type '" <> sv <> "' (in de context '" <> cid <> "')."
   show (TooManyPropertyValues cid pn) = "(TooManyPropertyValues) De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde (in de context '" <> cid <> "')."
   show (PropertyNotDefined cid pn rid rn) = "(PropertyNotDefined) De Rol '" <> rid <> "' van de context '" <> cid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
   show (AspectRolNotFromAspect rn arn cid) = "(AspectRolNotFromAspect) De Rol '" <> rn <> "' gebruikt de Rol '" <> arn <> "' als aspectrol, maar die is niet beschikbaar in de Aspecten van '" <> cid <> "'."
   show (CycleInAspects cid asps) = "(CycleInAspects) De Context '" <> cid <> "' heeft een Aspect dat (indirect) weer '" <> cid <> "' als Aspect heeft. De betrokken Aspecten zijn: " <> show asps <> "."
+  show (CycleInAspectRoles cid asps) = "(CycleInAspectRoles) De Rol '" <> cid <> "' heeft een AspectRol die (indirect) weer '" <> cid <> "' als AspectRol heeft. De betrokken AspectRollen zijn: " <> show asps <> "."
+  show (CycleInAspectProperties cid asps) = "(CycleInAspectProperties) De Property '" <> cid <> "' heeft een AspectProperty die (indirect) weer '" <> cid <> "' als AspectProperty heeft. De betrokken AspectProperties zijn: " <> show asps <> "."
   show (RolWithoutContext cid) = "(RolWithoutContext) De Rol-definitie '" <> cid <> "' heeft geen definiërende Context."
   -- show _ = "This is a usermessage"
   show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."

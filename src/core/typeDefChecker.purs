@@ -17,25 +17,25 @@ import Perspectives.ContextAndRole (context_binnenRol, rol_id, rol_pspType)
 import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), tripleObject, (@@), (@@=), (@@>), type (**>))
 import Perspectives.DataTypeObjectGetters (propertyTypen)
 import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, buitenRol) as DTTG
-import Perspectives.DataTypeTripleGetters (propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen) as DTG
+import Perspectives.DataTypeTripleGetters (propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen, buitenRol, binnenRol) as DTG
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownPropertiesDef, ownRangeDef, propertiesDef, propertyIsFunctioneel, propertyIsVerplicht, rangeDef, rolIsVerplicht, rollenDef)
+import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rollenDef)
 import Perspectives.ObjectGetterConstructors (alternatives, searchContextRol)
-import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..), Value(..))
+import Perspectives.PerspectivesTypes (AnyContext, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (getPropertyFunction, getInternalPropertyFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=), (##>))
-import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, some)
+import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, searchInRolTelescope, some)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, searchExternalUnqualifiedProperty)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, getInternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchProperty)
 import Perspectives.TypeChecker (contextHasType, isOrHasAspect)
-import Perspectives.Utilities (ifNothing, onNothing)
+import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, ifM, map, pure, unit, ($), (<), (<<<), (>=>), (>>=), (>>>), (||), (*>))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery (AjaxAvarCache e))
@@ -132,7 +132,7 @@ checkRolDef :: forall e. RolDef -> ContextDef -> TDChecker e Unit
 checkRolDef def deftype = do
   checkAspectOfRolType def
   checkMogelijkeBinding def
-  checkRolDefPropertyValues def
+  checkRolDefPropertyValues def deftype
   checkCyclicAspectRoles def
 
 -- | Checks the aspectRollen of the RolDefinition.
@@ -171,9 +171,30 @@ checkMogelijkeBinding def = do
 -- | Does the RolDef assign a value to the mandatory internal and external properties of the type of the
 -- | RolDef? These values can be assigned to the RolDef itself (on its binnen- or buitenrol), or
 -- | on its prototypes or AspectRollen.
--- TODO: implementeer checkRolDefPropertyValues.
-checkRolDefPropertyValues :: forall e. RolDef -> TDChecker e Unit
-checkRolDefPropertyValues def = pure unit
+checkRolDefPropertyValues :: forall e. RolDef -> ContextDef -> TDChecker e Unit
+checkRolDefPropertyValues def deftype = do
+  mandatoryExternalProperties <- lift (unwrap deftype @@= buitenRolBeschrijvingDef >-> mandatoryProperties)
+  traverse_ checkExternalProperty mandatoryExternalProperties
+
+  -- mandatoryInternalProperties <- lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties)
+  -- traverse_ checkExternalProperty mandatoryExternalProperties
+
+  where
+    findExternalValue :: PropertyDef -> (AnyContext **> Value) e
+    findExternalValue pdef = searchInAspectRolesAndPrototypes (DTG.buitenRol >-> searchProperty pdef)
+
+    checkExternalProperty :: PropertyDef -> TDChecker e Unit
+    checkExternalProperty pdef = ifNothing (lift $ lift (unwrap def ##> findExternalValue pdef))
+      (tell [MissingExternalPropertyValue (unwrap pdef) (unwrap def)])
+      (\ignore -> pure unit)
+
+    findInternalValue :: PropertyDef -> (AnyContext **> String) e
+    findInternalValue pdef = searchInAspectRolesAndPrototypes (DTG.binnenRol >-> unwrap `before` (searchInRolTelescope ((getInternalProperty pdef) `followedBy` unwrap)))
+
+    checkInternalProperty :: PropertyDef -> TDChecker e Unit
+    checkInternalProperty pdef = ifNothing (lift $ lift (unwrap def ##> findInternalValue pdef))
+      (tell [MissingExternalPropertyValue (unwrap pdef) (unwrap def)])
+      (\ignore -> pure unit)
 
 -- | Returns a warning if the AspectRollen of the Rol definition include the definition itself.
 checkCyclicAspectRoles :: forall e. RolDef -> TDChecker e Unit

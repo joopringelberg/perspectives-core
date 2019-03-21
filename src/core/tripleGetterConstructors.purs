@@ -112,7 +112,7 @@ searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter 
     (contextId @@ (directAspects >-> searchInAspectsAndPrototypes getter))
 
 -- | Applies the getter (s **> o) e to the RolDef and all its prototypes and recursively to all its aspects.
--- Test.Perspectives.TripleGetterConstructors via searchUnqualifiedPropertyDefinition.
+-- Test.Perspectives.TripleGetterConstructors (also via searchUnqualifiedPropertyDefinition).
 searchInAspectRolesAndPrototypes :: forall o e.
   Eq o =>
   (AnyContext **> o) e ->
