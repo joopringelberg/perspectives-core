@@ -52,23 +52,25 @@ checkAContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkConte
     checkContext' :: Context -> TDChecker e Unit
     checkContext' def = ifNothing (lift (unwrap def @@> DTG.contextType `followedBy` ContextDef))
       (tell [MissingType $ unwrap def])
-      \(tp :: ContextDef) -> checkContext def tp
+      -- \(tp :: ContextDef) -> checkContext def tp
+      \(tp :: ContextDef) -> checksForEachContext def tp *> mandatoryRolesInstantiated def tp
 
 -----------------------------------------------------------
 -- DEFINITION
 -----------------------------------------------------------
--- | Checks for any definition.
+-- | Dispatches to specific checks for Context-, Rol- and PropertyDef, and all others.
 checkDefinition :: forall e. ContextDef -> TDChecker e Unit
 checkDefinition def = ifNothing (lift (unwrap def @@> DTG.contextType `followedBy` ContextDef))
   (tell [MissingType $ unwrap def])
   \(tp :: ContextDef) -> do
-    ifM (def `isa` (ContextDef "model:Perspectives$Context"))
-      (checkContext (Context (unwrap def)) tp *> checkContextDef def tp)
-      (ifM (def `isa` (ContextDef "model:Perspectives$Rol"))
-        (checkContext (Context (unwrap def)) tp *> checkRolDef (RolDef (unwrap def)) tp)
-        (ifM (def `isa` (ContextDef "model:Perspectives$Property"))
-          (checkContext (Context (unwrap def)) tp *> checkPropertyDef (PropertyDef (unwrap def)) tp)
-          (checkContext (Context (unwrap def)) tp)))
+    ifM (tp `isa` (ContextDef "model:Perspectives$Context"))
+      (checksForEachContext (Context (unwrap def)) tp *> checkContextDef def tp)
+      (ifM (tp `isa` (ContextDef "model:Perspectives$Rol"))
+        (checksForEachContext (Context (unwrap def)) tp *> checkRolDef (RolDef (unwrap def)) tp)
+        (ifM (tp `isa` (ContextDef "model:Perspectives$Property"))
+          (checksForEachContext (Context (unwrap def)) tp *> checkPropertyDef (PropertyDef (unwrap def)) tp)
+          (checksForEachContext (Context (unwrap def)) tp) *> mandatoryRolesInstantiated (Context $ unwrap def) tp)
+          )
   where
     isa :: ContextDef -> ContextDef -> TDChecker e Boolean
     isa a b = lift $ lift $ isOrHasAspect a b
@@ -76,6 +78,10 @@ checkDefinition def = ifNothing (lift (unwrap def @@> DTG.contextType `followedB
 -----------------------------------------------------------
 -- CHECKCONTEXTDEF
 -----------------------------------------------------------
+-- | Is the Aspect relation not cyclic?
+-- | Have all mandatory external properties a value?
+-- | Have all mandatory internal properties a value?
+-- | Have all mandatory roles been instantiated?
 checkContextDef :: forall e. ContextDef -> ContextDef -> TDChecker e Unit
 checkContextDef def deftype = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
@@ -84,6 +90,10 @@ checkContextDef def deftype = do
   lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties) >>= traverse_ (checkPropertyAvailable def binnenrol (getBinnenRolPropertyValues (Context (unwrap def)) binnenrol))
 
   lift (unwrap deftype @@= buitenRolBeschrijvingDef >-> mandatoryProperties) >>= traverse_ (checkPropertyAvailable def buitenrol (getPropertyValues (Context $ unwrap def) buitenrol))
+
+  checkCyclicAspects def
+
+  mandatoryRolesInstantiated (Context $ unwrap def) deftype
 
 checkPropertyAvailable :: forall e.
   ContextDef ->
@@ -114,11 +124,16 @@ getBinnenRolPropertyValues def rol propertyType = do
 -----------------------------------------------------------
 -- CHECKROLDEF
 -----------------------------------------------------------
+-- | Is each AspectRol a role of an Aspect of the defining ContextDef of this RolDef?
+-- | Does the mogelijkeBinding have the mogelijkeBinding of each of its AspectRollen as an Aspect?
+-- | Does the RolDef provide all mandatory internal and external properties with a value?
+-- | Is there no cycle in AspectRol?
 checkRolDef :: forall e. RolDef -> ContextDef -> TDChecker e Unit
 checkRolDef def deftype = do
   checkAspectOfRolType def
   checkMogelijkeBinding def
   checkRolDefPropertyValues def
+  checkCyclicAspectRoles def
 
 -- | Checks the aspectRollen of the RolDefinition.
 -- | If such an aspectRol is not a Rol of one of the Aspecten of Context definition
@@ -160,6 +175,15 @@ checkMogelijkeBinding def = do
 checkRolDefPropertyValues :: forall e. RolDef -> TDChecker e Unit
 checkRolDefPropertyValues def = pure unit
 
+-- | Returns a warning if the AspectRollen of the Rol definition include the definition itself.
+checkCyclicAspectRoles :: forall e. RolDef -> TDChecker e Unit
+checkCyclicAspectRoles cid = do
+  aspects <- lift $ lift (cid ##= closureOfAspectRol)
+  case elemIndex cid aspects of
+    Nothing -> pure unit
+    otherwise -> tell [CycleInAspectRoles (unwrap cid) (map unwrap aspects)]
+
+
 -----------------------------------------------------------
 -- CHECKPROPERTYDEF
 -----------------------------------------------------------
@@ -169,11 +193,14 @@ checkRolDefPropertyValues def = pure unit
 -- | AspectProperties may assign true to them!
 -- | Is the range of the Property given with the PropertyDef, or one of its AspectProperties?
 -- | Is the range of the Property subsumed by the ranges of its AspectProperties?
+-- | Is there no cycle in AspectProperty?
 checkPropertyDef :: forall e. PropertyDef -> ContextDef -> TDChecker e Unit
 checkPropertyDef def deftype = do
   checkBooleanFacetOfProperty "isVerplicht"
   checkBooleanFacetOfProperty "isFunctioneel"
   checkRangeDef
+  checkCyclicAspectProperties def
+
   where
     checkBooleanFacetOfProperty :: LocalName ->  TDChecker e Unit
     checkBooleanFacetOfProperty ln = do
@@ -209,21 +236,35 @@ checkPropertyDef def deftype = do
                   (pure unit)
                   (tell [RangeNotSubsumed localRangeDef (unwrap aspectProp) aspectRange (unwrap def)]))
 
+-- | Returns a warning if the AspectProperties of the Rol definition include the definition itself.
+checkCyclicAspectProperties :: forall e. PropertyDef -> TDChecker e Unit
+checkCyclicAspectProperties cid = do
+  aspects <- lift $ lift (cid ##= closureOfAspectProperty)
+  case elemIndex cid aspects of
+    Nothing -> pure unit
+    otherwise -> tell [CycleInAspectProperties (unwrap cid) (map unwrap aspects)]
 
 -----------------------------------------------------------
 -- CHECKCONTEXT
 -----------------------------------------------------------
 -- | Is there an instance in Context for each Rol that is defined for ContextDef?
+mandatoryRolesInstantiated :: forall e. Context -> ContextDef -> TDChecker e Unit
+mandatoryRolesInstantiated def deftype =
+  (lift $ lift (unwrap deftype ##= mandatoryRollen)) >>= traverse_ (checkRolAvailable def)
+
+-----------------------------------------------------------
+-- CHECKSFOREACHCONTEXT
+-----------------------------------------------------------
 -- | Is there a definition with the ContextDef for each role of Context?
--- | Is the Aspect relation not cyclic?
 -- | Is there a definition on the buitenRolBeschrijving of ContextDef for each external property that
 -- | has been given a value?
 -- | Have all external properties been assigned the right type of value?
 -- | Is the number of values assigned to external properties in accordance with the cardinality of their
 -- | definitions?
 -- | The same checks for internal properties.
-checkContext :: forall e. Context -> ContextDef -> TDChecker e Unit
-checkContext def deftype = do
+
+checksForEachContext :: forall e. Context -> ContextDef -> TDChecker e Unit
+checksForEachContext def deftype = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
   (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap def) >>= pure <<< context_binnenRol
 
@@ -240,10 +281,6 @@ checkContext def deftype = do
   checkPropertyIsDefined binnenrol availableInternalProperties definedInternalProperties def
 
   checkIfRolesHaveDefinition deftype def
-
-  checkCyclicAspects def
-
-  (lift $ lift (unwrap deftype ##= mandatoryRollen)) >>= traverse_ (checkRolAvailable def)
 
   (lift $ lift (unwrap deftype ##= nonQueryRollen)) >>= traverse_ (compareRolInstancesToDefinition def)
 
@@ -330,7 +367,7 @@ checkIfRolesHaveDefinition deftype def = do
         otherwise -> pure unit
 
 -- | Returns a warning if the Aspecten of the Context definition include the definition itself.
-checkCyclicAspects :: forall e. Context -> TDChecker e Unit
+checkCyclicAspects :: forall e. ContextDef -> TDChecker e Unit
 checkCyclicAspects cid = do
   aspects <- lift $ lift (unwrap cid ##= closureOfAspect)
   case elemIndex (unwrap cid) aspects of
@@ -351,7 +388,6 @@ checkRolAvailable def rolType = ifM (lift $ lift $ searchContextRol rolType (unw
 -- | Compares that RolInstance to its definition:
 -- |  1. Checks each defined property with the instance of the rol.
 -- |  2. Checks the type of the binding, if given.
--- | Finally, if the Rol is mandatory and missing, adds a message.
 -- | Note that RolDef will never be a query, i.e. it does not have psp:Function
 -- | as Aspect.
 compareRolInstancesToDefinition :: forall e. Context -> RolDef -> TDChecker e Unit
