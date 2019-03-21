@@ -25,13 +25,13 @@ psp:Context t:myAspect
 	$aspect => t:myUrAspect
 	$rolInContext =>
 		psp:Rol $myAspectRol1
-			extern $isFunctioneel = true
+			--extern $isFunctioneel = true
 			extern $isVerplicht = true
 			$aspectRol => t:myUrAspect$myUrAspectRol1
-			$mogelijkeBinding => psp:Rol
+			--$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $myAspectRol1Property
-					extern $isFunctioneel = true
+					extern $isFunctioneel = false
 					extern $isVerplicht = true
 					$range => psp:Boolean
 	$rolInContext =>
@@ -49,11 +49,14 @@ psp:Context t:myContextDef
 			$aspectRol => t:myAspect$myAspectRol1
 			$rolProperty =>
 				psp:Property $rol1Property
+					--prototype t:myAspect$myAspectRol1$myAspectRol1Property
+					extern $isFunctioneel = true
 					$aspectProperty => t:myAspect$myAspectRol1$myAspectRol1Property
 
 t:myContextDef t:myContextPrototype
 	prototype psp:ContextPrototype
 	$rol1 => ()
+		$rol1Property = true
 		t:myAspect$myAspectRol1$myAspectRol1Property = false
 	t:myAspect$myAspectRol2 => ()
 
@@ -129,3 +132,14 @@ t:myContextDefWithInternalProperty t:myContextWithShadowedInternalProperty
 	prototype t:myContextWithInternalPropertyPrototype
 	extern $someProp = "Rain on the roof"
 	intern $someProp = "Sun on the roof"
+
+psp:Context t:myContextDef4
+	prototype psp:ContextPrototype
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $rol1Property
+					-- extern $isVerplicht = true -- test if it retrieves false!
+					extern $isFunctioneel = true

@@ -96,6 +96,7 @@ psp:Context psp:Context
 		psp:Rol $externeView
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:View
+	-- Deze roldefinitie is overbodig.
 	$rolInContext =>
 		psp:Rol $prototype
 			extern $isFunctioneel = true

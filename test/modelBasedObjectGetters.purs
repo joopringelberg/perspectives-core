@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.DataTypeObjectGetters (buitenRol, context, iedereRolInContext)
 import Perspectives.DataTypeTripleGetters (propertyTypen) as DTG
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, propertyIsVerplicht, rolIsVerplicht)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, propertyIsFunctioneel, propertyIsVerplicht, rolIsVerplicht)
 import Perspectives.ObjectGetterConstructors (closure_, directAspectProperties)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), Value(..), binding, genericBinding, getProperty, getUnqualifiedProperty)
@@ -18,7 +18,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ObjectGetterConstructors" do
+theSuite = suite "ModelBasedObjectGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rolIsVerplicht" do
@@ -28,8 +28,7 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "t:myContextDef$rol1 is verplicht by virtue of its aspectRol."
       (rolIsVerplicht (RolDef $ t "myContextDef$rol1"))
       [PBool "true"]
-  testOnly "propertyIsVerplicht" do
-    loadTestModel "TestOGC.crl"
+  test "propertyIsVerplicht" do
     assertEqual "t:myAspect$myAspectRol1$myAspectRol1Property is verplicht."
       (propertyIsVerplicht (PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"))
       [PBool "true"]
@@ -39,8 +38,20 @@ theSuite = suite "ObjectGetterConstructors" do
     assertEqual "t:myContextDef$rol1$rol1Property is verplicht by virtue of its aspectProperty."
       (propertyIsVerplicht (PropertyDef $ t "myContextDef$rol1$rol1Property"))
       [PBool "true"]
-    unLoadTestModel "model:TestOGC"
-    
+    assertEqual "t:myContextDef4$rol1$rol1Property is verplicht."
+      (propertyIsVerplicht (PropertyDef $ t "myContextDef4$rol1$rol1Property"))
+      [PBool "false"]
+
+  test "propertyIsFunctioneel" do
+    -- loadTestModel "TestOGC.crl"
+    assertEqual "t:myAspect$myAspectRol1$myAspectRol1Property is relational."
+      (propertyIsFunctioneel (PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"))
+      [PBool "false"]
+    assertEqual "t:myContextDef$rol1$rol1Property is functional because it overrides its aspectProperty."
+      (propertyIsFunctioneel (PropertyDef $ t "myContextDef$rol1$rol1Property"))
+      [PBool "true"]
+    -- unLoadTestModel "model:TestOGC"
+
   -- testOnly "Add a test!" do
   --   loadTestModel "TestOGC.crl"
   --

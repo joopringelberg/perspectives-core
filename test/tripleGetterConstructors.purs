@@ -11,7 +11,7 @@ import Perspectives.QueryCombinators (contains)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.StringTripleGetterConstructors (all, directAspects, getContextRol, searchInAspectsAndPrototypes, searchLocallyAndInPrototypeHierarchy, some)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closure_, concat, directAspectRoles, getInternalProperty, getRolInContext, getRoleBinders, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, getUnqualifiedRoleBinders, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition)
+import Perspectives.TripleGetterConstructors (closure_, concat, directAspectRoles, getInternalProperty, getRolInContext, getRoleBinders, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, getUnqualifiedRoleBinders, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -19,7 +19,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suiteSkip "TripleGetterConstructors" do
+theSuite = suite "TripleGetterConstructors" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "getContextRol" do
@@ -100,6 +100,7 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "myContextDef2 acquires the role t:myAspect$myAspectRol1 from its aspect t:myAspect"
       (ContextDef (t "myContextDef2") ##= searchUnqualifiedRolDefinition "myAspectRol1")
       [RolDef $ t "myAspect$myAspectRol1"]
+
   test "searchProperty (The value of the property pd, wherever in the telescope it is represented)" do
     assertEqual "rol1 of t:myContextPrototype assigns value 'true' to property myAspectRol1Property."
       ((t "myContextPrototype") ##= (getUnqualifiedRolInContext "rol1" >-> (searchProperty (PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"))))
@@ -107,6 +108,13 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "We should be able to retrieve the property myAspectRol1Property from t:myContext, because it has t:myContextPrototype as prototype"
       ((t "myContext") ##= (searchUnqualifiedRol "rol1" >-> (searchProperty (PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property"))))
       ([Value "false"]:: Array Value)
+    assertEqual "The buitenRol of $myUrAspectRol1 should have a value for psp:Rol$buitenRolBeschrijving$isFunctioneel"
+      ((t "myUrAspect$myUrAspectRol1") ##= (buitenRol >-> searchProperty (PropertyDef $ p "Rol$buitenRolBeschrijving$isFunctioneel")))
+      [(Value "true")]
+  test "searchInAspectRolesAndPrototypes" do
+    assertEqual "The buitenRol of $myUrAspectRol1 should have a value for psp:Rol$buitenRolBeschrijving$isFunctioneel"
+      ((t "myUrAspect$myUrAspectRol1") ##= (searchInAspectRolesAndPrototypes (buitenRol >-> searchProperty (PropertyDef $ p "Rol$buitenRolBeschrijving$isFunctioneel"))))
+      [(Value "true")]
   test "searchUnqualifiedProperty (The value of the unqualifiedproperty pd, wherever in the telescope it is represented)" do
     assertEqual "We should be able to retrieve the property myAspectRol1Property from t:myContext, because it has t:myContextPrototype as prototype"
       ((t "myContext") ##= (searchUnqualifiedRol "rol1" >-> (searchUnqualifiedProperty "myAspectRol1Property")))

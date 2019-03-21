@@ -13,7 +13,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ModelBasedTripleGetters" do
+theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rollenDef" do
@@ -44,12 +44,10 @@ theSuite = suite "ModelBasedTripleGetters" do
       ((t "myContextDef3") ##= buitenRolBeschrijvingDef)
       [RolDef $ p "ContextPrototype$buitenRolBeschrijving"]
 
-  testOnly "mogelijkeBinding" do
-    loadTestModel "TestOGC.crl"
+  test "mogelijkeBinding" do
     assertEqual "$myAspectRol1 has mogelijkeBinding psp:Rol through its $aspectRol"
       ((RolDef $ t "myAspect$myAspectRol1") ##= mogelijkeBinding)
       [p "Rol"]
-    unLoadTestModel "model:TestOGC"
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"
