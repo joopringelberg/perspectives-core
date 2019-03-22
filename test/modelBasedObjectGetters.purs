@@ -18,7 +18,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ModelBasedObjectGetters" do
+theSuite = suiteSkip "ModelBasedObjectGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rolIsVerplicht" do
