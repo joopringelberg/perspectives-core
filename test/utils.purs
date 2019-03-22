@@ -8,10 +8,15 @@ import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Except (runExcept)
-import Data.Array (singleton)
+import Data.Array (findIndex, singleton)
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Foreign (MultipleErrors)
 import Data.Foreign.Generic (decodeJSON)
+import Data.Maybe (Maybe(..))
+import Data.String.Regex (test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Node.FS (FS)
 import Node.Process (PROCESS)
 import Perspectives.ApiTypes (ContextSerialization)
@@ -95,3 +100,16 @@ loadTestModel ns = void $ runP $ loadCRLFile ns
 
 unLoadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
 unLoadTestModel ns = void $ runP $ unLoadCRLFile ns
+
+-- | Check the definitions given in the modelfile. Provide an Array
+-- | of error types (DataConstructors of UserMessage).
+-- | An assertion false follows for any error type in the list that
+-- | is not found by the TypeDefChecker.
+typeDefCheckerNotifies :: forall e. String -> Array String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
+typeDefCheckerNotifies modelName messages = do
+  notifications <- runP $ loadCRLFile modelName
+  notificationStrings <- pure $ (map show) notifications
+  for_ messages
+    \message -> case findIndex (test (unsafeRegex message noFlags)) notificationStrings of
+      Nothing -> Assert.assert ("TypeDefChecker failed to find " <> message) false
+      (Just i) -> pure unit

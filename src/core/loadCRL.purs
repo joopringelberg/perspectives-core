@@ -39,7 +39,7 @@ type FileName = String
 -- | Loads a file from the directory "src/model" relative to the directory of the
 -- | active process.
 -- | All definitions are loaded into the cache. The file is parsed and stored in Couchdb.
-loadCRLFile :: forall e. FileName -> MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION, process :: PROCESS | e)) Unit
+loadCRLFile :: forall e. FileName -> MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION, process :: PROCESS | e)) (Array UserMessage)
 loadCRLFile file = do
   lift $ log ("=========================Parse the file " <> file <> "===================")
   procesDir <- liftEff cwd
@@ -56,6 +56,7 @@ loadCRLFile file = do
           case mCtxt of
             Nothing -> do
               lift $ log ("Cannot find context " <> textName)
+              pure []
             (Just ctxt) -> do
               df@(DomeinFile {_id}) <- domeinFileFromContext ctxt
               storeDomeinFileInCouchdb df
@@ -69,12 +70,16 @@ loadCRLFile file = do
                       log $ show m
                       log "------"
                   lift $ log "\n"
+              pure messages
 
         (UserData buitenRollen) -> do
           lift $ log  "Attempting to save..."
           saveUserData (map BuitenRol buitenRollen)
           lift $ log $ show buitenRollen
-    (Left e) -> lift $ log (show e)
+          pure []
+    (Left e) -> do
+      lift $ log (show e)
+      pure []
 
 -- | Remove the model from the model cache
 unloadModel :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) Unit

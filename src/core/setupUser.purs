@@ -24,7 +24,7 @@ setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit "model:User$MijnSysteem"
   case mu of
     -- Nothing -> void $ setupUser'
-    Nothing -> loadCRLFile "systeemInstanties.crl"
+    Nothing -> void $ loadCRLFile "systeemInstanties.crl"
     otherwise -> pure unit
 
 setupUser' :: forall e. MonadPerspectives (AjaxAvarCache (now :: NOW | e)) (Array ID)

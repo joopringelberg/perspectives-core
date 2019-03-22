@@ -290,15 +290,9 @@ type TypeID = String
 type SimpleValueName = String
 
 data UserMessage =
-    MissingVariableDeclaration String
-  | VariableAlreadyDeclaredAs VariableName TypeID
-  | MissingAspect TypeID Aspect
+  -- TypeDefChecker messages
+    MissingAspect TypeID Aspect
   | MissingMogelijkeBinding TypeID
-  | MultipleDefinitions LocalName (Array TypeID)
-  | MissingUnqualifiedProperty LocalName RolName
-  | MissingQualifiedProperty PropertyName RolName
-  | MissingQualifiedRol RolName ContextID
-  | MissingUnqualifiedRol RolName ContextID
   | MissingType ContextID
   | MissingRolInstance RolName ContextID
   | IncorrectBinding ContextID RolName TypeID TypeID TypeID
@@ -314,13 +308,22 @@ data UserMessage =
   | CycleInAspectRoles RolName (Array TypeID)
   | CycleInAspectProperties PropertyName (Array TypeID)
   | RolWithoutContext RolName
-  | ContextExists ID
-  | NotAValidIdentifier String
-  | NotWellFormedContextSerialization String
   | CannotOverrideBooleanAspectProperty PropertyName PropertyName
   | MissingRange PropertyName
   | RangeNotSubsumed SimpleValueName PropertyName SimpleValueName PropertyName
   | MogelijkeBindingNotSubsumed String RolName String RolName
+
+  -- Other messages
+  | MultipleDefinitions LocalName (Array TypeID)
+  | MissingVariableDeclaration String
+  | VariableAlreadyDeclaredAs VariableName TypeID
+  | MissingUnqualifiedProperty LocalName RolName
+  | MissingQualifiedProperty PropertyName RolName
+  | MissingQualifiedRol RolName ContextID
+  | MissingUnqualifiedRol RolName ContextID
+  | ContextExists ID
+  | NotAValidIdentifier String
+  | NotWellFormedContextSerialization String
 
 type FD = Either UserMessage ID
 
