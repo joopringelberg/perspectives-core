@@ -87,23 +87,23 @@ checkContextDef def deftype = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
   (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap def) >>= pure <<< context_binnenRol
 
-  lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties) >>= traverse_ (checkPropertyAvailable def binnenrol (getBinnenRolPropertyValues (Context (unwrap def)) binnenrol))
+  mandatoryInternalProperties <- lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties)
+  traverse_
+    (\(propertyType :: PropertyDef) -> ifM ((getBinnenRolPropertyValues (Context (unwrap def)) binnenrol propertyType) >>= pure <<< null)
+      (tell [MissingInternalPropertyValue (unwrap propertyType) (unwrap def)])
+      (pure unit))
+    mandatoryInternalProperties
 
-  lift (unwrap deftype @@= buitenRolBeschrijvingDef >-> mandatoryProperties) >>= traverse_ (checkPropertyAvailable def buitenrol (getPropertyValues (Context $ unwrap def) buitenrol))
+  mandatoryExternalProperties <- (lift (unwrap deftype @@= buitenRolBeschrijvingDef >-> mandatoryProperties))
+  traverse_
+    (\(propertyType :: PropertyDef) -> ifM ((getPropertyValues (Context (unwrap def)) buitenrol propertyType) >>= pure <<< null)
+      (tell [MissingExternalPropertyValue (unwrap propertyType) (unwrap def)])
+      (pure unit))
+    mandatoryExternalProperties
 
   checkCyclicAspects def
 
   mandatoryRolesInstantiated (Context $ unwrap def) deftype
-
-checkPropertyAvailable :: forall e.
-  ContextDef ->
-  PerspectRol ->
-  (PropertyDef -> TDChecker e (Array String)) ->
-  PropertyDef ->
-  TDChecker e Unit
-checkPropertyAvailable cid rol getter propertyType = ifM (getter propertyType >>= pure <<< null)
-    (tell [MissingPropertyValue (unwrap cid) (unwrap propertyType) (rol_id rol)])
-    (pure unit)
 
 -- | Get the property values of a BuitenRol or a RolInContext.
 getPropertyValues :: forall e. Context -> PerspectRol -> PropertyDef -> TDChecker e (Array String)
@@ -176,8 +176,8 @@ checkRolDefPropertyValues def deftype = do
   mandatoryExternalProperties <- lift (unwrap deftype @@= buitenRolBeschrijvingDef >-> mandatoryProperties)
   traverse_ checkExternalProperty mandatoryExternalProperties
 
-  -- mandatoryInternalProperties <- lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties)
-  -- traverse_ checkExternalProperty mandatoryExternalProperties
+  mandatoryInternalProperties <- lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties)
+  traverse_ checkExternalProperty mandatoryExternalProperties
 
   where
     findExternalValue :: PropertyDef -> (AnyContext **> Value) e
@@ -193,7 +193,7 @@ checkRolDefPropertyValues def deftype = do
 
     checkInternalProperty :: PropertyDef -> TDChecker e Unit
     checkInternalProperty pdef = ifNothing (lift $ lift (unwrap def ##> findInternalValue pdef))
-      (tell [MissingExternalPropertyValue (unwrap pdef) (unwrap def)])
+      (tell [MissingInternalPropertyValue (unwrap pdef) (unwrap def)])
       (\ignore -> pure unit)
 
 -- | Returns a warning if the AspectRollen of the Rol definition include the definition itself.
@@ -453,3 +453,13 @@ compareRolInstancesToDefinition def rolType =
                   (do
                     typeOfTheBinding <- lift (theBinding @@ DTG.contextType)
                     (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) theBinding (tripleObject typeOfTheBinding) toegestaneBinding]))
+
+    checkPropertyAvailable ::
+      ContextDef ->
+      PerspectRol ->
+      (PropertyDef -> TDChecker e (Array String)) ->
+      PropertyDef ->
+      TDChecker e Unit
+    checkPropertyAvailable cid rol getter propertyType = ifM (getter propertyType >>= pure <<< null)
+        (tell [MissingPropertyValue (unwrap cid) (unwrap propertyType) (rol_id rol)])
+        (pure unit)

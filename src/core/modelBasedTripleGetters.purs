@@ -7,6 +7,7 @@ import Data.Newtype (alaF, unwrap, wrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
+import Perspectives.DataTypeTripleGetters (contextType)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef) as MBOG
@@ -18,6 +19,7 @@ import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
+import Perspectives.TypeChecker (isOrHasAspectRol)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
 -----------------------------------------------------------
@@ -141,6 +143,7 @@ mogelijkeBinding = unwrap `before` mbinding
 ownRollenDef :: forall e. (AnyContext **> RolDef) e
 ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context `followedBy` RolDef
 
+-- All Rollen defined for a Context type, locally or in Aspects.
 rollenDef :: forall e. (AnyContext **> RolDef) e
 rollenDef = closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef
 
@@ -152,9 +155,9 @@ mandatoryRollen = QC.difference f (f >-> directAspectRoles)
     f = QC.filter rolIsVerplicht (closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef)
 
 nonQueryRollen :: forall e. (AnyContext **> RolDef) e
-nonQueryRollen = QC.filter isNotAQuery rollenDef where
-  isNotAQuery :: (RolDef **> PBool) e
-  isNotAQuery = contains (RolDef "model:Perspectives$Rol") (unwrap `before` (closure_ directAspects) `followedBy` RolDef)
+nonQueryRollen = QC.filter (unwrap `before` contextType >-> isNotAQuery) rollenDef where
+  isNotAQuery :: (AnyDefinition **> PBool) e
+  isNotAQuery = contains "model:Perspectives$Rol" (closure_ directAspects)
 
 -- | All properties defined in the namespace of the Rol.
 ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e

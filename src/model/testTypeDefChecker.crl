@@ -1,0 +1,50 @@
+Context model:TestTDC als t:
+
+import model:Perspectives als psp:
+
+Section $rolInContext
+
+-- MissingMogelijkeBinding
+psp:Context t:myContextDef1
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+
+-- MissingRolInstance
+t:myContextDef1 t:myContext1
+	prototype psp:ContextPrototype
+
+psp:Context t:myContextDef2
+	prototype psp:ContextPrototype
+	$buitenRolBeschrijving => 
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$rolProperty =>
+				psp:Property $contextDef2ExtProp1
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+			
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => t:myContextDef2
+			$rolProperty =>
+				psp:Property $rol1Property1
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Boolean
+
+-- IncorrectBinding, RolNotDefined
+t:myContextDef2 t:myContext2
+	prototype psp:ContextPrototype
+	$rol1 => t:myContext1
+	$rolNotDefined => t:myContext1
+
+t:myContextDef2 t:myContext3
+	prototype psp:ContextPrototype
+	$rol1 => t:myContext2

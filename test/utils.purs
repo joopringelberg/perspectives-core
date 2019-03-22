@@ -106,8 +106,8 @@ unLoadTestModel ns = void $ runP $ unLoadCRLFile ns
 -- | An assertion false follows for any error type in the list that
 -- | is not found by the TypeDefChecker.
 typeDefCheckerNotifies :: forall e. String -> Array String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
-typeDefCheckerNotifies modelName messages = do
-  notifications <- runP $ loadCRLFile modelName
+typeDefCheckerNotifies fileName messages = do
+  notifications <- runP $ loadCRLFile fileName
   notificationStrings <- pure $ (map show) notifications
   for_ messages
     \message -> case findIndex (test (unsafeRegex message noFlags)) notificationStrings of
