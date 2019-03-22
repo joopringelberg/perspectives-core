@@ -222,10 +222,12 @@ checkCyclicAspectRoles cid = do
 -- | TODO: Are all AspectProperties Properties of AspectRollen of the defining Rol?
 checkPropertyDef :: forall e. PropertyDef -> ContextDef -> TDChecker e Unit
 checkPropertyDef def deftype = do
-  checkBooleanFacetOfProperty "isVerplicht"
-  checkBooleanFacetOfProperty "isFunctioneel"
-  checkRangeDef
-  checkCyclicAspectProperties def
+  ifM (checkCyclicAspectProperties def)
+    (pure unit)
+    do
+      checkBooleanFacetOfProperty "isVerplicht"
+      checkBooleanFacetOfProperty "isFunctioneel"
+      checkRangeDef
 
   where
     checkBooleanFacetOfProperty :: LocalName ->  TDChecker e Unit
@@ -263,12 +265,12 @@ checkPropertyDef def deftype = do
                   (tell [RangeNotSubsumed localRangeDef (unwrap aspectProp) aspectRange (unwrap def)]))
 
 -- | Returns a warning if the AspectProperties of the Rol definition include the definition itself.
-checkCyclicAspectProperties :: forall e. PropertyDef -> TDChecker e Unit
+checkCyclicAspectProperties :: forall e. PropertyDef -> TDChecker e Boolean
 checkCyclicAspectProperties cid = do
   aspects <- lift $ lift (cid ##= closureOfAspectProperty)
   case elemIndex cid aspects of
-    Nothing -> pure unit
-    otherwise -> tell [CycleInAspectProperties (unwrap cid) (map unwrap aspects)]
+    Nothing -> pure false
+    otherwise -> tell [CycleInAspectProperties (unwrap cid) (map unwrap aspects)] *> pure true
 
 -----------------------------------------------------------
 -- CHECKCONTEXT
