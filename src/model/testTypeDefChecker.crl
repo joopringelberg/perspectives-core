@@ -74,6 +74,7 @@ t:myContextDef2 t:myContext5
 		$rol1Property1 = true,false
 		$doesNotExist = "aap"
 
+-- CycleInAspects, CycleInAspectRoles, CycleInAspectProperties
 psp:Context t:myContextDef3
 	prototype psp:ContextPrototype
 	$aspect => t:myContextDef4
@@ -99,3 +100,27 @@ psp:Context t:myContextDef4
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
 					$aspectProperty => t:myContextDef3$myContextDef3Rol1$myContextDef3Rol1Prop1
+
+-- RolWithoutContext. The typeDefChecker will not find this: the model functions as context.
+psp:Rol t:myRoqueRol
+	extern $isFunctioneel = true
+	extern $isVerplicht = false
+
+-- CannotOverrideBooleanAspectProperty, MissingRange, RangeNotSubsumed
+psp:Context t:myContextDef5
+	prototype psp:ContextPrototype
+	$aspect => t:myContextDef2
+	$rolInContext =>
+		psp:Rol $rol1
+			$aspectRol => t:myContextDef2$rol1
+			$rolProperty =>
+				psp:Property $myContextDef5Rol1Prop1
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$aspectProperty => t:myContextDef2$rol1$rol1Property1
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $myContextDef5Rol1Prop2
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+			$mogelijkeBinding => psp:Context

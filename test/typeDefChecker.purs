@@ -16,7 +16,7 @@ t s = "model:TestTDC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
 theSuite = suite "TypeDefChecker" do
-  test "All types" do
+  test "All error situations that the TypeDefChecker can find, except for MissingType, MissingAspect and RolWithoutContext (we cannot upload a CRL file with those error situations)." do
     typeDefCheckerNotifies "testTypeDefChecker.crl"
       [ "MissingMogelijkeBinding"
       , "MissingRolInstance"
@@ -32,8 +32,13 @@ theSuite = suite "TypeDefChecker" do
       , "CycleInAspects"
       , "CycleInAspectRoles"
       , "CycleInAspectProperties"
+      , "CannotOverrideBooleanAspectProperty"
+      , "MissingRange"
+      , "RangeNotSubsumed"
+      , "MogelijkeBindingNotSubsumed"
         --  Not testable because the parser fails on the testfile:
         -- "MissingType"
         -- "MissingAspect"
+        -- "RolWithoutContext"
       ]
     unLoadTestModel "model:TestTDC"

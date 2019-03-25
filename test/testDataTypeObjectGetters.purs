@@ -7,9 +7,12 @@ import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..), RolInContext(..), binding)
-import Test.Perspectives.Utils (TestEffects, addTestContext, assertEqual, p, removeTestContext, u)
-import Test.Unit (TestF, suite, suiteSkip, test, testSkip)
+import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..), RolInContext(..), Value(..), binding, getUnqualifiedProperty)
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, addTestContext, assertEqual, loadTestModel, p, removeTestContext, u, unLoadTestModel)
+import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+
+t2 :: String -> String
+t2 s = "model:TestTDC$" <> s
 
 t1 :: String
 t1 = """{ "id": "u:myContext"
@@ -20,7 +23,7 @@ t1 = """{ "id": "u:myContext"
   , "externeProperties": {}
   }"""
 
-theSuite :: forall e. Free (TestF (TestEffects e)) Unit
+theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
 theSuite = suiteSkip "DataTypeObjectGetters" do
   test "Setting up" (addTestContext t1)
   test "contextType" do
@@ -85,5 +88,19 @@ theSuite = suiteSkip "DataTypeObjectGetters" do
     assertEqual "The role of u:myContext should have 'psp:Context' as rolBindingDef"
       ((iedereRolInContext >=> pure <<< map RolInContext) /-/ rolBindingDef $ (u "myContext"))
       [p "Context"]
+
+  test "getUnqualifiedProperty" do
+    loadTestModel "testTypeDefChecker.crl"
+    assertEqual "myContext5 should have value false for external property contextDef2ExtProp1"
+      ((buitenRol /-/ (getUnqualifiedProperty "contextDef2ExtProp1")) (t2 "myContext5"))
+      [Value "false"]
+    assertEqual "myContextDef5Rol1Prop1 should have a local value of $isVerplicht of true"
+      ((buitenRol /-/ getUnqualifiedProperty "isVerplicht" )(t2 "myContextDef5$rol1$myContextDef5Rol1Prop1"))
+      [Value "true"]
+    assertEqual "myContextDef5Rol1Prop1 should have a local value of $isFunctioneel of false"
+      ((buitenRol /-/ getUnqualifiedProperty "isFunctioneel" )(t2 "myContextDef5$rol1$myContextDef5Rol1Prop1"))
+      [Value "false"]
+    unLoadTestModel "model:TestTDC"
+
   test "Tearing down" do
     removeTestContext (u "myContext")
