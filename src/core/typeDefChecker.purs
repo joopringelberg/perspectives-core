@@ -232,20 +232,20 @@ checkPropertyDef def deftype = do
   where
     checkBooleanFacetOfProperty :: LocalName ->  TDChecker e Unit
     checkBooleanFacetOfProperty ln = do
-      localvalueForIsVerplicht <- lift (unwrap def @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
-      case localvalueForIsVerplicht of
+      mlocalValue <- lift (unwrap def @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
+      case mlocalValue of
         Just (Value "false") -> do
-          b <- lift (def @@> aspectPropertiesSpecifyVerplicht)
+          b <- lift (def @@> aspectPropertiesValue)
           case b of
             Just (PBool "true") -> tell [CannotOverrideBooleanAspectProperty (unwrap def) ln]
             otherwise -> pure unit
         otherwise -> pure unit
       where
-        aspectPropertiesSpecifyVerplicht :: (PropertyDef **> PBool) e
-        aspectPropertiesSpecifyVerplicht = some ((closure directAspectProperties) >-> isVerplicht)
+        aspectPropertiesValue :: (PropertyDef **> PBool) e
+        aspectPropertiesValue = some ((closure directAspectProperties) >-> getProp)
           where
-            isVerplicht :: (PropertyDef **> PBool) e
-            isVerplicht = (unwrap `before` (searchExternalUnqualifiedProperty ln)) `followedBy` (wrap <<< unwrap)
+            getProp :: (PropertyDef **> PBool) e
+            getProp = (unwrap `before` (searchExternalUnqualifiedProperty ln)) `followedBy` (wrap <<< unwrap)
     -- Checks if a range has been defined, somewhere.
     -- If so, checks if that range is subsumed by the range of each AspectProperty.
     checkRangeDef :: TDChecker e Unit

@@ -75,4 +75,4 @@ genericBinding :: forall e. (String **> String) e
 genericBinding = PT.genericBinding `trackedAs` "model:Perspectives$binding"
 
 getUnqualifiedProperty :: forall r e. RolClass r => LocalName -> (r **> Value) e
-getUnqualifiedProperty ln = (PT.getUnqualifiedProperty ln) `trackedAs` "model:Perspectives$getUnqualifiedProperty"
+getUnqualifiedProperty ln = (PT.getUnqualifiedProperty ln) `trackedAs` ln
