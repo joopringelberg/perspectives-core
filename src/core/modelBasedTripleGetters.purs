@@ -203,6 +203,9 @@ botSubjectRollenDef = getContextRol (RolDef "model:Perspectives$SysteemBot$subje
 contextDef :: forall e. (RolDef **> ContextDef) e
 contextDef = MBOG.contextDef `trackedAs` "contextDef"
 
+bindingProperty :: forall e. (PropertyDef **> PropertyDef) e
+bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Property$bindingProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
+
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM
 --   (QC.filter (QC.not (QC.containedIn ((QC.ref "#start") >-> ownPropertiesDefM)))

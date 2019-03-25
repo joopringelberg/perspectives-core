@@ -14,7 +14,7 @@ import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse_)
 import Perspectives.ContextAndRole (context_binnenRol, rol_id, rol_pspType)
-import Perspectives.CoreTypes (MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), tripleObject, (@@), (@@=), (@@>), type (**>))
+import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), tripleObject, (@@), (@@=), (@@>))
 import Perspectives.DataTypeObjectGetters (propertyTypen)
 import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, buitenRol) as DTTG
 import Perspectives.DataTypeTripleGetters (propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen, buitenRol, binnenRol) as DTG
@@ -23,7 +23,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedTripleGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rollenDef)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rollenDef)
 import Perspectives.ObjectGetterConstructors (alternatives, searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -128,7 +128,7 @@ getBinnenRolPropertyValues def rol propertyType = do
 -- | Is each AspectRol a role of an Aspect of the defining ContextDef of this RolDef?
 -- | Does the mogelijkeBinding have the mogelijkeBinding of each of its AspectRollen as an Aspect?
 -- | Does the RolDef provide all mandatory internal and external properties with a value?
--- | Is there no cycle in AspectRol? NOTE that, if there is such a cycle, the other
+-- | Is there no cycle in AspectRol? If there is such a cycle, the other
 -- | tests will not be carried out.
 checkRolDef :: forall e. RolDef -> ContextDef -> TDChecker e Unit
 checkRolDef def deftype = do
@@ -212,32 +212,56 @@ checkCyclicAspectRoles cid = do
 -----------------------------------------------------------
 -- CHECKPROPERTYDEF
 -----------------------------------------------------------
+-- | Is there no cycle in AspectProperty?
 -- | The properties isFunctioneel and isVerplicht have default values (false),
 -- | so we need not check whether there is a value.
 -- | But when these properties have a local value equal to false, none of their
 -- | AspectProperties may assign true to them!
 -- | Is the range of the Property given with the PropertyDef, or one of its AspectProperties?
 -- | Is the range of the Property subsumed by the ranges of its AspectProperties?
--- | Is there no cycle in AspectProperty?
--- | TODO: Are all AspectProperties Properties of AspectRollen of the defining Rol?
+-- | Are all AspectProperties Properties of AspectRollen of the defining Rol?
+-- | If a BindingProperty is specified, at least one AspectProperty should be given, too.
+-- | The BindingProperty that is bound to an AspectProperty should have a range that is subsumed by
+-- | the AspectProperties range. The same restrictions apply to the isFunctioneel and isVerplicht properties
+-- | of the BindingProperty as to a locally defined Property with an AspectProperty.
+-- | The BindingProperty should be a Property of the mogelijkeBinding (recursively).
 checkPropertyDef :: forall e. PropertyDef -> ContextDef -> TDChecker e Unit
 checkPropertyDef def deftype = do
   ifM (checkCyclicAspectProperties def)
     (pure unit)
     do
-      checkBooleanFacetOfProperty "isVerplicht"
-      checkBooleanFacetOfProperty "isFunctioneel"
-      checkRangeDef
+      mBindingproperty <- lift (def @@> bindingProperty)
+      -- | TODO: Are all AspectProperties Properties of AspectRollen of the defining Rol?
+      case mBindingproperty of
+        Nothing -> do
+          checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isVerplicht"
+          checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isFunctioneel"
+          checkRangeDef RangeNotSubsumed def def
+        (Just bindingproperty) -> do
+          -- TODO the binding property should be a property of the mogelijkeBinding.
+
+          ifNothing (lift (def @@> directAspectProperties))
+            (tell [MissingAspectPropertyForBindingProperty (unwrap def) (unwrap bindingproperty)])
+            \ignore -> do
+              checkBooleanFacetOfProperty (BindingPropertyCannotOverrideBooleanAspectProperty (unwrap def)) bindingproperty def "isVerplicht"
+              checkBooleanFacetOfProperty (BindingPropertyCannotOverrideBooleanAspectProperty (unwrap def)) bindingproperty def "isFunctioneel"
+              checkRangeDef (RangeNotSubsumedByBindingProperty (unwrap def)) bindingproperty def
 
   where
-    checkBooleanFacetOfProperty :: LocalName ->  TDChecker e Unit
-    checkBooleanFacetOfProperty ln = do
-      mlocalValue <- lift (unwrap def @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
+
+    checkBooleanFacetOfProperty ::
+      (String -> String -> UserMessage) ->
+      PropertyDef ->
+      PropertyDef ->
+      LocalName ->
+      TDChecker e Unit
+    checkBooleanFacetOfProperty userMessageConstructor defWithValues defWithAspects ln = do
+      mlocalValue <- lift (unwrap defWithValues @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
       case mlocalValue of
         Just (Value "false") -> do
-          b <- lift (def @@> aspectPropertiesValue)
+          b <- lift (defWithAspects @@> aspectPropertiesValue)
           case b of
-            Just (PBool "true") -> tell [CannotOverrideBooleanAspectProperty (unwrap def) ln]
+            Just (PBool "true") -> tell [userMessageConstructor (unwrap defWithValues) ln]
             otherwise -> pure unit
         otherwise -> pure unit
       where
@@ -248,21 +272,25 @@ checkPropertyDef def deftype = do
             getProp = (unwrap `before` (searchExternalUnqualifiedProperty ln)) `followedBy` (wrap <<< unwrap)
     -- Checks if a range has been defined, somewhere.
     -- If so, checks if that range is subsumed by the range of each AspectProperty.
-    checkRangeDef :: TDChecker e Unit
-    checkRangeDef = do
-      mrange <- lift (def @@> rangeDef)
+    checkRangeDef ::
+      (String -> String -> String -> String -> UserMessage) ->
+      PropertyDef ->
+      PropertyDef ->
+      TDChecker e Unit
+    checkRangeDef userMessageConstructor defWithValues defWithAspects = do
+      mrange <- lift (defWithValues @@> rangeDef)
       case mrange of
-        Nothing -> tell [MissingRange $ unwrap def]
+        Nothing -> tell [MissingRange $ unwrap defWithValues]
         (Just range) -> do
-          mlocalRange <- lift (def @@> ownRangeDef)
+          mlocalRange <- lift (defWithValues @@> ownRangeDef)
           case mlocalRange of
             Nothing -> pure unit
-            (Just (SimpleValueDef localRangeDef)) -> lift (def @@= closureOfAspectProperty) >>= traverse_
+            (Just (SimpleValueDef localRangeDef)) -> lift (defWithAspects @@= closureOfAspectProperty) >>= traverse_
               \aspectProp -> ifNothing (lift (aspectProp @@> ownRangeDef))
                 (pure unit)
                 (\(SimpleValueDef aspectRange) -> ifM (lift $ lift $ (ContextDef localRangeDef) `isOrHasAspect` (ContextDef aspectRange))
                   (pure unit)
-                  (tell [RangeNotSubsumed localRangeDef (unwrap aspectProp) aspectRange (unwrap def)]))
+                  (tell [userMessageConstructor localRangeDef (unwrap aspectProp) aspectRange (unwrap defWithValues)]))
 
 -- | Returns a warning if the AspectProperties of the Rol definition include the definition itself.
 checkCyclicAspectProperties :: forall e. PropertyDef -> TDChecker e Boolean

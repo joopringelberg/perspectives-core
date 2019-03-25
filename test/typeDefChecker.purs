@@ -36,6 +36,8 @@ theSuite = suite "TypeDefChecker" do
       , "MissingRange"
       , "RangeNotSubsumed"
       , "MogelijkeBindingNotSubsumed"
+      , "RangeNotSubsumedByBindingProperty"
+      , "MissingAspectPropertyForBindingProperty"
         --  Not testable because the parser fails on the testfile:
         -- "MissingType"
         -- "MissingAspect"

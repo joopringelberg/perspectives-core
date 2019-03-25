@@ -309,9 +309,12 @@ data UserMessage =
   | CycleInAspectProperties PropertyName (Array TypeID)
   | RolWithoutContext RolName
   | CannotOverrideBooleanAspectProperty PropertyName PropertyName
+  | BindingPropertyCannotOverrideBooleanAspectProperty PropertyName PropertyName PropertyName
   | MissingRange PropertyName
   | RangeNotSubsumed SimpleValueName PropertyName SimpleValueName PropertyName
+  | RangeNotSubsumedByBindingProperty PropertyName SimpleValueName PropertyName SimpleValueName PropertyName
   | MogelijkeBindingNotSubsumed String RolName String RolName
+  | MissingAspectPropertyForBindingProperty PropertyName PropertyName
 
   -- Other messages
   | MultipleDefinitions LocalName (Array TypeID)
@@ -356,10 +359,13 @@ instance showUserMessage :: Show UserMessage where
   show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."
   show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."
   show (NotWellFormedContextSerialization m) = "(NotWellFormedContextSerialization) De string '" <> m <> "' is geen geldige ContextSerialization."
-  show (CannotOverrideBooleanAspectProperty pn pp) = "(CannotOverrideBooleanAspectProperty) Er is een aspect van property '" <> pn <> "' dat aan '" <> pp <> "' al de waarde 'true' heeft gegeven."
+  show (CannotOverrideBooleanAspectProperty pn pp) = "(CannotOverrideBooleanAspectProperty) Er is een aspect van property '" <> pn <> "' dat aan '" <> pp <> "' al de waarde 'true' heeft gegeven ()."
+  show (BindingPropertyCannotOverrideBooleanAspectProperty bp pn pp) = "(BindingPropertyCannotOverrideBooleanAspectProperty) Er is een aspect van property '" <> pn <> "' dat aan '" <> pp <> "' al de waarde 'true' heeft gegeven (deze property wordt als BindingProperty aan die AspectProperty gebonden in de property '" <> bp <> "')."
   show (MissingRange pn) = "(MissingRange) Propery '" <> pn <> "' has not been given a range."
   show (RangeNotSubsumed ownRange aspect aspectRange property) = "(RangeNotSubsumed) De range '" <> aspectRange <> "' van de AspectProperty '" <> aspect <> "' is geen aspect van de range '" <> ownRange <> "' van de property '" <> property <> "'!"
+  show (RangeNotSubsumedByBindingProperty property ownRange aspect aspectRange bindingprop) = "(RangeNotSubsumedByBindingProperty) De range '" <> aspectRange <> "' van de AspectProperty '" <> aspect <> "' is geen aspect van de range '" <> ownRange <> "' van de BindingProperty '" <> bindingprop <> " (de BindingProperty wordt gebonden aan de AspectProperty in de property '" <> property <> "')'!"
   show (MogelijkeBindingNotSubsumed ownBinding aspect aspectBinding rol) = "(MogelijkeBindingNotSubsumed) De mogelijke binding '" <> aspectBinding <> "' van de AspectRol '" <> aspect <> "' is geen aspect van de mogelijke binding '" <> ownBinding <> "' van de rol '" <> rol <> "'!"
+  show (MissingAspectPropertyForBindingProperty property bindingproperty) = "(MissingAspectPropertyForBindingProperty) De property '" <> property <> "' heeft BindingProperty '" <> bindingproperty <> "' maar geen AspectProperty!"
 
 -----------------------------------------------------------
 -- TRANSACTIE

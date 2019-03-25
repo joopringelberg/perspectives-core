@@ -106,7 +106,7 @@ psp:Rol t:myRoqueRol
 	extern $isFunctioneel = true
 	extern $isVerplicht = false
 
--- CannotOverrideBooleanAspectProperty, MissingRange, RangeNotSubsumed
+-- CannotOverrideBooleanAspectProperty, MissingRange, RangeNotSubsumed, MogelijkeBindingNotSubsumed
 psp:Context t:myContextDef5
 	prototype psp:ContextPrototype
 	$aspect => t:myContextDef2
@@ -123,4 +123,25 @@ psp:Context t:myContextDef5
 				psp:Property $myContextDef5Rol1Prop2
 					extern $isFunctioneel = true
 					extern $isVerplicht = true
+			-- BindingPropertyCannotOverrideBooleanAspectProperty
+			$rolProperty =>
+				psp:Property $myContextDef5Rol1Prop3
+					$aspectProperty => t:myContextDef2$rol1$rol1Property1
+					$bindingProperty => t:myContextDef6$rol1$myContextDef6Prop1
+			$mogelijkeBinding => t:myContextDef6$rol1
+
+psp:Context t:myContextDef6
+	prototype psp:ContextPrototype
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Context
+			$rolProperty =>
+				psp:Property $myContextDef6Prop1
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $myContextDef6Prop2
+					$bindingProperty => t:myContextDef4$myContextDef4Rol1$myContextDef4Rol1Prop1
+		
