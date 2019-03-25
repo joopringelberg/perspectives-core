@@ -304,10 +304,12 @@ data UserMessage =
   | TooManyPropertyValues ContextID PropertyName
   | PropertyNotDefined ContextID PropertyName RolID RolName
   | AspectRolNotFromAspect RolName RolName ContextID
+  | AspectPropertyNotFromAspectRol PropertyName PropertyName RolName
   | CycleInAspects ContextID (Array TypeID)
   | CycleInAspectRoles RolName (Array TypeID)
   | CycleInAspectProperties PropertyName (Array TypeID)
   | RolWithoutContext RolName
+  | PropertyWithoutRol PropertyName
   | CannotOverrideBooleanAspectProperty PropertyName PropertyName
   | BindingPropertyCannotOverrideBooleanAspectProperty PropertyName PropertyName PropertyName
   | MissingRange PropertyName
@@ -351,10 +353,12 @@ instance showUserMessage :: Show UserMessage where
   show (TooManyPropertyValues cid pn) = "(TooManyPropertyValues) De Property '" <> pn <> "' is functioneel maar heeft méér dan 1 waarde (in de context '" <> cid <> "')."
   show (PropertyNotDefined cid pn rid rn) = "(PropertyNotDefined) De Rol '" <> rid <> "' van de context '" <> cid <> "' geeft een waarde aan Property '" <> pn <> "' maar die is niet gedefinieerd voor '" <> rn <> "'."
   show (AspectRolNotFromAspect rn arn cid) = "(AspectRolNotFromAspect) De Rol '" <> rn <> "' gebruikt de Rol '" <> arn <> "' als aspectrol, maar die is niet beschikbaar in de Aspecten van '" <> cid <> "'."
+  show (AspectPropertyNotFromAspectRol pn apn rid) = "(AspectPropertyNotFromAspectRol) De Property '" <> pn <> "' gebruikt de Property '" <> apn <> "' als aspectproperty, maar die is niet beschikbaar in de AspectenRollen van '" <> rid <> "'."
   show (CycleInAspects cid asps) = "(CycleInAspects) De Context '" <> cid <> "' heeft een Aspect dat (indirect) weer '" <> cid <> "' als Aspect heeft. De betrokken Aspecten zijn: " <> show asps <> "."
   show (CycleInAspectRoles cid asps) = "(CycleInAspectRoles) De Rol '" <> cid <> "' heeft een AspectRol die (indirect) weer '" <> cid <> "' als AspectRol heeft. De betrokken AspectRollen zijn: " <> show asps <> "."
   show (CycleInAspectProperties cid asps) = "(CycleInAspectProperties) De Property '" <> cid <> "' heeft een AspectProperty die (indirect) weer '" <> cid <> "' als AspectProperty heeft. De betrokken AspectProperties zijn: " <> show asps <> "."
   show (RolWithoutContext cid) = "(RolWithoutContext) De Rol-definitie '" <> cid <> "' heeft geen definiërende Context."
+  show (PropertyWithoutRol pid) = "(PropertyWithoutRol) De Property-definitie '" <> pid <> "' heeft geen definiërende Rol."
   -- show _ = "This is a usermessage"
   show (ContextExists id) = "(ContextExists) De Context: '" <> id <> "' bestaat al."
   show (NotAValidIdentifier id) =  "(NotAValidIdentifier) De string '" <> id <> "' is geen geldige identifier."

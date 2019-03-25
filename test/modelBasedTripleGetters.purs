@@ -17,6 +17,7 @@ import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 t :: String -> String
 t s = "model:TestOGC$" <> s
 
+t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit

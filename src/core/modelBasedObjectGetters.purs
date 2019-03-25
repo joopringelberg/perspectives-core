@@ -116,6 +116,10 @@ buitenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 buitenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$buitenRolBeschrijving")
 -- buitenRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
 
+-- | From the definition of a Property, find the enclosing definition of the Rol it is defined on.
+rolDef :: forall e. (PropertyDef ~~> RolDef) e
+rolDef = unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Rol$rolProperty") :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map RolDef
+
 -- | All Rollen defined for a Context type, excluding Aspects.
 -- | `psp:Context -> psp:Rol`
 ownRollenDef :: forall e. (AnyContext ~~> RolDef) e

@@ -10,7 +10,7 @@ import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, c
 import Perspectives.DataTypeTripleGetters (contextType)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef) as MBOG
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef, rolDef) as MBOG
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as QC
@@ -19,7 +19,6 @@ import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
-import Perspectives.TypeChecker (isOrHasAspectRol)
 import Prelude (show, (<<<), (<>), (==), (>>>), ($))
 
 -----------------------------------------------------------
@@ -202,6 +201,9 @@ botSubjectRollenDef = getContextRol (RolDef "model:Perspectives$SysteemBot$subje
 
 contextDef :: forall e. (RolDef **> ContextDef) e
 contextDef = MBOG.contextDef `trackedAs` "contextDef"
+
+rolDef :: forall e. (PropertyDef **> RolDef) e
+rolDef = MBOG.rolDef `trackedAs` "contextDef"
 
 bindingProperty :: forall e. (PropertyDef **> PropertyDef) e
 bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Property$bindingProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef

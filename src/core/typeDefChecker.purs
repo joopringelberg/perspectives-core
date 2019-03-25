@@ -23,7 +23,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rollenDef)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef)
 import Perspectives.ObjectGetterConstructors (alternatives, searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (toBoolean)
@@ -231,7 +231,7 @@ checkPropertyDef def deftype = do
     (pure unit)
     do
       mBindingproperty <- lift (def @@> bindingProperty)
-      -- | TODO: Are all AspectProperties Properties of AspectRollen of the defining Rol?
+      checkAspectsOfPropertyType def
       case mBindingproperty of
         Nothing -> do
           checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isVerplicht"
@@ -248,6 +248,23 @@ checkPropertyDef def deftype = do
               checkRangeDef (RangeNotSubsumedByBindingProperty (unwrap def)) bindingproperty def
 
   where
+
+    -- | Checks the aspectRollen of the RolDefinition.
+    -- | If such an aspectRol is not a Rol of one of the Aspecten of Context definition
+    -- | that holds the Rol definition, it returns a warning.
+    checkAspectsOfPropertyType :: PropertyDef -> TDChecker e Unit
+    checkAspectsOfPropertyType def = do
+      ifNothing (lift $ lift (def ##> rolDef))
+        (tell [PropertyWithoutRol $ unwrap def])
+        \(roldef :: RolDef) -> do
+          propertiesVanAspecten <- lift $ lift $ (roldef ##= closureOfAspectRol >-> propertiesDef)
+          (aspectproperties :: Array PropertyDef) <- lift $ lift (def ##= directAspectProperties)
+          traverse_
+            (\(aspectProperty :: PropertyDef) -> do
+              if isJust $ elemIndex aspectProperty propertiesVanAspecten
+                then pure unit
+                else tell [AspectPropertyNotFromAspectRol (unwrap def) (unwrap aspectProperty) (unwrap roldef)])
+            aspectproperties
 
     checkBooleanFacetOfProperty ::
       (String -> String -> UserMessage) ->

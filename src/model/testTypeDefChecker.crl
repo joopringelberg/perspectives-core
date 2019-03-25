@@ -141,7 +141,11 @@ psp:Context t:myContextDef6
 					extern $isFunctioneel = false
 					extern $isVerplicht = true
 					$range => psp:String
+			-- MissingAspectPropertyForBindingProperty
 			$rolProperty =>
 				psp:Property $myContextDef6Prop2
 					$bindingProperty => t:myContextDef4$myContextDef4Rol1$myContextDef4Rol1Prop1
+			$rolProperty =>
+				psp:Property $myContextDef6Prop3
+					$aspectProperty => t:myContextDef2$rol1$rol1Property1
 		
