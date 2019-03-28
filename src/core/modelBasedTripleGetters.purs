@@ -5,10 +5,10 @@ import Data.Foldable (foldMap)
 import Data.Maybe (maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap, wrap)
-import Perspectives.CoreTypes (TypedTripleGetter, type (**>), type (~~>))
+import Perspectives.CoreTypes (type (**>), type (~~>), TypedTripleGetter(..), TripleGetter, (@@))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
-import Perspectives.DataTypeTripleGetters (contextType) as DTTG
+import Perspectives.DataTypeTripleGetters (contextType, genericRolType) as DTTG
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef, rolDef) as MBOG
@@ -210,13 +210,34 @@ rolDef = MBOG.rolDef `trackedAs` "contextDef"
 bindingProperty :: forall e. (PropertyDef **> PropertyDef) e
 bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Property$bindingProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
 
--- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
--- | context `contextHasType` type
-hasType :: forall e. String -> (AnyDefinition **> PBool) e
+type Instance = String
+
+-- | True iff AnyDefinition is a type of AnyContext.
+-- | AnyDefinition `isContextTypeOf` AnyContext
+isContextTypeOf :: forall e. AnyContext -> (AnyDefinition **> PBool) e
+isContextTypeOf i = TypedTripleGetter ("isTypeOf_" <> i) f where
+  f :: TripleGetter AnyDefinition PBool e
+  f x = i @@ some (DTTG.contextType >-> closure_ directAspects >-> (agreesWithType x) )
+
+-- | True iff AnyDefinition is a type of r.
+-- | AnyDefinition `isRolTypeOf` r
+isRolTypeOf :: forall r e. RolClass r => r -> (AnyDefinition **> PBool) e
+isRolTypeOf r = TypedTripleGetter ("isTypeOf_" <> unwrap r) f where
+  f :: TripleGetter AnyDefinition PBool e
+  f tp = unwrap r @@ some (DTTG.genericRolType >-> closure_ (RolDef `before` directAspectRoles `followedBy` unwrap) >-> (agreesWithType tp))
+
+-- | True iff the type of AnyContext
+-- |  - equals AnyDefinition, or if
+-- |  - one of its Aspects is AnyDefinition.
+-- | AnyContext `hasType` AnyDefinition
+hasType :: forall e. AnyDefinition -> (AnyContext **> PBool) e
 hasType tp = DTTG.contextType >-> isOrHasAspect tp
 
 isOrHasAspect :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
 isOrHasAspect t = some (closure_ directAspects >-> agreesWithType t)
+
+-- equalsOrIsAspectOf :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
+-- equalsOrIsAspectOf t =
 
 agreesWithType :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
 agreesWithType t = f `trackedAs` ("agreesWithType_" <> t) where
