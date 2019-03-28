@@ -21,17 +21,17 @@ import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
-import Perspectives.ModelBasedTripleGetters (botSubjectRollenDef, contextBotDef)
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, contextBot)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.PerspectivesTypes (PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
+import Perspectives.PerspectivesTypes (ContextDef(..), PropertyDef(..), RolDef(..), RolInContext(..), ActieDef, genericBinding)
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
-import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.Utilities (onNothing)
@@ -389,26 +389,26 @@ type ActionID = String
 
 -- | From the description of an Action, compile a StringTypedTripleGetter that should be applied to an instance of
 -- | the Context holding the Action, to conditionally execute it.
-compileBotAction :: forall e. ActionID -> ContextID -> MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+compileBotAction :: forall e. ActieDef -> ContextID -> MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
 compileBotAction actionType contextId = do
   condition <- onNothing
-    (errorMessage "no condition provided in Action" actionType)
-    (actionType ##> getBindingOfRol "model:Perspectives$Actie$condition")
+    (errorMessage "no condition provided in Action" (unwrap actionType))
+    (unwrap actionType ##> getBindingOfRol "model:Perspectives$Actie$condition")
   action <- onNothing
-    (errorMessage "no effect provided in Action" actionType)
-    (actionType ##> getBindingOfRol "model:Perspectives$Actie$effect")
+    (errorMessage "no effect provided in Action" (unwrap actionType))
+    (unwrap actionType ##> getBindingOfRol "model:Perspectives$Actie$effect")
   (actionObjectsGetter :: (ContextID -> Action e)) <- constructActionFunction action
   (conditionQuery :: StringTypedTripleGetter e) <- getPropertyFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  pure $ conditionQuery >-> constructTripleGetterFromObjectsGetter actionType (actionObjectsGetter contextId)
+  pure $ conditionQuery >-> constructTripleGetterFromObjectsGetter (unwrap actionType) (actionObjectsGetter contextId)
 
   where
     errorMessage :: String -> String -> Error
-    errorMessage s t = error ("constructQueryFunction: " <> s <> " for: " <> t <> " " <> actionType)
+    errorMessage s t = error ("constructQueryFunction: " <> s <> " for: " <> t <> " " <> unwrap actionType)
 
 setupBotActions :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 setupBotActions cid = do
-  (actions :: Array String) <- cid ##= DTG.contextType >-> contextBotDef >-> botSubjectRollenDef
+  (actions :: Array ActieDef) <- cid ##= DTG.contextType `followedBy` ContextDef >-> botActiesInContext
   -- actions <- pure []
-  for_ actions \(a :: String) -> (compileBotAction a cid) >>= \tg -> cid ## tg
+  for_ actions \(a :: ActieDef) -> (compileBotAction a cid) >>= \tg -> cid ## tg

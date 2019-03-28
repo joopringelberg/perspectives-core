@@ -30,11 +30,11 @@ setupUser = do
 setupUser' :: forall e. MonadPerspectives (AjaxAvarCache (now :: NOW | e)) (Array ID)
 setupUser' = do
   cacheUncachedEntiteit "model:User$MijnSysteem"
-    (PerspectContext $ contextRecord "model:User" "Systeem" "model:Perspectives$Systeem")
+    (PerspectContext $ contextRecord "model:User" "Systeem" "model:Perspectives$PerspectivesSysteem")
   cacheUncachedEntiteit "model:User$MijnSysteem_BuitenRol"
     (PerspectRol $ buitenRolRecord  "model:User" "Systeem")
   cacheUncachedEntiteit "model:User$Me"
-    (PerspectRol $ rolRecord "model:Perspectives$Systeem$gebruiker" "model:User" "Me")
+    (PerspectRol $ rolRecord "model:Perspectives$PerspectivesSysteem$gebruiker" "model:User" "Me")
   cacheUncachedEntiteit "model:User$TrustedCluster"
     (PerspectContext $ contextRecord "model:User" "TrustedCluster" "model:Perspectives$TrustedCluster")
 

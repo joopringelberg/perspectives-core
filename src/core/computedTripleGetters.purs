@@ -31,7 +31,7 @@ import Perspectives.TypeDefChecker (checkDomeinFile)
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
 modellenM :: forall e. StringTypedTripleGetter e
 modellenM = constructTripleGetterWithArbitrarySupport
-  "model:Perspectives$Systeem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller") `followedBy` unwrap)
+  "model:Perspectives$PerspectivesSysteem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller") `followedBy` unwrap)
   where
     getListOfModels :: forall e1. ID -> MonadPerspectivesQuery (ajax :: AJAX | e1) (Array String)
     getListOfModels id = lift $ lift $ catchError (documentNamesInDatabase "perspect_models") \_ -> pure []
