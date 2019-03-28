@@ -1,25 +1,27 @@
 module Perspectives.ModelBasedTripleGetters where
 
+import Control.Alt ((<|>))
 import Data.Foldable (foldMap)
 import Data.Maybe (maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap, wrap)
-import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
+import Perspectives.CoreTypes (TypedTripleGetter, type (**>), type (~~>))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
-import Perspectives.DataTypeTripleGetters (contextType)
+import Perspectives.DataTypeTripleGetters (contextType) as DTTG
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef, rolDef) as MBOG
+import Perspectives.ObjectGetterConstructors (alternatives, unlessNull)
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as QC
 import Perspectives.QueryCombinators (contains)
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
-import Prelude (show, (<<<), (<>), (==), (>>>), ($))
+import Prelude (const, pure, show, ($), (<<<), (<>), (==), (>>>))
 
 -----------------------------------------------------------
 -- GETTERS BASED ON MODEL:PERSPECTIVES$
@@ -114,6 +116,7 @@ actiesInContextDef = unwrap `before` searchRolInContext (RolDef "model:Perspecti
 -- | The Acties that the Rol is the object of.
 objectRollenDef :: forall e. (RolDef **> ActieDef) e
 objectRollenDef = unwrap `before` searchRolInContext (RolDef "model:Perspectives$Rol$objectRol") >-> DTG.binding >-> DTG.context `followedBy` ContextDef
+-- objectRollenDef = (getRoleBinders (RolDef "model:Perspectives$Actie$object") :: () e) >-> DTG.context `followedBy` ContextDef
 
 -- | The Rollen that have this Actie as subjectRol.
 -- | `psp:Actie -> psp:Rol`
@@ -154,7 +157,7 @@ mandatoryRollen = QC.difference f (f >-> directAspectRoles)
     f = QC.filter rolIsVerplicht (closure_ directAspects >-> (closure_ getPrototype) >-> ownRollenDef)
 
 nonQueryRollen :: forall e. (AnyContext **> RolDef) e
-nonQueryRollen = QC.filter (unwrap `before` contextType >-> isNotAQuery) rollenDef where
+nonQueryRollen = QC.filter (unwrap `before` DTTG.contextType >-> isNotAQuery) rollenDef where
   isNotAQuery :: (AnyDefinition **> PBool) e
   isNotAQuery = contains "model:Perspectives$Rol" (closure_ directAspects)
 
@@ -190,14 +193,13 @@ buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "buitenRolB
 binnenRolBeschrijvingDef :: forall e. (AnyDefinition **> RolDef) e
 binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "binnenRolBeschrijving"
 
--- | From the description of a Context, return the description of its contextBot (a SysteemBot).
-contextBotDef :: forall e. (AnyContext **> AnyContext)e
-contextBotDef = getContextRol (RolDef "model:Perspectives$Context$contextBot")  >-> DTG.binding >-> DTG.context
+-- | From the description of a Context, return its contextBot.
+contextBot :: forall e. (ContextDef **> RolInContext)e
+contextBot = unwrap `before` getRolInContext (RolDef "model:Perspectives$Context$contextBot")
 
--- | The Acties that the SysteemBot is the subject (Actor) of. Thus, given a SysteemBot, returns its Acties.
--- | `psp:SysteemBot -> psp:Actie`
-botSubjectRollenDef :: forall e. (AnyContext **> AnyContext) e
-botSubjectRollenDef = getContextRol (RolDef "model:Perspectives$SysteemBot$subjectRol") >-> DTG.binding >-> DTG.context
+-- | The Acties of a Context that its contextBot is the subject (Actor) of.
+botActiesInContext :: forall e. (ContextDef **> ActieDef) e
+botActiesInContext = contextBot >-> (getRoleBinders (RolDef "model:Perspectives$Actie$subject") :: (RolInContext **> RolInContext) e) >-> DTG.context `followedBy` ContextDef
 
 contextDef :: forall e. (RolDef **> ContextDef) e
 contextDef = MBOG.contextDef `trackedAs` "contextDef"
@@ -207,6 +209,27 @@ rolDef = MBOG.rolDef `trackedAs` "contextDef"
 
 bindingProperty :: forall e. (PropertyDef **> PropertyDef) e
 bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Property$bindingProperty") >-> DTG.binding >-> DTG.context `followedBy` PropertyDef
+
+-- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
+-- | context `contextHasType` type
+hasType :: forall e. String -> (AnyDefinition **> PBool) e
+hasType tp = DTTG.contextType >-> isOrHasAspect tp
+
+isOrHasAspect :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
+isOrHasAspect t = some (closure_ directAspects >-> agreesWithType t)
+
+agreesWithType :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
+agreesWithType t = f `trackedAs` ("agreesWithType_" <> t) where
+  f :: (AnyDefinition ~~> PBool) e
+  f = if t == "model:Perspectives$ElkType"
+    then const (pure [PBool "true"])
+    else if t == "model:Perspectives$Niets"
+      then const (pure [PBool "false"])
+      else \x -> if (t == x) then pure $ [PBool "true"] else pure $ [PBool "false"]
+
+sumToSequence :: forall e. (AnyDefinition **> AnyDefinition) e
+sumToSequence = f `trackedAs` "sumToSequence" where
+  f t = unlessNull alternatives t <|> pure [t]
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

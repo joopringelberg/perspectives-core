@@ -143,3 +143,17 @@ psp:Context t:myContextDef4
 				psp:Property $rol1Property
 					-- extern $isVerplicht = true -- test if it retrieves false!
 					extern $isFunctioneel = true
+
+psp:Context t:myContext6
+	prototype psp:ContextPrototype
+	$contextBot => ()
+
+psp:Context t:myContextDef5
+	prototype psp:ContextPrototype
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding =>
+				psp:Sum $mySum
+					$alternative => psp:Rol
+					$alternative => psp:Property
