@@ -2,11 +2,12 @@ module Perspectives.TripleGetterComposition where
 
 import Data.Array (cons, difference, head, nub)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse)
-import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..))
+import Data.Traversable (traverse, sequence) as Trav
+import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery, applyTypedTripleGetter)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>=))
+import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>=), (<$>), (<<<))
 
 followedBy :: forall s o a e. TypedTripleGetter s o e -> (o -> a) -> TypedTripleGetter s a e
 followedBy (TypedTripleGetter n g) f = TypedTripleGetter n fNag where
@@ -33,7 +34,6 @@ before f (TypedTripleGetter n g) = TypedTripleGetter n fVoorg where
   }
 
 -- | Compose two queries like composing two functions.
--- | `psp:Function -> psp:Function -> psp:Function`
 composeTripleGetters :: forall s o t e.
   Eq t =>
   Eq o =>
@@ -46,7 +46,7 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
     getter :: TripleGetter s o e
     getter id = do
       (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
-      (triples :: Array (Triple t o e)) <- traverse q objectsOfP
+      (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
                     , predicate : name
@@ -59,6 +59,33 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
     name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
 infixl 9 composeTripleGetters as >->
+
+-- | Traverse the results of the second TypedTripleGetter with function that yields a TypedTripleGetter.
+traverse :: forall s o t e.
+  Eq t =>
+  Eq o =>
+  (t -> TypedTripleGetter s o e) ->
+  String ->
+  TypedTripleGetter s t e ->
+  TypedTripleGetter s o e
+traverse f nameOfF (TypedTripleGetter nameOfq q) =
+  memorize getter name
+    where
+    getter :: TripleGetter s o e
+    getter id = do
+      (t@(Triple{object : (objectsOfQ :: Array t)}) :: Triple s t e) <- q id
+      (monadicValues :: Array (MonadPerspectivesQuery (AjaxAvarCache e) (Triple s o e))) <- pure $ applyTypedTripleGetter id <<< f <$> objectsOfQ
+      (triples :: Array (Triple s o e)) <- Trav.sequence monadicValues
+      objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : objects
+                    , dependencies : []
+                    , supports : cons (getRef (typeWithPerspectivesTypes t)) (map getRef (typeWithPerspectivesTypes triples))
+                    , tripleGetter : getter}
+
+    name :: String
+    name = "(" <>  nameOfF <> " >-> " <> nameOfq <> ")"
 
 composeMonoidal :: forall s o a e.
   TypedTripleGetter s o e ->
@@ -102,7 +129,7 @@ composeLazy (TypedTripleGetter nameOfp p) g nameOfg =
         otherwise -> do
           (TypedTripleGetter nameOfq q) <- pure (g unit)
           -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-          (triples :: Array (Triple t o e)) <- traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
+          (triples :: Array (Triple t o e)) <- Trav.traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
           -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
           objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
           pure $ Triple { subject: id

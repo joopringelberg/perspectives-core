@@ -14,6 +14,7 @@ import Test.Perspectives.ModelBasedObjectGetters (theSuite) as MBOG
 import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
+import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
 import Test.Perspectives.DataTypeTripleGetters as DTG
 import Test.Perspectives.Utils (TestModelLoadEffects, runP)
@@ -29,6 +30,7 @@ main = runTest do
   MBOG.theSuite
   TDC.theSuite
   DTG.theSuite
+  TGCO.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP test)
