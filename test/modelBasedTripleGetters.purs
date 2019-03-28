@@ -5,13 +5,14 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
-import Perspectives.ModelBasedTripleGetters (agreesWithType, buitenRolBeschrijvingDef, contextBot, hasType, isOrHasAspect, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.DataTypeTripleGetters (rolType)
+import Perspectives.ModelBasedTripleGetters (agreesWithType, buitenRolBeschrijvingDef, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains)
-import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.TripleGetterComposition (before, followedBy)
-import Perspectives.TripleGetterConstructors (closure_, directAspects)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
+import Perspectives.TripleGetterComposition (before, followedBy, (>->))
+import Perspectives.TripleGetterConstructors (closure_, directAspects, searchRolInContext, searchUnqualifiedRol)
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -21,7 +22,7 @@ t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ModelBasedTripleGetters" do
+theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------
@@ -108,6 +109,18 @@ theSuite = suite "ModelBasedTripleGetters" do
     assertEqual "sumToSequence of t:myContextDef5$rol1$mySum is [psp:Rol, psp:Property]"
       (t "myContextDef5$rol1$mySum" ##= sumToSequence)
       [p "Rol", p "Property"]
+  test "isRolTypeOf" do
+    r <- runP (t "myContextPrototype" ##>> searchUnqualifiedRol "rol1")
+    assertEqual "$rol1 of t:myContextPrototype has type t:myContextDef$rol1"
+      ((t "myContextDef$rol1") ##= (isRolTypeOf r))
+      [PBool "true"]
+    assertEqual "$rol1 of t:myContextPrototype has type t:myAspect$myAspectRol1"
+      ((t "myAspect$myAspectRol1") ##= (isRolTypeOf r))
+      [PBool "true"]
+  test "isContextTypeOf" do
+    assertEqual ""
+      (RolInContext "model:TestOGC$rolInContext1" ##= rolType >-> mogelijkeBinding >-> sumToSequence)
+      ["model:Perspectives$Rol","model:Perspectives$Context"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

@@ -27,7 +27,7 @@ theSuite = suiteSkip "TripleGetterComposition" do
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "TestOGC.crl"
   ---------------------------------------------------------------------------------
-  testOnly "traverse" do
+  test "traverse" do
     loadTestModel "TestOGC.crl"
     assertEqual "t:myContextDef has four direct and indirect Aspects: "
       (t "myContextDef" ##= closure_ directAspects)

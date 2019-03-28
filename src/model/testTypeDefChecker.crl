@@ -19,7 +19,7 @@ t:myContextDef1 t:myContext1
 	prototype psp:ContextPrototype
 
 psp:Context t:myContextDef2
-	$buitenRolBeschrijving => 
+	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
 			$rolProperty =>
@@ -28,7 +28,7 @@ psp:Context t:myContextDef2
 					extern $isVerplicht = true
 					$range => psp:Boolean
 			$mogelijkeBinding => psp:Rol
-	$binnenRolBeschrijving => 
+	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			$rolProperty =>
@@ -36,7 +36,6 @@ psp:Context t:myContextDef2
 					extern $isFunctioneel = true
 					extern $isVerplicht = true
 					$range => psp:Boolean
-			
 	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $rol1
@@ -48,7 +47,7 @@ psp:Context t:myContextDef2
 					extern $isVerplicht = true
 					$range => psp:Boolean
 
--- IncorrectBinding, RolNotDefined, MissingPropertyValue
+-- IncorrectBinding (op ContextRol), RolNotDefined, MissingPropertyValue
 t:myContextDef2 t:myContext2
 	prototype psp:ContextPrototype
 	$rol1 => t:myContext1
@@ -82,7 +81,7 @@ psp:Context t:myContextDef3
 		psp:Rol $myContextDef3Rol1
 			extern $isFunctioneel = true
 			$aspectRol => t:myContextDef4$myContextDef4Rol1
-			$rolProperty => 
+			$rolProperty =>
 				psp:Property $myContextDef3Rol1Prop1
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
@@ -95,7 +94,7 @@ psp:Context t:myContextDef4
 		psp:Rol $myContextDef4Rol1
 			extern $isFunctioneel = true
 			$aspectRol => t:myContextDef3$myContextDef3Rol1
-			$rolProperty => 
+			$rolProperty =>
 				psp:Property $myContextDef4Rol1Prop1
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
@@ -148,4 +147,16 @@ psp:Context t:myContextDef6
 			$rolProperty =>
 				psp:Property $myContextDef6Prop3
 					$aspectProperty => t:myContextDef2$rol1$rol1Property1
-		
+
+-- IncorrectBinding (op RolInContext).
+psp:Context t:myContextDef7
+	prototype psp:ContextPrototype
+	$rolInContext(1) =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Context
+			$rolProperty =>
+				psp:Property $myContextDef6Prop1
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => $$$rolInContext(1)
