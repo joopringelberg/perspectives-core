@@ -5,6 +5,9 @@ import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Data.StrMap (keys, values)
+import Data.String.Regex (test)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, type (~~>))
@@ -12,6 +15,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (binnenRol) as PI
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), RolDef, binding, typeWithPerspectivesTypes)
+import Perspectives.Resource (getPerspectEntiteit)
 import Prelude (bind, join, pure, ($), (>=>), (<<<), map)
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
@@ -40,6 +44,9 @@ buitenRol = (getContextMember \c -> [context_buitenRol c]) >=> pure <<< map Buit
 -- | Returns Nothing if the context does not exist.
 buitenRol' :: forall e. AnyContext -> MonadPerspectives (AjaxAvarCache e) (Maybe BuitenRol)
 buitenRol' = (getContextMember' \c -> context_buitenRol c) >=> pure <<< map BuitenRol
+
+isBuitenRol :: forall r e. RolClass r => r -> MonadPerspectives (AjaxAvarCache e) Boolean
+isBuitenRol = typeWithPerspectivesTypes (getPerspectEntiteit >=> \r -> pure $ test (unsafeRegex "buitenRolBeschrijving$" noFlags) (rol_pspType r))
 
 binnenRol :: forall e. (AnyContext ~~> BinnenRol) e
 binnenRol = pure <<< singleton <<< BinnenRol <<< PI.binnenRol

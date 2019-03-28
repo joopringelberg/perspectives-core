@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, internePropertyTypen, isBuitenRol, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..), RolInContext(..), Value(..), binding, getUnqualifiedProperty)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, addTestContext, assertEqual, loadTestModel, p, removeTestContext, u, unLoadTestModel)
@@ -89,7 +89,12 @@ theSuite = suiteSkip "DataTypeObjectGetters" do
       ((iedereRolInContext >=> pure <<< map RolInContext) /-/ rolBindingDef $ (u "myContext"))
       [p "Context"]
 
-  test "getUnqualifiedProperty" do
+  test "isBuitenRol" do
+    assertEqual "The buitenRol of u:myContext is a BuitenRol."
+      (isBuitenRol (BuitenRol $ u "myContext_buitenRol"))
+      true
+
+  testSkip "getUnqualifiedProperty" do
     loadTestModel "testTypeDefChecker.crl"
     assertEqual "myContext5 should have value false for external property contextDef2ExtProp1"
       ((buitenRol /-/ (getUnqualifiedProperty "contextDef2ExtProp1")) (t2 "myContext5"))
