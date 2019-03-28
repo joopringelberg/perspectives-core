@@ -22,8 +22,8 @@ psp:Context q:DataTypeGetter
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
-					extern $isFunctioneel = true -- ziet ie niet
-					extern $isVerplicht = true -- ziet ie niet
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
 					$range => psp:String
 
 --------------------------------------------------------------------------------

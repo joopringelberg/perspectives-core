@@ -88,6 +88,7 @@ psp:Context psp:Context
 					$alternative => psp:Rol
 					-- Hier moet denk ik een query bij: dat is een Function.
 					$alternative => psp:Context
+	-- Hebben we dit werkelijk nodig? Een view op de buitenrol zou volstaan.
 	$rolInContext =>
 		psp:Rol $interneView
 			extern $isFunctioneel = false
@@ -108,11 +109,11 @@ psp:Context psp:Context
 	$rolInContext =>
 		psp:Rol $gebruikerRol
 			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Systeem$gebruiker
+			$mogelijkeBinding => psp:PerspectivesSysteem$gebruiker
 	$rolInContext =>
 		psp:Rol $contextBot
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:SysteemBot
+			$mogelijkeBinding => psp:Systeem$bot
 
 psp:Context psp:ContextPrototype
 	$binnenRolBeschrijving =>
@@ -167,35 +168,6 @@ psp:Context psp:Rol
 		psp:Rol $constraint
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Function
-	$rolInContext =>
-		psp:Rol $objectRol
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Actie
-	$rolInContext =>
-		psp:Rol $subjectRol
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Actie
-
-psp:Context psp:SysteemBot
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
-	$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:ElkType
-	$rolInContext =>
-		psp:Rol $rolProperty
-			extern $isFunctioneel = false
-			$mogelijkeBinding =>
-				psp:Sum $FunctionOrProperty
-					$alternative => psp:Function
-					$alternative => psp:Property
-	$rolInContext =>
-		psp:Rol $subjectRol
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Actie
 
 psp:Context psp:View
 	prototype psp:ContextPrototype
@@ -224,26 +196,39 @@ psp:Context psp:View
 psp:Context psp:Actie
 	prototype psp:ContextPrototype
 	$rolInContext =>
-		psp:Rol $subjectView
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:View
+		psp:Rol $subject
+			extern $isFunctioneel = false
+			$mogelijkeBinding => 
+				psp:Sum $botOrUser
+					$alternative => psp:PerspectivesSysteem$gebruiker
+					$alternative => psp:Context$contextBot
 	$rolInContext =>
 		psp:Rol $werkwoord
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Werkwoord
 	$rolInContext =>
-		psp:Rol $objectView
+		psp:Rol $object
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+	$rolInContext =>
+		psp:Rol $subjectView
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:View
 	$rolInContext =>
-		psp:Rol $objectConstraint
+		psp:Rol $objectView
 			extern $isFunctioneel = true
-			extern $isVerplicht = false
-			$mogelijkeBinding => psp:Function
+			$mogelijkeBinding => psp:View
+	-- Represents a runtime constraint on the subject
 	$rolInContext =>
 		psp:Rol $subjectConstraint
-			extern $isFunctioneel = true
 			extern $isVerplicht = false
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Function
+	-- Represents a runtime constraint on the object
+	$rolInContext =>
+		psp:Rol $objectConstraint
+			extern $isVerplicht = false
+			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Function
 	$rolInContext =>
 		psp:Rol $condition
@@ -309,7 +294,13 @@ psp:Context psp:Function
 	$aspect => psp:Context
 
 --------------------------------------------------------------------------------
--- UNIT TYPE: ELKTYPE
+-- BOTTOM TYPE: NIETS
+--------------------------------------------------------------------------------
+psp:Context psp:Niets
+	prototype psp:ContextPrototype
+
+--------------------------------------------------------------------------------
+-- TOP TYPE: ELKTYPE
 --------------------------------------------------------------------------------
 psp:Context psp:ElkType
 	prototype psp:ContextPrototype
@@ -327,8 +318,15 @@ psp:Context psp:Sum
 --------------------------------------------------------------------------------
 -- SYSTEEM
 --------------------------------------------------------------------------------
-
 psp:Context psp:Systeem
+	prototype psp:ContextPrototype
+	$rolInContext =>
+		psp:Rol $bot
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			$mogelijkeBinding => $Niets
+
+psp:Systeem psp:SysteemPrototype
 	$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
@@ -337,6 +335,13 @@ psp:Context psp:Systeem
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
+	$bot => ()
+
+psp:Systeem psp:PerspectivesSysteem
+	prototype psp:SysteemPrototype
+	$aspect => psp:Context
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $modelOphaalTeller
 					extern $isFunctioneel = true
@@ -349,9 +354,9 @@ psp:Context psp:Systeem
 	$rolInContext =>
 		psp:Rol $gebruiker
 			-- wat is de mogelijkeBinding van gebruiker?
-			-- we gaan niets binden, dus elk type is goed.
+			-- we gaan niets binden, dus geen enkel type.
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:ElkType
+			$mogelijkeBinding => psp:Niets
 			$viewInRol =>
 				psp:View $VolledigeNaam
 					$propertyReferentie => $$voornaam
@@ -398,7 +403,7 @@ psp:Zaak psp:TrustedCluster
 	psp:Context$rolInContext =>
 		psp:Rol $clusterGenoot
 			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Systeem$gebruiker
+			$mogelijkeBinding => psp:PerspectivesSysteem$gebruiker
 			$rolProperty =>
 				psp:Property $url
 					extern $isFunctioneel = true
@@ -408,13 +413,13 @@ psp:Zaak psp:TrustedCluster
 				psp:View $Adressering
 					$propertyReferentie => $$url
 						$volgNummer = 1
-					$propertyReferentie => psp:Systeem$gebruiker$voornaam
+					$propertyReferentie => psp:PerspectivesSysteem$gebruiker$voornaam
 						$volgNummer = 2
-			$objectRol => $$RaadpleegtClusterGenoot
-			$subjectRol => $$RaadpleegtClusterGenoot
 	$actieInContext =>
 		psp:Actie $RaadpleegtClusterGenoot
+			$subject => sys:TrustedCluster$clusterGenoot
 			$werkwoord => psp:Raadpleegt
+			$object => sys:TrustedCluster$clusterGenoot
 			$objectView => $$clusterGenoot$Adressering
 
 --------------------------------------------------------------------------------

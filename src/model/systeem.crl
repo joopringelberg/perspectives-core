@@ -86,9 +86,9 @@ arc:Zaak sys:TrustedCluster
 						$volgNummer = 1
 					$propertyReferentie => sys:Systeem$gebruiker$voornaam
 						$volgNummer = 2
-			$objectRol => $$RaadpleegtClusterGenoot
-			$subjectRol => $$RaadpleegtClusterGenoot
 	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
 			$werkwoord => psp:Raadpleegt
 			$objectView => $$clusterGenoot$Adressering
+			$object => sys:TrustedCluster$clusterGenoot
+			$subject => sys:TrustedCluster$clusterGenoot

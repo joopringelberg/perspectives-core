@@ -1,0 +1,65 @@
+BESPREKEN MET COR
+
+1. De SubjectRol van een Actie is relationeel (meerdere Rollen kunnen het subject van een Actie zijn). Ik neem echter aan dat de ObjectRol van een Actie functioneel is.
+
+Als dat zo is, dan kan ik beter $object bij psp:Actie modelleren, dan $objectRol bij $rol. Dat is omdat we bij een rol kunnen aangeven of hij functioneel is of niet. Maar als we bij $objectRol aangeven dat hij functioneel is, dan betekent dat dat een Rol maar in één Actie het object kan zijn - en dat is de verkeerde semantiek. We zouden moeten kunnen aangeven bij de $objectRol dat hij //omgekeerd functioneel// is, maar dat kan niet.
+
+Overigens: verwar dit niet met het functioneel of relationeel zijn op instantieniveau van Acties. Een Actie-instantie heeft altijd maar één subject en kan al dan niet meerdere objecten hebben.
+
+Dat is dan wel weer iets dat we bij $object van Actie moeten modelleren: zijn er één, of meerdere objecten? Dat is een te modelleren property bij de rol $object van Actie.
+
+2. Wat er veranderd is in het model:
+
+	a. psp:Systeem werd psp:PerspectivesSysteem
+	b. psp:SysteemBot werd psp:Systeem$bot
+	c. psp:Rol$objectRol en psp:Rol$subjectRol zijn vervallen, ten gunste van
+	d. psp:Actie$subject en psp:Actie$object
+	e. psp:Niets
+
+3. psp:Zaak heeft nu een rol $contextBot.
+Bij een Actie kan de Rol $subject gebonden worden aan deze rol $contextBot.
+
+REDENERING. Als ik een TaxiRit definieer, maak ik een rol $chauffeur en een rol $passagier. Als ik een TaxiRit instantieer, maak ik instanties aan van deze rollen en vul hen met rollen die de gebruikers representeren.
+Als ik die TaxiRit instantieer, kan ik ook een instantie maken van zijn bot. Ik hoef die instantie niet te vullen. Als het systeem dan zoekt naar botacties van die TaxiRit, begint hij bij die bot-instantie en kijkt welke Actie-instanties die bot als $subject hebben.
+Maar dat vooronderstelt dat alle (bot)Acties geïnstantieerd zijn. Waarom zou ik dat doen?
+Bovendien: je kunt net zo goed op type-niveau opzoeken welke Acties zijn gedefinieerd met de bot als $subject.
+Maar dan heb ik wel een specifieke bot-rol-definitie nodig voor de Taxirit. Ik kan die rol-definitie niet laten leveren door een prototype, want dan komen daar alle bot-Acties aan te hangen van alle Contexten die dat prototype gebruiken!
+Kortom: als ik op typeniveau wil bekijken welke botacties er zijn moet ik een specifieke bot-rol maken voor elk type context.
+
+Ik kan dat doen met $rolInContext, en dan telkens dezelfde lokale naam gebruiken ('contextBot', bijvoorbeeld).
+Ik kan het ook doen met een speciale rol bij Context: $contextBot, bijvoorbeeld. Ik instantieer die rol in de definitie van de Context, maar bindt hem niet.
+
+OPNIEUW
+Op enig moment verandert de instantie van een Context. 
+Je wilt dan weten: moet ik een automatische actie uitvoeren?
+Het antwoord vind je door ermee te beginnen de Acties op te sporen die bij het type van die instantie zijn gedefinieerd, waarvan de $subject Rol gevuld is met de bot van die Context.
+(je zou ook een rol $botActies bij de Context kunnen hebben; maar we vinden het mooier om het te vinden via de binding van de $subject Rol van de Actie).
+Maar merk op dat we op type-niveau denken. 
+De ContextDef moet dus een RolDef hebben voor de bot.
+Die RolDef vult de $subject Rol van de ActieDef.
+Maar de implicatie hiervan is dat je een aparte bot Rol moet definiëren voor elk type Context met bot acties. Dat is moeizaam.
+Gebruik je de bot-rol van een prototype (van b.v. Zaak of Context), dan krijgt die rol alle acties van ContextDefs die hetzelfde prototype hebben gebruikt. Dat is niet selectief genoeg.
+Gebruik je de bot-rol van een Aspect, dan geldt hetzelfde.
+
+Of: we gebruiken wèl de bot-rol van een prototype of aspect, maar vinden de bot-acties van een Context door de acties van de context te filteren op de binding van de $subject rol. Dat is minder efficient, want niet rechtstreeks geïndexeerd.
+
+Of: we binden de $subject Rol van Actie niet aan een RolDef, maar aan een Rol (instantie) van de ContextDef. Dat is een hybride aanpak. Je zou dan een ongevulde instantie van psp:Context#contextBot kunnen maken. Maar hoe bind je die aan de $subjectRol van de Actie? Hoe druk je dat uit? Die $subjectRol krijgt dan ook twee mogelijkeBindingen:
+	* een RolDef (denk aan chauffeur)
+	* een 
+
+
+TODO
+1. vervang psp:Systeem door psp:PerspectivesSysteem in de code. KLAAR
+2. Zoek voorkomen van psp:SysteemBot. KLAAR
+3. Speur alle voorkomens van $objectRol en $subjectRol op en zoek uit hoe veranderd moet worden.
+4. In de tests waar psp:ElkType voorkomt, moet ook een case gemaakt worden voor psp:Niets.
+
+SNELLE AANTEKENING AAN EINDE VAN DE DAG
+1. Ik heb checkBindingOfContextRol geheel herschreven.
+2. Maak nu checkBindingOfRolInContext. 
+3. Het blijkt namelijk wel degelijk mogelijk te zijn om in een CRL file een rol direct aan een andere rol te binden (de rollen die je maakt zijn dus niet allemaal ContextRollen!).
+4. Dit doe je met de $$ syntax. Zie de binding van $clusterGenoot in systeemInstantie.crl.
+5. We kunnen een Context een niet-gebonden instantie van $contextRol geven.
+6. Deze rol kunnen we hierdoor gebruiken als $subject van bot-acties.
+7. Dan kan de code om die bot-acties te vinden, worden herschreven.
+8. Dit alles is het gevolg van het opheffen van $subjectRol (en $objectRol).
