@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
-import Perspectives.ModelBasedTripleGetters (agreesWithType, buitenRolBeschrijvingDef, contextBot, hasType, isOrHasAspect, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, contextBot, hasType, isOrHasAspect, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains)
 import Perspectives.RunMonadPerspectivesQuery ((##=))

@@ -12,11 +12,11 @@ psp:Context psp:SimpleValue
 	$aspect => psp:Context
 
 psp:SimpleValue psp:SimpleValuePrototype
-	$binnenRolBeschrijving =>
+	psp:Context$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
-	$buitenRolBeschrijving =>
+	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
@@ -246,15 +246,15 @@ psp:Context psp:Actie
 					$alternative (3) => psp:effectFullFunction
 
 psp:Context psp:Werkwoord
-	$aspect => psp:Context
 	prototype psp:ContextPrototype
+	$aspect => psp:Context
 
 psp:Werkwoord psp:WerkwoordPrototype
-	$binnenRolBeschrijving =>
+	psp:Context$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
-	$buitenRolBeschrijving =>
+	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
@@ -291,7 +291,7 @@ psp:Context psp:Zaak
 --------------------------------------------------------------------------------
 psp:Context psp:Function
 	prototype psp:ContextPrototype
-	$aspect => psp:Context
+	$aspect => psp:Rol
 
 --------------------------------------------------------------------------------
 -- BOTTOM TYPE: NIETS
@@ -320,18 +320,19 @@ psp:Context psp:Sum
 --------------------------------------------------------------------------------
 psp:Context psp:Systeem
 	prototype psp:ContextPrototype
+	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $bot
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$mogelijkeBinding => $Niets
+			$mogelijkeBinding => psp:Niets
 
 psp:Systeem psp:SysteemPrototype
-	$binnenRolBeschrijving =>
+	psp:Context$binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
-	$buitenRolBeschrijving =>
+	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
@@ -339,19 +340,18 @@ psp:Systeem psp:SysteemPrototype
 
 psp:Systeem psp:PerspectivesSysteem
 	prototype psp:SysteemPrototype
-	$aspect => psp:Context
-	$buitenRolBeschrijving =>
+	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			$rolProperty =>
 				psp:Property $modelOphaalTeller
 					extern $isFunctioneel = true
 					extern $isVerplicht = true
 					$range => psp:Number
-	$rolInContext =>
+	psp:Context$rolInContext =>
 		psp:Rol $trustedCluster
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:TrustedCluster
-	$rolInContext =>
+	psp:Context$rolInContext =>
 		psp:Rol $gebruiker
 			-- wat is de mogelijkeBinding van gebruiker?
 			-- we gaan niets binden, dus geen enkel type.
@@ -373,13 +373,12 @@ psp:Systeem psp:PerspectivesSysteem
 					extern $isFunctioneel = false
 					extern $isVerplicht = true
 					$range => psp:String
-	$rolInContext =>
+	psp:Context$rolInContext =>
 		psp:Rol $zaken
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Zaak
-	$rolInContext =>
+	psp:Context$rolInContext =>
 		q:ComputedRolGetter $modellen
-			extern psp:Rol$buitenRolBeschrijving$isFunctioneel = false
 			extern $functionName = "modellenM"
 
 psp:Zaak psp:TrustedCluster
@@ -417,9 +416,10 @@ psp:Zaak psp:TrustedCluster
 						$volgNummer = 2
 	$actieInContext =>
 		psp:Actie $RaadpleegtClusterGenoot
-			$subject => sys:TrustedCluster$clusterGenoot
+			$subject => psp:TrustedCluster$clusterGenoot
+			--$subject => psp:PerspectivesSysteem$gebruiker
 			$werkwoord => psp:Raadpleegt
-			$object => sys:TrustedCluster$clusterGenoot
+			$object => psp:TrustedCluster$clusterGenoot
 			$objectView => $$clusterGenoot$Adressering
 
 --------------------------------------------------------------------------------

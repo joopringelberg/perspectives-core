@@ -6,13 +6,13 @@ import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
 import Perspectives.DataTypeTripleGetters (rolType)
-import Perspectives.ModelBasedTripleGetters (agreesWithType, buitenRolBeschrijvingDef, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closure_, directAspects, searchRolInContext, searchUnqualifiedRol)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel)
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchRolInContext, searchUnqualifiedRol)
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -38,6 +38,19 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "myContextDef defines three roles"
       ((t "myContextDef") ##= rollenDef)
       (map RolDef ["model:TestOGC$myContextDef$rol1","model:TestOGC$myAspect$myAspectRol1","model:TestOGC$myAspect$myAspectRol2","model:TestOGC$myUrAspect$myUrAspectRol1","model:Perspectives$Context$binnenRolBeschrijving","model:Perspectives$Context$buitenRolBeschrijving","model:Perspectives$Context$rolInContext","model:Perspectives$Context$interneView","model:Perspectives$Context$externeView","model:Perspectives$Context$prototype","model:Perspectives$Context$aspect","model:Perspectives$Context$gebruikerRol","model:Perspectives$Context$contextBot"])
+    assertEqual "q:ComputedRolGetter can use psp:Rol$buitenRolBeschrijving as AspectRol."
+      (q "ComputedRolGetter" ##= closureOfAspect >-> rollenDef)
+      (RolDef <$> [ "model:Perspectives$Rol$rolProperty"
+      , "model:Perspectives$Rol$mogelijkeBinding"
+      , "model:Perspectives$Rol$viewInRol"
+      , "model:Perspectives$Rol$aspectRol"
+      , "model:Perspectives$Rol$constraint"])
+    assertEqual "psp:TrustedCluster does have ???."
+      (p "TrustedCluster" ##= closureOfAspect >-> rollenDef)
+      []
+    assertEqual "psp:TrustedCluster does have ???."
+      (p "TrustedCluster" ##= closure_ directAspects >-> rollenDef)
+      [RolDef $ p "TrustedCluster$clusterGenoot"]
   test "ownPropertiesDef" do
     assertEqual "De roldefinitie t:myAspect$myAspectRol1 definieert de property $myAspectRol1Property."
       (RolDef (t "myAspect$myAspectRol1") ##= ownPropertiesDef)
@@ -59,6 +72,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "$myAspectRol1 has mogelijkeBinding psp:Rol through its $aspectRol"
       ((RolDef $ t "myAspect$myAspectRol1") ##= mogelijkeBinding)
       [p "Rol"]
+    assertEqual "psp:PerspectivesSysteem$buitenRolBeschrijving has no $mogelijkeBinding through its prototype (The RolDef has no prototype)"
+      ((RolDef $ p "PerspectivesSysteem$buitenRolBeschrijving") ##= mogelijkeBinding)
+      []
   test "contextBot" do
     assertEqual "t:myContext6 has a contextBot"
       (ContextDef $ t "myContext6" ##= contextBot)

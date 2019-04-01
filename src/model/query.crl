@@ -94,7 +94,6 @@ psp:Context q:RolGetter
 psp:Context q:ComputedRolGetter
 	prototype psp:ContextPrototype
 	$aspect => psp:Function
-	$aspect => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true

@@ -24,7 +24,7 @@ import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile)
+import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile, withSemanticChecks, withoutSemanticChecks)
 import Perspectives.PerspectivesState (runPerspectives)
 import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
 import Perspectives.SaveUserData (removeUserData, saveUserData)
@@ -96,7 +96,7 @@ removeTestContext cid = void $ runP $ removeTestContext' (buitenRol cid)
 type TestModelLoadEffects e = (console :: CONSOLE, exception :: EXCEPTION, fs :: FS, process :: PROCESS | e)
 
 loadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
-loadTestModel ns = void $ runP $ loadCRLFile ns
+loadTestModel ns = void $ runP $ loadCRLFile withoutSemanticChecks ns
 
 unLoadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
 unLoadTestModel ns = void $ runP $ unLoadCRLFile ns
@@ -107,7 +107,7 @@ unLoadTestModel ns = void $ runP $ unLoadCRLFile ns
 -- | is not found by the TypeDefChecker.
 typeDefCheckerNotifies :: forall e. String -> Array String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
 typeDefCheckerNotifies fileName messages = do
-  notifications <- runP $ loadCRLFile fileName
+  notifications <- runP $ loadCRLFile withSemanticChecks fileName
   notificationStrings <- pure $ (map show) notifications
   for_ messages
     \message -> case findIndex (test (unsafeRegex message noFlags)) notificationStrings of

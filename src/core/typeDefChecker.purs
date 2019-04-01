@@ -24,20 +24,20 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, isContextTypeOf, isRolTypeOf, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, isRolTypeOf, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, BuitenRol, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (toBoolean)
 import Perspectives.QueryCompiler (getPropertyFunction, getInternalPropertyFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=), (##>))
-import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, searchInRolTelescope, some)
+import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, searchInRolTelescope, some, isInEachRolTelescope)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, getInternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchProperty)
 import Perspectives.TypeChecker (isOrHasAspect)
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, const, discard, ifM, map, pure, unit, ($), (<), (<<<), (>=>), (>>=), (>>>), (*>), id)
+import Prelude (Unit, bind, const, discard, id, ifM, map, pure, show, unit, ($), (*>), (<), (<<<), (>=>), (>>=), (>>>))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery (AjaxAvarCache e))
 
@@ -517,12 +517,13 @@ compareRolInstancesToDefinition def rolType =
       case mBoundValue of
         Nothing -> pure unit
         (Just boundValue) -> do
-          (r :: Maybe PBool) <- lift (rolInstance @@> some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isContextTypeOf boundValue)))
+          (r :: Maybe PBool) <- lift (rolInstance @@> some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope boundValue)))
           case r of
             (Just (PBool "false")) -> do
               typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.contextType)) (pure "no type of binding") (pure <<< id)
-              toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding)) (pure "no toegestande binding") (pure <<< id)
-              (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) boundValue typeOfTheBinding toegestaneBinding])
+              toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding  >-> sumToSequence)) (pure "no toegestande binding") (pure <<< id)
+              toegestaneBindingen <- (lift (rolType @@= mogelijkeBinding >-> sumToSequence))
+              (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) boundValue typeOfTheBinding (show toegestaneBindingen)])
             otherwise -> pure unit
 
     checkPropertyAvailable ::
