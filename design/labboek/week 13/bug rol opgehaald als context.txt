@@ -1,0 +1,50 @@
+BUG 
+Het systeem probeert een rol op te halen alsof het een context is.
+
+model:Perspectives$ContextPrototype$binnenRolBeschrijving_1
+
+Waar gebeurt dat?
+
+1. Wat heb ik de laatste dagen veranderd?
+	Bepaal de laatste commit voor de login van woensdag 14:52.
+	Bekijk de verschillen in de typedefchecker.
+	De veranderingen zijn nog niet gecommit! 
+2. Wanneer testte het nog goed?
+	In elk geval voor de login van Wed Mar 27 14:52:02, maar ik weet niet hoever daarvoor.
+
+OBSERVATIES
+1. Het lukt al niet, in de test van DataTypeObjectGetters, om de testcontext aan te maken.
+2. Zonder checkAContext loopt de test DataTypeObjectGetters goed tot aan getUnqualifiedProperty en daar laad hij het testmodel. Zonder die test loopt het prima.
+3. Het probleem zit in checkBindingOfContextRol
+
+EXPERIMENT
+1. zet de typedefchecker uit bij het aanmaken van de testcontext, in BasicConstructors.
+
+AANPAK
+Test eerst de toeleverende modules:
+- dataTypeObjectGetters.isBuitenRol KLAAR
+- ModelBasedTripleGetters
+	- contextBot			KLAAR
+	- botActiesInContext	OVERSLAAN. Deze definitie wil ik nog aanpassen en wordt nu vrijwel zeker niet gebruikt.
+	- hasType				KLAAR (foutje ontdekt in agreesWithType: verkeerde tracking!)
+	- isOrHasAspect			KLAAR
+	- agreesWithType		KLAAR
+	- sumToSequence			KLAAR
+- TripleGetterComposition
+	- traverse				KLAAR
+
+2. Om te testen, zet de typeDefChecker uit bij het laden van een file, in Perspectives.LoadCRL.
+
+3. De regressietest van ModelBasedTripleGetters faalt sowieso, op:
+	- propertiesDef
+	- nonQueryRollen
+	De tests moesten worden aangepast.
+
+4. De test op mogelijkeBinding hergedefinieerd.
+
+OPGELOST!
+De bug is verdwenen.
+
+Semantisch lijkt het nog bagger.
+
+Is ook opgelost.

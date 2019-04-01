@@ -12,7 +12,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID)
 import Perspectives.Identifiers (Namespace, LocalName)
-import Perspectives.LoadCRL (loadCRLFile)
+import Perspectives.LoadCRL (loadCRLFile, withoutSemanticChecks)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit)
 import Perspectives.Resource (tryGetPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveUnversionedEntiteit)
@@ -24,7 +24,7 @@ setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit "model:User$MijnSysteem"
   case mu of
     -- Nothing -> void $ setupUser'
-    Nothing -> void $ loadCRLFile "systeemInstanties.crl"
+    Nothing -> void $ loadCRLFile withoutSemanticChecks "systeemInstanties.crl"
     otherwise -> pure unit
 
 setupUser' :: forall e. MonadPerspectives (AjaxAvarCache (now :: NOW | e)) (Array ID)

@@ -50,16 +50,20 @@ Of: we binden de $subject Rol van Actie niet aan een RolDef, maar aan een Rol (i
 
 TODO
 1. vervang psp:Systeem door psp:PerspectivesSysteem in de code. KLAAR
-2. Zoek voorkomen van psp:SysteemBot. KLAAR
+2. Zoek voorkomen van psp:SysteemBot. 							KLAAR
 3. Speur alle voorkomens van $objectRol en $subjectRol op en zoek uit hoe veranderd moet worden.
+																KLAAR
 4. In de tests waar psp:ElkType voorkomt, moet ook een case gemaakt worden voor psp:Niets.
+																KLAAR
 
 SNELLE AANTEKENING AAN EINDE VAN DE DAG
-1. Ik heb checkBindingOfContextRol geheel herschreven.
-2. Maak nu checkBindingOfRolInContext. 
+1. Ik heb checkBindingOfContextRol geheel herschreven. 	KLAAR
+2. Maak nu checkBindingOfRolInContext. 					KLAAR
+
 3. Het blijkt namelijk wel degelijk mogelijk te zijn om in een CRL file een rol direct aan een andere rol te binden (de rollen die je maakt zijn dus niet allemaal ContextRollen!).
 4. Dit doe je met de $$ syntax. Zie de binding van $clusterGenoot in systeemInstantie.crl.
 5. We kunnen een Context een niet-gebonden instantie van $contextRol geven.
 6. Deze rol kunnen we hierdoor gebruiken als $subject van bot-acties.
 7. Dan kan de code om die bot-acties te vinden, worden herschreven.
 8. Dit alles is het gevolg van het opheffen van $subjectRol (en $objectRol).
+9. Zoek uit: hoe wordt het Sum-type van mogelijkeBinding van $subject in Actie?

@@ -32,10 +32,11 @@ import Prelude (Unit, bind, discard, pure, show, unit, ($), (*>), (<$>), (<>), (
 
 type URL = String
 
-storeDomeinFileInCache :: forall e. Namespace -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
+storeDomeinFileInCache :: forall e. Namespace -> DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
 storeDomeinFileInCache ns df= do
-  dc <- domeinCache
-  liftAff $ liftEff $ poke dc ns df *> pure df
+  ev <- (liftAff makeEmptyVar) >>= domeinCacheInsert ns
+  liftAff $ putVar df ev
+  pure ev
 
 -- | Change the domeinfile in cache. NOTA BENE: does not store the modified file in Couchdb!
 modifyDomeinFileInCache :: forall e. Namespace -> (DomeinFile -> DomeinFile) -> MonadPerspectives (AvarCache e) Unit

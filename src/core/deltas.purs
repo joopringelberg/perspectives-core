@@ -207,6 +207,10 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   -- From the instance of the context, retrieve the instances of the users that play
   -- a Rol in this context that have a subjectRol bound to an Actie that is bound as the
   -- objectRol of the Rol of which memberName is an instance.
+  
+  -- From the instance of the context, retrieve the instances of the users that play
+  -- a Rol in this context who fill the $subject Rol of an Actie that has its $object Rol filled
+  -- with the Rol of which memberName is an instance.
   usersInvolvedInContext :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array RolInContext)
   usersInvolvedInContext (Delta{id, memberName}) =
     do
