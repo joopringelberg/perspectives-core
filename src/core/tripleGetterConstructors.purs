@@ -13,7 +13,7 @@ import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, c
 import Perspectives.DataTypeTripleGetters (binnenRol, identity)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
-import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders) as OGC
+import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders, agreesWithType, alternatives) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
@@ -63,10 +63,17 @@ closure_ :: forall o e.
   (o **> o) e
 closure_ tg = concat identity (closure tg)
 
--- | Combinator to make an ObjectsGetter fail if it returns an empty result.
+-- | Combinator to make a TripleGetter fail if it returns an empty result.
 -- | Useful in combination with computing alternatives using <|>
 unlessNull :: forall s o e. (s **> o) e -> TripleGetter s o e
 unlessNull tg id = (id @@ tg) >>= \r@(Triple{object}) -> if (Arr.null object) then empty else pure r
+
+-- | Combinator to make a TripleGetter fail if it returns PBool "false".
+-- | Useful in combination with computing alternatives using <|>
+unlessFalse :: forall s o e. (s **> PBool) e -> TripleGetter s PBool e
+unlessFalse tg id = (id @@ tg) >>= \r@(Triple{object}) -> case (Arr.elemIndex (PBool "false") object) of
+  Nothing -> pure r
+  otherwise -> empty
 
 searchInRolTelescope :: forall e. (String **> String) e -> (String **> String) e
 -- Test.Perspectives.TripleGetterConstructors, via searchProperty
@@ -170,6 +177,22 @@ concat (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
                     , tripleGetter : getter}
 
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+
+agreesWithType :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
+agreesWithType t = OGC.agreesWithType t `trackedAs` ("agreesWithType_" <> t)
+
+alternatives :: forall e. (AnyContext **> AnyContext) e
+alternatives = OGC.alternatives `trackedAs` "alternatives"
+
+-- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
+-- | for each of its mogelijkeBindingen.
+isInEachRolTelescope :: forall e. RolDef -> (RolDef **> PBool) e
+isInEachRolTelescope t = TypedTripleGetter ("isInEachRolTelescope_" <> unwrap t) f
+  where
+    f :: TripleGetter RolDef PBool e
+    f headOfGraph = unlessFalse (unwrap `before` agreesWithType (unwrap t)) headOfGraph
+      <|>
+      (headOfGraph @@ (all (unwrap `before` alternatives `followedBy` RolDef >-> (isInEachRolTelescope t))))
 
 -- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
 -- Test.Perspectives.TripleGetterConstructors

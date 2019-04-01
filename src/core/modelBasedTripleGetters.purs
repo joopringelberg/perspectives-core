@@ -5,23 +5,23 @@ import Data.Foldable (foldMap)
 import Data.Maybe (maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap, wrap)
-import Perspectives.CoreTypes (type (**>), type (~~>), TypedTripleGetter(..), TripleGetter, (@@))
+import Perspectives.CoreTypes (type (**>), TypedTripleGetter(..), TripleGetter, (@@))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
 import Perspectives.DataTypeTripleGetters (contextType, genericRolType) as DTTG
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef, rolDef) as MBOG
-import Perspectives.ObjectGetterConstructors (alternatives, unlessNull)
+import Perspectives.ObjectGetterConstructors (alternatives, unlessNull) as OGC
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as QC
 import Perspectives.QueryCombinators (contains)
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some)
+import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some, agreesWithType)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
-import Prelude (const, pure, show, ($), (<<<), (<>), (==), (>>>))
+import Prelude (pure, show, ($), (<<<), (<>), (==), (>>>))
 
 -----------------------------------------------------------
 -- GETTERS BASED ON MODEL:PERSPECTIVES$
@@ -239,18 +239,10 @@ isOrHasAspect t = some (closure_ directAspects >-> agreesWithType t)
 -- equalsOrIsAspectOf :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
 -- equalsOrIsAspectOf t =
 
-agreesWithType :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
-agreesWithType t = f `trackedAs` ("agreesWithType_" <> t) where
-  f :: (AnyDefinition ~~> PBool) e
-  f = if t == "model:Perspectives$ElkType"
-    then const (pure [PBool "true"])
-    else if t == "model:Perspectives$Niets"
-      then const (pure [PBool "false"])
-      else \x -> if (t == x) then pure $ [PBool "true"] else pure $ [PBool "false"]
-
 sumToSequence :: forall e. (AnyDefinition **> AnyDefinition) e
 sumToSequence = f `trackedAs` "sumToSequence" where
-  f t = unlessNull alternatives t <|> pure [t]
+  f t = OGC.unlessNull OGC.alternatives t <|> pure [t]
+
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

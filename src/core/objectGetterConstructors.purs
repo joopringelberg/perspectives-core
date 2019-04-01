@@ -21,8 +21,8 @@ import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, rolBin
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/), (\-\))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, AnyDefinition, binding, genericBinding, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
-import Perspectives.Syntax (PerspectContext(), PerspectRol(..))
-import Prelude (class Eq, bind, flip, id, join, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Perspectives.Syntax (PerspectContext, PerspectRol(..))
+import Prelude (class Eq, bind, const, flip, id, join, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -- | This module only exports constructors that search roles or properties,
 -- | in the space of prototypes, Aspects, AspectRoles and AspectProperties.
@@ -62,7 +62,7 @@ unlessNull og id = og id >>= \r -> if (null r) then empty else pure r
 
 -- | Combinator to make an ObjectsGetter fail if it returns PBool "false".
 -- | Useful in combination with computing alternatives using <|>
-unlessFalse :: forall s o e. (s ~~> PBool) e -> (s ~~> PBool) e
+unlessFalse :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e
 unlessFalse og id = og id >>= \r -> case (elemIndex (PBool "false") r) of
   Nothing -> pure r
   otherwise -> empty
@@ -170,6 +170,26 @@ searchInMogelijkeBinding f roldef =
     (((mogelijkeBinding /-/ alternatives) >=> pure <<< map RolDef) \-\ f)) roldef -- sum type
   <|>
   ((mogelijkeBinding >=> pure <<< map RolDef) /-/ searchInMogelijkeBinding f) roldef -- single type
+
+agreesWithType :: forall e. AnyDefinition -> (AnyDefinition ~~> PBool) e
+agreesWithType t = if t == "model:Perspectives$ElkType"
+  then const (pure [PBool "true"])
+  else if t == "model:Perspectives$Niets"
+    then const (pure [PBool "false"])
+    else \x -> if (x == "model:Perspectives$ElkType")
+        then pure [PBool "true"]
+        else if (x == "model:Perspectives$Niets")
+          then pure [PBool "false"]
+          else if (t == x)
+            then pure $ [PBool "true"]
+            else pure $ [PBool "false"]
+
+-- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
+-- | for each of its mogelijkeBindingen.
+isInEachRolTelescope :: forall e. RolDef -> (RolDef ~~> PBool) e
+isInEachRolTelescope t headOfGraph = unlessFalse (agreesWithType $ unwrap t) (unwrap headOfGraph)
+  <|>
+  all (alternatives >=> pure <<< map RolDef /-/ (isInEachRolTelescope t)) (unwrap headOfGraph)
 
 -- Test.Perspectives.ObjectGetterConstructors
 concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e
