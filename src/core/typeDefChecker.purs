@@ -502,18 +502,17 @@ compareRolInstancesToDefinition def rolType =
     -- check the bound value against each of the possibleBindings.
     checkBindingOfContextRol :: ContextRol -> TDChecker e Unit
     checkBindingOfContextRol rolInstance = do
-      mBoundValue <- lift (rolInstance @@> DTTG.rolBindingDef >-> DTG.contextType)
+      mBoundValue <- lift (rolInstance @@> DTTG.rolBindingDef)
       case mBoundValue of
         Nothing -> pure unit
         (Just boundValue) -> do
-          (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope boundValue)))
-          -- (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope boundValue)))
+          typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.contextType)) (pure "no type of binding") (pure <<< id)
+          (r :: Maybe PBool) <- lift (rolInstance @@>  STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope typeOfTheBinding)))
           case r of
             (Just (PBool "false")) -> do
-              -- typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.contextType)) (pure "no type of binding") (pure <<< id)
               toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding  >-> sumToSequence)) (pure "no toegestande binding") (pure <<< id)
               toegestaneBindingen <- (lift (rolType @@= mogelijkeBinding >-> sumToSequence))
-              (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) boundValue boundValue (show toegestaneBindingen)])
+              (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) boundValue typeOfTheBinding (show toegestaneBindingen)])
             otherwise -> pure unit
 
     -- Check a RolInContext in the same way as a ContextRol, but compare the *type* of the bound value to the possibleBindings.
