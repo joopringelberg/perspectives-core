@@ -10,11 +10,10 @@ import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), 
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext, binding, context) as DTG
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetRoleBinders) as OGC
-import Perspectives.PerspectivesTypes (PBool, RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
-import Perspectives.QueryCombinators (filter_)
+import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
+import Perspectives.QueryCombinators (filter_) as QC
 import Perspectives.TripleGetterComposition (before, (>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, alternatives, unlessFalse)
-import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles, getInternalProperty, all) as TGC
+import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles, getInternalProperty) as TGC
 import Perspectives.TripleGetterConstructors (closure, unlessNull, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (flip, (<>))
@@ -59,17 +58,6 @@ directAspectRoles = typeWithPerspectivesTypes OGC.directAspectRoles `trackedAs` 
 directAspectProperties :: forall e. StringTypedTripleGetter e
 directAspectProperties = typeWithPerspectivesTypes OGC.directAspectProperties `trackedAs` "model:Perspectives$Property$directAspectProperties"
 
--- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
--- | for each of its mogelijkeBindingen.
-isInEachRolTelescope :: forall e. String -> (String **> PBool) e
-isInEachRolTelescope t = TypedTripleGetter ("isInEachRolTelescope_" <> t) f
-  where
-    f :: TripleGetter String PBool e
-    f headOfGraph = unlessFalse (agreesWithType t) headOfGraph
-      <|>
-      (headOfGraph @@ (TGC.all (alternatives >-> (isInEachRolTelescope t))))
-
-
 -----------------------------------------------------------
 -- CLOSURES
 -----------------------------------------------------------
@@ -107,7 +95,7 @@ rolesOf cid = TypedTripleGetter ("rolesOf_" <> cid) (typeWithPerspectivesTypes g
 -----------------------------------------------------------
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
 searchContextRol :: forall e. String -> StringTypedTripleGetter e
-searchContextRol rn = searchLocallyAndInPrototypeHierarchy (DTG.genericContext >-> (getContextRol rn))
+searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getContextRol rn))
 
 searchRolInContext :: forall e. String -> StringTypedTripleGetter e
 searchRolInContext = searchContextRol
@@ -119,7 +107,7 @@ searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (DTG.genericConte
 -- GET A ROLDEFINITION FROM A CONTEXT DEFINITION
 -----------------------------------------------------------
 getUnqualifiedRolDefinition ::	forall e. Id.LocalName -> StringTypedTripleGetter e
-getUnqualifiedRolDefinition ln = (filter_
+getUnqualifiedRolDefinition ln = (QC.filter_
   (flip Id.hasLocalName ln)
   ("hasLocalName_" <> ln)
   (getUnqualifiedContextRol "rolInContext" >-> DTG.genericBinding >-> DTG.genericContext))
@@ -180,7 +168,7 @@ getRoleBinders rname = OGC.genericGetRoleBinders rname `trackedAs` rname
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION
 -----------------------------------------------------------
 getUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> StringTypedTripleGetter e
-getUnqualifiedPropertyDefinition ln = (filter_
+getUnqualifiedPropertyDefinition ln = (QC.filter_
   (flip Id.hasLocalName ln)
   ("hasLocalName_" <> ln)
   (getUnqualifiedContextRol "rolInContext" >-> DTG.genericBinding >-> DTG.genericContext))

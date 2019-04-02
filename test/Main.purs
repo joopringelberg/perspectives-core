@@ -14,6 +14,7 @@ import Test.Perspectives.LoadAModel (theSuite) as LAM
 import Test.Perspectives.ModelBasedObjectGetters (theSuite) as MBOG
 import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
+import Test.Perspectives.QueryCombinators (theSuite) as QC
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
 import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
@@ -33,6 +34,7 @@ main = runTest do
   DTG.theSuite
   TGCO.theSuite
   LAM.theSuite
+  QC.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP test)

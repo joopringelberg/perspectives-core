@@ -67,3 +67,68 @@ SNELLE AANTEKENING AAN EINDE VAN DE DAG
 7. Dan kan de code om die bot-acties te vinden, worden herschreven.
 8. Dit alles is het gevolg van het opheffen van $subjectRol (en $objectRol).
 9. Zoek uit: hoe wordt het Sum-type van mogelijkeBinding van $subject in Actie?
+
+HOE ZIT HET MET BUITENROLLEN
+Een prototype ontstaat door de buitenrol van een context te vullen met de buitenrol van een prototype. Zo is er een roltelescoop waardoor externe properties van prototype beschikbaar worden in de context.
+
+IS DE BUITENROL VAN EEN ASPECT NIET BESCHIKBAAR IN EEN CONTEXT?
+Neen. Zie de implementatie van ownRollenDef, waaruit rollenDef volgt, waarop checkAspectOfRolType is gebouwd.
+Kan het wel?
+Het effect zou zijn dat properties van een BuitenRol van een Aspect beschikbaar zijn in de BuitenRol van de Context.
+Daardoor zou PropertyNotDefined niet afgaan als zo'n property op de buitenrol van een instantie van de context gebruikt wordt.
+Voor checkPropertyIsDefined gebruiken we de properties die gevonden worden met propertiesDef op de buitenRolBeschrijving. Daar worden aspecten gewoon in meegenomen.
+Kortom, checkPropertyIsDefined kan met Aspecten van BuitenRollen omgaan.
+
+Gecontroleerd met een test in modelBasedTripleGetters. Inderdaad levert rollenDef niet de binnen- of buitenRolBeschrijving.
+
+ownRollenDef geeft de waarden van rolInContext voor een definitie, maar daar zit binnen-en buitenRolBeschrijving dus niet bij. M.a.w. de specifiek voor het type van de definitie gedefinieerde rollen ontbreken. Dat is voor alles wat een Context is, dus binnen- en buitenRolBeschrijving.
+
+MOGELIJKEBINDING ERIN BETREKKEN
+(IncorrectBinding) In de context 'model:Perspectives$TrustedCluster$RaadpleegtClusterGenoot' is de Rol 'model:Perspectives$TrustedCluster$RaadpleegtClusterGenoot$subject_1' gebonden aan 'model:Perspectives$TrustedCluster$clusterGenoot'(type: 'model:Perspectives$Rol') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$PerspectivesSysteem$gebruiker","model:Perspectives$Context$contextBot"]'.
+
+
+model:Perspectives$TrustedCluster$clusterGenoot
+	* heeft type model:Perspectives$Rol
+	* heeft mogelijkeBinding psp:PerspectivesSysteem$gebruiker
+
+psp:Actie$subject moet gebonden worden aan één van:
+	* psp:PerspectivesSysteem$gebruiker
+	* psp:Context$contextBot
+
+checkBindingOfContextRol moet dus niet alleen toetsen of het type van $clusterGenoot voorkomt in de toegestane types, maar óók of de mogelijkeBindingen van $clusterGenoot het toestaan.
+
+Hier is een test nodig op compatibiliteit van een type (hier achtereenvolgens $gebruiker, of $contextBot) en een rol-graaf (die van $clusterGenoot). Dat laatste betekent: komt het type langs elk van de paden in de graaf voor? De vertakkingen zijn immers een 'of'.
+Het is een soort type-test: "is het hoofd van de rol-graaf óók dit type? D.w.z. komt het langs elk pad in de graaf voor?"
+
+In termen van checkBindingOfContextRol:
+	* rolInstance is $subject_1
+	* zijn type is psp:Actie$subject
+	* de boundValue is $clusterGenoot
+	* de waarden van mogelijkeBinding zijn $gebruiker en $contextBot
+
+De toets zou moeten zijn:
+	- komt $gebruiker voor in de rolgraaf van $clusterGenoot? (JA)
+	- komt $contextBot voor in de rolgraaf van $clusterGenoot? (NEE)
+
+Dus je toetst het type, en elk van de waarden van de mogelijkeBinding van het type van de rolInstantie.
+Je toetst deze drie aan de rolgraaf van de boundValue (je vraagt je af: komt één van de drie types voor langs elk pad door de mogelijkeBinding graaf van de boundValue?).
+
+checkBindingOfContextRol is momenteel beperkt tot de toets (isContextTypeOf boundValue) van elk van de waarden van mogelijkeBinding, oftewel, of één van die waarden een type is van boundValue. De rolgraaf van boundValue blijft buiten schot.
+
+Maar dit is zelfs verkeerd. Ik moet kijken of een mogelijkeBinding van het type van de rol compatibel is met de rolgraaf van de boundvalue (inclusief hoofd).
+
+GELUKT! Voor checkBindingOfContextRol.
+
+Moet het ook voor checkBindingOfRolInContext?
+
+DEBUG ISINEACHROLTELESCOPE
+Het lijkt me dat als er geen alternatives zijn, 'true' wordt teruggegeven omdat 'all' 'true' teruggeeft op een lege sequence.
+Ik heb het aangepast, maar het werkt nog steeds niet.
+Test:
+* conj
+* notEmpty
+Beiden werken prima.
+Nu weet ik het even niet meer.
+
+
+

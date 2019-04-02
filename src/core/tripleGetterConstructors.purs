@@ -184,16 +184,6 @@ agreesWithType t = OGC.agreesWithType t `trackedAs` ("agreesWithType_" <> t)
 alternatives :: forall e. (AnyContext **> AnyContext) e
 alternatives = OGC.alternatives `trackedAs` "alternatives"
 
--- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
--- | for each of its mogelijkeBindingen.
-isInEachRolTelescope :: forall e. RolDef -> (RolDef **> PBool) e
-isInEachRolTelescope t = TypedTripleGetter ("isInEachRolTelescope_" <> unwrap t) f
-  where
-    f :: TripleGetter RolDef PBool e
-    f headOfGraph = unlessFalse (unwrap `before` agreesWithType (unwrap t)) headOfGraph
-      <|>
-      (headOfGraph @@ (all (unwrap `before` alternatives `followedBy` RolDef >-> (isInEachRolTelescope t))))
-
 -- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
 -- Test.Perspectives.TripleGetterConstructors
 some :: forall s e. (s **> PBool) e -> (s **> PBool) e

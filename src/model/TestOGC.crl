@@ -157,3 +157,53 @@ psp:Context t:myContextDef5
 				psp:Sum $mySum
 					$alternative => psp:Rol
 					$alternative => psp:Property
+
+psp:Context t:myContextDef6
+	prototype psp:ContextPrototype
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => t:myContextDef5$rol1
+
+psp:Context t:myContextDef7
+	prototype psp:ContextPrototype
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => 
+				psp:Sum $defOfdef6
+					$alternative => t:myContextDef5$rol1
+					$alternative => t:myContextDef$rol1
+
+psp:Context t:myContextDef8
+	prototype psp:ContextPrototype
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => t:myContextDef5$rol1
+
+psp:Context t:myContextDef9
+	prototype psp:ContextPrototype
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = false
+	$rolInContext =>
+		psp:Rol $rol1
+			extern $isFunctioneel = true
+			$mogelijkeBinding => 
+				psp:Sum $defOfdef6
+					$alternative => t:myContextDef6$rol1
+					$alternative => t:myContextDef8$rol1

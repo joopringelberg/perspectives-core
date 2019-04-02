@@ -38,13 +38,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "myContextDef defines three roles"
       ((t "myContextDef") ##= rollenDef)
       (map RolDef ["model:TestOGC$myContextDef$rol1","model:TestOGC$myAspect$myAspectRol1","model:TestOGC$myAspect$myAspectRol2","model:TestOGC$myUrAspect$myUrAspectRol1","model:Perspectives$Context$binnenRolBeschrijving","model:Perspectives$Context$buitenRolBeschrijving","model:Perspectives$Context$rolInContext","model:Perspectives$Context$interneView","model:Perspectives$Context$externeView","model:Perspectives$Context$prototype","model:Perspectives$Context$aspect","model:Perspectives$Context$gebruikerRol","model:Perspectives$Context$contextBot"])
-    assertEqual "q:ComputedRolGetter can use psp:Rol$buitenRolBeschrijving as AspectRol."
+    assertEqual "q:ComputedRolGetter has no defined Roles through Aspects."
       (q "ComputedRolGetter" ##= closureOfAspect >-> rollenDef)
-      (RolDef <$> [ "model:Perspectives$Rol$rolProperty"
-      , "model:Perspectives$Rol$mogelijkeBinding"
-      , "model:Perspectives$Rol$viewInRol"
-      , "model:Perspectives$Rol$aspectRol"
-      , "model:Perspectives$Rol$constraint"])
+      (RolDef <$> [])
     assertEqual "psp:TrustedCluster does have ???."
       (p "TrustedCluster" ##= closureOfAspect >-> rollenDef)
       []
@@ -72,9 +68,12 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "$myAspectRol1 has mogelijkeBinding psp:Rol through its $aspectRol"
       ((RolDef $ t "myAspect$myAspectRol1") ##= mogelijkeBinding)
       [p "Rol"]
-    assertEqual "psp:PerspectivesSysteem$buitenRolBeschrijving has no $mogelijkeBinding through its prototype (The RolDef has no prototype)"
-      ((RolDef $ p "PerspectivesSysteem$buitenRolBeschrijving") ##= mogelijkeBinding)
+    assertEqual "t:myContextDef6$buitenRolBeschrijving has no $mogelijkeBinding through its prototype (The RolDef has no prototype)"
+      ((RolDef $ t "myContextDef6$buitenRolBeschrijving") ##= mogelijkeBinding)
       []
+    assertEqual "t:myContextDef6$rol1 does have a value for mogelijkeBinding"
+      ((RolDef $ t "myContextDef6$rol1") ##= mogelijkeBinding)
+      [t "myContextDef5$rol1"]
   test "contextBot" do
     assertEqual "t:myContext6 has a contextBot"
       (ContextDef $ t "myContext6" ##= contextBot)

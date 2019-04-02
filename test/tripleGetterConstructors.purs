@@ -6,8 +6,10 @@ import Control.Monad.Free (Free)
 import Data.Array (length)
 import Data.Newtype (unwrap)
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, genericBinding, getUnqualifiedProperty, iedereRolInContext)
+import Perspectives.ModelBasedStringTripleGetters (isInEachRolTelescope, mogelijkeBinding)
+import Perspectives.ModelBasedTripleGetters (sumToSequence)
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), Value(..))
-import Perspectives.QueryCombinators (contains)
+import Perspectives.QueryCombinators (contains, notEmpty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.StringTripleGetterConstructors (all, directAspects, getContextRol, searchInAspectsAndPrototypes, searchLocallyAndInPrototypeHierarchy, some)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
@@ -70,6 +72,9 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "Not all roles defined to t:myAspect are functioneel"
       ((t "myAspect") ##= all (iedereRolInContext >-> genericBinding >-> (RolInContext `before` (getUnqualifiedProperty "isFunctioneel")) `followedBy` (PBool <<< unwrap)))
       [PBool "false"]
+    assertEqual "'All' applied to an empty sequence yields true"
+      ((p "Context") ##= all ((getUnqualifiedRolInContext "doesNotExist") >-> (getUnqualifiedProperty "isFunctioneel") `followedBy` (PBool <<< unwrap)))
+      [PBool "true"]
   test "getRolInContext" do
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       ((t "myContextDef") ##= getRolInContext (RolDef (p "Context$rolInContext")))
@@ -174,6 +179,29 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "myAspectRol1 obtains a definition for the property myUrAspectRol1Property from its AspectRol."
       ((RolDef $ t "myAspect$myAspectRol1") ##= searchUnqualifiedPropertyDefinition "myUrAspectRol1Property")
       [PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
+
+  test "isInEachRolTelescope" do
+    assertEqual "t:myContextDef6$rol1 is in its own rolTelescope."
+      ((t "myContextDef6$rol1") ##= (isInEachRolTelescope (t "myContextDef6$rol1")))
+      [PBool "true"]
+    assertEqual "t:myContextDef6$rol1 does have a value for mogelijkeBinding"
+      ((t "myContextDef6$rol1") ##= mogelijkeBinding)
+      [t "myContextDef5$rol1"]
+    assertEqual "t:myContextDef6$rol1 does have a value for mogelijkeBinding"
+      ((t "myContextDef6$rol1") ##= (notEmpty (mogelijkeBinding >-> sumToSequence)))
+      [PBool "true"]
+    assertEqual "t:myContextDef5$rol1 is in each rolTelescope that starts with t:myContextDef6$rol1"
+      ((t "myContextDef6$rol1") ##= (isInEachRolTelescope (t "myContextDef5$rol1")))
+      [PBool "true"]
+    assertEqual "t:myContextDef$rol1 is NOT in each rolTelescope that starts with t:myContextDef6$rol1"
+      ((t "myContextDef6$rol1") ##= (isInEachRolTelescope (t "myContextDef$rol1")))
+      [PBool "false"]
+    assertEqual "t:myContextDef5$rol1 is NOT in each rolTelescope that starts with t:myContextDef7$rol1"
+      ((t "myContextDef7$rol1") ##= (isInEachRolTelescope (t "myContextDef5$rol1")))
+      [PBool "false"]
+    assertEqual "t:myContextDef5$rol1 is in each rolTelescope that starts with t:myContextDef9$rol1"
+      ((t "myContextDef9$rol1") ##= (isInEachRolTelescope (t "myContextDef5$rol1")))
+      [PBool "true"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

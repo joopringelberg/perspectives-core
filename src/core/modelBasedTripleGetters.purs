@@ -15,11 +15,10 @@ import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRol
 import Perspectives.ObjectGetterConstructors (alternatives, unlessNull) as OGC
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
-import Perspectives.QueryCombinators (closure', filter, notEmpty, difference) as QC
-import Perspectives.QueryCombinators (contains)
+import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains) as QC
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some, agreesWithType)
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some, unlessFalse, all)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (pure, show, ($), (<<<), (<>), (==), (>>>))
 
@@ -159,7 +158,7 @@ mandatoryRollen = QC.difference f (f >-> directAspectRoles)
 nonQueryRollen :: forall e. (AnyContext **> RolDef) e
 nonQueryRollen = QC.filter (unwrap `before` DTTG.contextType >-> isNotAQuery) rollenDef where
   isNotAQuery :: (AnyDefinition **> PBool) e
-  isNotAQuery = contains "model:Perspectives$Rol" (closure_ directAspects)
+  isNotAQuery = QC.contains "model:Perspectives$Rol" (closure_ directAspects)
 
 -- | All properties defined in the namespace of the Rol.
 ownPropertiesDef :: forall e. (RolDef **> PropertyDef) e
@@ -243,6 +242,19 @@ sumToSequence :: forall e. (AnyDefinition **> AnyDefinition) e
 sumToSequence = f `trackedAs` "sumToSequence" where
   f t = OGC.unlessNull OGC.alternatives t <|> pure [t]
 
+-- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
+-- | for each of its mogelijkeBindingen
+-- | (is in each rol telescope that starts with the head of the graph).
+isInEachRolTelescope :: forall e. RolDef -> (RolDef **> PBool) e
+isInEachRolTelescope t = TypedTripleGetter ("isInEachRolTelescope_" <> unwrap t) f
+  where
+    f :: TripleGetter RolDef PBool e
+    f headOfGraph = unlessFalse (unwrap `before` agreesWithType (unwrap t)) headOfGraph
+      <|>
+      (headOfGraph @@
+        (QC.conj
+          (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
+          (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (isInEachRolTelescope t)))))
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

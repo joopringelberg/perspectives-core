@@ -8,7 +8,7 @@ import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, loadTestModel
 import Test.Unit (TestF, suite, suiteSkip, test)
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "Loading the model:" do
+theSuite = suiteSkip "Loading the model:" do
   test "" do
     void $ runP $ loadCRLFile withSemanticChecks "perspectives.crl"
     -- void $ runP $ loadCRLFile withSemanticChecks "query.crl"

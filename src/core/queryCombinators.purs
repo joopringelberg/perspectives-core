@@ -198,8 +198,8 @@ difference = setOperation Arr.difference
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,
 -- | nor memorisation.
-isNothing :: forall s o e. Triple s o e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple s PBool e)
-isNothing (Triple r@{subject, predicate, object, dependencies, supports, tripleGetter}) = pure $ Triple
+isSomething :: forall s o e. Triple s o e -> MonadPerspectivesQuery (AjaxAvarCache e) (Triple s PBool e)
+isSomething (Triple r@{subject, predicate, object, dependencies, supports, tripleGetter}) = pure $ Triple
   { subject: subject
   , predicate: predicate
   , object: [PBool $ show (HA.not $ Arr.null object)]
@@ -214,7 +214,7 @@ notEmpty :: forall s o e. (s **> o) e -> (s **> PBool) e
 notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
 
   getter :: TripleGetter s PBool e
-  getter = p >=> isNothing >=> \(Triple t) -> pure (Triple(t {predicate = name, tripleGetter = getter}))
+  getter = p >=> isSomething >=> \(Triple t) -> pure (Triple(t {predicate = name, tripleGetter = getter}))
 
   name :: String
   name = "(notEmpty " <> nameOfp <> ")"
