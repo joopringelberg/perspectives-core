@@ -407,7 +407,7 @@ roleBindingWithReference cName = roleBinding' cName do
     rolInHigherContext = lexeme do
       namespace <- getNamespace -- not $-terminated!
       namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
-      localName <- localContextName
+      localName <- segmentedName
       namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
       pure $ QualifiedName namespace' localName
 
