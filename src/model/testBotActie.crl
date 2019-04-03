@@ -57,7 +57,7 @@ psp:Zaak tba:Test
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:PerspectivesSysteem$gebruiker
 	psp:Context$contextBot(1) => ()
-	$actieInContext =>
+	$actie =>
 		psp:Actie $botCopiesV1ToV2
 			--$subject => $$Context$contextBot(1)
 			$subject => psp:Property

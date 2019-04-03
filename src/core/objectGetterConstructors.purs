@@ -2,8 +2,10 @@ module Perspectives.ObjectGetterConstructors where
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (cons, difference, elemIndex, foldMap, head, nub, null, union)
+import Data.Array (cons, difference, elemIndex, foldMap, head, nub, null, union, singleton)
 import Data.Array (filter, findIndex, index) as Arr
+import Data.HeytingAlgebra (conj, disj, implies) as HA
+import Data.HeytingAlgebra (not)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
@@ -84,6 +86,36 @@ toBoolean :: forall s e. (s ~~> PBool) e -> s -> MP e Boolean
 toBoolean g = g >=> \(bs :: Array PBool) -> case head bs of
   Nothing -> pure true
   (Just b) -> pure (b == PBool "true")
+
+-- | Applies the logical binary operator (such as OR, AND and IMPLIES) to the results of two queries applied to the same origin.
+-- | Note that just the first results of the argument ObjectGetters are used!
+logicalBinaryOperator :: forall s e.
+  (Boolean -> Boolean -> Boolean) ->
+  (s ~~> PBool) e ->
+  (s ~~> PBool) e ->
+  (s ~~> PBool) e
+logicalBinaryOperator op p q id = do
+  ps <- p id
+  qs <- q id
+  pure $ fromBool $ op (toBool ps) (toBool qs)
+  where
+    fromBool :: Boolean -> Array PBool
+    fromBool = singleton <<< PBool <<< show
+
+    toBool :: Array PBool -> Boolean
+    toBool s = maybe false ((==) (PBool "true")) (head s)
+
+conj :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e -> ((s ~~> PBool) e)
+conj = logicalBinaryOperator HA.conj
+
+disj :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e -> ((s ~~> PBool) e)
+disj = logicalBinaryOperator HA.disj
+
+implies :: forall s e. (s ~~> PBool) e -> (s ~~> PBool) e -> ((s ~~> PBool) e)
+implies = logicalBinaryOperator HA.implies
+
+notEmpty :: forall s o e. (s ~~> o) e -> (s ~~> PBool) e
+notEmpty p = p >=> \os -> pure $ [PBool $ show $ not (null os)]
 
 -- Test.Perspectives.ObjectGetterConstructors, via searchProperty
 searchInRolTelescope :: forall e. ObjectsGetter e -> ObjectsGetter e
@@ -183,13 +215,6 @@ agreesWithType t = if t == "model:Perspectives$ElkType"
           else if (t == x)
             then pure $ [PBool "true"]
             else pure $ [PBool "false"]
-
--- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
--- | for each of its mogelijkeBindingen.
-isInEachRolTelescope :: forall e. RolDef -> (RolDef ~~> PBool) e
-isInEachRolTelescope t headOfGraph = unlessFalse (agreesWithType $ unwrap t) (unwrap headOfGraph)
-  <|>
-  all (alternatives >=> pure <<< map RolDef /-/ (isInEachRolTelescope t)) (unwrap headOfGraph)
 
 -- Test.Perspectives.ObjectGetterConstructors
 concat :: forall s o e. Eq o => (s ~~> o) e -> (s ~~> o) e -> (s ~~> o) e

@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, context)
-import Perspectives.ObjectGetterConstructors (closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, getContextRol, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessNull)
+import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closureOfAspectProperty, closureOfAspectRol, closure_, concat, conj, directAspectProperties, getContextRol, getRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -124,3 +124,16 @@ rolDef = unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Ro
 -- | `psp:Context -> psp:Rol`
 ownRollenDef :: forall e. (AnyContext ~~> RolDef) e
 ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") /-/ binding /-/ context >=> pure <<< map RolDef
+
+sumToSequence :: forall e. (AnyDefinition ~~> AnyDefinition) e
+sumToSequence t = unlessNull alternatives t <|> pure [t]
+
+-- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
+-- | for each of its mogelijkeBindingen.
+isInEachRolTelescope :: forall e. RolDef -> (RolDef ~~> PBool) e
+isInEachRolTelescope t headOfGraph = unlessFalse (agreesWithType $ unwrap t) (unwrap headOfGraph)
+  <|>
+  ((conj
+    (notEmpty (mogelijkeBinding /-/ sumToSequence))
+    (all (unwrap >>> alternatives >=> pure <<< map RolDef /-/ (isInEachRolTelescope t))))
+    headOfGraph)

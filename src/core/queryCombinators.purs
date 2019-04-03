@@ -125,8 +125,7 @@ equal (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
 
 -- Applies the logical binary operator (such as OR, AND and IMPLIES) to the results of two queries applied to the same origin.
--- | `psp:Function -> psp:Function -> psp:Function`
-logicalBinaryOperator :: forall s o e.
+logicalBinaryOperator :: forall s e.
   (Boolean -> Boolean -> Boolean) ->
   (s **> PBool) e ->
   (s **> PBool) e ->

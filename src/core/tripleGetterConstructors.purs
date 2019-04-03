@@ -274,9 +274,6 @@ searchRolInContext :: forall e. RolDef -> (AnyContext **> RolInContext) e
 searchRolInContext rn = searchLocallyAndInPrototypeHierarchy ((getRolInContext rn) :: (AnyContext **> RolInContext) e)
 
 -- | Search for an unqualified rol both in the local context and all its prototypes.
--- TODO: hernoem getRolFromPrototypeHierarchy naar searchUnqualifiedRol
--- OF: let op of niet searchRolDefinitionInAspects gebruikt moet worden (mogelijke fout in aanroepende code!)
--- TODO: waarom alleen in ContextDef?
 -- Test.Perspectives.TripleGetterConstructors
 searchUnqualifiedRol :: forall e. Id.LocalName -> (AnyContext **> ContextRol) e
 searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualifiedContextRol rn) :: (AnyContext **> ContextRol) e)

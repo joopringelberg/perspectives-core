@@ -282,7 +282,7 @@ psp:Context psp:Zaak
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Zaak
 	$rolInContext =>
-		psp:Rol $actieInContext -- TODO: gewoon 'actie'?
+		psp:Rol $actie
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Actie
 
@@ -415,7 +415,7 @@ psp:Zaak psp:TrustedCluster
 						$volgNummer = 1
 					$propertyReferentie => psp:PerspectivesSysteem$gebruiker$voornaam
 						$volgNummer = 2
-	$actieInContext =>
+	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
 			$subject => psp:TrustedCluster$clusterGenoot
 			--$subject => psp:PerspectivesSysteem$gebruiker

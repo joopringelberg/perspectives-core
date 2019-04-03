@@ -128,16 +128,6 @@ constructRolPropertySearch :: forall r e.
   TypedTripleGetter r Value e
 constructRolPropertySearch qn = searchProperty qn `trackedAs` unwrap qn
 
--- constructRolGetter :: forall e.
---   RolName ->
---   TypedTripleGetter e
--- constructRolGetter rn = trackedAs getRol rn
-
--- constructRolLookup :: forall e.
---   RolName ->
---   TypedTripleGetter e
--- constructRolLookup rn = trackedAs getRolFromPrototypeHierarchy rn
-
 constructInverseRolGetter :: forall r b e.
   RolClass r =>
   RolClass b =>
