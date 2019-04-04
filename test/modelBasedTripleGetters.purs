@@ -4,14 +4,14 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
+import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (identity, rolType)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, hasType, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
-import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, (>->), (<<-<))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
+import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -22,7 +22,7 @@ t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ModelBasedTripleGetters" do
+theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------

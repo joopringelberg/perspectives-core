@@ -14,7 +14,7 @@ import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse_)
 import Perspectives.ContextAndRole (context_binnenRol, rol_id, rol_pspType)
-import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>), (@@>>))
+import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>))
 import Perspectives.DataTypeObjectGetters (isBuitenRol, propertyTypen)
 import Perspectives.DataTypeTripleGetters (binding)
 import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, buitenRol) as DTTG
@@ -233,7 +233,7 @@ checkPropertyDef def deftype = do
     (pure unit)
     do
       mBindingproperty <- lift (def @@> bindingProperty)
-      checkAspectsOfPropertyType def
+      checkAspectsOfPropertyType
       case mBindingproperty of
         Nothing -> do
           checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isVerplicht"
@@ -254,8 +254,8 @@ checkPropertyDef def deftype = do
     -- | Checks the aspectRollen of the RolDefinition.
     -- | If such an aspectRol is not a Rol of one of the Aspecten of Context definition
     -- | that holds the Rol definition, it returns a warning.
-    checkAspectsOfPropertyType :: PropertyDef -> TDChecker e Unit
-    checkAspectsOfPropertyType def = do
+    checkAspectsOfPropertyType :: TDChecker e Unit
+    checkAspectsOfPropertyType = do
       ifNothing (lift $ lift (def ##> rolDef))
         (tell [PropertyWithoutRol $ unwrap def])
         \(roldef :: RolDef) -> do
@@ -518,11 +518,10 @@ compareRolInstancesToDefinition def rolType =
     -- Check a RolInContext in the same way as a ContextRol, but compare the *type* of the bound value to the possibleBindings.
     checkBindingOfRolInContext :: RolInContext -> RolInContext -> TDChecker e Unit
     checkBindingOfRolInContext rolInstance boundValue = do
-      typeOfTheBinding <- (lift (boundValue @@>> DTG.rolType))
-      (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope $ unwrap typeOfTheBinding)))
+      typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.rolType)) (pure "no type of binding") (pure <<< unwrap)
+      (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope typeOfTheBinding)))
       case r of
         (Just (PBool "false")) -> do
-          typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.rolType)) (pure "no type of binding") (pure <<< unwrap)
           toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding)) (pure "no toegestande binding") (pure <<< id)
           (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) (unwrap boundValue) typeOfTheBinding toegestaneBinding])
         otherwise -> pure unit

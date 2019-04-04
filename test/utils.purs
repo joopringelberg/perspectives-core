@@ -71,7 +71,7 @@ assertEqual message test result = do
       false
 
 addTestContext :: forall e. String -> Aff (TestEffects e) Unit
-addTestContext s = void $ runP $ addTestContext' s
+addTestContext = void <<< runP <<< addTestContext'
   where
     addTestContext' :: forall eff. String -> MonadPerspectives (AjaxAvarCache eff) Unit
     addTestContext' s = do
@@ -79,8 +79,8 @@ addTestContext s = void $ runP $ addTestContext' s
       case r of
         (Left m) -> throwError $ error $ show [NotWellFormedContextSerialization $ show m]
         (Right cs) -> do
-          r <- constructContext cs
-          case r of
+          r' <- constructContext cs
+          case r' of
             (Left messages) -> throwError (error (show messages))
             (Right id) -> do
               _ <- saveUserData [BuitenRol $ buitenRol id]

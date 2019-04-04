@@ -3,15 +3,12 @@ module Test.Perspectives.TripleGetterComposition (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, contextBot, hasType, isOrHasAspect, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
-import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
-import Perspectives.QueryCombinators (contains)
+import Perspectives.ModelBasedTripleGetters (hasType)
+import Perspectives.PerspectivesTypes (PBool(PBool))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.TripleGetterComposition (before, followedBy, traverse)
+import Perspectives.TripleGetterComposition (traverse)
 import Perspectives.TripleGetterConstructors (closure_, directAspects, some)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String

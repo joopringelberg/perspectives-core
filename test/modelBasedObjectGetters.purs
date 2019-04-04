@@ -5,14 +5,12 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (~~>))
-import Perspectives.DataTypeObjectGetters (buitenRol, context, iedereRolInContext)
-import Perspectives.DataTypeTripleGetters (propertyTypen) as DTG
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, propertyIsFunctioneel, propertyIsVerplicht, rolDef, rolIsVerplicht)
-import Perspectives.ObjectGetterConstructors (closure_, directAspectProperties, getRoleBinders)
+import Perspectives.DataTypeObjectGetters (buitenRol)
+import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolDef, rolIsVerplicht)
+import Perspectives.ObjectGetterConstructors (directAspectProperties, getRoleBinders)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (BuitenRol(..), ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), Value(..), binding, genericBinding, getProperty, getUnqualifiedProperty)
-import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Perspectives.PerspectivesTypes (BuitenRol, ContextRol(..), PBool(..), PropertyDef(..), RolDef(..))
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String

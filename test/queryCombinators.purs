@@ -3,16 +3,11 @@ module Test.Perspectives.QueryCombinators (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
-import Perspectives.DataTypeTripleGetters (rolType)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
-import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
-import Perspectives.QueryCombinators (contains, not, notEmpty, conj) as QC
-import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
-import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchRolInContext, searchUnqualifiedRol)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
+import Perspectives.ModelBasedTripleGetters (rollenDef)
+import Perspectives.PerspectivesTypes (PBool(..))
+import Perspectives.QueryCombinators (not, notEmpty, conj) as QC
+import Perspectives.RunMonadPerspectivesQuery ((##=))
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String

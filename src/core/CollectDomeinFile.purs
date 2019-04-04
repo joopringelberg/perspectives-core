@@ -1,6 +1,5 @@
 module Perspectives.CollectDomeinFile where
 
-import Control.Monad.Aff.Console (error)
 import Control.Monad.Eff (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify, get)
 import Data.Foldable (for_)

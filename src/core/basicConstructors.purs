@@ -12,14 +12,13 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Actions (addRol, removeRol)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP, (##>))
-import Perspectives.DataTypeObjectGetters (contextType)
+import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
-import Perspectives.PerspectivesTypes (Context(..), ContextDef(..), RolDef(..))
+import Perspectives.PerspectivesTypes (Context(..), RolDef(..))
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkAContext)
@@ -32,12 +31,12 @@ constructContexts (ContextsSerialisation contexts) = (traverse (constructContext
 -- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
 -- | Type checks the context and returns any semantic problems as UserMessages. If there are no problems, returns the ID.
 constructContext :: forall e. ContextSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
-constructContext c@(ContextSerialization{id}) = do
+constructContext c@(ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
   ident <- pure $ expandDefaultNamespaces id
   (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit ident
   case mc of
     Nothing -> do
-      candidate <- runExceptT $ constructContext_ c
+      candidate <- runExceptT $ constructContext_
       case candidate of
         (Left messages) -> do
           removeFromCache ident
@@ -53,12 +52,12 @@ constructContext c@(ContextSerialization{id}) = do
     otherwise -> pure $ Left $ [ContextExists ident]
 
   where
-    constructContext_ :: ContextSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) ID
-    constructContext_ (ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
+    constructContext_ :: ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) ID
+    constructContext_ = do
       ident <- pure $ expandDefaultNamespaces id
       localName <- maybe (throwError [(NotAValidIdentifier ident)]) pure (deconstructLocalNameFromDomeinURI ident)
       -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
-      (rolIds :: StrMap (Array RolID)) <-constructRollen rollen
+      (rolIds :: StrMap (Array RolID)) <-constructRollen
       lift $ cacheUncachedEntiteit ident
         (PerspectContext defaultContextRecord
           { _id = ident
@@ -90,16 +89,16 @@ constructContext c@(ContextSerialization{id}) = do
       pure ident
 
     removeFromCache :: ContextID -> MP e Unit
-    removeFromCache id = do
+    removeFromCache id' = do
       -- Here we know for sure that id is in the cache, as it has been just created (but did fail the tests).
-      (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectEntiteit id
-      (_ :: Maybe (AVar PerspectContext)) <- removeInternally id
-      (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ buitenRol id
+      (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectEntiteit id'
+      (_ :: Maybe (AVar PerspectContext)) <- removeInternally id'
+      (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ buitenRol id'
       (_ :: StrMap (Array (Maybe (AVar PerspectRol)))) <- traverse (traverse removeInternally) rolInContext
       pure unit
 
-    constructRollen :: StrMap (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (StrMap (Array ID))
-    constructRollen rollen = do
+    constructRollen :: ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (StrMap (Array ID))
+    constructRollen = do
       (ts :: Array (Tuple String (Array RolSerialization))) <- pure $ toUnfoldable rollen
       (x :: Array (Tuple String (Array ID))) <- traverse keyRolInstances ts
       pure $ fromFoldable x
