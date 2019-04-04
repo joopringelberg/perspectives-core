@@ -497,7 +497,7 @@ compareRolInstancesToDefinition def rolType =
     -- Check a ContextRol as follows. We assume that the bound value represents a definition of some kind.
     -- Because its type can be a RolDef, we involve the mogelijkeBinding of that RolDef in the type checking.
     --  - find the values of mogelijkeBinding of the type of the rolInstance: the possibleBindings.
-    --  - At least one of these possibleBindings must be on each rolTelescope of the type of the bound value (if it is a RolDef).
+    --  - At least one of these possibleBindings must agree with or be a type of one Rol on each rolTelescope of the type of the bound value (if it is a RolDef).
     -- Note that because we include the head of the rolGraph in the check, if we do not have a RolDef, it will merely
     -- check the bound value against each of the possibleBindings.
     checkBindingOfContextRol :: ContextRol -> TDChecker e Unit
@@ -510,7 +510,7 @@ compareRolInstancesToDefinition def rolType =
           (r :: Maybe PBool) <- lift (rolInstance @@>  STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope typeOfTheBinding)))
           case r of
             (Just (PBool "false")) -> do
-              toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding  >-> sumToSequence)) (pure "no toegestande binding") (pure <<< id)
+              toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding  >-> sumToSequence)) (pure "no toegestane binding") (pure <<< id)
               toegestaneBindingen <- (lift (rolType @@= mogelijkeBinding >-> sumToSequence))
               (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) boundValue typeOfTheBinding (show toegestaneBindingen)])
             otherwise -> pure unit
@@ -522,7 +522,7 @@ compareRolInstancesToDefinition def rolType =
       (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope typeOfTheBinding)))
       case r of
         (Just (PBool "false")) -> do
-          toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding)) (pure "no toegestande binding") (pure <<< id)
+          toegestaneBinding <- ifNothing (lift (rolType @@> mogelijkeBinding)) (pure "no toegestane binding") (pure <<< id)
           (tell [IncorrectBinding (unwrap def) (unwrap rolInstance) (unwrap boundValue) typeOfTheBinding toegestaneBinding])
         otherwise -> pure unit
 

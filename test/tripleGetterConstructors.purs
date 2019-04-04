@@ -179,7 +179,6 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "myAspectRol1 obtains a definition for the property myUrAspectRol1Property from its AspectRol."
       ((RolDef $ t "myAspect$myAspectRol1") ##= searchUnqualifiedPropertyDefinition "myUrAspectRol1Property")
       [PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
-
   test "isInEachRolTelescope" do
     assertEqual "t:myContextDef6$rol1 is in its own rolTelescope."
       ((t "myContextDef6$rol1") ##= (isInEachRolTelescope (t "myContextDef6$rol1")))

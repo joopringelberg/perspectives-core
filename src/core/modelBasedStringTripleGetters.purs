@@ -4,23 +4,26 @@ import Control.Alt ((<|>))
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@))
 import Perspectives.DataTypeTripleGetters (genericBinding, genericContext)
 import Perspectives.EntiteitAndRDFAliases (RolName)
-import Perspectives.ModelBasedTripleGetters (sumToSequence)
+import Perspectives.ModelBasedTripleGetters (isOrHasSuperType, sumToSequence)
 import Perspectives.PerspectivesTypes (PBool, AnyDefinition)
 import Perspectives.QueryCombinators (notEmpty, conj) as QC
 import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndPrototypes, searchRolInContext)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, unlessFalse, all)
+import Perspectives.TripleGetterConstructors (unlessFalse, all)
 import Prelude ((<>))
 
--- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
--- | for each of its mogelijkeBindingen.
+-- | allowedBinding `isInEachRolTelescope` t
+-- | allowedBinding ## (`isInEachRolTelescope` t)
+-- | Means (i.e. this is how it is implemented):
+-- | On each path through the mogelijkeBinding graph of allowedBinding there is a type x for which holds:
+-- | t isOrHasSuperType x
 isInEachRolTelescope :: forall e. String -> (String **> PBool) e
 isInEachRolTelescope t = TypedTripleGetter ("isInEachRolTelescope_" <> t) f
   where
     f :: TripleGetter String PBool e
-    f headOfGraph = unlessFalse (agreesWithType t) headOfGraph
+    f allowedBinding = unlessFalse (isOrHasSuperType allowedBinding) t
       <|>
-      (headOfGraph @@
+      (allowedBinding @@
         (QC.conj
           (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
           (all (mogelijkeBinding >-> sumToSequence >-> (isInEachRolTelescope t)))))

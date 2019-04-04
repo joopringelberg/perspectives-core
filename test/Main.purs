@@ -9,6 +9,7 @@ import Test.Perspectives.DataTypeObjectGetters (theSuite) as DTO
 import Test.Perspectives.LoadAModel (theSuite) as LAM
 import Test.Perspectives.ModelBasedObjectGetters (theSuite) as MBOG
 import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
+import Test.Perspectives.ModelBasedStringTripleGetters (theSuite) as MBSTG
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.QueryCombinators (theSuite) as QC
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
@@ -24,12 +25,13 @@ main = runTest do
   DTO.theSuite
   OGC.theSuite
   MBTG.theSuite
+  MBSTG.theSuite
   TGC.theSuite
   MBOG.theSuite
   TDC.theSuite
   DTG.theSuite
   TGCO.theSuite
-  LAM.theSuite
+  LAM.theSuite 
   QC.theSuite
 
 -- Running other tests:

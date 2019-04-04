@@ -214,9 +214,16 @@ bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Prop
 type Instance = String
 
 -- | True iff AnyDefinition is a type of AnyContext.
+-- | q ## (isContextTypeOf p) should be understood as:
+-- | q is a type of p
+-- | q `isContextTypeOf` p
 -- | AnyDefinition `isContextTypeOf` AnyContext
 isContextTypeOf :: forall e. AnyContext -> (AnyDefinition **> PBool) e
 isContextTypeOf i = TypedTripleGetter ("isTypeOf_" <> i) f where
+  -- x ## (isContextTypeOf i) should be understood as:
+  -- some y in aspects (type i) `agreesWithType` x
+  -- (type i) `isOrHasAspect` x
+  -- x is a type of i.
   f :: TripleGetter AnyDefinition PBool e
   f x = i @@ some (DTTG.contextType >-> closure_ directAspects >-> (agreesWithType x) )
 
@@ -227,18 +234,40 @@ isRolTypeOf r = TypedTripleGetter ("isTypeOf_" <> unwrap r) f where
   f :: TripleGetter AnyDefinition PBool e
   f tp = unwrap r @@ some (DTTG.genericRolType >-> closure_ (RolDef `before` directAspectRoles `followedBy` unwrap) >-> (agreesWithType tp))
 
--- | True iff the type of AnyContext
+-- | p `hasType` q shoud be written:
+-- | p ## (hasType q)
+-- | True iff the **type** of AnyContext
 -- |  - equals AnyDefinition, or if
 -- |  - one of its Aspects is AnyDefinition.
 -- | AnyContext `hasType` AnyDefinition
+-- | p ## (hasType q)
+-- | (type of p) ## (isOrHasAspect q)
+-- | (type of p) `isOrHasAspect` q
+-- | p `hasType` q
+-- | AnyContext `hasType` AnyDefinition
 hasType :: forall e. AnyDefinition -> (AnyContext **> PBool) e
-hasType tp = DTTG.contextType >-> isOrHasAspect tp
+hasType q = DTTG.contextType >-> isOrHasAspect q
 
+-- | p `isOrHasAspect` q should be written:
+-- | p ## (isOrHasAspect q)
+-- | p `isOrHasAspect` q means either:
+-- |  * p `agreesWithType` q
+-- |  * for some Aspect a of p: a `agreesWithType` q
 isOrHasAspect :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
-isOrHasAspect t = some (closure_ directAspects >-> agreesWithType t)
+isOrHasAspect q = some (closure_ directAspects >-> agreesWithType q)
+-- | p ## (isOrHasAspect q)
+-- | for some a in aspects p: a `agreesWithType` q
+-- | q equals or is a superType of p
+-- | p `isOrHasAspect` q
+-- | Because:
+-- | q is a superType of p means:
+-- | q is an Aspect of p, or, equivalently:
+-- | p has q as Aspect.
 
--- equalsOrIsAspectOf :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
--- equalsOrIsAspectOf t =
+-- | p `isOrHasSuperType` q should be written:
+-- | p ## (isOrHasSuperType q)
+isOrHasSuperType :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
+isOrHasSuperType = isOrHasAspect
 
 sumToSequence :: forall e. (AnyDefinition **> AnyDefinition) e
 sumToSequence = f `trackedAs` "sumToSequence" where
