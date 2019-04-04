@@ -150,9 +150,11 @@ psp:Context t:myContext6
 
 psp:Context t:myContextDef5
 	prototype psp:ContextPrototype
+	$aspect => t:myContextDef4
 	$rolInContext =>
 		psp:Rol $rol1
 			extern $isFunctioneel = true
+			$aspectRol => t:myContextDef4$rol1
 			$mogelijkeBinding =>
 				psp:Sum $mySum
 					$alternative => psp:Rol
@@ -178,7 +180,7 @@ psp:Context t:myContextDef7
 	$rolInContext =>
 		psp:Rol $rol1
 			extern $isFunctioneel = true
-			$mogelijkeBinding => 
+			$mogelijkeBinding =>
 				psp:Sum $defOfdef6
 					$alternative => t:myContextDef5$rol1
 					$alternative => t:myContextDef$rol1
@@ -203,7 +205,7 @@ psp:Context t:myContextDef9
 	$rolInContext =>
 		psp:Rol $rol1
 			extern $isFunctioneel = true
-			$mogelijkeBinding => 
+			$mogelijkeBinding =>
 				psp:Sum $defOfdef6
 					$alternative => t:myContextDef6$rol1
 					$alternative => t:myContextDef8$rol1

@@ -5,13 +5,13 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (TypedTripleGetter, type (**>))
-import Perspectives.DataTypeTripleGetters (rolType)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.DataTypeTripleGetters (identity, rolType)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
-import Perspectives.QueryCombinators (contains)
+import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
-import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchRolInContext, searchUnqualifiedRol)
+import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, (>->), (<<-<))
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -22,7 +22,7 @@ t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suiteSkip "ModelBasedTripleGetters" do
+theSuite = suite "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------
@@ -136,6 +136,28 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual ""
       (RolInContext "model:TestOGC$rolInContext1" ##= rolType >-> mogelijkeBinding >-> sumToSequence)
       ["model:Perspectives$Rol","model:Perspectives$Context"]
+  test "collectUnqualifiedPropertyDefinitions" do
+    assertEqual "t:myContextDef9$rol1 does not by itself a property defined."
+      ((RolDef $ t "myContextDef9$rol1") ##= searchUnqualifiedPropertyDefinition "rol1Property")
+      []
+    assertEqual "t:myContextDef5$rol1 should have a property 'rol1Property' by virtue of its Aspects"
+      ((RolDef $ t "myContextDef5$rol1") ##= ignoreCache (collectUnqualifiedPropertyDefinitions "rol1Property"))
+      [PropertyDef $ t "myContextDef4$rol1$rol1Property"]
+    assertEqual "t:myContextDef6$rol1 should have a value for mogelijkeBinding"
+      ((RolDef $ t "myContextDef6$rol1") ##= (mogelijkeBinding >-> sumToSequence `followedBy` RolDef))
+      [RolDef $ t "myContextDef5$rol1"]
+    assertEqual "lazyIntersectionOfTripleObjects should pass on the values of its left argument to its right argument."
+      ((RolDef $ t "myContextDef6$rol1") ##= ((mogelijkeBinding >-> sumToSequence `followedBy` RolDef) <<-< (\_ -> identity) $ "identity"))
+      [RolDef $ t "myContextDef5$rol1"]
+    assertEqual "lazyIntersectionOfTripleObjects should pass on the values of its left argument to its right argument."
+      ((RolDef $ t "myContextDef6$rol1") ##= ((mogelijkeBinding >-> sumToSequence `followedBy` RolDef) <<-< (\_ -> identity) $ "identity"))
+      [RolDef $ t "myContextDef5$rol1"]
+    assertEqual "t:myContextDef6$rol1 should have a property 'rol1Property' by virtue of its mogelijkeBinding graph and Aspects of the bottom of the graph"
+      ((RolDef $ t "myContextDef6$rol1") ##= collectUnqualifiedPropertyDefinitions "rol1Property")
+      [PropertyDef $ t "myContextDef4$rol1$rol1Property"]
+    assertEqual "t:myContextDef9$rol1 should have a property 'rol1Property' by virtue of its mogelijkeBinding graph and Aspects of the bottom of the graph"
+      ((RolDef $ t "myContextDef9$rol1") ##= collectUnqualifiedPropertyDefinitions "rol1Property")
+      [PropertyDef $ t "myContextDef4$rol1$rol1Property"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

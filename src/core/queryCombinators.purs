@@ -2,7 +2,7 @@ module Perspectives.QueryCombinators where
 
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter) as Arr
+import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter, union) as Arr
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
@@ -193,6 +193,12 @@ difference :: forall s o e. Eq o =>
   (s **> o) e ->
   (s **> o) e
 difference = setOperation Arr.difference
+
+union :: forall s o e. Eq o =>
+  (s **> o) e ->
+  (s **> o) e ->
+  (s **> o) e
+union = setOperation Arr.union
 
 -- | This function is not a TripleGetter. It can be used to turn a tripleGetter into another
 -- | TripleGetter, that returns a boolean value. It does no dependency tracking,

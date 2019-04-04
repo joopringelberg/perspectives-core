@@ -1,9 +1,9 @@
 module Perspectives.TripleGetterComposition where
 
-import Data.Array (cons, difference, head, nub)
+import Data.Array (cons, difference, foldM, head, intersect, nub, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, sequence) as Trav
-import Perspectives.CoreTypes (Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery, applyTypedTripleGetter)
+import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), applyTypedTripleGetter, tripleObject, tripleObjects)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
@@ -34,20 +34,20 @@ before f (TypedTripleGetter n g) = TypedTripleGetter n fVoorg where
   }
 
 -- | Compose two queries like composing two functions.
-composeTripleGetters :: forall s o t e.
+unionOfTripleObjects :: forall s o t e.
   Eq t =>
   Eq o =>
   TypedTripleGetter s t e ->
   TypedTripleGetter t o e ->
   TypedTripleGetter s o e
-composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
+unionOfTripleObjects (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   memorize getter name
     where
     getter :: TripleGetter s o e
     getter id = do
       (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
       (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
-      objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
+      objects <- pure $ nub $ join $ map tripleObjects triples
       pure $ Triple { subject: id
                     , predicate : name
                     , object : objects
@@ -58,7 +58,117 @@ composeTripleGetters (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
     name :: String
     name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
 
-infixl 9 composeTripleGetters as >->
+infixl 9 unionOfTripleObjects as >->
+
+-- | TripleGetter composition where the second operand is treated as lazy
+-- | (wrapped in a function). Useful for recursive queries that bottom out
+-- | when the first operator yields no results.
+-- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
+lazyUnionOfTripleObjects :: forall s o t e.
+  Eq t =>
+  Eq o =>
+  TypedTripleGetter s t e ->
+  (Unit -> TypedTripleGetter t o e) ->
+  String ->
+  TypedTripleGetter s o e
+lazyUnionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
+  memorize getter name
+    where
+    getter :: TripleGetter s o e
+    getter id = do
+      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
+      case head objectsOfP of
+        Nothing -> pure $ typeWithPerspectivesTypes t
+        otherwise -> do
+          (TypedTripleGetter nameOfq q) <- pure (g unit)
+          -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
+          (triples :: Array (Triple t o e)) <- Trav.traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
+          -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
+          objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
+          pure $ Triple { subject: id
+                        , predicate : name
+                        , object : objects
+                        , dependencies : []
+                        , supports : cons (getRef (typeWithPerspectivesTypes t)) (map getRef (typeWithPerspectivesTypes triples))
+                        , tripleGetter : getter}
+
+    name :: String
+    name = "(" <>  nameOfp <> " lazyUnionOfTripleObjects " <> nameOfg <> ")"
+
+infixl 9 lazyUnionOfTripleObjects as >->>
+
+intersectionOfTripleObjects :: forall s o t e.
+  Eq t =>
+  Eq o =>
+  TypedTripleGetter s t e ->
+  TypedTripleGetter t o e ->
+  TypedTripleGetter s o e
+intersectionOfTripleObjects (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
+  memorize getter name
+    where
+    getter :: TripleGetter s o e
+    getter id = do
+      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
+      (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
+      objects <-
+        case uncons triples of
+          Nothing -> pure []
+          (Just {head, tail}) -> foldM
+            (\r (Triple{object}) -> pure $ intersect object r)
+            (tripleObjects head)
+            tail
+      pure $ Triple { subject: id
+                    , predicate : name
+                    , object : objects
+                    , dependencies : []
+                    , supports : cons (getRef (typeWithPerspectivesTypes t)) (map getRef (typeWithPerspectivesTypes triples))
+                    , tripleGetter : getter}
+
+    name :: String
+    name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
+
+infixl 9 intersectionOfTripleObjects as <-<
+
+-- | TripleGetter composition where the second operand is treated as lazy
+-- | (wrapped in a function). Useful for recursive queries that bottom out
+-- | when the first operator yields no results.
+-- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
+lazyIntersectionOfTripleObjects :: forall s o t e.
+  Eq t =>
+  Eq o =>
+  TypedTripleGetter s t e ->
+  (Unit -> TypedTripleGetter t o e) ->
+  String ->
+  TypedTripleGetter s o e
+lazyIntersectionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
+  memorize getter name
+    where
+    getter :: TripleGetter s o e
+    getter id = do
+      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
+      case head objectsOfP of
+        Nothing -> pure $ typeWithPerspectivesTypes t
+        otherwise -> do
+          (TypedTripleGetter nameOfq q) <- pure (g unit)
+          (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
+          objects <-
+            case uncons triples of
+              Nothing -> pure []
+              (Just {head, tail}) -> foldM
+                (\r (Triple{object}) -> pure $ intersect object r)
+                (tripleObjects head)
+                tail
+          pure $ Triple { subject: id
+                        , predicate : name
+                        , object : objects
+                        , dependencies : []
+                        , supports : cons (getRef (typeWithPerspectivesTypes t)) (map getRef (typeWithPerspectivesTypes triples))
+                        , tripleGetter : getter}
+
+    name :: String
+    name = "(" <>  nameOfp <> " lazyUnionOfTripleObjects " <> nameOfg <> ")"
+
+infixl 9 lazyIntersectionOfTripleObjects as <<-<
 
 -- | Traverse the results of the second TypedTripleGetter with function that yields a TypedTripleGetter.
 traverse :: forall s o t e.
@@ -106,40 +216,3 @@ composeMonoidal (TypedTripleGetter nameOfp p) f n = memorize getter name where
 
   name :: String
   name = "(" <>  nameOfp <> " >-> " <> n <> ")"
-
--- | TripleGetter composition where the second operand is treated as lazy
--- | (wrapped in a function). Useful for recursive queries that bottom out
--- | when the first operator yields no results.
--- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
-composeLazy :: forall s o t e.
-  Eq t =>
-  Eq o =>
-  TypedTripleGetter s t e ->
-  (Unit -> TypedTripleGetter t o e) ->
-  String ->
-  TypedTripleGetter s o e
-composeLazy (TypedTripleGetter nameOfp p) g nameOfg =
-  memorize getter name
-    where
-    getter :: TripleGetter s o e
-    getter id = do
-      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
-      case head objectsOfP of
-        Nothing -> pure $ typeWithPerspectivesTypes t
-        otherwise -> do
-          (TypedTripleGetter nameOfq q) <- pure (g unit)
-          -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-          (triples :: Array (Triple t o e)) <- Trav.traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
-          -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
-          objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
-          pure $ Triple { subject: id
-                        , predicate : name
-                        , object : objects
-                        , dependencies : []
-                        , supports : cons (getRef (typeWithPerspectivesTypes t)) (map getRef (typeWithPerspectivesTypes triples))
-                        , tripleGetter : getter}
-
-    name :: String
-    name = "(" <>  nameOfp <> " >-> " <> nameOfg <> ")"
-
-infixl 9 composeLazy as >->>

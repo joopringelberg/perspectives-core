@@ -11,14 +11,16 @@ import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, c
 import Perspectives.DataTypeTripleGetters (contextType, genericRolType) as DTTG
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
+import Perspectives.Identifiers as Id
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef, rolDef) as MBOG
 import Perspectives.ObjectGetterConstructors (alternatives, unlessNull) as OGC
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains) as QC
+import Perspectives.QueryCombinators (union)
 import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
-import Perspectives.TripleGetterComposition (before, composeLazy, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition, some, unlessFalse, all)
+import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, (>->))
+import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, unlessFalse)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (pure, show, ($), (<<<), (<>), (==), (>>>))
 
@@ -174,7 +176,7 @@ propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
   defsInAspectsAndPrototypes = closure_ directAspectRoles >-> unwrap `before` (closure_ getPrototype) `followedBy` RolDef >-> ownPropertiesDef
 
   defsInMogelijkeBinding :: (RolDef **> PropertyDef) e
-  defsInMogelijkeBinding = composeLazy
+  defsInMogelijkeBinding = lazyUnionOfTripleObjects
     (mogelijkeBinding `followedBy` RolDef)
     (\_ -> propertiesDef)
     "propertiesDef"
@@ -255,6 +257,15 @@ isInEachRolTelescope t = TypedTripleGetter ("isInEachRolTelescope_" <> unwrap t)
         (QC.conj
           (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
           (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (isInEachRolTelescope t)))))
+
+-- | Collect all definitions of a Property with the local name, in the RolDef and its Aspects
+-- | and in all their prototypes and on the rolGraph of the RolDef. Notice there may be more than one!
+collectUnqualifiedPropertyDefinitions :: forall e. Id.LocalName -> (RolDef **> PropertyDef) e
+collectUnqualifiedPropertyDefinitions ln = union (searchUnqualifiedPropertyDefinition ln)
+  (lazyIntersectionOfTripleObjects
+    (mogelijkeBinding >-> sumToSequence `followedBy` RolDef)
+    (\_ -> (collectUnqualifiedPropertyDefinitions ln))
+   "collectUnqualifiedPropertyDefinitions")
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

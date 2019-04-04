@@ -397,7 +397,6 @@ getUnqualifiedRoleBinders rname = OGC.getUnqualifiedRoleBinders rname `trackedAs
 -----------------------------------------------------------
 -- GET A PROPERTYDEFINITION FROM A ROL DEFINITION
 -----------------------------------------------------------
--- TODO: OOK DE BINDING DRAAGT PROPERTIES BIJ!
 -- When looking for a Property (value) on a Rol, we can use both its local and qualified name. Either way we have to
 -- look in the index of properties in that role.
 -- However, when looking for a Property **definition**, once we have a qualified name, we have the definition itself,
@@ -416,7 +415,10 @@ getUnqualifiedPropertyDefinition ln = unwrap `before` (filter_
 
    -- typeWithPerspectivesTypes $ getUnqualifiedContextRol ln >-> DTG.binding >-> DTG.context
 
--- | Look for the definition of a Property by its local name, in the RolDef and its Aspects and in all their prototypes.
+-- | Look for the definition of a Property by its local name, in the RolDef and its Aspects
+-- | and in all their prototypes. Use
+-- | Perspectives.ModelBasedTripleGetters.collectUnqualifiedPropertyDefinitions to include the
+-- | rolGraph in the search.
 searchUnqualifiedPropertyDefinition ::	forall e. Id.LocalName -> (RolDef **> PropertyDef) e
 searchUnqualifiedPropertyDefinition ln = unwrap `before` (searchInAspectRolesAndPrototypes f)
   where
