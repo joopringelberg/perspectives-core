@@ -14,7 +14,7 @@ import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse_)
 import Perspectives.ContextAndRole (context_binnenRol, rol_id, rol_pspType)
-import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>))
+import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>), (@@>>))
 import Perspectives.DataTypeObjectGetters (isBuitenRol, propertyTypen)
 import Perspectives.DataTypeTripleGetters (binding)
 import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, buitenRol) as DTTG
@@ -24,21 +24,21 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedStringTripleGetters (isInEachRolTelescope)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, BuitenRol, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), Value(..))
-import Perspectives.QueryCombinators (toBoolean)
+import Perspectives.QueryCombinators (contains, toBoolean)
 import Perspectives.QueryCompiler (getPropertyFunction, getInternalPropertyFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=), (##>))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, searchInRolTelescope, some) as STGC
-import Perspectives.ModelBasedStringTripleGetters (isInEachRolTelescope)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, getInternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchProperty)
 import Perspectives.TypeChecker (isOrHasAspect)
 import Perspectives.Utilities (ifNothing)
-import Prelude (Unit, bind, const, discard, id, ifM, map, pure, show, unit, ($), (*>), (<), (<<<), (>=>), (>>=), (>>>))
+import Prelude (Unit, bind, const, discard, id, ifM, map, pure, show, unit, ($), (*>), (<), (<<<), (>=>), (>>=), (>>>), (==))
 
 type TDChecker e = WriterT (Array UserMessage) (MonadPerspectivesQuery (AjaxAvarCache e))
 
@@ -232,15 +232,17 @@ checkPropertyDef def deftype = do
   ifM (checkCyclicAspectProperties def)
     (pure unit)
     do
-      mBindingproperty <- lift (def @@> bindingProperty)
       checkAspectsOfPropertyType
+      mBindingproperty <- lift (def @@> bindingProperty)
       case mBindingproperty of
         Nothing -> do
           checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isVerplicht"
           checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isFunctioneel"
           checkRangeDef RangeNotSubsumed def def
-        (Just bindingproperty) -> do
-          -- TODO the binding property should be a property of the mogelijkeBinding.
+        (Just (bindingproperty :: PropertyDef)) -> do
+
+          (PBool b) <- lift (unwrap def @@>> contains bindingproperty (enclosingDefinition `followedBy` RolDef >-> propertiesDef))
+          if (b == "true") then pure unit else (tell [BindingPropertyNotAvailable (unwrap def) (unwrap bindingproperty)])
 
           ifNothing (lift (def @@> directAspectProperties))
             (tell [MissingAspectPropertyForBindingProperty (unwrap def) (unwrap bindingproperty)])

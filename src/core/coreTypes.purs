@@ -317,6 +317,7 @@ data UserMessage =
   | RangeNotSubsumedByBindingProperty PropertyName SimpleValueName PropertyName SimpleValueName PropertyName
   | MogelijkeBindingNotSubsumed String RolName String RolName
   | MissingAspectPropertyForBindingProperty PropertyName PropertyName
+  | BindingPropertyNotAvailable PropertyName PropertyName
 
   -- Other messages
   | MultipleDefinitions LocalName (Array TypeID)
@@ -370,6 +371,7 @@ instance showUserMessage :: Show UserMessage where
   show (RangeNotSubsumedByBindingProperty property ownRange aspect aspectRange bindingprop) = "(RangeNotSubsumedByBindingProperty) De range '" <> aspectRange <> "' van de AspectProperty '" <> aspect <> "' is geen aspect van de range '" <> ownRange <> "' van de BindingProperty '" <> bindingprop <> " (de BindingProperty wordt gebonden aan de AspectProperty in de property '" <> property <> "')'!"
   show (MogelijkeBindingNotSubsumed ownBinding aspect aspectBinding rol) = "(MogelijkeBindingNotSubsumed) De mogelijke binding '" <> aspectBinding <> "' van de AspectRol '" <> aspect <> "' is geen aspect van de mogelijke binding '" <> ownBinding <> "' van de rol '" <> rol <> "'!"
   show (MissingAspectPropertyForBindingProperty property bindingproperty) = "(MissingAspectPropertyForBindingProperty) De property '" <> property <> "' heeft BindingProperty '" <> bindingproperty <> "' maar geen AspectProperty!"
+  show (BindingPropertyNotAvailable pdef bindingproperty) = "(BindingPropertyNotAvailable) Property '" <> pdef <> "' definieert binding property '" <> bindingproperty <> "' maar die is niet beschikbaar in deze definitie!"
 
 -----------------------------------------------------------
 -- TRANSACTIE

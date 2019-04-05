@@ -177,7 +177,7 @@ propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
 
   defsInMogelijkeBinding :: (RolDef **> PropertyDef) e
   defsInMogelijkeBinding = lazyUnionOfTripleObjects
-    (mogelijkeBinding `followedBy` RolDef)
+    (mogelijkeBinding >-> sumToSequence `followedBy` RolDef)
     (\_ -> propertiesDef)
     "propertiesDef"
 
