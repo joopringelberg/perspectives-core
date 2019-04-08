@@ -2,13 +2,12 @@ module Perspectives.QueryCompiler where
 
 import Control.Monad.Eff.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
-import Control.Monad.Trans.Class (lift)
 import Data.Array (foldl, unsnoc)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Perspectives.CoreTypes (type (**>), type (~~>), MP, MonadPerspectives, TypedTripleGetter(..), runMonadPerspectivesQueryCompiler, (##>), (##>>))
+import Perspectives.CoreTypes (type (**>), type (~~>), MP, MonadPerspectives, runMonadPerspectivesQueryCompiler, (##>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, genericContext)
 import Perspectives.DataTypeTripleGetters (buitenRol, contextType, genericBinding, identity, iedereRolInContext, label, genericContext, genericRolType) as DTG
 import Perspectives.Effects (AjaxAvarCache)
@@ -16,16 +15,15 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace)
 import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty) as OGC
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (AnyContext, PBool(..), PropertyDef(..), RolDef(..), Value, genericBinding, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (AnyContext, PropertyDef(..), RolDef(..), Value, genericBinding, typeWithPerspectivesTypes)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
-import Perspectives.QueryCache (queryCacheInsert, queryCacheLookup)
-import Perspectives.QueryCombinators (closure', conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, notEmpty, ref, useCache, var)
+import Perspectives.QueryCache (queryCacheLookup)
+import Perspectives.QueryCombinators (closure', conj, constant, disj, filter, ignoreCache, implies, lastElement, notEmpty, ref, useCache, var)
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
-import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetter)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, concat, constructInverseRolGetter, getInternalProperty, rolesOf, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty)
-import Perspectives.TripleGetterComposition (followedBy, (>->))
-import Perspectives.Utilities (ifNothing, onNothing, onNothing')
-import Prelude (bind, id, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), (>>>), map, (>=>), show)
+import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.Utilities (onNothing, onNothing')
+import Prelude (bind, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), map, (>=>), show)
 
 getPropertyFunction :: forall e.
   String ->

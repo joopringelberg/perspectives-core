@@ -10,10 +10,10 @@ import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
-import Perspectives.ObjectGetterConstructors (closureOfAspect, closureOfAspectRol, contains, getUnqualifiedContextRol, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean, alternatives, mogelijkeBinding)
+import Perspectives.ObjectGetterConstructors (agreesWithType, alternatives, closureOfAspect, closureOfAspectRol, closure_, contains, directAspects, getUnqualifiedContextRol, mogelijkeBinding, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, ContextDef(..), PropertyDef, RolDef(..), AnyDefinition, typeWithPerspectivesTypes)
-import Prelude (bind, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (||), (=<<), map)
+import Prelude (bind, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (||), (=<<), map, (>=>))
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
 -- erft een context interne- of externe properties van aspecten? Ja, dat kan.
@@ -86,12 +86,7 @@ checkContextForUnQualifiedRol ln cn = do
 -- | If the aspect is a sum type, tries each of the alternatives.
 -- | subtype `isOrHasAspect` aspect
 isOrHasAspect :: forall e. ContextDef -> ContextDef -> MonadPerspectives (AjaxAvarCache e) Boolean
-isOrHasAspect subtype aspect =
-  if subtype == aspect
-    then pure true
-    else if aspect == ContextDef "model:Perspectives$ElkType"
-      then pure true
-      else toBoolean (contains (unwrap aspect) closureOfAspect) (unwrap subtype)
+isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> some (closure_ directAspects /-/ agreesWithType (unwrap subtype))
 
 -- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
 -- | context `contextHasType` type
