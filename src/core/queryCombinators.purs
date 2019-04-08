@@ -124,6 +124,37 @@ equal (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
 
     name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
 
+cond :: forall s o e.
+  (s **> PBool) e ->
+  (s **> o) e ->
+  (s **> o) e ->
+  (s **> o) e
+cond cd@(TypedTripleGetter nameOfCondition condition) (TypedTripleGetter nameOfThenPart thenPart) (TypedTripleGetter nameOfElsePart elsePart) = memorize getter name where
+
+  name :: String
+  name = "(cond_" <> nameOfCondition <> "_" <> nameOfThenPart <> "_" <> nameOfElsePart <> ")"
+
+  getter :: TripleGetter s o e
+  getter id = do
+    c@(Triple{object : cs}) <- condition id
+    case Arr.head cs of
+      Just (PBool "true") -> do
+        (Triple{object, supports}) <- thenPart id
+        pure $ Triple { subject: id
+                      , predicate : name
+                      , object : object
+                      , dependencies : []
+                      , supports : Arr.cons (getRef c) supports
+                      , tripleGetter : typeWithPerspectivesTypes getter}
+      otherwise -> do
+        (Triple{object, supports}) <- elsePart id
+        pure $ Triple { subject: id
+                      , predicate : name
+                      , object : object
+                      , dependencies : []
+                      , supports : Arr.cons (getRef c) supports
+                      , tripleGetter : typeWithPerspectivesTypes getter}
+
 -- Applies the logical binary operator (such as OR, AND and IMPLIES) to the results of two queries applied to the same origin.
 logicalBinaryOperator :: forall s e.
   (Boolean -> Boolean -> Boolean) ->
