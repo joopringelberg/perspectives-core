@@ -17,8 +17,8 @@ import Perspectives.ObjectGetterConstructors (alternatives, unlessNull) as OGC
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains) as QC
-import Perspectives.QueryCombinators (union)
-import Perspectives.StringTripleGetterConstructors (directAspects, getPrototype)
+import Perspectives.QueryCombinators (cond, union)
+import Perspectives.StringTripleGetterConstructors (closure, directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, (>->))
 import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, unlessFalse)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
@@ -269,6 +269,9 @@ isOrHasAspect q = some (closure_ directAspects >-> agreesWithType q)
 isOrHasSuperType :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
 isOrHasSuperType = isOrHasAspect
 
+hasAspect :: forall e. AnyDefinition -> (AnyDefinition **> PBool) e
+hasAspect q = some (closure directAspects >-> agreesWithType q)
+
 sumToSequence :: forall e. (AnyDefinition **> AnyDefinition) e
 sumToSequence = f `trackedAs` "sumToSequence" where
   f t = OGC.unlessNull OGC.alternatives t <|> pure [t]
@@ -295,6 +298,21 @@ collectUnqualifiedPropertyDefinitions ln = union (searchUnqualifiedPropertyDefin
     (mogelijkeBinding >-> sumToSequence `followedBy` RolDef)
     (\_ -> (collectUnqualifiedPropertyDefinitions ln))
    "collectUnqualifiedPropertyDefinitions")
+
+-- Test.ModelBasedTripleGetters
+getFunctionResultType :: forall e. (AnyContext **> AnyDefinition) e
+getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$result") >-> DTG.rolBindingDef
+
+expressionType :: forall e. (AnyContext **> AnyDefinition) e
+-- expressionType = TypedTripleGetter "expressionType" f where
+--   f :: TripleGetter AnyContext AnyDefinition e
+--   f bv = do
+--     ct <- bv @@>> DTG.contextType
+--     isAFunction <- toBoolean (isOrHasAspect "model:Perspectives$Function") ct
+--     if isAFunction
+--       then ct @@ getFunctionResultType
+--       else bv @@ DTG.contextType
+expressionType = cond (hasType "model:Perspectives$Function") getFunctionResultType DTTG.contextType
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

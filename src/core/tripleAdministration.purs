@@ -34,7 +34,7 @@ memorizeQueryResults = lift $ gets _.memorizeQueryResults
 setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery (avar :: AVAR | e) Unit
 setMemorizeQueryResults b = lift $ modify \ps -> ps {memorizeQueryResults = b}
 
-getRef :: forall e. Triple String String e -> TripleRef
+getRef :: forall s o e. Triple s o e -> TripleRef
 getRef = unsafeCoerce
 
 -- | An index of Predicate-Object combinations, indexed by Subject.

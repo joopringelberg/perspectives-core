@@ -56,7 +56,7 @@ compileElementaryQueryStep s contextId = case s of
       rolType <- getQueryStepDomain
       putQueryStepDomain $ unsafePartial $ fromJust $ deconstructLocalNameFromDomeinURI rolType
       createDataTypeGetterDescription contextId "context"
-  Identity -> createDataTypeGetterDescription contextId  "identityM"
+  Identity -> createDataTypeGetterDescription contextId  "identity"
   Type -> do
     dom <- getQueryStepDomain
     b <- (lift $ (PT.ContextDef dom) `isOrHasAspect` PT.ContextDef (psp "Context"))
