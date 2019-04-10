@@ -418,8 +418,8 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
     relativeRolInstanceID :: IP RolName (AjaxAvarCache e)
     relativeRolInstanceID = try do
       qn <- rolInHigherContext
-      i <- roleOccurrence
-      pure $ show qn <> "_" <> show i
+      -- i <- roleOccurrence
+      pure $ show qn
 
     rolInHigherContext :: IP QualifiedName (AjaxAvarCache e)
     rolInHigherContext = lexeme do
