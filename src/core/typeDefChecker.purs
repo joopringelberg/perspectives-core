@@ -17,9 +17,7 @@ import Data.Traversable (for_, traverse, traverse_)
 import Perspectives.ContextAndRole (context_binnenRol, rol_id, rol_pspType)
 import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>), (@@>>))
 import Perspectives.DataTypeObjectGetters (isBuitenRol, propertyTypen)
-import Perspectives.DataTypeTripleGetters (binding)
-import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, buitenRol) as DTTG
-import Perspectives.DataTypeTripleGetters (propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen, buitenRol, binnenRol, rolType) as DTG
+import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen, buitenRol, binnenRol, rolType, binding) as DTG
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -152,7 +150,7 @@ checkRolDef def deftype = do
       LocalName ->
       TDChecker e Unit
     checkBooleanFacetOfProperty ln = do
-      mlocalValue <- lift (unwrap def @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
+      mlocalValue <- lift (unwrap def @@> (DTG.buitenRol >-> (DTG.getUnqualifiedProperty) ln))
       case mlocalValue of
         Just (Value "false") -> do
           b <- lift (def @@> aspectPropertiesValue)
@@ -319,7 +317,7 @@ checkPropertyDef def deftype = do
       LocalName ->
       TDChecker e Unit
     checkBooleanFacetOfProperty userMessageConstructor defWithValues defWithAspects ln = do
-      mlocalValue <- lift (unwrap defWithValues @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
+      mlocalValue <- lift (unwrap defWithValues @@> (DTG.buitenRol >-> (DTG.getUnqualifiedProperty) ln))
       case mlocalValue of
         Just (Value "false") -> do
           b <- lift (defWithAspects @@> aspectPropertiesValue)
@@ -531,12 +529,11 @@ compareRolInstancesToDefinition def rolType =
       -- The rolInstance can be both a ContextRol and a RolInContext.
       -- We do not distinghuish the two as types. However, the former is, by definition, bound to a
       -- BuitenRol, while the latter - again by definition - is not.
-      (mBnd :: Maybe BuitenRol) <- lift (rolInstance @@> binding)
+      (mBnd :: Maybe BuitenRol) <- lift (rolInstance @@> DTG.binding)
       case mBnd of
         Nothing -> pure unit
         (Just bnd) -> ifM (lift $ lift $ isBuitenRol bnd)
           (checkBindingOfContextRol rolInstance)
-          -- (pure unit)
           (checkBindingOfRolInContext (RolInContext $ unwrap rolInstance) (RolInContext $ unwrap bnd))
 
     -- Check a ContextRol as follows. We assume that the bound value represents a definition of some kind.
@@ -547,7 +544,7 @@ compareRolInstancesToDefinition def rolType =
     -- check the bound value against each of the possibleBindings.
     checkBindingOfContextRol :: ContextRol -> TDChecker e Unit
     checkBindingOfContextRol rolInstance = do
-      mBoundValue <- lift (rolInstance @@> DTTG.rolBindingDef)
+      mBoundValue <- lift (rolInstance @@> DTG.rolBindingDef)
       case mBoundValue of
         Nothing -> pure unit
         (Just boundValue) -> do
@@ -562,7 +559,7 @@ compareRolInstancesToDefinition def rolType =
     -- Check a RolInContext in the same way as a ContextRol, but compare the *type* of the bound value to the possibleBindings.
     checkBindingOfRolInContext :: RolInContext -> RolInContext -> TDChecker e Unit
     checkBindingOfRolInContext rolInstance boundValue = do
-      typeOfTheBinding <- ifNothing (lift (boundValue @@> unwrap `before` expressionType `followedBy` RolDef)) (pure "no type of binding") (pure <<< unwrap)
+      typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.rolType)) (pure "no type of binding") (pure <<< unwrap)
       (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheTypeOf typeOfTheBinding)))
       case r of
         (Just (PBool "false")) -> do
