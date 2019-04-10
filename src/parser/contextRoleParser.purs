@@ -28,7 +28,7 @@ import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
-import Prelude (Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail, ParseError(..))
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
@@ -157,8 +157,8 @@ prefixedPropertyName :: forall e. IP QualifiedName e
 prefixedPropertyName = prefixedContextName
 
 -- qualifiedResourceName = domeinName segmentedName
-expandedContextName :: forall e. IP QualifiedName e
-expandedContextName = try $ lexeme $ do
+expandedName :: forall e. IP QualifiedName e
+expandedName = try $ lexeme $ do
   dn <- domeinName
   _ <- STRING.string "$"
   ln <- segmentedName
@@ -198,10 +198,10 @@ relativePropertyTypeName = lexeme do
   pure $ QualifiedName namespace ln
 
 contextName :: forall e. IP QualifiedName e
-contextName = (expandedContextName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace) <?> "the name of a resource (Context or Role)."
+contextName = (expandedName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace) <?> "the name of a resource (Context or Role)."
 
 typeContextName :: forall e. IP QualifiedName e
-typeContextName = (expandedContextName <|> prefixedContextName <|> relativeContextTypeName) <?> "the name of a resource (Context or Role)."
+typeContextName = (expandedName <|> prefixedContextName <|> relativeContextTypeName) <?> "the name of a resource (Context or Role)."
 
 perspectEntiteitIdentifier :: forall e. IP PEIdentifier e
 perspectEntiteitIdentifier =
@@ -314,18 +314,24 @@ isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence
 roleOccurrence :: forall e. IP Int e
 roleOccurrence = token.parens token.integer
 
+data Arrow = ContextBinding | RoleBinding
+instance showArrow :: Show Arrow where
+  show ContextBinding = "=>"
+  show RoleBinding = "->"
+
 roleBinding' :: forall e.
-  QualifiedName
-  -> IP (Tuple (Array Comment) (Maybe ID)) (AjaxAvarCache e)
-  -> IP (Tuple RolName ID) (AjaxAvarCache e)
-roleBinding' cname p = ("rolename => contextName" <??>
+  QualifiedName ->
+  Arrow ->
+  IP (Tuple (Array Comment) (Maybe ID)) (AjaxAvarCache e) ->
+  IP (Tuple RolName ID) (AjaxAvarCache e)
+roleBinding' cname arrow p = ("rolename => contextName" <??>
   (try do
     -- Parsing
     cmtBefore <- manyOneLineComments
     withPos do
       rname@(QualifiedName _ localRoleName) <- roleName
       occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
-      _ <- (sameLine *> reservedOp "=>")
+      _ <- (sameLine *> reservedOp (show arrow))
       (Tuple cmt bindng) <- p
       props <- withExtendedTypeNamespace localRoleName $
             option Nil (indented *> (block (checkIndent *> rolePropertyAssignment)))
@@ -369,33 +375,45 @@ cacheContext contextId ctxt = do
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
-roleBindingWithInlineContext :: forall e. QualifiedName
+inlineContextBinding :: forall e. QualifiedName
   -> IP (Tuple RolName ID) (AjaxAvarCache e)
-roleBindingWithInlineContext cName = roleBinding' cName do
+inlineContextBinding cName = roleBinding' cName ContextBinding do
   cmt <- inLineComment
   _ <- nextLine
   (contextBuitenRol :: ID) <- indented *> context
   pure $ Tuple cmt (Just contextBuitenRol)
 
-emptyRoleBinding :: forall e. QualifiedName
+emptyBinding :: forall e. QualifiedName
   -> IP (Tuple RolName ID) (AjaxAvarCache e)
-emptyRoleBinding cName = roleBinding' cName do
+emptyBinding cName = roleBinding' cName ContextBinding do
   _ <- token.parens whiteSpace
   cmt <- inLineComment
   pure $ Tuple cmt Nothing
 
-
-roleBindingWithReference :: forall e. QualifiedName
+contextBindingByReference :: forall e. QualifiedName
   -> IP (Tuple RolName ID) (AjaxAvarCache e)
-roleBindingWithReference cName = roleBinding' cName do
-  ident <- (sameLine *> relativeRolInstanceID <|> contextReference)
+contextBindingByReference cName = roleBinding' cName ContextBinding do
+  ident <- (sameLine *> contextReference)
   cmt <- inLineComment
   pure $ Tuple cmt (Just ident)
   where
     contextReference :: IP RolName (AjaxAvarCache e)
     contextReference = do
-      qn <- (expandedContextName <|> prefixedContextName <|> relativeContextInstanceID)
+      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
       pure $ buitenRol (show qn)
+
+roleBindingByReference :: forall e. QualifiedName
+  -> IP (Tuple RolName ID) (AjaxAvarCache e)
+roleBindingByReference cName = roleBinding' cName RoleBinding do
+  ident <- (sameLine *> relativeRolInstanceID <|> rolReference)
+  occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
+  cmt <- inLineComment
+  pure $ Tuple cmt (Just (ident <> "_" <> (maybe "1" show occurrence)))
+  where
+    rolReference :: IP RolName (AjaxAvarCache e)
+    rolReference = do
+      qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
+      pure (show qn)
 
     relativeRolInstanceID :: IP RolName (AjaxAvarCache e)
     relativeRolInstanceID = try do
@@ -411,29 +429,34 @@ roleBindingWithReference cName = roleBinding' cName do
       namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
       pure $ QualifiedName namespace' localName
 
-    relativeContextInstanceID :: IP QualifiedName (AjaxAvarCache e)
-    relativeContextInstanceID = lexeme do
-      namespace <- getNamespace -- not $-terminated!
-      namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
-      sName <- segmentedName
-      namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
-      pure $ QualifiedName namespace' sName
+relativeInstanceID :: forall e. IP QualifiedName (AjaxAvarCache e)
+relativeInstanceID = lexeme do
+  namespace <- getNamespace -- not $-terminated!
+  namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
+  sName <- segmentedName
+  namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
+  pure $ QualifiedName namespace' sName
 
-    -- Returns a string that is NOT terminated on a "$".
-    -- NOTE: in order to be able to fail, we need do this in IP.
-    butLastNNamespaceLevels :: String -> Int -> IP String (AjaxAvarCache e)
-    butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
-    butLastNNamespaceLevels ns 0 = pure ns
-    butLastNNamespaceLevels ns n = do
-      segments <- pure (split (Pattern "$") ns)
-      if (n - 1) > (AR.length segments)
-        then fail "too many levels up"
-        else pure $ (intercalate "$" (dropEnd n segments))
+-- Returns a string that is NOT terminated on a "$".
+-- NOTE: in order to be able to fail, we need do this in IP.
+butLastNNamespaceLevels :: forall e. String -> Int -> IP String (AjaxAvarCache e)
+butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
+butLastNNamespaceLevels ns 0 = pure ns
+butLastNNamespaceLevels ns n = do
+  segments <- pure (split (Pattern "$") ns)
+  if (n - 1) > (AR.length segments)
+    then fail "too many levels up"
+    else pure $ (intercalate "$" (dropEnd n segments))
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding :: forall e. QualifiedName
   -> IP (Tuple RolName ID) (AjaxAvarCache e)
-roleBinding cname = roleBindingWithInlineContext cname <|> roleBindingWithReference cname <|> emptyRoleBinding cname -- TODO: query, noBinding
+roleBinding cname =
+  inlineContextBinding cname
+  <|> contextBindingByReference cname
+  <|> emptyBinding cname
+  <|> roleBindingByReference cname
+-- TODO: query, noBinding
 
 withRoleCounting :: forall a e. IP a e -> IP a e
 withRoleCounting p = do
