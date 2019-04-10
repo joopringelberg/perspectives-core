@@ -1,0 +1,13 @@
+DEFAULT PROTOTYPES
+
+1. Geef psp:Context een nieuwe rol: $defaultPrototype. Hij is functioneel en de $mogelijkeBinding is psp:Context.
+
+2. Als de parser een context X maakt waarvan het type psp:Context is, zoekt hij bij psp:Context de binding van $defaultPrototype en bindt die aan de buitenrol van die context X.
+
+3. Dat wil zeggen: tenzij X al een prototype heeft.
+
+Op deze manier verwerft elke Context met type psp:Context een prototype en voldoet daarmee aan de verplichting om een binding aan de rollen binnenRolBeschrijving en buitenRolBeschrijving te geven.
+
+Alléén bij het inlezen van psp:Context zelf ontstaat een probleem, want dan kan de parser nog niet de binding van $defaultPrototype opvragen. Misschien kunnen we dat opvangen door éérst na te gaan of er een prototype is.
+
+Vermoedelijk moet dan wel psp:Context de eerste definitie in perspectives.crl zijn.

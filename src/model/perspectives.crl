@@ -58,6 +58,7 @@ psp:Context psp:Property
 	$rolInContext =>
 		psp:Rol $range
 			extern $isFunctioneel = true
+			extern $isVerplicht = true
 			$mogelijkeBinding => psp:SimpleValue
 	$rolInContext =>
 		psp:Rol $aspectProperty
@@ -195,13 +196,11 @@ psp:Context psp:View
 --------------------------------------------------------------------------------
 psp:Context psp:Actie
 	prototype psp:ContextPrototype
+	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $subject
 			extern $isFunctioneel = false
-			$mogelijkeBinding =>
-				psp:Sum $botOrUser
-					$alternative => psp:PerspectivesSysteem$gebruiker
-					$alternative => psp:Context$contextBot
+			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
 		psp:Rol $werkwoord
 			extern $isFunctioneel = true
@@ -244,6 +243,16 @@ psp:Context psp:Actie
 					$alternative (1) => psp:assignToRol
 					$alternative (2) => psp:assignToProperty
 					$alternative (3) => psp:effectFullFunction
+
+psp:Actie psp:ActieModel
+	prototype psp:ContextPrototype
+	psp:Context$rolInContext =>
+		psp:Rol $subject
+			extern $isFunctioneel = false
+			$mogelijkeBinding =>
+				psp:Sum $botOrUser
+					$alternative => psp:PerspectivesSysteem$gebruiker
+					$alternative => psp:Context$contextBot
 
 psp:Context psp:Werkwoord
 	prototype psp:ContextPrototype
@@ -291,6 +300,11 @@ psp:Context psp:Zaak
 --------------------------------------------------------------------------------
 psp:Context psp:Function
 	prototype psp:ContextPrototype
+	$rolInContext =>
+		psp:Rol $result
+			extern $isVerplicht = false
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:ElkType
 
 --------------------------------------------------------------------------------
 -- BOTTOM TYPE: NIETS
@@ -381,6 +395,7 @@ psp:Systeem psp:PerspectivesSysteem
 	psp:Context$rolInContext =>
 		q:ComputedRolGetter $modellen
 			extern $functionName = "modellenM"
+			psp:Function$result => psp:Context
 
 psp:Zaak psp:TrustedCluster
 	psp:Context$buitenRolBeschrijving =>
@@ -417,11 +432,13 @@ psp:Zaak psp:TrustedCluster
 						$volgNummer = 2
 	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
-			$subject => psp:TrustedCluster$clusterGenoot
-			--$subject => psp:PerspectivesSysteem$gebruiker
-			$werkwoord => psp:Raadpleegt
-			$object => psp:TrustedCluster$clusterGenoot
-			$objectView => $$clusterGenoot$Adressering
+			prototype psp:ContextPrototype
+			psp:Context$aspect => psp:ActieModel
+			psp:Context$rolInContext =>
+				psp:Rol $subject
+					extern $isFunctioneel = false
+					$aspectRol => psp:ActieModel$subject
+					$mogelijkeBinding => psp:TrustedCluster$clusterGenoot
 
 --------------------------------------------------------------------------------
 -- ASSIGNMENT

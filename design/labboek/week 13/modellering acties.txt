@@ -130,5 +130,169 @@ Test:
 Beiden werken prima.
 Nu weet ik het even niet meer.
 
+MOGELIJKEBINDING
+Het probleem blijkt te liggen in mogelijkeBinding.
+Er zijn twee implementaties van TripleGetters voor mogelijkeBinding:
+* ModelBasedTripleGetters.mogelijkeBinding
+* ModelBasedStringTripleGetters.mogelijkeBinding
 
+De eerste wordt getest in Test.ModelBasedTripleGetters en slaagt.
+De tweede wordt getest in Test.TripleGetterConstructors, test "isInEachRolTelescope" en faalt.
 
+De laatste wordt gebruikt in ModelBasedStringTripleGetters.isInEachRolTelescope.
+Hij is opgebouwd uit:
+	- searchInAspectRolesAndPrototypes
+	- searchRolInContext
+	- genericBinding
+	- genericContext
+
+De implementatie van alle members van Class Binding gebruikt genericBinding. Daar kan het probleem niet in zitten.
+Het verschil tussen context en genericContext is het wrappen en unwrappen. Daar kan het verschil niet in zitten.
+
+Beide definities van mogelijkeBinding gebruiken StringTripleGetterConstructors.searchRolInContext. 
+NEEN, DAT KLOPT NIET!!
+Het blijkt dat de StringTripleGetterConstructors versie fout is.
+Nu doet de test isInEachRolTelescope het wel!
+
+==========================================================================================
+TODO
+1. Herschrijf de code om  bot-acties te vinden.
+2. Zoek uit: wat wordt het (Sum-)type van mogelijkeBinding van $subject in Actie?
+3. Los het probleem op dat 'model:QueryAst$ComputedRolGetter' niet gebonden zou mogen worden aan een rol die als mogelijkeBinding "model:Perspectives$Rol" heeft.
+q:RolGetter heeft Aspect psp:Function, maar daar houdt het op.
+
+1. Moeten we onderscheid maken tussen berekende Rollen en Properties?
+2. psp:Rol heeft een verplichte Rol, namelijk $mogelijkeBinding, en een verplichte property, namelijk $isFunctioneel. Deze gelden niet voor berekeningen.
+3. Op dezelfde wijze hebben we voor psp:Property de verplichte properties $isFunctioneel en $isVerplicht en de verplichte rol $range. Uiteraard gelden deze niet voor de berekende versies.
+
+ROLLEN DIE GEBONDEN WORDEN AAN BEREKENINGEN
+Een $rolInContext kunnen we binden aan een berekening.
+Dat kan ook voor een $rolProperty.
+De TypeDefChecker moet voor een $rolInContext controleren of de berekening een resultaat oplevert dat voldoet aan de $mogelijkeBinding van $rolInContext. Die luidt nu:
+
+				psp:Sum $RolOrContext
+					$alternative => psp:Rol
+					$alternative => psp:Context
+
+Oftewel, we moeten controleren of de query een Rol of een Context oplevert.
+
+Op dezelfde manier moeten we voor een $rolProperty controleren of de berekening een resultaat oplevert dat voldoet aan de $mogelijkeBinding van $rolProperty. Die luidt nu:
+
+				psp:Sum $FunctionOrProperty
+					$alternative => psp:Function
+					$alternative => psp:Property
+
+Oftewel, we moeten controleren of de query een Property oplevert (ik negeer psp:Function even).
+Samenvattend: we moeten (minstens) in staat zijn om vast te stellen of een query een Context, Rol of Property oplevert.
+
+Gaat het verder?
+
+Ja. Denk aan een berekende rol die gebonden wordt aan een andere rol. Nu moeten we de mogelijkeBinding van deze andere rol vergelijken met het type van de berekende rol. Die mogelijkeBinding kan veel specifiekere types eisen dan Context, Rol of Property.
+
+Kortom, we moeten het type resultaat van een query zo nauwkeurig mogelijk bepalen.
+
+In model:QueryAst hebben we een hele verzameling query-stappen. Hieronder zijn zij gegroepeerd NAAR HET TYPE RESULTAAT dat ze opleveren.
+
+	Properties:
+	* q:DataTypeGetter:
+		- identity
+		- label
+	* q:PropertyGetter (geparametriseerd met een property)
+	* q:ComputedPropertyGetter (function name will be looked up in the queryCache. Currently, we have modellenM, parserMessagesM, syntacticStateM, typeCheckerMessagesM, semanticStateM, but more may follow and there may even be functions from external modules. We will have to find a way to declare the type of these computed property getters)
+	
+	Rollen:
+	* q:DataTypeGetter:
+		- identity, 
+		- binding, 
+		- buitenRol, 
+		- binnenRol,
+		- iedereRolInContext, 
+	* q:RolGetter
+	* q:ComputedRolGetter
+	
+	Contexten (een querystap kan een Context opleveren, maar dat mag nooit het eindresultaat zijn: dat moet een buitenRol zijn. Merk op dat het type van het resultaat dan toch wel weer die Context is!):
+	* q:DataTypeGetter:
+		- identity, 
+		- rolType
+		- context	(niet in implementatie?)
+		- typeVanIedereRolInContext
+		- contextType
+	* q:contains (levert een psp:Boolean en dat is een Context!)
+
+	Alledrie:
+	* q:UnaryCombinator
+	* q:nAryCombinator
+	* q:filter
+	* q:Constant
+	* q:Variable
+	* q:setVariable
+
+TYPEBEREKENING VOOR FUNCTIES DIE PROPERTIES BEREKENEN
+Per functie moeten we een recept volgen
+	* identity: type van de voorafgaande stap
+	* label: het type is psp:String.
+	* propertyGetter: type wordt gegeven door de $property rol
+	* ComputedPropertyGetter: type moet worden opgezocht in de QueryCache.
+
+TYPEBEREKENING VOOR FUNCTIES DIE ROLLEN BEREKENEN
+Per functie moeten we een recept volgen
+	* q:DataTypeGetter:
+		- identity: type van de voorafgaande stap
+		- binding: neem de mogelijkeBinding van het type van de voorafgaande stap
+		- buitenRol: elke buitenRol heeft een apart type, namelijk dat van zijn context met de suffix _buitenRolBeschrijving.
+		- binnenRol: idem.
+		- iedereRolInContext. Ik twijfel over deze functie. Hij is berekenbaar, maar lastig typeerbaar. Of we moeten iets heel algemeens nemen, of we moeten het kleinste gemeenschappelijke Aspect berekenen.
+	* q:RolGetter: de binding van de rol $rol
+	* q:ComputedRolGetter: zoals bij ComputedPropertyGetter.
+
+TYPEBEREKENING VOOR FUNCTIES DIE CONTEXTEN BEREKENEN
+Per functie moeten we een recept volgen
+	* q:DataTypeGetter:
+		- identity: het type van de voorafgaande stap
+		- rolType: het type van de voorafgaande stap
+		- context: de definierende context van de voorafgaande stap
+		- typeVanIedereRolInContext. Het resultaat van deze functie is een verzameling types. Maar wat is het type daarvan? Misschien moeten we deze functie niet opnemen.
+		- contextType: het type van de context.
+	* q:Contains: psp:Boolean.
+
+TYPEBEREKENING VAN DE COMBINATOREN
+	* q:UnaryCombinator
+		- laatste:		type van de voorafgaande stap
+		- notEmpty:		psp:Boolean
+		- closure:		type van de voorafgaande stap
+		- closure':		type van de voorafgaande stap
+		- useCache:		type van de voorafgaande stap (controleer implementatie!)
+		- ignoreCache	type van de voorafgaande stap (controleer implementatie!)
+	* q:nAryCombinator (deze lijst komt uit de queryCompiler maar is m.i. niet compleet)
+		* compose		type van het laatste argument
+		* concat		type van elk argument
+		* and			psp:Boolean
+		* or			psp:Boolean
+		* implies		psp:Boolean
+		* equal			psp:Boolean
+	* q:filter: type van het tweede argument
+	* q:Constant: type van het argument
+	* q:Variabele: op te zoeken in de query omgeving...
+	* q:setVariabele: type van het waarde-argument
+	
+In MonadPerspectivesQueryCompiler houden we een omgeving bij met het type van de vorige stap en een omgeving met gebonden variabelen en hun type.
+
+Iets dergelijks moeten we ook doen in de functie die het type van een query (opnieuw) berekent.
+
+Overigens: we zouden het type-resultaat van de QueryFunctionDescriptionCompiler óók kunnen wegschrijven, samen met de query-beschrijving! Dan hoeven we niet opnieuw de zaak te berekenen ten bate van de typeDefChecker.
+
+Helaas is dit deels begging the question. De QueryFunctionDescriptionCompiler werkt op een AST die het resultaat zal zijn van parsing van een nog niet bestaande query-syntax. De compiler maakt daar een beschrijving in CRL van.
+Tot die tijd moet je in CRL die beschrijving met de hand maken. 
+Als we de QueryFunctionDescriptionCompiler het type laten bijschrijven, dan betekent dat dat je in CRL dat type er met de hand bij moet schrijven. 
+Dat kan, maar de typeDefChecker kan ons dan niet controleren.
+Dus: ofwel ik laat die controle achterwege in CRL, of ik maak een functie die het type van een query kan uitrekenen.
+Uit overweging van efficiency zou je dan die functie niet willen inzetten op de output van de QueryFunctionDescriptionCompiler, later.
+
+Ik kan natuurlijk EERST het type er met de hand bijschrijven en de typeDefChecker daar gebruik van laten maken. Mocht ik merken dat ik fouten maak, dan kan ik altijd nog de functie maken die het type uitrekent.
+
+Alternatief voor die laatste stap: ontwerp de querysyntax, maak de parser, en neem de nieuwe syntax op in CRL. Dat levert gemak op EN voorkomt fouten.
+
+TODO:
+1. Neem het  (resultaat)type van een Functie op in de beschrijving ervan.
+2. Baseer de typeDefChecker daarop.
+3. (later) Schrijf de query-syntax en de parser, integreer die in de CRL parser.

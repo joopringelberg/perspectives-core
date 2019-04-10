@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (identity, rolType)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, hasType, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
@@ -104,6 +104,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "t:myContextDef is not nor has aspect psp:Property"
       (t "myContextDef" ##= isOrHasAspect (p "Property"))
       [PBool "false"]
+
   test "hasType" do
     assertEqual "t:myContextPrototype has type psp:Context"
       (t "myContextPrototype" ##= hasType (p "Context"))
@@ -117,6 +118,10 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "t:myContextPrototype does not have type psp:Property"
       (t "myContextPrototype" ##= hasType (p "Property"))
       [PBool "false"]
+    assertEqual "psp:SimpleValue should have type psp:Context"
+      (p "SimpleValue" ##= hasType (p "Context"))
+      [PBool "true"]
+
   test "sumToSequence" do
     assertEqual "sumToSequence of t:myContextDef is t:myContextDef"
       (t "myContextDef" ##= sumToSequence)
@@ -133,9 +138,12 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       ((t "myAspect$myAspectRol1") ##= (isRolTypeOf r))
       [PBool "true"]
   test "isContextTypeOf" do
-    assertEqual ""
-      (RolInContext "model:TestOGC$rolInContext1" ##= rolType >-> mogelijkeBinding >-> sumToSequence)
-      ["model:Perspectives$Rol","model:Perspectives$Context"]
+    assertEqual "ActieModel `isContextTypeOf` RaadpleegtClusterGenoot is false"
+      (p "ActieModel" ##= (isContextTypeOf (p "TrustedCluster$RaadpleegtClusterGenoot")))
+      [PBool "false"]
+    assertEqual "RaadpleegtClusterGenoot `isOrHasAspect` ActieModel is true"
+      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (isOrHasAspect (p "ActieModel")))
+      [PBool "true"]
   test "collectUnqualifiedPropertyDefinitions" do
     assertEqual "t:myContextDef9$rol1 does not by itself a property defined."
       ((RolDef $ t "myContextDef9$rol1") ##= searchUnqualifiedPropertyDefinition "rol1Property")
@@ -188,6 +196,14 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   --   loadTestModel "testTypeDefChecker.crl"
   --
   --   unLoadTestModel "model:TestTDC"
+
+  ---------------------------------------------------------------------------------
+  -- TESTS ON THE FILE "perspectives.crl"
+  ---------------------------------------------------------------------------------
+  test "getFunctionResultType" do
+    assertEqual "The function result type of psp:PerspectivesSysteem$modellen is psp:Context"
+      ((p "PerspectivesSysteem$modellen") ##= getFunctionResultType)
+      [p "Context"]
 
   test "Tearing down" do
     unLoadTestModel "model:TestTDC"
