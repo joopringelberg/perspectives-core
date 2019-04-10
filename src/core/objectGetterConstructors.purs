@@ -2,7 +2,7 @@ module Perspectives.ObjectGetterConstructors where
 
 import Control.Alt ((<|>))
 import Control.Plus (empty)
-import Data.Array (cons, difference, elemIndex, foldMap, head, nub, null, union, singleton)
+import Data.Array (cons, difference, elemIndex, foldM, foldMap, head, nub, null, singleton, union)
 import Data.Array (filter, findIndex, index) as Arr
 import Data.HeytingAlgebra (conj, disj, implies) as HA
 import Data.HeytingAlgebra (not)
@@ -74,6 +74,17 @@ contains :: forall s o e. Eq o => o -> (s ~~> o) e -> (s ~~> PBool) e
 contains o getter = getter >=> \(os :: Array o) -> case elemIndex o os of
   Nothing -> pure [PBool "false"]
   otherwise -> pure [PBool "true"]
+
+-- | A selection of the results of the second query using the first (boolean) query as a criterium.
+-- | `psp:Constraint -> psp:Function -> psp:Function`
+filter :: forall s o e.
+  (o ~~> PBool) e ->
+  (s ~~> o) e ->
+  (s ~~> o) e
+filter criterium p id = do
+  objects <- p id
+  foldM (\cum obj -> toBoolean criterium obj >>= (\include -> if include then pure $ cons obj cum else pure cum)) [] objects
+
 
 -- Test.Perspectives.ObjectGetterConstructors, via getUnqualifiedRolDefinition
 filter_ :: forall s o e.

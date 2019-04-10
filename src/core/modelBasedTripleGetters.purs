@@ -16,8 +16,7 @@ import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRol
 import Perspectives.ObjectGetterConstructors (alternatives, unlessNull) as OGC
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
-import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains) as QC
-import Perspectives.QueryCombinators (cond, union)
+import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains, cond, union) as QC
 import Perspectives.StringTripleGetterConstructors (closure, directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, (>->))
 import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, unlessFalse)
@@ -136,7 +135,7 @@ mogelijkeBinding = unwrap `before` mbinding
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 ownRollenDef :: forall e. (AnyContext **> RolDef) e
-ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") >-> DTG.binding >-> DTG.context `followedBy` RolDef
+ownRollenDef = (QC.filter (hasType "model:Perspectives$Rol") (DTG.iedereRolInContext `followedBy` ContextRol >-> DTG.binding >-> DTG.context)) `followedBy` RolDef
 
 -- All Rollen defined for a Context type, locally or in Aspects.
 rollenDef :: forall e. (AnyContext **> RolDef) e
@@ -285,7 +284,7 @@ hasOnEachRolTelescopeTheTypeOf t = TypedTripleGetter ("hasOnEachRolTelescopeTheT
 -- | Collect all definitions of a Property with the local name, in the RolDef and its Aspects
 -- | and in all their prototypes and on the rolGraph of the RolDef. Notice there may be more than one!
 collectUnqualifiedPropertyDefinitions :: forall e. Id.LocalName -> (RolDef **> PropertyDef) e
-collectUnqualifiedPropertyDefinitions ln = union (searchUnqualifiedPropertyDefinition ln)
+collectUnqualifiedPropertyDefinitions ln = QC.union (searchUnqualifiedPropertyDefinition ln)
   (lazyIntersectionOfTripleObjects
     (mogelijkeBinding >-> sumToSequence `followedBy` RolDef)
     (\_ -> (collectUnqualifiedPropertyDefinitions ln))
@@ -296,7 +295,7 @@ getFunctionResultType :: forall e. (AnyContext **> AnyDefinition) e
 getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$result") >-> DTG.rolBindingDef
 
 expressionType :: forall e. (AnyContext **> AnyDefinition) e
-expressionType = cond (hasType "model:Perspectives$Function") getFunctionResultType DTTG.contextType
+expressionType = QC.cond (hasType "model:Perspectives$Function") getFunctionResultType DTTG.contextType
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

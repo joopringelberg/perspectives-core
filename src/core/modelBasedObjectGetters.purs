@@ -3,10 +3,10 @@ module Perspectives.ModelBasedObjectGetters where
 import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
-import Perspectives.DataTypeObjectGetters (buitenRol, context, contextType, rolBindingDef)
-import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closure, closureOfAspectProperty, closureOfAspectRol, closure_, concat, conj, directAspectProperties, directAspects, getContextRol, getRolInContext, getRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull, cond)
+import Perspectives.DataTypeObjectGetters (buitenRol, context, contextType, iedereRolInContext, rolBindingDef)
+import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closure, closureOfAspectProperty, closureOfAspectRol, closure_, concat, cond, conj, directAspectProperties, directAspects, getContextRol, getRolInContext, getRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull, filter)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol(..), PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
 
 
@@ -121,9 +121,9 @@ rolDef :: forall e. (PropertyDef ~~> RolDef) e
 rolDef = unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Rol$rolProperty") :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map RolDef
 
 -- | All Rollen defined for a Context type, excluding Aspects.
--- | `psp:Context -> psp:Rol`
 ownRollenDef :: forall e. (AnyContext ~~> RolDef) e
-ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") /-/ binding /-/ context >=> pure <<< map RolDef
+ownRollenDef = (filter (hasType "model:Perspectives$Rol") (iedereRolInContext >=> pure <<< map ContextRol /-/ binding /-/ context)) >=> pure <<< map RolDef
+
 
 isContextTypeOf :: forall e. AnyContext -> (AnyDefinition ~~> PBool) e
 isContextTypeOf x = some (expressionType /-/ closure_ directAspects /-/ (agreesWithType x) )
