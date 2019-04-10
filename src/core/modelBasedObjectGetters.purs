@@ -3,8 +3,8 @@ module Perspectives.ModelBasedObjectGetters where
 import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
-import Perspectives.DataTypeObjectGetters (buitenRol, context)
-import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closureOfAspectProperty, closureOfAspectRol, closure_, concat, conj, directAspectProperties, getContextRol, getRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull)
+import Perspectives.DataTypeObjectGetters (buitenRol, context, contextType, rolBindingDef)
+import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closure, closureOfAspectProperty, closureOfAspectRol, closure_, concat, conj, directAspectProperties, directAspects, getContextRol, getRolInContext, getRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull, cond)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol, PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -71,7 +71,7 @@ binnenRolBeschrijvingDef = searchInAspectsAndPrototypes f
     f :: (AnyContext ~~> RolDef) e
     f = typeWithPerspectivesTypes $ binnenRolBeschrijving /-/ binding /-/ context
 
--- | `psp:Rol -> psp:Context`
+-- | A RolDef must be embedded in a ContextDef. There are but a few roles to embed a RolDef.
 contextDef :: forall e. (RolDef ~~> ContextDef) e
 contextDef rid =
   unlessNull rolInContextContextDef rid <|>
@@ -79,6 +79,8 @@ contextDef rid =
   unlessNull buitenRolContextDef rid <|>
   -- unlessNull mogelijkeBinding rid <|>
   unlessNull gebruikerRolContextDef rid <|>
+  unlessNull subjectContextDef rid <|>
+  unlessNull objectContextDef rid <|>
   contextBotContextDef rid
 
 -- | Get the ContextDef that holds the RolDef in the given Rol.
@@ -86,35 +88,33 @@ rolDef2ContextDef :: forall e. RolDef -> (RolDef ~~> ContextDef) e
 rolDef2ContextDef rd = unwrap >>> buitenRol /-/ (getRoleBinders rd :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
 
 -- | The Context of the RolInContext.
--- | `psp:Rol -> psp:Context`
 rolInContextContextDef :: forall e. (RolDef ~~> ContextDef) e
 rolInContextContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$rolInContext")
--- rolInContextContextDef = unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Context$rolInContext") :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
 
 -- | The Context of the gebruikerRol.
--- | `psp:Rol -> psp:Context`
 gebruikerRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 gebruikerRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$gebruikerRol")
--- gebruikerRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$gebruikerRol" /-/ context
 
 -- | The Context of the contextBot.
--- | `psp:Rol -> psp:Context`
 contextBotContextDef :: forall e. (RolDef ~~> ContextDef) e
 contextBotContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$contextBot")
--- contextBotContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$contextBot" /-/ context
 
 -- | The Context of the BinnenRol.
--- | `psp:Rol -> psp:Context`
 binnenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 binnenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$binnenRolBeschrijving")
--- binnenRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$binnenRolBeschrijving" /-/ context
 
 -- | The Context of the buitenRolBeschrijving. I.e. starting from a Context that is a BuitenRolBeschrijving, returns
 -- | the Context that describes the type that the BuitenRolBeschrijving belongs to.
--- | `psp:Context -> psp:Context`
 buitenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
 buitenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$buitenRolBeschrijving")
--- buitenRolContextDef = buitenRol /-/ getRoleBinders "model:Perspectives$Context$buitenRolBeschrijving" /-/ context
+
+-- | The Context of the subjectRol.
+subjectContextDef :: forall e. (RolDef ~~> ContextDef) e
+subjectContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Actie$subject")
+
+-- | The Context of the objectRol.
+objectContextDef :: forall e. (RolDef ~~> ContextDef) e
+objectContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Actie$object")
 
 -- | From the definition of a Property, find the enclosing definition of the Rol it is defined on.
 rolDef :: forall e. (PropertyDef ~~> RolDef) e
@@ -125,15 +125,33 @@ rolDef = unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Ro
 ownRollenDef :: forall e. (AnyContext ~~> RolDef) e
 ownRollenDef = getContextRol (RolDef "model:Perspectives$Context$rolInContext") /-/ binding /-/ context >=> pure <<< map RolDef
 
+isContextTypeOf :: forall e. AnyContext -> (AnyDefinition ~~> PBool) e
+isContextTypeOf x = some (expressionType /-/ closure_ directAspects /-/ (agreesWithType x) )
+
+hasType :: forall e. AnyDefinition -> (AnyContext ~~> PBool) e
+hasType q = contextType /-/ isOrHasAspect q
+
+isOrHasAspect :: forall e. AnyDefinition -> (AnyDefinition ~~> PBool) e
+isOrHasAspect q = some (closure_ directAspects /-/ agreesWithType q)
+
+hasAspect :: forall e. AnyDefinition -> (AnyDefinition ~~> PBool) e
+hasAspect q = some (closure directAspects /-/ agreesWithType q)
+
 sumToSequence :: forall e. (AnyDefinition ~~> AnyDefinition) e
 sumToSequence t = unlessNull alternatives t <|> pure [t]
 
+expressionType :: forall e. (AnyContext ~~> AnyDefinition) e
+expressionType = cond (hasType "model:Perspectives$Function") getFunctionResultType contextType
+
+getFunctionResultType :: forall e. (AnyContext ~~> AnyDefinition) e
+getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$result") /-/ rolBindingDef
+
 -- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
 -- | for each of its mogelijkeBindingen.
-isInEachRolTelescope :: forall e. RolDef -> (RolDef ~~> PBool) e
-isInEachRolTelescope t headOfGraph = unlessFalse (agreesWithType $ unwrap t) (unwrap headOfGraph)
+hasOnEachRolTelescopeTheTypeOf :: forall e. RolDef -> (RolDef ~~> PBool) e
+hasOnEachRolTelescopeTheTypeOf t headOfGraph = unlessFalse (isContextTypeOf $ unwrap t) (unwrap headOfGraph)
   <|>
   ((conj
     (notEmpty (mogelijkeBinding /-/ sumToSequence))
-    (all (unwrap >>> alternatives >=> pure <<< map RolDef /-/ (isInEachRolTelescope t))))
+    (all (unwrap >>> alternatives >=> pure <<< map RolDef /-/ (hasOnEachRolTelescopeTheTypeOf t))))
     headOfGraph)

@@ -87,6 +87,17 @@ toBoolean g = g >=> \(bs :: Array PBool) -> case head bs of
   Nothing -> pure true
   (Just b) -> pure (b == PBool "true")
 
+cond :: forall s o e.
+  (s ~~> PBool) e ->
+  (s ~~> o) e ->
+  (s ~~> o) e ->
+  (s ~~> o) e
+cond condition thenPart elsePart id = do
+  cs <- condition id
+  case head cs of
+    Just (PBool "true") -> thenPart id
+    otherwise -> elsePart id
+
 -- | Applies the logical binary operator (such as OR, AND and IMPLIES) to the results of two queries applied to the same origin.
 -- | Note that just the first results of the argument ObjectGetters are used!
 logicalBinaryOperator :: forall s e.
