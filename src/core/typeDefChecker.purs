@@ -131,6 +131,8 @@ getBinnenRolPropertyValues def rol propertyType = do
 -- | Is each AspectRol a role of an Aspect of the defining ContextDef of this RolDef?
 -- | Does the mogelijkeBinding have the mogelijkeBinding of each of its AspectRollen as an Aspect?
 -- | Does the RolDef provide all mandatory internal and external properties with a value?
+-- TODO: Are the values given to the properties isFunctioneel and isVerplicht in accordance to values given to
+-- the Aspects? (see checkPropertyDef for an explanation)
 -- | Is there no cycle in AspectRol? If there is such a cycle, the other
 -- | tests will not be carried out.
 checkRolDef :: forall e. RolDef -> ContextDef -> TDChecker e Unit
@@ -139,8 +141,31 @@ checkRolDef def deftype = do
     (pure unit)
     do
       checkAspectOfRolType def
+      checkBooleanFacetOfProperty "isVerplicht"
+      checkBooleanFacetOfProperty "isFunctioneel"
       mogelijkeBindingSubsumedByAspect def
       checkRolDefPropertyValues def deftype
+
+  where
+
+    checkBooleanFacetOfProperty ::
+      LocalName ->
+      TDChecker e Unit
+    checkBooleanFacetOfProperty ln = do
+      mlocalValue <- lift (unwrap def @@> (DTTG.buitenRol >-> (DTTG.getUnqualifiedProperty) ln))
+      case mlocalValue of
+        Just (Value "false") -> do
+          b <- lift (def @@> aspectPropertiesValue)
+          case b of
+            Just (PBool "true") -> tell [CannotOverideBooleanRolProperty (unwrap def) ln]
+            otherwise -> pure unit
+        otherwise -> pure unit
+      where
+        aspectPropertiesValue :: (RolDef **> PBool) e
+        aspectPropertiesValue = STGC.some ((STGC.closure directAspectRoles) >-> getProp)
+          where
+            getProp :: (RolDef **> PBool) e
+            getProp = (unwrap `before` (searchExternalUnqualifiedProperty ln)) `followedBy` (wrap <<< unwrap)
 
 -- | Checks the aspectRollen of the RolDefinition.
 -- | If such an aspectRol is not a Rol of one of the Aspecten of Context definition
@@ -251,6 +276,8 @@ checkPropertyDef def deftype = do
       mBindingproperty <- lift (def @@> bindingProperty)
       case mBindingproperty of
         Nothing -> do
+          -- Below, the first occurrence of 'def' provides the value, the second provides the AspectProperties from
+          -- which a value will be retrieved to compare it with.
           checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isVerplicht"
           checkBooleanFacetOfProperty CannotOverrideBooleanAspectProperty def def "isFunctioneel"
           checkRangeDef RangeNotSubsumed def def
@@ -306,6 +333,7 @@ checkPropertyDef def deftype = do
           where
             getProp :: (PropertyDef **> PBool) e
             getProp = (unwrap `before` (searchExternalUnqualifiedProperty ln)) `followedBy` (wrap <<< unwrap)
+
     -- Checks if a range has been defined, somewhere.
     -- If so, checks if that range is subsumed by the range of each AspectProperty.
     checkRangeDef ::
