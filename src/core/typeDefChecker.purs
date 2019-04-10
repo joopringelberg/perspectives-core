@@ -25,7 +25,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheTypeOf)
+import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheTypeOf, isSubsumedOnEachRolTelescopeOf)
 import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, BuitenRol, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), Value(..))
@@ -175,7 +175,7 @@ mogelijkeBindingSubsumedByAspect def = do
           for_ aspectRollen
             \aspectRol -> do
               (bools :: Array Boolean) <- (lift (aspectRol @@= ownMogelijkeBinding >-> sumToSequence)) >>= (traverse
-                \alternative -> lift (toBoolean (hasOnEachRolTelescopeTheTypeOf alternative) localMbinding))
+                \alternative -> lift (toBoolean (isSubsumedOnEachRolTelescopeOf localMbinding) alternative))
                 -- read as: localMbinding ## (hasOnEachRolTelescopeTheTypeOf alternative)
                 -- means: alternative is on each rolTelescope that starts with localMbinding.
                 -- | On each path through the mogelijkeBinding graph of localMbinding there is a type x for which holds:
