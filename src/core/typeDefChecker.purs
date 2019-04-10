@@ -559,10 +559,10 @@ compareRolInstancesToDefinition def rolType =
     -- Check a RolInContext in the same way as a ContextRol, but compare the *type* of the bound value to the possibleBindings.
     checkBindingOfRolInContext :: RolInContext -> RolInContext -> TDChecker e Unit
     checkBindingOfRolInContext rolInstance boundValue = do
-      typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.rolType)) (pure "no type of binding") (pure <<< unwrap)
-      (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheTypeOf typeOfTheBinding)))
+      (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheTypeOf $ unwrap boundValue)))
       case r of
         (Just (PBool "false")) -> do
+          typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.rolType)) (pure "no type of binding") (pure <<< unwrap)
           toegestaneBindingen <- (lift (rolType @@= mogelijkeBinding >-> sumToSequence))
           (tell [IncorrectRolinContextBinding (unwrap def) (unwrap rolInstance) (unwrap boundValue) typeOfTheBinding (show toegestaneBindingen)])
         otherwise -> pure unit
