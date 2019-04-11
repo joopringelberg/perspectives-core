@@ -6,7 +6,7 @@ import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), 
 import Perspectives.DataTypeTripleGetters (genericBinding, genericContext)
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.ModelBasedTripleGetters (isContextTypeOf, isOrHasAspect, isRolTypeOf, sumToSequence)
-import Perspectives.PerspectivesTypes (AnyDefinition, PBool, RolInContext(..))
+import Perspectives.PerspectivesTypes (AnyDefinition, PBool, RolInContext)
 import Perspectives.QueryCombinators (notEmpty, conj) as QC
 import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndPrototypes, searchRolInContext)
 import Perspectives.TripleGetterComposition ((>->))

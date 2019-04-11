@@ -201,7 +201,10 @@ psp:Context psp:Actie
 		psp:Rol $subject
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$mogelijkeBinding => psp:Rol
+			$mogelijkeBinding =>
+				psp:Sum $rolOrBot
+					$alternative => psp:Rol
+					$alternative => psp:Context$contextBot
 	$rolInContext =>
 		psp:Rol $werkwoord
 			extern $isFunctioneel = true

@@ -4,26 +4,28 @@ import Perspectives.EntiteitAndRDFAliases
 
 import Control.Alt (void, (<|>))
 import Control.Monad.Aff.AVar (AVar, putVar, takeVar)
-import Control.Monad.Error.Class (catchError)
+import Control.Monad.Eff.Exception (error)
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable) as AR
-import Data.Array (dropEnd, intercalate)
+import Data.Array (dropEnd, head, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
-import Data.Foldable (elem, fold)
+import Data.Foldable (elem, fold, for_)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, values)
 import Data.String (Pattern(..), fromCharArray, split)
-import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, defaultContextRecord, defaultRolRecord, rol_binding, rol_id, rol_pspType)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_type, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_id, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, addContext, addRol, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
@@ -612,7 +614,7 @@ enclosingContext = withRoleCounting enclosingContext' where
       _ <- AR.many importExpression
       (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment)
       (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment)
-      defs <- AR.many section
+      (defs :: Array ((Tuple String (Array ID)))) <- AR.many section
       cacheContext textName
         (PerspectContext defaultContextRecord
           { _id = textName
@@ -676,11 +678,20 @@ parseAndCache text = do
     (Left e) -> pure $ Left e
     (Right r) -> catchError
       do
-        let (DomeinFile{roles}) = domeinFile
-        void $ for (values roles) \rol -> do
+        let (DomeinFile{roles, contexts}) = domeinFile
+        for_ (values roles) \rol -> do
           case rol_binding rol of
             Nothing -> pure unit
             (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
+        -- We must correct the type of the buitenRollen here. This is because the default type set by the parser
+        -- may be wrong if the type T of the context has an Aspect and uses the buitenRolBeschrijving of a prototype
+        -- of that Aspect. Then the local name "buitenRolBeschrijving" will be in the namespace of that Aspect,
+        -- rather than in the namespace T.
+        -- The same holds for the type of the binnenRollen.
+        -- We cannot find the correct types before all contexts in the entire modelfile have been parsed.
+        for_ (values contexts) \ctxt -> do
+          setBuitenRolType ctxt
+          setBinnenRolType ctxt
         pure $ Right r
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
@@ -693,3 +704,17 @@ parseAndCache text = do
       lift $ void $ do
         vullerRol <- takeVar av
         putVar (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
+
+    setBuitenRolType :: PerspectContext ->  MonadPerspectives (AjaxAvarCache e) Unit
+    setBuitenRolType ctxt = do
+      abrtype <- buitenRolBeschrijvingDef (context_pspType ctxt)
+      case head abrtype of
+        Nothing -> throwError (error ("setBuitenRolType: no buitenRolBeschrijving for '" <> (context_pspType ctxt) <> "'!"))
+        (Just brtype) -> do
+          (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (buitenRol (context_id ctxt))
+          lift $ void $ do
+            bRol <- takeVar av
+            putVar (changeRol_type (unwrap brtype) bRol) av
+
+    setBinnenRolType :: PerspectContext ->  MonadPerspectives (AjaxAvarCache e) Unit
+    setBinnenRolType ctxt = pure unit
