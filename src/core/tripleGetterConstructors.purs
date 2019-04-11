@@ -184,12 +184,14 @@ agreesWithType t = OGC.agreesWithType t `trackedAs` ("agreesWithType_" <> t)
 alternatives :: forall e. (AnyContext **> AnyContext) e
 alternatives = OGC.alternatives `trackedAs` "alternatives"
 
--- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true").
+-- | True iff at least one of the boolean results of f is true (where true is represented as PBool "true"). Yields false when applied to
+-- an empty sequence.
 -- Test.Perspectives.TripleGetterConstructors
 some :: forall s e. (s **> PBool) e -> (s **> PBool) e
 some f = composeMonoidal f (alaF Disj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "some"
 
--- | True iff at all of the boolean results of f is true (where true is represented as PBool "true").
+-- | True iff at all of the boolean results of f is true (where true is represented as PBool "true"). Yields true when applied to 
+-- an empty sequence.
 -- Test.Perspectives.TripleGetterConstructors
 all :: forall s e. (s **> PBool) e -> (s **> PBool) e
 all f = composeMonoidal f (alaF Conj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "all"

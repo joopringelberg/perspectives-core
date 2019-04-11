@@ -5,13 +5,14 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
-import Perspectives.DataTypeTripleGetters (identity, rolType)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
+import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -20,6 +21,9 @@ t s = "model:TestOGC$" <> s
 
 t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
+
+tba :: String -> String
+tba s = "model:TestBotActie$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
 theSuite = suiteSkip "ModelBasedTripleGetters" do
@@ -197,6 +201,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   --
   --   unLoadTestModel "model:TestTDC"
 
+  test "Unloading testTypeDefChecker" do
+    unLoadTestModel "model:TestTDC"
+
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "perspectives.crl"
   ---------------------------------------------------------------------------------
@@ -205,8 +212,41 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       ((p "PerspectivesSysteem$modellen") ##= getFunctionResultType)
       [p "Context"]
 
+  ---------------------------------------------------------------------------------
+  -- TESTS ON THE FILE "testBotActie.crl"
+  ---------------------------------------------------------------------------------
+  test "Loading testBotActie.crl" do
+    loadTestModel "testBotActie.crl"
+  test "expressionType" do
+    assertEqual "tba:Test$botCopiesV1ToV2$self is a Function"
+      (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= (hasType "model:Perspectives$Function"))
+      [PBool "true"]
+    assertEqual "tba:Test$botCopiesV1ToV2$self has no expressionType"
+      (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= expressionType)
+      []
+    assertEqual "tba:Test$botCopiesV1ToV2$self has no value for getFunctionResultType"
+      (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= getFunctionResultType)
+      []
+
+  test "checkBindingOfRolInContext" do
+    assertEqual "de mogelijkeBinding van de gebruikerRol van tba:Test is psp:PerspectivesSysteem$gebruiker"
+      ((tba "Test") ##= getRolInContext (RolDef $ p "Context$gebruikerRol") >-> rolType >-> mogelijkeBinding >-> sumToSequence)
+      [p "PerspectivesSysteem$gebruiker"]
+    assertEqual "PerspectivesSysteem$gebruiker `isContextTypeOf` usr:MijnSysteem$gebruiker(1)"
+      do
+        allowedBinding <- pure (p "PerspectivesSysteem$gebruiker")
+        boundValue <- ((tba "Test") ##>> getRolInContext (RolDef $ p "Context$gebruikerRol") >-> binding)
+        (allowedBinding ##= isRolTypeOf boundValue)
+      [PBool "true"]
+    assertEqual "PerspectivesSysteem$gebruiker `hasOnEachRolTelescopeTheContextTypeOf` usr:MijnSysteem$gebruiker(1)"
+      do
+        allowedBinding <- pure (p "PerspectivesSysteem$gebruiker")
+        boundValue <- ((tba "Test") ##>> getRolInContext (RolDef $ p "Context$gebruikerRol") >-> binding)
+        (allowedBinding ##= hasOnEachRolTelescopeTheContextTypeOf (unwrap boundValue))
+      [PBool "true"]
+
   test "Tearing down" do
-    unLoadTestModel "model:TestTDC"
+    unLoadTestModel "model:TestBotActie"
 
 -- part of the definition of nonQueryRollen, we need it here to test it seperately.
 -- returns true iff the inclusive closure of aspectRol of the RolDef contains psp:Rol.

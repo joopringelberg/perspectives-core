@@ -199,7 +199,8 @@ psp:Context psp:Actie
 	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $subject
-			extern $isFunctioneel = false
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
 			$mogelijkeBinding => psp:Rol
 	$rolInContext =>
 		psp:Rol $werkwoord
@@ -244,11 +245,11 @@ psp:Context psp:Actie
 					$alternative (2) => psp:assignToProperty
 					$alternative (3) => psp:effectFullFunction
 
-psp:Actie psp:ActieModel
+psp:Actie psp:ActieAspect
 	prototype psp:ContextPrototype
-	psp:Context$rolInContext =>
+	$subject =>
 		psp:Rol $subject
-			extern $isFunctioneel = false
+			extern $isFunctioneel = true
 			$mogelijkeBinding =>
 				psp:Sum $botOrUser
 					$alternative => psp:PerspectivesSysteem$gebruiker
@@ -433,11 +434,10 @@ psp:Zaak psp:TrustedCluster
 	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
 			prototype psp:ContextPrototype
-			psp:Context$aspect => psp:ActieModel
-			psp:Context$rolInContext =>
+			psp:Context$aspect => psp:ActieAspect
+			$subject =>
 				psp:Rol $subject
-					extern $isFunctioneel = false
-					$aspectRol => psp:ActieModel$subject
+					$aspectRol => psp:ActieAspect$subject
 					$mogelijkeBinding => psp:TrustedCluster$clusterGenoot
 
 --------------------------------------------------------------------------------

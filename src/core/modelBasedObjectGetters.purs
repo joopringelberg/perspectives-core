@@ -148,10 +148,10 @@ getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$res
 
 -- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
 -- | for each of its mogelijkeBindingen.
-hasOnEachRolTelescopeTheTypeOf :: forall e. RolDef -> (RolDef ~~> PBool) e
-hasOnEachRolTelescopeTheTypeOf t headOfGraph = unlessFalse (isContextTypeOf $ unwrap t) (unwrap headOfGraph)
+hasOnEachRolTelescopeTheContextTypeOf :: forall e. RolDef -> (RolDef ~~> PBool) e
+hasOnEachRolTelescopeTheContextTypeOf t headOfGraph = unlessFalse (isContextTypeOf $ unwrap t) (unwrap headOfGraph)
   <|>
   ((conj
     (notEmpty (mogelijkeBinding /-/ sumToSequence))
-    (all (unwrap >>> alternatives >=> pure <<< map RolDef /-/ (hasOnEachRolTelescopeTheTypeOf t))))
+    (all (unwrap >>> alternatives >=> pure <<< map RolDef /-/ (hasOnEachRolTelescopeTheContextTypeOf t))))
     headOfGraph)

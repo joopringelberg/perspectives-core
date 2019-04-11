@@ -270,8 +270,8 @@ sumToSequence = f `trackedAs` "sumToSequence" where
 -- | True iff t (the first parameter) either agrees with the head of the graph, or if it is in the rol telescope
 -- | for each of its mogelijkeBindingen
 -- | (is in each rol telescope that starts with the head of the graph).
-hasOnEachRolTelescopeTheTypeOf :: forall e. RolDef -> (RolDef **> PBool) e
-hasOnEachRolTelescopeTheTypeOf t = TypedTripleGetter ("hasOnEachRolTelescopeTheTypeOf_" <> unwrap t) f
+hasOnEachRolTelescopeTheContextTypeOf :: forall e. RolDef -> (RolDef **> PBool) e
+hasOnEachRolTelescopeTheContextTypeOf t = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> unwrap t) f
   where
     f :: TripleGetter RolDef PBool e
     f headOfGraph = unlessFalse (unwrap `before` isContextTypeOf (unwrap t)) headOfGraph
@@ -279,7 +279,7 @@ hasOnEachRolTelescopeTheTypeOf t = TypedTripleGetter ("hasOnEachRolTelescopeTheT
       (headOfGraph @@
         (QC.conj
           (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-          (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasOnEachRolTelescopeTheTypeOf t)))))
+          (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasOnEachRolTelescopeTheContextTypeOf t)))))
 
 -- | Collect all definitions of a Property with the local name, in the RolDef and its Aspects
 -- | and in all their prototypes and on the rolGraph of the RolDef. Notice there may be more than one!
