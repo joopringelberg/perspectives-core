@@ -12,7 +12,7 @@ import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -26,7 +26,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suiteSkip "ModelBasedTripleGetters" do
+theSuite = suite "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------
@@ -38,19 +38,26 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       -- []
       [ RolDef (p "Property$range")
       , RolDef (p "Property$aspectProperty")
-      , RolDef (p "Property$bindingProperty")]
-    assertEqual "myContextDef defines three roles"
-      ((t "myContextDef") ##= rollenDef)
-      (map RolDef ["model:TestOGC$myContextDef$rol1","model:TestOGC$myAspect$myAspectRol1","model:TestOGC$myAspect$myAspectRol2","model:TestOGC$myUrAspect$myUrAspectRol1","model:Perspectives$Context$binnenRolBeschrijving","model:Perspectives$Context$buitenRolBeschrijving","model:Perspectives$Context$rolInContext","model:Perspectives$Context$interneView","model:Perspectives$Context$externeView","model:Perspectives$Context$prototype","model:Perspectives$Context$aspect","model:Perspectives$Context$gebruikerRol","model:Perspectives$Context$contextBot"])
+      , RolDef (p "Property$bindingProperty")
+      , RolDef "model:Perspectives$Property$binnenRolBeschrijving"
+      , RolDef "model:Perspectives$Property$buitenRolBeschrijving"]
+    assertEqual "myContextDef defines 13 roles"
+      ((t "myContextDef") ##= count rollenDef)
+      ([15])
     assertEqual "q:ComputedRolGetter has no defined Roles through Aspects."
       (q "ComputedRolGetter" ##= closureOfAspect >-> rollenDef)
-      (RolDef <$> [])
+      (RolDef <$>
+      [ p "Function$result"
+      , p "ContextPrototype$buitenRolBeschrijving"
+      , p "ContextPrototype$binnenRolBeschrijving"])
     assertEqual "psp:TrustedCluster does have ???."
       (p "TrustedCluster" ##= closureOfAspect >-> rollenDef)
       []
-    assertEqual "psp:TrustedCluster does have ???."
+    assertEqual "psp:TrustedCluster does have 3 roles."
       (p "TrustedCluster" ##= closure_ directAspects >-> rollenDef)
-      [RolDef $ p "TrustedCluster$clusterGenoot"]
+      [ RolDef $ p "TrustedCluster$clusterGenoot"
+      , RolDef $ p "TrustedCluster$binnenRolBeschrijving"
+      , RolDef $ p "TrustedCluster$buitenRolBeschrijving"]
   test "ownPropertiesDef" do
     assertEqual "De roldefinitie t:myAspect$myAspectRol1 definieert de property $myAspectRol1Property."
       (RolDef (t "myAspect$myAspectRol1") ##= ownPropertiesDef)
@@ -142,11 +149,11 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       ((t "myAspect$myAspectRol1") ##= (isRolTypeOf r))
       [PBool "true"]
   test "isContextTypeOf" do
-    assertEqual "ActieModel `isContextTypeOf` RaadpleegtClusterGenoot is false"
-      (p "ActieModel" ##= (isContextTypeOf (p "TrustedCluster$RaadpleegtClusterGenoot")))
+    assertEqual "ActieAspect `isContextTypeOf` RaadpleegtClusterGenoot is false"
+      (p "ActieAspect" ##= (isContextTypeOf (p "TrustedCluster$RaadpleegtClusterGenoot")))
       [PBool "false"]
-    assertEqual "RaadpleegtClusterGenoot `isOrHasAspect` ActieModel is true"
-      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (isOrHasAspect (p "ActieModel")))
+    assertEqual "RaadpleegtClusterGenoot `isOrHasAspect` ActieAspect is true"
+      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (isOrHasAspect (p "ActieAspect")))
       [PBool "true"]
   test "collectUnqualifiedPropertyDefinitions" do
     assertEqual "t:myContextDef9$rol1 does not by itself a property defined."
@@ -185,16 +192,16 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   ---------------------------------------------------------------------------------
   test "rollenDef" do
     assertEqual "myContextDef2 defines a single rol and inherits many from Context"
-      (t2 "myContextDef2" ##= rollenDef)
-      (RolDef <$> ["model:TestTDC$myContextDef2$rol1","model:Perspectives$Context$binnenRolBeschrijving","model:Perspectives$Context$buitenRolBeschrijving","model:Perspectives$Context$rolInContext","model:Perspectives$Context$interneView","model:Perspectives$Context$externeView","model:Perspectives$Context$prototype","model:Perspectives$Context$aspect","model:Perspectives$Context$gebruikerRol","model:Perspectives$Context$contextBot"])
+      (t2 "myContextDef2" ##= count rollenDef)
+      ([14])
   test "isNotAQuery" do
     assertEqual "t:myContextDef2$rol1 is not a query-rol"
       (RolDef $ t2 "myContextDef2$rol1" ##= isNotAQuery)
       [PBool "false"]
   test "nonQueryRollen" do
     assertEqual "myContextDef2 defines a single non-query rol and inherits many from Context"
-      (t2 "myContextDef2" ##= nonQueryRollen)
-      (RolDef <$> ["model:TestTDC$myContextDef2$rol1","model:Perspectives$Context$binnenRolBeschrijving","model:Perspectives$Context$buitenRolBeschrijving","model:Perspectives$Context$rolInContext","model:Perspectives$Context$interneView","model:Perspectives$Context$externeView","model:Perspectives$Context$prototype","model:Perspectives$Context$aspect","model:Perspectives$Context$gebruikerRol","model:Perspectives$Context$contextBot"])
+      (t2 "myContextDef2" ##= count nonQueryRollen)
+      ([14])
 
   -- testOnly "" do
   --   loadTestModel "testTypeDefChecker.crl"
@@ -221,12 +228,12 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "tba:Test$botCopiesV1ToV2$self is a Function"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= (hasType "model:Perspectives$Function"))
       [PBool "true"]
-    assertEqual "tba:Test$botCopiesV1ToV2$self has no expressionType"
+    assertEqual "tba:Test$botCopiesV1ToV2$self expressionType psp:Actie"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= expressionType)
-      []
+      [p "Actie"]
     assertEqual "tba:Test$botCopiesV1ToV2$self has no value for getFunctionResultType"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= getFunctionResultType)
-      []
+      ["model:TestBotActie$Test$botCopiesV1ToV2"]
 
   test "checkBindingOfRolInContext" do
     assertEqual "de mogelijkeBinding van de gebruikerRol van tba:Test is psp:PerspectivesSysteem$gebruiker"
