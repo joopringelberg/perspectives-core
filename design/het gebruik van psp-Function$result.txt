@@ -1,0 +1,30 @@
+HET GEBRUIK VAN DE ROL PSP:FUNCTION$RESULT
+Het type psp:Function heeft een rol $result. Aan deze rol bind je het type van de resultaten die door die functie worden opgeleverd. Ik licht het gebruik daarvan toe aan de hand van een voorbeeld voor een berekende property.
+
+De typeDefChecker controleert of de binding van $rolProperty wel aan de eisen voldoet. De eis is dat het type van die binding psp:Property moet zijn.
+
+Bindt je de rolProperty aan een context-declaratie die begint met psp:Property, dan voldoet dat. De typeDefChecker neemt het type van de expressie en kijkt of dat voldoet (en dat is zo, want het type van zo'n expressie is psp:Property).
+
+Maar als je de rolProperty bindt aan een context-declaratie die begint met q:PropertyGetter, dan mag de typeDefChecker niet hetzelfde recept toepassen en de zaak op basis van het type van die expressie beoordelen. Dat is immers q:PropertyGetter en niet psp:Property. En q:PropertyGetter is niet van het type psp:Property en heeft die evenmin als Aspect. De structuur van een psp:Property, als lokaal gerepresenteerde property, is helemaal niet van toepassing op een query die een propertywaarde ophaalt.
+
+Daarom haalt de typeDefChecker, als de expressie een psp:Function is, de waarde van de binding van psp:Function$result op en substitueert die voor de expressie zelf. Dat klopt volledig met de bedoeling van de query: niet de query zelf is de waarde van de property, maar het resultaat van de query.
+
+Vervolgens bepaalt de typeDefChecker wat het type is van de substitutie (dus: van de binding van psp:Function$result). Dàt moet dan een psp:Property zijn.
+
+Een voorbeeld: een $rolProperty wordt gebonden aan een bepaalde property-berekening die als $result het type psp:Property$buitenRolBeschrijving$isFunctioneel heeft gekregen. Oftewel, de property-berekening resulteert in de boolean value van de property $isFunctioneel van een andere rol. De typeDefChecker gebruikt deze substitutie, neemt het type ervan, vindt psp:Property en constateert dat dat voldoet aan de $mogelijkeBinding van $rolProperty.
+
+Kortom: de typeDefChecker gebruikt de binding van psp:Function$result als **substituut** van de binding van $rolProperty.
+
+Dit gaat op voor een **query** die de property van een andere Rol ophaalt. Oftewel, het resultaat van de query is een elders gedefinieerde property. Door de naam van die property als waarde van $result te geven, geven we de typeDefChecker de gelegenheid om te toetsen of die andere property voldoet aan de eisen die de rol stelt.
+
+Maar er zijn ook **berekeningen** van property-waarden mogelijk. Bijvoorbeeld de logische conjunctie van twee boolean waarden. Zo'n resultaat is al niet elders beschreven als de waarde van een property. In dat geval kunnen we niet meer dan het type van het resultaat vastleggen, in dit voorbeeld psp:Boolean.
+
+De typeDefChecker zal nu het type van psp:Boolean nemen. Dat is psp:SimpleValue en die rijmt niet met psp:Property!
+Daarom moet op plekken waar de mogelijke binding van een Rol een psp:Property is, óók psp:SimpleValue als alternatief toegestaan worden, om **berekeningen** van propertywaarden te kunnen hanteren. Dus:
+
+	psp:Sum psp:SimpleValueOrProperty
+		$alternative => psp:SimpleValue
+		$alternative => psp:Property
+
+ROLLEN
+Ook voor rollen kunnen we een Query schrijven. Maar we kunnen nooit een nieuwe rol het resultaat van een berekening laten zijn. Kortom, dit patroon gaat niet op voor berekende rollen. Daar kunnen we altijd voor de binding van psp:Function$resultaat de identifier van een al beschreven Rol gebruiken.

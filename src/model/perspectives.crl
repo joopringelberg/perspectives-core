@@ -87,8 +87,8 @@ psp:Context psp:Context
 			$mogelijkeBinding =>
 				psp:Sum $RolOrContext
 					$alternative => psp:Rol
-					-- Hier moet denk ik een query bij: dat is een Function.
 					$alternative => psp:Context
+					$alternative => psp:Sum
 	-- Hebben we dit werkelijk nodig? Een view op de buitenrol zou volstaan.
 	$rolInContext =>
 		psp:Rol $interneView
@@ -148,10 +148,7 @@ psp:Context psp:Rol
 	$rolInContext =>
 		psp:Rol $rolProperty
 			extern $isFunctioneel = false
-			$mogelijkeBinding =>
-				psp:Sum $FunctionOrProperty
-					$alternative => psp:Function
-					$alternative => psp:Property
+			$mogelijkeBinding => psp:SimpleValueOrProperty
 	$rolInContext =>
 		psp:Rol $mogelijkeBinding
 			extern $isFunctioneel = true
@@ -186,10 +183,7 @@ psp:Context psp:View
 					extern $isFunctioneel = true
 					extern $isVerplicht = false
 					$range => psp:String
-			$mogelijkeBinding =>
-				psp:Sum $PropOrFun
-					$alternative => psp:Property
-					$alternative => psp:Function
+			$mogelijkeBinding => psp:SimpleValueOrProperty
 
 --------------------------------------------------------------------------------
 -- ACTIES
@@ -240,7 +234,7 @@ psp:Context psp:Actie
 		psp:Rol $condition
 			extern $isFunctioneel = true
 			extern $isVerplicht = false
-			$mogelijkeBinding => psp:Function
+			$mogelijkeBinding => psp:SimpleValue
 	$rolInContext =>
 		psp:Rol $effect
 			extern $isFunctioneel = true
@@ -334,6 +328,10 @@ psp:Context psp:Sum
 		psp:Rol $alternative
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
+
+psp:Sum psp:SimpleValueOrProperty
+	$alternative => psp:SimpleValue
+	$alternative => psp:Property
 
 --------------------------------------------------------------------------------
 -- SYSTEEM
@@ -533,7 +531,7 @@ psp:Context psp:assignToProperty
 		-- The property query that gives the value:
 		psp:Rol $value
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Function
+			$mogelijkeBinding => psp:SimpleValue
 
 -- Apply an effectful function like storeDomeinFileInCouchdb as follows:
 -- storeDomeinFileInCouchdb :: forall e. DomeinFile -> MonadPerspectives (AjaxAvarCache e) Unit

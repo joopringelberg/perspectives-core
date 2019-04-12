@@ -45,17 +45,14 @@ psp:Context q:PropertyGetter
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
 				psp:Property $functionName
-					extern $isFunctioneel = true -- ziet ie niet
-					extern $isVerplicht = true -- ziet ie niet
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
 					$range => psp:String
 	$rolInContext =>
 		psp:Rol $property
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$mogelijkeBinding =>
-				psp:Sum $propertyOrFunction
-					$alternative (1) => psp:Property
-					$alternative (2) => psp:Function
+			$mogelijkeBinding => psp:SimpleValueOrProperty
 
 --------------------------------------------------------------------------------
 -- ROLGETTER
@@ -177,7 +174,7 @@ psp:Context q:nAryCombinator
 		psp:Rol $operand
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
-			$mogelijkeBinding => psp:Function
+			$mogelijkeBinding => psp:ElkType
 
 --------------------------------------------------------------------------------
 -- COMBINATORS

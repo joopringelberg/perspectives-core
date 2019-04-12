@@ -294,8 +294,13 @@ collectUnqualifiedPropertyDefinitions ln = QC.union (searchUnqualifiedPropertyDe
 getFunctionResultType :: forall e. (AnyContext **> AnyDefinition) e
 getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$result") >-> DTG.rolBindingDef
 
+-- | The argument should be an instance of psp:Context.
+-- | If the argument is not a function, we return its type.
+-- | If the argument is an instance of psp:Function, we do not return its type (that would be psp:Function).
+-- | Instead, we return the type of the **result** of the function. The result is explicitly given as
+-- | the value bound to the role psp:Function$result.
 expressionType :: forall e. (AnyContext **> AnyDefinition) e
-expressionType = QC.cond (hasType "model:Perspectives$Function") getFunctionResultType DTTG.contextType
+expressionType = QC.cond (hasType "model:Perspectives$Function") (getFunctionResultType >-> DTTG.contextType) DTTG.contextType
 
 -- propertiesDefM = QC.concat
 --   ownPropertiesDefM

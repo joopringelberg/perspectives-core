@@ -539,7 +539,7 @@ compareRolInstancesToDefinition def rolType =
     -- Check a ContextRol as follows. We assume that the bound value represents a definition of some kind.
     -- Because its type can be a RolDef, we involve the mogelijkeBinding of that RolDef in the type checking.
     --  - find the values of mogelijkeBinding of the type of the rolInstance: the possibleBindings;
-    --  - then there must be at least one possibleBinding for which holds: typeOfTheBinding is on each rolTelescope that starts with possibleBinding.
+    --  - then there must be at least one possibleBinding for which holds: there must be a type x on each rolTelescope starting at that possibleBinding, for which (x `isContextTypeOf` boundValue).
     -- Note that because we include the head of the rolGraph in the check, if we do not have a RolDef, it will merely
     -- check the bound value against each of the possibleBindings.
     checkBindingOfContextRol :: ContextRol -> TDChecker e Unit
