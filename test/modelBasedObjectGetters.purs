@@ -6,11 +6,11 @@ import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol)
-import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, propertyIsVerplicht, rolDef, rolIsVerplicht)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, propertyIsFunctioneel, propertyIsVerplicht, rolDef, rolIsVerplicht)
 import Perspectives.ObjectGetterConstructors (directAspectProperties, getRoleBinders)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol, ContextRol(..), PBool(..), PropertyDef(..), RolDef(..))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel)
+import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel, p)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -18,6 +18,9 @@ t s = "model:TestOGC$" <> s
 
 t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
+
+tba :: String -> String
+tba s = "model:TestBotActie$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
 theSuite = suiteSkip "ModelBasedObjectGetters" do
@@ -82,6 +85,31 @@ theSuite = suiteSkip "ModelBasedObjectGetters" do
   --
   --   unLoadTestModel "model:TestTDC"
 
-  test "Tearing down" do
+  ---------------------------------------------------------------------------------
+  -- TESTS ON THE FILE "testBotActie.crl"
+  ---------------------------------------------------------------------------------
+  test "Changing testfile" do
     unLoadTestModel "model:TestTDC"
+    loadTestModel "testBotActie.crl"
+
+  test "buitenRolBeschrijvingDef" do
+    assertEqual "tba:Test$botCopiesV1ToV2 has no buitenRolBeschrijving"
+      (buitenRolBeschrijvingDef (tba "Test$botCopiesV1ToV2"))
+      [RolDef $ p "ContextPrototype$buitenRolBeschrijving"]
+
+
+  -- testOnly "Add a test!" do
+  --   loadTestModel "testBotActie.crl"
+  --
+  --   unLoadTestModel "model:TestBotActie"
+  ---------------------------------------------------------------------------------
+  -- TESTS ON THE FILE "perspectives.crl"
+  ---------------------------------------------------------------------------------
+  test "buitenRolBeschrijvingDef" do
+    assertEqual "psp:Sum has a buitenRolBeschrijving through its prototype."
+      (buitenRolBeschrijvingDef (p "Sum"))
+      [RolDef (p "ContextPrototype$buitenRolBeschrijving")]
+
+  test "Tearing down" do
+    unLoadTestModel "model:TestBotActie"
   pure unit

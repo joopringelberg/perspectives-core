@@ -212,7 +212,10 @@ psp:Context psp:Actie
 	$rolInContext =>
 		psp:Rol $object
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
+			$mogelijkeBinding => 
+				psp:Sum $contextOrRol
+					$alternative => psp:Rol
+					$alternative => psp:Context
 	$rolInContext =>
 		psp:Rol $subjectView
 			extern $isFunctioneel = true

@@ -380,7 +380,7 @@ mandatoryRolesInstantiated def deftype =
 -- | Is the number of values assigned to external properties in accordance with the cardinality of their
 -- | definitions?
 -- | The same checks for internal properties.
-
+-- | TODO: Is the prototype of the same type as the context?
 checksForEachContext :: forall e. Context -> ContextDef -> TDChecker e Unit
 checksForEachContext def deftype = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
