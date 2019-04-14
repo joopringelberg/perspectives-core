@@ -24,7 +24,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf, hasOnEachRolTelescopeTheRolTypeOf, isSubsumedOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, hasType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, BuitenRol, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (contains, toBoolean)
@@ -32,6 +32,7 @@ import Perspectives.QueryCompiler (getPropertyFunction, getInternalPropertyFunct
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery, (##=), (##>))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, closureOfAspect, searchInRolTelescope, some) as STGC
+import Perspectives.StringTripleGetterConstructors (getPrototype)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, getInternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchProperty)
@@ -59,7 +60,8 @@ checkAContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkConte
 -----------------------------------------------------------
 -- DEFINITION
 -----------------------------------------------------------
--- | Dispatches to specific checks for Context-, Rol- and PropertyDef, and all others.
+-- | Dispatches to specific checks for Context-, Rol- and PropertyDef, and all others,
+-- | based on the **type** of the definition.
 checkDefinition :: forall e. ContextDef -> TDChecker e Unit
 checkDefinition def = ifNothing (lift (unwrap def @@> DTG.contextType `followedBy` ContextDef))
   (tell [MissingType $ unwrap def])
@@ -129,8 +131,8 @@ getBinnenRolPropertyValues def rol propertyType = do
 -- | Is each AspectRol a role of an Aspect of the defining ContextDef of this RolDef?
 -- | Does the mogelijkeBinding have the mogelijkeBinding of each of its AspectRollen as an Aspect?
 -- | Does the RolDef provide all mandatory internal and external properties with a value?
--- TODO: Are the values given to the properties isFunctioneel and isVerplicht in accordance to values given to
--- the Aspects? (see checkPropertyDef for an explanation)
+-- | Are the values given to the properties isFunctioneel and isVerplicht in accordance to values
+-- | given to the Aspects? (see checkPropertyDef for an explanation)
 -- | Is there no cycle in AspectRol? If there is such a cycle, the other
 -- | tests will not be carried out.
 checkRolDef :: forall e. RolDef -> ContextDef -> TDChecker e Unit
@@ -380,7 +382,7 @@ mandatoryRolesInstantiated def deftype =
 -- | Is the number of values assigned to external properties in accordance with the cardinality of their
 -- | definitions?
 -- | The same checks for internal properties.
--- | TODO: Is the prototype of the same type as the context?
+-- | Is the prototype of the same type as the context?
 checksForEachContext :: forall e. Context -> ContextDef -> TDChecker e Unit
 checksForEachContext def deftype = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
@@ -400,7 +402,16 @@ checksForEachContext def deftype = do
 
   checkIfRolesHaveDefinition deftype def
 
+  checkPrototype def deftype
+
   (lift $ lift (unwrap deftype ##= nonQueryRollen)) >>= traverse_ (compareRolInstancesToDefinition def)
+
+checkPrototype :: forall e. Context -> ContextDef -> TDChecker e Unit
+checkPrototype def deftype = ifNothing (lift $ lift (unwrap def ##> getPrototype >-> DTG.contextType))
+  (pure unit)
+  (\ptType -> ifM (lift (toBoolean (hasType ptType) (unwrap def)))
+    (pure unit)
+    (tell [IncompatiblePrototype (unwrap def) (unwrap deftype) ptType]))
 
 -- | Does the rol type hold a definition for all properties given to the rol instance?
 checkPropertyIsDefined :: forall e.

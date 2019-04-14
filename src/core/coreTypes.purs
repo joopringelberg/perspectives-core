@@ -320,6 +320,7 @@ data UserMessage =
   | MogelijkeBindingNotSubsumed String RolName String RolName
   | MissingAspectPropertyForBindingProperty PropertyName PropertyName
   | BindingPropertyNotAvailable PropertyName PropertyName
+  | IncompatiblePrototype ContextID ContextID ContextID
 
   -- Other messages
   | MultipleDefinitions LocalName (Array TypeID)
@@ -376,6 +377,7 @@ instance showUserMessage :: Show UserMessage where
   show (MogelijkeBindingNotSubsumed ownBinding aspect aspectBinding rol) = "(MogelijkeBindingNotSubsumed) De mogelijke binding '" <> aspectBinding <> "' van de AspectRol '" <> aspect <> "' is geen aspect van de mogelijke binding '" <> ownBinding <> "' van de rol '" <> rol <> "'!"
   show (MissingAspectPropertyForBindingProperty property bindingproperty) = "(MissingAspectPropertyForBindingProperty) De property '" <> property <> "' heeft BindingProperty '" <> bindingproperty <> "' maar geen AspectProperty!"
   show (BindingPropertyNotAvailable pdef bindingproperty) = "(BindingPropertyNotAvailable) Property '" <> pdef <> "' definieert binding property '" <> bindingproperty <> "' maar die is niet beschikbaar in deze definitie!"
+  show (IncompatiblePrototype def deftype ptype) = "(IncompatiblePrototype) Definition '" <> def <> "' has type '" <> deftype <> "', but its prototype '" <> ptype <> "' does not have that type!"
 
 -----------------------------------------------------------
 -- TRANSACTIE
