@@ -24,13 +24,13 @@ import Text.Parsing.Parser.Pos (Position)
 -- | - the namespace for context declarations. The namespace does not terminate on a $!
 -- | - the section, i.e. the current role that should be used to stick a role in a context;
 -- | - the prefixes: a map of prefixes to namespaces.
-type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: StrMap String, domeinFile :: DomeinFile}
+type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: StrMap String, domeinFile :: DomeinFile, nameCounter :: Int}
 
 defaultPrefixes :: StrMap String
 defaultPrefixes = fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes, domeinFile: defaultDomeinFile}
+initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes, domeinFile: defaultDomeinFile, nameCounter: 0}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is MonadPerspectives, which we need to access couchdb.
@@ -84,6 +84,13 @@ setRoleInstances rmap = do
 -----------------------------------------------------------
 getNamespace :: forall e. IP String e
 getNamespace = lift (lift get) >>= pure <<< (_.namespace)
+
+generatedNameCounter :: forall e. IP Int e
+generatedNameCounter = do
+  s <- lift (lift get)
+  n <- pure s.nameCounter
+  lift (lift (put s {nameCounter = n + 1}))
+  pure n
 
 setNamespace :: forall e. String -> IP Unit e
 setNamespace ns = do

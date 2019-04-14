@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Data.Newtype (unwrap, wrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol, context, contextType, iedereRolInContext, rolBindingDef)
-import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closure, closureOfAspectProperty, closureOfAspectRol, closure_, concat, cond, conj, directAspectProperties, directAspects, getContextRol, getRolInContext, getRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull, filter)
+import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closure, closureOfAspectProperty, closureOfAspectRol, closure_, concat, cond, conj, directAspectProperties, directAspects, filter, getContextRol, getRolInContext, getRoleBinders, getUnqualifiedRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol(..), PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
 import Prelude (($), (>=>), (<<<), pure, map, (>>>))
@@ -87,6 +87,9 @@ contextDef rid =
 rolDef2ContextDef :: forall e. RolDef -> (RolDef ~~> ContextDef) e
 rolDef2ContextDef rd = unwrap >>> buitenRol /-/ (getRoleBinders rd :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
 
+localName2ContextDef ::forall e. String -> (RolDef ~~> ContextDef) e
+localName2ContextDef ln = unwrap >>> buitenRol /-/ (getUnqualifiedRoleBinders ln :: (BuitenRol ~~> ContextRol) e) /-/ context >=> pure <<< map wrap
+
 -- | The Context of the RolInContext.
 rolInContextContextDef :: forall e. (RolDef ~~> ContextDef) e
 rolInContextContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$rolInContext")
@@ -101,20 +104,20 @@ contextBotContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$con
 
 -- | The Context of the BinnenRol.
 binnenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
-binnenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$binnenRolBeschrijving")
+binnenRolContextDef = localName2ContextDef "binnenRolBeschrijving"
 
 -- | The Context of the buitenRolBeschrijving. I.e. starting from a Context that is a BuitenRolBeschrijving, returns
 -- | the Context that describes the type that the BuitenRolBeschrijving belongs to.
 buitenRolContextDef :: forall e. (RolDef ~~> ContextDef) e
-buitenRolContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Context$buitenRolBeschrijving")
+buitenRolContextDef = localName2ContextDef "buitenRolBeschrijving"
 
 -- | The Context of the subjectRol.
 subjectContextDef :: forall e. (RolDef ~~> ContextDef) e
-subjectContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Actie$subject")
+subjectContextDef = localName2ContextDef "subject"
 
 -- | The Context of the objectRol.
 objectContextDef :: forall e. (RolDef ~~> ContextDef) e
-objectContextDef = rolDef2ContextDef (RolDef "model:Perspectives$Actie$object")
+objectContextDef =  localName2ContextDef "object"
 
 -- | From the definition of a Property, find the enclosing definition of the Rol it is defined on.
 rolDef :: forall e. (PropertyDef ~~> RolDef) e

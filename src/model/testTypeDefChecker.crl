@@ -159,4 +159,4 @@ psp:Context t:myContextDef7
 				psp:Property $myContextDef6Prop1
 					extern $isFunctioneel = false
 					extern $isVerplicht = true
-					$range => $$$rolInContext(1)
+					$range -> $$$rolInContext(1)

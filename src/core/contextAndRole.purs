@@ -1,10 +1,12 @@
 module Perspectives.ContextAndRole where
 
 import Perspectives.EntiteitAndRDFAliases
+
 import Data.Array (cons, delete, elemIndex)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Ord (Ordering, compare)
-import Data.StrMap (StrMap, empty, lookup, insert)
+import Data.StrMap (StrMap, empty, insert, lookup, pop)
+import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord)
@@ -75,6 +77,12 @@ removeContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID 
 setContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
 setContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
   PerspectContext cr {rolInContext = insert rolName [rolID] rolInContext}
+
+context_changeRolIdentifier :: PerspectContext -> RolName -> RolName -> PerspectContext
+context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
+  case pop oldName rolInContext of
+    Nothing -> ct
+    (Just (Tuple vs cr')) -> PerspectContext cr {rolInContext = insert newName vs cr'}
 
 context_comments :: PerspectContext -> Comments
 context_comments (PerspectContext{comments})= comments

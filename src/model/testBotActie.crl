@@ -7,7 +7,7 @@ Section $rolInContext
 
 psp:Zaak tba:Test
 	prototype psp:ContextPrototype
-	psp:Context$binnenRolBeschrijving =>
+	?binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
@@ -29,22 +29,20 @@ psp:Zaak tba:Test
 					$range => psp:Boolean
 			$rolProperty =>
 				q:nAryCombinator $propsEqual
-					prototype psp:ContextPrototype
+					--prototype psp:ContextPrototype
 					extern $functionName = "equal"
 					$operand (1) =>
-						q:PropertyGetter $n1
-							prototype psp:ContextPrototype
+						q:PropertyGetter _
 							extern $functionName = "constructInternalPropertyGetter"
 							$property => tba:Test$binnenRolBeschrijving$v1
-							--psp:Function$result => psp:String -- matcht met psp:SimpleValue.
-							psp:Function$result => tba:Test$binnenRolBeschrijving$v1 -- matcht met psp:Property.
+							--?result => psp:String -- matcht met psp:SimpleValue.
+							?result => tba:Test$binnenRolBeschrijving$v1 -- matcht met psp:Property.
 					$operand (2) =>
 						q:PropertyGetter $n2
-							prototype psp:ContextPrototype
 							extern $functionName = "constructInternalPropertyGetter"
 							$property => tba:Test$binnenRolBeschrijving$v2
-							psp:Function$result => psp:String
-					psp:Function$result => psp:Boolean
+							?result => psp:String
+					?result => psp:Boolean
 			$viewInRol =>
 				psp:View $allProps
 					$propertyReferentie => $$v1
@@ -55,41 +53,37 @@ psp:Zaak tba:Test
 						$volgNummer = 3
 					$propertyReferentie => $$propsEqual
 						$volgNummer = 4
-	psp:Context$gebruikerRol -> usr:MijnSysteem$gebruiker(1) -- overbodig hier, maar een goede test.
-	psp:Context$contextBot(1) => ()
+	?gebruikerRol -> usr:MijnSysteem$gebruiker(1) -- overbodig hier, maar een goede test.
+	?contextBot => ()
 	$actie =>
 		psp:Actie $botCopiesV1ToV2
 			prototype psp:ContextPrototype
 			$subject -> $$Context$contextBot(1)
 			$werkwoord => psp:Beheert
 			$object =>
-				q:DataTypeGetter $self -- deze query wordt toegepast op de context.
+				q:DataTypeGetter _ -- deze query wordt toegepast op de context.
 					extern $functionName = "buitenRol"
-					psp:Function$result => $$$botCopiesV1ToV2
+					?result => $$$botCopiesV1ToV2
 			$condition =>
-				q:nAryCombinator $propsEqualAndTrigger -- deze query wordt toegepast op de context.
-					prototype psp:ContextPrototype
+				q:nAryCombinator _ -- deze query wordt toegepast op de context.
 					extern $functionName = "conj"
 					$operand (1) =>
-						q:PropertyGetter $propsEqual1
-							prototype psp:ContextPrototype
+						q:PropertyGetter _
 							extern $functionName = "propertyQuery"
 							$property => tba:Test$binnenRolBeschrijving$propsEqual
-							psp:Function$result => psp:Boolean
+							?result => psp:Boolean
 					$operand (2) =>
-						q:PropertyGetter $trigger
-							prototype psp:ContextPrototype
+						q:PropertyGetter _
 							extern $functionName = "constructInternalPropertyGetter"
 							$property => tba:Test$binnenRolBeschrijving$trigger
-							psp:Function$result => psp:Boolean
-					psp:Function$result => psp:Boolean
+							?result => psp:Boolean
+					?result => psp:Boolean
 			$effect =>
-				psp:assignToProperty $copyV1ToV2
+				psp:assignToProperty _
 					extern $operation = "set"
 					$property => tba:Test$binnenRolBeschrijving$v2
 					$value =>
-						q:PropertyGetter $n1 -- This getter will be applied to the $object.
-							prototype psp:ContextPrototype
+						q:PropertyGetter _ -- This getter will be applied to the $object.
 							extern $functionName = "constructInternalPropertyGetter"
 							$property => tba:Test$binnenRolBeschrijving$v1
-							psp:Function$result => psp:String
+							?result => psp:String

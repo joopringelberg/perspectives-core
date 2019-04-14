@@ -3,6 +3,7 @@ module Test.Perspectives.TypeDefChecker (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Perspectives.CoreTypes (UserMessage(..))
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, typeDefCheckerNotifies)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly)
 
@@ -15,7 +16,7 @@ theSuite = suiteSkip "TypeDefChecker" do
     typeDefCheckerNotifies "testTypeDefChecker.crl"
       [ "MissingMogelijkeBinding"
       , "MissingRolInstance"
-      , "IncorrectBinding"
+      , "IncorrectRolinContextBinding"
       , "RolNotDefined"
       , "MissingPropertyValue"
       , "MissingExternalPropertyValue"
@@ -35,6 +36,8 @@ theSuite = suiteSkip "TypeDefChecker" do
       , "MissingAspectPropertyForBindingProperty"
       , "AspectPropertyNotFromAspectRol"
       , "BindingPropertyNotAvailable"
+      , "IncompatiblePrototype"
+      , "CannotOverideBooleanRolProperty"
         --  Not testable because the parser fails on the testfile:
         -- "MissingType"
         -- "MissingAspect"

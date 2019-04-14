@@ -6,8 +6,9 @@ import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijving)
 import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
@@ -26,7 +27,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "ModelBasedTripleGetters" do
+theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------
@@ -202,6 +203,13 @@ theSuite = suite "ModelBasedTripleGetters" do
     assertEqual "myContextDef2 defines a single non-query rol and inherits many from Context"
       (t2 "myContextDef2" ##= count nonQueryRollen)
       ([14])
+  test "mandatoryProperties" do
+    assertEqual "psp:Rol has a single mandatory external property."
+      ((p "Rol") ##= buitenRolBeschrijvingDef >-> mandatoryProperties)
+      [PropertyDef $ p "Rol$buitenRolBeschrijving$isFunctioneel"]
+    assertEqual "t:myContextDef2 has a mandatory external property $contextDef2ExtProp1."
+      ((t2 "myContextDef2") ##= buitenRolBeschrijvingDef >-> mandatoryProperties)
+      [PropertyDef $ t2 "myContextDef2$buitenRolBeschrijving$contextDef2ExtProp1"]
 
   -- testOnly "" do
   --   loadTestModel "testTypeDefChecker.crl"

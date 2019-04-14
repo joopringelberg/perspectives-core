@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
-import Perspectives.DataTypeObjectGetters (buitenRol, context, iedereRolInContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, context, contextType, iedereRolInContext)
 import Perspectives.DataTypeTripleGetters (propertyTypen) as DTG
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
 import Perspectives.ObjectGetterConstructors (all, closureOfAspect, closureOfBinding, closure_, concat, contains, directAspectRoles, directAspects, getInternalProperty, getRolInContext, getRoleBinders, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, getUnqualifiedRoleBinders, hasLocalRolDefinition, hasRolDefinition, mogelijkeBinding, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some)
@@ -121,6 +121,9 @@ theSuite = suiteSkip "ObjectGetterConstructors" do
     assertEqual "myContextDef2 acquires the role t:myAspect$myAspectRol1 from its aspect t:myAspect"
       (searchUnqualifiedRolDefinition "myAspectRol1" $ ContextDef (t "myContextDef2"))
       [RolDef $ t "myAspect$myAspectRol1"]
+    assertEqual "for model:TestBotActie$Test a role with local name 'binnenRolBeschrijving' is defined through its Aspect psp:Context."
+      ((contextType >=> pure <<< map ContextDef /-/ (searchUnqualifiedRolDefinition "binnenRolBeschrijving")) "model:TestBotActie$Test")
+      [RolDef $ "model:Perspectives$Context$binnenRolBeschrijving"]
   test "buitenRolBeschrijvingDef" do
     assertEqual "From a context that is a definition, get the definition of its BuitenRol."
       (buitenRolBeschrijvingDef (t "myContextDef"))

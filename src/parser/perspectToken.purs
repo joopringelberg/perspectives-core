@@ -34,7 +34,7 @@ perspectDef = LanguageDef
                 , identLetter:     alphaNum <|> oneOf ['_', '\'']
                 , opStart:         op'
                 , opLetter:        op'
-                , reservedOpNames : ["=", "=>"]
+                , reservedOpNames : ["=", "=>", "->", "_"]
                 , reservedNames   : [ "intern","extern", "property", "Section", "Context", "als", "import", "GebruikerGegevens"]
                 , caseSensitive:   true
                 }

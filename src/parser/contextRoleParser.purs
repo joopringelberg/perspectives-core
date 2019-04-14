@@ -17,20 +17,24 @@ import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, values)
-import Data.String (Pattern(..), fromCharArray, split)
+import Data.String (Pattern(..), charAt, drop, fromCharArray, split)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_type, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_id, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_type, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
+import Perspectives.CoreTypes (MonadPerspectives, (##>))
+import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
-import Perspectives.IndentParser (IP, addContext, addRol, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
+import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
+import Perspectives.ObjectGetterConstructors (searchUnqualifiedRolDefinition)
+import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
+import Perspectives.PerspectivesTypes (ContextDef(..))
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
-import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
+import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>), (>=>), map, (<<<))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail, ParseError(..))
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
@@ -199,6 +203,11 @@ relativePropertyTypeName = lexeme do
   ln <- (STRING.string "$") *> localPropertyName
   pure $ QualifiedName namespace ln
 
+relativeRolTypeNameOutsideNamespace :: forall e. IP QualifiedName e
+relativeRolTypeNameOutsideNamespace = lexeme do
+  ln <- (STRING.string "?") *> uncapitalizedString
+  pure $ QualifiedName "?" ln
+
 contextName :: forall e. IP QualifiedName e
 contextName = (expandedName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace) <?> "the name of a resource (Context or Role)."
 
@@ -220,7 +229,7 @@ propertyName :: forall e. IP QualifiedName e
 propertyName = (expandedPropertyName <|> prefixedPropertyName <|> relativePropertyTypeName) <?> "a property or role name."
 
 roleName :: forall e. IP QualifiedName e
-roleName = propertyName
+roleName = (expandedPropertyName <|> prefixedPropertyName <|> relativePropertyTypeName <|> relativeRolTypeNameOutsideNamespace) <?> "a role name."
 
 -----------------------------------------------------------
 -- Datatypes
@@ -275,7 +284,18 @@ enclosingContextDeclaration = (do
 
 -- | contextDeclaration = contextName contextName
 contextDeclaration :: forall e. IP ContextDeclaration e
-contextDeclaration = (ContextDeclaration <$> typeContextName <*> contextName <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
+contextDeclaration = (ContextDeclaration <$> typeContextName <*> (anonymousContextName <|> contextName) <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
+  where
+    -- matches an underscore
+    -- returns "c<x>" (where <x> is an integer), scoped to the current namespace.
+    -- x is kept in the parserstate as a counter.
+    anonymousContextName :: IP QualifiedName e
+    anonymousContextName = lexeme do
+      namespace <- getNamespace
+      reservedOp "_"
+      n <- generatedNameCounter
+      pure $ QualifiedName namespace ("c" <> (show n))
+
 
 -- | Apply to a single line parser. Will parse a block of contiguous line comments before the line and
 -- | the comment after the expression on the line.
@@ -458,7 +478,7 @@ roleBinding cname =
   <|> contextBindingByReference cname
   <|> emptyBinding cname
   <|> roleBindingByReference cname
--- TODO: query, noBinding
+-- TODO: query
 
 withRoleCounting :: forall a e. IP a e -> IP a e
 withRoleCounting p = do
@@ -683,6 +703,10 @@ parseAndCache text = do
           case rol_binding rol of
             Nothing -> pure unit
             (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
+        for_ (values roles) \rol -> do
+          if (isRelativeRolTypeNameOutsideNamespace (rol_pspType rol))
+            then addNamespaceToLocalName rol
+            else pure unit
         -- We must correct the type of the buitenRollen here. This is because the default type set by the parser
         -- may be wrong if the type T of the context has an Aspect and uses the buitenRolBeschrijving of a prototype
         -- of that Aspect. Then the local name "buitenRolBeschrijving" will be in the namespace of that Aspect,
@@ -695,6 +719,30 @@ parseAndCache text = do
         pure $ Right r
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
+
+    -- True for an uncapitalizedString that starts with a question mark.
+    -- In this context, it suffices to just check for a questionmark.
+    isRelativeRolTypeNameOutsideNamespace :: String -> Boolean
+    isRelativeRolTypeNameOutsideNamespace s = case charAt 0 s of
+      (Just '?') -> true
+      otherwise -> false
+
+    -- Change the type of the rol to the qualified name, and change the key
+    -- in the context's rolinContext StrMap, too.
+    addNamespaceToLocalName :: PerspectRol -> MonadPerspectives (AjaxAvarCache e) Unit
+    addNamespaceToLocalName rol = do
+      localRolName <- pure $ drop 2 (rol_pspType rol)
+      mrolType <- (rol_context rol) ##> (contextType >=> pure <<< map ContextDef /-/ (searchUnqualifiedRolDefinition localRolName))
+      case mrolType of
+        Nothing -> throwError (error ("addNamespaceToLocalName: cannot find qualified name for '" <> localRolName <> "' in the context of '" <> (rol_context rol) <> "'!" ))
+        (Just rolType) -> do
+          (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (rol_id rol)
+          void $ lift $ takeVar av
+          lift $ void $ putVar (changeRol_type (unwrap rolType) rol) av
+          (cav :: AVar PerspectContext) <- getAVarRepresentingPerspectEntiteit (rol_context rol)
+          lift $ void $ do
+            ctxt <- takeVar cav
+            putVar (context_changeRolIdentifier ctxt (rol_pspType rol) (unwrap rolType)) cav
 
     -- Ensure we have an AVar for the RolInstance that is represented by vuller.
     -- Take the Rol out of that AVar in a Forked Aff and add rolId to its gevuldeRollen.
@@ -716,5 +764,6 @@ parseAndCache text = do
             bRol <- takeVar av
             putVar (changeRol_type (unwrap brtype) bRol) av
 
+    -- TODO Implementeer setBinnenRolType
     setBinnenRolType :: PerspectContext ->  MonadPerspectives (AjaxAvarCache e) Unit
     setBinnenRolType ctxt = pure unit
