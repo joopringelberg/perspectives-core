@@ -4,6 +4,7 @@ import Control.Alt ((<|>))
 import Control.Plus (empty)
 import Data.Array (elemIndex, union, difference, cons, null, nub, foldMap) as Arr
 import Data.Maybe (Maybe(..))
+import Data.Monoid.Additive (Additive(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap)
@@ -19,7 +20,7 @@ import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Perspectives.TripleGetterComposition (before, composeMonoidal, followedBy, (>->))
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
-import Prelude (class Eq, bind, pure, ($), (<>), join, map, (>>=), (>>>), (==), show, flip)
+import Prelude (class Eq, bind, const, flip, join, map, pure, show, ($), (<>), (==), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- COMBINATORS
@@ -190,11 +191,14 @@ alternatives = OGC.alternatives `trackedAs` "alternatives"
 some :: forall s e. (s **> PBool) e -> (s **> PBool) e
 some f = composeMonoidal f (alaF Disj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "some"
 
--- | True iff at all of the boolean results of f is true (where true is represented as PBool "true"). Yields true when applied to 
+-- | True iff at all of the boolean results of f is true (where true is represented as PBool "true"). Yields true when applied to
 -- an empty sequence.
 -- Test.Perspectives.TripleGetterConstructors
 all :: forall s e. (s **> PBool) e -> (s **> PBool) e
 all f = composeMonoidal f (alaF Conj Arr.foldMap ((==) (PBool "true")) >>> show >>> PBool) "all"
+
+count :: forall s o e. (s **> o) e -> (s **> Int) e
+count f = composeMonoidal f (alaF Additive Arr.foldMap (const 1) ) "count"
 
 -----------------------------------------------------------
 -- CLOSURES
