@@ -54,11 +54,15 @@ psp:Zaak tba:Test
 					$propertyReferentie => $$propsEqual
 						$volgNummer = 4
 	?gebruikerRol -> usr:MijnSysteem$gebruiker(1) -- overbodig hier, maar een goede test.
-	?contextBot => ()
+	-- ?contextBot syntax geeft de rol de id "model:TestBotActie$Test$contextBot_1"
+	-- psp:Context$contextBot geeft de rol de id "model:TestBotActie$Test$Context$contextBot_1"
+	-- Dat verschil wordt nog niet gecorrigeerd.
+	?contextBot => () 
 	$actie =>
 		psp:Actie $botCopiesV1ToV2
 			prototype psp:ContextPrototype
-			$subject -> $$Context$contextBot(1)
+			--$subject -> $$Context$contextBot(1) -- Dit werkt voor psp:Context$contextBot
+			$subject -> $$contextBot(1) -- Dit werkt voor ?contextBot
 			$werkwoord => psp:Beheert
 			$object =>
 				q:DataTypeGetter _ -- deze query wordt toegepast op de context.

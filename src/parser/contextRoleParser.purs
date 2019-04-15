@@ -721,7 +721,6 @@ parseAndCache text = do
   where
 
     -- True for an uncapitalizedString that starts with a question mark.
-    -- In this context, it suffices to just check for a questionmark.
     isRelativeRolTypeNameOutsideNamespace :: String -> Boolean
     isRelativeRolTypeNameOutsideNamespace s = case charAt 0 s of
       (Just '?') -> true
@@ -729,6 +728,9 @@ parseAndCache text = do
 
     -- Change the type of the rol to the qualified name, and change the key
     -- in the context's rolinContext StrMap, too.
+    -- TODO. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
+    -- However, when a direct reference to that Role is made (using $$-syntax), precisely that name must be re-used,
+    -- otherwise the binding cannot be constructed. See "testBotActie.crl" for an example
     addNamespaceToLocalName :: PerspectRol -> MonadPerspectives (AjaxAvarCache e) Unit
     addNamespaceToLocalName rol = do
       localRolName <- pure $ drop 2 (rol_pspType rol)

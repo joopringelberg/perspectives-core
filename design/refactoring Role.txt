@@ -1,0 +1,23 @@
+ON ROLES
+
+Een Rol kan zowel berekend als lokaal gerepresenteerd zijn. Dat drukken we uit met een som:
+
+psp:Sum psp:Rol
+	$alternative => psp:RepresentedRole
+	$alternative => psp:Function
+
+Een berekende rol (psp:Function) is uiteraard niet lokaal gerepresenteerd. Dat betekent dat de getter van zo'n rol zijn resultaat als het ware uit een andere context plukt en oplevert als ware hij lokaal gerepresenteerd. De binding van een berekende rol is dan ook hetzelfde als de binding van de rol in die andere context.
+Er is, om het heel expliciet te maken, geen lokaal gerepresenteerde rol die gebonden is aan een rol uit een andere context.
+
+Een berekende rol kan daarom ook niet voorzien van specifieke properties in de context waarin hij berekend wordt. Evenmin kun je iets over de cardinaliteit zeggen, of bepalen dat hij al dan niet verplicht moet zijn.
+
+REFACTORING
+1. Splits $rolInContext in $rolInContext en $contextRol
+	- in de modelfiles wordt merendeel $contextRol bedoeld met $rolInContext.
+	- "rolInContext" komt maar heel weinig voor in de code
+
+2. Hernoem psp:Rol naar psp:RepresentedRole
+
+3. Maak psp:Role als sum (zie boven). Vervang psp:Rol overal door psp:Role.
+
+

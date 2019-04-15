@@ -16,3 +16,10 @@ Als de queryCompiler een getter construeert voor een q:PropertyGetter expressie,
 Ja, dat kan hij, als de functionName "propertyQuery" is.
 
 De consequentie is dat we inderdaad psp:SimpleValue moeten accepteren als mogelijke binding van $property. Dat is immers het (substituut) type van een berekende property.
+
+Dit blijkt een patroon te zijn dat zich op diverse plekken voordoet. Namelijk bij de $mogelijkeBinding van:
+	* psp:Rol$rolProperty
+	* psp:View$propertyReferentie
+	* q:PropertyGetter$property
+
+Dit zijn allemaal plekken waar de mogelijke binding een psp:Property kan zijn, of een functie die de waarde van een property berekent.
