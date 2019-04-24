@@ -197,9 +197,12 @@ searchInAspectRolesAndPrototypes getter contextId =
   <|>
   (directAspectRoles /-/ (unwrap >>> searchInAspectRolesAndPrototypes getter)) (RolDef contextId)
 
+localAspects :: forall e. (AnyContext ~~> AnyContext) e
+localAspects = searchLocallyAndInPrototypeHierarchy (getContextRol (RolDef "model:Perspectives$Context$aspect") /-/ rolBindingDef)
+
 -- Test.Perspectives.ObjectGetterConstructors
 directAspects :: forall e. (AnyContext ~~> AnyContext) e
-directAspects = getContextRol (RolDef "model:Perspectives$Context$aspect") /-/ rolBindingDef
+directAspects = searchLocallyAndInPrototypeHierarchy localAspects
 
 -- Test.Perspectives.ObjectGetterConstructors
 directAspectRoles :: forall e. (RolDef ~~> RolDef) e

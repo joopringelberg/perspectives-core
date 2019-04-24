@@ -189,7 +189,7 @@ psp:Context psp:View
 --------------------------------------------------------------------------------
 psp:Context psp:Actie
 	$aspect => psp:Context
-	$defaultPrototype => psp:ContextPrototype
+	$defaultPrototype => psp:ActiePrototype
 	$rolInContext =>
 		psp:Rol $subject
 			extern $isFunctioneel = true
@@ -252,6 +252,11 @@ psp:Actie psp:ActieAspect
 				psp:Sum $botOrUser
 					$alternative => psp:PerspectivesSysteem$gebruiker
 					$alternative => psp:Context$contextBot
+
+psp:Actie psp:ActiePrototype
+	prototype psp:ContextPrototype
+	?aspect => psp:ActieAspect
+	$subject => ()
 
 psp:Context psp:Werkwoord
 	$aspect => psp:Context
@@ -425,7 +430,6 @@ psp:Zaak psp:TrustedCluster
 						$volgNummer = 2
 	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
-			psp:Context$aspect => psp:ActieAspect
 			$subject =>
 				psp:Rol $subject
 					$aspectRol => psp:ActieAspect$subject

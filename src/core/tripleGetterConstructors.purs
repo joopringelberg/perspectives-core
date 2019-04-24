@@ -14,7 +14,7 @@ import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, c
 import Perspectives.DataTypeTripleGetters (binnenRol, identity)
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
-import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, directAspects, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders, agreesWithType, alternatives) as OGC
+import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders, agreesWithType, alternatives, localAspects) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
@@ -146,8 +146,11 @@ searchInAspectPropertiesAndPrototypes getter@(TypedTripleGetter n _) = TypedTrip
     (rolDefId @@ (PropertyDef `before` directAspectProperties >-> unwrap `before` searchInAspectPropertiesAndPrototypes getter))
 
 -- Test.Perspectives.TripleGetterConstructors
+localAspects :: forall e. (AnyContext **> AnyContext) e
+localAspects = OGC.localAspects `trackedAs` "model:Perspectives$Context$directAspects"
+
 directAspects :: forall e. (AnyContext **> AnyContext) e
-directAspects = OGC.directAspects `trackedAs` "model:Perspectives$Context$directAspects"
+directAspects = searchLocallyAndInPrototypeHierarchy localAspects
 
 -- Test.Perspectives.TripleGetterConstructors
 directAspectRoles :: forall e. (RolDef **> RolDef) e
