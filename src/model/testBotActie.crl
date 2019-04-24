@@ -6,7 +6,6 @@ import model:QueryAst als q:
 Section $rolInContext
 
 psp:Zaak tba:Test
-	prototype psp:ContextPrototype
 	?binnenRolBeschrijving =>
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
@@ -29,7 +28,6 @@ psp:Zaak tba:Test
 					$range => psp:Boolean
 			$rolProperty =>
 				q:nAryCombinator $propsEqual
-					--prototype psp:ContextPrototype
 					extern $functionName = "equal"
 					$operand (1) =>
 						q:PropertyGetter _
@@ -57,10 +55,9 @@ psp:Zaak tba:Test
 	-- ?contextBot syntax geeft de rol de id "model:TestBotActie$Test$contextBot_1"
 	-- psp:Context$contextBot geeft de rol de id "model:TestBotActie$Test$Context$contextBot_1"
 	-- Dat verschil wordt nog niet gecorrigeerd.
-	?contextBot => () 
+	?contextBot => ()
 	$actie =>
 		psp:Actie $botCopiesV1ToV2
-			prototype psp:ContextPrototype
 			--$subject -> $$Context$contextBot(1) -- Dit werkt voor psp:Context$contextBot
 			$subject -> $$contextBot(1) -- Dit werkt voor ?contextBot
 			$werkwoord => psp:Beheert

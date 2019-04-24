@@ -89,7 +89,6 @@ psp:Context q:RolGetter
 --	q:ComputedRolGetter q:r1
 -- 		extern $functionName = "modelsM"
 psp:Context q:ComputedRolGetter
-	prototype psp:ContextPrototype
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
@@ -108,7 +107,6 @@ psp:Context q:ComputedRolGetter
 --	q:ComputedPropertyGetter q:p1
 -- 		extern $functionName = "modelsM"
 psp:Context q:ComputedPropertyGetter
-	prototype psp:ContextPrototype
 	$aspect => psp:Function
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
@@ -180,7 +178,6 @@ psp:Context q:nAryCombinator
 -- COMBINATORS
 --------------------------------------------------------------------------------
 psp:Context q:filter
-	prototype psp:ContextPrototype
 	$aspect => psp:Function
 	$rolInContext =>
 	 	psp:Rol $criterium
@@ -192,7 +189,6 @@ psp:Context q:filter
 			$mogelijkeBinding => psp:Function
 
 psp:Context q:rolesOf
-	prototype psp:ContextPrototype
 	$aspect => psp:Function
 	$rolInContext =>
 		psp:Rol $context
@@ -204,7 +200,6 @@ psp:Context q:rolesOf
 --------------------------------------------------------------------------------
 -- It is unlikely we will use this constructor in a model.
 psp:Context q:contains
-	prototype psp:ContextPrototype
 	$aspect => psp:Function
 	$rolInContext =>
 		psp:Rol $valueOrId

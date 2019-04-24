@@ -19,22 +19,22 @@ import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, values)
 import Data.String (Pattern(..), charAt, drop, fromCharArray, split)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_type, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, (##>))
 import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
-import Perspectives.ObjectGetterConstructors (searchUnqualifiedRolDefinition)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, getDefaultPrototype)
+import Perspectives.ObjectGetterConstructors (getPrototype, notEmpty, searchUnqualifiedRolDefinition, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, retrieveInternally)
-import Perspectives.PerspectivesTypes (ContextDef(..))
+import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
+import Perspectives.PerspectivesTypes (BuitenRol, ContextDef(..))
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
-import Prelude (class Show, Unit, bind, discard, id, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>), (>=>), map, (<<<))
+import Prelude (class Show, Unit, bind, discard, id, ifM, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>=>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail, ParseError(..))
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
@@ -699,6 +699,7 @@ parseAndCache text = do
     (Right r) -> catchError
       do
         let (DomeinFile{roles, contexts}) = domeinFile
+        for_ (values contexts) setDefaultPrototype
         for_ (values roles) \rol -> do
           case rol_binding rol of
             Nothing -> pure unit
@@ -720,6 +721,21 @@ parseAndCache text = do
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
 
+    setDefaultPrototype :: PerspectContext -> MonadPerspectives (AjaxAvarCache e) Unit
+    setDefaultPrototype ctxt = ifM (toBoolean (notEmpty getPrototype) (context_id ctxt))
+      (pure unit)
+      (do
+        (mdefprot :: Maybe BuitenRol) <- (context_pspType ctxt) ##> getDefaultPrototype
+        case mdefprot of
+          Nothing -> pure unit
+          (Just defProt) -> if (context_buitenRol ctxt) == (unwrap defProt)
+            then pure unit
+            else do
+              (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (context_buitenRol ctxt)
+              (brol :: PerspectRol) <- lift $takeVar av
+              lift $ putVar (changeRol_binding (unwrap defProt) brol) av
+        )
+
     -- True for an uncapitalizedString that starts with a question mark.
     isRelativeRolTypeNameOutsideNamespace :: String -> Boolean
     isRelativeRolTypeNameOutsideNamespace s = case charAt 0 s of
@@ -728,7 +744,7 @@ parseAndCache text = do
 
     -- Change the type of the rol to the qualified name, and change the key
     -- in the context's rolinContext StrMap, too.
-    -- TODO. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
+    -- NOTE. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
     -- However, when a direct reference to that Role is made (using $$-syntax), precisely that name must be re-used,
     -- otherwise the binding cannot be constructed. See "testBotActie.crl" for an example
     addNamespaceToLocalName :: RolID -> MonadPerspectives (AjaxAvarCache e) Unit

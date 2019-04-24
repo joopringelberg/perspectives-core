@@ -158,3 +158,6 @@ hasOnEachRolTelescopeTheContextTypeOf t headOfGraph = unlessFalse (isContextType
     (notEmpty (mogelijkeBinding /-/ sumToSequence))
     (all (unwrap >>> alternatives >=> pure <<< map RolDef /-/ (hasOnEachRolTelescopeTheContextTypeOf t))))
     headOfGraph)
+
+getDefaultPrototype :: forall e. (AnyContext ~~> BuitenRol) e
+getDefaultPrototype = searchInAspectsAndPrototypes ((getContextRol (RolDef "model:Perspectives$Context$defaultPrototype")) /-/ binding)
