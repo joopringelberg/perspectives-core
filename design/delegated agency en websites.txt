@@ -1,0 +1,26 @@
+1. Een individu kan gevonden worden worden via een domeinnaam, als op die url een service draait die zijn huidige IP adres geeft.
+2. Met een actuele url geef je iets van je privacy weg. Mag het wel een openbare service zijn?
+3. Het kan een persoonlijke URL zijn, of een directory service.
+4. Er is die ene internet activist die een software stack bouwt waar een persoonlijke domeinnaam in no time geregeld kan worden.
+
+5. Een bedrijf kan bots bepaalde taken automatisch laten uitvoeren.
+6. Ik denk dat een context waarin bots actief dingen doen, altijd ook een gebruikerrol moet hebben die de agency delegeert. Hoe schaalt dat?
+7. Iemand die vanuit een rol als werknemer handelt, vertegenwoordigt dat bedrijf. Hoe gaat het als zijn rol wordt overgenomen door iemand anders (een nieuwe werknemer, bijvoorbeeld)? Een nieuwe werknemer moet weliswaar toegang hebben tot lopende dossiers, maar het mag niet lijken alsof hij de handelingen van zijn voorganger heeft uitgevoerd.
+
+8. De aanleiding voor deze vragen is: hoe leg je als gebruiker contact met de relay server? Je gaat eigenlijk een verbinding aan met een service provider. Dat moet natuurlijk automatisch kunnen gebeuren. Dus een bot ligt voor de hand. Maar waar krijgt die zijn agency vandaan?
+
+9. Daar komt de vraag uit voort: wat is een webpagina, van een bedrijf? 
+	* Een InPlace installatie is een single-person webserver waar de gebruiker pagina's opvraagt
+	* Kan zo'n server achter een domeinnaam bereikbaar zijn voor publiek? 
+	* Wat is dan de pagina via welke je je aanmeldt bij de relayserver?
+
+10. Van een webpagina kan je als bezoeker een json documentje wegnemen en in je eigen InPlace scherm droppen, om zo een context met de agent achter de webpagina te gaan delen (het Json doc bevat de identiteit van de agent).
+
+11. Maar je zou ook je eigen 'kaartje' in een rol op de pagina kunnen droppen. Als achter die pagina een InPlace server zit, stuurt die server jou vervolgens de context waarin je jezelf een rol hebt gegeven.
+
+12. Dit wordt helemaal eenvoudig als je zo'n pagina vanuit InPlace opent. Het kaartje is dan gewoon iets uit de ui van InPlace.
+
+13. En dan nog een variant: de webpagina kan van een 'gewone' server komen. Op het moment dat een bezoeker zijn id gebruikt om een rol te vullen, maakt de server een json document aan dat de serialisatie vormt van een context met de bezoeker en met een gebruikerrol van de (organisatie of persoon achter) de website (de agent van de website). Dit document wordt naar de bezoeker èn naar de agent van de website gestuurd. 
+Oftewel, de website is een 'gewoon' programma dat óók het Perspectives protocol gebruikt. Dit is dan een voorbeeld van systeemintegratie.
+
+14. Tenslotte: als een domeinnaam staat voor een InPlace gebruiker, dan kan die pagina's vanuit dat domein ter beschikking stellen die evenzovele specifieke contexten representeren, waar bezoekers een rol in kunnen spelen. Dat kan bijvoorbeeld een contactverzoek pagina zijn. De agent achter de domeinnaam kan dan besluiten of hij op het verzoek in gaat of niet.

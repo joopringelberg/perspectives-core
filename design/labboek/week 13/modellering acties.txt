@@ -296,3 +296,6 @@ TODO:
 1. Neem het  (resultaat)type van een Functie op in de beschrijving ervan.
 2. Baseer de typeDefChecker daarop.
 3. (later) Schrijf de query-syntax en de parser, integreer die in de CRL parser.
+
+GEBRUIK VAN PSP:FUNCTION$RESULT IN DE TYPEDEFCHECKER
+

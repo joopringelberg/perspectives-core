@@ -21,9 +21,10 @@ Altijd als je een roldefinitie maakt met de lokale naam "buitenRolBeschrijving",
 Er ontstaat dan een roldefinitie met de lokale naam "buitenRolBeschrijving", maar in een andere namespace. Bijvoorbeeld: psp:Rol$buitenRolBeschrijving.
 Deze rol beschrijft de buitenRol van contexten waarvan het type psp:Rol is. Dat zijn dus contexten die een rol definiëren. Oftewel, het type van de buitenRol van een context die als type psp:Rol heeft, is psp:Rol$buitenRolBeschrijving.
 
-ContextType (T)	Context	(X)						Rol										Bound Value (B)
-psp:Context		psp:Rol							psp:Context$buitenRolBeschrijving		psp:Rol$buitenRolBeschrijving
-psp:Rol			psp:View$propertyReferentie		psp:View$propertyReferentie_buitenRol	psp:Rol$buitenRolBeschrijving
+ContextType (T)				Context	(X)						Rol										Bound Value (B)
+psp:Context					psp:Rol							psp:Context$buitenRolBeschrijving		psp:Rol$buitenRolBeschrijving
+psp:Rol						psp:View$propertyReferentie		psp:View$propertyReferentie_buitenRol	psp:Rol$buitenRolBeschrijving
+
 
 Dus, terugredenerend:
 1. Ga uit van een buitenRol BR.
@@ -51,3 +52,8 @@ het is nu:
     "model:TestBotActie$Test$botCopiesV1ToV2_buitenRol": {
       "pspType": "model:Perspectives$ContextPrototype$buitenRolBeschrijving",
 en dat klopt!
+
+
+Een instantie van de Actie tba:Test$botCopiesV1ToV2 heeft een buitenRol die als type heeft de buitenRolBeschrijving die geldt voor tba:Test$botCopiesV1ToV2
+Maar wat is dat?
+Die vind ik niet bij tba:Test$botCopiesV1ToV2.

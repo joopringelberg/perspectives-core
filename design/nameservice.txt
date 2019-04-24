@@ -1,0 +1,9 @@
+NAME SERVICE
+
+1. Een peer die mij het afgelopen uur nog een bericht stuurde, stuur ik mijn nieuwe adres.
+2. Als ik een peer binnen het afgelopen uur nog een bericht heb gestuurd, heb ik zijn actuele adres.
+3. Anders haal ik zijn adres op bij één van de vier stabiele adresservices die hij gebruikt.
+4. Ik moet dus telkens als ik een bericht stuur, bij die peer registreren hoe laat dat was (of dat snel kunnen opzoeken).
+
+Gegeven n peers, moet ik dus bij wijziging van IP adres maximaal n + 4 keer mijn verhuisbericht sturen.
+Tevens moet ik maximaal 1 maal per uur het adres ophalen van elke peer waarmee ik communiceer.

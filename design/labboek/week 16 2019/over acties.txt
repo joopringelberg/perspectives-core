@@ -9,8 +9,10 @@ ACTIES
 4. Dat kunnen we afdwingen door aan een definitie van een Actie een Aspect mee te geven ('ActieAspect') dat deze rollen al heeft en dan $aspectRol te gebruiken in de rollen van de definitie.
 
 5. Misschien kunnen we met een default prototype voor Actie garanderen dat elke instantie van Actie het aspect ActieAspect heeft?
+	JA.
 
 6. Heel misschien kunnen we de subject- en object rol binden aan een speciaal soort van Rol, dat middels een default prototype ook al $aspectRol heeft?
+	DAT IS ME NIET GELUKT
 
 7. Wat ik opschrijf als $mogelijkeBinding van de $object rol van Actie, moet het **type** zijn van de boundvalue.
 	JA OF NEE?
