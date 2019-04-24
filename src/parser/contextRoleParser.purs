@@ -29,7 +29,7 @@ import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, 
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef)
 import Perspectives.ObjectGetterConstructors (searchUnqualifiedRolDefinition)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
+import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion, retrieveInternally)
 import Perspectives.PerspectivesTypes (ContextDef(..))
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
@@ -705,7 +705,7 @@ parseAndCache text = do
             (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
         for_ (values roles) \rol -> do
           if (isRelativeRolTypeNameOutsideNamespace (rol_pspType rol))
-            then addNamespaceToLocalName rol
+            then addNamespaceToLocalName (rol_id rol)
             else pure unit
         -- We must correct the type of the buitenRollen here. This is because the default type set by the parser
         -- may be wrong if the type T of the context has an Aspect and uses the buitenRolBeschrijving of a prototype
@@ -731,15 +731,15 @@ parseAndCache text = do
     -- TODO. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
     -- However, when a direct reference to that Role is made (using $$-syntax), precisely that name must be re-used,
     -- otherwise the binding cannot be constructed. See "testBotActie.crl" for an example
-    addNamespaceToLocalName :: PerspectRol -> MonadPerspectives (AjaxAvarCache e) Unit
-    addNamespaceToLocalName rol = do
+    addNamespaceToLocalName :: RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+    addNamespaceToLocalName rolId = do
+      (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit rolId
+      (rol :: PerspectRol) <- lift $ takeVar av
       localRolName <- pure $ drop 2 (rol_pspType rol)
       mrolType <- (rol_context rol) ##> (contextType >=> pure <<< map ContextDef /-/ (searchUnqualifiedRolDefinition localRolName))
       case mrolType of
         Nothing -> throwError (error ("addNamespaceToLocalName: cannot find qualified name for '" <> localRolName <> "' in the context of '" <> (rol_context rol) <> "'!" ))
         (Just rolType) -> do
-          (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (rol_id rol)
-          void $ lift $ takeVar av
           lift $ void $ putVar (changeRol_type (unwrap rolType) rol) av
           (cav :: AVar PerspectContext) <- getAVarRepresentingPerspectEntiteit (rol_context rol)
           lift $ void $ do
