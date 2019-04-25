@@ -154,7 +154,9 @@ context definedResources c = do
       buitenRol <- lift $ lift $ getPerspectEntiteit $ context_buitenRol c
       strMapTraverse_ publicProperty (rol_properties buitenRol)
 
-    privateProperties = strMapTraverse_ privateProperty (rol_properties (context_binnenRol c))
+    privateProperties = do
+      binnenRol <- lift $ lift $ getPerspectEntiteit $ context_binnenRol c
+      strMapTraverse_ privateProperty (rol_properties binnenRol)
 
     roleBinding :: PerspectRol -> PerspectText e
     roleBinding role = do

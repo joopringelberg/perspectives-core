@@ -361,14 +361,15 @@ createContext name typeId roles properties = do
       , _rev = Nothing
       , displayName = ln
       , pspType = typeId
-      , buitenRol = (buitenRol name)
-      , binnenRol =
-          PerspectRol defaultRolRecord
-            { _id =  binnenRol name
-            , pspType = typeId <> "$binnenRolBeschrijving"
-            , binding = binding (buitenRol name)
-            }
+      , buitenRol = buitenRol name
+      , binnenRol = binnenRol name
       , rolInContext = fromFoldable roles
+      })
+  lift $ cacheEntiteitPreservingVersion (binnenRol name)
+    (PerspectRol defaultRolRecord
+      { _id =  binnenRol name
+      , pspType = typeId <> "$binnenRolBeschrijving"
+      , binding = binding (buitenRol name)
       })
   lift $ cacheEntiteitPreservingVersion (buitenRol name)
     (PerspectRol defaultRolRecord

@@ -524,17 +524,19 @@ context = withRoleCounting context' where
                 { _id = (show instanceName)
                 , displayName  = localName
                 , pspType = show typeName
-                , binnenRol =
-                  PerspectRol defaultRolRecord
-                    { _id = binnenRol (show instanceName)
-                    , pspType = show typeName <> "$binnenRolBeschrijving"
-                    , binding = binding $ buitenRol (show instanceName)
-                    , properties = fromFoldable privateProps
-                    }
+                , binnenRol = (binnenRol (show instanceName))
                 , buitenRol = buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
                 , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
               })
+            cacheRol (binnenRol (show instanceName))
+              (PerspectRol defaultRolRecord
+                { _id = binnenRol (show instanceName)
+                , pspType = show typeName <> "$binnenRolBeschrijving"
+                , context = (show instanceName)
+                , binding = binding $ buitenRol (show instanceName)
+                , properties = fromFoldable privateProps
+                })
             cacheRol (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = buitenRol (show instanceName)
@@ -640,18 +642,19 @@ enclosingContext = withRoleCounting enclosingContext' where
           { _id = textName
           , displayName  = textName
           , pspType = "model:Perspectives$Context"
-          , binnenRol =
-            PerspectRol defaultRolRecord
-              { _id = binnenRol textName
-              , pspType = "model:Perspectives$Context$binnenRolBeschrijving"
-              , binding = binding $ buitenRol textName
-              , properties = fromFoldable privateProps
-              }
+          , binnenRol = binnenRol textName
           , buitenRol = buitenRol textName
           , rolInContext = fromFoldable defs
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
-
+      cacheRol (binnenRol textName)
+        (PerspectRol defaultRolRecord
+          { _id = binnenRol textName
+          , pspType = "model:Perspectives$Context$binnenRolBeschrijving"
+          , context = textName
+          , binding = binding $ buitenRol textName
+          , properties = fromFoldable privateProps
+          })
       cacheRol (buitenRol textName)
         (PerspectRol defaultRolRecord
           { _id = buitenRol textName
@@ -732,7 +735,7 @@ parseAndCache text = do
             then pure unit
             else do
               (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (context_buitenRol ctxt)
-              (brol :: PerspectRol) <- lift $takeVar av
+              (brol :: PerspectRol) <- lift $ takeVar av
               lift $ putVar (changeRol_binding (unwrap defProt) brol) av
         )
 

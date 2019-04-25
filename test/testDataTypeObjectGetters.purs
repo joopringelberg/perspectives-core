@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
-import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, internePropertyTypen, isBuitenRol, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
+import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, isBuitenRol, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..), RolInContext(..), Value(..), binding, getUnqualifiedProperty)
 import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, addTestContext, assertEqual, loadTestModel, p, removeTestContext, u, unLoadTestModel)
@@ -55,11 +55,6 @@ theSuite = suiteSkip "DataTypeObjectGetters" do
       (propertyTypen (p "Rol$mogelijkeBinding_buitenRol"))
       [(p "Rol$buitenRolBeschrijving$isFunctioneel"),
       (p "Rol$buitenRolBeschrijving$isVerplicht")]
-  testSkip "internePropertyTypen" do
-      assertEqual "No instances of 'intern' in model:Perspectives"
-        (internePropertyTypen (p ""))
-        [(p ""),
-        (p "")]
   test "label" do
     assertEqual "u:myContext has label 'myContext'"
       (label (u "myContext"))

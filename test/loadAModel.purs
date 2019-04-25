@@ -10,7 +10,7 @@ import Test.Unit (TestF, suite, suiteSkip, test)
 theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
 theSuite = suiteSkip "Loading the model:" do
   test "" do
-    void $ runP $ loadCRLFile withSemanticChecks "testbotActie.crl"
+    void $ runP $ loadCRLFile withSemanticChecks "testbotInstantie.crl"
     -- void $ runP $ loadCRLFile withSemanticChecks "query.crl"
   -- test "Unloading the model" do
     -- unLoadTestModel "model:Perspectives"

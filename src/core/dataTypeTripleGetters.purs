@@ -1,9 +1,9 @@
 module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.CoreTypes (ObjectsGetter, type (**>))
-import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, internePropertyTypen, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
+import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
 import Perspectives.Identifiers (LocalName)
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value(..), getUnqualifiedProperty, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value, typeWithPerspectivesTypes)
 import Perspectives.PerspectivesTypes (genericBinding, binding, getUnqualifiedProperty) as PT
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter, trackedAs)
@@ -40,9 +40,6 @@ typeVanIedereRolInContext =  DTOG.typeVanIedereRolInContext `trackedAs` "model:P
 -- | The types of every property for which this rol has a value.
 propertyTypen :: forall e. (String **> String) e
 propertyTypen = DTOG.propertyTypen `trackedAs` "model:Perspectives$typeVanIederePropertyVanRol"
-
-internePropertyTypen :: forall e. (String **> String) e
-internePropertyTypen = DTOG.internePropertyTypen `trackedAs` "model:Perspectives$typeVanIederePropertyVanBinnenRol"
 
 -- | The string that labels the context instance.
 label :: forall e. (AnyContext **> String) e

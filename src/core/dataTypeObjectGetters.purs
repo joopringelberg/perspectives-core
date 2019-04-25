@@ -8,7 +8,7 @@ import Data.StrMap (keys, values)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, type (~~>))
 import Perspectives.Effects (AjaxAvarCache)
@@ -62,10 +62,6 @@ typeVanIedereRolInContext = getContextMember \context -> keys (context_rolInCont
 -- | The types of every property for which this rol has a value.
 propertyTypen :: forall e. ObjectsGetter e
 propertyTypen = getRolMember \rol -> keys (rol_properties rol)
-
--- | The types of every property for which the BinnenRol has a value.
-internePropertyTypen :: forall e. ObjectsGetter e
-internePropertyTypen = getContextMember \context -> keys (rol_properties (context_binnenRol context))
 
 label :: forall e. ObjectsGetter e
 label = getContextMember \context -> [(context_displayName context)]

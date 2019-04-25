@@ -5,18 +5,18 @@ import Data.Foreign.Class (class Decode, class Encode)
 import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (class Newtype)
 import Data.StrMap (keys, lookup)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_binnenRol, rol_binding, rol_properties)
-import Perspectives.ContextRolAccessors (getRolMember, getContextMember')
+import Perspectives.ContextAndRole (rol_binding, rol_properties)
+import Perspectives.ContextRolAccessors (getRolMember)
 import Perspectives.CoreTypes (type (~~>), ObjectsGetter)
-import Perspectives.Identifiers (deconstructBinnenRol, LocalName)
+import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Prelude (class Eq, class Show, bind, pure, show, ($), (==), (<>))
+import Prelude (class Eq, class Show, show, ($), (==), (<>))
 import Unsafe.Coerce (unsafeCoerce)
 
 typeWithPerspectivesTypes :: forall a b. a -> b
@@ -198,19 +198,8 @@ instance eqBinnenRol :: Eq BinnenRol where
   eq (BinnenRol c1) (BinnenRol c2) = c1 == c2
 
 instance rolClassBinnenRol :: RolClass BinnenRol where
-  getProperty pn rn = typeWithPerspectivesTypes $ do
-    cid <- pure $ deconstructBinnenRol (unwrap rn)
-    (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol cid
-    case mbr of
-      Nothing -> pure []
-      (Just rol) -> pure $ (maybe [] propertyValue) (lookup (unwrap pn) (rol_properties rol))
-
-  getUnqualifiedProperty ln rn = typeWithPerspectivesTypes $ do
-    cid <- pure $ deconstructBinnenRol (unwrap rn)
-    (mbr :: Maybe PerspectRol) <- getContextMember' context_binnenRol cid
-    case mbr of
-      Nothing -> pure []
-      (Just rol) -> pure $ getUnQualifiedPropertyFromPerspectRol ln rol
+  getProperty = typeWithPerspectivesTypes genericGetProperty
+  getUnqualifiedProperty = typeWithPerspectivesTypes genericGetUnqualifiedProperty
 
 instance bindingBinnenRol :: Binding BinnenRol BuitenRol where
   binding = typeWithPerspectivesTypes genericBinding

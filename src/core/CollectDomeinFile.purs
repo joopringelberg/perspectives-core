@@ -6,7 +6,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.StrMap (lookup)
-import Perspectives.ContextAndRole (context_buitenRol, context_id, context_rev)
+import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_id, context_rev)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (iedereRolInContext) as DTG
 import Perspectives.DomeinFile (DomeinFile(..), addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
@@ -48,6 +48,7 @@ domeinFileFromContext enclosingContext = do
                 modify $ addContextToDomeinFile ctxt
                 -- As a context and its buitenRol are always created together, we can safely assume the latter exists.
                 (lift $ getPerspectEntiteit (context_buitenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
+                (lift $ getPerspectEntiteit (context_binnenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
                 rollen <- lift $ ((context_id ctxt) ##= DTG.iedereRolInContext)
                 for_ rollen
                   \rolID ->

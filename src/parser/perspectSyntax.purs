@@ -22,7 +22,7 @@ type ContextRecord =
   , _rev :: Revision
   , displayName :: String
   , pspType :: ID
-  , binnenRol :: PerspectRol
+  , binnenRol :: ID
   , buitenRol :: ID
   , rolInContext :: StrMap (Array ID)
   , comments :: Comments

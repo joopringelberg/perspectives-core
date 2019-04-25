@@ -47,7 +47,7 @@ context_pspType (PerspectContext{pspType})= pspType
 changeContext_type :: ContextID -> PerspectContext -> PerspectContext
 changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = tp}
 
-context_binnenRol :: PerspectContext -> PerspectRol
+context_binnenRol :: PerspectContext -> RolID
 context_binnenRol (PerspectContext{binnenRol})= binnenRol
 
 context_buitenRol :: PerspectContext -> RolID
@@ -93,7 +93,7 @@ defaultContextRecord =
   , _rev: Nothing
   , displayName: ""
   , pspType: ""
-  , binnenRol: PerspectRol defaultRolRecord
+  , binnenRol: ""
   , buitenRol: ""
   , rolInContext: empty
   , comments: defaultComments

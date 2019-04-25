@@ -63,22 +63,23 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           { _id = ident
           , displayName  = localName
           , pspType = expandDefaultNamespaces ctype
-          , binnenRol =
-            PerspectRol defaultRolRecord
-              { _id = binnenRol ident
-              , pspType = expandDefaultNamespaces ctype <> "$binnenRolBeschrijving"
-              , binding = Just $ buitenRol ident
-              , context = ident
-              , properties = constructProperties interneProperties
-              }
+          , binnenRol = binnenRol ident
           , buitenRol = buitenRol ident
           , rolInContext = rolIds
           , comments = Comments { commentBefore: [], commentAfter: []}
         })
+      lift $ cacheUncachedEntiteit (binnenRol ident)
+        (PerspectRol defaultRolRecord
+          { _id = binnenRol ident
+          , pspType = expandDefaultNamespaces ctype <> "$binnenRolBeschrijving"
+          , binding = Just $ buitenRol ident
+          , context = ident
+          , properties = constructProperties interneProperties
+          })
       (b :: Maybe String) <- case prototype of
         Nothing -> pure Nothing
         (Just p) -> pure (Just (buitenRol (expandDefaultNamespaces p)))
-      lift$ cacheUncachedEntiteit (buitenRol ident)
+      lift $ cacheUncachedEntiteit (buitenRol ident)
         (PerspectRol defaultRolRecord
           { _id = buitenRol ident
           , pspType = expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"

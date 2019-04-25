@@ -14,15 +14,15 @@ import Data.Newtype (ala, unwrap, wrap)
 import Data.Number (fromString) as Nmb
 import Data.StrMap (keys)
 import Data.Traversable (for_, traverse, traverse_)
-import Perspectives.ContextAndRole (context_binnenRol, rol_id, rol_pspType)
+import Perspectives.ContextAndRole (rol_id, rol_pspType)
 import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>), (@@>>))
 import Perspectives.DataTypeObjectGetters (isBuitenRol, propertyTypen)
-import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, propertyTypen, contextType, typeVanIedereRolInContext, internePropertyTypen, buitenRol, binnenRol, rolType, binding) as DTG
+import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, propertyTypen, contextType, typeVanIedereRolInContext, buitenRol, binnenRol, rolType, binding) as DTG
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
-import Perspectives.Identifiers (LocalName, buitenRol)
+import Perspectives.Identifiers (LocalName, buitenRol, binnenRol)
 import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf, hasOnEachRolTelescopeTheRolTypeOf, isSubsumedOnEachRolTelescopeOf)
 import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, hasType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
@@ -91,7 +91,7 @@ checkContextDef def deftype = do
     (pure unit)
     do
       (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
-      (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap def) >>= pure <<< context_binnenRol
+      (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ binnenRol $ unwrap def
 
       mandatoryInternalProperties <- lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> mandatoryProperties)
       traverse_
@@ -386,7 +386,7 @@ mandatoryRolesInstantiated def deftype =
 checksForEachContext :: forall e. Context -> ContextDef -> TDChecker e Unit
 checksForEachContext def deftype = do
   (buitenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ buitenRol $ unwrap def
-  (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit (unwrap def) >>= pure <<< context_binnenRol
+  (binnenrol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit $ binnenRol $ unwrap def
 
   definedInternalProperties <- lift (unwrap deftype @@= binnenRolBeschrijvingDef >-> propertiesDef)
   traverse_ (checkRange def binnenrol (getBinnenRolPropertyValues def binnenrol)) definedInternalProperties
@@ -397,7 +397,7 @@ checksForEachContext def deftype = do
   availableExternalProperties <- lift (buitenRol $ unwrap def @@= DTG.propertyTypen)
   checkPropertyIsDefined buitenrol availableExternalProperties definedExternalProperties def
 
-  availableInternalProperties <- lift (unwrap def @@= DTG.internePropertyTypen)
+  availableInternalProperties <- lift (binnenRol $ unwrap def  @@= DTG.propertyTypen)
   checkPropertyIsDefined binnenrol availableInternalProperties definedInternalProperties def
 
   checkIfRolesHaveDefinition deftype def
