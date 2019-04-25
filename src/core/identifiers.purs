@@ -32,6 +32,8 @@ module Perspectives.Identifiers
 , isBinnenRol
 , isModelName
 , expandDefaultNamespaces
+, q
+, psp
   )
 
 where
@@ -258,3 +260,12 @@ expandDefaultNamespaces s = if (indexOf (Pattern "psp:") s) == Just 0 then
     else if (indexOf (Pattern "u:") s) == Just 0 then
       replace (Pattern "u:") (Replacement "model:User$") s
       else s
+
+-----------------------------------------------------------
+-- CONVENIENCE NAMESPACE PREFIX FUNCIONS
+-----------------------------------------------------------
+q :: String -> String
+q ln = "model:QueryAst$" <> ln
+
+psp :: String -> String
+psp ln = "model:Perspectives$" <> ln

@@ -88,7 +88,7 @@ constructQueryFunction typeDescriptionID = do
         (typeDescriptionID ##> getBindingOfRol "model:QueryAst$PropertyGetter$property")
       case unwrap functionName of
         "searchProperty" -> pure $ typeWithPerspectivesTypes ((searchProperty property))
-        "getInternalPropery" -> pure $ typeWithPerspectivesTypes $ getInternalProperty property
+        "getInternalPropery" -> pure $ getInternalProperty property
         "searchExternalProperty" -> pure $ typeWithPerspectivesTypes $ searchExternalProperty property
         "searchUnqualifiedProperty" -> pure $ typeWithPerspectivesTypes $ ((searchUnqualifiedProperty property))
         "searchInternalUnqualfiedProperty" -> pure $ typeWithPerspectivesTypes $ searchInternalUnqualifiedProperty property

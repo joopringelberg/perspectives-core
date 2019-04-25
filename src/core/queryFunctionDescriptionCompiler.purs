@@ -15,7 +15,7 @@ import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserM
 import Perspectives.DataTypeObjectGetters (context, contextType) as DTG
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
-import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace)
+import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace, q, psp)
 import Perspectives.ModelBasedObjectGetters (ownRollenDef)
 import Perspectives.ObjectGetterConstructors (hasRolDefinition, mogelijkeBinding, searchContextRol, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
@@ -282,12 +282,6 @@ compileCombinatorQueryStep s contextId = case s of
       case eab of
         (Left a) -> pure $ Left a
         (Right b) -> f b
-
-q :: String -> String
-q ln = "model:QueryAst$" <> ln
-
-psp :: String -> String
-psp ln = "model:Perspectives$" <> ln
 
 -- | Constructs a context with a single role that is bound to the role identified by 'bindingValue'
 -- | Uses the type description provided by parameter 'contextType'.

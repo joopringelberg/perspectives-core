@@ -21,6 +21,7 @@ import Test.Perspectives.QueryCombinators (theSuite) as QC
 import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
+import Test.Perspectives.TestBotActie as TBA
 import Test.Perspectives.Utils (TestModelLoadEffects, runP)
 import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Main (runTest)
@@ -38,6 +39,7 @@ main = runTest do
   TGCO.theSuite
   LAM.theSuite
   QC.theSuite
+  TBA.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP setupUser)

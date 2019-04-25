@@ -1,0 +1,8 @@
+GebruikerGegevens
+
+import model:Perspectives als psp:
+import model:TestBotActie als tba:
+
+tba:Test usr:test1
+	intern tba:Test$binnenRolBeschrijving$v1 = "aap"
+	intern tba:Test$binnenRolBeschrijving$trigger = true

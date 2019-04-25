@@ -1,0 +1,19 @@
+PARSER
+1. Implementeer setBinnenRolType.
+2. Directe rolbinding met $$ syntax.
+
+	a. Ga na of er een administratie van inverse rolbinding is voor model:TestBotActie$Test$contextBot_1.
+		ANTWOORD: nee.
+	b. Waarom niet?
+		ANTWOORD: foutje, is hersteld.
+	Ik laat dit verder zoals het is. Het is te ingewikkeld en kwetsbaar om op te lossen.
+
+DEFAULT PROTOTYPE
+Maak het default prototype mechanisme. KLAAR
+
+ACTIONS
+
+1. Test Actions.constructActionFunction
+2. Test Actions.compileBotAction
+3. Controleer/Herschrijf ModelBasedTripleGetters.botActiesInContext
+4. Bedenk hoe je de acties die opgezet zijn voor een ContextInstantie, weer weg kunt halen.

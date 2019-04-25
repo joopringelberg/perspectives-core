@@ -152,6 +152,9 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "t:myContextWithInternalPropertyPrototype gives a value to $intProp1"
       ((t "myContextWithInternalPropertyPrototype") ##= (getInternalProperty $ PropertyDef $ t "myContextDefWithInternalProperty$binnenRolBeschrijving$intProp1"))
       [Value "hello world!"]
+    -- assertEqual "model:User$test1 has a value for internal property v1"
+    --   ("model:User$test1" ##= (getInternalProperty $ PropertyDef "model:TestBotActie$Test$binnenRolBeschrijving$v1"))
+    --   [Value "aap"]
   test "searchInternalUnqualifiedProperty (Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope)" do
     assertEqual "t:myContextWithInternalProperty has no value for $intProp1 through its prototype"
       ((t "myContextWithInternalProperty") ##= (searchInternalUnqualifiedProperty "intProp1"))

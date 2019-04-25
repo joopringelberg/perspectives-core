@@ -115,6 +115,8 @@ newtype PString = PString String
 derive instance newtypePString :: Newtype PString _
 instance eqPString :: Eq PString where
   eq (PString c1) (PString c2) = c1 == c2
+instance showPString :: Show PString where
+  show (PString b) = show b
 
 -----------------------------------------------------------
 -- CONTEXT AS INSTANCE

@@ -62,9 +62,9 @@ psp:Zaak tba:Test
 			$subject -> $$contextBot(1) -- Dit werkt voor ?contextBot
 			$werkwoord => psp:Beheert
 			$object =>
-				q:DataTypeGetter _ -- deze query wordt toegepast op de context.
-					extern $functionName = "buitenRol"
-					?result => $$$botCopiesV1ToV2
+				q:DataTypeGetter _ -- deze query wordt toegepast op de context en MOET een rol opleveren.
+					extern $functionName = "binnenRol"
+					?result => tba:Test
 			$condition =>
 				q:nAryCombinator _ -- deze query wordt toegepast op de context.
 					extern $functionName = "conj"
@@ -85,6 +85,6 @@ psp:Zaak tba:Test
 					$property => tba:Test$binnenRolBeschrijving$v2
 					$value =>
 						q:PropertyGetter _ -- This getter will be applied to the $object.
-							extern $functionName = "constructInternalPropertyGetter"
+							extern $functionName = "getInternalPropery"
 							$property => tba:Test$binnenRolBeschrijving$v1
 							?result => psp:String

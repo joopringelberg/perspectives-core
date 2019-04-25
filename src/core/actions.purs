@@ -19,14 +19,14 @@ import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject)
-import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject, Object)
+import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID, psp)
 import Perspectives.ModelBasedTripleGetters (botActiesInContext)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.PerspectivesTypes (ContextDef(..), PropertyDef(..), RolDef(..), RolInContext(..), ActieDef, genericBinding)
-import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
+import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
+import Perspectives.QueryCompiler (constructQueryFunction, getPropertyFunction, getRolFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
@@ -100,7 +100,7 @@ setContextType = updatePerspectEntiteit
   changeContext_type
   (\theType cid -> Delta
     { id : cid
-    , memberName: "model:Perspectives$type"
+    , memberName: psp "type"
     , deltaType: Change
     , value:  (Just theType)
     , isContext: true
@@ -111,7 +111,7 @@ setRolType = updatePerspectEntiteit
   changeRol_type
   (\theType cid -> Delta
     { id : cid
-    , memberName: "model:Perspectives$type"
+    , memberName: psp "type"
     , deltaType: Change
     , value:  (Just theType)
     , isContext: false
@@ -122,7 +122,7 @@ setContextDisplayName = updatePerspectEntiteit
   changeContext_displayName
   (\displayName cid -> Delta
     { id : cid
-    , memberName: "model:Perspectives$label"
+    , memberName: psp "label"
     , deltaType: Change
     , value: (Just displayName)
     , isContext: true
@@ -133,7 +133,7 @@ setContext = updatePerspectEntiteit
   changeRol_context
   (\rol cid -> Delta
     { id : cid
-    , memberName: "model:Perspectives$context"
+    , memberName: psp "context"
     , deltaType: Change
     , value: (Just rol)
     , isContext: false
@@ -145,13 +145,13 @@ setBinding rid boundRol = do
   updatePerspectEntiteit' changeRol_binding rid boundRol
   case head oldBinding of
     Nothing -> pure unit
-    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob "model:Perspectives$binding" rid
-  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol "model:Perspectives$binding" rid
+    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (psp "binding") rid
+  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol (psp "binding") rid
   cid <- (RolInContext rid) ##>> context
   setupBotActions cid
   addDelta $ Delta
     { id : rid
-    , memberName: "model:Perspectives$binding"
+    , memberName: psp "binding"
     , deltaType: Change
     , value: (Just boundRol)
     , isContext: false
@@ -174,13 +174,13 @@ updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid
 updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   ID -> MemberName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
-updatePerspectEntiteitMember' changeEntityMember cid memberName value = do
-  (context :: a) <- getPerspectEntiteit cid
+updatePerspectEntiteitMember' changeEntityMember pid memberName value = do
+  (pe :: a) <- getPerspectEntiteit pid
   -- Change the entity in cache:
-  void $ cacheCachedEntiteit cid (changeEntityMember context memberName value)
+  void $ cacheCachedEntiteit pid (changeEntityMember pe memberName value)
   -- Save the entity to Couchdb.
-  (changedContext :: a) <- getPerspectEntiteit cid
-  void $ saveVersionedEntiteit cid changedContext
+  (changedContext :: a) <- getPerspectEntiteit pid
+  void $ saveVersionedEntiteit pid changedContext
 
   -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
   -- -- Store the changed entity in couchdb.
@@ -297,31 +297,31 @@ setProperty = setUpBotActionsAfter setProperty'
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
 -----------------------------------------------------------
-type Action e = (Subject -> MonadPerspectives (AjaxAvarCache e) (Array Value))
+type Action e = (PBool -> MonadPerspectives (AjaxAvarCache e) (Array Value))
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
-constructActionFunction :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) (ContextID -> Action e)
-constructActionFunction actionInstanceID = do
+constructActionFunction :: forall e. ContextID -> StringTypedTripleGetter e -> MonadPerspectives (AjaxAvarCache e) (ContextID -> Action e)
+constructActionFunction actionInstanceID objectGetter = do
   actionType <- onNothing (errorMessage "no type found" "")
     (actionInstanceID ##> contextType)
   case actionType of
-    "model:ActionAst$assignToRol" -> do
+    "model:Perspectives$assignToRol" -> do
       -- The assignment operation to be executed. Possible values are: "add", "remove", "set"
-      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID ##> (searchExternalProperty (PropertyDef "model:ActionAst$assignToRol$buitenRolBeschrijving$operation")))
+      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID ##> (searchExternalProperty (PropertyDef $psp "assignToRol$buitenRolBeschrijving$operation")))
       -- The rol we will assign to. The qualified name is used!
       (rol :: String) <- onNothing
         (errorMessage "no rol provided to assign to" actionType)
-        (actionInstanceID ##> getBindingOfRol "model:ActionAst$assignToRol$rol")
+        (actionInstanceID ##> getBindingOfRol (psp "assignToRol$rol"))
       -- The description of the value (probably a query, on the context holding the Action).
       value <- onNothing
         (errorMessage "no value provided to assign" actionType)
-        (actionInstanceID ##> getBindingOfRol "model:ActionAst$assignToRol$value")
+        (actionInstanceID ##> getBindingOfRol (psp "assignToRol$value"))
       -- The function that will compute the value from the context.
       valueComputer <- getRolFunction value
 
       action <- pure (\f contextId bool -> case bool of
-        "true" -> do
+        PBool "true" -> do
           val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
             Nothing -> pure []
@@ -334,26 +334,33 @@ constructActionFunction actionInstanceID = do
         "set" -> pure $ action setRol'
         _ -> throwError (error $ "constructActionFunction: unknown operation for assigntoRol: '" <> unwrap operation <> "'")
 
-    "model:ActionAst$assignToProperty" -> do
+    "model:Perspectives$assignToProperty" -> do
       -- The assignment operation to be executed. Possible values are: "add", "remove", "set"
-      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID ##> (searchExternalProperty (PropertyDef "model:ActionAst$assignToRol$buitenRolBeschrijving$operation") ))
+      operation <- onNothing (errorMessage "no operation name provided" actionType) (actionInstanceID ##> (searchExternalProperty (PropertyDef $ psp "assignToProperty$buitenRolBeschrijving$operation") ))
       -- The property we will assign to.
       (property :: String) <- onNothing
         (errorMessage "no property provided to assign to" actionType)
-        (actionInstanceID ##> getBindingOfRol "model:ActionAst$assignToRol$property")
+        (actionInstanceID ##> getBindingOfRol (psp "assignToProperty$property"))
       -- The description of the value (probably a query, on the context holding the Action).
       value <- onNothing
         (errorMessage "no value provided to assign" actionType)
-        (actionInstanceID ##> getBindingOfRol "model:ActionAst$assignToRol$value")
+        (actionInstanceID ##> getBindingOfRol (psp "assignToProperty$value"))
       -- The function that will compute the value from the context.
-      valueComputer <- getPropertyFunction value
+      valueComputer <- constructQueryFunction value
 
-      action <- pure (\f rolId bool -> case bool of
-        "true" -> do
-          val <- (runTypedTripleGetterToMaybeObject rolId valueComputer)
+      action <- pure (\f contextId bool -> case bool of
+        PBool "true" -> do
+          val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
             Nothing -> pure []
-            (Just v) -> f property v rolId
+            -- TODO. If we assign an internal or external property, this will not do.
+            -- But the action should be applied to the $object, anyway!
+            (Just v) -> do
+              object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
+              -- object <- pure Nothing
+              case object of
+                Nothing -> pure []
+                (Just o) -> f property v o
         _ -> pure [])
 
       case (unwrap operation) of
@@ -362,17 +369,17 @@ constructActionFunction actionInstanceID = do
         "set" -> pure $ action setProperty'
         _ -> throwError (error $ "constructActionFunction: unknown operation for assignToProperty: '" <> (unwrap operation) <> "'")
 
-    "model:ActionAst$effectFullFunction" -> do
+    "model:Perspectives$effectFullFunction" -> do
       -- The effectful function to be applied. NOTE: the syntax coloring goes mad when we write out the propertyname below in full...
-      functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID ##> (searchExternalProperty $ (PropertyDef $ "model:ActionAst$effectFullFunction$buitenRolBeschrijving$" <>
+      functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID ##> (searchExternalProperty $ (PropertyDef $ psp "effectFullFunction$buitenRolBeschrijving$" <>
         "functionName")))
       -- The parameters
-      (parameters :: Array String) <- (actionInstanceID %% getBindingOfRol "model:ActionAst$effectFullFunction$parameter")
+      (parameters :: Array String) <- (actionInstanceID %% getBindingOfRol (psp "effectFullFunction$parameter"))
       case unwrap functionName of
         -- The Action is for the bot that plays a role in a model:CrlText$Text context.
         -- The contextId identifies this context, hence we need no parameters when calling this function.
         "storeDomeinFileInCouchdb" -> pure $ \contextId bool -> case bool of
-          "true" -> storeDomeinFile contextId *> pure []
+          PBool "true" -> storeDomeinFile contextId *> pure []
           _ -> pure []
 
         _ -> throwError (error $ "constructActionFunction: unknown functionName for effectFullFunction: '" <> (unwrap functionName) <> "'")
@@ -380,7 +387,7 @@ constructActionFunction actionInstanceID = do
     _ -> throwError (error $ "constructActionFunction: unknown type description: '" <> actionType <> "'")
   where
     errorMessage :: String -> String -> Error
-    errorMessage s t = error ("constructQueryFunction: " <> s <> " for: " <> t <> " " <> actionInstanceID)
+    errorMessage s t = error ("constructActionFunction: " <> s <> " for: " <> t <> " " <> actionInstanceID)
 
 getBindingOfRol :: forall e. ID -> ObjectsGetter e
 getBindingOfRol rolName = getContextRol (RolDef rolName) /-/ rolBindingDef
@@ -393,19 +400,25 @@ compileBotAction :: forall e. ActieDef -> ContextID -> MonadPerspectives (AjaxAv
 compileBotAction actionType contextId = do
   condition <- onNothing
     (errorMessage "no condition provided in Action" (unwrap actionType))
-    (unwrap actionType ##> getBindingOfRol "model:Perspectives$Actie$condition")
+    (unwrap actionType ##> getBindingOfRol (psp "Actie$condition"))
   action <- onNothing
     (errorMessage "no effect provided in Action" (unwrap actionType))
-    (unwrap actionType ##> getBindingOfRol "model:Perspectives$Actie$effect")
-  (actionObjectsGetter :: (ContextID -> Action e)) <- constructActionFunction action
-  (conditionQuery :: StringTypedTripleGetter e) <- getPropertyFunction condition
+    (unwrap actionType ##> getBindingOfRol (psp "Actie$effect"))
+  object <- onNothing
+    (errorMessage "no effect provided in Action" (unwrap actionType))
+    (unwrap actionType ##> getBindingOfRol (psp "Actie$object"))
+  (objectGetter :: StringTypedTripleGetter e) <- constructQueryFunction object
+  (conditionalEffect :: (ContextID -> Action e)) <- constructActionFunction action objectGetter
+  -- TODO: DIT MOET waarschijnlijk constructQueryFunction condition zijn.
+  (conditionQuery :: StringTypedTripleGetter e) <- constructQueryFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  pure $ conditionQuery >-> constructTripleGetterFromObjectsGetter (unwrap actionType) (actionObjectsGetter contextId)
+  -- TODO: het object van de actie moet meegegeven worden aan de conditionalEffect.
+  pure $ conditionQuery `followedBy` PBool >-> constructTripleGetterFromObjectsGetter (unwrap actionType) (conditionalEffect contextId)
 
   where
     errorMessage :: String -> String -> Error
-    errorMessage s t = error ("constructQueryFunction: " <> s <> " for: " <> t <> " " <> unwrap actionType)
+    errorMessage s t = error ("constructActionFunction: " <> s <> " for: " <> t <> " " <> unwrap actionType)
 
 setupBotActions :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
 setupBotActions cid = do
