@@ -19,14 +19,14 @@ import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName, Subject, Object)
+import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID, psp)
 import Perspectives.ModelBasedTripleGetters (botActiesInContext)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
-import Perspectives.QueryCompiler (constructQueryFunction, getPropertyFunction, getRolFunction)
+import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
@@ -318,14 +318,19 @@ constructActionFunction actionInstanceID objectGetter = do
         (errorMessage "no value provided to assign" actionType)
         (actionInstanceID ##> getBindingOfRol (psp "assignToRol$value"))
       -- The function that will compute the value from the context.
-      valueComputer <- getRolFunction value
+      valueComputer <- constructQueryFunction value
 
       action <- pure (\f contextId bool -> case bool of
         PBool "true" -> do
           val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
             Nothing -> pure []
-            (Just v) -> f rol v contextId <* setupBotActions contextId
+            (Just v) -> do
+              object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
+              case object of
+                Nothing -> pure []
+                (Just o) -> f rol v o <* setupBotActions contextId
+
         _ -> pure [])
 
       case unwrap operation of
@@ -353,11 +358,8 @@ constructActionFunction actionInstanceID objectGetter = do
           val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
             Nothing -> pure []
-            -- TODO. If we assign an internal or external property, this will not do.
-            -- But the action should be applied to the $object, anyway!
             (Just v) -> do
               object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
-              -- object <- pure Nothing
               case object of
                 Nothing -> pure []
                 (Just o) -> f property v o
@@ -370,9 +372,7 @@ constructActionFunction actionInstanceID objectGetter = do
         _ -> throwError (error $ "constructActionFunction: unknown operation for assignToProperty: '" <> (unwrap operation) <> "'")
 
     "model:Perspectives$effectFullFunction" -> do
-      -- The effectful function to be applied. NOTE: the syntax coloring goes mad when we write out the propertyname below in full...
-      functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID ##> (searchExternalProperty $ (PropertyDef $ psp "effectFullFunction$buitenRolBeschrijving$" <>
-        "functionName")))
+      functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID ##> (searchExternalProperty $ (PropertyDef $ psp "effectFullFunction$buitenRolBeschrijving$functionName")))
       -- The parameters
       (parameters :: Array String) <- (actionInstanceID %% getBindingOfRol (psp "effectFullFunction$parameter"))
       case unwrap functionName of

@@ -1,5 +1,8 @@
 TEST Actions.constructActionFunction
 
+TODO
+
+DONE
 1. Maak een instantie van tba:Test (usr:test1)
 	HOE? Neem een voorbeeld aan systeemInstanties.crl.
 	KLAAR.
@@ -70,4 +73,14 @@ Het is duidelijk dat deze check niet ok is. Een zinvolle test zou zijn te onderz
 
 M.a.w., op deze manier compileElementaryQueryStep aanvliegen gaat verkeerd.
 
+Opgelost door de queryCompiler toe te passen op de binding van $value.
+
+
+5. PROBLEEM: als de waarde voor assignToProperty dan bekend is, wordt hij niet toegekend aan de binnenRol.
+
+* De $value query van het $effect van de Actie start bij de context;
+* maar de operatie die de constructActionFunction maakt, moet worden toegepast op het $object van de actie.
+OPGELOST door de binnenRol apart op te slaan.
+
+4. Check in de actionCompiler de andere gevallen van toepassen van de queryFunctionDescriptionCompiler; vervang zo nodig door toepassing van de queryCompiler.
 

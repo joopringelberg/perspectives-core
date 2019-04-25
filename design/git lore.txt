@@ -67,9 +67,14 @@ ATOM/GIT HANDIGHEID
 
 15. Sync a forc: https://help.github.com/articles/syncing-a-fork/
 
-15. List files being tracked:
+16. List files being tracked:
 
 	git ls-tree -r master --name-only
+
+17. Merge a branch.
+
+		git checkout master
+		git merge <branchename>
 
 
 OPEN
