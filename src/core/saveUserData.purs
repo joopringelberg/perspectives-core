@@ -84,6 +84,8 @@ removeUserData' buitenRollen = void $ for buitenRollen removeBuitenRol
       (pure unit)
       (do
         haveSeen $ unwrap rolId
+        -- remove the binnenRol.
+        void (removeEntiteit' (buitenToBinnenRol (unwrap rolId)) :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
         lift (rolId ##>> context) >>= removeContext
         void (removeEntiteit' (unwrap rolId) :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
       )
