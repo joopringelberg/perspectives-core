@@ -5,22 +5,29 @@ import Data.Array (elemIndex, cons)
 import Data.Maybe (maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for, for_)
-import Perspectives.CoreTypes (MonadPerspectives, (%%>>), (##>>))
+import Perspectives.ContextAndRole (context_id, rol_id)
+import Perspectives.CoreTypes (MonadPerspectives, (%%>>), (##>>), MP)
 import Perspectives.DataTypeObjectGetters (buitenRol, context, genericContext, iedereRolInContext)
+import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenToBinnenRol)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit)
-import Perspectives.PerspectivesTypes (BuitenRol(..), genericBinding)
+import Perspectives.PerspectivesTypes (BuitenRol)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (removeEntiteit, saveEntiteitPreservingVersion)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (Unit, ifM, pure, unit, (==), discard, (>>=), bind, ($), const, void, (>=>), (<<<), map)
+import Prelude (Unit, ifM, pure, unit, (==), discard, (>>=), bind, ($), const, void, (>=>), (<<<), map, (>>>))
 
 type UserDataState = Array ID
 
 type MonadSaveUserData e = StateT UserDataState (MonadPerspectives e)
+
+saveDomeinFileAsUserData :: forall e. DomeinFile -> MonadPerspectives (AjaxAvarCache e) Unit
+saveDomeinFileAsUserData (DomeinFile{contexts, roles}) = do
+  for_ contexts (context_id >>> saveEntiteitPreservingVersion :: ID -> MP e PerspectContext)
+  for_ roles (rol_id >>> saveEntiteitPreservingVersion :: ID -> MP e PerspectRol)
 
 saveUserData :: forall e. Array BuitenRol -> MonadPerspectives (AjaxAvarCache e) Unit
 saveUserData buitenRollen = evalStateT (saveUserData' buitenRollen) []
@@ -51,11 +58,7 @@ saveUserData' buitenRollen = void $ for buitenRollen saveBuitenRol
         void $ for rollen \(rol :: String) -> do
           haveSeen rol
           void (saveEntiteit rol :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
-          bs <- lift $ genericBinding rol
-          for_ bs
-            \b -> ifM (isBuitenRol b)
-                    (saveBuitenRol $ BuitenRol b)
-                    (pure unit)
+        pure unit
 
     seenBefore :: ID -> MonadSaveUserData (AjaxAvarCache e) Boolean
     seenBefore id = get >>= \ids -> pure $ maybe false (const true) (elemIndex id ids)

@@ -1,0 +1,13 @@
+AANPASSING PARSEANDCACHE
+Het resultaat van Perspectives.ContextRoleParser.parseAndCache is nu ParseRoot.
+Dat is:
+
+	data ParseRoot = UserData (Array ID) | RootContext ID
+
+Maar dat is niet handig:
+	* als het een RootContext is, ga ik daarna weer een DomeinFile opbouwen - terwijl die al in de parserstate opgebouwd was!
+	* als het een UserData is, krijg ik een probleem met het vinden van alle nieuwe entiteiten vanuit de nieuwe buitenrollen.
+
+In beide gevallen is het simpeler om de domeinfile terug te geven. Gaat het om het user domein, dan kan ik simpelweg alle contexten en rollen bewaren (veel simpeler dan wat nu in SaveUserData gebeurt).
+Gaat het om een ander domein, dan kan ik gewoon de domeinfile direct opslaan.
+

@@ -39,7 +39,6 @@ theSuite = suiteSkip "DataTypeTripleGetters" do
 
 
   test "getUnqualifiedProperty" do
-    loadTestModel "testTypeDefChecker.crl"
     assertEqual "myContext5 should have value false for external property contextDef2ExtProp1"
       ((t2 "myContext5") ##= buitenRol >-> getUnqualifiedProperty "contextDef2ExtProp1")
       [Value "false"]
@@ -49,7 +48,6 @@ theSuite = suiteSkip "DataTypeTripleGetters" do
     assertEqual "myContextDef5Rol1Prop1 should have a local value of $isFunctioneel of false"
       ((t2 "myContextDef5$rol1$myContextDef5Rol1Prop1") ##= buitenRol >-> getUnqualifiedProperty "isFunctioneel")
       [Value "false"]
-    unLoadTestModel "model:TestTDC"
 
   -- testOnly "" do
   --   loadTestModel "testTypeDefChecker.crl"

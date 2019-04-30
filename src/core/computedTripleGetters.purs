@@ -49,7 +49,7 @@ parserMessagesM = constructTripleGetterWithArbitrarySupport
       sourceText <- (textId @@>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
       parseResult <- lift $ parseAndCache sourceText
       case parseResult of
-        (Right parseRoot) -> case parseRoot of
+        (Right (Tuple parseRoot domeinFile)) -> case parseRoot of
           (RootContext rootId) -> pure [rootId]
           (UserData buitenRollen) -> pure buitenRollen
         (Left e) -> pure [(show e)]

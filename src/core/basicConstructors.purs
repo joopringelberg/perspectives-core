@@ -43,6 +43,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           pure $ Left messages
         (Right _) -> do
           (m :: Array UserMessage) <- checkAContext $ Context ident
+          (m :: Array UserMessage) <- pure []
           case length m of
             0 -> pure $ Right ident
             otherwise -> do
@@ -112,12 +113,12 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           pure $ Tuple expandedRol instances
 
         constructRolInstances :: String -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (Array RolID)
-        constructRolInstances rolType rollen = do
+        constructRolInstances rolType rollen' = do
             contextId <- pure $ expandDefaultNamespaces id
             localName <- maybe (throwError [(NotAValidIdentifier rolType)]) pure (deconstructLocalNameFromDomeinURI rolType)
             -- The id without the numeric index.
             rolId <- pure (contextId  <> "$" <> localName <> "_")
-            rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen
+            rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen'
             pure rolIds
 
 constructRol :: forall e. RolName -> ContextID -> RolID -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) RolID

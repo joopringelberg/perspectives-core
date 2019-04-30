@@ -33,7 +33,6 @@ import Perspectives.User (entitiesDatabase)
 
 
 -- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
--- TODO rename
 fetchPerspectEntiteitFromCouchdb :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 fetchPerspectEntiteitFromCouchdb id = if isUserURI id
   then fetchEntiteit id
@@ -62,6 +61,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
     liftAff $ readVar v
   \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> id <> " from couchdb. " <> show e)
 
+-- | Save a user Resource.
 saveEntiteitPreservingVersion :: forall e a. PerspectEntiteit a => ID -> MonadPerspectives (AjaxAvarCache e) a
 -- saveEntiteitPreservingVersion id = catchError do
 --     (_ :: a) <- fetchPerspectEntiteitFromCouchdb id

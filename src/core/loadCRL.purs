@@ -12,12 +12,12 @@ import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Node.Encoding (Encoding(..))
 import Node.FS (FS)
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Node.Process (PROCESS, cwd)
-import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCache, storeDomeinFileInCouchdb)
@@ -25,9 +25,8 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.PerspectivesState (domeinCacheRemove)
-import Perspectives.PerspectivesTypes (BuitenRol(..))
 import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.SaveUserData (saveUserData)
+import Perspectives.SaveUserData (saveDomeinFileAsUserData)
 import Perspectives.Syntax (PerspectContext)
 import Perspectives.TypeDefChecker (checkModel)
 
@@ -52,7 +51,7 @@ loadCRLFile checkSemantics file = do
   text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [procesDir, modelDirectory, file])
   parseResult <- parseAndCache text
   case parseResult of
-    (Right parseRoot) ->
+    (Right (Tuple parseRoot domeinFile@(DomeinFile dfr))) ->
       case parseRoot of
         (RootContext textName)-> do
           (mCtxt :: Maybe PerspectContext) <- catchError ((getPerspectEntiteit textName) >>= pure <<< Just)
@@ -64,7 +63,7 @@ loadCRLFile checkSemantics file = do
               lift $ log ("Model file parsed, but cannot find the root context for '" <> textName <> "'!\n")
               pure []
             (Just ctxt) -> do
-              df@(DomeinFile {_id}) <- domeinFileFromContext ctxt
+              df@(DomeinFile {_id}) <- pure $ DomeinFile dfr {_id = textName}
               (messages :: Array UserMessage) <-
                 if checkSemantics
                   then do
@@ -78,7 +77,7 @@ loadCRLFile checkSemantics file = do
               case null messages of
                 true -> do
                   lift $ log $ "Model '" <> textName <> (if checkSemantics then "' is OK and will be stored.\n" else "' will be stored.\n")
-                  storeDomeinFileInCouchdb df
+                  storeDomeinFileInCouchdb df -- TODO Error here.
                 false -> do
                   lift $ log $ "Model '" <> textName <> "' contains semantical errors and is not saved!\n"
                   lift $ for_ messages
@@ -90,7 +89,7 @@ loadCRLFile checkSemantics file = do
 
         (UserData buitenRollen) -> do
           lift $ log  "Attempting to save userdata..."
-          saveUserData (map BuitenRol buitenRollen)
+          saveDomeinFileAsUserData domeinFile
           lift $ log "Done. These are the items:\n"
           lift $ log $ show buitenRollen
           lift $ log "\n\n"
