@@ -18,9 +18,10 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.StrMap (StrMap, empty, fromFoldable, insert, lookup, values)
 import Data.String (Pattern(..), charAt, drop, fromCharArray, split)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, (##>))
+import Perspectives.CoreTypes (MonadPerspectives, (##>), MP)
 import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Effects (AjaxAvarCache)
@@ -31,7 +32,7 @@ import Perspectives.ObjectGetterConstructors (getPrototype, notEmpty, searchUnqu
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.PerspectivesTypes (BuitenRol, ContextDef(..))
-import Perspectives.Resource (getAVarRepresentingPerspectEntiteit)
+import Perspectives.Resource (getAVarRepresentingPerspectEntiteit, getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
 import Prelude (class Show, Unit, bind, discard, id, ifM, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>=>))
@@ -675,6 +676,7 @@ userData = do
     _ <- userDataDeclaration
     _ <- AR.many importExpression
     contexts <- AR.many context
+    -- Hier kan ik ook de rollen van de domeinfile nemen.
     pure $ UserData contexts
   where
 
@@ -694,7 +696,7 @@ rootParser = enclosingContext <|> userData
 -----------------------------------------------------------
 -- catchError :: forall a. m a -> (e -> m a) -> m a
 
-parseAndCache :: forall e. String -> MonadPerspectives (AjaxAvarCache e) (Either ParseError ParseRoot)
+parseAndCache :: forall e. String -> MonadPerspectives (AjaxAvarCache e) (Either ParseError (Tuple ParseRoot DomeinFile))
 parseAndCache text = do
   (Tuple parseResult {domeinFile}) <- runIndentParser' text rootParser
   case parseResult of
@@ -703,10 +705,12 @@ parseAndCache text = do
       do
         let (DomeinFile{roles, contexts}) = domeinFile
         for_ (values contexts) setDefaultPrototype
+        -- change value in cache.
         for_ (values roles) \rol -> do
           case rol_binding rol of
             Nothing -> pure unit
             (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
+        -- this must read the cache, not use the roles themselves, as they have been changed in the cache!
         for_ (values roles) \rol -> do
           if (isRelativeRolTypeNameOutsideNamespace (rol_pspType rol))
             then addNamespaceToLocalName (rol_id rol)
@@ -720,9 +724,16 @@ parseAndCache text = do
         for_ (values contexts) \ctxt -> do
           setBuitenRolType ctxt
           setBinnenRolType ctxt
-        pure $ Right r
+        actualisedDomeinFile <- actualiseDomeinFile domeinFile
+        pure $ Right (Tuple r actualisedDomeinFile)
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
+
+    actualiseDomeinFile :: DomeinFile -> MP e DomeinFile
+    actualiseDomeinFile df@(DomeinFile {_id, _rev, contexts, roles}) = do
+      (ac :: StrMap PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
+      (ar :: StrMap PerspectRol) <- traverse (getPerspectEntiteit <<< rol_id) roles
+      pure $ DomeinFile {_id: _id, _rev: _rev, contexts: ac, roles: ar}
 
     setDefaultPrototype :: PerspectContext -> MonadPerspectives (AjaxAvarCache e) Unit
     setDefaultPrototype ctxt = ifM (toBoolean (notEmpty getPrototype) (context_id ctxt))
@@ -774,6 +785,7 @@ parseAndCache text = do
         vullerRol <- takeVar av
         putVar (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
 
+    -- reads BuitenRol from cache before changing it.
     setBuitenRolType :: PerspectContext ->  MonadPerspectives (AjaxAvarCache e) Unit
     setBuitenRolType ctxt = do
       abrtype <- buitenRolBeschrijvingDef (context_pspType ctxt)

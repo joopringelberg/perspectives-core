@@ -77,7 +77,7 @@ loadCRLFile checkSemantics file = do
               case null messages of
                 true -> do
                   lift $ log $ "Model '" <> textName <> (if checkSemantics then "' is OK and will be stored.\n" else "' will be stored.\n")
-                  storeDomeinFileInCouchdb df -- TODO Error here.
+                  storeDomeinFileInCouchdb df
                 false -> do
                   lift $ log $ "Model '" <> textName <> "' contains semantical errors and is not saved!\n"
                   lift $ for_ messages
