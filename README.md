@@ -15,9 +15,11 @@ Assuming code will be changed with Atom (and the Atom-purescript-ide), changes i
 is executed before changing code, changes will be immediately reflected in the bundled code in `dist/perspectives-core.js`.
 
 ### Symlinks for easy updates
-`package.json` contains a run target `symlinks` that will replace the subdirectory
+`package.json` contains a run target `symlinks` that will replace the subdirectories
 * aff-sockets
+* perspectives-apitypes
+* avar-monadask
 
-in the .psc-package directory with a symlink to ~Code/purescript-aff-sockets. Run this script after calling `npm install`. A change in this project is then immediately picked up by webpack (when watching, of course).
+in the .psc-package directory with symlinks to projects in ~Code. Run this script after calling `npm install`. A change in this project is then immediately picked up by webpack (when watching, of course).
 
 **Note**. If a new version of `psc-0.11.7-perspectives-core3` is created, the script needs to be adapted!

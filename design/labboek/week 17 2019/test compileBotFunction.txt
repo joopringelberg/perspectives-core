@@ -35,3 +35,11 @@ WAAROM zie ik niet
 HYPOTHESES
 1. de propagate functie wordt maar éénmaal uitgevoerd.
 2. De dependent-administratie wordt niet goed aangelegd.
+
+ANALYSE
+1. De actie verandert $v2
+2. Dan wordt $propsEqual herberekend.
+3. Dan wordt de ontkenning van $propsEqual herberekend.
+4. Dan wordt de conditie herberekend
+5. Dan wordt de actiefunctie opnieuw uitgevoerd
+Maar, dan wordt niet opnieuw de property gezet, zou je zeggen.

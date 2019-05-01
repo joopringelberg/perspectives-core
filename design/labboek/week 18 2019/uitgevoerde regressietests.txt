@@ -14,5 +14,5 @@ OPNIEUW UITGEVOERDE REGRESSIETESTS
 
 TODO
 * ModelBasedStringTripleGetters en TripleGetterConstructors. De tests zijn niet goed.
-* TestBotActie. Loopt.
+* TestBotActie. Termineert niet.
 
