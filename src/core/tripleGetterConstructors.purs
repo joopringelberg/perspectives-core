@@ -20,7 +20,7 @@ import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Perspectives.TripleGetterComposition (before, composeMonoidal, followedBy, (>->))
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
-import Prelude (class Eq, bind, const, flip, join, map, pure, show, ($), (<>), (==), (>>=), (>>>))
+import Prelude (class Eq, class Show, bind, const, flip, join, map, pure, show, ($), (<>), (==), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- COMBINATORS
@@ -58,7 +58,7 @@ closure (TypedTripleGetter nameOfp p) =
 -- | The result contains the root.
 -- Test.Perspectives.ModelBasedTripleGetters, via propertiesDef.
 -- Test.Perspectives.TripleGetterConstructors
-closure_ :: forall o e.
+closure_ :: forall o e. Show o =>
   Eq o =>
   (o **> o) e ->
   (o **> o) e
@@ -71,7 +71,7 @@ unlessNull tg id = (id @@ tg) >>= \r@(Triple{object}) -> if (Arr.null object) th
 
 -- | Combinator to make a TripleGetter fail if it returns PBool "false".
 -- | Useful in combination with computing alternatives using <|>
-unlessFalse :: forall s o e. (s **> PBool) e -> TripleGetter s PBool e
+unlessFalse :: forall s e. (s **> PBool) e -> TripleGetter s PBool e
 unlessFalse tg id = (id @@ tg) >>= \r@(Triple{object}) -> case (Arr.elemIndex (PBool "false") object) of
   Nothing -> pure r
   otherwise -> empty

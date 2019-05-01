@@ -12,11 +12,11 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TripleQueue, TripleQueueElement(..), TripleRef(..))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
-import Perspectives.PerspectivesState (setTripleQueue, tripleQueue)
+import Perspectives.PerspectivesState (addToRecomputed, setTripleQueue, tripleQueue)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
 import Perspectives.TripleAdministration (lookupInTripleIndex, setSupports_)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
-import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), discard, map)
+import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), discard, map, (*>))
 import Unsafe.Coerce (unsafeCoerce)
 
 tripleToTripleQueueElement :: forall e. Triple String String e -> TripleQueueElement
@@ -86,7 +86,7 @@ getDependencies (Triple{dependencies}) = do
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 recompute :: forall e. Triple String String e -> MonadPerspectives (AjaxAvarCache e) (Triple String String e)
-recompute (Triple{subject, tripleGetter}) = runMonadPerspectivesQuery subject tripleGetter
+recompute (Triple{subject, predicate, tripleGetter}) = addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *> runMonadPerspectivesQuery subject tripleGetter
 
 -- Change the object of the triple to the array of IDs passed to the function.
 saveChangedObject :: forall e1 e2. Triple String String e2 -> Array String -> Aff e1 (Triple String String e2)

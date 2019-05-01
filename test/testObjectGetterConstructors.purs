@@ -70,10 +70,10 @@ theSuite = suiteSkip "ObjectGetterConstructors" do
   test "propertyTypen (The types of every property for which this rol has a value)" do
     assertEqual "The buitenrol of t:myAspect$myAspectRol1 has one external property"
       (t "myAspect$myAspectRol1_buitenRol" ##= DTG.propertyTypen)
-      ["model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"]
+      ["model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"]
   test "some" do
-    assertEqual "Some roles defined to t:myAspect are functioneel"
-      (some (iedereRolInContext /-/ genericBinding /-/ ((getUnqualifiedProperty "isFunctioneel") <<< RolInContext) >=> pure <<< map (PBool <<< unwrap)) (t "myAspect"))
+    assertEqual "Some roles defined to t:myUrAspect are functioneel"
+      (some (iedereRolInContext /-/ genericBinding /-/ ((getUnqualifiedProperty "isFunctioneel") <<< RolInContext) >=> pure <<< map (PBool <<< unwrap)) (t "myUrAspect"))
       [PBool "true"]
   test "all" do
     assertEqual "Not all roles defined to t:myAspect are functioneel"

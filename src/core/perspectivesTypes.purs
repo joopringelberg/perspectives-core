@@ -146,7 +146,7 @@ type AnyDefinition = String
 -- THE CLASS ROLCLASS
 -----------------------------------------------------------
 -- | The class of which all types that represent an instance of a rol are a member.
-class (Newtype rol String, Eq rol) <= RolClass rol where
+class (Newtype rol String, Eq rol, Show rol) <= RolClass rol where
   getProperty :: forall e. PropertyDef -> (rol ~~> Value) e
   getUnqualifiedProperty :: forall e. LocalName -> (rol ~~> Value) e
 
@@ -204,6 +204,8 @@ instance rolClassBinnenRol :: RolClass BinnenRol where
 instance bindingBinnenRol :: Binding BinnenRol BuitenRol where
   binding = typeWithPerspectivesTypes genericBinding
 
+instance showBinnenRol :: Show BinnenRol where
+  show (BinnenRol r) = r
 -----------------------------------------------------------
 -- BUITENROL AS INSTANCE
 -----------------------------------------------------------

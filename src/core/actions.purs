@@ -168,6 +168,7 @@ updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
   MemberName -> Value -> ObjectsGetter e
 updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
+  -- TODO. Om te proberen: maak alleen een delta als er echt iets verandert.
   addDelta $ createDelta memberName value cid
   pure [cid]
 
@@ -177,10 +178,9 @@ updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
 updatePerspectEntiteitMember' changeEntityMember pid memberName value = do
   (pe :: a) <- getPerspectEntiteit pid
   -- Change the entity in cache:
-  void $ cacheCachedEntiteit pid (changeEntityMember pe memberName value)
-  -- Save the entity to Couchdb.
-  (changedContext :: a) <- getPerspectEntiteit pid
-  void $ saveVersionedEntiteit pid changedContext
+  (changedEntity :: a) <- cacheCachedEntiteit pid (changeEntityMember pe memberName value)
+  -- And save it to Couchdb.
+  void $ saveVersionedEntiteit pid changedEntity
 
   -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
   -- -- Store the changed entity in couchdb.
@@ -409,11 +409,9 @@ compileBotAction actionType contextId = do
     (unwrap actionType ##> getBindingOfRol (psp "Actie$object"))
   (objectGetter :: StringTypedTripleGetter e) <- constructQueryFunction object
   (conditionalEffect :: (ContextID -> Action e)) <- constructActionFunction action objectGetter
-  -- TODO: DIT MOET waarschijnlijk constructQueryFunction condition zijn.
   (conditionQuery :: StringTypedTripleGetter e) <- constructQueryFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  -- TODO: het object van de actie moet meegegeven worden aan de conditionalEffect.
   pure $ conditionQuery `followedBy` PBool >-> constructTripleGetterFromObjectsGetter (unwrap actionType) (conditionalEffect contextId)
 
   where

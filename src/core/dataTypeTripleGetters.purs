@@ -1,20 +1,20 @@
 module Perspectives.DataTypeTripleGetters where
 
-import Perspectives.CoreTypes (ObjectsGetter, type (**>))
+import Perspectives.CoreTypes (type (**>), type (~~>))
 import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
 import Perspectives.Identifiers (LocalName)
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value)
 import Perspectives.PerspectivesTypes (genericBinding, binding, getUnqualifiedProperty) as PT
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter, trackedAs)
-import Prelude (pure)
+import Prelude (class Show, pure)
 
-identity_ :: forall e. ObjectsGetter e
+identity_ :: forall o e.  Show o => (o ~~> o) e
 identity_ x = pure [x]
 
 -- | Identity for all values, contexts and roles.
-identity :: forall o e. (o **> o) e
-identity = typeWithPerspectivesTypes constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity_
+identity :: forall o e.  Show o => (o **> o) e
+identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity_
 
 -- | The type of the context instance.
 contextType :: forall e. (AnyContext **> AnyDefinition) e
@@ -54,10 +54,10 @@ genericRolType = DTOG.genericRolType `trackedAs` "model:Perspectives$type"
 
 -- | The rol instance that this rol instance is bound to, i.e. the head of its telescope.
 -- | `psp:RolInstance -> psp:RolInstance`
-binding :: forall binder bound e. Binding binder bound => (binder **> bound) e
+binding :: forall binder bound e. Show binder => Binding binder bound => (binder **> bound) e
 binding = PT.binding `trackedAs` "model:Perspectives$binding"
 
-rolBindingDef :: forall r b e. Binding r b => (r **> AnyContext) e
+rolBindingDef :: forall r b e. Show r => Binding r b => (r **> AnyContext) e
 rolBindingDef = binding >-> context
 
 -- | The context instance of the rol instance.

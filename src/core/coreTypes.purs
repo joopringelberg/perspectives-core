@@ -46,6 +46,7 @@ type PerspectivesState = CouchdbState (
   , memorizeQueryResults :: Boolean
   , transactie :: Transactie
   , tripleQueue :: TripleQueue
+  , recomputed :: Array TripleRef
   )
 
 -----------------------------------------------------------

@@ -12,7 +12,7 @@ import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectivesTypes (PBool(..), typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
 import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, constructTripleGetterFromObjectsGetter)
-import Prelude (class Eq, bind, const, discard, eq, flip, id, map, pure, show, ($), (<<<), (<>), (>=>), (>>=), (==))
+import Prelude (class Eq, class Show, bind, const, discard, eq, flip, id, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=))
 import Type.Data.Boolean (kind Boolean)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -122,7 +122,7 @@ equal (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
                     , supports : map (typeWithPerspectivesTypes getRef) [pt, qt]
                     , tripleGetter : typeWithPerspectivesTypes getter}
 
-    name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+    name = "(equal " <> nameOfp <> " " <> nameOfq <> ")"
 
 cond :: forall s o e.
   (s **> PBool) e ->
@@ -157,11 +157,12 @@ cond cd@(TypedTripleGetter nameOfCondition condition) (TypedTripleGetter nameOfT
 
 -- Applies the logical binary operator (such as OR, AND and IMPLIES) to the results of two queries applied to the same origin.
 logicalBinaryOperator :: forall s e.
+  String ->
   (Boolean -> Boolean -> Boolean) ->
   (s **> PBool) e ->
   (s **> PBool) e ->
   ((s **> PBool) e)
-logicalBinaryOperator op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
+logicalBinaryOperator n op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) = do
   memorize getter name
   where
     getter :: TripleGetter s PBool e
@@ -175,7 +176,7 @@ logicalBinaryOperator op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOf
                     , supports : map (typeWithPerspectivesTypes getRef) [pt, qt]
                     , tripleGetter : typeWithPerspectivesTypes getter}
     name :: String
-    name = "(concat " <> nameOfp <> " " <> nameOfq <> ")"
+    name = "(" <> n <> nameOfp <> " " <> nameOfq <> ")"
 
     fromBool :: Boolean -> Array PBool
     fromBool = Arr.singleton <<< PBool <<< show
@@ -184,13 +185,13 @@ logicalBinaryOperator op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOf
     toBool s = maybe false ((==) (PBool "true")) (Arr.head s)
 
 conj :: forall s e. (s **> PBool) e -> (s **> PBool) e -> ((s **> PBool) e)
-conj = logicalBinaryOperator HA.conj
+conj = logicalBinaryOperator "conj" HA.conj
 
 disj :: forall s e. (s **> PBool) e -> (s **> PBool) e -> ((s **> PBool) e)
-disj = logicalBinaryOperator HA.disj
+disj = logicalBinaryOperator "disj" HA.disj
 
 implies :: forall s e. (s **> PBool) e -> (s **> PBool) e -> ((s **> PBool) e)
-implies = logicalBinaryOperator HA.implies
+implies = logicalBinaryOperator "implies" HA.implies
 
 -- A set operation applied to the results of two queries applied to the same origin.
 -- | `psp:Function -> psp:Function -> psp:Function`
@@ -262,7 +263,7 @@ toBoolean tg = flip applyTypedTripleGetterToMaybeObject tg >=> pure <<< maybe fa
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.
 contains :: forall s o e.
-  Eq o =>
+  Eq o => Show s =>
   o ->
   TypedTripleGetter s o e ->
   TypedTripleGetter s PBool e
@@ -275,7 +276,7 @@ contains id' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpr
       Nothing -> pure [PBool "false"]
       otherwise -> pure [PBool "true"]
 
-containsMatching :: forall s o e. (s -> o -> Boolean) -> String -> TypedTripleGetter s o e -> TypedTripleGetter s PBool e
+containsMatching :: forall s o e. Show s => (s -> o -> Boolean) -> String -> TypedTripleGetter s o e -> TypedTripleGetter s PBool e
 containsMatching criterium criteriumName (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> criteriumName) f where
   f :: (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array PBool))
   f subject = do
@@ -284,7 +285,7 @@ containsMatching criterium criteriumName (TypedTripleGetter nameOfp p) = constru
 
 -- | Apply to a query and retrieve a boolean query that returns true iff its subject occurs in its result.
 -- | `psp:Function -> psp:Constraint`
-containedIn :: forall o e. Eq o => (o **> o) e -> (o **> PBool) e
+containedIn :: forall o e. Eq o => Show o => (o **> o) e -> (o **> PBool) e
 containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn_" <> nameOfp) f where
   f :: (o -> MonadPerspectivesQuery (AjaxAvarCache e) (Array PBool))
   f id = do
@@ -295,7 +296,7 @@ containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpre
 
 -- | The logical negation of a Constraint.
 -- | `psp:Constraint -> psp:Constraint`
-not :: forall s e. (s **> PBool) e -> (s **> PBool) e
+not :: forall s e. Show s => (s **> PBool) e -> (s **> PBool) e
 not (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
   f :: (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array PBool))
   f id = do
@@ -304,10 +305,19 @@ not (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("
       (Just (PBool "true")) -> pure [PBool "false"]
       otherwise -> pure [PBool "true"] -- NOTE: type checking guarantees we only have two values.
 
+not' :: forall s e.  Show s => (s **> String) e -> (s **> String) e
+not' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
+  f :: (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array String))
+  f id = do
+    (Triple{object}) <- p id
+    case Arr.head object of
+      (Just "true") -> pure ["false"]
+      otherwise -> pure ["true"] -- NOTE: type checking guarantees we only have two values.
+
 -- | Turn a query of many arguments into a query of a single element.
 -- | The selected element depends on the ordering returned by the query.
 -- | `psp:Function -> psp:SingularFunction`
-lastElement :: forall s o e. (s **> o) e -> (s **> o) e
+lastElement :: forall s o e.  Show s => (s **> o) e -> (s **> o) e
 lastElement (TypedTripleGetter nameOfp (p :: TripleGetter s o e)) = constructTripleGetterFromEffectExpression
   ("(lastElement_" <> nameOfp <> ")")
   (p >=> pure <<< (maybe [] Arr.singleton) <<< Arr.last <<< tripleObjects)
@@ -339,7 +349,7 @@ useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
       setMemorizeQueryResults remember
       pure result
 
-constant :: forall s e. s -> TypedTripleGetter s s e
+constant :: forall s e. Show s => s -> TypedTripleGetter s s e
 constant subject = constructTripleGetterFromObjectsGetter
   ("model:Perspectives$constant$_" <> unsafeCoerce subject)
   (\_ -> pure [subject])

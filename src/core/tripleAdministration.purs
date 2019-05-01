@@ -151,6 +151,7 @@ foreign import removeDependency_ :: forall e1 e2. Triple String String e2 -> Tri
 foreign import setSupports_ ::  forall e1 e2. Triple String String e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
 
 -- | Add the dependentRef (first argument) as a dependency to the triple identified by the supportingRef (second argument).
+-- TODO: cycle detection. Follow the arrows from support to dependent depth first and report a cycle.
 addDependency :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
 addDependency dependentRef supportingRef = do
   ms <- getTriple supportingRef

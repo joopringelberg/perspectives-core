@@ -1,4 +1,5 @@
 TEST Actions.constructActionFunction
+VOLTOOID.
 
 TODO
 
@@ -83,4 +84,6 @@ Opgelost door de queryCompiler toe te passen op de binding van $value.
 OPGELOST door de binnenRol apart op te slaan.
 
 4. Check in de actionCompiler de andere gevallen van toepassen van de queryFunctionDescriptionCompiler; vervang zo nodig door toepassing van de queryCompiler.
+Correctie: het ging op getPropertyFunction
+KLAAR
 

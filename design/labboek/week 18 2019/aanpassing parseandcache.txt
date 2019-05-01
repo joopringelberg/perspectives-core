@@ -11,3 +11,17 @@ Maar dat is niet handig:
 In beide gevallen is het simpeler om de domeinfile terug te geven. Gaat het om het user domein, dan kan ik simpelweg alle contexten en rollen bewaren (veel simpeler dan wat nu in SaveUserData gebeurt).
 Gaat het om een ander domein, dan kan ik gewoon de domeinfile direct opslaan.
 
+1. Wat is het gebruik van saveUserData?
+	* in loadCRL
+	* in PerspectivesAPI
+
+2. In de API wordt een ContextSerialization ontvangen. Die heeft nimmer geneste contexten of rollen: alleen verwijzingen met ID's.
+
+3. In loadCRL gaat het om het resultaat van de ContextRoleParser.
+
+4. Wat is het gebruik van parseAndCache?
+	* in loadCRL
+	* parserMessagesM, where we return the list of buitenRollen that are created (or the root context ID).
+
+ONTWERPBESLUIT
+Ik geef zowel de ParseRoot als de DomeinFile terug.

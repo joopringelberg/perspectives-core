@@ -1,0 +1,37 @@
+TEST Actions.compileBotAction
+
+PROBLEEM. setProperty faalt door setUpBotActionsAfter. Een rol wordt opgehaald als context en dat gaat fout.
+
+PROBLEEM. Als de botActie is uitgevoerd, en de conditie verandert van false naar true, wordt hij niet opnieuw uitgevoerd.
+
+$propsEqual wordt niet ge-updated. GEREPAREERD.
+
+Run de botactie
+[
+{"model:User$test1", 
+	"(equal 
+		(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) 		
+		(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))"
+		},
+	
+{"model:User$test1", 
+	"(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2)"}
+]
+
+Run de assignment van $v1.
+[{"model:User$test1", "(equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))"},{"model:User$test1", "(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)"}]
+
+OBSERVATIES
+1. Beide traces zijn exact gelijk, hetgeen suggereert dat alles wat oorspronkelijk berekend werd, ook herberekend wordt.
+
+2. 'concat' moet waarschijnlijk 'equal' zijn. Ik denk dat ik de naamgeving voor binaire operatoren niet goed heb. GEREPAREERD
+
+3. Ik zie alleen herberekening van v2 (wat ik niet snap) en van v1 == v2.
+
+WAAROM zie ik niet
+	* de berekening van de conditie
+	* de berekening van not $propsEqual
+
+HYPOTHESES
+1. de propagate functie wordt maar éénmaal uitgevoerd.
+2. De dependent-administratie wordt niet goed aangelegd.

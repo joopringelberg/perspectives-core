@@ -18,15 +18,16 @@ import Test.Perspectives.ModelBasedStringTripleGetters (theSuite) as MBSTG
 import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.QueryCombinators (theSuite) as QC
+import Test.Perspectives.QueryCompiler (theSuite) as CQR
+import Test.Perspectives.TestBotActie as TBA
 import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
-import Test.Perspectives.TestBotActie as TBA
-import Test.Perspectives.Utils (TestModelLoadEffects, runP)
+import Test.Perspectives.Utils (TestModelLoadEffects, TestEffects, runP)
 import Test.Unit.Console (TESTOUTPUT)
 import Test.Unit.Main (runTest)
 
-main :: forall e. Eff (AjaxAvarCache (now :: NOW, testOutput :: TESTOUTPUT | (TestModelLoadEffects e))) Unit
+main :: forall e. Eff (TestEffects (testOutput :: TESTOUTPUT | (TestModelLoadEffects e))) Unit
 main = runTest do
   DTO.theSuite
   OGC.theSuite
@@ -40,6 +41,7 @@ main = runTest do
   LAM.theSuite
   QC.theSuite
   TBA.theSuite
+  CQR.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP setupUser)

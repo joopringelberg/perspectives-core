@@ -1,0 +1,18 @@
+OPNIEUW UITGEVOERDE REGRESSIETESTS
+
+* ObjectGetterConstructors
+* DataTypeObjectGetters
+* DataTypeTripleGetters
+* ModelBasedObjectGetters
+* ModelBasedTripleGetters
+* QueryCombinators
+* QueryCompiler
+* TripleGetterComposition
+* TripleGetterConstructors
+* ModelBasedStringTripleGetters
+
+
+TODO
+* ModelBasedStringTripleGetters en TripleGetterConstructors. De tests zijn niet goed.
+* TestBotActie. Loopt.
+

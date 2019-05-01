@@ -3,6 +3,7 @@ module Test.Perspectives.Utils where
 import Prelude
 
 import Control.Monad.Aff (Aff, error, throwError)
+import Control.Monad.Aff.Console (log)
 import Control.Monad.Eff.AVar (AVAR)
 import Control.Monad.Eff.Console (CONSOLE)
 import Control.Monad.Eff.Exception (EXCEPTION)
@@ -17,26 +18,38 @@ import Data.Maybe (Maybe(..))
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.Tuple (Tuple(..))
 import Node.FS (FS)
 import Node.Process (PROCESS)
 import Perspectives.ApiTypes (ContextSerialization)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
 import Perspectives.Effects (AjaxAvarCache)
-import Perspectives.Identifiers (buitenRol)
+import Perspectives.Identifiers (buitenRol, expandDefaultNamespaces)
 import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile, withSemanticChecks, withoutSemanticChecks)
-import Perspectives.PerspectivesState (runPerspectives)
 import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
+import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithPropagation)
 import Perspectives.SaveUserData (removeUserData, saveUserData)
 import Test.Unit.Assert as Assert
 
-type TestEffects e = AjaxAvarCache (now :: NOW | e)
+type TestEffects e = AjaxAvarCache (now :: NOW, console :: CONSOLE | e)
 type RunEffects e = (avar :: AVAR, now :: NOW | e)
+type TestModelLoadEffects e = (console :: CONSOLE, exception :: EXCEPTION, fs :: FS, process :: PROCESS | e)
+
 
 runP :: forall a e.
   MonadPerspectives (RunEffects e) a ->
   Aff (RunEffects e) a
 runP t = runPerspectives "cor" "geheim" t
+
+runPWithPropagation :: forall a e.
+  MonadPerspectives (TestEffects e) a ->
+  Number ->
+  Aff (TestEffects e) a
+runPWithPropagation t n = do
+  (Tuple s a) <- runPerspectivesWithPropagation "cor" "geheim" t n
+  log $ show $ _.recomputed s
+  pure a
 
 p :: String -> String
 p s = "model:Perspectives$" <> s
@@ -57,12 +70,23 @@ assertEqual :: forall a e. Eq a => Show a =>
   MonadPerspectives (RunEffects e) a ->
   a ->
   Aff (RunEffects e) Unit
--- assertEqual message test result = do
---   (Assert.assert message) =<<
---     (runP test >>=
---       (shouldEqual result))
 assertEqual message test result = do
   r <- runP test
+  case result == r of
+    true -> Assert.assert message true
+    false -> Assert.assert (message <> "\nExpected: " <>
+      show result <> "\nReceived: " <>
+      show r)
+      false
+
+assertEqualWithPropagation :: forall a e. Eq a => Show a =>
+  Message ->
+  MonadPerspectives (TestEffects e) a ->
+  a ->
+  Number ->
+  Aff (TestEffects e) Unit
+assertEqualWithPropagation message test result duration = do
+  r <- runPWithPropagation test duration
   case result == r of
     true -> Assert.assert message true
     false -> Assert.assert (message <> "\nExpected: " <>
@@ -87,13 +111,11 @@ addTestContext = void <<< runP <<< addTestContext'
               pure unit
 
 removeTestContext :: forall e. AnyContext -> Aff (TestEffects e) Unit
-removeTestContext cid = void $ runP $ removeTestContext' (buitenRol cid)
+removeTestContext cid = void $ runP $ removeTestContext' (buitenRol (expandDefaultNamespaces cid))
   where
 
   removeTestContext' :: forall eff. AnyContext -> MonadPerspectives (AjaxAvarCache eff) Unit
   removeTestContext' = void <<< removeUserData <<< singleton <<< BuitenRol
-
-type TestModelLoadEffects e = (console :: CONSOLE, exception :: EXCEPTION, fs :: FS, process :: PROCESS | e)
 
 loadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
 loadTestModel ns = void $ runP $ loadCRLFile withoutSemanticChecks ns

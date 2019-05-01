@@ -26,7 +26,7 @@ import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, getInternalProperty)
 import Perspectives.TripleGetterComposition (followedBy)
 import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructTripleGetterWithArbitrarySupport)
-import Perspectives.TypeDefChecker (checkDomeinFile)
+import Perspectives.TypeDefChecker (checkDomeinFile) 
 
 -- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
 modellenM :: forall e. StringTypedTripleGetter e

@@ -31,13 +31,12 @@ psp:Zaak tba:Test
 					extern $functionName = "equal"
 					$operand (1) =>
 						q:PropertyGetter _
-							extern $functionName = "constructInternalPropertyGetter"
+							extern $functionName = "getInternalPropery"
 							$property => tba:Test$binnenRolBeschrijving$v1
-							--?result => psp:String -- matcht met psp:SimpleValue.
-							?result => tba:Test$binnenRolBeschrijving$v1 -- matcht met psp:Property.
+							?result => psp:String -- matcht met psp:SimpleValue.
 					$operand (2) =>
 						q:PropertyGetter $n2
-							extern $functionName = "constructInternalPropertyGetter"
+							extern $functionName = "getInternalPropery"
 							$property => tba:Test$binnenRolBeschrijving$v2
 							?result => psp:String
 					?result => psp:Boolean
@@ -62,20 +61,19 @@ psp:Zaak tba:Test
 			$subject -> $$contextBot(1) -- Dit werkt voor ?contextBot
 			$werkwoord => psp:Beheert
 			$object =>
-				q:DataTypeGetter _ -- deze query wordt toegepast op de context en MOET een rol opleveren.
+				q:DataTypeGetter $self -- deze query wordt toegepast op de context en MOET een rol opleveren.
 					extern $functionName = "binnenRol"
 					?result => tba:Test
 			$condition =>
 				q:nAryCombinator _ -- deze query wordt toegepast op de context.
 					extern $functionName = "conj"
 					$operand (1) =>
-						q:PropertyGetter _
-							extern $functionName = "propertyQuery"
-							$property => tba:Test$binnenRolBeschrijving$propsEqual
-							?result => psp:Boolean
+						q:UnaryCombinator _
+							extern $functionName = "not"
+							$query => tba:Test$binnenRolBeschrijving$propsEqual
 					$operand (2) =>
 						q:PropertyGetter _
-							extern $functionName = "constructInternalPropertyGetter"
+							extern $functionName = "getInternalPropery"
 							$property => tba:Test$binnenRolBeschrijving$trigger
 							?result => psp:Boolean
 					?result => psp:Boolean

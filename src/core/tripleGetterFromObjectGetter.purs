@@ -11,9 +11,9 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.ObjectGetterConstructors (getRoleBinders, searchExternalProperty, searchInternalUnqualifiedProperty, searchProperty)
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, PropertyDef, RolDef, Value, getProperty, typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
-import Prelude (bind, flip, pure, ($), (<<<), (<>))
+import Prelude (class Show, bind, flip, pure, show, ($), (<<<), (<>))
 
-constructTripleGetterFromEffectExpression :: forall s o e.
+constructTripleGetterFromEffectExpression :: forall s o e. Show s =>
   Predicate ->
   (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array o)) ->
   TypedTripleGetter s o e
@@ -27,7 +27,13 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
         case mt of
           Nothing -> do
             (object :: Array o) <- objectsGetter id
-            t <- liftEff (addToTripleIndex (typeWithPerspectivesTypes id) pn (typeWithPerspectivesTypes object) [] [] (typeWithPerspectivesTypes tripleGetter))
+            t <- liftEff (addToTripleIndex
+              (typeWithPerspectivesTypes id)
+              pn
+              (typeWithPerspectivesTypes object)
+              []
+              [TripleRef {subject: show id, predicate: pn}]
+              (typeWithPerspectivesTypes tripleGetter))
             pure $ ((typeWithPerspectivesTypes t) :: Triple s o e)
           (Just t) -> pure ((typeWithPerspectivesTypes t) :: Triple s o e)
       else do
@@ -84,19 +90,19 @@ constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter _ 
 -- | psp:iedereRolInContext and psp:typeVanIedereRolInContext.
 
 -- TODO: faseer deze functie uit tgv `trackedAs`
-constructTripleGetterFromObjectsGetter :: forall s o e.
+constructTripleGetterFromObjectsGetter :: forall s o e. Show s =>
   Predicate ->
   (s ~~> o) e ->
   TypedTripleGetter s o e
 constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromEffectExpression pn (lift <<< objGetter)
 
-constructTripleGetter :: forall r s o e.
+constructTripleGetter :: forall r s o e. Show s =>
   Predicate ->
   (s ~~> o) e ->
   TypedTripleGetter s o e
 constructTripleGetter pn objectsGetter = constructTripleGetterFromEffectExpression pn (lift <<< objectsGetter)
 
-trackedAs :: forall r s o e.
+trackedAs :: forall r s o e. Show s =>
   (s ~~> o) e ->
   Predicate ->
   TypedTripleGetter s o e

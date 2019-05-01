@@ -263,7 +263,9 @@ expandDefaultNamespaces s = if (indexOf (Pattern "psp:") s) == Just 0 then
     replace (Pattern "q:") (Replacement "model:QueryAst$") s
     else if (indexOf (Pattern "u:") s) == Just 0 then
       replace (Pattern "u:") (Replacement "model:User$") s
-      else s
+      else if (indexOf (Pattern "usr:") s) == Just 0 then
+        replace (Pattern "usr:") (Replacement "model:User$") s
+        else s
 
 -----------------------------------------------------------
 -- CONVENIENCE NAMESPACE PREFIX FUNCIONS

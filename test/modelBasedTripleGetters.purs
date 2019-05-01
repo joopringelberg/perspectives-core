@@ -34,17 +34,19 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   -- TESTS ON THE FILE "TestOGC.crl"
   ---------------------------------------------------------------------------------
   test "rollenDef" do
-    assertEqual "The Context 'psp:Property' defines three roles."
+    assertEqual "The Context 'psp:Property' defines a number of roles."
       ((p "Property") ##= rollenDef)
       -- []
       [ RolDef (p "Property$range")
       , RolDef (p "Property$aspectProperty")
       , RolDef (p "Property$bindingProperty")
       , RolDef "model:Perspectives$Property$binnenRolBeschrijving"
-      , RolDef "model:Perspectives$Property$buitenRolBeschrijving"]
-    assertEqual "myContextDef defines 13 roles"
+      , RolDef "model:Perspectives$Property$buitenRolBeschrijving"
+      , RolDef "model:Perspectives$ContextPrototype$buitenRolBeschrijving"
+      , RolDef "model:Perspectives$ContextPrototype$binnenRolBeschrijving"]
+    assertEqual "myContextDef defines 16 roles"
       ((t "myContextDef") ##= count rollenDef)
-      ([15])
+      ([16])
     assertEqual "q:ComputedRolGetter has no defined Roles through Aspects."
       (q "ComputedRolGetter" ##= closureOfAspect >-> rollenDef)
       (RolDef <$>
@@ -58,7 +60,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       (p "TrustedCluster" ##= closure_ directAspects >-> rollenDef)
       [ RolDef $ p "TrustedCluster$clusterGenoot"
       , RolDef $ p "TrustedCluster$binnenRolBeschrijving"
-      , RolDef $ p "TrustedCluster$buitenRolBeschrijving"]
+      , RolDef $ p "TrustedCluster$buitenRolBeschrijving"
+      , RolDef "model:Perspectives$ContextPrototype$buitenRolBeschrijving"
+      , RolDef "model:Perspectives$ContextPrototype$binnenRolBeschrijving"]
   test "ownPropertiesDef" do
     assertEqual "De roldefinitie t:myAspect$myAspectRol1 definieert de property $myAspectRol1Property."
       (RolDef (t "myAspect$myAspectRol1") ##= ownPropertiesDef)
@@ -194,7 +198,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "rollenDef" do
     assertEqual "myContextDef2 defines a single rol and inherits many from Context"
       (t2 "myContextDef2" ##= count rollenDef)
-      ([14])
+      ([15])
   test "isNotAQuery" do
     assertEqual "t:myContextDef2$rol1 is not a query-rol"
       (RolDef $ t2 "myContextDef2$rol1" ##= isNotAQuery)
@@ -202,7 +206,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "nonQueryRollen" do
     assertEqual "myContextDef2 defines a single non-query rol and inherits many from Context"
       (t2 "myContextDef2" ##= count nonQueryRollen)
-      ([14])
+      ([15])
   test "mandatoryProperties" do
     assertEqual "psp:Rol has a single mandatory external property."
       ((p "Rol") ##= buitenRolBeschrijvingDef >-> mandatoryProperties)
@@ -238,10 +242,10 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       [PBool "true"]
     assertEqual "tba:Test$botCopiesV1ToV2$self expressionType psp:Actie"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= expressionType)
-      [p "Actie"]
+      [p "Zaak"]
     assertEqual "tba:Test$botCopiesV1ToV2$self has no value for getFunctionResultType"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= getFunctionResultType)
-      ["model:TestBotActie$Test$botCopiesV1ToV2"]
+      ["model:TestBotActie$Test"]
 
   test "checkBindingOfRolInContext" do
     assertEqual "de mogelijkeBinding van de gebruikerRol van tba:Test is psp:PerspectivesSysteem$gebruiker"

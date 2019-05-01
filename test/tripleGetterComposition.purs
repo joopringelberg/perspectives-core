@@ -25,7 +25,6 @@ theSuite = suiteSkip "TripleGetterComposition" do
   -- TESTS ON THE FILE "TestOGC.crl"
   ---------------------------------------------------------------------------------
   test "traverse" do
-    loadTestModel "TestOGC.crl"
     assertEqual "t:myContextDef has four direct and indirect Aspects: "
       (t "myContextDef" ##= closure_ directAspects)
       ["model:TestOGC$myContextDef","model:TestOGC$myAspect","model:TestOGC$myUrAspect","model:Perspectives$Context"]
@@ -35,7 +34,6 @@ theSuite = suiteSkip "TripleGetterComposition" do
     assertEqual "t:myContextDef has some of its (indirect) Aspects as its type."
       (t "myContextDef" ##= some (traverse hasType "hasType" (closure_ directAspects)))
       [PBool "true"]
-    unLoadTestModel "model:TestOGC"
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

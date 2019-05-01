@@ -1,15 +1,13 @@
 module Perspectives.PerspectivesState where
 
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, putVar, readVar, takeVar, tryReadVar)
+import Control.Monad.Aff.AVar (AVAR, AVar, putVar, readVar, takeVar, tryReadVar)
 import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Now (NOW)
-import Control.Monad.Reader (runReaderT)
 import Control.Monad.Trans.Class (lift)
+import Data.Array (cons)
 import Data.Maybe (Maybe)
-import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, TripleQueue, createTransactie)
+import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, TripleQueue, TripleRef)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Effects (AvarCache)
@@ -28,26 +26,10 @@ newPerspectivesState uinfo tr av =
   , memorizeQueryResults: true
   , transactie: tr
   , tripleQueue: []
+  -- For debugging purposes only:
+  , recomputed: []
   -- , queryCache: new unit
   }
-
--- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR, now :: NOW | e) a
-  -> Aff (avar :: AVAR, now :: NOW | e) a
-runPerspectives userName password mp = do
-  (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
-  (tr :: Transactie) <- createTransactie userName
-  (rf :: AVar PerspectivesState) <- makeVar $
-    newPerspectivesState
-      { userName: userName
-      , couchdbPassword: password
-      , couchdbBaseURL: "http://127.0.0.1:5984/"}
-      tr
-      av
-  runReaderT mp rf
-
-runPerspectivesWithState :: forall e a. MonadPerspectives (avar :: AVAR | e) a -> (AVar PerspectivesState) -> Aff (avar :: AVAR | e) a
-runPerspectivesWithState = runReaderT
 
 -----------------------------------------------------------
 -- FUNCTIONS THAT GET OR MODIFY PARTS OF PERSPECTIVESSTATE
@@ -148,3 +130,17 @@ remove g k = do
   ma <- liftAff $ liftEff $ peek dc k
   _ <- liftAff $ liftEff $ (delete dc k)
   pure ma
+
+-----------------------------------------------------------
+-- FOR DEBUGGING ONLY
+-----------------------------------------------------------
+setRecomputed :: forall e. Array TripleRef -> MonadPerspectives (avar :: AVAR | e) Unit
+setRecomputed t = modify \s -> s { recomputed = t }
+
+getRecomputed :: forall e. MonadPerspectives (avar :: AVAR | e) (Array TripleRef)
+getRecomputed = gets _.recomputed
+
+addToRecomputed :: forall e. TripleRef -> MonadPerspectives (avar :: AVAR | e) Unit
+addToRecomputed i = do
+  r <- getRecomputed
+  setRecomputed (cons i r)
