@@ -4,7 +4,7 @@ module Perspectives.Actions where
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
-import Control.Monad.Eff.Exception (Error, error)
+import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Data.Array (head)
 import Data.Foldable (for_)

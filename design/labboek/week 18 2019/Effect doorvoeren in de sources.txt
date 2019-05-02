@@ -1,0 +1,56 @@
+EFFECT IN DE SOURCE FILES
+
+Op een rij wat belangrijke naamsveranderingen zijn.
+
+NAAMSVERANDERING
+Control.Monad.Eff						Effect
+	Eff -> Effect
+Control.Monad.Eff.AVar					Effect.AVar
+Control.Monad.Eff.Class					Effect.Class			liftEff -> liftEffect
+Control.Monad.Eff.Exception				Effect.Exception
+Control.Monad.Eff.Uncurried				Effect.Uncurried
+	EffFn1 -> EffectFn1
+	etc.
+
+Control.Monad.Aff						Effect.Aff
+Control.Monad.Aff.AVar					Effect.AVar
+Control.Monad.Aff.AVar					Effect.Aff.AVar
+	putVar	-> put
+	takeVar	-> take
+	readVar	-> read
+Control.Monad.Aff.Class 				Effect.Aff.Class
+	
+Data.Foreign							Foreign
+Data.Foreign.Class						Foreign.Class
+Data.Foreign.Generic					Foreign.Generic
+Data.StrMap								Foreign.Object
+
+Network.HTTP.Affjax						Affjax
+Network.HTTP.RequestHeader				Affjax.RequestHeader
+Network.HTTP.ResponseHeader				Affjax.ResponseHeader
+Network.HTTP.StatusCode					Affjax.StatusCode
+Network.HTTP.Affjax.Response			Affjax.ResponseFormat
+
+
+ARRAYS, STRMAP, ETC
+Er is nu:
+	"ordered-collections"
+Daar zitten in de Purely-functional map and set data structures.
+StrMap is verhuisd naar: Foreign.Object.
+StrMap héét nu: Object
+
+
+AFFJAX
+De functie 'affjax' heet nu 'request'.
+Met ResponseFormat.json kun je aangeven dat je een json waarde verwacht. Als die qua vorm correct is, is de body van de response een json waarde.
+Onder de vorige versie kon ik aangeven wat het type was van de 'response' member van de response, met 'AffjaxResponse a' (waar a een purescript type is). Ik moest dat doen door mijn a een instance van Respondable te maken. Die had een 'fromResponse' member, die geïmplementeerd was met genericDecode.
+
+Nu krijg ik dus een Json waarde terug, die ik moet zien te decoderen naar een purescript waarde.
+De vraag is dus: hoe verander ik Json in een purescript waarde?
+
+Neem bijvoorbeeld PutCouchdbDocument. Dat is een newtype van een record met de members die uit Couchdb terugkomen na een put.
+Ik krijg dus nu een Json terug en daar moet ik een record van maken.
+Kan dat met Argonaut? 
+De functie caseJsonObject maakt van Json een Object. Dat is wat voorheen een StrMap was. Dat is dus niet hetzelfde als een record!
+
+Ik denk dat ik genericDecode opnieuw moet gebruiken. Waar hoort dat bij?

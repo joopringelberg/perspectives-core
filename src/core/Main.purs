@@ -3,9 +3,9 @@
 --
 -- import Test.TypeDefChecker (test)
 -- import Test.TestEffects as TE
--- import Control.Monad.Aff (Aff, Fiber, runAff, runAff_)
--- import Control.Monad.Aff.Console (CONSOLE, log) as AC
--- import Control.Monad.Eff (Eff)
+-- import Effect.Aff (Aff, Fiber, runAff, runAff_)
+-- import Effect.Aff.Console (CONSOLE, log) as AC
+-- import Effect (Eff)
 -- import Perspectives.PerspectivesState (runPerspectives)
 -- import Prelude (class Show, Unit, pure, unit, (>>=), show)
 --
@@ -20,29 +20,23 @@
 
 
 module Main where
-import Control.Aff.Sockets (SOCKETIO)
-import Control.Monad.Aff (Error, Milliseconds(..), delay, forkAff, runAff)
-import Control.Monad.Aff.AVar (AVar, makeVar)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
-import Control.Monad.Eff.Exception (EXCEPTION)
-import Control.Monad.Eff.Now (NOW)
+import Effect.Aff (Error, Milliseconds(..), delay, forkAff, runAff)
+import Effect.Aff.AVar (AVar, makeVar)
+import Effect (Effect)
+import Effect.Console (log)
 import Control.Monad.Rec.Class (forever)
-import DOM (DOM)
 import Data.Either (Either(..))
-import Node.FS (FS)
-import Node.Process (PROCESS)
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.CoreTypes (Transactie, createTransactie)
-import Perspectives.Effects (AjaxAvarCache, REACT)
+import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.TheoryChange (propagate)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
-main :: Eff (AjaxAvarCache (console :: CONSOLE, dom :: DOM, react :: REACT, socketio :: SOCKETIO, now :: NOW, fs :: FS, exception :: EXCEPTION, process :: PROCESS)) Unit
+main :: Effect Unit
 main = void $ runAff handleError do
   -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
   usr <- pure "cor"

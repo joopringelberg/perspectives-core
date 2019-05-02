@@ -5,7 +5,7 @@ import Perspectives.EntiteitAndRDFAliases
 import Data.Array (cons, delete, elemIndex)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Ord (Ordering, compare)
-import Data.StrMap (StrMap, empty, insert, lookup, pop)
+import Foreign.Object (StrMap, empty, insert, lookup, pop)
 import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)

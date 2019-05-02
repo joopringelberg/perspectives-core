@@ -1,12 +1,11 @@
 module Perspectives.DomeinFile where
 
-import Data.Foreign.Class (class Encode)
-import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Class (class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap, empty, insert)
+import Foreign.Object (StrMap, empty, insert)
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision)
 import Prelude (($))
 

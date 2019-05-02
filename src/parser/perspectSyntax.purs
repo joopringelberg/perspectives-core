@@ -1,14 +1,13 @@
 module Perspectives.Syntax where
 
 import Perspectives.EntiteitAndRDFAliases
-import Data.Foreign.Class (class Decode, class Encode)
-import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (StrMap)
+import Foreign.Object (StrMap)
 import Data.Tuple (Tuple(..))
-import Network.HTTP.Affjax.Response (class Respondable, ResponseType(..))
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
 import Prelude (class Show, ($))
 

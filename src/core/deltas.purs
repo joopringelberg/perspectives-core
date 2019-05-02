@@ -1,18 +1,18 @@
 module Perspectives.Deltas where
 
-import Control.Monad.Aff (error, throwError)
-import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff.AVar (AVAR)
+import Effect.Aff (error, throwError)
+import Effect.Aff.Class (liftAff)
+import Effect.AVar (AVAR)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head)
-import Data.Foreign.Generic (encodeJSON)
+import Foreign.Generic (encodeJSON)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
-import Data.StrMap (StrMap, empty, insert, lookup)
+import Foreign.Object (StrMap, empty, insert, lookup)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
-import Network.HTTP.Affjax (AffjaxResponse, put) as AJ
-import Network.HTTP.StatusCode (StatusCode(..))
+import Affjax (AffjaxResponse, put) as AJ
+import Affjax.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), createTransactie, transactieID, (%%>>), type (**>))
 import Perspectives.DataTypeObjectGetters (context)

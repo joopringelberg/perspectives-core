@@ -1,10 +1,10 @@
 module Perspectives.Effects where
 
 import Control.Aff.Sockets (SOCKETIO)
-import Control.Monad.Aff.AVar (AVAR)
-import Control.Monad.Eff (kind Effect)
-import Control.Monad.Eff.Now (NOW)
-import Network.HTTP.Affjax (AJAX)
+import Effect.Aff.AVar (AVAR)
+import Effect (kind Effect)
+import Effect.Now (NOW)
+import Affjax (AJAX)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 
 -- | The REACT Effect labels the effects in a React Gui interface.

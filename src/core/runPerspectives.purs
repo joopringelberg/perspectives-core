@@ -1,8 +1,8 @@
 module Perspectives.RunPerspectives where
 
-import Control.Monad.Aff (Aff, Milliseconds(..), delay, error, forkAff, joinFiber, killFiber)
-import Control.Monad.Aff.AVar (AVAR, AVar, makeVar, readVar)
-import Control.Monad.Eff.Now (NOW)
+import Effect.Aff (Aff, Milliseconds(..), delay, error, forkAff, joinFiber, killFiber)
+import Effect.Aff.AVar (AVAR, AVar, makeVar, readVar)
+import Effect.Now (NOW)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Rec.Class (forever)
 import Data.Tuple (Tuple(..))

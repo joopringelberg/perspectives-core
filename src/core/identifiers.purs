@@ -38,7 +38,7 @@ module Perspectives.Identifiers
   )
 
 where
-import Control.Monad.Eff.Exception (Error, error)
+import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array (index, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, maybe)

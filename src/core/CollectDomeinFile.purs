@@ -1,11 +1,11 @@
 module Perspectives.CollectDomeinFile where
 
-import Control.Monad.Eff (kind Effect)
+import Effect (kind Effect)
 import Control.Monad.State (StateT, execStateT, lift, modify, get)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Data.StrMap (lookup)
+import Foreign.Object (lookup)
 import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_id, context_rev)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (iedereRolInContext) as DTG

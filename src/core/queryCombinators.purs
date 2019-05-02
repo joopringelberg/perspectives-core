@@ -1,6 +1,6 @@
 module Perspectives.QueryCombinators where
 
-import Control.Monad.Eff.Class (liftEff)
+import Effect.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter, union) as Arr
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA

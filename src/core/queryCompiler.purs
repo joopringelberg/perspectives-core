@@ -1,6 +1,6 @@
 module Perspectives.QueryCompiler where
 
-import Control.Monad.Eff.Exception (Error, error)
+import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Data.Array (foldl, head, unsnoc)
 import Data.Either (Either(..))

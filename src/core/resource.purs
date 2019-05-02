@@ -2,9 +2,9 @@ module Perspectives.Resource where
 
 import Prelude
 
-import Control.Monad.Aff.AVar (AVar, readVar)
-import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff (kind Effect)
+import Effect.Aff.AVar (AVar, readVar)
+import Effect.Aff.Class (liftAff)
+import Effect (kind Effect)
 import Control.Monad.Error.Class (catchError)
 import Data.Array (singleton)
 import Data.Maybe (Maybe(..), fromJust)

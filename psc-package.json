@@ -1,6 +1,6 @@
 {
   "name": "perspectives-core",
-  "set": "psc-12-perspectives",
+  "set": "psc-12.5-perspectives",
   "source": "https://github.com/joopringelberg/package-sets.git",
   "depends": [
     "aff",
@@ -22,6 +22,7 @@
     "prelude",
     "psci-support",
     "test-unit",
-    "uri"
+    "uri",
+    "node-fs-aff"
   ]
 }

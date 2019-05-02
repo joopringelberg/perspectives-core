@@ -4,10 +4,10 @@ module Perspectives.TypesForDeltas where
 -- DELTA
 -----------------------------------------------------------
 import Data.Eq (class Eq)
-import Data.Foreign (Foreign)
-import Data.Foreign.Class (class Encode)
-import Data.Foreign.Generic (defaultOptions, genericEncode)
-import Data.Foreign.Generic.Class (class GenericEncode)
+import Foreign (Foreign)
+import Foreign.Class (class Encode)
+import Foreign.Generic (defaultOptions, genericEncode)
+import Foreign.Generic.Class (class GenericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)

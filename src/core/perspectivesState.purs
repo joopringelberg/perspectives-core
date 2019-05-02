@@ -1,9 +1,9 @@
 module Perspectives.PerspectivesState where
 
-import Control.Monad.Aff.AVar (AVAR, AVar, putVar, readVar, takeVar, tryReadVar)
-import Control.Monad.Aff.Class (liftAff)
+import Effect.Aff.AVar (AVAR, AVar, putVar, readVar, takeVar, tryReadVar)
+import Effect.Aff.Class (liftAff)
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Eff.Class (liftEff)
+import Effect.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons)
 import Data.Maybe (Maybe)

@@ -1,11 +1,11 @@
 module Perspectives.BasicConstructors where
 
-import Control.Monad.Eff.AVar (AVar)
+import Effect.AVar (AVar)
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.Array (concat, length)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Data.StrMap (StrMap, fromFoldable, toUnfoldable)
+import Foreign.Object (StrMap, fromFoldable, toUnfoldable)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))

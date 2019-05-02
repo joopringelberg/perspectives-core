@@ -1,10 +1,10 @@
 module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addTripleToQueue) where
 
-import Control.Monad.Aff (Aff)
-import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.AVar (AVAR)
-import Control.Monad.Eff.Class (liftEff)
+import Effect.Aff (Aff)
+import Effect.Aff.Class (liftAff)
+import Effect (Eff)
+import Effect.AVar (AVAR)
+import Effect.Class (liftEff)
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)

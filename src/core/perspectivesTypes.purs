@@ -1,12 +1,12 @@
 module Perspectives.PerspectivesTypes where
 
 import Data.Array (findIndex, index, singleton)
-import Data.Foreign.Class (class Decode, class Encode)
-import Data.Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (class Newtype)
-import Data.StrMap (keys, lookup)
+import Foreign.Object (keys, lookup)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)

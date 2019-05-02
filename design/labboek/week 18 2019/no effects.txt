@@ -33,17 +33,17 @@ Een merge geeft veranderingen, lokaal. Die kan ik in Atom ook weer verwerpen.
 Moet ik de branch in de master mergen? Of andersom?
 
 PACKAGES DIE IK HEB TOEGEVOEGD OF AANGEPAST
-							AANGEPAST	IN NIEUWSTE VERSIE
-* aff-sockets									
-* affjax					X
-* avar-monadask
-* node-mailer				X					- 
-* parsing					X
-* perspectives-apitypes
-* perspectives-couchdb
-* datetime-iso									- 
-* uuid											- 
-* uri											- 
+							AANGEPAST	IN NIEUWSTE VERSIE		PSC-12.5-PERSPECTIVES	GECOMPILEERD		BUMP VERSION
+* aff-sockets													+							+					v2.0.0
+* affjax					X									+							
+* avar-monadask													+							+					v2.0.0
+* node-mailer				X					- 				+							+
+* parsing					X									+							+
+* perspectives-apitypes											+							+					v2.0.0
+* perspectives-couchdb											+							+					v2.0.0
+* datetime-iso									- 				+
+* uuid											- 				+
+* uri											- 				+
 
 MOGELIJKE PROBLEMEN BIJ MERGEN
 1. Packages die ik heb aangepast, verwijzen nu naar een andere repository. Eigenlijk moet ik upstream commits doorvoeren in die packages.
@@ -98,6 +98,7 @@ merged de upstream in de master en in de branch serviceTransportConfig.
 
 Tag maken. De tag was: "v0.1.0-service"
 De nieuwste tag is v1.0.0. Ik maak daarvan pv1.0.0
+FOUT: de nieuwste tag was v2.0.0. DIT MOET NOG HERSTELD WORDEN.
 
 git tag -a pv1.0.0 -m "Version v1.0.0 with service"
 
@@ -170,6 +171,22 @@ Maar dat is een dependency die verdwenen is in de laatste versie:
   }
 
 TODO: check andere geactualiseerde packages voor geactualiseerde dependencies!
-	* node-mailer
-	* datetime-iso
+	* node-mailer		KLAAR
+	* datetime-iso		KLAAR
 	* uuid
+
+
+NIEUWE COMPILER INSTALLEREN
+Uiteindelijk heb ik Node versie lts/carbon -> v8.16.0 geïnstalleerd. En toen:
+	* purs
+	* pulp
+	* psc-package
+
+Het probleem is nu dat de build niets oplevert in output. Een global rebuild levert niets op.
+
+In een vers project lukt het wel.
+
+purs compile: No files found using pattern: .psc-package/psc-12-perspectives/avar-monadask/v1.0.0/src/**/*.purs
+
+AVAR-MONADASK
+	git tag -a v2.0.0 -m "This package set works with compiler version 12.5"

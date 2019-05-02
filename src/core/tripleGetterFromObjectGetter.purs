@@ -1,6 +1,6 @@
 module Perspectives.TripleGetterFromObjectGetter where
 
-import Control.Monad.Eff.Class (liftEff)
+import Effect.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)

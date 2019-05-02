@@ -10,8 +10,8 @@ module Perspectives.GlobalUnsafeStrMap
   , delete
   ) where
 
-import Control.Monad.Eff (Eff, kind Effect)
-import Data.Foreign (Foreign, isUndefined, unsafeFromForeign)
+import Effect (Eff, kind Effect)
+import Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Data.Maybe (Maybe(..))
 import Data.Unit (Unit)
 import Prelude (bind, pure)

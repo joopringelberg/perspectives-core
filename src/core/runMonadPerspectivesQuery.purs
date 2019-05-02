@@ -1,12 +1,12 @@
 module Perspectives.RunMonadPerspectivesQuery where
 
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Exception (error)
+import Effect.Class (liftEff)
+import Effect.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (evalStateT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
-import Data.StrMap (singleton)
+import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), tripleObjects, type (**>))
 import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)

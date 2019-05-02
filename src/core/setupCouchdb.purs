@@ -1,12 +1,12 @@
 module Perspectives.SetupCouchdb where
 
-import Control.Monad.Aff.Class (liftAff)
+import Effect.Aff.Class (liftAff)
 import Data.Argonaut (fromString)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
+import Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, User, onAccepted)
 import Perspectives.Couchdb.Databases (createDatabase, defaultPerspectRequest, ensureAuthentication, allDbs)

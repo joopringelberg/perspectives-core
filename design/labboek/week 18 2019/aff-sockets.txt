@@ -1,0 +1,149 @@
+AFF-SOCKETS
+
+produce' :: forall a r m. MonadAff m => (Emitter Effect a r -> Effect Unit) -> Producer a m r
+
+createMessageEmitter :: Connection -> Emitter String Unit
+
+messageProducer connection = produce' (createMessageEmitter connection)
+
+substitutie:
+
+messageProducer connection = produce' (Emitter String Unit)
+
+Dus nu moet matchen:
+	(Emitter Effect a r -> Effect Unit) 
+	(Emitter String Unit)
+
+We hebben gedefinieerd:
+
+type EmitFunction a r = (Either a r -> Effect Unit)
+type Emitter a r = EmitFunction a r -> Effect Unit
+
+dus: 
+Emitter String Unit = EmitFunction String Unit -> Effect Unit
+
+en (linkerhelft)
+
+	EmitFunction String Unit
+	Emitter Effect a r
+
+Substitutie van EmitFunction:
+
+	(Either String Unit -> Effect Unit)
+
+maar in die laatste regel komt Emitter uit dezelfde module als produce':
+newtype Emitter m a r
+
+maar dat kan nooit matchen. 
+
+IN VERSIE 5.0 was de definitie van produce'
+
+produce' :: forall a r m eff. MonadAff (avar :: AVAR | eff) m => ((Either a r -> Eff (avar :: AVAR | eff) Unit) -> Eff (avar :: AVAR | eff) Unit) -> Producer a m r
+
+zonder effecten:
+
+produce' :: forall a r m. MonadAff m => 
+	((Either a r -> Effect Unit) -> Effect Unit) -> 
+	Producer a m r
+produce' :: forall a r m. MonadAff m => 
+	(Emitter Effect a r -> Effect Unit) -> 
+	Producer a m r				huidige versie
+
+Is
+	(Either a r -> Effect Unit)
+gelijk aan
+	Emitter Effect a r				-- huidige versie
+
+ik vind:
+
+	emitter m a r = Emitter (Step a r -> m Unit)
+
+substitutie en unwrap
+
+	(Step a r -> Effect Unit)
+
+Als Step gelijk zou zijn aan Either, klopt het. Maar :
+
+data Step a b
+  = Emit a
+  | Finish b
+
+De conclusie lijkt me dat produce' veranderd is.
+
+NOG EEN KEER: HOE PRODUCE' VERANDERD IS
+versie 5:
+
+	produce' :: forall a r m. MonadAff m => 
+		((Either a r -> Effect Unit) -> Effect Unit) -> 
+		Producer a m r
+
+versie 7
+
+	produce' :: forall a r m. MonadAff m => 
+		(Emitter Effect a r -> Effect Unit) -> 
+		Producer a m r
+
+Observaties:
+	- beide versies zijn een functie van één argument
+	- beide versies hebben hetzelfde resultaat, namelijk een Producer a m r
+	- het argument van beide versies is een functie met als resultaat Effect Unit.
+
+In versie 5 was het argument van de functie-die-argument is:
+
+	(Either a r -> Effect Unit)
+
+maar in versie 7 is het:
+
+	Emitter Effect a r
+
+Emitter is een nieuw type, een newtype. Unwrapped:
+
+	Step a r -> m Unit
+
+Dus we hebben het verschil tussen:
+
+	Either a r -> Effect Unit
+	en
+	Step a r -> m Unit
+
+waar:
+
+	data Step a b
+	  = Emit a
+	  | Finish b
+
+Het is dus zo dat het algemene 'Either' vervangen is door het specifieke Step. Geen Left en Right meer, maar Emit en Finish.
+Bovendien is de monad nu vrij. Het was in 5 Effect, in 7 een parameter m.
+
+IK HAD IN MIJN CODE al een type Emitter gemaakt:
+
+	type EmitFunction a r = (Either a r -> Effect Unit)
+	type Emitter a r = EmitFunction a r -> Effect Unit
+
+oftewel:
+
+	type Emitter a r = (Either a r -> Effect Unit) -> Effect Unit
+
+en dat is precies het argument van produce' in versie 5!
+
+Wat ik zou kunnen doen:
+	* mijn definitie van Emitter aanpassen zodat hij gelijk wordt aan het argument van produce' in versie 7
+	* mijn definitie van Emitter vervangen door de Emitter van versie 7 te gebruiken.
+
+Pikant: wat in mijn code 'EmitFunction' is, heet in versie 7 'Emitter', maar met een extra argument voor de vrijgelaten monad.
+
+1. Vervang 'EmitFunction' door 'Emitter'. Omdat 
+
+	newtype Emitter m a r = Emitter (Step a r -> m Unit)
+	
+	geldt dus m = Effect
+
+	EmitFunction a r ==wordt==> Emitter Effect a r
+	
+OF
+	implementeer EmitFunction met de gekwalificeerde variant van Emitter:
+
+2. Waar ik Either a r gebruik, moet ik Step gaan gebruiken.
+
+
+

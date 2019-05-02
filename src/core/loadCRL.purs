@@ -2,10 +2,8 @@ module Perspectives.LoadCRL where
 
 import Prelude
 
-import Control.Monad.Aff.Console (log)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Exception (EXCEPTION)
+import Effect.Console (log)
+import Effect.Class (liftEff)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (null)
@@ -14,10 +12,9 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Node.Encoding (Encoding(..))
-import Node.FS (FS)
-import Node.FS.Sync (readTextFile)
+import Node.FS.Aff (readTextFile)
 import Node.Path as Path
-import Node.Process (PROCESS, cwd)
+import Node.Process (cwd)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCache, storeDomeinFileInCouchdb)

@@ -4,7 +4,7 @@ import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
-import Data.StrMap (keys, values)
+import Foreign.Object (keys, values)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)

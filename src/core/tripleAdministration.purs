@@ -14,9 +14,9 @@ module Perspectives.TripleAdministration
   where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Eff (Eff, foreachE)
-import Control.Monad.Eff.AVar (AVAR)
-import Control.Monad.Eff.Class (liftEff)
+import Effect (Eff, foreachE)
+import Effect.AVar (AVAR)
+import Effect.Class (liftEff)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))

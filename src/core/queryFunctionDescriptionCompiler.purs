@@ -1,12 +1,12 @@
 module Perspectives.QueryFunctionDescriptionCompiler where
 
-import Control.Monad.Eff.Exception (error)
+import Effect.Exception (error)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (find, head, singleton)
 import Data.Either (Either(..), either, fromLeft, fromRight, isLeft)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Data.StrMap (fromFoldable)
+import Foreign.Object (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Partial.Unsafe (unsafePartial)

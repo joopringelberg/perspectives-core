@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, unwrap, wrap)
 import Data.Number (fromString) as Nmb
-import Data.StrMap (keys)
+import Foreign.Object (keys)
 import Data.Traversable (for_, traverse, traverse_)
 import Perspectives.ContextAndRole (rol_id, rol_pspType)
 import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>), (@@>>))

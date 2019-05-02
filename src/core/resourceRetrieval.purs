@@ -11,16 +11,16 @@ where
 
 import Prelude
 
-import Control.Monad.Aff.AVar (AVar, putVar, readVar, takeVar)
-import Control.Monad.Aff.Class (liftAff)
-import Control.Monad.Eff.Exception (error)
+import Effect.Aff.AVar (AVar, putVar, readVar, takeVar)
+import Effect.Aff.Class (liftAff)
+import Effect.Exception (error)
 import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Network.HTTP.Affjax (AffjaxRequest, AffjaxResponse, affjax)
-import Network.HTTP.StatusCode (StatusCode(..))
+import Affjax (AffjaxRequest, AffjaxResponse, affjax)
+import Affjax.StatusCode (StatusCode(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (DeleteCouchdbDocument, PutCouchdbDocument, onAccepted)

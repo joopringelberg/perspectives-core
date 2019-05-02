@@ -1,6 +1,6 @@
 module Perspectives.QueryCache where
 
-import Control.Monad.Eff.Class (liftEff)
+import Effect.Class (liftEff)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Perspectives.CoreTypes (MonadPerspectives, QueryCache, type (**>))
