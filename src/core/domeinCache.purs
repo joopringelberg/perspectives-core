@@ -22,7 +22,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvarCache, AvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
 import Perspectives.GlobalUnsafeStrMap (poke)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)

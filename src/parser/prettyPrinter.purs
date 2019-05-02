@@ -9,7 +9,7 @@ import Data.Array (elemIndex, replicate, sortBy)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (StrMap, foldM, values)
+import Foreign.Object (Object, foldM, values)
 import Data.String (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
@@ -17,7 +17,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
 import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..))
@@ -190,7 +190,7 @@ context definedResources c = do
     reference :: PerspectRol -> PerspectRol -> PerspectText e
     reference role binding = withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => " <> (rol_context binding))
 
-strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> StrMap a -> m Unit
+strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> F.Object a -> m Unit
 strMapTraverse_ f map = foldM (\z s a -> f s a) unit map
 
 enclosingContext :: forall e. PrettyPrinter PerspectContext e

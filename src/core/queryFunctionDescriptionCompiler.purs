@@ -13,7 +13,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, withQueryCompilerEnvironment, (##>), (##>>), (##=))
 import Perspectives.DataTypeObjectGetters (context, contextType) as DTG
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace, q, psp)
 import Perspectives.ModelBasedObjectGetters (ownRollenDef)

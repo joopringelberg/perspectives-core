@@ -10,7 +10,7 @@ import Affjax (AffjaxRequest, AffjaxResponse, affjax, put)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, User, onAccepted)
 import Perspectives.Couchdb.Databases (createDatabase, defaultPerspectRequest, ensureAuthentication, allDbs)
-import Perspectives.Effects (AjaxAvarCache, AjaxAvar)
+
 import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
 import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (<>), (>>=))
 

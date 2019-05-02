@@ -29,7 +29,7 @@ import Data.Either (Either(..))
 import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.CoreTypes (Transactie, createTransactie)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)

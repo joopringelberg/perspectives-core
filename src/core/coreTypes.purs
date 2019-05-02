@@ -23,7 +23,7 @@ import Foreign.Object (StrMap, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)

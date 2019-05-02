@@ -9,7 +9,7 @@ import Perspectives.ContextAndRole (context_id, rol_id)
 import Perspectives.CoreTypes (MonadPerspectives, (%%>>), (##>>), MP)
 import Perspectives.DataTypeObjectGetters (buitenRol, context, genericContext, iedereRolInContext)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenToBinnenRol)
 import Perspectives.ObjectsGetterComposition ((/-/))

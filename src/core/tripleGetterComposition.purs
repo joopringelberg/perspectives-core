@@ -4,7 +4,7 @@ import Data.Array (cons, difference, foldM, head, intersect, nub, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, sequence) as Trav
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), applyTypedTripleGetter, tripleObject, tripleObjects)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>=), (<$>), (<<<))

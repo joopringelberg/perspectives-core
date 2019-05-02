@@ -11,7 +11,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.ContextAndRole (context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, type (~~>))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.Identifiers (binnenRol) as PI
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), RolDef, binding, typeWithPerspectivesTypes)

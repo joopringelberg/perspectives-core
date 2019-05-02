@@ -8,7 +8,7 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
 import Perspectives.ObjectGetterConstructors (agreesWithType, alternatives, closureOfAspect, closureOfAspectRol, closure_, contains, directAspects, getUnqualifiedContextRol, mogelijkeBinding, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))

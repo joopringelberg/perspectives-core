@@ -4,7 +4,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Perspectives.ContextRoleParser (expression, enclosingContext)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.IndentParser (runIndentParser)
 import Prelude ((*>), (-), bind, pure, ($))
 import Text.Parsing.Parser (ParseError(..))

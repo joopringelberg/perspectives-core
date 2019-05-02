@@ -6,7 +6,7 @@ import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
-import Foreign.Object (StrMap, empty, fromFoldable, insert, lookup)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -24,9 +24,9 @@ import Text.Parsing.Parser.Pos (Position)
 -- | - the namespace for context declarations. The namespace does not terminate on a $!
 -- | - the section, i.e. the current role that should be used to stick a role in a context;
 -- | - the prefixes: a map of prefixes to namespaces.
-type ContextRoleParserState = { rolOccurrences :: StrMap Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: StrMap String, domeinFile :: DomeinFile, nameCounter :: Int}
+type ContextRoleParserState = { rolOccurrences :: F.Object Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: F.Object String, domeinFile :: DomeinFile, nameCounter :: Int}
 
-defaultPrefixes :: StrMap String
+defaultPrefixes :: F.Object String
 defaultPrefixes = fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
@@ -71,10 +71,10 @@ incrementRoleInstances roleName = lift (lift (modify f))
   where
     f s@{rolOccurrences} = s {rolOccurrences = insert roleName (maybe 1 ((+)1) (lookup roleName rolOccurrences)) rolOccurrences}
 
-getRoleInstances :: forall e. IP (StrMap Int) e
+getRoleInstances :: forall e. IP (F.Object Int) e
 getRoleInstances = lift (lift get) >>= pure <<< (_.rolOccurrences)
 
-setRoleInstances :: forall e. (StrMap Int) -> IP Unit e
+setRoleInstances :: forall e. (F.Object Int) -> IP Unit e
 setRoleInstances rmap = do
   s <- lift (lift get)
   lift (lift (put s {rolOccurrences = rmap}))

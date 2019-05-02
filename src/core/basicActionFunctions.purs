@@ -6,7 +6,7 @@ import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ComputedTripleGetters (parserMessagesM, syntacticStateM)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##>>))

@@ -10,7 +10,7 @@ import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, contex
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (iedereRolInContext) as DTG
 import Perspectives.DomeinFile (DomeinFile(..), addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (isInNamespace)
 import Perspectives.ModelBasedTripleGetters (boundContexts)

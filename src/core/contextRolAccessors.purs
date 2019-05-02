@@ -3,7 +3,7 @@ module Perspectives.ContextRolAccessors where
 import Control.Monad.Error.Class (catchError)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext, PerspectRol)

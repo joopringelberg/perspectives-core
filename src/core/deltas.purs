@@ -18,7 +18,7 @@ import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), cr
 import Perspectives.DataTypeObjectGetters (context)
 import Perspectives.DataTypeTripleGetters (identity, rolType, rolBindingDef) as DTG
 import Perspectives.DomeinCache (saveCachedDomeinFile)
-import Perspectives.Effects (AjaxAvarCache, TransactieEffects)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, rolIsFunctioneel)
 import Perspectives.ModelBasedTripleGetters (actiesInContextDef, actiesOfRol, enclosingDefinition, inverse_subjectRollenDef, objectRollenDef, objectViewDef, propertyReferenties, rolUser)

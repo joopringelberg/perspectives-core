@@ -18,7 +18,7 @@ import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, (%%), (##>), (#
 import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID, psp)
 import Perspectives.ModelBasedTripleGetters (botActiesInContext)

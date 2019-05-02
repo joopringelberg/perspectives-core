@@ -15,7 +15,7 @@ import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives, (@@>>))
 import Perspectives.DomeinCache (documentNamesInDatabase)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.Identifiers (isQualifiedWithDomein)

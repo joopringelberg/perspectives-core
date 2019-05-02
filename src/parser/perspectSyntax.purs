@@ -6,8 +6,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Foreign.Object (StrMap)
-import Data.Tuple (Tuple(..))
+import Foreign.Object (Object) as F
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
 import Prelude (class Show, ($))
 
@@ -23,7 +22,7 @@ type ContextRecord =
   , pspType :: ID
   , binnenRol :: ID
   , buitenRol :: ID
-  , rolInContext :: StrMap (Array ID)
+  , rolInContext :: F.Object (Array ID)
   , comments :: Comments
   }
 
@@ -38,10 +37,6 @@ instance encodePerspectContext :: Encode PerspectContext where
 instance decodePerspectContext :: Decode PerspectContext where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
-instance respondablePerspectContext :: Respondable PerspectContext where
-  responseType = Tuple Nothing JSONResponse
-  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
 -----------------------------------------------------------
 -- PERSPECTROL
 -----------------------------------------------------------
@@ -55,8 +50,8 @@ type RolRecord =
   , _rev :: Revision
   , binding :: Binding
   -- The four fields below could also be modeled as Maybe values.
-  , properties :: StrMap PropertyValueWithComments
-  , gevuldeRollen :: StrMap (Array RolID)
+  , properties :: F.Object PropertyValueWithComments
+  , gevuldeRollen :: F.Object (Array RolID)
   , occurrence :: Int
   , comments :: Comments
   }
@@ -71,10 +66,6 @@ instance encodePerspectRol :: Encode PerspectRol where
 
 instance decodePerspectRol :: Decode PerspectRol where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
-instance respondablePerspectRol :: Respondable PerspectRol where
-  responseType = Tuple Nothing JSONResponse
-  fromResponse = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
 -- REVISION, BINDING

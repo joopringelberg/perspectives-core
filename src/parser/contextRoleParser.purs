@@ -16,7 +16,7 @@ import Data.Foldable (elem, fold, for_)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (StrMap, empty, fromFoldable, insert, lookup, values)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as F
 import Data.String (Pattern(..), charAt, drop, fromCharArray, split)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -24,7 +24,7 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, cha
 import Perspectives.CoreTypes (MonadPerspectives, (##>), MP)
 import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, getDefaultPrototype)
@@ -547,7 +547,7 @@ context = withRoleCounting context' where
                 , properties = fromFoldable publicProps
                 })
             pure $ buitenRol (show instanceName)
-  collect :: List (Tuple RolName ID) -> StrMap (Array ID)
+  collect :: List (Tuple RolName ID) -> F.Object (Array ID)
   collect Nil = empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
     case lookup rname map of
@@ -731,8 +731,8 @@ parseAndCache text = do
 
     actualiseDomeinFile :: DomeinFile -> MP e DomeinFile
     actualiseDomeinFile df@(DomeinFile {_id, _rev, contexts, roles}) = do
-      (ac :: StrMap PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
-      (ar :: StrMap PerspectRol) <- traverse (getPerspectEntiteit <<< rol_id) roles
+      (ac :: F.Object PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
+      (ar :: F.Object PerspectRol) <- traverse (getPerspectEntiteit <<< rol_id) roles
       pure $ DomeinFile {_id: _id, _rev: _rev, contexts: ac, roles: ar}
 
     setDefaultPrototype :: PerspectContext -> MonadPerspectives (AjaxAvarCache e) Unit
@@ -757,7 +757,7 @@ parseAndCache text = do
       otherwise -> false
 
     -- Change the type of the rol to the qualified name, and change the key
-    -- in the context's rolinContext StrMap, too.
+    -- in the context's rolinContext F.Object, too.
     -- NOTE. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
     -- However, when a direct reference to that Role is made (using $$-syntax), precisely that name must be re-used,
     -- otherwise the binding cannot be constructed. See "testBotActie.crl" for an example

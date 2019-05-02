@@ -8,7 +8,7 @@ import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), tripleObjects, type (**>))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex)

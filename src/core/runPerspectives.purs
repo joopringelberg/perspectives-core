@@ -7,7 +7,7 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.Rec.Class (forever)
 import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState, Transactie, createTransactie)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.TheoryChange (propagate)
 import Prelude (bind, discard, pure, ($))

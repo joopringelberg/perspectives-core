@@ -5,7 +5,7 @@ import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), type (~~>))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (Predicate)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.ObjectGetterConstructors (getRoleBinders, searchExternalProperty, searchInternalUnqualifiedProperty, searchProperty)

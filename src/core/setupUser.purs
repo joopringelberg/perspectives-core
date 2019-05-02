@@ -2,7 +2,7 @@ module Perspectives.SetupUser where
 
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.LoadCRL (loadCRLFile, withoutSemanticChecks)
 import Perspectives.Resource (tryGetPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)

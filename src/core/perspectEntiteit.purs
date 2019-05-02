@@ -13,7 +13,7 @@ import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', chang
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveContextFromDomein, retrieveRolFromDomein)
 import Perspectives.DomeinFile (addContextToDomeinFile, addRolToDomeinFile)
-import Perspectives.Effects (AvarCache, AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace)
 import Perspectives.PerspectivesState (contextDefinitionsInsert, contextDefinitionsLookup, contextDefinitionsRemove, rolDefinitionsInsert, rolDefinitionsLookup, rolDefinitionsRemove)

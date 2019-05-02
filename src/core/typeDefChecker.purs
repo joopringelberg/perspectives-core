@@ -20,7 +20,7 @@ import Perspectives.DataTypeObjectGetters (isBuitenRol, propertyTypen)
 import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, propertyTypen, contextType, typeVanIedereRolInContext, buitenRol, binnenRol, rolType, binding) as DTG
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol, binnenRol)
 import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf, hasOnEachRolTelescopeTheRolTypeOf, isSubsumedOnEachRolTelescopeOf)

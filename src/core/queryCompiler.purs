@@ -11,7 +11,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (**>), type (~~>), MP, MonadPerspectives, runMonadPerspectivesQueryCompiler, (##>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, genericContext)
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, contextType, genericBinding, genericContext, genericRolType, identity, iedereRolInContext, label) as DTG
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace)
 import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty) as OGC

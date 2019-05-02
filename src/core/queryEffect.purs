@@ -3,7 +3,7 @@ module Perspectives.QueryEffect where
 import Effect (Eff)
 import Effect.Class (liftEff)
 import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery, type (**>))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, const, pure, ($), (<>))

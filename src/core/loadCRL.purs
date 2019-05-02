@@ -19,7 +19,7 @@ import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.Identifiers (Namespace)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Resource (getPerspectEntiteit)

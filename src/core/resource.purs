@@ -10,7 +10,7 @@ import Data.Array (singleton)
 import Data.Maybe (Maybe(..), fromJust)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache)
+
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, getType, removeInternally, retrieveInternally)
 import Perspectives.ResourceRetrieval (fetchPerspectEntiteitFromCouchdb)
