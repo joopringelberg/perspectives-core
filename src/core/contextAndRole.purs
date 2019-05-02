@@ -1,13 +1,12 @@
 module Perspectives.ContextAndRole where
 
-import Perspectives.EntiteitAndRDFAliases
-
 import Data.Array (cons, delete, elemIndex)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Ord (Ordering, compare)
-import Foreign.Object (StrMap, empty, insert, lookup, pop)
 import Data.Tuple (Tuple(..))
+import Foreign.Object (Object, empty, insert, lookup, pop)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord)
 import Prelude (($))
@@ -53,7 +52,7 @@ context_binnenRol (PerspectContext{binnenRol})= binnenRol
 context_buitenRol :: PerspectContext -> RolID
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
-context_rolInContext :: PerspectContext -> StrMap (Array RolID)
+context_rolInContext :: PerspectContext -> Object (Array RolID)
 context_rolInContext (PerspectContext{rolInContext})= rolInContext
 
 addContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
@@ -153,7 +152,7 @@ rol_context (PerspectRol{context}) = context
 changeRol_context :: ContextID -> PerspectRol -> PerspectRol
 changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 
-rol_properties :: PerspectRol -> StrMap PropertyValueWithComments
+rol_properties :: PerspectRol -> Object PropertyValueWithComments
 rol_properties (PerspectRol{properties}) = properties
 
 addRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
@@ -196,7 +195,7 @@ setRol_property rl@(PerspectRol rp@{properties}) propertyName value =
           (PropertyValueWithComments pvc {value = [value]})
           properties}
 
-rol_gevuldeRollen :: PerspectRol -> StrMap (Array RolID)
+rol_gevuldeRollen :: PerspectRol -> Object (Array RolID)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
 
 addRol_gevuldeRollen :: PerspectRol -> RolName -> RolID -> PerspectRol
