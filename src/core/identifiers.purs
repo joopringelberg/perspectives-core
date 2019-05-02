@@ -38,17 +38,17 @@ module Perspectives.Identifiers
   )
 
 where
-import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (class MonadThrow)
-import Data.Array (index, unsafeIndex)
+import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.String (Pattern(..), Replacement(..), contains, indexOf, replace, replaceAll)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, id, ($), (<>), (==), (||), (>>>))
+import Prelude (class Show, identity, ($), (<>), (==), (||), (>>>))
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -212,7 +212,7 @@ roleIndexNrRegex = unsafeRegex "_(\\d+)$" noFlags
 -- | Role names are postfixed with an index to distinghuish between multiple occurrences of the same role type.
 roleIndexNr :: String -> Maybe String
 roleIndexNr s = case match roleIndexNrRegex s of
-  (Just (matches :: Array (Maybe String))) -> maybe Nothing id (index matches 1)
+  (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 1)
   _ -> Nothing
 
 -----------------------------------------------------------
@@ -241,12 +241,12 @@ isContainingNamespace ns ident = contains (Pattern ns) ident
 -----------------------------------------------------------
 getFirstMatch :: Regex -> String -> Maybe String
 getFirstMatch regex s = case match regex s of
-  (Just matches) -> unsafePartial unsafeIndex matches 1
+  (Just matches) -> maybe Nothing identity (index matches 1)
   _ -> Nothing
 
 getSecondMatch :: Regex -> String -> Maybe String
 getSecondMatch regex s = case match regex s of
-  (Just matches) -> unsafePartial unsafeIndex matches 2
+  (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 2)
   _ -> Nothing
 
 -----------------------------------------------------------
