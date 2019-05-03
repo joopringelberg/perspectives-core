@@ -4,10 +4,9 @@ import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Data.Array (foldl, head, unsnoc)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (**>), type (~~>), MP, MonadPerspectives, runMonadPerspectivesQueryCompiler, (##>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, genericContext)
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, contextType, genericBinding, genericContext, genericRolType, identity, iedereRolInContext, label) as DTG
@@ -16,36 +15,36 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace)
 import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty) as OGC
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (AnyContext, PBool(..), PropertyDef(..), RolDef(..), Value, genericBinding, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (AnyContext, PBool, PropertyDef(..), RolDef(..), Value, genericBinding, typeWithPerspectivesTypes)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
 import Perspectives.QueryCache (queryCacheLookup)
 import Perspectives.QueryCombinators (closure', conj, constant, disj, equal, filter, ignoreCache, implies, lastElement, not', notEmpty, ref, useCache, var)
 import Perspectives.QueryFunctionDescriptionCompiler (compileElementaryQueryStep)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, closure, concat, constructInverseRolGetter, getInternalProperty, rolesOf, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty)
-import Perspectives.TripleGetterComposition (before, followedBy, (>->))
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.Utilities (onNothing, onNothing')
 import Prelude (bind, pure, ($), (<$>), (<*>), (<<<), (<>), (>>=), map, (>=>), show)
 
-getPropertyFunction :: forall e.
+getPropertyFunction ::
   String ->
-  MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+  MonadPerspectives StringTypedTripleGetter
 getPropertyFunction = constructGetter QualifiedProperty
 
-getInternalPropertyFunction :: forall e.
+getInternalPropertyFunction ::
   String ->
-  MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+  MonadPerspectives StringTypedTripleGetter
 getInternalPropertyFunction = constructGetter QualifiedInternalProperty
 
-getRolFunction :: forall e.
+getRolFunction ::
   String ->
-  MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+  MonadPerspectives StringTypedTripleGetter
 getRolFunction = constructGetter QualifiedRol
 
 -- | Returns a getter, lookup function or compiled query.
-constructGetter :: forall e.
+constructGetter ::
   (String -> ElementaryQueryStep) ->
   String ->
-  MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+  MonadPerspectives StringTypedTripleGetter
 constructGetter queryAstConstructor pn = do
   mrn <- pure $ deconstructNamespace pn
   case mrn of
@@ -62,9 +61,9 @@ constructGetter queryAstConstructor pn = do
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
-constructQueryFunction :: forall s o e.
+constructQueryFunction :: forall s o.
   AnyContext ->
-  MonadPerspectives (AjaxAvarCache e) ((String **> String) e)
+  MonadPerspectives ((String **> String))
 constructQueryFunction typeDescriptionID = do
   queryStepType <- onNothing (errorMessage "no type found" "")
     (typeDescriptionID ##> contextType)
@@ -169,26 +168,26 @@ constructQueryFunction typeDescriptionID = do
 
   where
     equal' ::
-      (s **> String) e ->
-      (s **> String) e ->
-      (s **> PBool) e
+      (s **> String) ->
+      (s **> String) ->
+      (s **> PBool)
     equal' = equal
 
-    getBindingOfRol :: String -> (AnyContext ~~> AnyContext) e
+    getBindingOfRol :: String -> (AnyContext ~~> AnyContext)
     getBindingOfRol rolName = OGC.searchContextRol (RolDef rolName) /-/ rolBindingDef
 
-    applyUnaryCombinator :: forall t.
-      ((String **> String) e -> (String **> String) e) ->
+    applyUnaryCombinator ::
+      ((String **> String) -> (String **> String)) ->
       ID ->
-      MP e ((String **> String) e)
+      MP ((String **> String))
     applyUnaryCombinator c queryStepType = do
       query <- onNothing (errorMessage "no query provided" queryStepType) (typeDescriptionID ##> getBindingOfRol "model:QueryAst$UnaryCombinator$query")
       constructQueryFunction query >>= pure <<< c
 
     applyBinaryCombinator ::
-      ((String **> String) e -> (String **> String) e -> (String **> String) e) ->
+      ((String **> String) -> (String **> String) -> (String **> String)) ->
       ID ->
-      MP e ((String **> String) e)
+      MP ((String **> String))
     applyBinaryCombinator c queryStepType = do
       (operandIds :: Array AnyContext) <- (OGC.searchContextRol (RolDef "model:QueryAst$nAryCombinator$operand") /-/ rolBindingDef) typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
