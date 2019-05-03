@@ -11,7 +11,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##>>))
 
-storeDomeinFile :: forall e. ID -> MonadPerspectives (AjaxAvarCache e) Unit
+storeDomeinFile :: ID -> MonadPerspectives Unit
 storeDomeinFile textId = do
   syntacticState <- textId ##>> syntacticStateM
   case syntacticState of

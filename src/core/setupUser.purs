@@ -8,7 +8,7 @@ import Perspectives.Resource (tryGetPerspectEntiteit)
 import Perspectives.Syntax (PerspectContext)
 import Prelude (Unit, bind, pure, unit, void, ($))
 
-setupUser :: forall e. MonadPerspectives Unit
+setupUser :: MonadPerspectives Unit
 setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit "model:User$MijnSysteem"
   case mu of
