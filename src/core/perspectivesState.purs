@@ -1,9 +1,9 @@
-module Perspectives.PerspectivesState where
+module Perspectives.PerspectivesState where 
 
-import Effect.Aff.AVar (AVAR, AVar, putVar, readVar, takeVar, tryReadVar)
+import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Effect.Aff.Class (liftAff)
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Effect.Class (liftEff)
+import Effect.Class (liftEffect)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons)
 import Data.Maybe (Maybe)
@@ -11,7 +11,7 @@ import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspective
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, new, peek, poke, delete)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
@@ -34,113 +34,113 @@ newPerspectivesState uinfo tr av =
 -----------------------------------------------------------
 -- FUNCTIONS THAT GET OR MODIFY PARTS OF PERSPECTIVESSTATE
 -----------------------------------------------------------
-couchdbSessionStarted :: forall e. MonadPerspectives (avar :: AVAR | e) Boolean
+couchdbSessionStarted :: MonadPerspectives Boolean
 couchdbSessionStarted = gets _.couchdbSessionStarted
 
-setCouchdbSessionStarted :: forall e. Boolean -> MonadPerspectives (avar :: AVAR | e) Unit
+setCouchdbSessionStarted :: Boolean -> MonadPerspectives Unit
 setCouchdbSessionStarted b = modify \ps -> ps {couchdbSessionStarted = b}
 
-sessionCookie :: forall e. MonadPerspectives (avar :: AVAR | e) (AVar String)
+sessionCookie :: MonadPerspectives (AVar String)
 sessionCookie = gets _.sessionCookie
 
-takeSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) String
-takeSessionCookieValue = gets _.sessionCookie >>= lift <<< takeVar
+takeSessionCookieValue :: MonadPerspectives String
+takeSessionCookieValue = gets _.sessionCookie >>= lift <<< take
 
-readSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) String
-readSessionCookieValue = gets _.sessionCookie >>= lift <<< readVar
+readSessionCookieValue :: MonadPerspectives String
+readSessionCookieValue = gets _.sessionCookie >>= lift <<< read
 
-tryReadSessionCookieValue :: forall e. MonadPerspectives (avar :: AVAR | e) (Maybe String)
-tryReadSessionCookieValue = gets _.sessionCookie >>= lift <<< tryReadVar
+tryReadSessionCookieValue :: MonadPerspectives (Maybe String)
+tryReadSessionCookieValue = gets _.sessionCookie >>= lift <<< tryRead
 
-setSessionCookie :: forall e. String -> MonadPerspectives (avar :: AVAR | e) Unit
-setSessionCookie c = sessionCookie >>= (lift <<< putVar c)
+setSessionCookie :: String -> MonadPerspectives Unit
+setSessionCookie c = sessionCookie >>= (lift <<< put c)
 
-transactie :: forall e. MonadPerspectives (avar :: AVAR | e) Transactie
+transactie :: MonadPerspectives Transactie
 transactie = gets _.transactie
 
-setTripleQueue :: forall e. TripleQueue -> MonadPerspectives (avar :: AVAR | e) Unit
+setTripleQueue :: TripleQueue -> MonadPerspectives Unit
 setTripleQueue t = modify \s -> s { tripleQueue = t }
 
-tripleQueue :: forall e. MonadPerspectives (avar :: AVAR | e) TripleQueue
+tripleQueue :: MonadPerspectives TripleQueue
 tripleQueue = gets _.tripleQueue
 
-setTransactie :: forall e. Transactie -> MonadPerspectives (avar :: AVAR | e) Unit
+setTransactie :: Transactie -> MonadPerspectives Unit
 setTransactie t = modify \s -> s { transactie = t }
 
-contextDefinitions :: forall e. MonadPerspectives (avar :: AVAR | e) ContextDefinitions
+contextDefinitions :: MonadPerspectives ContextDefinitions
 contextDefinitions = gets _.contextDefinitions
 
-contextDefinitionsLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar PerspectContext))
+contextDefinitionsLookup :: String -> MonadPerspectives (Maybe (AVar PerspectContext))
 contextDefinitionsLookup = lookup contextDefinitions
 
-contextDefinitionsInsert :: forall e. String -> AVar PerspectContext -> MonadPerspectives (AvarCache e) (AVar PerspectContext)
+contextDefinitionsInsert :: String -> AVar PerspectContext -> MonadPerspectives (AVar PerspectContext)
 contextDefinitionsInsert = insert contextDefinitions
 
-contextDefinitionsRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar PerspectContext))
+contextDefinitionsRemove :: String -> MonadPerspectives (Maybe (AVar PerspectContext))
 contextDefinitionsRemove = remove contextDefinitions
 
-rolDefinitions :: forall e. MonadPerspectives (avar :: AVAR | e) RolDefinitions
+rolDefinitions :: MonadPerspectives RolDefinitions
 rolDefinitions = gets _.rolDefinitions
 
-rolDefinitionsLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar PerspectRol))
+rolDefinitionsLookup :: String -> MonadPerspectives (Maybe (AVar PerspectRol))
 rolDefinitionsLookup = lookup rolDefinitions
 
-rolDefinitionsInsert :: forall e. String -> AVar PerspectRol -> MonadPerspectives (AvarCache e) (AVar PerspectRol)
+rolDefinitionsInsert :: String -> AVar PerspectRol -> MonadPerspectives (AVar PerspectRol)
 rolDefinitionsInsert = insert rolDefinitions
 
-rolDefinitionsRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar PerspectRol))
+rolDefinitionsRemove :: String -> MonadPerspectives (Maybe (AVar PerspectRol))
 rolDefinitionsRemove = remove rolDefinitions
 
-domeinCache :: forall e. MonadPerspectives (avar :: AVAR | e) DomeinCache
+domeinCache :: MonadPerspectives DomeinCache
 domeinCache = gets _.domeinCache
 
-domeinCacheLookup :: forall e. String -> MonadPerspectives (gm :: GLOBALMAP, avar :: AVAR | e) (Maybe (AVar DomeinFile))
+domeinCacheLookup :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheLookup = lookup domeinCache
 
-domeinCacheInsert :: forall e. String -> AVar DomeinFile -> MonadPerspectives (AvarCache e) (AVar DomeinFile)
+domeinCacheInsert :: String -> AVar DomeinFile -> MonadPerspectives (AVar DomeinFile)
 domeinCacheInsert = insert domeinCache
 
-domeinCacheRemove :: forall e. String -> MonadPerspectives (AvarCache e) (Maybe (AVar DomeinFile))
+domeinCacheRemove :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheRemove = remove domeinCache
 
-insert :: forall eff a.
-  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
+insert :: forall a.
+  MonadPerspectives (GLStrMap a) ->
   String ->
   a ->
-  MonadPerspectives (gm :: GLOBALMAP | eff) a
+  MonadPerspectives a
 insert g ns av = do
   (dc :: (GLStrMap a)) <- g
-  _ <- liftAff $ liftEff $ (poke dc ns av)
+  _ <- liftAff $ liftEffect $ (poke dc ns av)
   pure av
 
-lookup :: forall e a.
-  MonadPerspectives (gm :: GLOBALMAP | e) (GLStrMap a) ->
+lookup :: forall a.
+  MonadPerspectives (GLStrMap a) ->
   String ->
-  MonadPerspectives (gm :: GLOBALMAP | e) (Maybe a)
+  MonadPerspectives (Maybe a)
 lookup g k = do
   dc <- g
-  liftAff $ liftEff $ peek dc k
+  liftAff $ liftEffect $ peek dc k
 
-remove :: forall eff a.
-  MonadPerspectives (gm :: GLOBALMAP | eff) (GLStrMap a) ->
+remove :: forall a.
+  MonadPerspectives (GLStrMap a) ->
   String ->
-  MonadPerspectives (gm :: GLOBALMAP | eff) (Maybe a)
+  MonadPerspectives (Maybe a)
 remove g k = do
   (dc :: (GLStrMap a)) <- g
-  ma <- liftAff $ liftEff $ peek dc k
-  _ <- liftAff $ liftEff $ (delete dc k)
+  ma <- liftAff $ liftEffect $ peek dc k
+  _ <- liftAff $ liftEffect $ (delete dc k)
   pure ma
 
 -----------------------------------------------------------
 -- FOR DEBUGGING ONLY
 -----------------------------------------------------------
-setRecomputed :: forall e. Array TripleRef -> MonadPerspectives (avar :: AVAR | e) Unit
+setRecomputed :: Array TripleRef -> MonadPerspectives Unit
 setRecomputed t = modify \s -> s { recomputed = t }
 
-getRecomputed :: forall e. MonadPerspectives (avar :: AVAR | e) (Array TripleRef)
+getRecomputed :: MonadPerspectives (Array TripleRef)
 getRecomputed = gets _.recomputed
 
-addToRecomputed :: forall e. TripleRef -> MonadPerspectives (avar :: AVAR | e) Unit
+addToRecomputed :: TripleRef -> MonadPerspectives Unit
 addToRecomputed i = do
   r <- getRecomputed
   setRecomputed (cons i r)
