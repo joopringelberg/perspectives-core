@@ -3,15 +3,14 @@ module Perspectives.TripleGetterComposition where
 import Data.Array (cons, difference, foldM, head, intersect, nub, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, sequence) as Trav
-import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), applyTypedTripleGetter, tripleObject, tripleObjects)
-
+import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), applyTypedTripleGetter, tripleObjects)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
-import Prelude (Unit, bind, join, map, pure, unit, ($), (<>), class Eq, (>=>), (>>=), (<$>), (<<<))
+import Prelude (class Eq, class Ord, Unit, bind, join, map, pure, unit, ($), (<$>), (<<<), (<>), (>=>), (>>=))
 
-followedBy :: forall s o a e. TypedTripleGetter s o e -> (o -> a) -> TypedTripleGetter s a e
+followedBy :: forall s o a. TypedTripleGetter s o -> (o -> a) -> TypedTripleGetter s a
 followedBy (TypedTripleGetter n g) f = TypedTripleGetter n fNag where
-  fNag :: TripleGetter s a e
+  fNag :: TripleGetter s a
   fNag = g >=> \(Triple{subject, predicate, object, dependencies, supports, tripleGetter}) -> pure $ Triple
     { subject: subject
     , predicate: predicate
@@ -21,9 +20,9 @@ followedBy (TypedTripleGetter n g) f = TypedTripleGetter n fNag where
     , tripleGetter: fNag
   }
 
-before :: forall s o a e. (a -> s) -> TypedTripleGetter s o e -> TypedTripleGetter a o e
+before :: forall s o a. (a -> s) -> TypedTripleGetter s o -> TypedTripleGetter a o
 before f (TypedTripleGetter n g) = TypedTripleGetter n fVoorg where
-  fVoorg :: TripleGetter a o e
+  fVoorg :: TripleGetter a o
   fVoorg a = g (f a) >>= \(Triple{subject, predicate, object, dependencies, supports, tripleGetter}) -> pure $ Triple
     { subject: a
     , predicate: predicate
@@ -34,19 +33,20 @@ before f (TypedTripleGetter n g) = TypedTripleGetter n fVoorg where
   }
 
 -- | Compose two queries like composing two functions.
-unionOfTripleObjects :: forall s o t e.
+unionOfTripleObjects :: forall s o t.
   Eq t =>
   Eq o =>
-  TypedTripleGetter s t e ->
-  TypedTripleGetter t o e ->
-  TypedTripleGetter s o e
+  Ord o =>
+  TypedTripleGetter s t ->
+  TypedTripleGetter t o ->
+  TypedTripleGetter s o
 unionOfTripleObjects (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   memorize getter name
     where
-    getter :: TripleGetter s o e
+    getter :: TripleGetter s o
     getter id = do
-      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
-      (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
+      (t@(Triple{object : objectsOfP}) :: Triple s t) <- p id
+      (triples :: Array (Triple t o)) <- Trav.traverse q objectsOfP
       objects <- pure $ nub $ join $ map tripleObjects triples
       pure $ Triple { subject: id
                     , predicate : name
@@ -64,25 +64,26 @@ infixl 9 unionOfTripleObjects as >->
 -- | (wrapped in a function). Useful for recursive queries that bottom out
 -- | when the first operator yields no results.
 -- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
-lazyUnionOfTripleObjects :: forall s o t e.
+lazyUnionOfTripleObjects :: forall s o t.
   Eq t =>
   Eq o =>
-  TypedTripleGetter s t e ->
-  (Unit -> TypedTripleGetter t o e) ->
+  Ord o =>
+  TypedTripleGetter s t ->
+  (Unit -> TypedTripleGetter t o) ->
   String ->
-  TypedTripleGetter s o e
+  TypedTripleGetter s o
 lazyUnionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
   memorize getter name
     where
-    getter :: TripleGetter s o e
+    getter :: TripleGetter s o
     getter id = do
-      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
+      (t@(Triple{object : objectsOfP}) :: Triple s t) <- p id
       case head objectsOfP of
         Nothing -> pure $ typeWithPerspectivesTypes t
         otherwise -> do
           (TypedTripleGetter nameOfq q) <- pure (g unit)
           -- NOTE: (difference objectsOfP [id]) is our safety catch for cyclic graphs.
-          (triples :: Array (Triple t o e)) <- Trav.traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
+          (triples :: Array (Triple t o)) <- Trav.traverse q (difference objectsOfP [typeWithPerspectivesTypes id])
           -- some t' in triples may have zero objects under q. Their subjects contribute nothing to the objects of the composition.
           objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
           pure $ Triple { subject: id
@@ -97,19 +98,19 @@ lazyUnionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
 
 infixl 9 lazyUnionOfTripleObjects as >->>
 
-intersectionOfTripleObjects :: forall s o t e.
+intersectionOfTripleObjects :: forall s o t.
   Eq t =>
   Eq o =>
-  TypedTripleGetter s t e ->
-  TypedTripleGetter t o e ->
-  TypedTripleGetter s o e
+  TypedTripleGetter s t ->
+  TypedTripleGetter t o ->
+  TypedTripleGetter s o
 intersectionOfTripleObjects (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
   memorize getter name
     where
-    getter :: TripleGetter s o e
+    getter :: TripleGetter s o
     getter id = do
-      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
-      (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
+      (t@(Triple{object : objectsOfP}) :: Triple s t) <- p id
+      (triples :: Array (Triple t o)) <- Trav.traverse q objectsOfP
       objects <-
         case uncons triples of
           Nothing -> pure []
@@ -133,24 +134,24 @@ infixl 9 intersectionOfTripleObjects as <-<
 -- | (wrapped in a function). Useful for recursive queries that bottom out
 -- | when the first operator yields no results.
 -- | `psp:Function -> (Unit -> psp:Function) -> String -> psp:Function`
-lazyIntersectionOfTripleObjects :: forall s o t e.
+lazyIntersectionOfTripleObjects :: forall s o t.
   Eq t =>
   Eq o =>
-  TypedTripleGetter s t e ->
-  (Unit -> TypedTripleGetter t o e) ->
+  TypedTripleGetter s t ->
+  (Unit -> TypedTripleGetter t o) ->
   String ->
-  TypedTripleGetter s o e
+  TypedTripleGetter s o
 lazyIntersectionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
   memorize getter name
     where
-    getter :: TripleGetter s o e
+    getter :: TripleGetter s o
     getter id = do
-      (t@(Triple{object : objectsOfP}) :: Triple s t e) <- p id
+      (t@(Triple{object : objectsOfP}) :: Triple s t) <- p id
       case head objectsOfP of
         Nothing -> pure $ typeWithPerspectivesTypes t
         otherwise -> do
           (TypedTripleGetter nameOfq q) <- pure (g unit)
-          (triples :: Array (Triple t o e)) <- Trav.traverse q objectsOfP
+          (triples :: Array (Triple t o)) <- Trav.traverse q objectsOfP
           objects <-
             case uncons triples of
               Nothing -> pure []
@@ -171,21 +172,22 @@ lazyIntersectionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
 infixl 9 lazyIntersectionOfTripleObjects as <<-<
 
 -- | Traverse the results of the second TypedTripleGetter with function that yields a TypedTripleGetter.
-traverse :: forall s o t e.
+traverse :: forall s o t.
   Eq t =>
   Eq o =>
-  (t -> TypedTripleGetter s o e) ->
+  Ord o =>
+  (t -> TypedTripleGetter s o) ->
   String ->
-  TypedTripleGetter s t e ->
-  TypedTripleGetter s o e
+  TypedTripleGetter s t ->
+  TypedTripleGetter s o
 traverse f nameOfF (TypedTripleGetter nameOfq q) =
   memorize getter name
     where
-    getter :: TripleGetter s o e
+    getter :: TripleGetter s o
     getter id = do
-      (t@(Triple{object : (objectsOfQ :: Array t)}) :: Triple s t e) <- q id
-      (monadicValues :: Array (MonadPerspectivesQuery (AjaxAvarCache e) (Triple s o e))) <- pure $ applyTypedTripleGetter id <<< f <$> objectsOfQ
-      (triples :: Array (Triple s o e)) <- Trav.sequence monadicValues
+      (t@(Triple{object : (objectsOfQ :: Array t)}) :: Triple s t) <- q id
+      (monadicValues :: Array (MonadPerspectivesQuery (Triple s o))) <- pure $ applyTypedTripleGetter id <<< f <$> objectsOfQ
+      (triples :: Array (Triple s o)) <- Trav.sequence monadicValues
       objects <- pure $ nub $ join $ map (\(Triple{object}) -> object) triples
       pure $ Triple { subject: id
                     , predicate : name
@@ -197,15 +199,15 @@ traverse f nameOfF (TypedTripleGetter nameOfq q) =
     name :: String
     name = "(" <>  nameOfF <> " >-> " <> nameOfq <> ")"
 
-composeMonoidal :: forall s o a e.
-  TypedTripleGetter s o e ->
+composeMonoidal :: forall s o a.
+  TypedTripleGetter s o ->
   (Array o -> a) ->
   String ->
-  TypedTripleGetter s a e
+  TypedTripleGetter s a
 composeMonoidal (TypedTripleGetter nameOfp p) f n = memorize getter name where
-  getter :: TripleGetter s a e
+  getter :: TripleGetter s a
   getter id = do
-    (t@(Triple{object : objectsOfP}) :: Triple s o e) <- p id
+    (t@(Triple{object : objectsOfP}) :: Triple s o) <- p id
     a <- pure $ f objectsOfP
     pure $ Triple { subject: id
                   , predicate : name
