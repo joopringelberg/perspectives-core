@@ -3,7 +3,7 @@ module Perspectives.LoadCRL where
 import Prelude
 
 import Effect.Console (log)
-import Effect.Class (liftEff)
+import Effect.Class (liftEffect)
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (null)
@@ -41,11 +41,11 @@ withoutSemanticChecks = false
 -- | Loads a file from the directory "src/model" relative to the directory of the
 -- | active process.
 -- | All definitions are loaded into the cache. The file is parsed and stored in Couchdb.
-loadCRLFile :: forall e. Boolean -> FileName -> MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION, process :: PROCESS | e)) (Array UserMessage)
+loadCRLFile :: Boolean -> FileName -> MonadPerspectives (Array UserMessage)
 loadCRLFile checkSemantics file = do
-  lift $ log ("=========================Parse the file " <> file <> "===================")
-  procesDir <- liftEff cwd
-  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [procesDir, modelDirectory, file])
+  liftEffect $ log ("=========================Parse the file " <> file <> "===================")
+  procesDir <- liftEffect cwd
+  text <- lift $ readTextFile UTF8 (Path.concat [procesDir, modelDirectory, file])
   parseResult <- parseAndCache text
   case parseResult of
     (Right (Tuple parseRoot domeinFile@(DomeinFile dfr))) ->
@@ -53,52 +53,52 @@ loadCRLFile checkSemantics file = do
         (RootContext textName)-> do
           (mCtxt :: Maybe PerspectContext) <- catchError ((getPerspectEntiteit textName) >>= pure <<< Just)
             (\_ -> do
-              lift $ log ("Model file parsed, but root of '" <> textName <> "' results in runtime error!\n")
+              liftEffect $ log ("Model file parsed, but root of '" <> textName <> "' results in runtime error!\n")
               pure Nothing)
           case mCtxt of
             Nothing -> do
-              lift $ log ("Model file parsed, but cannot find the root context for '" <> textName <> "'!\n")
+              liftEffect $ log ("Model file parsed, but cannot find the root context for '" <> textName <> "'!\n")
               pure []
             (Just ctxt) -> do
               df@(DomeinFile {_id}) <- pure $ DomeinFile dfr {_id = textName}
               (messages :: Array UserMessage) <-
                 if checkSemantics
                   then do
-                    lift $ log ("Parsed. Run the typeDefChecker on " <> show textName <> ".\n")
+                    liftEffect $ log ("Parsed. Run the typeDefChecker on " <> show textName <> ".\n")
                     -- put it in the DomeinFileCache.
                     void $ storeDomeinFileInCache _id df
                     checkModel _id <* domeinCacheRemove _id
                   else do
-                    lift $ log ("Parsed. Skipping typeDefChecker for " <> show textName <> ".\n")
+                    liftEffect $ log ("Parsed. Skipping typeDefChecker for " <> show textName <> ".\n")
                     pure []
               case null messages of
                 true -> do
-                  lift $ log $ "Model '" <> textName <> (if checkSemantics then "' is OK and will be stored.\n" else "' will be stored.\n")
+                  liftEffect $ log $ "Model '" <> textName <> (if checkSemantics then "' is OK and will be stored.\n" else "' will be stored.\n")
                   storeDomeinFileInCouchdb df
                 false -> do
-                  lift $ log $ "Model '" <> textName <> "' contains semantical errors and is not saved!\n"
-                  lift $ for_ messages
+                  liftEffect $ log $ "Model '" <> textName <> "' contains semantical errors and is not saved!\n"
+                  liftEffect $ for_ messages
                     \m -> do
                       log $ show m
                       log "------"
-                  lift $ log "\n\n"
+                  liftEffect $ log "\n\n"
               pure messages
 
         (UserData buitenRollen) -> do
-          lift $ log  "Attempting to save userdata..."
+          liftEffect $ log  "Attempting to save userdata..."
           saveDomeinFileAsUserData domeinFile
-          lift $ log "Done. These are the items:\n"
-          lift $ log $ show buitenRollen
-          lift $ log "\n\n"
+          liftEffect $ log "Done. These are the items:\n"
+          liftEffect $ log $ show buitenRollen
+          liftEffect $ log "\n\n"
           pure []
     (Left e) -> do
-      lift $ log (show e)
+      liftEffect $ log (show e)
       pure []
 
 -- | Remove the model from the model cache
-unloadModel :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) Unit
+unloadModel :: Namespace -> MonadPerspectives Unit
 unloadModel = void <<< domeinCacheRemove
 
 -- | Remove the file from Couchdb and the model from the cache.
-unLoadCRLFile :: forall e. Namespace -> MonadPerspectives (AjaxAvarCache e) Unit
+unLoadCRLFile :: Namespace -> MonadPerspectives Unit
 unLoadCRLFile = removeDomeinFileFromCouchdb
