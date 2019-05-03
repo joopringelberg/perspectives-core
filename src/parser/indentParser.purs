@@ -6,15 +6,15 @@ import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
-import Foreign.Object (Object, empty, fromFoldable, insert, lookup)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as F
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile, addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (Prefix, QualifiedName(..))
 import Perspectives.Syntax (PerspectContext, PerspectRol)
-import Prelude (Unit, bind, discard, pure, unit, (+), (<<<), (<>), (>>=), ($))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
 import Text.Parsing.Parser.Pos (Position)
@@ -27,33 +27,33 @@ import Text.Parsing.Parser.Pos (Position)
 type ContextRoleParserState = { rolOccurrences :: F.Object Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: F.Object String, domeinFile :: DomeinFile, nameCounter :: Int}
 
 defaultPrefixes :: F.Object String
-defaultPrefixes = fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
+defaultPrefixes = F.fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes, domeinFile: defaultDomeinFile, nameCounter: 0}
+initialContextRoleParserMonadState = {rolOccurrences: F.empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes, domeinFile: defaultDomeinFile, nameCounter: 0}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is MonadPerspectives, which we need to access couchdb.
 -- | Then we have ContextRoleParserState, which we need to keep track of the number of
 -- | instances of a particular role type in a context (to generate unique names).
 -- | Finally, the StateT Position part is used by the IndentParser.
-type ContextRoleParserMonad e = (StateT Position (StateT ContextRoleParserState (MonadPerspectives e)))
+type ContextRoleParserMonad = (StateT Position (StateT ContextRoleParserState (MonadPerspectives)))
 
 -- | This is the type that is produced by the ContextRoleParser.
 -- | It can also be expressed in terms of the type synonym IndentParser:
--- | type IP a e = IndentParser (StateT ContextRoleParserState (Aff e)) String a
-type IP a e = ParserT String (ContextRoleParserMonad e) a
+-- | type IP a = IndentParser (StateT ContextRoleParserState (Aff e)) String a
+type IP a = ParserT String ContextRoleParserMonad a
 
 -- | Apply a parser, keeping only the parsed result.
-runIndentParser :: forall a e. String -> IP a e -> MonadPerspectives e (Either ParseError a)
+runIndentParser :: forall a. String -> IP a -> MonadPerspectives (Either ParseError a)
 runIndentParser s p = evalStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
 
 -- | Apply a parser, keeping both state and the parsed result.
-runIndentParser' :: forall a e. String -> IP a e -> MonadPerspectives e (Tuple (Either ParseError a) ContextRoleParserState)
+runIndentParser' :: forall a. String -> IP a -> MonadPerspectives (Tuple (Either ParseError a) ContextRoleParserState)
 runIndentParser' s p = runStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
 
 -- | As convienience, to lift functions on Aff all the way up:
-liftAffToIP :: forall a e. MonadPerspectives e a -> IP a e
+liftAffToIP :: forall a. MonadPerspectives a -> IP a
 liftAffToIP = lift <<< lift <<< lift
 
 -----------------------------------------------------------
@@ -61,20 +61,20 @@ liftAffToIP = lift <<< lift <<< lift
 -----------------------------------------------------------
 -- | Reach all the way into the stack to retrieve the number of times a particular
 -- | role has been instantiated in a context:
-getRoleOccurrences :: forall e. RolName -> IP (Maybe Int) e
+getRoleOccurrences :: RolName -> IP (Maybe Int)
 getRoleOccurrences roleName = do
-  lift (lift (gets (\{rolOccurrences} -> lookup roleName rolOccurrences)))
+  lift (lift (gets (\{rolOccurrences} -> F.lookup roleName rolOccurrences)))
 
 -- | Increment the number of instances of a particular role.
-incrementRoleInstances :: forall e. RolName -> IP Unit e
-incrementRoleInstances roleName = lift (lift (modify f))
+incrementRoleInstances :: RolName -> IP Unit
+incrementRoleInstances roleName = void $ lift (lift (modify f))
   where
-    f s@{rolOccurrences} = s {rolOccurrences = insert roleName (maybe 1 ((+)1) (lookup roleName rolOccurrences)) rolOccurrences}
+    f s@{rolOccurrences} = s {rolOccurrences = F.insert roleName (maybe 1 ((+)1) (F.lookup roleName rolOccurrences)) rolOccurrences}
 
-getRoleInstances :: forall e. IP (F.Object Int) e
+getRoleInstances :: IP (F.Object Int)
 getRoleInstances = lift (lift get) >>= pure <<< (_.rolOccurrences)
 
-setRoleInstances :: forall e. (F.Object Int) -> IP Unit e
+setRoleInstances :: (F.Object Int) -> IP Unit
 setRoleInstances rmap = do
   s <- lift (lift get)
   lift (lift (put s {rolOccurrences = rmap}))
@@ -82,23 +82,23 @@ setRoleInstances rmap = do
 -----------------------------------------------------------
 -- Namespace
 -----------------------------------------------------------
-getNamespace :: forall e. IP String e
+getNamespace :: IP String
 getNamespace = lift (lift get) >>= pure <<< (_.namespace)
 
-generatedNameCounter :: forall e. IP Int e
+generatedNameCounter :: IP Int
 generatedNameCounter = do
   s <- lift (lift get)
   n <- pure s.nameCounter
   lift (lift (put s {nameCounter = n + 1}))
   pure n
 
-setNamespace :: forall e. String -> IP Unit e
+setNamespace :: String -> IP Unit
 setNamespace ns = do
   s <- lift (lift get)
   lift (lift (put s {namespace = ns}))
 
 -- Note that the namespace in state is not terminated by a $.
-withExtendedNamespace :: forall a e. String -> IP a e -> IP a e
+withExtendedNamespace :: forall a. String -> IP a -> IP a
 withExtendedNamespace extension p = do
   namespace <- getNamespace
   case null extension of
@@ -110,7 +110,7 @@ withExtendedNamespace extension p = do
   pure result
 
 -- Note that the namespace in state is not terminated by a $.
-withNamespace :: forall a e. String -> IP a e -> IP a e
+withNamespace :: forall a. String -> IP a -> IP a
 withNamespace ns p = do
   namespace <- getNamespace
   _ <- setNamespace ns
@@ -121,16 +121,16 @@ withNamespace ns p = do
 -----------------------------------------------------------
 -- TypeNamespace
 -----------------------------------------------------------
-getTypeNamespace :: forall e. IP String e
+getTypeNamespace :: IP String
 getTypeNamespace = lift (lift get) >>= pure <<< (_.typeNamespace)
 
-setTypeNamespace :: forall e. String -> IP Unit e
+setTypeNamespace :: String -> IP Unit
 setTypeNamespace ns = do
   s <- lift (lift get)
   lift (lift (put s {typeNamespace = ns}))
 
 -- Note that the namespace in state is not terminated by a $.
-withExtendedTypeNamespace :: forall a e. String -> IP a e -> IP a e
+withExtendedTypeNamespace :: forall a. String -> IP a -> IP a
 withExtendedTypeNamespace extension p = do
   namespace <- getTypeNamespace
   case null extension of
@@ -142,7 +142,7 @@ withExtendedTypeNamespace extension p = do
   pure result
 
 -- Note that the namespace in state is not terminated by a $.
-withTypeNamespace :: forall a e. String -> IP a e -> IP a e
+withTypeNamespace :: forall a. String -> IP a -> IP a
 withTypeNamespace ns p = do
   namespace <- getTypeNamespace
   _ <- setTypeNamespace ns
@@ -153,30 +153,30 @@ withTypeNamespace ns p = do
 -----------------------------------------------------------
 -- Section
 -----------------------------------------------------------
-setSection :: forall e. QualifiedName -> IP Unit e
+setSection :: QualifiedName -> IP Unit
 setSection propertyName = do
   s <- lift (lift get)
   lift (lift (put s {section = propertyName}))
 
-getSection :: forall e. IP QualifiedName e
+getSection :: IP QualifiedName
 getSection = lift (lift get) >>= pure <<< (_.section)
 
 -----------------------------------------------------------
 -- Prefixes
 -----------------------------------------------------------
-setPrefix :: forall e. Prefix -> String -> IP Unit e
+setPrefix :: Prefix -> String -> IP Unit
 setPrefix pre exp = do
   (s@{prefixes}) <- lift (lift get)
-  lift (lift (put s {prefixes = insert pre exp prefixes}))
+  lift (lift (put s {prefixes = F.insert pre exp prefixes}))
 
-getPrefix :: forall e. Prefix -> IP (Maybe String) e
-getPrefix pre = lift (lift (gets (\{prefixes} -> lookup pre prefixes)))
+getPrefix :: Prefix -> IP (Maybe String)
+getPrefix pre = lift (lift (gets (\{prefixes} -> F.lookup pre prefixes)))
 
 -----------------------------------------------------------
 -- Domeinfile
 -----------------------------------------------------------
-addRol :: forall e. PerspectRol -> IP Unit e
-addRol rol = lift $ lift $ modify \s@{domeinFile} -> s {domeinFile = addRolToDomeinFile rol domeinFile }
+addRol :: PerspectRol -> IP Unit
+addRol rol = void $ lift $ lift $ modify \s@{domeinFile} -> s {domeinFile = addRolToDomeinFile rol domeinFile }
 
-addContext :: forall e. PerspectContext -> IP Unit e
-addContext ctxt = lift (lift (modify \s@{domeinFile} -> s {domeinFile = addContextToDomeinFile ctxt domeinFile }))
+addContext :: PerspectContext -> IP Unit
+addContext ctxt = void $ lift (lift (modify \s@{domeinFile} -> s {domeinFile = addContextToDomeinFile ctxt domeinFile }))
