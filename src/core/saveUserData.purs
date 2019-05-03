@@ -22,95 +22,95 @@ import Prelude (Unit, ifM, pure, unit, (==), discard, (>>=), bind, ($), const, v
 
 type UserDataState = Array ID
 
-type MonadSaveUserData e = StateT UserDataState (MonadPerspectives e)
+type MonadSaveUserData = StateT UserDataState MonadPerspectives
 
-saveDomeinFileAsUserData :: forall e. DomeinFile -> MonadPerspectives (AjaxAvarCache e) Unit
+saveDomeinFileAsUserData :: DomeinFile -> MonadPerspectives Unit
 saveDomeinFileAsUserData (DomeinFile{contexts, roles}) = do
-  for_ contexts (context_id >>> saveEntiteitPreservingVersion :: ID -> MP e PerspectContext)
-  for_ roles (rol_id >>> saveEntiteitPreservingVersion :: ID -> MP e PerspectRol)
+  for_ contexts (context_id >>> saveEntiteitPreservingVersion :: ID -> MP PerspectContext)
+  for_ roles (rol_id >>> saveEntiteitPreservingVersion :: ID -> MP PerspectRol)
 
-saveUserData :: forall e. Array BuitenRol -> MonadPerspectives (AjaxAvarCache e) Unit
+saveUserData :: Array BuitenRol -> MonadPerspectives Unit
 saveUserData buitenRollen = evalStateT (saveUserData' buitenRollen) []
 
-saveUserData' :: forall e. Array BuitenRol -> MonadSaveUserData (AjaxAvarCache e) Unit
+saveUserData' :: Array BuitenRol -> MonadSaveUserData Unit
 saveUserData' buitenRollen = void $ for buitenRollen saveBuitenRol
   where
-    saveEntiteit :: forall a. PerspectEntiteit a => String -> MonadSaveUserData (AjaxAvarCache e) a
+    saveEntiteit :: forall a. PerspectEntiteit a => String -> MonadSaveUserData a
     saveEntiteit id = lift $ saveEntiteitPreservingVersion id
 
-    saveBuitenRol :: BuitenRol -> MonadSaveUserData (AjaxAvarCache e) Unit
+    saveBuitenRol :: BuitenRol -> MonadSaveUserData Unit
     saveBuitenRol rolId = ifM (seenBefore $ unwrap rolId)
       (pure unit)
       (do
         haveSeen $ unwrap rolId
-        void (saveEntiteit (unwrap rolId) :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
+        void (saveEntiteit (unwrap rolId) :: MonadSaveUserData PerspectRol)
         lift (rolId ##>> context) >>= saveContext
-        void (saveEntiteit (buitenToBinnenRol $ unwrap rolId) :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
+        void (saveEntiteit (buitenToBinnenRol $ unwrap rolId) :: MonadSaveUserData PerspectRol)
       )
 
-    saveContext :: ID -> MonadSaveUserData (AjaxAvarCache e) Unit
+    saveContext :: ID -> MonadSaveUserData Unit
     saveContext contextId = ifM (seenBefore contextId)
       (pure unit)
       do
         haveSeen contextId
-        void (saveEntiteit contextId :: MonadSaveUserData (AjaxAvarCache e) PerspectContext)
+        void (saveEntiteit contextId :: MonadSaveUserData PerspectContext)
         rollen <- lift $ iedereRolInContext contextId
         void $ for rollen \(rol :: String) -> do
           haveSeen rol
-          void (saveEntiteit rol :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
+          void (saveEntiteit rol :: MonadSaveUserData PerspectRol)
         pure unit
 
-    seenBefore :: ID -> MonadSaveUserData (AjaxAvarCache e) Boolean
+    seenBefore :: ID -> MonadSaveUserData Boolean
     seenBefore id = get >>= \ids -> pure $ maybe false (const true) (elemIndex id ids)
 
-    haveSeen :: ID -> MonadSaveUserData (AjaxAvarCache e) Unit
-    haveSeen id = modify (cons id)
+    haveSeen :: ID -> MonadSaveUserData Unit
+    haveSeen id = void $ modify (cons id)
 
-    isBuitenRol :: ID -> MonadSaveUserData (AjaxAvarCache e) Boolean
+    isBuitenRol :: ID -> MonadSaveUserData Boolean
     isBuitenRol id = do
       r <- lift $ (id %%>> genericContext /-/ buitenRol >=> pure <<< map unwrap)
       pure $ id == r
 
-removeUserData :: forall e. Array BuitenRol -> MonadPerspectives (AjaxAvarCache e) Unit
+removeUserData :: Array BuitenRol -> MonadPerspectives Unit
 removeUserData buitenRollen = evalStateT (removeUserData' buitenRollen) []
 
-removeUserData' :: forall e. Array BuitenRol -> MonadSaveUserData (AjaxAvarCache e) Unit
+removeUserData' :: Array BuitenRol -> MonadSaveUserData Unit
 removeUserData' buitenRollen = void $ for buitenRollen removeBuitenRol
   where
-    removeEntiteit' :: forall a. PerspectEntiteit a => String -> MonadSaveUserData (AjaxAvarCache e) a
+    removeEntiteit' :: forall a. PerspectEntiteit a => String -> MonadSaveUserData a
     removeEntiteit' id = do
       ent <- lift $ getPerspectEntiteit id
       lift $ removeEntiteit id ent
 
-    removeBuitenRol :: BuitenRol -> MonadSaveUserData (AjaxAvarCache e) Unit
+    removeBuitenRol :: BuitenRol -> MonadSaveUserData Unit
     removeBuitenRol rolId = ifM (seenBefore $ unwrap rolId)
       (pure unit)
       (do
         haveSeen $ unwrap rolId
         -- remove the binnenRol.
-        void (removeEntiteit' (buitenToBinnenRol (unwrap rolId)) :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
+        void (removeEntiteit' (buitenToBinnenRol (unwrap rolId)) :: MonadSaveUserData PerspectRol)
         lift (rolId ##>> context) >>= removeContext
-        void (removeEntiteit' (unwrap rolId) :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
+        void (removeEntiteit' (unwrap rolId) :: MonadSaveUserData PerspectRol)
       )
 
-    removeContext :: ID -> MonadSaveUserData (AjaxAvarCache e) Unit
+    removeContext :: ID -> MonadSaveUserData Unit
     removeContext contextId = ifM (seenBefore contextId)
       (pure unit)
       do
         haveSeen contextId
         rollen <- lift $ iedereRolInContext contextId
-        void (removeEntiteit' contextId :: MonadSaveUserData (AjaxAvarCache e) PerspectContext)
+        void (removeEntiteit' contextId :: MonadSaveUserData PerspectContext)
         void $ for rollen \rol -> do
           haveSeen rol
-          (removeEntiteit' rol :: MonadSaveUserData (AjaxAvarCache e) PerspectRol)
+          (removeEntiteit' rol :: MonadSaveUserData PerspectRol)
 
-    seenBefore :: ID -> MonadSaveUserData (AjaxAvarCache e) Boolean
+    seenBefore :: ID -> MonadSaveUserData Boolean
     seenBefore id = get >>= \ids -> pure $ maybe false (const true) (elemIndex id ids)
 
-    haveSeen :: ID -> MonadSaveUserData (AjaxAvarCache e) Unit
-    haveSeen id = modify (cons id)
+    haveSeen :: ID -> MonadSaveUserData Unit
+    haveSeen id = void $ modify (cons id)
 
-    isBuitenRol :: ID -> MonadSaveUserData (AjaxAvarCache e) Boolean
+    isBuitenRol :: ID -> MonadSaveUserData Boolean
     isBuitenRol id = do
       r <- lift $ (id %%>> genericContext /-/ buitenRol >=> pure <<< map unwrap)
       pure $ id == r
