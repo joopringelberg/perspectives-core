@@ -19,7 +19,7 @@ import Effect.Exception (error)
 import Effect.Now (now)
 import Foreign (unsafeToForeign)
 import Foreign.Class (class Encode)
-import Foreign.Object (Object, empty, insert, lookup)
+import Foreign.Object (Object, empty, insert, lookup) as O
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DomeinFile (DomeinFile)
@@ -36,7 +36,7 @@ import Unsafe.Coerce (unsafeCoerce)
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
 type DomeinCache = GLStrMap (AVar DomeinFile)
-type QueryCache e = GLStrMap (TypedTripleGetter String String e)
+type QueryCache = GLStrMap (TypedTripleGetter String String)
 
 type PerspectivesState = CouchdbState (
   rolDefinitions :: RolDefinitions
@@ -60,7 +60,7 @@ type MP = MonadPerspectives
 -- MONADPERSPECTIVESQUERY
 -----------------------------------------------------------
 -- | The QueryEnvironment is a set of bindings of variableNames (Strings) to references to Triples.
-type QueryEnvironment = Object TripleRef
+type QueryEnvironment = O.Object TripleRef
 
 type MonadPerspectivesQuery =  StateT QueryEnvironment MonadPerspectives
 
@@ -69,10 +69,10 @@ type MPQ = MonadPerspectivesQuery
 type MonadPerspectivesObjects = MonadPerspectives (Array ID)
 
 putQueryVariable :: VariableName -> TripleRef -> MonadPerspectivesQuery Unit
-putQueryVariable var t = void $ modify \env -> insert var t env
+putQueryVariable var t = void $ modify \env -> O.insert var t env
 
 readQueryVariable :: VariableName -> MonadPerspectivesQuery TripleRef
-readQueryVariable var = gets \env -> unsafePartial (fromJust (lookup var env))
+readQueryVariable var = gets \env -> unsafePartial (fromJust (O.lookup var env))
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERYCOMPILER
 -----------------------------------------------------------
@@ -84,7 +84,7 @@ type VariableName = String
 
 type QueryCompilerEnvironment =
   { domain :: Domain
-  , declaredVariables :: Object ContextID
+  , declaredVariables :: O.Object ContextID
   }
 
 type MonadPerspectivesQueryCompiler = StateT QueryCompilerEnvironment MonadPerspectives
@@ -93,7 +93,7 @@ runMonadPerspectivesQueryCompiler :: forall a.
   ContextID
   -> (MonadPerspectivesQueryCompiler a)
   -> MonadPerspectives a
-runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: empty}
+runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: O.empty}
 
 putQueryStepDomain :: Domain -> MonadPerspectivesQueryCompiler Unit
 putQueryStepDomain d = void $ modify \env -> env { domain = d}
@@ -102,10 +102,10 @@ getQueryStepDomain :: MonadPerspectivesQueryCompiler Domain
 getQueryStepDomain = gets \{domain} -> domain
 
 putQueryVariableType :: VariableName -> ContextID -> MonadPerspectivesQueryCompiler Unit
-putQueryVariableType var typeId = void $ modify \s@{declaredVariables} -> s { declaredVariables = insert var typeId declaredVariables }
+putQueryVariableType var typeId = void $ modify \s@{declaredVariables} -> s { declaredVariables = O.insert var typeId declaredVariables }
 
 getQueryVariableType :: VariableName -> MonadPerspectivesQueryCompiler (Maybe String)
-getQueryVariableType var = gets \{declaredVariables} -> lookup var declaredVariables
+getQueryVariableType var = gets \{declaredVariables} -> O.lookup var declaredVariables
 
 withQueryCompilerEnvironment :: forall a. MonadPerspectivesQueryCompiler a -> MonadPerspectivesQueryCompiler a
 withQueryCompilerEnvironment a = do
@@ -131,9 +131,9 @@ infix 0 applyObjectsGetter as %%=
 applyObjectsGetterToMaybeObject :: ID -> ObjectsGetter -> MonadPerspectives (Maybe Value)
 applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
-infix 0 applyObjectsGetterToMaybeObject as %%> 
+infix 0 applyObjectsGetterToMaybeObject as %%>
 
-applyObjectsGetterToObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives o
+applyObjectsGetterToObject :: forall s o. s -> (s ~~> o) -> MonadPerspectives o
 applyObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
     Nothing -> throwError $ error $ "applyObjectsGetterToObject: no values for '" <> (unsafeCoerce id) <> "'."
@@ -144,27 +144,27 @@ infix 0 applyObjectsGetterToObject as %%>>
 -----------------------------------------------------------
 -- TYPEDOBJECT(S)GETTER
 -----------------------------------------------------------
-type TypedObjectsGetter s o e = s -> MonadPerspectives (Array o)
+type TypedObjectsGetter s o = s -> MonadPerspectives (Array o)
 
 infixl 5 type TypedObjectsGetter as ~~>
 
-type TypedObjectGetter s o e = s -> MonadPerspectives o
+type TypedObjectGetter s o = s -> MonadPerspectives o
 
--- | -- | Apply (s ~~> o) e to s to get an Array of o, possibly empty.
-applyTypedObjectsGetter :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (Array o)
+-- | -- | Apply (s ~~> o) to s to get an Array of o, possibly O.empty.
+applyTypedObjectsGetter :: forall s o. s -> (s ~~> o) -> MonadPerspectives (Array o)
 applyTypedObjectsGetter id g = g id
 
 infix 0 applyTypedObjectsGetter as ##
 infix 0 applyTypedObjectsGetter as ##=
 
--- | Apply (s ~~> o) e to s to get (a single) o wrapped in Just, Nothing otherwise.
-applyTypedObjectsGetterToMaybeObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives (Maybe o)
+-- | Apply (s ~~> o) to s to get (a single) o wrapped in Just, Nothing otherwise.
+applyTypedObjectsGetterToMaybeObject :: forall s o. s -> (s ~~> o) -> MonadPerspectives (Maybe o)
 applyTypedObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyTypedObjectsGetterToMaybeObject as ##>
 
--- | Apply (s ~~> o) e to s to get (a single) o. Throws an error of no o is available.
-applyTypedObjectsGetterToObject :: forall s o e. s -> (s ~~> o) e -> MonadPerspectives o
+-- | Apply (s ~~> o) to s to get (a single) o. Throws an error of no o is available.
+applyTypedObjectsGetterToObject :: forall s o. s -> (s ~~> o) -> MonadPerspectives o
 applyTypedObjectsGetterToObject id g = g id >>= \objs ->
   case head objs of
     Nothing -> throwError $ error $ "applyTypedObjectsGetterToObject: no values for '" <> unsafeCoerce id <> "'."
@@ -181,30 +181,30 @@ data NamedFunction f = NamedFunction Name f
 -----------------------------------------------------------
 -- TRIPLE
 -----------------------------------------------------------
-newtype Triple s o e = Triple
+newtype Triple s o = Triple
   { subject :: s
   , predicate :: Predicate
   , object :: Array o
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
-  , tripleGetter :: TripleGetter s o e}
+  , tripleGetter :: TripleGetter s o}
 
-instance showTriple :: (Show s, Show o) => Show (Triple s o e) where
+instance showTriple :: (Show s, Show o) => Show (Triple s o) where
   show (Triple{subject, predicate, object}) = "<" <> show subject <> ";" <> show predicate <> ";" <> show object <> ">"
 
-instance eqTriple :: (Eq s, Eq o) => Eq (Triple s o e) where
+instance eqTriple :: (Eq s, Eq o) => Eq (Triple s o) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
-tripleObjects :: forall s o e. Triple s o e -> Array o
+tripleObjects :: forall s o. Triple s o -> Array o
 tripleObjects (Triple{object}) = object
 
-tripleObjects_  :: forall s o e m. Monad m => (Triple s o e) -> m (Array o)
+tripleObjects_  :: forall s o m. Monad m => (Triple s o) -> m (Array o)
 tripleObjects_ (Triple{object}) = pure object
 
-mtripleObject :: forall s o e. Triple s o e -> Maybe o
+mtripleObject :: forall s o. Triple s o -> Maybe o
 mtripleObject = head <<< tripleObjects
 
-tripleObject :: forall s o e. Triple s o e -> o
+tripleObject :: forall s o. Triple s o -> o
 tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
 
 -----------------------------------------------------------
@@ -220,49 +220,49 @@ instance eqTripleQueueElement :: Eq TripleQueueElement where
 -----------------------------------------------------------
 -- TRIPLEGETTER
 -----------------------------------------------------------
-type TripleGetter s o e = s -> MonadPerspectivesQuery (Triple s o e)
+type TripleGetter s o = s -> MonadPerspectivesQuery (Triple s o)
 
 -----------------------------------------------------------
 -- TYPED GETTERS
 -----------------------------------------------------------
 
-data TypedTripleGetter s o e = TypedTripleGetter Name (TripleGetter s o e)
+data TypedTripleGetter s o = TypedTripleGetter Name (TripleGetter s o)
 
 infixl 5 type TypedTripleGetter as **>
 
-typedTripleGetterName :: forall s o e. TypedTripleGetter s o e -> String
+typedTripleGetterName :: forall s o. TypedTripleGetter s o -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
 
 -- | NB. If the TripleGetter uses the #start queryvariable, this will not work, because
 -- | it will only be bound in runMonadPerspectivesQuery.
-applyTypedTripleGetter :: forall s o e.
+applyTypedTripleGetter :: forall s o.
   s
-  -> TypedTripleGetter s o e
-  -> (MonadPerspectivesQuery) (Triple s o e)
+  -> TypedTripleGetter s o
+  -> (MonadPerspectivesQuery) (Triple s o)
 applyTypedTripleGetter a (TypedTripleGetter _ f) = f a
 
 infix 0 applyTypedTripleGetter as @@
 
-applyTypedTripleGetterToObjects :: forall s o e.
+applyTypedTripleGetterToObjects :: forall s o.
   s
-  -> TypedTripleGetter s o e
+  -> TypedTripleGetter s o
   -> (MonadPerspectivesQuery) (Array o)
 applyTypedTripleGetterToObjects a (TypedTripleGetter _ f) = f a >>= pure <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToObjects as @@=
 
-applyTypedTripleGetterToMaybeObject :: forall s o e.
+applyTypedTripleGetterToMaybeObject :: forall s o.
   s
-  -> TypedTripleGetter s o e
+  -> TypedTripleGetter s o
   -> (MonadPerspectivesQuery) (Maybe o)
 applyTypedTripleGetterToMaybeObject a (TypedTripleGetter _ f) = f a >>= pure <<< head <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToMaybeObject as @@>
 
-applyTypedTripleGetterToObject :: forall s o e.
+applyTypedTripleGetterToObject :: forall s o.
   Show s =>
   s
-  -> TypedTripleGetter s o e
+  -> TypedTripleGetter s o
   -> (MonadPerspectivesQuery) o
 applyTypedTripleGetterToObject a (TypedTripleGetter n f) = f a >>= \(Triple{object}) ->
   case head object of
@@ -421,9 +421,3 @@ instance encodeSerializableDateTime :: Encode SerializableDateTime where
 
 instance showSerializableDateTime :: Show SerializableDateTime where
   show (SerializableDateTime d) = "todo"
-
--- instance showSerializableDateTime :: Show SerializableDateTime where
---   show (SerializableDateTime d) = runPure (catchException handleError (toISOString (fromDateTime d)))
---
--- handleError :: forall eff. Error -> Eff eff String
--- handleError e = pure "Could not serialize DateTime"

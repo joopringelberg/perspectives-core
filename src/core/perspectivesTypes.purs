@@ -147,28 +147,28 @@ type AnyDefinition = String
 -----------------------------------------------------------
 -- | The class of which all types that represent an instance of a rol are a member.
 class (Newtype rol String, Eq rol, Show rol) <= RolClass rol where
-  getProperty :: forall e. PropertyDef -> (rol ~~> Value) e
-  getUnqualifiedProperty :: forall e. LocalName -> (rol ~~> Value) e
+  getProperty :: PropertyDef -> (rol ~~> Value)
+  getUnqualifiedProperty :: LocalName -> (rol ~~> Value)
 
-genericGetProperty :: forall e. String -> (String ~~> String) e
+genericGetProperty :: String -> (String ~~> String)
 genericGetProperty pn = getRolMember \(rol :: PerspectRol) -> maybe [] propertyValue (lookup pn (rol_properties rol))
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r.
 -- | NOTICE that this does not return AspectProperties! These are not qualified with
 -- | The name of the rol.
 -- | E.g. getUnqualifiedProperty "voornaam"
-genericGetUnqualifiedLocalProperty :: forall e. LocalName -> (String ~~> String) e
+genericGetUnqualifiedLocalProperty :: LocalName -> (String ~~> String)
 genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] propertyValue (lookup (ln `qualifiedWith` rol) (rol_properties rol))
   where
     qualifiedWith :: LocalName -> PerspectRol -> String
-    qualifiedWith ln (PerspectRol {pspType}) = pspType <> "$" <> ln
+    qualifiedWith ln' (PerspectRol {pspType}) = pspType <> "$" <> ln'
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"
-genericGetUnqualifiedProperty :: forall e. LocalName -> (String ~~> String) e
+genericGetUnqualifiedProperty :: LocalName -> (String ~~> String)
 genericGetUnqualifiedProperty ln = getRolMember $ getUnQualifiedPropertyFromPerspectRol ln
 
-getUnQualifiedPropertyFromPerspectRol :: forall e. LocalName -> PerspectRol -> Array String
+getUnQualifiedPropertyFromPerspectRol :: LocalName -> PerspectRol -> Array String
 getUnQualifiedPropertyFromPerspectRol ln rol =
   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
     Nothing -> []
@@ -181,9 +181,9 @@ getUnQualifiedPropertyFromPerspectRol ln rol =
 -- | `bound` depends functionally on `binder`. We therefore have four instances.
 -- | In other words, with this class we represent for each instance of RolClass to what type of role it can be bound.
 class (RolClass binder, RolClass bound) <= Binding binder bound | binder -> bound where
-  binding :: forall e. (binder ~~> bound) e
+  binding :: (binder ~~> bound)
 
-genericBinding :: forall e. ObjectsGetter e
+genericBinding :: ObjectsGetter
 genericBinding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
 -----------------------------------------------------------
