@@ -1,24 +1,26 @@
 module Perspectives.Deltas where
 
-import Effect.Aff (error, throwError)
-import Effect.Aff.Class (liftAff)
-import Effect.AVar (AVAR)
+import Affjax (printResponseFormatError)
+import Affjax (put) as AJ
+import Affjax.RequestBody as RequestBody
+import Affjax.ResponseFormat as ResponseFormat
+import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head)
-import Foreign.Generic (encodeJSON)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (StrMap, empty, insert, lookup)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
-import Affjax (AffjaxResponse, put) as AJ
-import Affjax.StatusCode (StatusCode(..))
+import Effect.Aff (error, throwError)
+import Effect.Aff.Class (liftAff)
+import Foreign.Generic (encodeJSON)
+import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), createTransactie, transactieID, (%%>>), type (**>))
 import Perspectives.DataTypeObjectGetters (context)
 import Perspectives.DataTypeTripleGetters (identity, rolType, rolBindingDef) as DTG
 import Perspectives.DomeinCache (saveCachedDomeinFile)
-
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, rolIsFunctioneel)
 import Perspectives.ModelBasedTripleGetters (actiesInContextDef, actiesOfRol, enclosingDefinition, inverse_subjectRollenDef, objectRollenDef, objectViewDef, propertyReferenties, rolUser)
@@ -33,10 +35,10 @@ import Perspectives.TripleGetterConstructors (searchUnqualifiedRolDefinition, ro
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
-import Prelude (Unit, bind, discard, id, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
+import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
-runTransactie :: forall e. MonadPerspectives (TransactieEffects e) Unit
+runTransactie :: MonadPerspectives Unit
 runTransactie = do
   user <- getUser
   t@(Transactie{deltas, changedDomeinFiles}) <- transactie
@@ -50,39 +52,39 @@ runTransactie = do
   distributeTransactie t
   (lift $ createTransactie user) >>= setTransactie
 
-distributeTransactie :: forall e. Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
+distributeTransactie :: Transactie -> MonadPerspectives Unit
 distributeTransactie t = do
-  (customizedTransacties :: StrMap Transactie) <- transactieForEachUser t
+  (customizedTransacties :: FO.Object Transactie) <- transactieForEachUser t
   _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
-addContextToTransactie :: forall e. PerspectContext ->
-  MonadPerspectives (avar :: AVAR | e) Unit
+addContextToTransactie :: PerspectContext ->
+  MonadPerspectives Unit
 addContextToTransactie c = do
   (Transactie tf@{createdContexts}) <- transactie
   setTransactie $ Transactie tf {createdContexts = cons c createdContexts}
   -- put $ Transactie tf {createdContexts = cons c createdContexts}
 
-addRolToTransactie :: forall e. PerspectRol -> MonadPerspectives (avar :: AVAR | e) Unit
+addRolToTransactie :: PerspectRol -> MonadPerspectives Unit
 addRolToTransactie c = do
   (Transactie tf@{createdRoles}) <- transactie
   setTransactie $ Transactie tf {createdRoles = cons c createdRoles}
 
-deleteContextFromTransactie :: forall e. PerspectContext -> MonadPerspectives (avar :: AVAR | e) Unit
+deleteContextFromTransactie :: PerspectContext -> MonadPerspectives Unit
 deleteContextFromTransactie c@(PerspectContext{_id}) = do
   (Transactie tf@{createdContexts, deletedContexts}) <- transactie
   case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
     Nothing -> setTransactie (Transactie tf{deletedContexts = cons _id deletedContexts})
     (Just i) -> setTransactie (Transactie tf{createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
-deleteRolFromTransactie :: forall e. PerspectRol -> MonadPerspectives (avar :: AVAR | e) Unit
+deleteRolFromTransactie :: PerspectRol -> MonadPerspectives Unit
 deleteRolFromTransactie c@(PerspectRol{_id}) = do
   (Transactie tf@{createdRoles, deletedRoles}) <- transactie
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
     Nothing -> setTransactie (Transactie tf{deletedRoles = cons _id deletedRoles})
     (Just i) -> setTransactie (Transactie tf{createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
-addDomeinFileToTransactie :: forall e. ID -> MonadPerspectives (avar :: AVAR | e) Unit
+addDomeinFileToTransactie :: ID -> MonadPerspectives Unit
 addDomeinFileToTransactie dfId = do
   (Transactie tf@{changedDomeinFiles}) <- transactie
   case elemIndex dfId changedDomeinFiles of
@@ -104,7 +106,7 @@ addDomeinFileToTransactie dfId = do
 -- 	Indien gevonden: verwijder de oude.
 -- 	Anders: voeg de nieuwe toe.
 
-addDelta :: forall e. Delta -> MonadPerspectives (AjaxAvarCache e) Unit
+addDelta :: Delta -> MonadPerspectives Unit
 addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   t@(Transactie tf@{deltas}) <- transactie
   case elemIndex newCD deltas of
@@ -160,89 +162,91 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
     add :: Delta -> Transactie -> Transactie
     add delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons delta deltas}
     replace :: Int -> Delta -> Transactie -> Transactie
-    replace i delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons newCD (maybe deltas id (deleteAt i deltas))}
+    replace i delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons newCD (maybe deltas identity (deleteAt i deltas))}
     remove :: Delta -> Transactie -> Transactie
     remove i (Transactie tf@{deltas}) = Transactie tf {deltas = (delete i deltas)}
 
 
-sendTransactieToUser :: forall e. ID -> Transactie -> MonadPerspectives (AjaxAvarCache e) Unit
+sendTransactieToUser :: ID -> Transactie -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
   (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
   -- TODO controleer of hier authentication nodig is!
-  (res :: AJ.AffjaxResponse String)  <- liftAff $ AJ.put (userIP <> "/" <> userId <> "_post/" <> transactieID t) (encodeJSON t)
+  res  <- liftAff $ AJ.put ResponseFormat.string (userIP <> "/" <> userId <> "_post/" <> transactieID t) (RequestBody.string (encodeJSON t))
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
     true -> pure unit
-    false -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> show res.response <> ")")
+    false -> case res.body of
+      (Left e) -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> printResponseFormatError e <> ")")
+      _ -> pure unit
   pure unit
 
 -- TODO. De verbinding tussen Actie en Rol is omgekeerd en is niet
 -- langer geregistreerd als een rol van de Actie, maar als rol van de Rol (objectRol en subjectRol).
 -- | The (IDs of the) users that play a role in, and have a relevant perspective on, the Context that is modified;
 -- | or the users that play a role in the context of the Role that is modified and have a relevant perspective on that Role.
-usersInvolvedInDelta :: forall e. Delta -> MonadPerspectives (AjaxAvarCache e) (Array RolInContext)
+usersInvolvedInDelta :: Delta -> MonadPerspectives (Array RolInContext)
 usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInContext dlt else usersInvolvedInRol dlt
   where
 
   -- From the instance of a Rol, retrieve the instances of users that play another Rol
   -- in the same context, such that they have an Actie with an objectView that has the
   -- changed property (as identified by memberName).
-  usersInvolvedInRol :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array RolInContext)
+  usersInvolvedInRol :: Delta -> MonadPerspectives (Array RolInContext)
   usersInvolvedInRol (Delta{id, memberName}) =
     do
       (contextId :: AnyContext) <- (RolInContext id) %%>> context
-      ((Triple {object}) :: Triple RolInContext RolInContext e) <-
+      ((Triple {object}) :: Triple RolInContext RolInContext) <-
         (RolInContext id) ## DTG.rolType >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUser
       pure $ object
     where
       -- roles in context that play the subjectRol in the relevant acties
-      subjectsOfRelevantActies :: (RolDef **> UserRolDef) e
+      subjectsOfRelevantActies :: (RolDef **> UserRolDef)
       subjectsOfRelevantActies = unwrap `before` filter (notEmpty (intersect actiesOfRol relevantActies)) (enclosingDefinition `followedBy` ContextDef >-> searchUnqualifiedRolDefinition "gebruikerRol")
 
       -- acties that have an objectView with the memberName
-      relevantActies :: (RolDef **> ActieDef) e
+      relevantActies :: (RolDef **> ActieDef)
       relevantActies = unwrap `before` filter (hasRelevantView (PropertyDef memberName)) (enclosingDefinition `followedBy` ContextDef >-> actiesInContextDef)
 
   -- From the instance of the context, retrieve the instances of the users that play
   -- a Rol in this context that have a subjectRol bound to an Actie that is bound as the
   -- objectRol of the Rol of which memberName is an instance.
-  
+
   -- From the instance of the context, retrieve the instances of the users that play
   -- a Rol in this context who fill the $subject Rol of an Actie that has its $object Rol filled
   -- with the Rol of which memberName is an instance.
-  usersInvolvedInContext :: Delta -> MonadPerspectives (AjaxAvarCache e) (Array RolInContext)
+  usersInvolvedInContext :: Delta -> MonadPerspectives (Array RolInContext)
   usersInvolvedInContext (Delta{id, memberName}) =
     do
       (Triple {object}) <- (RolInContext id) ## DTG.rolType >-> actorsForObject >-> (rolesOf id) >-> rolUser
       pure object
     where
       -- All Rollen that are the subject of Acties that have the Rol as object.
-      actorsForObject :: (RolDef **> UserRolDef) e
+      actorsForObject :: (RolDef **> UserRolDef)
       actorsForObject = objectRollenDef >-> inverse_subjectRollenDef
 
   -- Tests an Actie for having memberName in the view that is its objectView.
   -- psp:Actie -> psp:Boolean
-  hasRelevantView :: PropertyDef -> (ActieDef **> PBool) e
+  hasRelevantView :: PropertyDef -> (ActieDef **> PBool)
   hasRelevantView id = contains id (objectViewDef >-> propertyReferenties >-> DTG.rolBindingDef `followedBy` PropertyDef)
 
 
 -- Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
 -- Doorloop de verzameling deltas en bepaal per delta welke gebruikers betrokken zijn.
--- Bouw al doende een StrMap van userId en gespecialiseerde transacties op, waarbij je een transactie toevoegt voor een gebruiker die nog niet in de StrMap voorkomt.
-transactieForEachUser :: forall e. Transactie -> MonadPerspectives (AjaxAvarCache e)(StrMap Transactie)
+-- Bouw al doende een FO.Object van userId en gespecialiseerde transacties op, waarbij je een transactie toevoegt voor een gebruiker die nog niet in de FO.Object voorkomt.
+transactieForEachUser :: Transactie -> MonadPerspectives(FO.Object Transactie)
 transactieForEachUser t@(Transactie{deltas}) = do
   execStateT
     (for_ deltas (\d -> (lift $ usersInvolvedInDelta d) >>= (\(users :: Array RolInContext) -> transactieForEachUser' d users)))
-    empty
+    FO.empty
   where
-    transactieForEachUser' :: Delta -> (Array RolInContext) -> StateT (StrMap Transactie) (MonadPerspectives (AjaxAvarCache e)) Unit
+    transactieForEachUser' :: Delta -> (Array RolInContext) -> StateT (FO.Object Transactie) (MonadPerspectives) Unit
     transactieForEachUser' d users = do
       trs <- get
       for_
         users
-        (\(user :: RolInContext) -> case lookup (unwrap user) trs of
-          Nothing -> put $ insert (unwrap user) (transactieCloneWithJustDelta t d) trs
-          (Just (Transactie tr@{deltas: ds})) -> put $ insert (unwrap user) (Transactie tr {deltas = cons d ds}) trs)
+        (\(user :: RolInContext) -> case FO.lookup (unwrap user) trs of
+          Nothing -> put $ FO.insert (unwrap user) (transactieCloneWithJustDelta t d) trs
+          (Just (Transactie tr@{deltas: ds})) -> put $ FO.insert (unwrap user) (Transactie tr {deltas = cons d ds}) trs)
     transactieCloneWithJustDelta :: Transactie -> Delta -> Transactie
     transactieCloneWithJustDelta (Transactie tr) d = Transactie tr {deltas = [d]}
