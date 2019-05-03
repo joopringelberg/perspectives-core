@@ -23,7 +23,7 @@ import Foreign.Generic (decodeJSON, encodeJSON)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted)
+import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
@@ -134,14 +134,6 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
   where
     setRevision :: String -> (AVar DomeinFile) -> MonadPerspectives Unit
     setRevision s av = liftAff $ put (DomeinFile (dfr {_rev = (revision s)})) av
-
-onCorrectCallAndResponse :: forall a m. MonadError Error m => Decode a => Either ResponseFormatError String -> (a -> m Unit) -> m a
-onCorrectCallAndResponse (Left e) _ = throwError $ error ("createDomeinFileInCouchdb: error in call: " <> printResponseFormatError e)
-onCorrectCallAndResponse (Right r) f = do
-  (x :: Either MultipleErrors a) <- pure $ runExcept (decodeJSON r)
-  case x of
-    (Left e) -> throwError $ error ("createDomeinFileInCouchdb: error in decoding result: " <> show e)
-    (Right result) -> f result *> pure result
 
 modifyDomeinFileInCouchdb :: DomeinFile -> (AVar DomeinFile) -> MonadPerspectives Unit
 modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
