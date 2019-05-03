@@ -8,28 +8,28 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.CoreTypes (ObjectsGetter)
 import Prelude (Unit, unit, ($))
 
-type ObjectsGetterCache e = (Tuple (Array (OG e)) (Array String))
+type ObjectsGetterCache = (Tuple (Array OG) (Array String))
 
-newtype OG e = OG (ObjectsGetter e)
+newtype OG = OG ObjectsGetter
 
-derive instance newtypeOG :: Newtype (OG e) _
+derive instance newtypeOG :: Newtype OG _
 
-instance eqOG :: Eq (OG e) where
+instance eqOG :: Eq OG where
   eq = objectsGettersEqual
 
-lookupObjectsGetterName :: forall e. ObjectsGetter e -> Maybe String
+lookupObjectsGetterName :: ObjectsGetter -> Maybe String
 lookupObjectsGetterName getter = case elemIndex (OG getter) (fst objectsGetterCache) of
   Nothing -> Nothing
   (Just i) -> index (snd objectsGetterCache) i
 
-lookupObjectsGetterByName :: forall e. String -> Maybe (ObjectsGetter e)
+lookupObjectsGetterByName :: String -> Maybe ObjectsGetter
 lookupObjectsGetterByName name = case elemIndex name (snd objectsGetterCache) of
   Nothing -> Nothing
-  (Just i) -> case (index (fst objectsGetterCache) i :: Maybe (OG e)) of
-    Nothing -> (Nothing :: Maybe (ObjectsGetter e))
+  (Just i) -> case (index (fst objectsGetterCache) i :: Maybe OG) of
+    Nothing -> (Nothing :: Maybe ObjectsGetter)
     (Just og) -> Just $ unwrap og
 
-objectsGetterCacheInsert :: forall e. String -> ObjectsGetter e -> Unit
+objectsGetterCacheInsert :: String -> ObjectsGetter -> Unit
 objectsGetterCacheInsert name getter = case lookupObjectsGetterByName name of
   Nothing -> let
     ignore1 = addToArray name (snd objectsGetterCache)
@@ -37,9 +37,9 @@ objectsGetterCacheInsert name getter = case lookupObjectsGetterByName name of
     in unit
   otherwise -> unit
 
-objectsGetterCache :: forall e. ObjectsGetterCache e
+objectsGetterCache :: ObjectsGetterCache
 objectsGetterCache = Tuple [][]
 
 foreign import addToArray :: forall a. a -> Array a -> Array a
 
-foreign import objectsGettersEqual :: forall e. OG e -> OG e -> Boolean
+foreign import objectsGettersEqual :: OG -> OG -> Boolean
