@@ -60,7 +60,7 @@ instance encodeRolDef :: Encode RolDef where
 instance eqRolDef :: Eq RolDef where
   eq (RolDef c1) (RolDef c2) = c1 == c2
 derive instance newtypeRolDef :: Newtype RolDef _
-instance rolPropertyDef :: Ord RolDef where
+instance ordRolDef :: Ord RolDef where
   compare (RolDef p1) (RolDef p2) = compare p1 p2
 
 type UserRolDef = RolDef
@@ -231,6 +231,9 @@ instance bindingBuitenRol :: Binding BuitenRol BuitenRol where
 instance showBuitenRol :: Show BuitenRol where
   show (BuitenRol b) = show b
 
+instance ordBuitenRol :: Ord BuitenRol where
+  compare (BuitenRol p1) (BuitenRol p2) = compare p1 p2
+
 -----------------------------------------------------------
 -- ROLINCONTEXT AS INSTANCE
 -----------------------------------------------------------
@@ -250,6 +253,9 @@ instance rolClassRolInContext :: RolClass RolInContext where
 
 instance bindingRolInContext :: Binding RolInContext RolInContext where
   binding = typeWithPerspectivesTypes genericBinding
+
+instance ordRolInContext :: Ord RolInContext where
+  compare (RolInContext p1) (RolInContext p2) = compare p1 p2
 
 -----------------------------------------------------------
 -- CONTEXTROL AS INSTANCE
@@ -271,6 +277,9 @@ instance rolClassContextRol :: RolClass ContextRol where
 instance bindingContextRol :: Binding ContextRol BuitenRol where
   binding = typeWithPerspectivesTypes genericBinding
 
+instance ordContextRol :: Ord ContextRol where
+  compare (ContextRol p1) (ContextRol p2) = compare p1 p2
+
 -----------------------------------------------------------
 -- VALUE AS INSTANCE
 -----------------------------------------------------------
@@ -285,3 +294,6 @@ instance eqValue :: Eq Value where
   eq (Value c1) (Value c2) = c1 == c2
 instance showValue :: Show Value where
   show (Value c) = show c
+
+instance ordValue :: Ord Value where
+  compare (Value p1) (Value p2) = compare p1 p2
