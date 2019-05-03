@@ -5,7 +5,7 @@ import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.Array (concat, length)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Foreign.Object (StrMap, fromFoldable, toUnfoldable)
+import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
@@ -22,15 +22,15 @@ import Perspectives.PerspectivesTypes (Context(..), RolDef(..))
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkAContext)
-import Prelude (Unit, bind, const, discard, id, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
+import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 
 -- | Construct contexts and roles from the serialisation.
-constructContexts :: forall e. ContextsSerialisation -> MonadPerspectives (AjaxAvarCache e) (Array UserMessage)
-constructContexts (ContextsSerialisation contexts) = (traverse (constructContext >=> (pure <<< (either id (const [])))) >=> (pure <<< concat)) contexts
+constructContexts :: ContextsSerialisation -> MonadPerspectives (Array UserMessage)
+constructContexts (ContextsSerialisation contexts) = (traverse (constructContext >=> (pure <<< (either identity (const [])))) >=> (pure <<< concat)) contexts
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
 -- | Type checks the context and returns any semantic problems as UserMessages. If there are no problems, returns the ID.
-constructContext :: forall e. ContextSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
+constructContext :: ContextSerialization -> MonadPerspectives (Either (Array UserMessage) ID)
 constructContext c@(ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
   ident <- pure $ expandDefaultNamespaces id
   (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit ident
@@ -43,7 +43,6 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           pure $ Left messages
         (Right _) -> do
           (m :: Array UserMessage) <- checkAContext $ Context ident
-          (m :: Array UserMessage) <- pure []
           case length m of
             0 -> pure $ Right ident
             otherwise -> do
@@ -53,12 +52,12 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
     otherwise -> pure $ Left $ [ContextExists ident]
 
   where
-    constructContext_ :: ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) ID
+    constructContext_ :: ExceptT (Array UserMessage) (MonadPerspectives) ID
     constructContext_ = do
       ident <- pure $ expandDefaultNamespaces id
       localName <- maybe (throwError [(NotAValidIdentifier ident)]) pure (deconstructLocalNameFromDomeinURI ident)
       -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
-      (rolIds :: StrMap (Array RolID)) <-constructRollen
+      (rolIds :: FO.Object (Array RolID)) <-constructRollen
       lift $ cacheUncachedEntiteit ident
         (PerspectContext defaultContextRecord
           { _id = ident
@@ -90,29 +89,29 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           })
       pure ident
 
-    removeFromCache :: ContextID -> MP e Unit
+    removeFromCache :: ContextID -> MP Unit
     removeFromCache id' = do
       -- Here we know for sure that id is in the cache, as it has been just created (but did fail the tests).
       (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectEntiteit id'
       (_ :: Maybe (AVar PerspectContext)) <- removeInternally id'
       (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ buitenRol id'
-      (_ :: StrMap (Array (Maybe (AVar PerspectRol)))) <- traverse (traverse removeInternally) rolInContext
+      (_ :: FO.Object (Array (Maybe (AVar PerspectRol)))) <- traverse (traverse removeInternally) rolInContext
       pure unit
 
-    constructRollen :: ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (StrMap (Array ID))
+    constructRollen :: ExceptT (Array UserMessage) (MonadPerspectives) (FO.Object (Array ID))
     constructRollen = do
-      (ts :: Array (Tuple String (Array RolSerialization))) <- pure $ toUnfoldable rollen
+      (ts :: Array (Tuple String (Array RolSerialization))) <- pure $ FO.toUnfoldable rollen
       (x :: Array (Tuple String (Array ID))) <- traverse keyRolInstances ts
-      pure $ fromFoldable x
+      pure $ FO.fromFoldable x
 
       where
-        keyRolInstances :: Tuple String (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (Tuple String (Array ID))
+        keyRolInstances :: Tuple String (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives) (Tuple String (Array ID))
         keyRolInstances (Tuple rol rolSerialisations) = do
           expandedRol <- pure $ expandDefaultNamespaces rol
           instances <- constructRolInstances expandedRol rolSerialisations
           pure $ Tuple expandedRol instances
 
-        constructRolInstances :: String -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) (Array RolID)
+        constructRolInstances :: String -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) (Array RolID)
         constructRolInstances rolType rollen' = do
             contextId <- pure $ expandDefaultNamespaces id
             localName <- maybe (throwError [(NotAValidIdentifier rolType)]) pure (deconstructLocalNameFromDomeinURI rolType)
@@ -121,7 +120,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
             rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen'
             pure rolIds
 
-constructRol :: forall e. RolName -> ContextID -> RolID -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives (AjaxAvarCache e)) RolID
+constructRol :: RolName -> ContextID -> RolID -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RolID
 constructRol rolType contextId rolId i (RolSerialization {properties, binding: bnd}) = do
   rolInstanceId <- pure (expandDefaultNamespaces rolId <> (show i))
   lift$ cacheUncachedEntiteit rolInstanceId
@@ -137,7 +136,7 @@ constructRol rolType contextId rolId i (RolSerialization {properties, binding: b
 -- | Construct and add a Rol instance to the Context instance, provided the construction process doesn't yield
 -- | exceptions and that the resulting context instance is semantically correct.
 -- | Saves the new Rol instance.
-constructAnotherRol :: forall e. RolName -> ContextID -> RolSerialization -> MonadPerspectives (AjaxAvarCache e) (Either (Array UserMessage) ID)
+constructAnotherRol :: RolName -> ContextID -> RolSerialization -> MonadPerspectives (Either (Array UserMessage) ID)
 constructAnotherRol rolType id rolSerialisation = do
   ident <- pure $ expandDefaultNamespaces id
   rolInstances <- getRolInContext (RolDef rolType) ident
@@ -154,8 +153,8 @@ constructAnotherRol rolType id rolSerialisation = do
           void $ removeRol rolType rolId ident
           pure $ Left m
 
-constructProperties :: PropertySerialization -> StrMap PropertyValueWithComments
-constructProperties (PropertySerialization props) = ((toUnfoldable :: StrMap (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> fromFoldable >>> map f) props
+constructProperties :: PropertySerialization -> FO.Object PropertyValueWithComments
+constructProperties (PropertySerialization props) = ((FO.toUnfoldable :: FO.Object (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> FO.fromFoldable >>> map f) props
   where
     keyValuePair :: Tuple String (Array String) -> (Tuple String (Array String))
     keyValuePair (Tuple key values) = Tuple (expandDefaultNamespaces key) values
