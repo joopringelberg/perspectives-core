@@ -1,6 +1,6 @@
 module Perspectives.RunMonadPerspectivesQuery where
 
-import Effect.Class (liftEff)
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (evalStateT)
@@ -9,18 +9,17 @@ import Data.Maybe (Maybe(..))
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), tripleObjects, type (**>))
 
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
 
 -- | Run the function in a QueryEnvironment that has s as the value of "#start".
-runMonadPerspectivesQuery :: forall s o e.
+runMonadPerspectivesQuery :: forall s o.
   s
-  -> (s -> MonadPerspectivesQuery (gm :: GLOBALMAP | e) o)
-  -> (MonadPerspectives (gm :: GLOBALMAP | e) o)
+  -> (s -> MonadPerspectivesQuery o)
+  -> (MonadPerspectives o)
 runMonadPerspectivesQuery a f = do
-  _ <- liftEff $ typeWithPerspectivesTypes $ addToTripleIndex (typeWithPerspectivesTypes a) "model:Perspectives$start" [typeWithPerspectivesTypes a] [] [] (typeWithPerspectivesTypes tripleGetter)
+  _ <- liftEffect $ typeWithPerspectivesTypes $ addToTripleIndex (typeWithPerspectivesTypes a) "model:Perspectives$start" [typeWithPerspectivesTypes a] [] [] (typeWithPerspectivesTypes tripleGetter)
   evalStateT (f a) (singleton "#start" tref)
   where
     tref :: TripleRef
@@ -28,23 +27,23 @@ runMonadPerspectivesQuery a f = do
           { subject: (typeWithPerspectivesTypes a)
           , predicate: "model:Perspectives$start"
         }
-    tripleGetter :: TripleGetter s o e
-    tripleGetter id = liftEff (typeWithPerspectivesTypes $ addToTripleIndex (typeWithPerspectivesTypes id) "model:Perspectives$start" [typeWithPerspectivesTypes a] [] [] (typeWithPerspectivesTypes tripleGetter))
+    tripleGetter :: TripleGetter s o
+    tripleGetter id = liftEffect (typeWithPerspectivesTypes $ addToTripleIndex (typeWithPerspectivesTypes id) "model:Perspectives$start" [typeWithPerspectivesTypes a] [] [] (typeWithPerspectivesTypes tripleGetter))
 
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A TRIPLE
 ------------------------------------------------------------------------------------------------------------------------
 -- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
-runTypedTripleGetter :: forall s o e.
-  (s **> o) e
+runTypedTripleGetter :: forall s o.
+  (s **> o)
   -> s
-  -> MonadPerspectives (AjaxAvarCache e) (Triple s o e)
+  -> MonadPerspectives (Triple s o)
 runTypedTripleGetter (TypedTripleGetter _ f) a = runMonadPerspectivesQuery a f
 
-runQuery :: forall s o e.
+runQuery :: forall s o.
   s
-  -> (s **> o) e
-  -> (MonadPerspectives (AjaxAvarCache e)) (Triple s o e)
+  -> (s **> o)
+  -> (MonadPerspectives) (Triple s o)
 runQuery = (flip runTypedTripleGetter)
 
 -- low precedence!
@@ -53,7 +52,7 @@ infix 0 runQuery as ##
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN AN ARRAY OF IDS (##=)
 ------------------------------------------------------------------------------------------------------------------------
-runTypedTripleGetterToObjects :: forall s o e. s -> (s **> o) e -> (MonadPerspectives (AjaxAvarCache e)) (Array o)
+runTypedTripleGetterToObjects :: forall s o. s -> (s **> o) -> (MonadPerspectives) (Array o)
 runTypedTripleGetterToObjects id ttg = runTypedTripleGetter ttg id >>= pure <<< tripleObjects
 
 infix 0 runTypedTripleGetterToObjects as ##=
@@ -61,7 +60,7 @@ infix 0 runTypedTripleGetterToObjects as ##=
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A MAYBE ID (##>)
 ------------------------------------------------------------------------------------------------------------------------
-runTypedTripleGetterToMaybeObject :: forall s o e. s -> (s **> o) e -> (MonadPerspectives (AjaxAvarCache e)) (Maybe o)
+runTypedTripleGetterToMaybeObject :: forall s o. s -> (s **> o) -> (MonadPerspectives) (Maybe o)
 runTypedTripleGetterToMaybeObject id ttg = runTypedTripleGetter ttg id >>= pure <<< head <<< tripleObjects
 
 infix 0 runTypedTripleGetterToMaybeObject as ##>
@@ -69,7 +68,7 @@ infix 0 runTypedTripleGetterToMaybeObject as ##>
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN AN ID, MAYBE AN ERROR (##>>)
 ------------------------------------------------------------------------------------------------------------------------
-runTypedTripleGetterToObject :: forall s o e. s -> (s **> o) e -> (MonadPerspectives (AjaxAvarCache e)) o
+runTypedTripleGetterToObject :: forall s o. s -> (s **> o) -> (MonadPerspectives) o
 runTypedTripleGetterToObject id ttg@(TypedTripleGetter n _) = runTypedTripleGetter ttg id >>= \(Triple({object})) ->
   case head object of
   Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> (typeWithPerspectivesTypes id) <> "'."
