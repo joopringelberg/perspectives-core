@@ -11,7 +11,6 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Perspectives.ContextAndRole (context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, type (~~>))
-
 import Perspectives.Identifiers (binnenRol) as PI
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), RolDef, binding, typeWithPerspectivesTypes)
@@ -21,7 +20,7 @@ import Prelude (bind, join, pure, ($), (>=>), (<<<), map)
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of context), others roles (such as the result of binding). The Partial function below returns that
 -- | single ID instead of the Array holding it, effectively turning an ObjectsGetter into an ObjectGetter.
-toSingle :: forall e. Partial => ObjectsGetter e -> ObjectGetter e
+toSingle :: Partial => ObjectsGetter -> ObjectGetter
 toSingle og id = do
   (ar :: Array String) <- og id
   pure $ ArrayPartial.head ar
@@ -33,50 +32,50 @@ toSingle og id = do
 -- | In the same vein, the result of this function could be any of ContextDef, RolDef, PropertyDef and SimpleValueDef.
 -- | So at this level, we leave the Perspectives data untyped. We'll have to type the argument and result of this
 -- | function in the context of its application.
-contextType :: forall e. (AnyContext ~~> AnyDefinition) e
+contextType :: (AnyContext ~~> AnyDefinition)
 contextType = getContextMember \context -> [context_pspType context]
 
 -- | We know that, as long as we apply this function to an identifier that represents a PerspectContext, we'll
 -- | get a BuitenRol. We cannot constrain the argument, however.
-buitenRol :: forall e. (AnyContext ~~> BuitenRol) e
+buitenRol :: (AnyContext ~~> BuitenRol)
 buitenRol = (getContextMember \c -> [context_buitenRol c]) >=> pure <<< map BuitenRol
 
 -- | Returns Nothing if the context does not exist.
-buitenRol' :: forall e. AnyContext -> MonadPerspectives (AjaxAvarCache e) (Maybe BuitenRol)
+buitenRol' :: AnyContext -> MonadPerspectives (Maybe BuitenRol)
 buitenRol' = (getContextMember' \c -> context_buitenRol c) >=> pure <<< map BuitenRol
 
-isBuitenRol :: forall r e. RolClass r => r -> MonadPerspectives (AjaxAvarCache e) Boolean
+isBuitenRol :: forall r. RolClass r => r -> MonadPerspectives Boolean
 isBuitenRol = typeWithPerspectivesTypes (getPerspectEntiteit >=> \r -> pure $ test (unsafeRegex "buitenRolBeschrijving$" noFlags) (rol_pspType r))
 
-binnenRol :: forall e. (AnyContext ~~> BinnenRol) e
+binnenRol :: (AnyContext ~~> BinnenRol)
 binnenRol = pure <<< singleton <<< BinnenRol <<< PI.binnenRol
 
 -- | We cannot type the result, as it can be either a RolInContext, or a ContextRol. Neither can we type the argument.
-iedereRolInContext :: forall e. ObjectsGetter e
+iedereRolInContext :: ObjectsGetter
 iedereRolInContext = getContextMember \context -> nub $ join $ values (context_rolInContext context)
 
 -- | The names of every rol given to this context.
-typeVanIedereRolInContext :: forall e. ObjectsGetter e
+typeVanIedereRolInContext :: ObjectsGetter
 typeVanIedereRolInContext = getContextMember \context -> keys (context_rolInContext context)
 
 -- | The types of every property for which this rol has a value.
-propertyTypen :: forall e. ObjectsGetter e
+propertyTypen :: ObjectsGetter
 propertyTypen = getRolMember \rol -> keys (rol_properties rol)
 
-label :: forall e. ObjectsGetter e
+label :: ObjectsGetter
 label = getContextMember \context -> [(context_displayName context)]
 
-rolType :: forall r e. RolClass r => (r ~~> RolDef) e
+rolType :: forall r. RolClass r => (r ~~> RolDef)
 rolType = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_pspType rol]
 
-genericRolType :: forall e. (String ~~> String) e
+genericRolType :: (String ~~> String)
 genericRolType = getRolMember \rol -> [rol_pspType rol]
 
-rolBindingDef :: forall r b e. Binding r b => (r ~~> AnyContext) e
+rolBindingDef :: forall r b. Binding r b => (r ~~> AnyContext)
 rolBindingDef = binding /-/ context
 
-context :: forall r e. RolClass r => (r ~~> String) e
+context :: forall r. RolClass r => (r ~~> String)
 context = pure <<< unwrap >=> getRolMember \rol -> [rol_context rol]
 
-genericContext :: forall e. ObjectsGetter e
+genericContext :: ObjectsGetter
 genericContext = getRolMember \rol -> [rol_context rol]
