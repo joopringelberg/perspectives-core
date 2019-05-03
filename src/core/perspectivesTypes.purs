@@ -40,6 +40,8 @@ instance encodeContextDef :: Encode ContextDef where
 derive instance newtypeContextDef :: Newtype ContextDef _
 instance eqContextDef :: Eq ContextDef where
   eq (ContextDef c1) (ContextDef c2) = c1 == c2
+instance ordContextDef :: Ord ContextDef where
+  compare (ContextDef p1) (ContextDef p2) = compare p1 p2
 
 type ZaakDef = ContextDef
 type ActieDef = ContextDef
@@ -91,6 +93,8 @@ newtype SimpleValueDef = SimpleValueDef String
 derive instance newtypeSimpleValueDef :: Newtype SimpleValueDef _
 instance eqSimpleValueDef :: Eq SimpleValueDef where
   eq (SimpleValueDef c1) (SimpleValueDef c2) = c1 == c2
+instance ordSimpleValueDef :: Ord SimpleValueDef where
+  compare (SimpleValueDef p1) (SimpleValueDef p2) = compare p1 p2
 
 -----------------------------------------------------------
 -- PBOOL AS TYPE
@@ -106,6 +110,8 @@ instance eqPBool :: Eq PBool where
   eq (PBool c1) (PBool c2) = c1 == c2
 instance showPBool :: Show PBool where
   show (PBool b) = show b
+instance ordPBool :: Ord PBool where
+  compare (PBool p1) (PBool p2) = compare p1 p2
 
 -----------------------------------------------------------
 -- PSTRING AS TYPE
