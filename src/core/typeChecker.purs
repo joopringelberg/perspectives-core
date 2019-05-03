@@ -29,15 +29,15 @@ import Prelude (bind, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (==), (>>
 -- |      * the RolDef (recursively) has the AspectRol;
 -- |      * the mogelijkeBinding of the RolDef (recursively) has the AspectRol.
 -- |  * the RolDef actually has the fully qualified property as part of its definition.
-checkRolForQualifiedProperty :: forall e. PropertyDef -> RolDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+checkRolForQualifiedProperty :: PropertyDef -> RolDef -> MonadPerspectives Boolean
 checkRolForQualifiedProperty pn rn = do
   (namespaceOfProperty :: RolDef) <- pure <<< RolDef =<< (guardWellFormedNess deconstructNamespace $ unwrap pn)
   (&&) <$> checkRolHasAspect rn namespaceOfProperty <*> checkRolHasProperty namespaceOfProperty pn
   where
-    checkRolHasAspect :: RolDef -> RolDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+    checkRolHasAspect :: RolDef -> RolDef -> MonadPerspectives Boolean
     checkRolHasAspect rn' an = (||) <$> rn' `isOrHasAspectRol` an <*> checkMogelijkeBindingHasAspect rn' an
 
-    checkMogelijkeBindingHasAspect :: RolDef -> RolDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+    checkMogelijkeBindingHasAspect :: RolDef -> RolDef -> MonadPerspectives Boolean
     checkMogelijkeBindingHasAspect rn' an = do
       b <- typeWithPerspectivesTypes mogelijkeBinding rn'
       case head b of
@@ -49,11 +49,11 @@ checkRolForQualifiedProperty pn rn = do
             otherwise -> foldM (\r alt -> checkRolForQualifiedProperty pn alt >>= pure <<< (&&) r) true (map RolDef object)
 
     -- | Does the RolDef or one of its prototypes have a $rolProperty bound to (the BuitenRol of) the propertyDef?
-    checkRolHasProperty :: RolDef -> PropertyDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+    checkRolHasProperty :: RolDef -> PropertyDef -> MonadPerspectives Boolean
     checkRolHasProperty rn' pn' = (toBoolean (contains (unwrap pn') (getUnqualifiedContextRol "rolProperty" /-/ rolBindingDef)) (unwrap rn'))
 
 -- | True if the first RolDef recursively has the second RolDef as AspectRol, or if they are the same.
-isOrHasAspectRol :: forall e. RolDef -> RolDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+isOrHasAspectRol :: RolDef -> RolDef -> MonadPerspectives Boolean
 isOrHasAspectRol subtype aspectRol =
   if aspectRol == subtype
     then pure true
@@ -65,7 +65,7 @@ isOrHasAspectRol subtype aspectRol =
 -- | local name can be found, or that several have been found.
 -- TODO: ObjectGetterConstrutors.searchUnqualifiedPropertyDefinition vervult dezelfde functie (maar geeft de PropertyDef terug - althans, als daar is ingebouwd dat hij ook op de mogelijkeBinding graaf zoekt).
 -- Deze functie wordt alleen gebruikt in de QueryFunctionDescriptionCompiler.
-checkRolForUnQualifiedProperty :: forall e. LocalName -> RolDef -> MonadPerspectives (AjaxAvarCache e) FD
+checkRolForUnQualifiedProperty :: LocalName -> RolDef -> MonadPerspectives FD
 checkRolForUnQualifiedProperty ln rn = do
   (propdefs :: Array PropertyDef) <- searchUnqualifiedPropertyDefinition ln rn
   case length propdefs of
@@ -74,7 +74,7 @@ checkRolForUnQualifiedProperty ln rn = do
     otherwise -> pure $ Left $ MultipleDefinitions ln (map unwrap propdefs)
 
 -- | Looks for the Aspect(s) that define an unqualified Rol with the given local name.
-checkContextForUnQualifiedRol :: forall e. LocalName -> ContextDef -> MonadPerspectives (AjaxAvarCache e) FD
+checkContextForUnQualifiedRol :: LocalName -> ContextDef -> MonadPerspectives FD
 checkContextForUnQualifiedRol ln cn = do
   (roldefs :: Array RolDef) <- searchUnqualifiedRolDefinition ln cn
   case length roldefs of
@@ -85,24 +85,24 @@ checkContextForUnQualifiedRol ln cn = do
 -- | True when both parameters are equal and also when the first has the second as aspect.
 -- | If the aspect is a sum type, tries each of the alternatives.
 -- | subtype `isOrHasAspect` aspect
-isOrHasAspect :: forall e. ContextDef -> ContextDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+isOrHasAspect :: ContextDef -> ContextDef -> MonadPerspectives Boolean
 isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> some (closure_ directAspects /-/ agreesWithType (unwrap subtype))
 
 -- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
 -- | context `contextHasType` type
-contextHasType :: forall e. AnyContext -> ContextDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+contextHasType :: AnyContext -> ContextDef -> MonadPerspectives Boolean
 contextHasType ctxt tp = do
   (typeOfBinding :: AnyDefinition) <- ctxt %%>> contextType
   ContextDef typeOfBinding `isOrHasAspect` tp
 
 -- | True iff the type of the role equals the given type, or if its type has the given type as aspect.
 -- | `psp:RolInstance -> psp:Rol -> Boolean`
-rolHasType :: forall r e. RolClass r => r -> RolDef -> MonadPerspectives (AjaxAvarCache e) Boolean
+rolHasType :: forall r. RolClass r => r -> RolDef -> MonadPerspectives Boolean
 rolHasType rol tp = do
   (typeOfBinding :: RolDef) <- rol %%>> rolType
   (ContextDef $ unwrap typeOfBinding) `isOrHasAspect` (ContextDef $ unwrap tp)
 
-mostSpecificCommonAspect :: forall e. Array AnyDefinition -> MonadPerspectives (AjaxAvarCache e) ContextDef
+mostSpecificCommonAspect :: Array AnyDefinition -> MonadPerspectives ContextDef
 mostSpecificCommonAspect types = do
   x <- traverse closureOfAspect types
   (aspects :: Array AnyContext) <- pure $ join x
