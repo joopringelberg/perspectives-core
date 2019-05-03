@@ -1,8 +1,7 @@
 module Perspectives.RunPerspectives where
 
 import Effect.Aff (Aff, Milliseconds(..), delay, error, forkAff, joinFiber, killFiber)
-import Effect.Aff.AVar (AVAR, AVar, makeVar, readVar)
-import Effect.Now (NOW)
+import Effect.Aff.AVar (AVar, new, read)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Rec.Class (forever)
 import Data.Tuple (Tuple(..))
@@ -13,12 +12,12 @@ import Perspectives.TheoryChange (propagate)
 import Prelude (bind, discard, pure, ($))
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a e. String -> String -> MonadPerspectives (avar :: AVAR, now :: NOW | e) a
-  -> Aff (avar :: AVAR, now :: NOW | e) a
+runPerspectives :: forall a. String -> String -> MonadPerspectives a
+  -> Aff a
 runPerspectives userName password mp = do
-  (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
+  (av :: AVar String) <- new "This value will be removed on first authentication!"
   (tr :: Transactie) <- createTransactie userName
-  (rf :: AVar PerspectivesState) <- makeVar $
+  (rf :: AVar PerspectivesState) <- new $
     newPerspectivesState
       { userName: userName
       , couchdbPassword: password
@@ -29,16 +28,16 @@ runPerspectives userName password mp = do
 
 -- | Run an action in MonadPerspectives, given a username and password,
 -- | while propagating changes in the dependency network in parallel.
-runPerspectivesWithPropagation :: forall a e.
+runPerspectivesWithPropagation :: forall a.
   String ->
   String ->
-  MonadPerspectives (now :: NOW | (AjaxAvarCache e)) a ->
+  MonadPerspectives a ->
   Number ->
-  Aff (now :: NOW | (AjaxAvarCache e)) (Tuple PerspectivesState a)
+  Aff (Tuple PerspectivesState a)
 runPerspectivesWithPropagation userName password mp duration = do
-  (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
+  (av :: AVar String) <- new "This value will be removed on first authentication!"
   (tr :: Transactie) <- createTransactie userName
-  (rf :: AVar PerspectivesState) <- makeVar $
+  (rf :: AVar PerspectivesState) <- new $
     newPerspectivesState
       { userName: userName
       , couchdbPassword: password
@@ -54,8 +53,8 @@ runPerspectivesWithPropagation userName password mp duration = do
     killFiber (error "Error on killing the computation") computation
     killFiber (error "Error on killing the propagation") propagation
   a <- joinFiber computation
-  s <- readVar rf
+  s <- read rf
   pure (Tuple s a)
 
-runPerspectivesWithState :: forall e a. MonadPerspectives (avar :: AVAR | e) a -> (AVar PerspectivesState) -> Aff (avar :: AVAR | e) a
+runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a
 runPerspectivesWithState = runReaderT
