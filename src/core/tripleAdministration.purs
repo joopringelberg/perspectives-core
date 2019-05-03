@@ -14,41 +14,40 @@ module Perspectives.TripleAdministration
   where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Effect (Eff, foreachE)
-import Effect.AVar (AVAR)
-import Effect.Class (liftEff)
+import Effect (Effect, foreachE)
+import Effect.Class (liftEffect)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP, GLStrMap, delete, new, peek, poke)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Prelude (Unit, bind, discard, pure, unit, void, ($))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
 -- | before computing it.
-memorizeQueryResults :: forall e. MonadPerspectivesQuery (avar :: AVAR | e) Boolean
+memorizeQueryResults :: MonadPerspectivesQuery Boolean
 memorizeQueryResults = lift $ gets _.memorizeQueryResults
 
-setMemorizeQueryResults :: forall e. Boolean -> MonadPerspectivesQuery (avar :: AVAR | e) Unit
+setMemorizeQueryResults :: Boolean -> MonadPerspectivesQuery Unit
 setMemorizeQueryResults b = lift $ modify \ps -> ps {memorizeQueryResults = b}
 
-getRef :: forall s o e. Triple s o e -> TripleRef
+getRef :: forall s o. Triple s o -> TripleRef
 getRef = unsafeCoerce
 
 -- | An index of Predicate-Object combinations, indexed by Subject.
-type TripleIndex e = GLStrMap (PredicateIndex e)
+type TripleIndex = GLStrMap PredicateIndex
 
 -- An index of objects indexed by Predicate (for a single Subject).
-type PredicateIndex e = GLStrMap (Triple String String e)
+type PredicateIndex = GLStrMap (Triple String String)
 
 -- | A global store of triples, indexed by Subject and Predicate.
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
-tripleIndex :: forall e. TripleIndex e
+tripleIndex :: TripleIndex
 tripleIndex = new unit
 
-lookupInTripleIndex :: forall s o e1 e2. Subject -> Predicate -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple s o e2))
+lookupInTripleIndex :: forall s o. Subject -> Predicate -> Effect (Maybe (Triple s o))
 lookupInTripleIndex rid pid = do
   preds <- peek tripleIndex rid
   case preds of
@@ -61,23 +60,23 @@ lookupInTripleIndex rid pid = do
           pure Nothing
         (Just o) -> pure (Just (typeWithPerspectivesTypes o))
 
-getTriple :: forall e1 e2. TripleRef -> Eff (gm :: GLOBALMAP | e1) (Maybe (Triple String String e2))
+getTriple :: TripleRef -> Effect (Maybe (Triple String String))
 getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 -- | Construct a triple and add it to the index.
 -- | Will add an entry for the Subject if it is not yet present.
 -- | Adds a dependency to each of the supports.
-addToTripleIndex :: forall e1 e2.
+addToTripleIndex ::
   Subject ->
   Predicate ->
   (Array String) ->
   Array TripleRef ->
   Array TripleRef ->
-  TripleGetter String String e2 ->
-  Eff (gm :: GLOBALMAP | e1) (Triple String String e2)
+  TripleGetter String String ->
+  Effect (Triple String String)
 addToTripleIndex rid pid val deps sups tripleGetter =
     do
-      (m :: PredicateIndex e2) <- ensureResource rid
+      (m :: PredicateIndex) <- ensureResource rid
       triple <- pure (Triple{ subject: rid
                 , predicate: pid
                 , object: val
@@ -92,21 +91,21 @@ addToTripleIndex rid pid val deps sups tripleGetter =
 -- | Add the triple to the index.
 -- | Will add an entry for the Subject if it is not yet present.
 -- | Adds a dependency to each of the supports.
-registerTriple :: forall e1 e2. Triple String String e2 -> Eff (gm :: GLOBALMAP | e1) (Triple String String e2)
+registerTriple :: Triple String String -> Effect (Triple String String)
 registerTriple triple@(Triple{subject, predicate, supports}) = do
-  (m :: PredicateIndex e2) <- ensureResource subject
+  (m :: PredicateIndex) <- ensureResource subject
   predIndex <- poke m predicate triple
   _ <- foreachE supports (addDependency (getRef triple))
   pure triple
 
 -- | Remove the triple identified by the reference from the index (removes the dependency from its supports, too)
-unRegisterTriple :: forall e1. TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+unRegisterTriple :: TripleRef -> Effect Unit
 unRegisterTriple (TripleRef{subject, predicate}) = do
   preds <- peek tripleIndex subject
   case preds of
     Nothing ->
       pure unit
-    (Just (p :: PredicateIndex e1)) -> do
+    (Just (p :: PredicateIndex)) -> do
       objls <- peek p predicate
       case objls of
         Nothing ->
@@ -117,42 +116,42 @@ unRegisterTriple (TripleRef{subject, predicate}) = do
 
 -- | Make sure an entry for the given resource identifier is in the tripleIndex. Return the PredicateIndex for the
 -- | resource.
-ensureResource :: forall e1 e2. Subject -> Eff (gm :: GLOBALMAP | e1) (PredicateIndex e2)
+ensureResource :: Subject -> Effect (PredicateIndex)
 ensureResource rid = do
   pid <- peek tripleIndex rid
   case pid of
     Nothing -> do
-        (m :: PredicateIndex e2) <- pure (new unit)
+        (m :: PredicateIndex) <- pure (new unit)
         _ <- poke tripleIndex rid m
         pure m
     (Just m) -> pure m
 
-memorize :: forall s o e. TripleGetter s o e -> String -> TypedTripleGetter s o e
+memorize :: forall s o. TripleGetter s o -> String -> TypedTripleGetter s o
 memorize getter name = TypedTripleGetter name
   \(id :: s) -> do
     remember <- memorizeQueryResults
     case remember of
       true -> do
-        mt <- lift $ liftEff (lookupInTripleIndex (typeWithPerspectivesTypes id) name)
+        mt <- lift $ liftEffect (lookupInTripleIndex (typeWithPerspectivesTypes id) name)
         case mt of
           Nothing -> do
             t <- getter id
-            (stringTriple :: Triple String String e) <- pure $ typeWithPerspectivesTypes t
-            _ <- lift $ liftEff $ registerTriple stringTriple
+            (stringTriple :: Triple String String) <- pure $ typeWithPerspectivesTypes t
+            _ <- lift $ liftEffect $ registerTriple stringTriple
             pure t
           (Just t) -> pure $ typeWithPerspectivesTypes t
       false -> getter id
 
 -- | Add the reference to the triple.
-foreign import addDependency_ :: forall e1 e2. Triple String String e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
+foreign import addDependency_ :: Triple String String -> TripleRef -> Effect TripleRef
 
 -- | Remove the reference from the triple.
-foreign import removeDependency_ :: forall e1 e2. Triple String String e2 -> TripleRef -> Eff (gm :: GLOBALMAP | e1) TripleRef
-foreign import setSupports_ ::  forall e1 e2. Triple String String e2 -> Array TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+foreign import removeDependency_ :: Triple String String -> TripleRef -> Effect TripleRef
+foreign import setSupports_ ::  Triple String String -> Array TripleRef -> Effect Unit
 
 -- | Add the dependentRef (first argument) as a dependency to the triple identified by the supportingRef (second argument).
 -- TODO: cycle detection. Follow the arrows from support to dependent depth first and report a cycle.
-addDependency :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+addDependency :: TripleRef -> TripleRef -> Effect Unit
 addDependency dependentRef supportingRef = do
   ms <- getTriple supportingRef
   case ms of
@@ -160,7 +159,7 @@ addDependency dependentRef supportingRef = do
     Nothing -> pure unit
 
 -- | Remove the dependentRef (first argument) as a dependency from the triple identified by the supportingRef (second argument).
-removeDependency :: forall e1. TripleRef -> TripleRef -> Eff (gm :: GLOBALMAP | e1) Unit
+removeDependency :: TripleRef -> TripleRef -> Effect Unit
 removeDependency dependentRef supportingRef = do
   ms <- getTriple supportingRef
   case ms of
