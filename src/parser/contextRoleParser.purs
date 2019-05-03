@@ -3,7 +3,7 @@ module Perspectives.ContextRoleParser where
 import Perspectives.EntiteitAndRDFAliases
 
 import Control.Alt (void, (<|>))
-import Effect.Aff.AVar (AVar, putVar, takeVar)
+import Effect.Aff.AVar (AVar, put, take)
 import Effect.Exception (error)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (get, gets)
@@ -16,8 +16,9 @@ import Data.Foldable (elem, fold, for_)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as F
-import Data.String (Pattern(..), charAt, drop, fromCharArray, split)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
+import Data.String (Pattern(..), drop, split)
+import Data.String.CodeUnits (charAt, fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
@@ -35,7 +36,7 @@ import Perspectives.PerspectivesTypes (BuitenRol, ContextDef(..))
 import Perspectives.Resource (getAVarRepresentingPerspectEntiteit, getPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
 import Perspectives.Token (token)
-import Prelude (class Show, Unit, bind, discard, id, ifM, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>=>))
+import Prelude (class Show, Unit, bind, discard, identity, ifM, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>=>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail, ParseError(..))
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
@@ -47,7 +48,7 @@ import Text.Parsing.Parser.Token (alphaNum, upper)
 -- Comments
 -----------------------------------------------------------
 
-inLineComment :: forall e. IP (Array Comment) e
+inLineComment ::  IP (Array Comment)
 inLineComment = option [] do
   sameLine
   _ <- (STRING.string "--")
@@ -55,7 +56,7 @@ inLineComment = option [] do
   _ <- whiteSpace
   pure [fromCharArray chars]
 
-manyOneLineComments :: forall e. IP (Array Comment) e
+manyOneLineComments ::  IP (Array Comment)
 manyOneLineComments = AR.many
     (fromCharArray <$> ((STRING.string "--") *> (AR.many (satisfy (_ /= '\n')) <* whiteSpace)))
 
@@ -63,90 +64,90 @@ manyOneLineComments = AR.many
 -- Identifiers
 -----------------------------------------------------------
 
-reservedOp :: forall e. String -> IP Unit e
+reservedOp ::  String -> IP Unit
 reservedOp = token.reservedOp
 
-reserved :: forall e. String -> IP Unit e
+reserved ::  String -> IP Unit
 reserved = token.reserved
 
-identifier :: forall e. IP String e
+identifier ::  IP String
 identifier = token.identifier
 
-lexeme :: forall a e. IP a e -> IP a e
+lexeme :: forall a. IP a -> IP a
 lexeme = token.lexeme
 
-int :: forall e. IP String e
+int ::  IP String
 int = show <$> token.integer
 
-bool :: forall e. IP String e
+bool ::  IP String
 bool = reserved "true" $> "true" <|> reserved "false" $> "false"
 
-string :: forall e. IP String e
+string ::  IP String
 string = token.stringLiteral
 
-simpleValue :: forall e. IP String e
+simpleValue ::  IP String
 simpleValue = string <|> int <|> bool
 
-identLetter :: forall e. IP Char e
+identLetter ::  IP Char
 identLetter = alphaNum <|> STRING.oneOf ['_', '\'']
 
-identLetterString :: forall e. IP String e
+identLetterString ::  IP String
 identLetterString = f <$> identLetter <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
 -- /([A-Z]\w*\b)/
 -- /(\p{Uppercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+)/gu
-capitalizedString :: forall e. IP String e
+capitalizedString ::  IP String
 capitalizedString = f <$> upper <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
-lower :: forall e. IP Char e
+lower ::  IP Char
 lower = satisfy isLower <?> "uppercase letter"
 
 -- /([a-z]\w*\b)/
 -- /(\b\p{Lowercase}[\p{Alphabetic}\p{Mark}\p{Decimal_Number}\p{Connector_Punctuation}\p{Join_Control}]+\b)/gu
-uncapitalizedString :: forall e. IP String e
+uncapitalizedString ::  IP String
 uncapitalizedString = f <$> lower <*> AR.many identLetter where
   f c ca = fromCharArray $ AR.cons c ca
 
 -- domeinName = 'model:' upper alphaNum* '$'
-domeinName :: forall e. IP String e
+domeinName ::  IP String
 domeinName = do
   _ <- STRING.string "model:"
   domein <- capitalizedString
   pure $ "model:" <> domein
 
-modelName :: forall e. IP ModelName e
+modelName ::  IP ModelName
 modelName = lexeme do
   dn <- domeinName
   pure $ ModelName dn
 
 -- segmentedName = aap$noot$mies
-segmentedName :: forall e. IP String e
+segmentedName ::  IP String
 segmentedName = f <$> identLetterString <*> AR.many (defaultEmbedded identLetterString) where
   f first rest = fold $ AR.cons first rest
 
-defaultEmbedded :: forall e. IP String e -> IP String e
+defaultEmbedded ::  IP String -> IP String
 defaultEmbedded p = (<>) <$> STRING.string "$" <*> p
 
 -- localContextName = aap | Aap
-localContextName :: forall e. IP String e
+localContextName ::  IP String
 localContextName = identLetterString
 
 -- localPropertyName = lower alphaNum*
-localPropertyName :: forall e. IP String e
+localPropertyName ::  IP String
 localPropertyName = uncapitalizedString
 
 -- localPropertyName = lower alphaNum*
-localRolName :: forall e. IP String e
+localRolName ::  IP String
 localRolName = uncapitalizedString
 
 -- prefix = lower+ ':'
-prefix :: forall e. IP String e
+prefix ::  IP String
 prefix = (f <$> lower <*> AR.many lower <*> char ':') where
   f fst ca c = fromCharArray $ AR.cons fst (AR.snoc ca c)
 
-prefixedName :: forall e. IP String e -> IP QualifiedName e
+prefixedName ::  IP String -> IP QualifiedName
 prefixedName localName = lexeme do
   pre <- prefix
   ln <- localName
@@ -156,15 +157,15 @@ prefixedName localName = lexeme do
     (Just ns) -> pure $ QualifiedName ns ln
 
 -- prefixedContextName = prefix segmentedName
-prefixedContextName :: forall e. IP QualifiedName e
+prefixedContextName ::  IP QualifiedName
 prefixedContextName = prefixedName segmentedName
 
 -- prefixedPropertyName = prefix localPropertyName
-prefixedPropertyName :: forall e. IP QualifiedName e
+prefixedPropertyName ::  IP QualifiedName
 prefixedPropertyName = prefixedContextName
 
 -- qualifiedResourceName = domeinName segmentedName
-expandedName :: forall e. IP QualifiedName e
+expandedName ::  IP QualifiedName
 expandedName = try $ lexeme $ do
   dn <- domeinName
   _ <- STRING.string "$"
@@ -172,7 +173,7 @@ expandedName = try $ lexeme $ do
   pure $ QualifiedName dn ln
 
 -- expandedPropertyName = domeinName localPropertyName
-expandedPropertyName :: forall e. IP QualifiedName e
+expandedPropertyName ::  IP QualifiedName
 expandedPropertyName =
   try $ lexeme $ do
     dn <- domeinName
@@ -180,42 +181,42 @@ expandedPropertyName =
     ln <- localPropertyName
     pure $ QualifiedName dn ln
 
-contextInstanceIDInCurrentNamespace :: forall e. IP QualifiedName e
+contextInstanceIDInCurrentNamespace ::  IP QualifiedName
 contextInstanceIDInCurrentNamespace = lexeme do
   namespace <- getNamespace
   ln <- (STRING.string "$") *> localContextName
   pure $ QualifiedName namespace ln
 
-relativeContextTypeName :: forall e. IP QualifiedName e
+relativeContextTypeName ::  IP QualifiedName
 relativeContextTypeName = lexeme do
   namespace <- getTypeNamespace
   ln <- (STRING.string "$") *> localContextName
   pure $ QualifiedName namespace ln
 
-relativeRolTypeName :: forall e. IP QualifiedName e
+relativeRolTypeName ::  IP QualifiedName
 relativeRolTypeName = lexeme do
   namespace <- getTypeNamespace
   ln <- (STRING.string "$") *> localRolName
   pure $ QualifiedName namespace ln
 
-relativePropertyTypeName :: forall e. IP QualifiedName e
+relativePropertyTypeName ::  IP QualifiedName
 relativePropertyTypeName = lexeme do
   namespace <- getTypeNamespace
   ln <- (STRING.string "$") *> localPropertyName
   pure $ QualifiedName namespace ln
 
-relativeRolTypeNameOutsideNamespace :: forall e. IP QualifiedName e
+relativeRolTypeNameOutsideNamespace ::  IP QualifiedName
 relativeRolTypeNameOutsideNamespace = lexeme do
   ln <- (STRING.string "?") *> uncapitalizedString
   pure $ QualifiedName "?" ln
 
-contextName :: forall e. IP QualifiedName e
+contextName ::  IP QualifiedName
 contextName = (expandedName <|> prefixedContextName <|> contextInstanceIDInCurrentNamespace) <?> "the name of a resource (Context or Role)."
 
-typeContextName :: forall e. IP QualifiedName e
+typeContextName ::  IP QualifiedName
 typeContextName = (expandedName <|> prefixedContextName <|> relativeContextTypeName) <?> "the name of a resource (Context or Role)."
 
-perspectEntiteitIdentifier :: forall e. IP PEIdentifier e
+perspectEntiteitIdentifier ::  IP PEIdentifier
 perspectEntiteitIdentifier =
   do
     d <- modelName
@@ -226,10 +227,10 @@ perspectEntiteitIdentifier =
     pure (show d)
 
 -- propertyName = prefixedPropertyName | expandedPropertyName
-propertyName :: forall e. IP QualifiedName e
+propertyName ::  IP QualifiedName
 propertyName = (expandedPropertyName <|> prefixedPropertyName <|> relativePropertyTypeName) <?> "a property or role name."
 
-roleName :: forall e. IP QualifiedName e
+roleName ::  IP QualifiedName
 roleName = (expandedPropertyName <|> prefixedPropertyName <|> relativePropertyTypeName <|> relativeRolTypeNameOutsideNamespace) <?> "a role name."
 
 -----------------------------------------------------------
@@ -239,7 +240,7 @@ roleName = (expandedPropertyName <|> prefixedPropertyName <|> relativePropertyTy
 dataTypes :: Array String
 dataTypes = ["Number", "String", "Boolean", "Date", "SimpleValueDef"]
 
-dataType :: forall e. IP String e
+dataType ::  IP String
 dataType = try do
   s <- identifier
   if elem s dataTypes then pure $ s else fail "one of 'Number', 'String', 'Boolean' or 'Date'."
@@ -250,7 +251,7 @@ dataType = try do
 
 -- | @ getPosition @ returns current position
 -- | should probably be added to Text.Parsing.Parser.Pos
-getPosition :: forall e. IP Position e
+getPosition ::  IP Position
 getPosition = gets \(ParseState _ pos _) -> pos
 
 sourceColumn :: Position -> Int
@@ -260,7 +261,7 @@ sourceLine :: Position -> Int
 sourceLine (Position {line: l, column: _}) = l
 
 -- | Parses only on the next line as the reference
-nextLine :: forall e. IP Unit e
+nextLine ::  IP Unit
 nextLine = do
     pos <- getPosition
     s   <- lift get
@@ -271,7 +272,7 @@ nextLine = do
 -----------------------------------------------------------
 
 -- | enclosingContextDeclaration = Context PerspectEntiteitIdentifier
-enclosingContextDeclaration :: forall e. IP EnclosingContextDeclaration e
+enclosingContextDeclaration ::  IP EnclosingContextDeclaration
 enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> perspectEntiteitIdentifier)
   _ <- setNamespace $ cname
@@ -284,13 +285,13 @@ enclosingContextDeclaration = (do
   pure $ EnclosingContextDeclaration cname cmt) <?> "the context declaration: Context <name>."
 
 -- | contextDeclaration = contextName contextName
-contextDeclaration :: forall e. IP ContextDeclaration e
+contextDeclaration ::  IP ContextDeclaration
 contextDeclaration = (ContextDeclaration <$> typeContextName <*> (anonymousContextName <|> contextName) <*> inLineComment) <?> "a type declaration, e.g. :ContextType :ContextName."
   where
     -- matches an underscore
     -- returns "c<x>" (where <x> is an integer), scoped to the current namespace.
     -- x is kept in the parserstate as a counter.
-    anonymousContextName :: IP QualifiedName e
+    anonymousContextName :: IP QualifiedName
     anonymousContextName = lexeme do
       namespace <- getNamespace
       reservedOp "_"
@@ -300,7 +301,7 @@ contextDeclaration = (ContextDeclaration <$> typeContextName <*> (anonymousConte
 
 -- | Apply to a single line parser. Will parse a block of contiguous line comments before the line and
 -- | the comment after the expression on the line.
-withComments :: forall e a. IP a e -> IP (Tuple Comments a) e
+withComments :: forall a. IP a -> IP (Tuple Comments a)
 withComments p = do
   before <- manyOneLineComments
   withPos do
@@ -308,7 +309,7 @@ withComments p = do
     after <- inLineComment
     pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
 
-typedPropertyAssignment :: forall e. IP Unit e -> IP (Tuple ID PropertyValueWithComments) e
+typedPropertyAssignment ::  IP Unit -> IP (Tuple ID PropertyValueWithComments)
 typedPropertyAssignment scope = go (try (withComments
   (withPos
     (Tuple
@@ -320,21 +321,21 @@ typedPropertyAssignment scope = go (try (withComments
       pure $ Tuple (show pname) (PropertyValueWithComments {value: AR.fromFoldable value, commentBefore: commentBefore, commentAfter: commentAfter})
 
 -- | publicContextPropertyAssignment = 'extern' propertyName '=' simpleValue
-publicContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
+publicContextPropertyAssignment ::  IP (Tuple ID PropertyValueWithComments)
 publicContextPropertyAssignment = (typedPropertyAssignment (reserved "extern")) <?> "extern propertyname = value"
 
 -- | privateContextPropertyAssignment = 'intern' propertyName '=' simpleValue
-privateContextPropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
+privateContextPropertyAssignment ::  IP (Tuple ID PropertyValueWithComments)
 privateContextPropertyAssignment = (typedPropertyAssignment (reserved "intern")) <?> "intern propertyname = value"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
-rolePropertyAssignment :: forall e. IP (Tuple ID PropertyValueWithComments) e
+rolePropertyAssignment ::  IP (Tuple ID PropertyValueWithComments)
 rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "intern propertyname = value"
 
-isRoleDeclaration :: forall e. IP Unit (AjaxAvarCache e)
+isRoleDeclaration ::  IP Unit
 isRoleDeclaration = withPos (roleName *> (sameLine *> optionMaybe roleOccurrence) *> (sameLine *> reservedOp "=>") *> pure unit)
 
-roleOccurrence :: forall e. IP Int e
+roleOccurrence ::  IP Int
 roleOccurrence = token.parens token.integer
 
 data Arrow = ContextBinding | RoleBinding
@@ -342,11 +343,11 @@ instance showArrow :: Show Arrow where
   show ContextBinding = "=>"
   show RoleBinding = "->"
 
-roleBinding' :: forall e.
+roleBinding' ::
   QualifiedName ->
   Arrow ->
-  IP (Tuple (Array Comment) (Maybe ID)) (AjaxAvarCache e) ->
-  IP (Tuple RolName ID) (AjaxAvarCache e)
+  IP (Tuple (Array Comment) (Maybe ID)) ->
+  IP (Tuple RolName ID)
 roleBinding' cname arrow p = ("rolename => contextName" <??>
   (try do
     -- Parsing
@@ -370,9 +371,9 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           { _id = rolId
           , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
           , pspType = show rname
-          , binding = binding (maybe "" id bindng)
+          , binding = binding (maybe "" identity bindng)
           , context = show cname
-          , properties = fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
+          , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
 
@@ -386,65 +387,65 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         (Just n) -> n
         Nothing -> 0
 
-cacheRol :: forall e. RolID -> PerspectRol -> IP Unit (AjaxAvarCache e)
+cacheRol ::  RolID -> PerspectRol -> IP Unit
 cacheRol rolId rol = do
   addRol rol
   liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
 
-cacheContext :: forall e. ContextID -> PerspectContext -> IP Unit (AjaxAvarCache e)
+cacheContext ::  ContextID -> PerspectContext -> IP Unit
 cacheContext contextId ctxt = do
   addContext ctxt
   liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
-inlineContextBinding :: forall e. QualifiedName
-  -> IP (Tuple RolName ID) (AjaxAvarCache e)
+inlineContextBinding ::  QualifiedName
+  -> IP (Tuple RolName ID)
 inlineContextBinding cName = roleBinding' cName ContextBinding do
   cmt <- inLineComment
   _ <- nextLine
   (contextBuitenRol :: ID) <- indented *> context
   pure $ Tuple cmt (Just contextBuitenRol)
 
-emptyBinding :: forall e. QualifiedName
-  -> IP (Tuple RolName ID) (AjaxAvarCache e)
+emptyBinding ::  QualifiedName
+  -> IP (Tuple RolName ID)
 emptyBinding cName = roleBinding' cName ContextBinding do
   _ <- token.parens whiteSpace
   cmt <- inLineComment
   pure $ Tuple cmt Nothing
 
-contextBindingByReference :: forall e. QualifiedName
-  -> IP (Tuple RolName ID) (AjaxAvarCache e)
+contextBindingByReference ::  QualifiedName
+  -> IP (Tuple RolName ID)
 contextBindingByReference cName = roleBinding' cName ContextBinding do
   ident <- (sameLine *> contextReference)
   cmt <- inLineComment
   pure $ Tuple cmt (Just ident)
   where
-    contextReference :: IP RolName (AjaxAvarCache e)
+    contextReference :: IP RolName
     contextReference = do
       qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
       pure $ buitenRol (show qn)
 
-roleBindingByReference :: forall e. QualifiedName
-  -> IP (Tuple RolName ID) (AjaxAvarCache e)
+roleBindingByReference ::  QualifiedName
+  -> IP (Tuple RolName ID)
 roleBindingByReference cName = roleBinding' cName RoleBinding do
   ident <- (sameLine *> relativeRolInstanceID <|> rolReference)
   occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
   cmt <- inLineComment
   pure $ Tuple cmt (Just (ident <> "_" <> (maybe "1" show occurrence)))
   where
-    rolReference :: IP RolName (AjaxAvarCache e)
+    rolReference :: IP RolName
     rolReference = do
       qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
       pure (show qn)
 
-    relativeRolInstanceID :: IP RolName (AjaxAvarCache e)
+    relativeRolInstanceID :: IP RolName
     relativeRolInstanceID = try do
       qn <- rolInHigherContext
       -- i <- roleOccurrence
       pure $ show qn
 
-    rolInHigherContext :: IP QualifiedName (AjaxAvarCache e)
+    rolInHigherContext :: IP QualifiedName
     rolInHigherContext = lexeme do
       namespace <- getNamespace -- not $-terminated!
       namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
@@ -452,7 +453,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
       namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
       pure $ QualifiedName namespace' localName
 
-relativeInstanceID :: forall e. IP QualifiedName (AjaxAvarCache e)
+relativeInstanceID ::  IP QualifiedName
 relativeInstanceID = lexeme do
   namespace <- getNamespace -- not $-terminated!
   namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
@@ -462,7 +463,7 @@ relativeInstanceID = lexeme do
 
 -- Returns a string that is NOT terminated on a "$".
 -- NOTE: in order to be able to fail, we need do this in IP.
-butLastNNamespaceLevels :: forall e. String -> Int -> IP String (AjaxAvarCache e)
+butLastNNamespaceLevels ::  String -> Int -> IP String
 butLastNNamespaceLevels _ -1 = fail "local name starting with '$'."
 butLastNNamespaceLevels ns 0 = pure ns
 butLastNNamespaceLevels ns n = do
@@ -472,8 +473,8 @@ butLastNNamespaceLevels ns n = do
     else pure $ (intercalate "$" (dropEnd n segments))
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
-roleBinding :: forall e. QualifiedName
-  -> IP (Tuple RolName ID) (AjaxAvarCache e)
+roleBinding ::  QualifiedName
+  -> IP (Tuple RolName ID)
 roleBinding cname =
   inlineContextBinding cname
   <|> contextBindingByReference cname
@@ -481,10 +482,10 @@ roleBinding cname =
   <|> roleBindingByReference cname
 -- TODO: query
 
-withRoleCounting :: forall a e. IP a e -> IP a e
+withRoleCounting :: forall a. IP a -> IP a
 withRoleCounting p = do
   roleInstances <- getRoleInstances
-  setRoleInstances empty
+  setRoleInstances FO.empty
   r <- p
   setRoleInstances roleInstances
   pure r
@@ -499,10 +500,10 @@ withRoleCounting p = do
 -- | The parser never backtracks over a Context. This means we can safely perform the side
 -- | effect of storing its constituent roles and contexts.
 -- | NOTE: we do not construct an inverse binding from an eventual prototype.
-context :: forall e. IP ID (AjaxAvarCache e)
+context ::  IP ID
 context = withRoleCounting context' where
 
-  context' :: IP ID (AjaxAvarCache e)
+  context' :: IP ID
   context' = do
     -- Parsing
     cmtBefore <- manyOneLineComments
@@ -536,7 +537,7 @@ context = withRoleCounting context' where
                 , pspType = show typeName <> "$binnenRolBeschrijving"
                 , context = (show instanceName)
                 , binding = binding $ buitenRol (show instanceName)
-                , properties = fromFoldable privateProps
+                , properties = FO.fromFoldable privateProps
                 })
             cacheRol (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
@@ -544,30 +545,30 @@ context = withRoleCounting context' where
                 , pspType = show typeName <> "$buitenRolBeschrijving"
                 , context = (show instanceName)
                 , binding = binding $ maybe "" buitenRol prototype
-                , properties = fromFoldable publicProps
+                , properties = FO.fromFoldable publicProps
                 })
             pure $ buitenRol (show instanceName)
-  collect :: List (Tuple RolName ID) -> F.Object (Array ID)
-  collect Nil = empty
+  collect :: List (Tuple RolName ID) -> FO.Object (Array ID)
+  collect Nil = FO.empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
-    case lookup rname map of
-      Nothing -> insert rname [id] map
-      (Just ids) -> insert rname (AR.cons id ids) map
+    case FO.lookup rname map of
+      Nothing -> FO.insert rname [id] map
+      (Just ids) -> FO.insert rname (AR.cons id ids) map
 
-  prototypeDeclaration :: IP (Maybe ID) (AjaxAvarCache e)
+  prototypeDeclaration :: IP (Maybe ID)
   prototypeDeclaration = do
     prototype <- reserved "prototype" *> contextName
     pure $ Just $ show prototype
 
 -- Helper functions for development.
-allTheRest :: forall e. IP String e
+allTheRest ::  IP String
 allTheRest = fromCharArray <$> (AR.many STRING.anyChar)
 
 -----------------------------------------------------------
 -- Expression
 -----------------------------------------------------------
 
-expression :: forall e. IP String (AjaxAvarCache e)
+expression ::  IP String
 expression = choice
   [ try (enclosingContextDeclaration *> (pure "enclosingContextDeclaration"))
   , try (importExpression *> (pure "importExpression"))
@@ -584,19 +585,19 @@ expression = choice
 -----------------------------------------------------------
 -- Section and definition
 -----------------------------------------------------------
-section :: forall e. IP (Tuple String (Array ID)) (AjaxAvarCache e)
+section ::  IP (Tuple String (Array ID))
 section = do
   prop <- sectionHeading
   ids <- AR.many definition
   pure $ Tuple prop ids
 
-sectionHeading :: forall e. IP ID (AjaxAvarCache e)
+sectionHeading ::  IP ID
 sectionHeading = do
   prop <- reserved "Section" *> propertyName
   setSection prop
   pure $ show prop
 
-definition :: forall e. IP ID (AjaxAvarCache e)
+definition ::  IP ID
 definition = do
   bindng <- context
   prop@(QualifiedName _ localName) <- getSection
@@ -607,7 +608,7 @@ definition = do
   cacheRol rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
-      , occurrence = maybe 0 id nrOfRoleOccurrences
+      , occurrence = maybe 0 identity nrOfRoleOccurrences
       , pspType = (show prop)
       , binding = binding bindng
       , context = enclContext
@@ -617,7 +618,7 @@ definition = do
 -----------------------------------------------------------
 -- Import
 -----------------------------------------------------------
-importExpression :: forall e. IP Unit e
+importExpression ::  IP Unit
 importExpression = do
   ns@(ModelName mn) <- reserved "import" *> modelName
   mpre <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
@@ -628,7 +629,7 @@ importExpression = do
 -----------------------------------------------------------
 -- Text
 -----------------------------------------------------------
-enclosingContext :: forall e. IP ParseRoot (AjaxAvarCache e)
+enclosingContext ::  IP ParseRoot
 enclosingContext = withRoleCounting enclosingContext' where
   enclosingContext' = do
     cmtBefore <- manyOneLineComments
@@ -645,7 +646,7 @@ enclosingContext = withRoleCounting enclosingContext' where
           , pspType = "model:Perspectives$Context"
           , binnenRol = binnenRol textName
           , buitenRol = buitenRol textName
-          , rolInContext = fromFoldable defs
+          , rolInContext = FO.fromFoldable defs
           , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
       cacheRol (binnenRol textName)
@@ -654,14 +655,14 @@ enclosingContext = withRoleCounting enclosingContext' where
           , pspType = "model:Perspectives$Context$binnenRolBeschrijving"
           , context = textName
           , binding = binding $ buitenRol textName
-          , properties = fromFoldable privateProps
+          , properties = FO.fromFoldable privateProps
           })
       cacheRol (buitenRol textName)
         (PerspectRol defaultRolRecord
           { _id = buitenRol textName
           , pspType = "model:Perspectives$Context$buitenRolBeschrijving"
           , context = textName
-          , properties = fromFoldable publicProps
+          , properties = FO.fromFoldable publicProps
           , binding = binding "model:Perspectives$ContextPrototype_buitenRol"
           })
       pure $ RootContext textName
@@ -669,7 +670,7 @@ enclosingContext = withRoleCounting enclosingContext' where
 -----------------------------------------------------------
 -- User data
 -----------------------------------------------------------
-userData :: forall e. IP ParseRoot (AjaxAvarCache e)
+userData ::  IP ParseRoot
 userData = do
   cmtBefore <- manyOneLineComments
   withPos do
@@ -680,7 +681,7 @@ userData = do
     pure $ UserData contexts
   where
 
-    userDataDeclaration :: IP Unit (AjaxAvarCache e)
+    userDataDeclaration :: IP Unit
     userDataDeclaration = reserved "GebruikerGegevens"
 
 -----------------------------------------------------------
@@ -688,7 +689,7 @@ userData = do
 -----------------------------------------------------------
 data ParseRoot = UserData (Array ID) | RootContext ID
 
-rootParser :: forall e. IP ParseRoot (AjaxAvarCache e)
+rootParser ::  IP ParseRoot
 rootParser = enclosingContext <|> userData
 
 -----------------------------------------------------------
@@ -696,7 +697,7 @@ rootParser = enclosingContext <|> userData
 -----------------------------------------------------------
 -- catchError :: forall a. m a -> (e -> m a) -> m a
 
-parseAndCache :: forall e. String -> MonadPerspectives (AjaxAvarCache e) (Either ParseError (Tuple ParseRoot DomeinFile))
+parseAndCache ::  String -> MonadPerspectives (Either ParseError (Tuple ParseRoot DomeinFile))
 parseAndCache text = do
   (Tuple parseResult {domeinFile}) <- runIndentParser' text rootParser
   case parseResult of
@@ -704,14 +705,14 @@ parseAndCache text = do
     (Right r) -> catchError
       do
         let (DomeinFile{roles, contexts}) = domeinFile
-        for_ (values contexts) setDefaultPrototype
+        for_ (FO.values contexts) setDefaultPrototype
         -- change value in cache.
-        for_ (values roles) \rol -> do
+        for_ (FO.values roles) \rol -> do
           case rol_binding rol of
             Nothing -> pure unit
             (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
         -- this must read the cache, not use the roles themselves, as they have been changed in the cache!
-        for_ (values roles) \rol -> do
+        for_ (FO.values roles) \rol -> do
           if (isRelativeRolTypeNameOutsideNamespace (rol_pspType rol))
             then addNamespaceToLocalName (rol_id rol)
             else pure unit
@@ -721,7 +722,7 @@ parseAndCache text = do
         -- rather than in the namespace T.
         -- The same holds for the type of the binnenRollen.
         -- We cannot find the correct types before all contexts in the entire modelfile have been parsed.
-        for_ (values contexts) \ctxt -> do
+        for_ (FO.values contexts) \ctxt -> do
           setBuitenRolType ctxt
           setBinnenRolType ctxt
         actualisedDomeinFile <- actualiseDomeinFile domeinFile
@@ -729,13 +730,13 @@ parseAndCache text = do
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
 
-    actualiseDomeinFile :: DomeinFile -> MP e DomeinFile
+    actualiseDomeinFile :: DomeinFile -> MP DomeinFile
     actualiseDomeinFile df@(DomeinFile {_id, _rev, contexts, roles}) = do
-      (ac :: F.Object PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
-      (ar :: F.Object PerspectRol) <- traverse (getPerspectEntiteit <<< rol_id) roles
+      (ac :: FO.Object PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
+      (ar :: FO.Object PerspectRol) <- traverse (getPerspectEntiteit <<< rol_id) roles
       pure $ DomeinFile {_id: _id, _rev: _rev, contexts: ac, roles: ar}
 
-    setDefaultPrototype :: PerspectContext -> MonadPerspectives (AjaxAvarCache e) Unit
+    setDefaultPrototype :: PerspectContext -> MonadPerspectives Unit
     setDefaultPrototype ctxt = ifM (toBoolean (notEmpty getPrototype) (context_id ctxt))
       (pure unit)
       (do
@@ -746,8 +747,8 @@ parseAndCache text = do
             then pure unit
             else do
               (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (context_buitenRol ctxt)
-              (brol :: PerspectRol) <- lift $ takeVar av
-              lift $ putVar (changeRol_binding (unwrap defProt) brol) av
+              (brol :: PerspectRol) <- lift $ take av
+              lift $ put (changeRol_binding (unwrap defProt) brol) av
         )
 
     -- True for an uncapitalizedString that starts with a question mark.
@@ -757,36 +758,36 @@ parseAndCache text = do
       otherwise -> false
 
     -- Change the type of the rol to the qualified name, and change the key
-    -- in the context's rolinContext F.Object, too.
+    -- in the context's rolinContext FO.Object, too.
     -- NOTE. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
     -- However, when a direct reference to that Role is made (using $$-syntax), precisely that name must be re-used,
     -- otherwise the binding cannot be constructed. See "testBotActie.crl" for an example
-    addNamespaceToLocalName :: RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+    addNamespaceToLocalName :: RolID -> MonadPerspectives Unit
     addNamespaceToLocalName rolId = do
       (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit rolId
-      (rol :: PerspectRol) <- lift $ takeVar av
-      localRolName <- pure $ drop 2 (rol_pspType rol)
-      mrolType <- (rol_context rol) ##> (contextType >=> pure <<< map ContextDef /-/ (searchUnqualifiedRolDefinition localRolName))
+      (rol :: PerspectRol) <- lift $ take av
+      localRolName' <- pure $ drop 2 (rol_pspType rol)
+      mrolType <- (rol_context rol) ##> (contextType >=> (pure <<< map ContextDef) /-/ (searchUnqualifiedRolDefinition localRolName'))
       case mrolType of
-        Nothing -> throwError (error ("addNamespaceToLocalName: cannot find qualified name for '" <> localRolName <> "' in the context of '" <> (rol_context rol) <> "'!" ))
+        Nothing -> throwError (error ("addNamespaceToLocalName: cannot find qualified name for '" <> localRolName' <> "' in the context of '" <> (rol_context rol) <> "'!" ))
         (Just rolType) -> do
-          lift $ void $ putVar (changeRol_type (unwrap rolType) rol) av
+          lift $ void $ put (changeRol_type (unwrap rolType) rol) av
           (cav :: AVar PerspectContext) <- getAVarRepresentingPerspectEntiteit (rol_context rol)
           lift $ void $ do
-            ctxt <- takeVar cav
-            putVar (context_changeRolIdentifier ctxt (rol_pspType rol) (unwrap rolType)) cav
+            ctxt <- take cav
+            put (context_changeRolIdentifier ctxt (rol_pspType rol) (unwrap rolType)) cav
 
     -- Ensure we have an AVar for the RolInstance that is represented by vuller.
     -- Take the Rol out of that AVar in a Forked Aff and add rolId to its gevuldeRollen.
-    vultRol :: RolID -> RolName -> RolID -> MonadPerspectives (AjaxAvarCache e) Unit
+    vultRol :: RolID -> RolName -> RolID -> MonadPerspectives Unit
     vultRol vuller rolName gevuldeRol = do
       (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit vuller
       lift $ void $ do
-        vullerRol <- takeVar av
-        putVar (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
+        vullerRol <- take av
+        put (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
 
     -- reads BuitenRol from cache before changing it.
-    setBuitenRolType :: PerspectContext ->  MonadPerspectives (AjaxAvarCache e) Unit
+    setBuitenRolType :: PerspectContext ->  MonadPerspectives Unit
     setBuitenRolType ctxt = do
       abrtype <- buitenRolBeschrijvingDef (context_pspType ctxt)
       case head abrtype of
@@ -794,9 +795,9 @@ parseAndCache text = do
         (Just brtype) -> do
           (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (buitenRol (context_id ctxt))
           lift $ void $ do
-            bRol <- takeVar av
-            putVar (changeRol_type (unwrap brtype) bRol) av
+            bRol <- take av
+            put (changeRol_type (unwrap brtype) bRol) av
 
     -- TODO Implementeer setBinnenRolType
-    setBinnenRolType :: PerspectContext ->  MonadPerspectives (AjaxAvarCache e) Unit
+    setBinnenRolType :: PerspectContext ->  MonadPerspectives Unit
     setBinnenRolType ctxt = pure unit
