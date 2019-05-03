@@ -64,19 +64,19 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -}
 -- | Create update functions on PerspectContext or PerspectRol.
 -- | The result is an ObjectsGetter that always returns the (ID of the) PerspectEntiteit.
-updatePerspectEntiteit :: forall e a. PerspectEntiteit a =>
+updatePerspectEntiteit :: forall a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
-  Value -> ObjectsGetter e
+  Value -> ObjectsGetter
 updatePerspectEntiteit changeEntity createDelta value cid = do
   updatePerspectEntiteit' changeEntity cid value
   addDelta $ createDelta cid value
   setupBotActions cid
   pure [cid]
 
-updatePerspectEntiteit' :: forall e a. PerspectEntiteit a =>
+updatePerspectEntiteit' :: forall a. PerspectEntiteit a =>
   (Value -> a -> a) ->
-  ID -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
+  ID -> Value -> MonadPerspectives Unit
 updatePerspectEntiteit' changeEntity cid value = do
   (entity) <- (getPerspectEntiteit cid)
   if (isUserEntiteitID cid)
@@ -95,7 +95,7 @@ updatePerspectEntiteit' changeEntity cid value = do
   -- -- Set the new revision in the entity.
   -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
-setContextType :: forall e. ID -> ObjectsGetter e
+setContextType :: ID -> ObjectsGetter
 setContextType = updatePerspectEntiteit
   changeContext_type
   (\theType cid -> Delta
@@ -106,7 +106,7 @@ setContextType = updatePerspectEntiteit
     , isContext: true
     })
 
-setRolType :: forall e. ID -> ObjectsGetter e
+setRolType :: ID -> ObjectsGetter
 setRolType = updatePerspectEntiteit
   changeRol_type
   (\theType cid -> Delta
@@ -117,7 +117,7 @@ setRolType = updatePerspectEntiteit
     , isContext: false
     })
 
-setContextDisplayName :: forall e. ID -> ObjectsGetter e
+setContextDisplayName :: ID -> ObjectsGetter
 setContextDisplayName = updatePerspectEntiteit
   changeContext_displayName
   (\displayName cid -> Delta
@@ -128,7 +128,7 @@ setContextDisplayName = updatePerspectEntiteit
     , isContext: true
     })
 
-setContext :: forall e. ID -> ObjectsGetter e
+setContext :: ID -> ObjectsGetter
 setContext = updatePerspectEntiteit
   changeRol_context
   (\rol cid -> Delta
@@ -139,7 +139,7 @@ setContext = updatePerspectEntiteit
     , isContext: false
     })
 
-setBinding :: forall e. ID -> ID -> MonadPerspectives (AjaxAvarCache e) Unit
+setBinding :: ID -> ID -> MonadPerspectives Unit
 setBinding rid boundRol = do
   oldBinding <- genericBinding rid
   updatePerspectEntiteit' changeRol_binding rid boundRol
@@ -162,19 +162,19 @@ setBinding rid boundRol = do
 -----------------------------------------------------------
 -- | Create an ObjectsGetter from a function that modifies the member (such as a role or property) of a PerspectEntiteit (respectively a context or role).
 -- | The result of this ObjectsGetter is always the (ID of the) PerspectEntiteit that is passed in.
-updatePerspectEntiteitMember :: forall e a. PerspectEntiteit a =>
+updatePerspectEntiteitMember :: forall a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
-  MemberName -> Value -> ObjectsGetter e
+  MemberName -> Value -> ObjectsGetter
 updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid = do
   updatePerspectEntiteitMember' changeEntityMember cid memberName value
   -- TODO. Om te proberen: maak alleen een delta als er echt iets verandert.
   addDelta $ createDelta memberName value cid
   pure [cid]
 
-updatePerspectEntiteitMember' :: forall e a. PerspectEntiteit a =>
+updatePerspectEntiteitMember' :: forall a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
-  ID -> MemberName -> Value -> MonadPerspectives (AjaxAvarCache e) Unit
+  ID -> MemberName -> Value -> MonadPerspectives Unit
 updatePerspectEntiteitMember' changeEntityMember pid memberName value = do
   (pe :: a) <- getPerspectEntiteit pid
   -- Change the entity in cache:
@@ -190,7 +190,7 @@ updatePerspectEntiteitMember' changeEntityMember pid memberName value = do
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
-addRol' :: forall e. RolName -> RolID -> ObjectsGetter e
+addRol' :: RolName -> RolID -> ObjectsGetter
 addRol' =
   updatePerspectEntiteitMember
     addContext_rolInContext
@@ -203,10 +203,10 @@ addRol' =
         , isContext: true
         })
 
-addRol :: forall e. RolName -> RolID -> ObjectsGetter e
+addRol :: RolName -> RolID -> ObjectsGetter
 addRol = setUpBotActionsAfter addRol'
 
-setUpBotActionsAfter :: forall e. (ID -> ID -> ObjectsGetter e) -> ID -> ID -> (ObjectsGetter e)
+setUpBotActionsAfter :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
 -- setUpBotActionsAfter g mn mid cid = g mn mid cid <* setupBotActions cid
 setUpBotActionsAfter g mn mid cid = do
   r <- g mn mid cid
@@ -214,7 +214,7 @@ setUpBotActionsAfter g mn mid cid = do
   pure r
 
 
-removeRol' :: forall e. RolName -> RolID -> ObjectsGetter e
+removeRol' :: RolName -> RolID -> ObjectsGetter
 removeRol' =
   updatePerspectEntiteitMember
     removeContext_rolInContext
@@ -227,10 +227,10 @@ removeRol' =
         , isContext: true
         })
 
-removeRol :: forall e. RolName -> RolID -> ObjectsGetter e
+removeRol :: RolName -> RolID -> ObjectsGetter
 removeRol = setUpBotActionsAfter removeRol'
 
-setRol' :: forall e. RolName -> RolID -> ObjectsGetter e
+setRol' :: RolName -> RolID -> ObjectsGetter
 setRol' =
   updatePerspectEntiteitMember
     setContext_rolInContext
@@ -243,10 +243,10 @@ setRol' =
         , isContext: true
         })
 
-setRol :: forall e. RolName -> RolID -> ObjectsGetter e
+setRol :: RolName -> RolID -> ObjectsGetter
 setRol = setUpBotActionsAfter setRol'
 
-addProperty' :: forall e. PropertyName -> Value -> ObjectsGetter e
+addProperty' :: PropertyName -> Value -> ObjectsGetter
 addProperty' =
   updatePerspectEntiteitMember
     addRol_property
@@ -259,10 +259,10 @@ addProperty' =
         , isContext: false
         })
 
-addProperty :: forall e. RolName -> RolID -> ObjectsGetter e
+addProperty :: RolName -> RolID -> ObjectsGetter
 addProperty = setUpBotActionsAfter addProperty'
 
-removeProperty' :: forall e. PropertyName -> Value -> ObjectsGetter e
+removeProperty' :: PropertyName -> Value -> ObjectsGetter
 removeProperty' =
   updatePerspectEntiteitMember
     removeRol_property
@@ -275,10 +275,10 @@ removeProperty' =
         , isContext: false
         })
 
-removeProperty :: forall e. RolName -> RolID -> ObjectsGetter e
+removeProperty :: RolName -> RolID -> ObjectsGetter
 removeProperty = setUpBotActionsAfter removeProperty'
 
-setProperty' :: forall e. PropertyName -> Value -> ObjectsGetter e
+setProperty' :: PropertyName -> Value -> ObjectsGetter
 setProperty' =
   updatePerspectEntiteitMember
     setRol_property
@@ -291,17 +291,17 @@ setProperty' =
         , isContext: false
         })
 
-setProperty :: forall e. PropertyName -> Value -> ObjectsGetter e
+setProperty :: PropertyName -> Value -> ObjectsGetter
 setProperty = setUpBotActionsAfter setProperty'
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
 -----------------------------------------------------------
-type Action e = (PBool -> MonadPerspectives (AjaxAvarCache e) (Array Value))
+type Action = (PBool -> MonadPerspectives (Array Value))
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
-constructActionFunction :: forall e. ContextID -> StringTypedTripleGetter e -> MonadPerspectives (AjaxAvarCache e) (ContextID -> Action e)
+constructActionFunction :: ContextID -> StringTypedTripleGetter -> MonadPerspectives (ContextID -> Action)
 constructActionFunction actionInstanceID objectGetter = do
   actionType <- onNothing (errorMessage "no type found" "")
     (actionInstanceID ##> contextType)
@@ -389,14 +389,14 @@ constructActionFunction actionInstanceID objectGetter = do
     errorMessage :: String -> String -> Error
     errorMessage s t = error ("constructActionFunction: " <> s <> " for: " <> t <> " " <> actionInstanceID)
 
-getBindingOfRol :: forall e. ID -> ObjectsGetter e
+getBindingOfRol :: ID -> ObjectsGetter
 getBindingOfRol rolName = getContextRol (RolDef rolName) /-/ rolBindingDef
 
 type ActionID = String
 
 -- | From the description of an Action, compile a StringTypedTripleGetter that should be applied to an instance of
 -- | the Context holding the Action, to conditionally execute it.
-compileBotAction :: forall e. ActieDef -> ContextID -> MonadPerspectives (AjaxAvarCache e) (StringTypedTripleGetter e)
+compileBotAction :: ActieDef -> ContextID -> MonadPerspectives StringTypedTripleGetter
 compileBotAction actionType contextId = do
   condition <- onNothing
     (errorMessage "no condition provided in Action" (unwrap actionType))
@@ -407,9 +407,9 @@ compileBotAction actionType contextId = do
   object <- onNothing
     (errorMessage "no effect provided in Action" (unwrap actionType))
     (unwrap actionType ##> getBindingOfRol (psp "Actie$object"))
-  (objectGetter :: StringTypedTripleGetter e) <- constructQueryFunction object
-  (conditionalEffect :: (ContextID -> Action e)) <- constructActionFunction action objectGetter
-  (conditionQuery :: StringTypedTripleGetter e) <- constructQueryFunction condition
+  (objectGetter :: StringTypedTripleGetter) <- constructQueryFunction object
+  (conditionalEffect :: (ContextID -> Action)) <- constructActionFunction action objectGetter
+  (conditionQuery :: StringTypedTripleGetter) <- constructQueryFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
   pure $ conditionQuery `followedBy` PBool >-> constructTripleGetterFromObjectsGetter (unwrap actionType) (conditionalEffect contextId)
@@ -418,7 +418,7 @@ compileBotAction actionType contextId = do
     errorMessage :: String -> String -> Error
     errorMessage s t = error ("constructActionFunction: " <> s <> " for: " <> t <> " " <> unwrap actionType)
 
-setupBotActions :: forall e. ContextID -> MonadPerspectives (AjaxAvarCache e) Unit
+setupBotActions :: ContextID -> MonadPerspectives Unit
 setupBotActions cid = do
   (actions :: Array ActieDef) <- cid ##= DTG.contextType `followedBy` ContextDef >-> botActiesInContext
   -- actions <- pure []
