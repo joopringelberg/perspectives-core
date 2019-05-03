@@ -1,22 +1,22 @@
 module Perspectives.PerspectivesTypes where
 
 import Data.Array (findIndex, index, singleton)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (class Newtype)
-import Foreign.Object (keys, lookup)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_binding, rol_properties)
 import Perspectives.ContextRolAccessors (getRolMember)
 import Perspectives.CoreTypes (type (~~>), ObjectsGetter)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Prelude (class Eq, class Show, show, ($), (==), (<>))
+import Prelude (class Eq, class Ord, class Show, compare, show, ($), (<>), (==))
 import Unsafe.Coerce (unsafeCoerce)
 
 typeWithPerspectivesTypes :: forall a b. a -> b
@@ -60,6 +60,8 @@ instance encodeRolDef :: Encode RolDef where
 instance eqRolDef :: Eq RolDef where
   eq (RolDef c1) (RolDef c2) = c1 == c2
 derive instance newtypeRolDef :: Newtype RolDef _
+instance rolPropertyDef :: Ord RolDef where
+  compare (RolDef p1) (RolDef p2) = compare p1 p2
 
 type UserRolDef = RolDef
 -----------------------------------------------------------
@@ -78,6 +80,8 @@ instance encodePropertyDef :: Encode PropertyDef where
 derive instance newtypePropertyDef :: Newtype PropertyDef _
 instance eqPropertyDef :: Eq PropertyDef where
   eq (PropertyDef c1) (PropertyDef c2) = c1 == c2
+instance ordPropertyDef :: Ord PropertyDef where
+  compare (PropertyDef p1) (PropertyDef p2) = compare p1 p2
 
 -----------------------------------------------------------
 -- SIMPLEVALUE AS TYPE
