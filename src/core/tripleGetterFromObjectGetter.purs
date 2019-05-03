@@ -1,6 +1,6 @@
 module Perspectives.TripleGetterFromObjectGetter where
 
-import Effect.Class (liftEff)
+import Effect.Class (liftEffect)
 import Control.Monad.State (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -13,29 +13,29 @@ import Perspectives.PerspectivesTypes (class RolClass, AnyContext, PropertyDef, 
 import Perspectives.TripleAdministration (addToTripleIndex, lookupInTripleIndex, memorizeQueryResults)
 import Prelude (class Show, bind, flip, pure, show, ($), (<<<), (<>))
 
-constructTripleGetterFromEffectExpression :: forall s o e. Show s =>
+constructTripleGetterFromEffectExpression :: forall s o. Show s =>
   Predicate ->
-  (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array o)) ->
-  TypedTripleGetter s o e
+  (s -> MonadPerspectivesQuery (Array o)) ->
+  TypedTripleGetter s o
 constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter pn tripleGetter where
-  tripleGetter :: TripleGetter s o e
+  tripleGetter :: TripleGetter s o
   tripleGetter id = do
     b <- memorizeQueryResults
     if b
       then do
-        mt <- liftEff (lookupInTripleIndex (typeWithPerspectivesTypes id) pn)
+        mt <- liftEffect (lookupInTripleIndex (typeWithPerspectivesTypes id) pn)
         case mt of
           Nothing -> do
             (object :: Array o) <- objectsGetter id
-            t <- liftEff (addToTripleIndex
+            t <- liftEffect (addToTripleIndex
               (typeWithPerspectivesTypes id)
               pn
               (typeWithPerspectivesTypes object)
               []
               [TripleRef {subject: show id, predicate: pn}]
               (typeWithPerspectivesTypes tripleGetter))
-            pure $ ((typeWithPerspectivesTypes t) :: Triple s o e)
-          (Just t) -> pure ((typeWithPerspectivesTypes t) :: Triple s o e)
+            pure $ ((typeWithPerspectivesTypes t) :: Triple s o)
+          (Just t) -> pure ((typeWithPerspectivesTypes t) :: Triple s o)
       else do
         (object :: Array o) <- objectsGetter id
         pure (Triple{ subject: id
@@ -49,31 +49,31 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
 -- | Construct a TripleGetter from an ObjectsGetter, that is supported by a Triple returned by an arbitrary
 -- | TripleGetter. In this way we can insert a computed (rather than calculated by a query) Triple in the
 -- | dependency tracking store and have it recomputed when the support changes value.
-constructTripleGetterWithArbitrarySupport :: forall s o e.
+constructTripleGetterWithArbitrarySupport :: forall s o.
   Predicate ->
-  (s -> MonadPerspectivesQuery (AjaxAvarCache e) (Array o)) ->
-  TypedTripleGetter s o e ->
-  TypedTripleGetter s o e
+  (s -> MonadPerspectivesQuery (Array o)) ->
+  TypedTripleGetter s o ->
+  TypedTripleGetter s o
 constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter _ supportGetter) = TypedTripleGetter pn tripleGetter where
-  tripleGetter :: TripleGetter s o e
+  tripleGetter :: TripleGetter s o
   tripleGetter id = do
     b <- memorizeQueryResults
     if b
       then do
-        mt <- liftEff (lookupInTripleIndex (typeWithPerspectivesTypes id) pn)
+        mt <- liftEffect (lookupInTripleIndex (typeWithPerspectivesTypes id) pn)
         case mt of
           Nothing -> do
             (object :: Array o) <- objectsGetter id
             (Triple{subject, predicate}) <- supportGetter id
-            t <- liftEff $ addToTripleIndex
+            t <- liftEffect $ addToTripleIndex
               (typeWithPerspectivesTypes id)
               pn
               (typeWithPerspectivesTypes object)
               []
               [TripleRef {subject: (typeWithPerspectivesTypes subject), predicate: predicate}]
               (typeWithPerspectivesTypes tripleGetter)
-            pure $ ((typeWithPerspectivesTypes t) :: Triple s o e)
-          (Just t) -> pure ((typeWithPerspectivesTypes t) :: Triple s o e)
+            pure $ ((typeWithPerspectivesTypes t) :: Triple s o)
+          (Just t) -> pure ((typeWithPerspectivesTypes t) :: Triple s o)
       else do
         (object :: Array o) <- objectsGetter id
         pure (Triple{ subject: id
@@ -90,27 +90,27 @@ constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter _ 
 -- | psp:iedereRolInContext and psp:typeVanIedereRolInContext.
 
 -- TODO: faseer deze functie uit tgv `trackedAs`
-constructTripleGetterFromObjectsGetter :: forall s o e. Show s =>
+constructTripleGetterFromObjectsGetter :: forall s o. Show s =>
   Predicate ->
-  (s ~~> o) e ->
-  TypedTripleGetter s o e
+  (s ~~> o) ->
+  TypedTripleGetter s o
 constructTripleGetterFromObjectsGetter pn objGetter = constructTripleGetterFromEffectExpression pn (lift <<< objGetter)
 
-constructTripleGetter :: forall r s o e. Show s =>
+constructTripleGetter :: forall s o. Show s =>
   Predicate ->
-  (s ~~> o) e ->
-  TypedTripleGetter s o e
+  (s ~~> o) ->
+  TypedTripleGetter s o
 constructTripleGetter pn objectsGetter = constructTripleGetterFromEffectExpression pn (lift <<< objectsGetter)
 
-trackedAs :: forall r s o e. Show s =>
-  (s ~~> o) e ->
+trackedAs :: forall s o. Show s =>
+  (s ~~> o) ->
   Predicate ->
-  TypedTripleGetter s o e
+  TypedTripleGetter s o
 trackedAs = flip constructTripleGetter
 
-constructExternalPropertySearch :: forall e.
+constructExternalPropertySearch ::
   PropertyDef ->
-  TypedTripleGetter AnyContext Value e
+  TypedTripleGetter AnyContext Value
 constructExternalPropertySearch ln = searchExternalProperty ln `trackedAs` unwrap ln
 
 -- constructInternalPropertyGetter :: forall e.
@@ -118,25 +118,25 @@ constructExternalPropertySearch ln = searchExternalProperty ln `trackedAs` unwra
 --   TypedTripleGetter AnyContext Value e
 -- constructInternalPropertyGetter pn = trackedAs (unwrap pn) (getInternalProperty pn)
 
-constructInternalPropertyLookup :: forall e.
+constructInternalPropertyLookup ::
   LocalName ->
-  TypedTripleGetter AnyContext Value e
+  TypedTripleGetter AnyContext Value
 constructInternalPropertyLookup ln = searchInternalUnqualifiedProperty ln `trackedAs` ln
 
-constructRolPropertyGetter :: forall r e. RolClass r =>
+constructRolPropertyGetter :: forall r. RolClass r =>
   PropertyDef ->
-  TypedTripleGetter r Value e
+  TypedTripleGetter r Value
 constructRolPropertyGetter pn = getProperty pn `trackedAs` unwrap pn
 
-constructRolPropertySearch :: forall r e.
+constructRolPropertySearch :: forall r.
   RolClass r =>
   PropertyDef ->
-  TypedTripleGetter r Value e
+  TypedTripleGetter r Value
 constructRolPropertySearch qn = searchProperty qn `trackedAs` unwrap qn
 
-constructInverseRolGetter :: forall r b e.
+constructInverseRolGetter :: forall r b.
   RolClass r =>
   RolClass b =>
   RolDef ->
-  TypedTripleGetter r b e
+  TypedTripleGetter r b
 constructInverseRolGetter pn = getRoleBinders pn `trackedAs` ((unwrap pn) <> "_inverse")
