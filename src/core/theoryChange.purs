@@ -2,36 +2,33 @@ module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addT
 
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
-import Effect (Eff)
-import Effect.AVar (AVAR)
-import Effect.Class (liftEff)
+import Effect (Effect)
+import Effect.Class (liftEffect)
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TripleQueue, TripleQueueElement(..), TripleRef(..))
-
-import Perspectives.GlobalUnsafeStrMap (GLOBALMAP)
 import Perspectives.PerspectivesState (addToRecomputed, setTripleQueue, tripleQueue)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
 import Perspectives.TripleAdministration (lookupInTripleIndex, setSupports_)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
-import Prelude (Ordering(..), Unit, bind, id, join, pure, void, ($), discard, map, (*>))
+import Prelude (Ordering(..), Unit, bind, identity, join, pure, void, ($), discard, map, (*>))
 import Unsafe.Coerce (unsafeCoerce)
 
-tripleToTripleQueueElement :: forall e. Triple String String e -> TripleQueueElement
+tripleToTripleQueueElement :: Triple String String -> TripleQueueElement
 tripleToTripleQueueElement = unsafeCoerce
 
-tripleQueueElementToTripleRef :: forall e. TripleQueueElement -> TripleRef
+tripleQueueElementToTripleRef :: TripleQueueElement -> TripleRef
 tripleQueueElementToTripleRef = unsafeCoerce
 
-tripleQueueElementToTriple :: forall e. TripleQueueElement -> Triple String String e
+tripleQueueElementToTriple :: TripleQueueElement -> Triple String String
 tripleQueueElementToTriple = unsafeCoerce
 
 tripleRefToTripleQueueElement :: TripleRef -> TripleQueueElement
 tripleRefToTripleQueueElement = unsafeCoerce
 
-addTripleToQueue :: forall e. TripleQueueElement ->  MonadPerspectives (avar :: AVAR | e) Unit
+addTripleToQueue :: TripleQueueElement ->  MonadPerspectives Unit
 addTripleToQueue t = do
   q <- tripleQueue
   setTripleQueue $ cons t q
@@ -51,55 +48,55 @@ dependsOn tqe (TripleQueueElement{dependencies}) =
     Nothing -> EQ
     otherwise -> GT
 
-addToQueue :: forall e. TripleQueue -> TripleQueue -> TripleQueue
+addToQueue :: TripleQueue -> TripleQueue -> TripleQueue
 addToQueue q triples = union q (sortBy dependsOn (difference triples q))
 
-propagate :: forall e. MonadPerspectives (AjaxAvarCache e) Unit
+propagate :: MonadPerspectives Unit
 propagate = do
   (q :: Array TripleQueueElement) <- tripleQueue
   setTripleQueue []
   void $ updateFromSeeds q
 
-updateFromSeeds :: forall e. TripleQueue -> MonadPerspectives (AjaxAvarCache e) (Array String)
+updateFromSeeds :: TripleQueue -> MonadPerspectives (Array String)
 updateFromSeeds ts = do
   x <- pure (map (\(TripleQueueElement{dependencies}) -> map tripleRefToTripleQueueElement dependencies) ts)
   propagateTheoryDeltas (join x)
 
-propagateTheoryDeltas :: forall e. TripleQueue -> MonadPerspectives (AjaxAvarCache e) (Array String)
+propagateTheoryDeltas :: TripleQueue -> MonadPerspectives (Array String)
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do
     tr@(Triple{dependencies}) <- pure $ tripleQueueElementToTriple head
     -- Note: the recomputed triple will not have dependencies. These are computed on adding other triples,
     -- from their supports. And when triples are removed, their supports should lose a depencency.
-    t@(Triple{object, supports} :: Triple String String e) <- recompute tr
+    t@(Triple{object, supports} :: Triple String String) <- recompute tr
     _ <- liftAff $ saveChangedObject tr object
-    _ <- liftAff $ liftEff $ setSupports_ tr supports
+    _ <- liftAff $ liftEffect $ setSupports_ tr supports
     propagateTheoryDeltas (addToQueue tail (map tripleRefToTripleQueueElement dependencies))
 
-getDependencies :: forall e eff. Triple String String e ->  Eff (gm :: GLOBALMAP | eff) (Array (Triple String String e))
+getDependencies :: Triple String String ->  Effect (Array (Triple String String))
 getDependencies (Triple{dependencies}) = do
   x <- traverse lookupRef dependencies
-  pure (foldr (maybe id cons) [] x)
+  pure (foldr (maybe identity cons) [] x)
   where
-    -- lookupRef :: TripleRef -> Eff (gm :: GLOBALMAP | eff) (Maybe (Triple String String e))
+    -- lookupRef :: TripleRef -> Effect (gm :: GLOBALMAP | eff) (Maybe (Triple String String))
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
-recompute :: forall e. Triple String String e -> MonadPerspectives (AjaxAvarCache e) (Triple String String e)
+recompute :: Triple String String -> MonadPerspectives (Triple String String)
 recompute (Triple{subject, predicate, tripleGetter}) = addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *> runMonadPerspectivesQuery subject tripleGetter
 
 -- Change the object of the triple to the array of IDs passed to the function.
-saveChangedObject :: forall e1 e2. Triple String String e2 -> Array String -> Aff e1 (Triple String String e2)
-saveChangedObject t obj = liftEff (saveChangedObject_ t obj)
+saveChangedObject :: Triple String String -> Array String -> Aff (Triple String String)
+saveChangedObject t obj = liftEffect (saveChangedObject_ t obj)
 
-foreign import saveChangedObject_ :: forall e1 e2. Triple String String e2 -> Array String -> Eff e1 (Triple String String e2)
+foreign import saveChangedObject_ :: Triple String String -> Array String -> Effect (Triple String String)
 
 -- | Actually modify the triple according to the Delta. Return the changed Triple.
-modifyTriple :: forall e1 e2. Delta -> Aff (gm :: GLOBALMAP | e1) (Maybe TripleQueueElement)
+modifyTriple :: Delta -> Aff (Maybe TripleQueueElement)
 modifyTriple (Delta{id: rid, memberName: pid, value, deltaType}) =
   do
     value' <- pure (unsafePartial (fromJust value))
-    mt <- liftEff $ lookupInTripleIndex rid pid
+    mt <- liftEffect $ lookupInTripleIndex rid pid
     case mt of
       Nothing -> pure Nothing
       (Just t@(Triple tr@{object})) -> do
