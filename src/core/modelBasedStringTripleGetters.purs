@@ -22,10 +22,10 @@ import Prelude ((<>))
 -- | boundValue hasType x
 -- | Or: boundValue is on each rolTelescope that starts with allowedBinding
 -- | Formulated this way, 'hasOnEachRolTelescopeTheContextTypeOf' has it backwards.
-hasOnEachRolTelescopeTheContextTypeOf :: forall e. String -> (String **> PBool) e
+hasOnEachRolTelescopeTheContextTypeOf :: String -> (String **> PBool)
 hasOnEachRolTelescopeTheContextTypeOf boundValue = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> boundValue) f
   where
-    f :: TripleGetter String PBool e
+    f :: TripleGetter String PBool
     f allowedBinding = unlessFalse (isContextTypeOf boundValue) allowedBinding
       -- this is: allowedBinding ## (isContextTypeOf boundValue)
       -- read as: allowedBinding `isContextTypeOf` boundValue
@@ -36,10 +36,10 @@ hasOnEachRolTelescopeTheContextTypeOf boundValue = TypedTripleGetter ("hasOnEach
           (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
           (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheContextTypeOf boundValue)))))
 
-hasOnEachRolTelescopeTheRolTypeOf :: forall e. RolInContext -> (String **> PBool) e
+hasOnEachRolTelescopeTheRolTypeOf :: RolInContext -> (String **> PBool)
 hasOnEachRolTelescopeTheRolTypeOf boundValue = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> (unwrap boundValue)) f
   where
-    f :: TripleGetter String PBool e
+    f :: TripleGetter String PBool
     f allowedBinding = unlessFalse (isRolTypeOf boundValue) allowedBinding
       <|>
       (allowedBinding @@
@@ -48,10 +48,10 @@ hasOnEachRolTelescopeTheRolTypeOf boundValue = TypedTripleGetter ("hasOnEachRolT
           (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheRolTypeOf boundValue)))))
 
 -- | aspect ## (isSubsumedOnEachRolTelescopeOf allowedBinding)
-isSubsumedOnEachRolTelescopeOf :: forall e. String -> (String **> PBool) e
+isSubsumedOnEachRolTelescopeOf :: String -> (String **> PBool)
 isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> allowedBinding) f
   where
-    f :: TripleGetter String PBool e
+    f :: TripleGetter String PBool
     f aspect = unlessFalse (isOrHasAspect aspect) allowedBinding
       -- this is: allowedBinding ## (isOrHasAspect aspect)
       -- read as: allowedBinding `isOrHasAspect` aspect
@@ -64,9 +64,9 @@ isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("hasOnEachRol
 -- | The type of Rol or Context that can be bound to the Rol, taken
 -- | from the RolDef itself or any aspectRol or prototype.
 -- | `psp:Rol -> psp:Context | psp:Rol`
-mogelijkeBinding :: forall e. (RolName **> AnyDefinition) e
+mogelijkeBinding :: (RolName **> AnyDefinition)
 mogelijkeBinding = searchInAspectRolesAndPrototypes f
   where
 
-    f :: (String **> AnyDefinition) e
+    f :: (String **> AnyDefinition)
     f = searchRolInContext "model:Perspectives$Rol$mogelijkeBinding" >-> genericBinding >-> genericContext
