@@ -5,13 +5,13 @@
 -- import Test.TestEffects as TE
 -- import Effect.Aff (Aff, Fiber, runAff, runAff_)
 -- import Effect.Aff.Console (CONSOLE, log) as AC
--- import Effect (Eff)
+-- import Effect (Effect)
 -- import Perspectives.PerspectivesState (runPerspectives)
 -- import Prelude (class Show, Unit, pure, unit, (>>=), show)
 --
 -- -- import Test.BoundContexts
 --
--- main :: forall e. Eff (TE.CancelerEffects e) (Fiber (TE.CancelerEffects e) Unit)
+-- main :: forall e. Effect (TE.CancelerEffects e) (Fiber (TE.CancelerEffects e) Unit)
 -- main = runAff TE.handleError (runPerspectives "cor" "geheim" test)
 
 
@@ -21,7 +21,7 @@
 
 module Main where
 import Effect.Aff (Error, Milliseconds(..), delay, forkAff, runAff)
-import Effect.Aff.AVar (AVar, makeVar)
+import Effect.Aff.AVar (AVar, new)
 import Effect (Effect)
 import Effect.Console (log)
 import Control.Monad.Rec.Class (forever)
@@ -42,14 +42,14 @@ main = void $ runAff handleError do
   usr <- pure "cor"
   pwd <- pure "geheim"
   url <- pure "http://127.0.0.1:5984/"
-  (av :: AVar String) <- makeVar "This value will be removed on first authentication!"
+  (av :: AVar String) <- new "This value will be removed on first authentication!"
   (tr :: Transactie) <- createTransactie usr
-  state <- makeVar $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} tr av
+  state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} tr av
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
   void $ forkAff $ forever do
     delay (Milliseconds 1000.0)
-    -- liftEff $ log "propagating"
+    -- liftEffect $ log "propagating"
     runPerspectivesWithState propagate state
   where
     f = do
@@ -57,6 +57,6 @@ main = void $ runAff handleError do
       addComputedTripleGetters
       setupApi
 
-handleError :: forall e a. (Either Error a -> Eff (console :: CONSOLE | e) Unit)
+handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
 handleError (Right a) = log $ "Perspectives-core has started!"
