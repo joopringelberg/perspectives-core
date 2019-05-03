@@ -17,7 +17,7 @@ type AceError =
   , text :: String
   , type :: String }
 
-parse :: forall e. String -> MonadPerspectives (AjaxAvarCache e) (Either (Array AceError) String)
+parse :: String -> MonadPerspectives (Either (Array AceError) String)
 parse s = do
   parseResult <- runIndentParser s enclosingContext
   case parseResult of
@@ -29,7 +29,7 @@ parse s = do
       }]
     otherwise -> pure $ Right "Parse succeeded, resources stored!"
 
-errorsIn :: forall e. String -> String -> MonadPerspectives (AjaxAvarCache e) (Maybe (Array AceError))
+errorsIn :: String -> String -> MonadPerspectives (Maybe (Array AceError))
 errorsIn previousLine s = do
   parseResult <- runIndentParser s (whiteSpace *> expression)
   case parseResult of
@@ -43,7 +43,7 @@ errorsIn previousLine s = do
       }]
     otherwise -> pure Nothing
 
-expressionTypeForNextLine :: forall e. String -> MonadPerspectives (AjaxAvarCache e) String
+expressionTypeForNextLine :: String -> MonadPerspectives String
 expressionTypeForNextLine s = do
   parseResult <- runIndentParser s (whiteSpace *> expression)
   case parseResult of
