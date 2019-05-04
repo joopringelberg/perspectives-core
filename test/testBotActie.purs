@@ -2,8 +2,8 @@ module Test.Perspectives.TestBotActie (theSuite) where
 
 import Prelude
 
-import Control.Monad.Aff (Milliseconds(..), delay)
-import Control.Monad.Eff.Exception (error)
+import Effect.Aff (Milliseconds(..), delay)
+import Effect.Exception (error)
 import Control.Monad.Free (Free)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (length)
@@ -26,7 +26,7 @@ import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
 import Perspectives.TheoryChange (propagate)
 import Perspectives.TripleGetterComposition (followedBy)
 import Perspectives.Utilities (onNothing)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel, p, u, assertEqualWithPropagation)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, unLoadTestModel, p, u, assertEqualWithPropagation)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -38,8 +38,8 @@ t2 s = "model:TestTDC$" <> s
 tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
-theSuite = suite "TestBotActie" do
+theSuite :: Free TestF Unit
+theSuite = suiteSkip "TestBotActie" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
@@ -73,7 +73,7 @@ theSuite = suite "TestBotActie" do
         (u "test1") ##= conditionQuery
       ["true"]
 
-  testOnly "compileBotAction" do
+  test "compileBotAction" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
     assertEqualWithPropagation "Apply the botAction to the context usr:test1 to copy the value of $v1 to $v2"

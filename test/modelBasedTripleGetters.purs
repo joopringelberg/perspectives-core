@@ -14,7 +14,7 @@ import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
 import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -26,7 +26,7 @@ t2 s = "model:TestTDC$" <> s
 tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
@@ -92,7 +92,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       [t "myContextDef5$rol1"]
   test "contextBot" do
     assertEqual "t:myContext6 has a contextBot"
-      (ContextDef $ t "myContext6" ##= contextBot)
+      ((ContextDef $ t "myContext6") ##= contextBot)
       [RolInContext $ t "myContext6$contextBot_1"]
   test "agreesWithType" do
     assertEqual "t:myContextDef agrees with type t:myContextDef"
@@ -201,7 +201,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       ([15])
   test "isNotAQuery" do
     assertEqual "t:myContextDef2$rol1 is not a query-rol"
-      (RolDef $ t2 "myContextDef2$rol1" ##= isNotAQuery)
+      ((RolDef $ t2 "myContextDef2$rol1") ##= isNotAQuery)
       [PBool "false"]
   test "nonQueryRollen" do
     assertEqual "myContextDef2 defines a single non-query rol and inherits many from Context"
@@ -269,5 +269,5 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
 
 -- part of the definition of nonQueryRollen, we need it here to test it seperately.
 -- returns true iff the inclusive closure of aspectRol of the RolDef contains psp:Rol.
-isNotAQuery :: forall e. (RolDef **> PBool) e
+isNotAQuery :: forall e. (RolDef **> PBool)
 isNotAQuery = contains (RolDef "model:Perspectives$Rol") (unwrap `before` (closure_ directAspects) `followedBy` RolDef)

@@ -4,13 +4,13 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Perspectives.CoreTypes (UserMessage(..))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, typeDefCheckerNotifies)
+import Test.Perspectives.Utils (typeDefCheckerNotifies)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly)
 
 t :: String -> String
 t s = "model:TestTDC$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "TypeDefChecker" do
   test "All error situations that the TypeDefChecker can find, except for MissingType, MissingAspect, RolWithoutContext and PropertyWithoutRol (we cannot upload a CRL file with those error situations)." do
     typeDefCheckerNotifies "testTypeDefChecker.crl"

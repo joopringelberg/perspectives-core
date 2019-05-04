@@ -10,7 +10,7 @@ import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, propertyI
 import Perspectives.ObjectGetterConstructors (directAspectProperties, getRoleBinders)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol, ContextRol(..), PBool(..), PropertyDef(..), RolDef(..))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, unLoadTestModel, p)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, unLoadTestModel, p)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -22,7 +22,7 @@ t2 s = "model:TestTDC$" <> s
 tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "ModelBasedObjectGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
@@ -74,7 +74,7 @@ theSuite = suiteSkip "ModelBasedObjectGetters" do
 
   test "rolDef" do
     assertEqual ""
-      ((unwrap >>> buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Rol$rolProperty") :: forall eff. (BuitenRol ~~> ContextRol) eff)) (PropertyDef $ t2 "myContextDef6$rol1$myContextDef6Prop3"))
+      ((unwrap >>> (buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Rol$rolProperty")) :: (BuitenRol ~~> ContextRol))) (PropertyDef $ t2 "myContextDef6$rol1$myContextDef6Prop3"))
       [ContextRol "model:TestTDC$myContextDef6$rol1$rolProperty_3"]
     assertEqual "$myContextDef6Prop3 should have Rol $rol1 as defining Rol."
       (rolDef (PropertyDef $ t2 "myContextDef6$rol1$myContextDef6Prop3"))

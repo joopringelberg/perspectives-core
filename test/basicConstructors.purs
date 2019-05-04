@@ -2,33 +2,29 @@ module Test.BasicConstructors where
 
 import Prelude
 
-import Control.Monad.Aff.Console (log)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Trans.Class (lift)
-import Data.Foreign.Generic (encodeJSON)
-import Data.StrMap (singleton)
+import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
+import Foreign.Generic (encodeJSON)
+import Foreign.Object (singleton)
 import Node.Encoding (Encoding(..))
-import Node.FS (FS)
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), defaultContextSerializationRecord)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.QueryCompiler (getPropertyFunction)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 
 modelDirectory :: String
 modelDirectory = "/Users/joopringelberg/Code/perspectives-core/src/model"
 
-test :: forall e. MonadPerspectives (AjaxAvarCache (console :: CONSOLE, fs :: FS, exception :: EXCEPTION | e)) Unit
+test :: MonadPerspectives Unit
 test = do
   lift $ log "=========================CREATE A CONTEXT==================="
   addComputedTripleGetters
-  text <- lift $ liftEff $ readTextFile UTF8 (Path.concat [modelDirectory, "politie.crl"])
+  text <- lift $ liftEffect $ readTextFile UTF8 (Path.concat [modelDirectory, "politie.crl"])
   s <- pure $ ContextSerialization $ defaultContextSerializationRecord
     { id = "model:User$Politie_text"
     , ctype = "model:CrlText$Text"

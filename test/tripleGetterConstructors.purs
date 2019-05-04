@@ -14,13 +14,13 @@ import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.StringTripleGetterConstructors (all, directAspects, getContextRol, searchInAspectsAndPrototypes, searchLocallyAndInPrototypeHierarchy, some)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closure_, concat, directAspectRoles, getInternalProperty, getRolInContext, getRoleBinders, getUnqualifiedPropertyDefinition, getUnqualifiedRolDefinition, getUnqualifiedRolInContext, getUnqualifiedRoleBinders, searchContextRol, searchExternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchInPrototypeHierarchy, searchInternalUnqualifiedProperty, searchProperty, searchUnqualifiedProperty, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, p, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
 t s = "model:TestOGC$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "TripleGetterConstructors" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"

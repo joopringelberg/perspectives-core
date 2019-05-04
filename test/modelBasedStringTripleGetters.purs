@@ -9,7 +9,7 @@ import Perspectives.PerspectivesTypes (PBool(..))
 import Perspectives.QueryCombinators (notEmpty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.TripleGetterComposition ((>->))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, p, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -18,7 +18,7 @@ t s = "model:TestOGC$" <> s
 t2 :: String -> String
 t2 s = "model:TestTDC$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "ModelBasedStringTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"

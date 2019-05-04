@@ -9,7 +9,7 @@ import Perspectives.QueryCombinators (not, notEmpty, conj, equal) as QC
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.TripleGetterConstructors (getInternalProperty)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, removeTestContext, u, unLoadTestModel)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, removeTestContext, u, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -21,7 +21,7 @@ t2 s = "model:TestTDC$" <> s
 tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "QueryCompiler" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"

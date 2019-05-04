@@ -2,29 +2,22 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
-import Control.Monad.Aff (Aff, error, throwError)
-import Control.Monad.Aff.Console (log)
-import Control.Monad.Eff.AVar (AVAR)
-import Control.Monad.Eff.Console (CONSOLE)
-import Control.Monad.Eff.Exception (EXCEPTION)
-import Control.Monad.Eff.Now (NOW)
 import Control.Monad.Except (runExcept)
 import Data.Array (findIndex, singleton)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Foreign (MultipleErrors)
-import Data.Foreign.Generic (decodeJSON)
 import Data.Maybe (Maybe(..))
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
-import Node.FS (FS)
-import Node.Process (PROCESS)
+import Effect.Aff (Aff, error, throwError)
+import Effect.Class.Console (log)
+import Foreign (MultipleErrors)
+import Foreign.Generic (decodeJSON)
 import Perspectives.ApiTypes (ContextSerialization)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
-import Perspectives.Effects (AjaxAvarCache)
 import Perspectives.Identifiers (buitenRol, expandDefaultNamespaces)
 import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile, withSemanticChecks, withoutSemanticChecks)
 import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
@@ -32,20 +25,16 @@ import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithPropaga
 import Perspectives.SaveUserData (removeUserData, saveUserData)
 import Test.Unit.Assert as Assert
 
-type TestEffects e = AjaxAvarCache (now :: NOW, console :: CONSOLE | e)
-type RunEffects e = (avar :: AVAR, now :: NOW | e)
-type TestModelLoadEffects e = (console :: CONSOLE, exception :: EXCEPTION, fs :: FS, process :: PROCESS | e)
 
-
-runP :: forall a e.
-  MonadPerspectives (RunEffects e) a ->
-  Aff (RunEffects e) a
+runP :: forall a.
+  MonadPerspectives a ->
+  Aff a
 runP t = runPerspectives "cor" "geheim" t
 
-runPWithPropagation :: forall a e.
-  MonadPerspectives (TestEffects e) a ->
+runPWithPropagation :: forall a.
+  MonadPerspectives a ->
   Number ->
-  Aff (TestEffects e) a
+  Aff a
 runPWithPropagation t n = do
   (Tuple s a) <- runPerspectivesWithPropagation "cor" "geheim" t n
   log $ show $ _.recomputed s
@@ -60,16 +49,16 @@ q s = "model:QueryAst$" <> s
 u :: String -> String
 u s = "model:User$" <> s
 
-shouldEqual :: forall a e. Eq a => a -> a -> Aff e Boolean
+shouldEqual :: forall a. Eq a => a -> a -> Aff Boolean
 shouldEqual a = \b -> pure (a == b)
 
 type Message = String
 
-assertEqual :: forall a e. Eq a => Show a =>
+assertEqual :: forall a. Eq a => Show a =>
   Message ->
-  MonadPerspectives (RunEffects e) a ->
+  MonadPerspectives a ->
   a ->
-  Aff (RunEffects e) Unit
+  Aff Unit
 assertEqual message test result = do
   r <- runP test
   case result == r of
@@ -79,12 +68,12 @@ assertEqual message test result = do
       show r)
       false
 
-assertEqualWithPropagation :: forall a e. Eq a => Show a =>
+assertEqualWithPropagation :: forall a. Eq a => Show a =>
   Message ->
-  MonadPerspectives (TestEffects e) a ->
+  MonadPerspectives a ->
   a ->
   Number ->
-  Aff (TestEffects e) Unit
+  Aff Unit
 assertEqualWithPropagation message test result duration = do
   r <- runPWithPropagation test duration
   case result == r of
@@ -94,10 +83,10 @@ assertEqualWithPropagation message test result duration = do
       show r)
       false
 
-addTestContext :: forall e. String -> Aff (TestEffects e) Unit
+addTestContext :: String -> Aff Unit
 addTestContext = void <<< runP <<< addTestContext'
   where
-    addTestContext' :: forall eff. String -> MonadPerspectives (AjaxAvarCache eff) Unit
+    addTestContext' :: String -> MonadPerspectives Unit
     addTestContext' s = do
       (r :: Either MultipleErrors ContextSerialization) <- pure $ runExcept $ decodeJSON s
       case r of
@@ -110,24 +99,24 @@ addTestContext = void <<< runP <<< addTestContext'
               _ <- saveUserData [BuitenRol $ buitenRol id]
               pure unit
 
-removeTestContext :: forall e. AnyContext -> Aff (TestEffects e) Unit
+removeTestContext :: AnyContext -> Aff Unit
 removeTestContext cid = void $ runP $ removeTestContext' (buitenRol (expandDefaultNamespaces cid))
   where
 
-  removeTestContext' :: forall eff. AnyContext -> MonadPerspectives (AjaxAvarCache eff) Unit
+  removeTestContext' :: AnyContext -> MonadPerspectives Unit
   removeTestContext' = void <<< removeUserData <<< singleton <<< BuitenRol
 
-loadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
+loadTestModel :: String -> Aff Unit
 loadTestModel ns = void $ runP $ loadCRLFile withoutSemanticChecks ns
 
-unLoadTestModel :: forall e. String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
+unLoadTestModel :: String -> Aff Unit
 unLoadTestModel ns = void $ runP $ unLoadCRLFile ns
 
 -- | Check the definitions given in the modelfile. Provide an Array
 -- | of error types (DataConstructors of UserMessage).
 -- | An assertion false follows for any error type in the list that
 -- | is not found by the TypeDefChecker.
-typeDefCheckerNotifies :: forall e. String -> Array String -> Aff (TestEffects (TestModelLoadEffects e)) Unit
+typeDefCheckerNotifies :: String -> Array String -> Aff Unit
 typeDefCheckerNotifies fileName messages = do
   notifications <- runP $ loadCRLFile withSemanticChecks fileName
   notificationStrings <- pure $ (map show) notifications

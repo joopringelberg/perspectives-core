@@ -8,7 +8,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, isBuitenRol, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..), RolInContext(..), Value(..), binding, getUnqualifiedProperty)
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, addTestContext, assertEqual, loadTestModel, p, removeTestContext, u, unLoadTestModel)
+import Test.Perspectives.Utils (addTestContext, assertEqual, loadTestModel, p, removeTestContext, u, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t2 :: String -> String
@@ -23,7 +23,7 @@ t1 = """{ "id": "u:myContext"
   , "externeProperties": {}
   }"""
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "DataTypeObjectGetters" do
   test "Setting up" (addTestContext t1)
   test "contextType" do

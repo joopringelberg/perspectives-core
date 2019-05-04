@@ -11,13 +11,13 @@ import Perspectives.ObjectGetterConstructors (all, closureOfAspect, closureOfBin
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), Value(..), binding, genericBinding, getProperty, getUnqualifiedProperty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Test.Perspectives.Utils (TestEffects, TestModelLoadEffects, assertEqual, loadTestModel, p, unLoadTestModel)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, p, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
 t s = "model:TestOGC$" <> s
 
-theSuite :: forall e. Free (TestF (TestEffects (TestModelLoadEffects e))) Unit
+theSuite :: Free TestF Unit
 theSuite = suiteSkip "ObjectGetterConstructors" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
@@ -47,7 +47,7 @@ theSuite = suiteSkip "ObjectGetterConstructors" do
       [t "myAspect", t "myUrAspect", p "Context"]
   test "concat" do
     assertEqual "The concatenation of 'aspect' and 'rolInContext', applied to t:myContextDef should result in [t:myAspect, t:myContextDef$rol1]!"
-      (concat directAspects (iedereRolInContext >=> pure <<< map RolInContext /-/ binding /-/ context) (t "myContextDef"))
+      (concat directAspects (iedereRolInContext >=> (pure <<< map RolInContext) /-/ binding /-/ context) (t "myContextDef"))
       [(t "myAspect"), (t "myContextDef$rol1")]
   test "getProperty" do
     assertEqual "The external Property isFunctioneel of the Role 'rol1' of 't:myContextDef' should be true."
@@ -122,7 +122,7 @@ theSuite = suiteSkip "ObjectGetterConstructors" do
       (searchUnqualifiedRolDefinition "myAspectRol1" $ ContextDef (t "myContextDef2"))
       [RolDef $ t "myAspect$myAspectRol1"]
     assertEqual "for model:TestBotActie$Test a role with local name 'binnenRolBeschrijving' is defined through its Aspect psp:Context."
-      ((contextType >=> pure <<< map ContextDef /-/ (searchUnqualifiedRolDefinition "binnenRolBeschrijving")) "model:TestBotActie$Test")
+      ((contextType >=> (pure <<< map ContextDef) /-/ (searchUnqualifiedRolDefinition "binnenRolBeschrijving")) "model:TestBotActie$Test")
       [RolDef $ "model:Perspectives$Context$binnenRolBeschrijving"]
   test "buitenRolBeschrijvingDef" do
     assertEqual "From a context that is a definition, get the definition of its BuitenRol."
