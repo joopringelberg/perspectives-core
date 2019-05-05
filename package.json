@@ -6,7 +6,7 @@
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "license": "Copyright Perspect-IT 2018",
   "dependencies": {
-    "xhr2": "^0.1.4",
+    "xhr2-cookies": "^1.1.0",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git"
   },
   "repository": {
