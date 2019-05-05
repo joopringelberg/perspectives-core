@@ -3,6 +3,7 @@ module Perspectives.PerspectEntiteit where
 import Control.Monad.Except (throwError, runExcept)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, unwrap)
 import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
@@ -18,6 +19,7 @@ import Perspectives.Identifiers (Namespace)
 import Perspectives.PerspectivesState (contextDefinitionsInsert, contextDefinitionsLookup, contextDefinitionsRemove, rolDefinitionsInsert, rolDefinitionsLookup, rolDefinitionsRemove)
 import Perspectives.Syntax (PerspectContext, PerspectRol, Revision)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (>>=), (>=>))
+import Simple.JSON (writeJSON)
 
 class (Encode a, Decode a) <=  PerspectEntiteit a where
   getRevision' :: a -> Revision
@@ -47,7 +49,7 @@ instance perspectEntiteitContext :: PerspectEntiteit PerspectContext where
   representInternally c = (liftAff empty) >>= contextDefinitionsInsert c
   retrieveInternally = contextDefinitionsLookup
   removeInternally = contextDefinitionsRemove
-  encode = encodeJSON
+  encode = writeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveContextFromDomein
   cacheInDomeinFile ns c = modifyDomeinFileInCache ns (addContextToDomeinFile c)
@@ -62,7 +64,7 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   representInternally c = (liftAff empty) >>= rolDefinitionsInsert c
   retrieveInternally = rolDefinitionsLookup
   removeInternally = rolDefinitionsRemove
-  encode = encodeJSON
+  encode = writeJSON
   decode = runExcept <<< decodeJSON
   retrieveFromDomein = retrieveRolFromDomein
   cacheInDomeinFile ns c = modifyDomeinFileInCache ns (addRolToDomeinFile c)

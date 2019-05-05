@@ -22,7 +22,8 @@ import Perspectives.Identifiers (buitenRol, expandDefaultNamespaces)
 import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile, withSemanticChecks, withoutSemanticChecks)
 import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithPropagation)
-import Perspectives.SaveUserData (removeUserData, saveUserData)
+import Perspectives.SaveUserData (removeUserData, saveUserContext, saveUserData)
+import Perspectives.Syntax (PerspectContext(..))
 import Test.Unit.Assert as Assert
 
 
@@ -88,16 +89,20 @@ addTestContext = void <<< runP <<< addTestContext'
   where
     addTestContext' :: String -> MonadPerspectives Unit
     addTestContext' s = do
-      (r :: Either MultipleErrors ContextSerialization) <- pure $ runExcept $ decodeJSON s
-      case r of
-        (Left m) -> throwError $ error $ show [NotWellFormedContextSerialization $ show m]
-        (Right cs) -> do
-          r' <- constructContext cs
-          case r' of
-            (Left messages) -> throwError (error (show messages))
-            (Right id) -> do
-              _ <- saveUserData [BuitenRol $ buitenRol id]
-              pure unit
+      cs <- string2ContextSerialization s
+      r' <- constructContext cs
+      case r' of
+        (Left messages) -> throwError (error (show messages))
+        (Right id) -> do
+          _ <- saveUserContext id
+          pure unit
+
+string2ContextSerialization :: String -> MonadPerspectives ContextSerialization
+string2ContextSerialization s = do
+  (r :: Either MultipleErrors ContextSerialization) <- pure $ runExcept $ decodeJSON s
+  case r of
+    (Left m) -> throwError $ error $ show [NotWellFormedContextSerialization $ show m]
+    (Right cs) -> pure cs
 
 removeTestContext :: AnyContext -> Aff Unit
 removeTestContext cid = void $ runP $ removeTestContext' (buitenRol (expandDefaultNamespaces cid))

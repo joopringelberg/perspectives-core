@@ -9,9 +9,8 @@ import Perspectives.ContextAndRole (context_id, rol_id)
 import Perspectives.CoreTypes (MonadPerspectives, (%%>>), (##>>), MP)
 import Perspectives.DataTypeObjectGetters (buitenRol, context, genericContext, iedereRolInContext)
 import Perspectives.DomeinFile (DomeinFile(..))
-
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Identifiers (buitenToBinnenRol)
+import Perspectives.Identifiers (binnenRol, buitenRol, buitenToBinnenRol) as ID
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit)
 import Perspectives.PerspectivesTypes (BuitenRol)
@@ -29,6 +28,13 @@ saveDomeinFileAsUserData (DomeinFile{contexts, roles}) = do
   for_ contexts (context_id >>> saveEntiteitPreservingVersion :: ID -> MP PerspectContext)
   for_ roles (rol_id >>> saveEntiteitPreservingVersion :: ID -> MP PerspectRol)
 
+saveUserContext :: ID -> MonadPerspectives Unit
+saveUserContext id = do
+  (_ :: PerspectContext) <- saveEntiteitPreservingVersion id
+  (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.buitenRol id)
+  (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.binnenRol id)
+  pure unit
+
 saveUserData :: Array BuitenRol -> MonadPerspectives Unit
 saveUserData buitenRollen = evalStateT (saveUserData' buitenRollen) []
 
@@ -45,7 +51,7 @@ saveUserData' buitenRollen = void $ for buitenRollen saveBuitenRol
         haveSeen $ unwrap rolId
         void (saveEntiteit (unwrap rolId) :: MonadSaveUserData PerspectRol)
         lift (rolId ##>> context) >>= saveContext
-        void (saveEntiteit (buitenToBinnenRol $ unwrap rolId) :: MonadSaveUserData PerspectRol)
+        void (saveEntiteit (ID.buitenToBinnenRol $ unwrap rolId) :: MonadSaveUserData PerspectRol)
       )
 
     saveContext :: ID -> MonadSaveUserData Unit
@@ -88,7 +94,7 @@ removeUserData' buitenRollen = void $ for buitenRollen removeBuitenRol
       (do
         haveSeen $ unwrap rolId
         -- remove the binnenRol.
-        void (removeEntiteit' (buitenToBinnenRol (unwrap rolId)) :: MonadSaveUserData PerspectRol)
+        void (removeEntiteit' (ID.buitenToBinnenRol (unwrap rolId)) :: MonadSaveUserData PerspectRol)
         lift (rolId ##>> context) >>= removeContext
         void (removeEntiteit' (unwrap rolId) :: MonadSaveUserData PerspectRol)
       )

@@ -152,6 +152,7 @@ dispatchOnRequest req =
       case r of
         (Left messages) -> liftEffect $ setter (map show messages)
         (Right id) -> do
+          -- TODO. Binnen- en buitenrol!
           saveUserData [PT.BuitenRol $ buitenRol id]
           liftEffect $ setter ["ok", buitenRol id] -- saveUserData
     (CreateRol cid rn rolSerialisation setter) -> do

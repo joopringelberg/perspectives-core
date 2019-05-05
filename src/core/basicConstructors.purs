@@ -1,19 +1,19 @@
 module Perspectives.BasicConstructors where
 
-import Effect.AVar (AVar)
-import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Data.Array (concat, length)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), maybe)
-import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.AVar (AVar)
+import Effect.Aff (error, throwError)
+import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Perspectives.Actions (addRol, removeRol)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
-
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
@@ -27,6 +27,13 @@ import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, voi
 -- | Construct contexts and roles from the serialisation.
 constructContexts :: ContextsSerialisation -> MonadPerspectives (Array UserMessage)
 constructContexts (ContextsSerialisation contexts) = (traverse (constructContext >=> (pure <<< (either identity (const [])))) >=> (pure <<< concat)) contexts
+
+constructContext' :: ContextSerialization -> MonadPerspectives ID
+constructContext' c = do
+      r <- constructContext c
+      case r of
+        (Left messages) -> throwError (error (show messages))
+        (Right id) -> pure id
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
 -- | Type checks the context and returns any semantic problems as UserMessages. If there are no problems, returns the ID.

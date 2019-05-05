@@ -22,6 +22,7 @@ import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
 import Test.Perspectives.Utils (runP)
+import Test.Perspectives.ResourceRetrieval (theSuite) as ResRet
 import Test.Unit.Main (runTest)
 
 main :: Effect Unit
@@ -39,6 +40,7 @@ main = runTest do
   QC.theSuite
   TBA.theSuite
   CQR.theSuite
+  ResRet.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP setupUser)

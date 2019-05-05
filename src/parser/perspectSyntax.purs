@@ -1,14 +1,17 @@
 module Perspectives.Syntax where
 
 import Perspectives.EntiteitAndRDFAliases
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object) as F
 import Perspectives.Identifiers (QualifiedName, PEIdentifier)
-import Prelude (class Show, ($))
+import Prelude (class Show, ($), class Eq, (==))
+import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
@@ -36,6 +39,13 @@ instance encodePerspectContext :: Encode PerspectContext where
 
 instance decodePerspectContext :: Decode PerspectContext where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+instance eqPerspectContext :: Eq PerspectContext where
+  eq (PerspectContext {_id : id1}) (PerspectContext {_id : id2}) = id1 == id2
+
+derive instance newtypePerspectContext :: Newtype PerspectContext _
+
+derive newtype instance writeForeignPerspectContext :: WriteForeign PerspectContext
 
 -----------------------------------------------------------
 -- PERSPECTROL
@@ -67,6 +77,9 @@ instance encodePerspectRol :: Encode PerspectRol where
 instance decodePerspectRol :: Decode PerspectRol where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
+derive instance newtypePerspectRol :: Newtype PerspectRol _
+
+derive newtype instance writeForeignPerspectRol :: WriteForeign PerspectRol
 -----------------------------------------------------------
 -- REVISION, BINDING
 -----------------------------------------------------------
@@ -101,6 +114,7 @@ instance encodeComments :: Encode Comments where
 instance decodeComments :: Decode Comments where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
+derive newtype instance writeForeignComments :: WriteForeign Comments
 -----------------------------------------------------------
 -- PROPERTYVALUEWITHCOMMENTS
 -----------------------------------------------------------
@@ -124,6 +138,7 @@ instance decodePropertyValueWithComments :: Decode PropertyValueWithComments whe
 propertyValue :: PropertyValueWithComments -> Array String
 propertyValue (PropertyValueWithComments{value}) = value
 
+derive newtype instance writeForeignPropertyValueWithComments :: WriteForeign PropertyValueWithComments
 -----------------------------------------------------------
 -- CONTEXTDECLARATION, ENCLOSINGCONTEXTDECLARATION
 -----------------------------------------------------------

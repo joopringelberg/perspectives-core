@@ -23,6 +23,7 @@
     "psci-support",
     "test-unit",
     "uri",
-    "node-fs-aff"
+    "node-fs-aff",
+    "simple-json"
   ]
 }
