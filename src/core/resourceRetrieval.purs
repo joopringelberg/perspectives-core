@@ -86,7 +86,6 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
     Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> id)
     (Just avar) -> do
       pe <- liftAff $ take avar
-      void $ throwError (error (encode pe))
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> id), content = Just $ RequestBody.string (encode pe)}
