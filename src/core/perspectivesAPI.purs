@@ -3,13 +3,13 @@ module Perspectives.Api where
 import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
 import Control.Coroutine.Aff (produce')
-import Effect.Aff (catchError, launchAff_)
-import Effect (Effect)
-import Effect.Class (liftEffect)
-import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
+import Effect (Effect)
+import Effect.Aff (catchError, launchAff_)
+import Effect.Class (liftEffect)
+import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (MultipleErrors, unsafeFromForeign)
 import Foreign.Class (encode)
 import Perspectives.Actions (addRol, setBinding, setProperty)
@@ -18,15 +18,13 @@ import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..))
 import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
 import Perspectives.Deltas (runTransactie)
-
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject, ViewName)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.PerspectivesTypes (BuitenRol(..)) as PT
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
 import Perspectives.QueryEffect (QueryEffect, (~>))
 import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.SaveUserData (saveUserData)
+import Perspectives.SaveUserData (saveUserContext)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
@@ -153,7 +151,7 @@ dispatchOnRequest req =
         (Left messages) -> liftEffect $ setter (map show messages)
         (Right id) -> do
           -- TODO. Binnen- en buitenrol!
-          saveUserData [PT.BuitenRol $ buitenRol id]
+          saveUserContext id
           liftEffect $ setter ["ok", buitenRol id] -- saveUserData
     (CreateRol cid rn rolSerialisation setter) -> do
       r <- constructAnotherRol rn cid rolSerialisation

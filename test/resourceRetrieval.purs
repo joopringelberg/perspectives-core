@@ -26,7 +26,7 @@ t1 = """{ "id": "u:myContext"
   }"""
 
 theSuite :: Free TestF Unit
-theSuite = suite "ResourceRetrieval" do
+theSuite = suiteSkip "ResourceRetrieval" do
 
   testSkip "addTestContext" do
     assertEqual "It should be possible to add a test context."

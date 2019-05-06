@@ -3,7 +3,7 @@ module Test.Perspectives.Utils where
 import Prelude
 
 import Control.Monad.Except (runExcept)
-import Data.Array (findIndex, singleton)
+import Data.Array (findIndex)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
@@ -18,12 +18,11 @@ import Foreign.Generic (decodeJSON)
 import Perspectives.ApiTypes (ContextSerialization)
 import Perspectives.BasicConstructors (constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..))
-import Perspectives.Identifiers (buitenRol, expandDefaultNamespaces)
+import Perspectives.Identifiers (expandDefaultNamespaces)
 import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile, withSemanticChecks, withoutSemanticChecks)
-import Perspectives.PerspectivesTypes (BuitenRol(..), AnyContext)
+import Perspectives.PerspectivesTypes (AnyContext)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithPropagation)
-import Perspectives.SaveUserData (removeUserData, saveUserContext, saveUserData)
-import Perspectives.Syntax (PerspectContext(..))
+import Perspectives.SaveUserData (removeUserContext, saveUserContext)
 import Test.Unit.Assert as Assert
 
 
@@ -105,11 +104,7 @@ string2ContextSerialization s = do
     (Right cs) -> pure cs
 
 removeTestContext :: AnyContext -> Aff Unit
-removeTestContext cid = void $ runP $ removeTestContext' (buitenRol (expandDefaultNamespaces cid))
-  where
-
-  removeTestContext' :: AnyContext -> MonadPerspectives Unit
-  removeTestContext' = void <<< removeUserData <<< singleton <<< BuitenRol
+removeTestContext cid = void $ runP $ removeUserContext (expandDefaultNamespaces cid)
 
 loadTestModel :: String -> Aff Unit
 loadTestModel ns = void $ runP $ loadCRLFile withoutSemanticChecks ns

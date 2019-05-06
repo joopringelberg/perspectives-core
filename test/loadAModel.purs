@@ -8,7 +8,7 @@ import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test)
 
 theSuite :: Free TestF Unit
-theSuite = suite "Loading the model:" do
+theSuite = suiteSkip "Loading the model:" do
   test "" do
     void $ runP $ loadCRLFile withSemanticChecks "testbotInstantie.crl"
     -- void $ runP $ loadCRLFile withSemanticChecks "query.crl"

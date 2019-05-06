@@ -24,7 +24,7 @@ t1 = """{ "id": "u:myContext"
   }"""
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "DataTypeObjectGetters" do
+theSuite = suite "DataTypeObjectGetters" do
   test "Setting up" (addTestContext t1)
   test "contextType" do
     assertEqual "Context 'u:myContext' should have contextDef psp:Context as contextType."
