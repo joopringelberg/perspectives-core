@@ -2,11 +2,13 @@ module Perspectives.DomeinFile where
 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
+import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert)
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..), Revision)
-import Prelude (($))
+import Prelude (($), (>>>))
+import Simple.JSON (class WriteForeign, writeJSON)
 
 newtype DomeinFile = DomeinFile
   { _rev :: Revision
@@ -18,10 +20,13 @@ newtype DomeinFile = DomeinFile
 derive instance genericDomeinFile :: Generic DomeinFile _
 
 instance encodeDomeinFile :: Encode DomeinFile where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+  -- encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+  encode = writeJSON >>> unsafeToForeign
 
 instance decodeDomeinFile :: Decode DomeinFile where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+derive newtype instance writeForeignDomeinFile :: WriteForeign DomeinFile
 
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, roles: empty}

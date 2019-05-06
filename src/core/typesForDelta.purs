@@ -4,15 +4,16 @@ module Perspectives.TypesForDeltas where
 -- DELTA
 -----------------------------------------------------------
 import Data.Eq (class Eq)
-import Foreign (Foreign)
-import Foreign.Class (class Encode)
-import Foreign.Generic (defaultOptions, genericEncode)
-import Foreign.Generic.Class (class GenericEncode)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
+import Foreign (Foreign, unsafeToForeign)
+import Foreign.Class (class Encode)
+import Foreign.Generic (defaultOptions, genericEncode)
+import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Prelude (class Show, ($))
+import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
 -- DELTA
@@ -35,6 +36,8 @@ instance encodeDelta :: Encode Delta where
 
 derive instance eqDelta :: Eq Delta
 
+derive newtype instance writeForeignDelta :: WriteForeign Delta
+
 -----------------------------------------------------------
 -- DELTATYPE
 -----------------------------------------------------------
@@ -48,6 +51,11 @@ instance showDeltaType :: Show DeltaType where
 
 instance encodeDeltaType :: Encode DeltaType where
   encode = encodeDefault
+
+instance writeForeignDeltaType :: WriteForeign DeltaType where
+  writeImpl Add = unsafeToForeign "Add"
+  writeImpl Remove = unsafeToForeign "Remove"
+  writeImpl Change = unsafeToForeign "Change"
 
 encodeDefault :: forall t a. Generic a t => GenericEncode t => a -> Foreign
 encodeDefault = genericEncode $ defaultOptions {unwrapSingleConstructors = true}

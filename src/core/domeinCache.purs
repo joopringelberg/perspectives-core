@@ -18,8 +18,7 @@ import Effect.Aff.AVar (AVar, empty, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error, Error)
 import Foreign (MultipleErrors)
-import Foreign.Class (class Decode)
-import Foreign.Generic (decodeJSON, encodeJSON)
+import Foreign.Class (class Decode, encode)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -31,6 +30,7 @@ import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
 import Perspectives.Syntax (PerspectContext, PerspectRol, revision)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=))
+import Simple.JSON (writeJSON)
 
 type URL = String
 
@@ -84,7 +84,7 @@ retrieveDomeinFile ns = do
         (liftAff $ AX.request $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns})
         \e -> throwError $ error $ "Failure in retrieveDomeinFile for: " <> ns <> ". " <> show e
       onAccepted res.status [200, 304] "retrieveDomeinFile"
-        (onCorrectCallAndResponse res.body (\(a :: DomeinFile) -> liftAff $ put a ev))
+        (onCorrectCallAndResponse "retrieveDomeinFile" res.body (\(a :: DomeinFile) -> liftAff $ put a ev))
     (Just avar) -> liftAff $ read avar
 
 -- | A name not preceded or followed by a forward slash.
@@ -94,7 +94,7 @@ documentsInDatabase :: DatabaseName -> Aff GetCouchdbAllDocs
 documentsInDatabase database = do
   res <- AX.request $ domeinRequest {url = baseURL <> escapeCouchdbDocumentName database <> "/_all_docs"}
   onAccepted res.status [200] "documentsInDatabase"
-    (onCorrectCallAndResponse res.body \(a :: GetCouchdbAllDocs) -> pure unit)
+    (onCorrectCallAndResponse "documentsInDatabase" res.body \(a :: GetCouchdbAllDocs) -> pure unit)
 
 documentNamesInDatabase :: DatabaseName -> Aff (Array String)
 documentNamesInDatabase database = do
@@ -122,7 +122,8 @@ storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
 createDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
 createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
   ev <- (liftAff empty) >>= domeinCacheInsert _id
-  res <- liftAff $ AX.put ResponseFormat.string (modelsURL <> escapeCouchdbDocumentName _id) (RequestBody.string (encodeJSON df))
+  res <- liftAff $ AX.put ResponseFormat.string (modelsURL <> escapeCouchdbDocumentName _id) (RequestBody.string (writeJSON df))
+
   if res.status == (StatusCode 409)
     then do
       rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
@@ -130,7 +131,7 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
       updatedDomeinFile <- liftAff $ read ev
       modifyDomeinFileInCouchdb updatedDomeinFile ev
     else onAccepted res.status [200, 201] "createDomeinFileInCouchdb"
-      (void $ onCorrectCallAndResponse res.body \(a :: PutCouchdbDocument) -> setRevision (unsafePartial $ fromJust $ (unwrap a).rev) ev)
+      (void $ onCorrectCallAndResponse "createDomeinFileInCouchdb" res.body \(a :: PutCouchdbDocument) -> setRevision (unsafePartial $ fromJust $ (unwrap a).rev) ev)
   where
     setRevision :: String -> (AVar DomeinFile) -> MonadPerspectives Unit
     setRevision s av = liftAff $ put (DomeinFile (dfr {_rev = (revision s)})) av
@@ -143,7 +144,7 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   res <- liftAff $ AX.put
     ResponseFormat.string
     (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision)
-    (RequestBody.string (encodeJSON (DomeinFile dfr {_rev = _rev})))
+    (RequestBody.string (writeJSON (DomeinFile dfr {_rev = _rev})))
   if res.status == (StatusCode 409)
     then do
       rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
@@ -151,7 +152,7 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
       updatedDomeinFile <- liftAff $ read av
       modifyDomeinFileInCouchdb updatedDomeinFile av
     else onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb"
-      (void (onCorrectCallAndResponse res.body \(a :: PutCouchdbDocument)-> setRevision (unsafePartial $ fromJust $ (unwrap a).rev)))
+      (void (onCorrectCallAndResponse "modifyDomeinFileInCouchdb" res.body \(a :: PutCouchdbDocument)-> setRevision (unsafePartial $ fromJust $ (unwrap a).rev)))
   where
     setRevision :: String -> MonadPerspectives Unit
     setRevision s = liftAff $ put (DomeinFile (dfr {_rev = (revision s)})) av

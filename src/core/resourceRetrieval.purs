@@ -58,7 +58,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
     (rq :: (Request String)) <- defaultPerspectRequest
     res <- liftAff $ request $ rq {url = ebase <> id}
     void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
-      (onCorrectCallAndResponse res.body \(a :: a) -> put a v)
+      (onCorrectCallAndResponse "fetchEntiteit" res.body \(a :: a) -> put a v)
     liftAff $ read v
   \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> id <> " from couchdb. " <> show e)
 
@@ -86,6 +86,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
     Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> id)
     (Just avar) -> do
       pe <- liftAff $ take avar
+      void $ throwError (error (encode pe))
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> id), content = Just $ RequestBody.string (encode pe)}
@@ -93,7 +94,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
         then retrieveDocumentVersion (ebase <> id) >>= pure <<< (flip setRevision pe) >>= saveVersionedEntiteit id
         else do
           void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-            (onCorrectCallAndResponse res.body (\(a :: PutCouchdbDocument) -> void $ liftAff $ put (setRevision (unsafePartial $ fromJust (unwrap a).rev) pe) avar))
+            (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ liftAff $ put (setRevision (unsafePartial $ fromJust (unwrap a).rev) pe) avar))
           pure pe
 
 saveVersionedEntiteit :: forall a. PerspectEntiteit a => ID -> a -> MonadPerspectives a
@@ -108,7 +109,7 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
         then retrieveDocumentVersion entId >>= pure <<< (flip setRevision entiteit) >>= saveVersionedEntiteit entId
         else do
           void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
-            (onCorrectCallAndResponse res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust (unwrap a).rev) entiteit)))
+            (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust (unwrap a).rev) entiteit)))
           pure entiteit
 
 

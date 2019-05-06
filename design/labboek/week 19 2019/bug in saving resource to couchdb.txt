@@ -1,0 +1,43 @@
+BUG IN saveUnversionedEntiteit OF constructContext
+
+VERMOEDEN: de json bevat een property _rev met waarde null. Dit wordt door Couchdb geweigerd.
+
+"{\"rolInContext\":{\"model:Perspectives$Context$rolInContext\":[\"model:User$myContext$rolInContext_0\"]},\"pspType\":\"model:Perspectives$Context\",\"displayName\":\"myContext\",\"comments\":{\"commentBefore\":[],\"commentAfter\":[]},\"buitenRol\":\"model:User$myContext_buitenRol\",\"binnenRol\":\"model:User$myContext_binnenRol\",\"_rev\":null,\"_id\":\"model:User$myContext\"}"
+
+Gebruik Curl om een json waarde met en zonder _rev:null op te sturen.
+
+curl -X PUT http://cor:geheim@127.0.0.1:5984/user_cor_entities/model%3AUser%24myContext -H "Content-Type: application/json" -d '{"test":true}'
+>>> {"ok":true,"id":"model:User$myContext","rev":"105-c6700b5a8c4f465194e152dfeed24a34"}
+
+curl -X PUT http://cor:geheim@127.0.0.1:5984/user_cor_entities/model%3AUser%24myContext -H "Content-Type: application/json" --verbose -d '{"test":true, "_rev":null}'
+
+>>> {"error":"bad_request","reason":"Invalid rev format"}
+
+< HTTP/1.1 400 Bad Request
+< X-CouchDB-Body-Time: 0
+< X-Couch-Request-ID: 8b2a1d37ae
+< Server: CouchDB/2.1.1 (Erlang OTP/19)
+< Date: Sun, 05 May 2019 18:06:41 GMT
+< Content-Type: application/json
+< Content-Length: 54
+< Cache-Control: must-revalidate
+< 
+{"error":"bad_request","reason":"Invalid rev format"}
+
+AANPAK
+1. Vermijd om de _rev parameter mee te sturen. De encoding gebeurt met encodeJSON.
+
+PROBLEEM IN OPSLAAN VAN EEN DOMEINFILE
+
+curl -X PUT http://cor:geheim@127.0.0.1:5984/perspect_models/model%3AMinimalModel -H "Content-Type: application/json" --verbose -d '{"test":true}'
+
+HET ZIT 'M IN DE ENCODING
+(zie het vorbeeld hieronder)
+In de encoding van de domeinfile zijn alle double quotes voorzien van een backslash. Waarom?
+
+
+Dit is de encoding van een Context: 
+{"rolInContext":{},"pspType":"model:TestBotActie$Test","displayName":"test1","comments":{"commentBefore":[],"commentAfter":[]},"buitenRol":"model:User$test1_buitenRol","binnenRol":"model:User$test1_binnenRol","_id":"model:User$test1"}
+
+En dit die van een domeinfile:
+{"roles":{"model:MinimalModel$myContextDef$rol1$mogelijkeBinding_1":{"pspType":"model:Perspectives$Rol$mogelijkeBinding","properties":{},"occurrence":1,"gevuldeRollen":{},"context":"model:MinimalModel$myContextDef$rol1","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:Perspectives$Rol_buitenRol","_id":"model:MinimalModel$myContextDef$rol1$mogelijkeBinding_1"},"model:MinimalModel$myContextDef$rol1_binnenRol":{"pspType":"model:Perspectives$Rol$binnenRolBeschrijving","properties":{},"occurrence":0,"gevuldeRollen":{},"context":"model:MinimalModel$myContextDef$rol1","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:MinimalModel$myContextDef$rol1_buitenRol","_id":"model:MinimalModel$myContextDef$rol1_binnenRol"},"model:MinimalModel$myContextDef$rol1_buitenRol":{"pspType":"model:Perspectives$Rol$buitenRolBeschrijving","properties":{"model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel":{"value":["true"],"commentBefore":[],"commentAfter":[]}},"occurrence":0,"gevuldeRollen":{"model:Perspectives$Rol$binnenRolBeschrijving":["model:MinimalModel$myContextDef$rol1_binnenRol"],"model:Perspectives$Context$rolInContext":["model:MinimalModel$myContextDef$rolInContext_1"]},"context":"model:MinimalModel$myContextDef$rol1","comments":{"commentBefore":[],"commentAfter":[]},"_id":"model:MinimalModel$myContextDef$rol1_buitenRol"},"model:MinimalModel$myContextDef$rolInContext_1":{"pspType":"model:Perspectives$Context$rolInContext","properties":{},"occurrence":1,"gevuldeRollen":{},"context":"model:MinimalModel$myContextDef","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:MinimalModel$myContextDef$rol1_buitenRol","_id":"model:MinimalModel$myContextDef$rolInContext_1"},"model:MinimalModel$myContextDef_binnenRol":{"pspType":"model:Perspectives$Context$binnenRolBeschrijving","properties":{},"occurrence":0,"gevuldeRollen":{},"context":"model:MinimalModel$myContextDef","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:MinimalModel$myContextDef_buitenRol","_id":"model:MinimalModel$myContextDef_binnenRol"},"model:MinimalModel$myContextDef_buitenRol":{"pspType":"model:Perspectives$ContextPrototype$buitenRolBeschrijving","properties":{},"occurrence":0,"gevuldeRollen":{"model:Perspectives$Context$binnenRolBeschrijving":["model:MinimalModel$myContextDef_binnenRol"],"model:Perspectives$Context$rolInContext":["model:MinimalModel$rolInContext1"]},"context":"model:MinimalModel$myContextDef","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:Perspectives$ContextPrototype_buitenRol","_id":"model:MinimalModel$myContextDef_buitenRol"},"model:MinimalModel$rolInContext1":{"pspType":"model:Perspectives$Context$rolInContext","properties":{},"occurrence":1,"gevuldeRollen":{},"context":"model:MinimalModel","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:MinimalModel$myContextDef_buitenRol","_id":"model:MinimalModel$rolInContext1"},"model:MinimalModel$_binnenRol":{"pspType":"model:Perspectives$Context$binnenRolBeschrijving","properties":{},"occurrence":0,"gevuldeRollen":{},"context":"model:MinimalModel","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:MinimalModel$_buitenRol","_id":"model:MinimalModel$_binnenRol"},"model:MinimalModel$_buitenRol":{"pspType":"model:Perspectives$ContextPrototype$buitenRolBeschrijving","properties":{},"occurrence":0,"gevuldeRollen":{"model:Perspectives$Context$binnenRolBeschrijving":["model:MinimalModel$_binnenRol"]},"context":"model:MinimalModel","comments":{"commentBefore":[],"commentAfter":[]},"binding":"model:Perspectives$ContextPrototype_buitenRol","_id":"model:MinimalModel$_buitenRol"}},"contexts":{"model:MinimalModel$myContextDef$rol1":{"rolInContext":{"model:Perspectives$Rol$mogelijkeBinding":["model:MinimalModel$myContextDef$rol1$mogelijkeBinding_1"]},"pspType":"model:Perspectives$Rol","displayName":"rol1","comments":{"commentBefore":[],"commentAfter":[]},"buitenRol":"model:MinimalModel$myContextDef$rol1_buitenRol","binnenRol":"model:MinimalModel$myContextDef$rol1_binnenRol","_id":"model:MinimalModel$myContextDef$rol1"},"model:MinimalModel$myContextDef":{"rolInContext":{"model:Perspectives$Context$rolInContext":["model:MinimalModel$myContextDef$rolInContext_1"]},"pspType":"model:Perspectives$Context","displayName":"myContextDef","comments":{"commentBefore":[],"commentAfter":[]},"buitenRol":"model:MinimalModel$myContextDef_buitenRol","binnenRol":"model:MinimalModel$myContextDef_binnenRol","_id":"model:MinimalModel$myContextDef"},"model:MinimalModel":{"rolInContext":{"model:Perspectives$Context$rolInContext":["model:MinimalModel$rolInContext1"]},"pspType":"model:Perspectives$Context","displayName":"model:MinimalModel","comments":{"commentBefore":[],"commentAfter":[]},"buitenRol":"model:MinimalModel$_buitenRol","binnenRol":"model:MinimalModel$_binnenRol","_id":"model:MinimalModel"}},"_id":"model:MinimalModel"}

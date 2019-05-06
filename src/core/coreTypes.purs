@@ -28,6 +28,7 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Perspectives.TypesForDeltas (Delta, encodeDefault)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
+import Simple.JSON (class WriteForeign)
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -401,6 +402,8 @@ instance showTransactie :: Show Transactie where
 instance encodeTransactie :: Encode Transactie where
   encode = encodeDefault
 
+derive newtype instance writeForeignTransactie :: WriteForeign Transactie
+
 createTransactie :: String -> Aff Transactie
 createTransactie author =
   do
@@ -421,3 +424,6 @@ instance encodeSerializableDateTime :: Encode SerializableDateTime where
 
 instance showSerializableDateTime :: Show SerializableDateTime where
   show (SerializableDateTime d) = "todo"
+
+instance writeForeignSerializableDateTime :: WriteForeign SerializableDateTime where
+  writeImpl (SerializableDateTime dt) = unsafeToForeign $ show dt

@@ -14,7 +14,6 @@ import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff (error, throwError)
 import Effect.Aff.Class (liftAff)
-import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), createTransactie, transactieID, (%%>>), type (**>))
@@ -36,6 +35,7 @@ import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
+import Simple.JSON (writeJSON)
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
 runTransactie :: MonadPerspectives Unit
@@ -172,7 +172,7 @@ sendTransactieToUser userId t = do
   tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
   (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
   -- TODO controleer of hier authentication nodig is!
-  res  <- liftAff $ AJ.put ResponseFormat.string (userIP <> "/" <> userId <> "_post/" <> transactieID t) (RequestBody.string (encodeJSON t))
+  res  <- liftAff $ AJ.put ResponseFormat.string (userIP <> "/" <> userId <> "_post/" <> transactieID t) (RequestBody.string (writeJSON t))
   (StatusCode n) <- pure res.status
   case n == 200 || n == 201 of
     true -> pure unit

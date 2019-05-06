@@ -3,13 +3,12 @@ module Perspectives.PerspectEntiteit where
 import Control.Monad.Except (throwError, runExcept)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
 import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign (MultipleErrors)
 import Foreign.Class (class Encode, class Decode)
-import Foreign.Generic (decodeJSON, encodeJSON)
+import Foreign.Generic (decodeJSON)
 import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', changeContext_type, changeRol_rev, changeRol_rev', changeRol_type, context_id, context_pspType, context_rev', rol_id, rol_pspType, rol_rev')
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveContextFromDomein, retrieveRolFromDomein)
@@ -32,9 +31,7 @@ class (Encode a, Decode a) <=  PerspectEntiteit a where
   representInternally :: ID -> MonadPerspectives (AVar a)
   retrieveInternally :: ID -> MonadPerspectives (Maybe (AVar a))
   removeInternally :: ID -> MonadPerspectives (Maybe (AVar a))
-  -- | A default implementation for encode is encodeJSON.
   encode :: a -> String
-  -- | A default implementation for decode is decodeJSON.
   decode :: String -> Either MultipleErrors a
   retrieveFromDomein :: ID -> Namespace -> MonadPerspectives a
   cacheInDomeinFile :: ID -> a -> MonadPerspectives Unit
