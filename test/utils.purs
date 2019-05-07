@@ -37,7 +37,7 @@ runPWithPropagation :: forall a.
   Aff a
 runPWithPropagation t n = do
   (Tuple s a) <- runPerspectivesWithPropagation "cor" "geheim" t n
-  log $ show $ _.recomputed s
+  log ("Recomputed triples: " <> (show $ _.recomputed s))
   pure a
 
 p :: String -> String

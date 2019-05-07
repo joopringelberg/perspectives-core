@@ -23,6 +23,8 @@ import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
 import Test.Perspectives.Utils (runP)
 import Test.Perspectives.ResourceRetrieval (theSuite) as ResRet
+import Test.Dependencies (theSuite) as DEPS
+import Test.TheoryChange as THC
 import Test.Unit.Main (runTest)
 
 main :: Effect Unit
@@ -41,6 +43,8 @@ main = runTest do
   TBA.theSuite
   CQR.theSuite
   ResRet.theSuite
+  DEPS.theSuite
+  THC.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP setupUser)
