@@ -16,7 +16,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_rolInContext)
+import Perspectives.ContextAndRole (context_iedereRolInContext)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), MP, ObjectsGetter)
 import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, rolBindingDef)
@@ -297,7 +297,7 @@ closureOfPrototype = closure getPrototype
 -- | E.g. getRol "model:Perspectives$View$rolProperty" will return all rol instances that bind a PropertyDef on an instance of psp:View.
 -- Test.Perspectives.ObjectGetterConstructors via getRolinContext
 getContextRol :: RolDef -> (AnyContext ~~> ContextRol)
-getContextRol rn = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] identity (lookup (unwrap rn) (context_rolInContext context))
+getContextRol rn = typeWithPerspectivesTypes $ getContextMember \context -> maybe [] identity (lookup (unwrap rn) (context_iedereRolInContext context))
 
 -- | As getContextRol, but for RolinContext (same function, differently typed).
 -- Test.Perspectives.ObjectGetterConstructors
@@ -313,9 +313,9 @@ getUnqualifiedContextRol ln' = typeWithPerspectivesTypes (getContextMember $ get
   where
   getUnQualifiedRolFromPerspectContext :: Id.LocalName -> PerspectContext -> Array String
   getUnQualifiedRolFromPerspectContext ln ctxt =
-    case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ context_rolInContext ctxt) of
+    case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ context_iedereRolInContext ctxt) of
       Nothing -> []
-      (Just i) -> maybe [] identity (lookup (unsafePartial $ fromJust (Arr.index (keys $ context_rolInContext ctxt) i)) (context_rolInContext ctxt))
+      (Just i) -> maybe [] identity (lookup (unsafePartial $ fromJust (Arr.index (keys $ context_iedereRolInContext ctxt) i)) (context_iedereRolInContext ctxt))
 
 -- | As getUnqualifiedContextRol, but for RolinContext (same function, differently typed).
 -- Test.Perspectives.ObjectGetterConstructors

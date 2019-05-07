@@ -8,7 +8,7 @@ import Foreign.Object (keys, values)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Perspectives.ContextAndRole (context_buitenRol, context_displayName, context_pspType, context_rolInContext, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_buitenRol, context_displayName, context_pspType, context_iedereRolInContext, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, type (~~>))
 import Perspectives.Identifiers (binnenRol) as PI
@@ -52,11 +52,11 @@ binnenRol = pure <<< singleton <<< BinnenRol <<< PI.binnenRol
 
 -- | We cannot type the result, as it can be either a RolInContext, or a ContextRol. Neither can we type the argument.
 iedereRolInContext :: ObjectsGetter
-iedereRolInContext = getContextMember \context -> nub $ join $ values (context_rolInContext context)
+iedereRolInContext = getContextMember \context -> nub $ join $ values (context_iedereRolInContext context)
 
 -- | The names of every rol given to this context.
 typeVanIedereRolInContext :: ObjectsGetter
-typeVanIedereRolInContext = getContextMember \context -> keys (context_rolInContext context)
+typeVanIedereRolInContext = getContextMember \context -> keys (context_iedereRolInContext context)
 
 -- | The types of every property for which this rol has a value.
 propertyTypen :: ObjectsGetter

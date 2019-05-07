@@ -9,15 +9,14 @@ import Data.Array (elemIndex, replicate, sortBy)
 import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (Object, foldM, values) as F
 import Data.String.CodeUnits (fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (snd)
+import Foreign.Object (Object, foldM, values) as F
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_pspType, context_rolInContext, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_iedereRolInContext, context_pspType, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
-
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
 import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..))
@@ -145,7 +144,7 @@ context definedResources c = do
   publicProperties
   privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
-  (bindings :: Array PerspectRol) <- traverse (lift <<< lift <<< getPerspectEntiteit) (join (F.values (context_rolInContext c)))
+  (bindings :: Array PerspectRol) <- traverse (lift <<< lift <<< getPerspectEntiteit) (join (F.values (context_iedereRolInContext c)))
   traverse_ (indent roleBinding) (sortBy compareOccurrences bindings)
   where
 

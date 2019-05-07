@@ -1,15 +1,15 @@
 module Perspectives.ContextAndRole where
 
 import Data.Array (cons, delete, elemIndex)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Ord (Ordering, compare)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, insert, lookup, pop)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
-import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord)
-import Prelude (($))
+import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, propertyValue)
+import Prelude (identity, ($))
 
 -- CONTEXT
 
@@ -52,8 +52,11 @@ context_binnenRol (PerspectContext{binnenRol})= binnenRol
 context_buitenRol :: PerspectContext -> RolID
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
-context_rolInContext :: PerspectContext -> Object (Array RolID)
-context_rolInContext (PerspectContext{rolInContext})= rolInContext
+context_iedereRolInContext :: PerspectContext -> Object (Array RolID)
+context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
+
+context_rolInContext :: PerspectContext -> RolName -> Array Value
+context_rolInContext (PerspectContext{rolInContext}) rn = maybe [] identity (lookup rn rolInContext)
 
 addContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
 addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
@@ -155,6 +158,9 @@ changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 rol_properties :: PerspectRol -> Object PropertyValueWithComments
 rol_properties (PerspectRol{properties}) = properties
 
+rol_property :: PerspectRol -> PropertyName -> Array Value
+rol_property (PerspectRol{properties}) pn = maybe [] propertyValue (lookup pn properties)
+
 addRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
 addRol_property rl@(PerspectRol rp@{properties}) propertyName value =
   case lookup propertyName properties of
@@ -197,6 +203,9 @@ setRol_property rl@(PerspectRol rp@{properties}) propertyName value =
 
 rol_gevuldeRollen :: PerspectRol -> Object (Array RolID)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
+
+rol_gevuldeRol :: PerspectRol -> RolName -> Array RolID
+rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup rn gevuldeRollen)
 
 addRol_gevuldeRollen :: PerspectRol -> RolName -> RolID -> PerspectRol
 addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =

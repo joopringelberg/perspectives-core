@@ -155,7 +155,6 @@ searchExternalUnqualifiedProperty :: Id.LocalName -> StringTypedTripleGetter
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext (typeWithPerspectivesTypes DTG.buitenRol) ln
 
 getInternalProperty :: String -> StringTypedTripleGetter
--- getInternalProperty pn = typeWithPerspectivesTypes DTG.binnenRol >-> genericGetProperty pn `trackedAs` pn
 getInternalProperty = typeWithPerspectivesTypes TGC.getInternalProperty
 
 searchInternalUnqualifiedProperty :: Id.LocalName -> StringTypedTripleGetter
