@@ -281,7 +281,7 @@ instance eqTripleRef :: Eq TripleRef where
   eq (TripleRef({subject: s1, predicate: p1})) (TripleRef({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
 instance showTripleRef :: Show TripleRef where
-  show (TripleRef {subject, predicate}) = "{" <> show subject <> ", " <> show predicate <> "}"
+  show (TripleRef {subject, predicate}) = "<" <> subject <> " - " <> predicate <> ">"
 
 -----------------------------------------------------------
 -- TYPE CHECKING
