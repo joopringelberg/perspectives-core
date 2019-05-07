@@ -32,7 +32,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "TheoryChange" do
+theSuite = suiteSkip "TheoryChange" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
 

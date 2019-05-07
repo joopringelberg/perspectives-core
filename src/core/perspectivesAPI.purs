@@ -176,7 +176,7 @@ type QueryUnsubscriber e = Effect Unit
 -- | Runs a the query and adds the ReactStateSetter to the result.
 subscribeToObjects :: Subject -> StringTypedTripleGetter -> ReactStateSetter -> CorrelationIdentifier -> MonadPerspectives Unit
 subscribeToObjects subject query setter setterId = do
-  (effectInReact :: QueryEffect) <- pure $ NamedFunction setterId setter
+  (effectInReact :: QueryEffect) <- pure $ NamedFunction setterId (liftEffect <<< setter)
   void $ (subject ## query ~> effectInReact)
 
 unsubscribeFromObjects :: Subject -> Predicate -> CorrelationIdentifier -> MonadPerspectives Unit

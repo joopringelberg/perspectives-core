@@ -1,14 +1,13 @@
 module Perspectives.QueryEffect where
 
-import Effect (Effect)
+import Control.Monad.Trans.Class (lift)
 import Effect.Class (liftEffect)
-import Perspectives.CoreTypes (NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectivesQuery, type (**>))
-
+import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, const, pure, ($), (<>))
 
-type QueryEffect = NamedFunction (Array String -> Effect Unit)
+type QueryEffect = NamedFunction (Array String -> MonadPerspectives Unit)
 
 -- | Make an effect function (QueryEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.
@@ -34,7 +33,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     --  - copy its supports to the triple administration (in the old effect triple)
     effectFun :: Triple s o -> MonadPerspectivesQuery (Triple s o)
     effectFun queryResult@(Triple{subject, object}) = do
-      _ <- liftEffect $ effect (typeWithPerspectivesTypes object)
+      _ <- lift $ effect (typeWithPerspectivesTypes object)
       pure $ Triple { subject: subject
                     , predicate : name
                     , object : object

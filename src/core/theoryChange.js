@@ -7,7 +7,7 @@ exports.saveChangedObject = function(triple)
     return function()
     {
       triple.object = obj;
-      console.log( "Triple " + triple.subject + "-" + triple.predicate + " has now object: " +  triple.object);
+      // console.log( "Triple " + triple.subject + "-" + triple.predicate + " has now object: " +  triple.object);
       return triple;
     };
   };

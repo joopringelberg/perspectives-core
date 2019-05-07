@@ -1,18 +1,16 @@
 module Perspectives.QueryCombinators where
 
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter, union) as Arr
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Effect.Class (liftEffect)
-import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, type (**>))
 import Perspectives.PerspectivesTypes (PBool(..), typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
-import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, trackedAs, tripleGetterFromTripleGetter)
+import Perspectives.TripleGetterFromObjectGetter (trackedAs, tripleGetterFromTripleGetter)
 import Prelude (class Eq, class Show, bind, const, discard, eq, flip, identity, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=))
 import Type.Data.Boolean (kind Boolean)
 import Unsafe.Coerce (unsafeCoerce)
@@ -269,57 +267,52 @@ contains :: forall s o.
   TypedTripleGetter s o ->
   TypedTripleGetter s PBool
 -- Test.Perspectives.TripleGetterConstructors
-contains id' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains_" <> typeWithPerspectivesTypes id') f where
-  f :: (s -> MonadPerspectivesQuery (Array PBool))
-  f id = do
-    (Triple{object}) <- p id
-    case Arr.elemIndex id' object of
-      Nothing -> pure [PBool "false"]
-      otherwise -> pure [PBool "true"]
+contains id' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("model:Perspectives$contains(" <> typeWithPerspectivesTypes id' <> ")") f where
+  f :: Array o -> s -> Array PBool
+  f os _ = do
+    case Arr.elemIndex id' os of
+      Nothing -> [PBool "false"]
+      otherwise -> [PBool "true"]
 
 containsMatching :: forall s o. Show s => (s -> o -> Boolean) -> String -> TypedTripleGetter s o -> TypedTripleGetter s PBool
-containsMatching criterium criteriumName (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$contains" <> criteriumName) f where
-  f :: (s -> MonadPerspectivesQuery (Array PBool))
-  f subject = do
-    (Triple{object}) <- p subject
-    pure $ maybe [PBool "true"] (const [PBool "false"]) (Arr.findIndex (criterium subject) object)
+containsMatching criterium criteriumName tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("contains(" <> criteriumName <> ")") f where
+  f :: Array o -> s -> Array PBool
+  f os subject = maybe [PBool "true"] (const [PBool "false"]) (Arr.findIndex (criterium subject) os)
 
 -- | Apply to a query and retrieve a boolean query that returns true iff its subject occurs in its result.
 -- | `psp:Function -> psp:Constraint`
 containedIn :: forall o. Eq o => Show o => (o **> o) -> (o **> PBool)
-containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$containedIn_" <> nameOfp) f where
-  f :: (o -> MonadPerspectivesQuery (Array PBool))
-  f id = do
-    (Triple{object}) <- p id
-    case Arr.elemIndex id object of
-      Nothing -> pure [PBool "false"]
-      otherwise -> pure [PBool "true"]
+containedIn tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("containedIn(" <> nameOfp <> ")") f where
+  f :: Array o -> o -> Array PBool
+  f os id = do
+    case Arr.elemIndex id os of
+      Nothing -> [PBool "false"]
+      otherwise -> [PBool "true"]
 
 -- | The logical negation of a Constraint.
 -- | `psp:Constraint -> psp:Constraint`
 not :: forall s. (s **> PBool) -> (s **> PBool)
 not tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("not(" <> nameOfp <> ")") f where
-  f :: Array PBool -> Array PBool
-  f object = case Arr.head object of
+  f :: Array PBool -> s -> Array PBool
+  f object _ = case Arr.head object of
       (Just (PBool "true")) -> [PBool "false"]
       otherwise -> [PBool "true"] -- NOTE: type checking guarantees we only have two values.
 
 not' :: forall s.  Show s => (s **> String) -> (s **> String)
-not' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
-  f :: (s -> MonadPerspectivesQuery (Array String))
-  f id = do
-    (Triple{object}) <- p id
-    case Arr.head object of
-      (Just "true") -> pure ["false"]
-      otherwise -> pure ["true"] -- NOTE: type checking guarantees we only have two values.
+not' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("not(" <> nameOfp <> ")") f where
+  f :: Array String -> s -> Array String
+  f object _ = case Arr.head object of
+      (Just "true") -> ["false"]
+      otherwise -> ["true"] -- NOTE: type checking guarantees we only have two values.
 
 -- | Turn a query of many arguments into a query of a single element.
 -- | The selected element depends on the ordering returned by the query.
 -- | `psp:Function -> psp:SingularFunction`
 lastElement :: forall s o.  Show s => (s **> o) -> (s **> o)
-lastElement (TypedTripleGetter nameOfp (p :: TripleGetter s o)) = constructTripleGetterFromEffectExpression
-  ("(lastElement_" <> nameOfp <> ")")
-  (p >=> pure <<< (maybe [] Arr.singleton) <<< Arr.last <<< tripleObjects)
+lastElement tg@(TypedTripleGetter nameOfp (p :: TripleGetter s o)) = tripleGetterFromTripleGetter tg
+  ("lastElement(" <> nameOfp <> ")") f where
+    f :: Array o -> s -> Array o
+    f os _ = maybe [] Arr.singleton (Arr.last os)
 
 -- | Ignore the cache of query results for the given named function, i.e. always compute.
 -- | The resulting query returns exactly the same result as the argument query.

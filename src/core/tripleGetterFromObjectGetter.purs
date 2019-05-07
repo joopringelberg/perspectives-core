@@ -12,7 +12,7 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.ObjectGetterConstructors (getRoleBinders, searchExternalProperty, searchInternalUnqualifiedProperty, searchProperty)
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, PropertyDef, RolDef, Value, getProperty, typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex, detectCycles, lookupInTripleIndex, memorize, memorizeQueryResults)
-import Prelude (class Show, bind, flip, pure, show, ($), (<<<), (<>), discard)
+import Prelude (class Show, bind, flip, pure, show, ($), (<>), discard)
 
 trackedAs :: forall s o. Show s =>
   (s ~~> o) ->
@@ -24,13 +24,7 @@ constructTripleGetter :: forall s o. Show s =>
   Predicate ->
   (s ~~> o) ->
   TypedTripleGetter s o
-constructTripleGetter pn objectsGetter = constructTripleGetterFromEffectExpression pn (lift <<< objectsGetter)
-
-constructTripleGetterFromEffectExpression :: forall s o. Show s =>
-  Predicate ->
-  (s -> MonadPerspectivesQuery (Array o)) ->
-  TypedTripleGetter s o
-constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter pn tripleGetter where
+constructTripleGetter pn objectsGetter = TypedTripleGetter pn tripleGetter where
   tripleGetter :: TripleGetter s o
   tripleGetter id = do
     b <- memorizeQueryResults
@@ -39,7 +33,7 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
         mt <- liftEffect (lookupInTripleIndex (typeWithPerspectivesTypes id) pn)
         case mt of
           Nothing -> do
-            (object :: Array o) <- objectsGetter id
+            (object :: Array o) <- lift $ objectsGetter id
             t <- liftEffect (addToTripleIndex
               (typeWithPerspectivesTypes id)
               pn
@@ -51,7 +45,7 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
             pure $ ((typeWithPerspectivesTypes t) :: Triple s o)
           (Just t) -> pure ((typeWithPerspectivesTypes t) :: Triple s o)
       else do
-        (object :: Array o) <- objectsGetter id
+        (object :: Array o) <- lift $ objectsGetter id
         pure (Triple{ subject: id
                   , predicate: pn
                   , object: object
@@ -60,7 +54,7 @@ constructTripleGetterFromEffectExpression pn objectsGetter = TypedTripleGetter p
                   , tripleGetter: tripleGetter
                   })
 
-tripleGetterFromTripleGetter :: forall s o t. (s **> o) -> String -> (Array o -> Array t) -> (s **> t)
+tripleGetterFromTripleGetter :: forall s o t. (s **> o) -> String -> (Array o -> s -> Array t) -> (s **> t)
 tripleGetterFromTripleGetter (TypedTripleGetter nameOfp p) name f = memorize tripleGetter name where
   tripleGetter :: TripleGetter s t
   tripleGetter id = do
@@ -68,7 +62,7 @@ tripleGetterFromTripleGetter (TypedTripleGetter nameOfp p) name f = memorize tri
     t <- liftEffect (addToTripleIndex
       (typeWithPerspectivesTypes id)
       name
-      (typeWithPerspectivesTypes (f object))
+      (typeWithPerspectivesTypes (f object id))
       []
       [TripleRef {subject: typeWithPerspectivesTypes subject, predicate: predicate}]
       (typeWithPerspectivesTypes tripleGetter))

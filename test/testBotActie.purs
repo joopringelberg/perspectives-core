@@ -8,6 +8,7 @@ import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff (Milliseconds(..), delay)
+import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Exception (error)
 import Perspectives.Actions (compileBotAction, constructActionFunction, getBindingOfRol, setProperty')
@@ -40,7 +41,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "TestBotActie" do
+theSuite = suite "TestBotActie" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
@@ -74,7 +75,7 @@ theSuite = suiteSkip "TestBotActie" do
         (u "test1") ##= conditionQuery
       ["false"]
 
-  test "compileBotAction" do
+  testOnly "compileBotAction" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
     assertEqualWithPropagation "Apply the botAction to the context usr:test1 to copy the value of $v1 to $v2"
@@ -87,34 +88,33 @@ theSuite = suiteSkip "TestBotActie" do
     assertEqual "$propsEqual should now be true"
       do
         propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
-        propsEqualWithEffect <- pure $ propsEqual ~> NamedFunction "propsEqualEffect" \vals -> log ("propsEqual is now: " <>  show vals)
-        (u "test1") ##= propsEqualWithEffect
+        propsEqualWithEffect <- pure $ propsEqual ~> NamedFunction "propsEqualEffect" \vals -> liftEffect $ log ("propsEqual is now: " <>  show vals)
+        (u "test1") ##= propsEqual
       ["true"]
-    assertEqualWithPropagation "Setting $v1 to a new value causes $propsEqual to be false"
+    assertEqualWithPropagation "Setting $v1 to a new value should cause $propsEqual to be false, but the bot immediately copies the new value to $v2 so it is true again."
       do
         void $ setProperty' (tba "Test$binnenRolBeschrijving$v1") "noot" (u "test1_binnenRol")
         lift $ delay (Milliseconds 100.0)
         propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
         (u "test1") ##= propsEqual
         -- pure ["false"]
-      ["false"]
+      ["true"]
       1000.0
-    assertEqual "Setting $v1 to a new value caused the condition to become true"
+    assertEqual "Setting $v1 to a new value caused the condition to become true, but the bot copied $v1 to $v2 so it is false again."
       do
         condition <- onNothing
           (error "Cannot find condition")
           (tba "Test$botCopiesV1ToV2" ##> getBindingOfRol (psp "Actie$condition"))
         conditionQuery <- constructQueryFunction condition
         (u "test1") ##= conditionQuery
-      ["true"]
+      ["false"]
 
-    -- TODO. De volgende test faalt. Hoewel de conditie van waarde verandert, wordt de actie niet opnieuw uitgevoerd.
-    -- assertEqual "Setting $v1 to a new value caused $v2 to assume the same value"
-    --   do
-    --     r <- getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
-    --     -- removeUserData [BuitenRol "model:User$test1_buitenRol"]
-    --     pure r
-    --   [Value "noot"]
+    assertEqual "Setting $v1 to a new value caused $v2 to assume the same value"
+      do
+        r <- getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
+        -- removeUserData [BuitenRol "model:User$test1_buitenRol"]
+        pure r
+      [Value "noot"]
 
   -- testOnly "Add a test!" do
   --   loadTestModel "testBotActie.crl"

@@ -14,7 +14,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
 import Perspectives.BasicActionFunctions (storeDomeinFile)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
-import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, (%%), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, (##>), (##>>), (%%))
 import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
@@ -26,6 +26,7 @@ import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
 import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
 import Perspectives.QueryCompiler (constructQueryFunction)
+import Perspectives.QueryEffect (QueryEffect, (~>))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
@@ -290,7 +291,7 @@ setProperty = setUpBotActionsAfter setProperty'
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
 -----------------------------------------------------------
-type Action = (PBool -> MonadPerspectives (Array Value))
+type Action = (PBool ~~> Value)
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
@@ -330,7 +331,7 @@ constructActionFunction actionInstanceID objectGetter = do
         "add" -> pure $ action addRol'
         "remove" -> pure $ action removeRol'
         "set" -> pure $ action setRol'
-        _ -> throwError (error $ "constructActionFunction: unknown operation for assigntoRol: '" <> unwrap operation <> "'")
+        _ -> throwError (error $ "constructActionFunction: unknown operation for assignToRol: '" <> unwrap operation <> "'")
 
     "model:Perspectives$assignToProperty" -> do
       -- The assignment operation to be executed. Possible values are: "add", "remove", "set"
@@ -405,7 +406,10 @@ compileBotAction actionType contextId = do
   (conditionQuery :: StringTypedTripleGetter) <- constructQueryFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  pure $ conditionQuery `followedBy` PBool >-> (conditionalEffect contextId) `trackedAs` (unwrap actionType)
+  -- pure $ conditionQuery `followedBy` PBool >-> (conditionalEffect contextId) `trackedAs` (unwrap actionType)
+  pure $ (conditionQuery ~> (NamedFunction
+    (unwrap actionType)
+    \bs -> void $ conditionalEffect contextId (PBool (unsafePartial (fromJust (head bs))))))
 
   where
     errorMessage :: String -> String -> Error
