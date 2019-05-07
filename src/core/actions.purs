@@ -4,21 +4,20 @@ module Perspectives.Actions where
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
-import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Data.Array (head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
+import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
 import Perspectives.BasicActionFunctions (storeDomeinFile)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setRol_property, setContext_rolInContext)
+import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, (%%), (##>), (##>>))
 import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
-
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID, psp)
 import Perspectives.ModelBasedTripleGetters (botActiesInContext)
@@ -32,7 +31,7 @@ import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
 import Perspectives.TripleGetterComposition (followedBy, (>->))
-import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter)
+import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.Utilities (onNothing)
 
@@ -181,12 +180,6 @@ updatePerspectEntiteitMember' changeEntityMember pid memberName value = do
   (changedEntity :: a) <- cacheCachedEntiteit pid (changeEntityMember pe memberName value)
   -- And save it to Couchdb.
   void $ saveVersionedEntiteit pid changedEntity
-
-  -- rev <- lift $ onNothing' ("updateRoleProperty: context has no revision, deltas are impossible: " <> cid) (un(getRevision' context))
-  -- -- Store the changed entity in couchdb.
-  -- newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
-  -- -- Set the new revision in the entity.
-  -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
@@ -412,7 +405,7 @@ compileBotAction actionType contextId = do
   (conditionQuery :: StringTypedTripleGetter) <- constructQueryFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  pure $ conditionQuery `followedBy` PBool >-> constructTripleGetterFromObjectsGetter (unwrap actionType) (conditionalEffect contextId)
+  pure $ conditionQuery `followedBy` PBool >-> (conditionalEffect contextId) `trackedAs` (unwrap actionType)
 
   where
     errorMessage :: String -> String -> Error

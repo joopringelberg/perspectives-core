@@ -6,7 +6,7 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value)
 import Perspectives.PerspectivesTypes (genericBinding, binding, getUnqualifiedProperty) as PT
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromObjectsGetter, trackedAs)
+import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (class Show, pure)
 
 identity_ :: forall o.  Show o => (o ~~> o)
@@ -14,7 +14,7 @@ identity_ x = pure [x]
 
 -- | Identity for all values, contexts and roles.
 identity :: forall o.  Show o => (o **> o)
-identity = constructTripleGetterFromObjectsGetter "model:Perspectives$identity" identity_
+identity = identity_ `trackedAs` "model:Perspectives$identity"
 
 -- | The type of the context instance.
 contextType :: (AnyContext **> AnyDefinition)

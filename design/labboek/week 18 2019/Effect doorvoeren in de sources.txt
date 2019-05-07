@@ -53,4 +53,33 @@ Ik krijg dus nu een Json terug en daar moet ik een record van maken.
 Kan dat met Argonaut? 
 De functie caseJsonObject maakt van Json een Object. Dat is wat voorheen een StrMap was. Dat is dus niet hetzelfde als een record!
 
-Ik denk dat ik genericDecode opnieuw moet gebruiken. Waar hoort dat bij?
+Ik denk dat ik genericDecode opnieuw moet gebruiken. Die hoort bij Foreign.Generic (ook de laatste versie, gelukkig!).
+Maar, genericDecode neemt (Options en) een Foreign waarde als argument, terwijl ik al Json heb.
+De Decode class heeft een member decode, maar die gaat ook van Foreign naar F a.
+Met decodeJSON kan ik een String decoderen naar een type a dat een instance is van Decode.
+
+Ik kan natuurlijk domweg het responseFormat op String zetten en dan decodeJSON gebruiken.
+
+Extra complicatie is dat het resultaat in F is. Hoe moet ik dat ook alweer hanteren?
+type Except e = ExceptT e Identity
+type F = Except MultipleErrors
+type F = ExceptT MultipleErrors Identity
+
+
+Dus, een monad stack gebaseerd op Identity.
+The type parameter e is the type of exceptions, and a is the type of successful results.
+
+runExcept :: forall e a. Except e a -> Either e a
+
+Dus, je runt een Except e a type.
+decodeJSON :: forall a. Decode a => String -> F a
+decodeJSON :: forall a. Decode a => String -> ExceptT MultipleErrors (Identity a)
+
+runExceptT :: forall e m a. ExceptT e m a -> m (Either e a)
+
+runExceptT (decodeJSON <string>) :: Identity (Either MultipleErrors a)
+
+runExcept (decodeJSON <string>) :: Either MultipleErrors <gewenste type>
+en dan moet <gewenste type> een instantie van Decode zijn.
+
+In couchdb gebruik ik in handleError 'throwError'. Dat is van Control.Monad.Error.Class.
