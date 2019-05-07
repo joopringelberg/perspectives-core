@@ -14,6 +14,7 @@ import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff (error, throwError)
 import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), createTransactie, transactieID, (%%>>), type (**>))
@@ -112,7 +113,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   case elemIndex newCD deltas of
     (Just _) -> pure unit
     Nothing -> do
-      maybeM (pure unit) addTripleToQueue (lift $ modifyTriple newCD)
+      maybeM (pure unit) addTripleToQueue (lift $ liftEffect $ modifyTriple newCD)
       (isfunc :: Array PBool) <- case isContext of
         true -> rolIsFunctioneel (RolDef memberName)
         false -> propertyIsFunctioneel (PropertyDef memberName)

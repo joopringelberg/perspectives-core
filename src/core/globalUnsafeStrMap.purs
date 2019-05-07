@@ -9,11 +9,13 @@ module Perspectives.GlobalUnsafeStrMap
   , delete
   ) where
 
-import Effect (Effect)
-import Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Data.Maybe (Maybe(..))
 import Data.Unit (Unit)
-import Prelude (bind, pure)
+import Effect (Effect)
+import Foreign (Foreign, isUndefined, unsafeFromForeign)
+import Foreign.Object (Object)
+import Prelude (class Show, bind, pure, show)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | A reference to a mutable map
 -- |
@@ -37,3 +39,6 @@ foreign import poke :: forall a. GLStrMap a -> String -> a -> Effect (GLStrMap a
 
 -- | Remove a key and the corresponding value from a global map
 foreign import delete :: forall a. GLStrMap a -> String -> Effect (GLStrMap a)
+
+instance showGLStrMap :: Show a => Show (GLStrMap a) where
+  show s = show (unsafeCoerce s :: Object a)
