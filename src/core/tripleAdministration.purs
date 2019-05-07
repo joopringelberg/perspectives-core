@@ -10,19 +10,25 @@ module Perspectives.TripleAdministration
   , memorize
   , removeDependency_
   , setSupports_
+  , detectCycles
+  , lookupSubject
   )
   where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Effect (Effect, foreachE)
-import Effect.Class (liftEffect)
 import Control.Monad.State (lift)
+import Data.Array (cons)
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Effect (Effect, foreachE)
+import Effect.AVar (AVar, new, read) as AV
+import Effect.Aff (Aff, error, throwError)
+import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
-import Prelude (Unit, bind, discard, pure, unit, void, ($))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (==), (<>), show, (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | If memorizeQueryResults == true, we will look up a result in the triple cache
@@ -46,6 +52,9 @@ type PredicateIndex = GLStrMap (Triple String String)
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 tripleIndex :: TripleIndex
 tripleIndex = new unit
+
+lookupSubject :: Subject -> Effect (Maybe PredicateIndex)
+lookupSubject = peek tripleIndex
 
 lookupInTripleIndex :: forall s o. Subject -> Predicate -> Effect (Maybe (Triple s o))
 lookupInTripleIndex rid pid = do
@@ -150,13 +159,29 @@ foreign import removeDependency_ :: Triple String String -> TripleRef -> Effect 
 foreign import setSupports_ ::  Triple String String -> Array TripleRef -> Effect Unit
 
 -- | Add the dependentRef (first argument) as a dependency to the triple identified by the supportingRef (second argument).
--- TODO: cycle detection. Follow the arrows from support to dependent depth first and report a cycle.
 addDependency :: TripleRef -> TripleRef -> Effect Unit
 addDependency dependentRef supportingRef = do
   ms <- getTriple supportingRef
   case ms of
     (Just support) -> void (addDependency_ support dependentRef)
     Nothing -> pure unit
+
+detectCycles :: TripleRef -> Aff Unit
+detectCycles source = getDependents source >>= detectCycles' source [source]
+
+detectCycles' :: TripleRef ->  Array TripleRef -> Array TripleRef -> Aff Unit
+detectCycles' source path dependents =
+  for_ dependents
+    \dep -> if (dep == source)
+      then throwError (error $ "Cycle in dependencies: " <> show (cons dep path))
+      else getDependents dep >>= detectCycles' source (cons dep path)
+
+getDependents :: TripleRef -> Aff (Array TripleRef)
+getDependents tr = do
+  ms <- liftEffect $ getTriple tr
+  case ms of
+    (Just (Triple{dependencies})) -> pure dependencies
+    Nothing -> pure []
 
 -- | Remove the dependentRef (first argument) as a dependency from the triple identified by the supportingRef (second argument).
 removeDependency :: TripleRef -> TripleRef -> Effect Unit
