@@ -1,14 +1,13 @@
 module Perspectives.RunMonadPerspectivesQuery where
 
-import Effect.Class (liftEffect)
-import Effect.Exception (error)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (evalStateT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
+import Effect.Class (liftEffect)
+import Effect.Exception (error)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), tripleObjects, type (**>))
-
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
@@ -19,7 +18,13 @@ runMonadPerspectivesQuery :: forall s o.
   -> (s -> MonadPerspectivesQuery o)
   -> (MonadPerspectives o)
 runMonadPerspectivesQuery a f = do
-  _ <- liftEffect $ typeWithPerspectivesTypes $ addToTripleIndex (typeWithPerspectivesTypes a) "model:Perspectives$start" [typeWithPerspectivesTypes a] [] [] (typeWithPerspectivesTypes tripleGetter)
+  _ <- liftEffect $ typeWithPerspectivesTypes $ addToTripleIndex
+    (typeWithPerspectivesTypes a)
+    "model:Perspectives$start"
+    [typeWithPerspectivesTypes a]
+    []
+    []
+    (typeWithPerspectivesTypes tripleGetter)
   evalStateT (f a) (singleton "#start" tref)
   where
     tref :: TripleRef
@@ -28,7 +33,13 @@ runMonadPerspectivesQuery a f = do
           , predicate: "model:Perspectives$start"
         }
     tripleGetter :: TripleGetter s o
-    tripleGetter id = liftEffect (typeWithPerspectivesTypes $ addToTripleIndex (typeWithPerspectivesTypes id) "model:Perspectives$start" [typeWithPerspectivesTypes a] [] [] (typeWithPerspectivesTypes tripleGetter))
+    tripleGetter id = liftEffect (typeWithPerspectivesTypes $ addToTripleIndex
+      (typeWithPerspectivesTypes id)
+      "model:Perspectives$start"
+      [typeWithPerspectivesTypes a]
+      []
+      []
+      (typeWithPerspectivesTypes tripleGetter))
 
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A TRIPLE

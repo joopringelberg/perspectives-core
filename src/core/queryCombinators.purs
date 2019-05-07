@@ -1,16 +1,18 @@
 module Perspectives.QueryCombinators where
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, difference, elemIndex, findIndex, foldr, head, intersect, last, null, singleton, filter, union) as Arr
 import Data.HeytingAlgebra (not, conj, disj, implies) as HA
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (traverse)
 import Effect.Class (liftEffect)
+import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), applyTypedTripleGetterToMaybeObject, putQueryVariable, readQueryVariable, tripleObjects, type (**>))
 import Perspectives.PerspectivesTypes (PBool(..), typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, lookupInTripleIndex, memorize, memorizeQueryResults, setMemorizeQueryResults)
-import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, constructTripleGetterFromObjectsGetter)
+import Perspectives.TripleGetterFromObjectGetter (constructTripleGetterFromEffectExpression, trackedAs, tripleGetterFromTripleGetter)
 import Prelude (class Eq, class Show, bind, const, discard, eq, flip, identity, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=))
 import Type.Data.Boolean (kind Boolean)
 import Unsafe.Coerce (unsafeCoerce)
@@ -295,14 +297,12 @@ containedIn (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpre
 
 -- | The logical negation of a Constraint.
 -- | `psp:Constraint -> psp:Constraint`
-not :: forall s. Show s => (s **> PBool) -> (s **> PBool)
-not (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
-  f :: (s -> MonadPerspectivesQuery (Array PBool))
-  f id = do
-    (Triple{object}) <- p id
-    case Arr.head object of
-      (Just (PBool "true")) -> pure [PBool "false"]
-      otherwise -> pure [PBool "true"] -- NOTE: type checking guarantees we only have two values.
+not :: forall s. (s **> PBool) -> (s **> PBool)
+not tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("not(" <> nameOfp <> ")") f where
+  f :: Array PBool -> Array PBool
+  f object = case Arr.head object of
+      (Just (PBool "true")) -> [PBool "false"]
+      otherwise -> [PBool "true"] -- NOTE: type checking guarantees we only have two values.
 
 not' :: forall s.  Show s => (s **> String) -> (s **> String)
 not' (TypedTripleGetter nameOfp p) = constructTripleGetterFromEffectExpression ("model:Perspectives$not_" <> nameOfp) f where
@@ -349,9 +349,7 @@ useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
       pure result
 
 constant :: forall s. Show s => s -> TypedTripleGetter s s
-constant subject = constructTripleGetterFromObjectsGetter
-  ("model:Perspectives$constant$_" <> unsafeCoerce subject)
-  (\_ -> pure [subject])
+constant subject = (\_ -> pure [subject]) `trackedAs` ("model:Perspectives$constant$_" <> unsafeCoerce subject)
 
 -----------------------------------------------------------
 -- VARIABLES
