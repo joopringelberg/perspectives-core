@@ -6,11 +6,6 @@ VAN WEEK 17
 4. Bedenk hoe je de acties die opgezet zijn voor een ContextInstantie, weer weg kunt halen.
 
 DEZE WEEK
-3. Schoon de code op van debugging statements:
-	- logging in tripleAdministration/theoryChange
-	- triples in state pushen bij theorychange
-4. Maak de naamgeving van TypedTripleGetters consistent.
-
 5. Maak een scherm voor TestBotActie.
 
 6. Bestudeer de vormgeving van schermen.
@@ -25,4 +20,8 @@ DEZE WEEK
 DONE
 1. Verbouw in Action constructActionFunction zodat die geen Action, maar een QueryEffect oplevert.
 2. Controleer waarom in testBotActie.purs propsEqualWithEffect niet werkt.
+3. Schoon de code op van debugging statements:
+	- logging in tripleAdministration/theoryChange
+	- triples in state pushen bij theorychange
+4. Maak de naamgeving van TypedTripleGetters consistent.
 
