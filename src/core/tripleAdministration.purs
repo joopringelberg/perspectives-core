@@ -21,7 +21,6 @@ import Data.Array (cons)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Effect (Effect, foreachE)
-import Effect.AVar (AVar, new, read) as AV
 import Effect.Aff (Aff, error, throwError)
 import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))

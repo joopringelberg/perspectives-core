@@ -43,3 +43,20 @@ ANALYSE
 4. Dan wordt de conditie herberekend
 5. Dan wordt de actiefunctie opnieuw uitgevoerd
 Maar, dan wordt niet opnieuw de property gezet, zou je zeggen.
+
+
+Triple 
+model:User$test1-
+	((conj(
+		model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) 
+		not(
+			(equal 
+				(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) 
+				(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) 
+		>-> model:TestBotActie$Test$botCopiesV1ToV2)
+has now object: model:User$test1_binnenRol
+
+Recomputed triples: 
+[<model:User$test1 - ((conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) >-> model:TestBotActie$Test$botCopiesV1ToV2)>,
+
+<model:User$test1 - (conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))))>,<model:User$test1 - ((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)) ~> propsEqualEffect)>,<model:User$test1 - not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))>,<model:User$test1 - (equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))>,<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)>]

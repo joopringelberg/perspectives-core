@@ -1,0 +1,72 @@
+DEBUG PROPSEQUALWITHEFFECT
+2. Controleer waarom in testBotActie.purs propsEqualWithEffect niet werkt.
+
+Recomputed triples: [
+<model:User$test1 - ((conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) ~> model:TestBotActie$Test$botCopiesV1ToV2)>,
+
+<model:User$test1 - (conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))))>,
+
+<model:User$test1 - not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))>,
+
+<model:User$test1 - (equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))>,
+
+<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2)>,
+
+<model:User$test1 - ((conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) ~> model:TestBotActie$Test$botCopiesV1ToV2)>,
+
+<model:User$test1 - (conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))))>,
+
+<model:User$test1 - not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))>,
+
+<model:User$test1 - (equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))>,
+
+<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)>]
+
+=========
+
+Recomputed triples: [
+
+<model:User$test1 - ((conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) ~> model:TestBotActie$Test$botCopiesV1ToV2)>,
+
+<model:User$test1 - (conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))))>,
+
+<model:User$test1 - not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))>,
+
+<model:User$test1 - ((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)) ~> propsEqualWithEffect)>,
+
+<model:User$test1 - (equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))>,
+
+<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2)>]
+
+
+[
+
+<model:User$test1 - ((conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) ~> model:TestBotActie$Test$botCopiesV1ToV2)>,
+
+<model:User$test1 - (conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))))>,
+
+<model:User$test1 - not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))>,
+
+<model:User$test1 - ((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)) ~> propsEqualWithEffect)>,
+
+<model:User$test1 - (equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))>,
+
+<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2)>,
+
+<model:User$test1 - ((conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))) ~> model:TestBotActie$Test$botCopiesV1ToV2)>,
+
+<model:User$test1 - (conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger) not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))))>,
+
+<model:User$test1 - not((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))>,
+
+	<model:User$test1 - ((equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)) ~> propsEqualWithEffect)>,
+
+<model:User$test1 - (equal (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2) (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1))>,
+
+<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)>]
+
+OBSERVATIES
+1. Het triple wordt op de verwachte momenten (en in de juiste volgorde) herberekend.
+2. De ontvangen waarde lijkt te worden gecached. Hij blijft gelijk aan de allereerste ontvangen waarde.
+
+OPGELOST. De functie pushesObjectsTo bevatte een fout.

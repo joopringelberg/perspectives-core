@@ -5,24 +5,26 @@ import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, registerTriple)
-import Prelude (Unit, bind, const, pure, ($), (<>))
+import Prelude (Unit, bind, pure, ($), (<>))
 
-type QueryEffect = NamedFunction (Array String -> MonadPerspectives Unit)
+type QueryEffect a = NamedFunction (PerspectivesEffect a)
+
+type PerspectivesEffect a = Array a -> MonadPerspectives Unit
 
 -- | Make an effect function (QueryEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.
 -- | Remove the effect function's dependency on the tripleGetter by using unsubscribeFromObjects.
 pushesObjectsTo :: forall s o.
   (s **> o) ->
-  QueryEffect ->
+  QueryEffect String ->
   (s **> o)
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
   TypedTripleGetter effectName pushesObjectsTo' where
 
     pushesObjectsTo' :: TripleGetter s o
     pushesObjectsTo' id = do
-      t <- tg id
-      et <- effectFun t
+      et <- effectFun id
+      -- Now register the effect triple et as a dependency of t:
       _ <- liftEffect $ registerTriple (typeWithPerspectivesTypes et)
       pure et
       -- To unsubscribe the effect, de-register the effect triple.
@@ -31,15 +33,16 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     -- i.e. to sort the effect again and it will use the resulting triple to
     --  - set new dependencies based on its supports;
     --  - copy its supports to the triple administration (in the old effect triple)
-    effectFun :: Triple s o -> MonadPerspectivesQuery (Triple s o)
-    effectFun queryResult@(Triple{subject, object}) = do
+    effectFun :: s -> MonadPerspectivesQuery (Triple s o)
+    effectFun id = do
+      queryResult@(Triple{subject, object}) <- tg id
       _ <- lift $ effect (typeWithPerspectivesTypes object)
       pure $ Triple { subject: subject
                     , predicate : name
                     , object : object
                     , dependencies : []
                     , supports : [getRef $ typeWithPerspectivesTypes queryResult]
-                    , tripleGetter : const (effectFun queryResult)}
+                    , tripleGetter : effectFun}
 
     name :: String
     name = "(" <>  tgName <> " ~> " <> effectName <> ")"

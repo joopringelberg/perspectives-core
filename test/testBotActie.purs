@@ -54,7 +54,7 @@ theSuite = suite "TestBotActie" do
           Nothing -> pure []
           (Just effect) -> do
             f <- (constructActionFunction effect (binnenRol `followedBy` unwrap))
-            void $ f (u "test1") (PBool "true")
+            void $ f (u "test1") ["true"]
             getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
       [Value "aap"]
 
@@ -81,6 +81,9 @@ theSuite = suite "TestBotActie" do
     assertEqualWithPropagation "Apply the botAction to the context usr:test1 to copy the value of $v1 to $v2"
       do
         botaction <- (compileBotAction (ContextDef $ tba "Test$botCopiesV1ToV2") (u "test1"))
+        propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
+        propsEqualWithEffect <- pure $ propsEqual ~> NamedFunction "propsEqualWithEffect" \vals -> liftEffect $ log ("propsEqual is now: " <>  show vals)
+        void ((u "test1") ## propsEqualWithEffect)
         void ((u "test1") ## botaction)
         getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
       [Value "aap"]
@@ -88,7 +91,6 @@ theSuite = suite "TestBotActie" do
     assertEqual "$propsEqual should now be true"
       do
         propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
-        propsEqualWithEffect <- pure $ propsEqual ~> NamedFunction "propsEqualEffect" \vals -> liftEffect $ log ("propsEqual is now: " <>  show vals)
         (u "test1") ##= propsEqual
       ["true"]
     assertEqualWithPropagation "Setting $v1 to a new value should cause $propsEqual to be false, but the bot immediately copies the new value to $v2 so it is true again."

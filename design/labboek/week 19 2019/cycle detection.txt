@@ -85,13 +85,13 @@ registerTriple
 	QueryEffect.pushesObjectsTo			- OK
 addToTripleIndex
 	- constructTripleGetterFromEffectExpression
-		- constructTripleGetter, alias trackedAs.
+		- constructTripleGetter, alias trackedAs. GECONTROLEERD
 			Wordt 57 keer gebruikt.
-		- QueryCombinator.contains
-		- QueryCombinator.containsMatching
-		- QueryCombinator.containedIn
-		- QueryCombinator.not
-		- QueryCombinator.not'
+		- QueryCombinator.contains 				VERVANGEN
+		- QueryCombinator.containsMatching 		VERVANGEN
+		- QueryCombinator.containedIn 			VERVANGEN
+		- QueryCombinator.not 					VERVANGEN
+		- QueryCombinator.not' 					VERVANGEN
 	- constructTripleGetterWithArbitrarySupport
 		- ComputedTripleGetters.modellenM
 		- ComputedTripleGetters.parserMessagesM
