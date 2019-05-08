@@ -24,9 +24,9 @@ import Perspectives.ModelBasedTripleGetters (botActiesInContext)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
+import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool, PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
 import Perspectives.QueryCompiler (constructQueryFunction)
-import Perspectives.QueryEffect (QueryEffect, (~>))
+import Perspectives.QueryEffect (PerspectivesEffect, (~>))
 import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
@@ -295,7 +295,7 @@ type Action = (PBool ~~> Value)
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
-constructActionFunction :: ContextID -> StringTypedTripleGetter -> MonadPerspectives (ContextID -> Action)
+constructActionFunction :: ContextID -> StringTypedTripleGetter -> MonadPerspectives (ContextID -> PerspectivesEffect String)
 constructActionFunction actionInstanceID objectGetter = do
   actionType <- onNothing (errorMessage "no type found" "")
     (actionInstanceID ##> contextType)
@@ -314,18 +314,18 @@ constructActionFunction actionInstanceID objectGetter = do
       -- The function that will compute the value from the context.
       valueComputer <- constructQueryFunction value
 
-      action <- pure (\f contextId bool -> case bool of
-        PBool "true" -> do
+      action <- pure (\f contextId bools -> case head bools of
+        Just "true" -> do
           val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
-            Nothing -> pure []
+            Nothing -> pure unit
             (Just v) -> do
               object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
               case object of
-                Nothing -> pure []
-                (Just o) -> f rol v o <* setupBotActions contextId
+                Nothing -> pure unit
+                (Just o) -> f rol v o *> setupBotActions contextId
 
-        _ -> pure [])
+        _ -> pure unit)
 
       case unwrap operation of
         "add" -> pure $ action addRol'
@@ -347,17 +347,17 @@ constructActionFunction actionInstanceID objectGetter = do
       -- The function that will compute the value from the context.
       valueComputer <- constructQueryFunction value
 
-      action <- pure (\f contextId bool -> case bool of
-        PBool "true" -> do
+      action <- pure (\f contextId bools -> case head bools of
+        Just "true" -> do
           val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
-            Nothing -> pure []
+            Nothing -> pure unit
             (Just v) -> do
               object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
               case object of
-                Nothing -> pure []
-                (Just o) -> f property v o
-        _ -> pure [])
+                Nothing -> pure unit
+                (Just o) -> void $ f property v o
+        _ -> pure unit)
 
       case (unwrap operation) of
         "add" -> pure $ action addProperty'
@@ -372,9 +372,9 @@ constructActionFunction actionInstanceID objectGetter = do
       case unwrap functionName of
         -- The Action is for the bot that plays a role in a model:CrlText$Text context.
         -- The contextId identifies this context, hence we need no parameters when calling this function.
-        "storeDomeinFileInCouchdb" -> pure $ \contextId bool -> case bool of
-          PBool "true" -> storeDomeinFile contextId *> pure []
-          _ -> pure []
+        "storeDomeinFileInCouchdb" -> pure $ \contextId bools -> case head bools of
+          Just "true" -> void $ storeDomeinFile contextId
+          _ -> pure unit
 
         _ -> throwError (error $ "constructActionFunction: unknown functionName for effectFullFunction: '" <> (unwrap functionName) <> "'")
 
@@ -402,14 +402,11 @@ compileBotAction actionType contextId = do
     (errorMessage "no effect provided in Action" (unwrap actionType))
     (unwrap actionType ##> getBindingOfRol (psp "Actie$object"))
   (objectGetter :: StringTypedTripleGetter) <- constructQueryFunction object
-  (conditionalEffect :: (ContextID -> Action)) <- constructActionFunction action objectGetter
+  (conditionalEffect :: (ContextID -> PerspectivesEffect String)) <- constructActionFunction action objectGetter
   (conditionQuery :: StringTypedTripleGetter) <- constructQueryFunction condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  -- pure $ conditionQuery `followedBy` PBool >-> (conditionalEffect contextId) `trackedAs` (unwrap actionType)
-  pure $ (conditionQuery ~> (NamedFunction
-    (unwrap actionType)
-    \bs -> void $ conditionalEffect contextId (PBool (unsafePartial (fromJust (head bs))))))
+  pure $ (conditionQuery ~> (NamedFunction (unwrap actionType) (conditionalEffect contextId)))
 
   where
     errorMessage :: String -> String -> Error
@@ -418,5 +415,4 @@ compileBotAction actionType contextId = do
 setupBotActions :: ContextID -> MonadPerspectives Unit
 setupBotActions cid = do
   (actions :: Array ActieDef) <- cid ##= DTG.contextType `followedBy` ContextDef >-> botActiesInContext
-  -- actions <- pure []
   for_ actions \(a :: ActieDef) -> (compileBotAction a cid) >>= \tg -> cid ## tg

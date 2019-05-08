@@ -150,7 +150,6 @@ dispatchOnRequest req =
       case r of
         (Left messages) -> liftEffect $ setter (map show messages)
         (Right id) -> do
-          -- TODO. Binnen- en buitenrol!
           saveUserContext id
           liftEffect $ setter ["ok", buitenRol id] -- saveUserData
     (CreateRol cid rn rolSerialisation setter) -> do
@@ -176,7 +175,7 @@ type QueryUnsubscriber e = Effect Unit
 -- | Runs a the query and adds the ReactStateSetter to the result.
 subscribeToObjects :: Subject -> StringTypedTripleGetter -> ReactStateSetter -> CorrelationIdentifier -> MonadPerspectives Unit
 subscribeToObjects subject query setter setterId = do
-  (effectInReact :: QueryEffect) <- pure $ NamedFunction setterId (liftEffect <<< setter)
+  (effectInReact :: QueryEffect String) <- pure $ NamedFunction setterId (liftEffect <<< setter)
   void $ (subject ## query ~> effectInReact)
 
 unsubscribeFromObjects :: Subject -> Predicate -> CorrelationIdentifier -> MonadPerspectives Unit
@@ -196,15 +195,6 @@ getRol :: ContextID -> RolName -> ReactStateSetter -> CorrelationIdentifier -> M
 getRol cid rn setter setterId = do
   qf <- getRolFunction rn
   subscribeToObjects cid qf setter setterId
-
--- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
--- getRolFunction :: ContextID -> RolName -> MonadPerspectives (AjaxAvarCache e)  (StringTypedTripleGetter e)
--- getRolFunction cid rn = do
---   ctxtType <- cid ##>> DTG.contextType
---   m <- runMonadPerspectivesQueryCompiler ctxtType (compileElementaryQueryStep (QualifiedRol rn) (rn <> "_getter"))
---   case m of
---     (Left message) -> throwError $ error (show message)
---     (Right id) -> constructQueryFunction id
 
 -- | Retrieve the property from the rol, subscribe to it.
 getProperty :: RolID -> PropertyName -> ReactStateSetter -> CorrelationIdentifier -> MonadPerspectives Unit
