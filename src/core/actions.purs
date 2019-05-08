@@ -9,12 +9,13 @@ import Data.Array (head)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
+import Effect.Class (liftEffect)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
 import Perspectives.BasicActionFunctions (storeDomeinFile)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, (##>), (##>>), (%%))
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>), (##>>), (%%))
 import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
@@ -31,8 +32,8 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
+import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition (followedBy, (>->))
-import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.Utilities (onNothing)
 
@@ -416,3 +417,11 @@ setupBotActions :: ContextID -> MonadPerspectives Unit
 setupBotActions cid = do
   (actions :: Array ActieDef) <- cid ##= DTG.contextType `followedBy` ContextDef >-> botActiesInContext
   for_ actions \(a :: ActieDef) -> (compileBotAction a cid) >>= \tg -> cid ## tg
+
+-- | Remove all actions associated with this context. To do so, we recompute the actions, to get at their names.
+-- | This might be computationally expensive. Some form of caching will speed it up greatly.
+-- | A sneaky way would be to find triples on cid whose predicate match with the pattern "~>".
+tearDownBotActions :: ContextID -> MonadPerspectives Unit
+tearDownBotActions cid = do
+  (actions :: Array ActieDef) <- cid ##= DTG.contextType `followedBy` ContextDef >-> botActiesInContext
+  for_ actions \(a :: ActieDef) -> (compileBotAction a cid) >>= \(TypedTripleGetter name _) -> liftEffect $ unRegisterTriple (TripleRef {subject: cid, predicate: name})

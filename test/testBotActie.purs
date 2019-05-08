@@ -11,7 +11,7 @@ import Effect.Aff (Milliseconds(..), delay)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Effect.Exception (error)
-import Perspectives.Actions (compileBotAction, constructActionFunction, getBindingOfRol, setProperty')
+import Perspectives.Actions (compileBotAction, constructActionFunction, getBindingOfRol, setProperty', setupBotActions, tearDownBotActions)
 import Perspectives.CoreTypes (type (~~>), NamedFunction(..), (##>))
 import Perspectives.DataTypeObjectGetters (rolBindingDef)
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, identity)
@@ -41,7 +41,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "TestBotActie" do
+theSuite = suite "TestBotActie" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
@@ -75,7 +75,7 @@ theSuite = suiteSkip "TestBotActie" do
         (u "test1") ##= conditionQuery
       ["false"]
 
-  testOnly "compileBotAction" do
+  test "compileBotAction" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
     assertEqualWithPropagation "Apply the botAction to the context usr:test1 to copy the value of $v1 to $v2"
@@ -117,6 +117,32 @@ theSuite = suiteSkip "TestBotActie" do
         -- removeUserData [BuitenRol "model:User$test1_buitenRol"]
         pure r
       [Value "noot"]
+
+  test "setupBotActions" do
+    loadTestModel "testbotInstantie.crl"
+
+    assertEqualWithPropagation "setupBotActions"
+      do
+        setupBotActions (u "test1")
+        lift $ delay (Milliseconds 100.0)
+        getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
+      [Value "aap"]
+      1000.0
+
+  testOnly "tearDownBotActions" do
+    loadTestModel "testBotActie.crl"
+    loadTestModel "testbotInstantie.crl"
+
+    assertEqualWithPropagation "After tearing down, a new value for $v1 will not be copied to $v2"
+      do
+        setupBotActions (u "test1")
+        lift $ delay (Milliseconds 100.0)
+        tearDownBotActions (u "test1")
+        void $ setProperty' (tba "Test$binnenRolBeschrijving$v1") "noot" (u "test1_binnenRol")
+        lift $ delay (Milliseconds 100.0)
+        getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
+      [Value "aap"]
+      1000.0
 
   -- testOnly "Add a test!" do
   --   loadTestModel "testBotActie.crl"

@@ -19,7 +19,7 @@ pushesObjectsTo :: forall s o.
   QueryEffect String ->
   (s **> o)
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
-  TypedTripleGetter effectName pushesObjectsTo' where
+  TypedTripleGetter name pushesObjectsTo' where
 
     pushesObjectsTo' :: TripleGetter s o
     pushesObjectsTo' id = do
@@ -27,7 +27,8 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
       -- Now register the effect triple et as a dependency of t:
       _ <- liftEffect $ registerTriple (typeWithPerspectivesTypes et)
       pure et
-      -- To unsubscribe the effect, de-register the effect triple.
+      -- To unsubscribe the effect, de-register the effect triple. Find the triple
+      -- by its subject (=id) and predicate (=name)
 
     -- propagateTheoryDeltas will use the tripleGetter to recompute,
     -- i.e. to sort the effect again and it will use the resulting triple to
@@ -45,7 +46,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
                     , tripleGetter : effectFun}
 
     name :: String
-    name = "(" <>  tgName <> " ~> " <> effectName <> ")"
+    name = tgName <> " ~> " <> effectName
 
 -- high precedence!
 infixl 9 pushesObjectsTo as ~>
