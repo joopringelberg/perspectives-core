@@ -52,7 +52,7 @@ closure (TypedTripleGetter nameOfp p) =
         otherwise -> pure t
 
     name :: String
-    name = "(closure " <>  nameOfp <> ")"
+    name = "closure(" <>  nameOfp <> ")"
 
 -- | The recursive closure of a query, bottoming out when it has no results.
 -- | The result contains the root.

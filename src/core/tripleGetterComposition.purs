@@ -56,7 +56,7 @@ unionOfTripleObjects (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q)
                     , tripleGetter : getter}
 
     name :: String
-    name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
+    name = nameOfp <> " >-> " <> nameOfq
 
 infixl 9 unionOfTripleObjects as >->
 
@@ -94,7 +94,7 @@ lazyUnionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
                         , tripleGetter : getter}
 
     name :: String
-    name = "(" <>  nameOfp <> " lazyUnionOfTripleObjects " <> nameOfg <> ")"
+    name = nameOfp <> " >->> " <> nameOfg
 
 infixl 9 lazyUnionOfTripleObjects as >->>
 
@@ -126,7 +126,7 @@ intersectionOfTripleObjects (TypedTripleGetter nameOfp p) (TypedTripleGetter nam
                     , tripleGetter : getter}
 
     name :: String
-    name = "(" <>  nameOfp <> " >-> " <> nameOfq <> ")"
+    name = nameOfp <> " <-< " <> nameOfq
 
 infixl 9 intersectionOfTripleObjects as <-<
 
@@ -167,7 +167,7 @@ lazyIntersectionOfTripleObjects (TypedTripleGetter nameOfp p) g nameOfg =
                         , tripleGetter : getter}
 
     name :: String
-    name = "(" <>  nameOfp <> " lazyUnionOfTripleObjects " <> nameOfg <> ")"
+    name = nameOfp <> " <<-< " <> nameOfg
 
 infixl 9 lazyIntersectionOfTripleObjects as <<-<
 
@@ -197,7 +197,7 @@ traverse f nameOfF (TypedTripleGetter nameOfq q) =
                     , tripleGetter : getter}
 
     name :: String
-    name = "(" <>  nameOfF <> " >-> " <> nameOfq <> ")"
+    name = "traverse(" <>  nameOfF <> ", " <> nameOfq <> ")"
 
 composeMonoidal :: forall s o a.
   TypedTripleGetter s o ->
@@ -217,4 +217,4 @@ composeMonoidal (TypedTripleGetter nameOfp p) f n = memorize getter name where
                   , tripleGetter : getter}
 
   name :: String
-  name = "(" <>  nameOfp <> " >-> " <> n <> ")"
+  name = "composeMonoidal(" <>  nameOfp <> "," <> n <> ")"

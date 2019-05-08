@@ -45,7 +45,7 @@ closure' (TypedTripleGetter nameOfp p) =
         otherwise -> pure t
 
     name :: String
-    name = "(closure' " <>  nameOfp <> ")"
+    name = "closure('" <>  nameOfp <> ")"
 
 mcons :: forall a. Maybe a -> Array a -> Array a
 mcons = maybe identity Arr.cons
@@ -77,7 +77,7 @@ filter (TypedTripleGetter nameOfc criterium) (TypedTripleGetter nameOfp p) =
       _ -> Arr.cons subject arr
 
     name :: String
-    name = "(filter " <> nameOfc <> " " <> nameOfp <> ")"
+    name = "filter(" <> nameOfc <> ", " <> nameOfp <> ")"
 
 -- | A selection of the results of the query using a simple (boolean) function as a criterium.
 -- Test.Perspectives.TripleGetterConstructors, via getUnqualifiedRolDefinition
@@ -131,7 +131,7 @@ cond :: forall s o.
 cond cd@(TypedTripleGetter nameOfCondition condition) (TypedTripleGetter nameOfThenPart thenPart) (TypedTripleGetter nameOfElsePart elsePart) = memorize getter name where
 
   name :: String
-  name = "(cond_" <> nameOfCondition <> "_" <> nameOfThenPart <> "_" <> nameOfElsePart <> ")"
+  name = "(cond(" <> nameOfCondition <> ", " <> nameOfThenPart <> ", " <> nameOfElsePart <> ")"
 
   getter :: TripleGetter s o
   getter id = do
@@ -175,7 +175,7 @@ logicalBinaryOperator n op (TypedTripleGetter nameOfp p) (TypedTripleGetter name
                     , supports : map (typeWithPerspectivesTypes getRef) [pt, qt]
                     , tripleGetter : typeWithPerspectivesTypes getter}
     name :: String
-    name = "(" <> n <> nameOfp <> " " <> nameOfq <> ")"
+    name = n <> "(" <> nameOfp <> " " <> nameOfq <> ")"
 
     fromBool :: Boolean -> Array PBool
     fromBool = Arr.singleton <<< PBool <<< show
@@ -211,7 +211,7 @@ setOperation op (TypedTripleGetter nameOfp p) (TypedTripleGetter nameOfq q) =
                     , dependencies : []
                     , supports : map (typeWithPerspectivesTypes getRef) [pt, qt]
                     , tripleGetter : getter}
-    name = "(intersect " <> nameOfp <> " " <> nameOfq <> ")"
+    name = "intersect(" <> nameOfp <> ", " <> nameOfq <> ")"
 
 intersect :: forall s o. Eq o =>
   (s **> o) ->
@@ -253,7 +253,7 @@ notEmpty (TypedTripleGetter nameOfp p) = memorize getter name where
   getter = p >=> isSomething >=> \(Triple t) -> pure (Triple(t {predicate = name, tripleGetter = getter}))
 
   name :: String
-  name = "(notEmpty " <> nameOfp <> ")"
+  name = "notEmpty(" <> nameOfp <> ")"
 
 -- | Construct a function that returns a bool in MonadPerspectivesQuery, from a TypedTripleGetter.
 toBoolean :: forall s. (s **> PBool) -> s -> MonadPerspectivesQuery Boolean
@@ -267,7 +267,7 @@ contains :: forall s o.
   TypedTripleGetter s o ->
   TypedTripleGetter s PBool
 -- Test.Perspectives.TripleGetterConstructors
-contains id' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("model:Perspectives$contains(" <> typeWithPerspectivesTypes id' <> ")") f where
+contains id' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("contains(" <> typeWithPerspectivesTypes id' <> ")") f where
   f :: Array o -> s -> Array PBool
   f os _ = do
     case Arr.elemIndex id' os of
@@ -275,7 +275,7 @@ contains id' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg 
       otherwise -> [PBool "true"]
 
 containsMatching :: forall s o. Show s => (s -> o -> Boolean) -> String -> TypedTripleGetter s o -> TypedTripleGetter s PBool
-containsMatching criterium criteriumName tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("contains(" <> criteriumName <> ")") f where
+containsMatching criterium criteriumName tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("containsMatching(" <> criteriumName <> ")") f where
   f :: Array o -> s -> Array PBool
   f os subject = maybe [PBool "true"] (const [PBool "false"]) (Arr.findIndex (criterium subject) os)
 
@@ -318,7 +318,7 @@ lastElement tg@(TypedTripleGetter nameOfp (p :: TripleGetter s o)) = tripleGette
 -- | The resulting query returns exactly the same result as the argument query.
 -- | `psp:Function -> psp:Function`
 ignoreCache :: forall s o. (s **> o) -> (s **> o)
-ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
+ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter ("ignore(" <> nameOfp <> ")") go where
   go r =
     do
       remember <- memorizeQueryResults
@@ -332,7 +332,7 @@ ignoreCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
 -- | The resulting query returns exactly the same result as the argument query.
 -- | `psp:Function -> psp:Function`
 useCache :: forall s o. (s **> o) -> (s **> o)
-useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
+useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter ("useCache(" <> nameOfp <> ")") go where
   go r =
     do
       remember <- memorizeQueryResults
@@ -342,7 +342,7 @@ useCache (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
       pure result
 
 constant :: forall s. Show s => s -> TypedTripleGetter s s
-constant subject = (\_ -> pure [subject]) `trackedAs` ("model:Perspectives$constant$_" <> unsafeCoerce subject)
+constant subject = (\_ -> pure [subject]) `trackedAs` ("constant()" <> unsafeCoerce subject <> ")")
 
 -----------------------------------------------------------
 -- VARIABLES
@@ -351,7 +351,7 @@ constant subject = (\_ -> pure [subject]) `trackedAs` ("model:Perspectives$const
 -- | The resulting query returns exactly the same result as the argument query.
 -- | `String -> psp:Function -> psp:Function`
 var :: forall s o. String -> (s **> o) -> (s **> o)
-var name (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
+var name (TypedTripleGetter nameOfp p) = TypedTripleGetter ("var(" <> nameOfp <> ")") go where
   go subject = do
     r <- p subject
     putQueryVariable name $ (typeWithPerspectivesTypes getRef) r
@@ -361,7 +361,7 @@ var name (TypedTripleGetter nameOfp p) = TypedTripleGetter nameOfp go where
 -- | Returns exactly the same value as the query used to store the value.
 -- | `String -> psp:Function`
 ref :: forall s o. String -> TypedTripleGetter s o
-ref name = TypedTripleGetter name (ref' name)
+ref name = TypedTripleGetter ("ref(" <> name <> ")") (ref' name)
 
 ref' :: forall s o. String -> s -> MonadPerspectivesQuery (Triple s o)
 ref' name ignore = readQueryVariable name >>= \(TripleRef{subject, predicate}) ->
@@ -373,7 +373,7 @@ ref' name ignore = readQueryVariable name >>= \(TripleRef{subject, predicate}) -
 -- | Use this combinator to protect a query variable value.
 -- | `String -> psp:Function -> psp:Function`
 saveVar :: forall s o. String -> (s **> o) -> (s **> o)
-saveVar name (TypedTripleGetter nameOfp p) = TypedTripleGetter ("saveVar_" <> name <> nameOfp) go where
+saveVar name (TypedTripleGetter nameOfp p) = TypedTripleGetter ("saveVar(" <> name <> ", " <> nameOfp <> ")") go where
   go subject = do
     variableValue <- readQueryVariable name
     r <- p subject

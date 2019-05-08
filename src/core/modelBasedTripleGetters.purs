@@ -88,7 +88,7 @@ propertyReferenties = typeWithPerspectivesTypes searchUnqualifiedRolDefinition "
 
 -- | Tests whether the type of the Rol has a specific local name. Used to test if a Rol is a BuitenRol type or a BinnenRol type.
 rolHasTypeWithLocalName :: ID.LocalName -> TypedTripleGetter String PBool
-rolHasTypeWithLocalName localName = ((RolInContext >>> rolType) `composeMonoidal` f) `trackedAs` ("model:Perspectives$rolHasTypeWithLocalName" <> "_" <> localName)
+rolHasTypeWithLocalName localName = ((RolInContext >>> rolType) `composeMonoidal` f) `trackedAs` ("rolHasTypeWithLocalName" <> "_" <> localName)
   where
     f :: Array RolDef -> PBool
     f = PBool <<< show <<< alaF Disj foldMap (maybe false ((==) localName) <<< deconstructLocalNameFromDomeinURI <<< unwrap)
@@ -180,10 +180,10 @@ mandatoryProperties = QC.difference f (f >-> directAspectProperties)
     f = QC.filter propertyIsVerplicht (closure_ directAspectRoles >-> (unwrap `before` closure_ getPrototype) >-> RolDef `before` ownPropertiesDef)
 
 buitenRolBeschrijvingDef :: (AnyDefinition **> RolDef)
-buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "buitenRolBeschrijving"
+buitenRolBeschrijvingDef = MBOG.buitenRolBeschrijvingDef `trackedAs` "model:Perspectives$Context$buitenRolBeschrijving"
 
 binnenRolBeschrijvingDef :: (AnyDefinition **> RolDef)
-binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "binnenRolBeschrijving"
+binnenRolBeschrijvingDef = MBOG.binnenRolBeschrijvingDef `trackedAs` "model:Perspectives$Context$binnenRolBeschrijving"
 
 -- | From the description of a Context, return its contextBot.
 contextBot :: (ContextDef **> RolInContext)
