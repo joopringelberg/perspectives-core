@@ -86,7 +86,9 @@ getDependencies (Triple{dependencies}) = do
     lookupRef (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
 
 recompute :: Triple String String -> MonadPerspectives (Triple String String)
-recompute (Triple{subject, predicate, tripleGetter}) = addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *> runMonadPerspectivesQuery subject tripleGetter
+recompute (Triple{subject, predicate, tripleGetter}) =
+  -- addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *> 
+  runMonadPerspectivesQuery subject tripleGetter
 
 -- Change the object of the triple to the array of IDs passed to the function.
 foreign import saveChangedObject :: Triple String String -> Array String -> Effect (Triple String String)
