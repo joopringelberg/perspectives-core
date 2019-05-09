@@ -2,7 +2,7 @@ module Perspectives.Api where
 
 import Control.Aff.Sockets (ConnectionProcess, EmitFunction, Emitter, Left, Right, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 import Control.Coroutine (Consumer, Producer, Process, await, runProcess, transform, ($$), ($~))
-import Control.Coroutine.Aff (produce')
+import Control.Coroutine.Aff (Step(..), produce')
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
@@ -65,10 +65,10 @@ type RequestRecord =
 showRequestRecord :: RequestRecord -> String
 showRequestRecord {request, subject, predicate} = "{" <> request <> ", " <> subject <> ", " <> predicate <> "}"
 
-foreign import createRequestEmitterImpl :: EffectFn3 (Left RequestRecord) (Right RequestRecord) (EmitFunction RequestRecord Unit) Unit
+foreign import createRequestEmitterImpl :: EffectFn3 (RequestRecord -> Step RequestRecord Unit) (Unit -> Step RequestRecord Unit) (EmitFunction RequestRecord Unit) Unit
 
 createRequestEmitter :: Emitter RequestRecord Unit
-createRequestEmitter = runEffectFn3 createRequestEmitterImpl Left Right
+createRequestEmitter = runEffectFn3 createRequestEmitterImpl Emit Finish
 
 -- A Producer for Requests.
 requestProducer :: Producer RequestRecord (MonadPerspectives) Unit
