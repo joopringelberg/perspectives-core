@@ -3,8 +3,6 @@ module Perspectives.ContextRoleParser where
 import Perspectives.EntiteitAndRDFAliases
 
 import Control.Alt (void, (<|>))
-import Effect.Aff.AVar (AVar, put, take)
-import Effect.Exception (error)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
@@ -16,19 +14,20 @@ import Data.Foldable (elem, fold, for_)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
 import Data.String (Pattern(..), drop, split)
 import Data.String.CodeUnits (charAt, fromCharArray)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Aff.AVar (AVar, put, take)
+import Effect.Exception (error)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, (##>), MP)
 import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
-
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
 import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, getDefaultPrototype)
+import Perspectives.ModelBasedObjectGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, getDefaultPrototype)
 import Perspectives.ObjectGetterConstructors (getPrototype, notEmpty, searchUnqualifiedRolDefinition, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
@@ -798,6 +797,13 @@ parseAndCache text = do
             bRol <- take av
             put (changeRol_type (unwrap brtype) bRol) av
 
-    -- TODO Implementeer setBinnenRolType
     setBinnenRolType :: PerspectContext ->  MonadPerspectives Unit
-    setBinnenRolType ctxt = pure unit
+    setBinnenRolType ctxt = do
+      abrtype <- binnenRolBeschrijvingDef (context_pspType ctxt)
+      case head abrtype of
+        Nothing -> throwError (error ("setBinnenRolType: no binnenRolBeschrijving for '" <> (context_pspType ctxt) <> "'!"))
+        (Just brtype) -> do
+          (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (binnenRol (context_id ctxt))
+          lift $ void $ do
+            bRol <- take av
+            put (changeRol_type (unwrap brtype) bRol) av
