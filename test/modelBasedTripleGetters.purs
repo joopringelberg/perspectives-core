@@ -3,12 +3,13 @@ module Test.Perspectives.ModelBasedTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Data.Array (length)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijving)
 import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, rollenDef, sumToSequence, botActiesInContext)
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
@@ -231,6 +232,11 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       ((p "PerspectivesSysteem$modellen") ##= getFunctionResultType)
       [p "Context"]
 
+  test "propertyReferenties" do
+    assertEqual "psp:PerspectivesSysteem$gebruiker$VolledigeNaam has two roles $propertyReferentie"
+      (((RolDef $ p "PerspectivesSysteem$gebruiker$VolledigeNaam") ##= propertyReferenties) >>= (pure <<< length))
+      2
+
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "testBotActie.crl"
   ---------------------------------------------------------------------------------
@@ -264,10 +270,10 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
         (allowedBinding ##= hasOnEachRolTelescopeTheContextTypeOf (unwrap boundValue))
       [PBool "true"]
 
-  testOnly "botActiesInContext" do
+  test "botActiesInContext" do
     loadTestModel "testBotActie.crl"
     assertEqual "tba:Test has a single action for the contextBot."
-      (ContextDef (tba "Test") ##= botActiesInContext) 
+      (ContextDef (tba "Test") ##= botActiesInContext)
       [ContextDef $ tba "Test$botCopiesV1ToV2"]
     unLoadTestModel "model:TestBotActie"
 

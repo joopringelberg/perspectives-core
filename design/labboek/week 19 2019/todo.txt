@@ -1,9 +1,6 @@
 TODO
 
 VAN WEEK 17
-1. Implementeer setBinnenRolType.
-3. Controleer/Herschrijf ModelBasedTripleGetters.botActiesInContext
-4. Bedenk hoe je de acties die opgezet zijn voor een ContextInstantie, weer weg kunt halen.
 
 DEZE WEEK
 5. Maak een scherm voor TestBotActie.
@@ -17,6 +14,8 @@ DEZE WEEK
 9. Begin aan de schermgenerator.
 	- bedenk een taal voor schermbeschrijving
 
+10. Los de problemen met de typeDefChecker op.
+
 DONE
 1. Verbouw in Action constructActionFunction zodat die geen Action, maar een QueryEffect oplevert.
 2. Controleer waarom in testBotActie.purs propsEqualWithEffect niet werkt.
@@ -25,3 +24,7 @@ DONE
 	- triples in state pushen bij theorychange
 4. Maak de naamgeving van TypedTripleGetters consistent.
 
+3. Controleer/Herschrijf ModelBasedTripleGetters.botActiesInContext
+	- test setupBotActions.
+4. Bedenk hoe je de acties die opgezet zijn voor een ContextInstantie, weer weg kunt halen.
+1. Implementeer setBinnenRolType.

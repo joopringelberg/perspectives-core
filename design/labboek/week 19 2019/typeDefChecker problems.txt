@@ -1,0 +1,14 @@
+TYPEDEFCHECKER PROBLEMS
+
+1. Model 'model:TestBotActie' contains semantical errors and is not saved!
+
+(IncorrectContextRolBinding) In de context 'model:TestBotActie$Test$botCopiesV1ToV2$c1$c2' is de ContextRol 'model:TestBotActie$Test$botCopiesV1ToV2$c1$c2$query_1' gebonden aan 'model:TestBotActie$Test$binnenRolBeschrijving$propsEqual'(type: 'model:Perspectives$SimpleValue') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$Function"]'.
+------
+(IncorrectContextRolBinding) In de context 'model:TestBotActie$Test$botCopiesV1ToV2$c1' is de ContextRol 'model:TestBotActie$Test$botCopiesV1ToV2$c1$operand_1' gebonden aan 'model:TestBotActie$Test$botCopiesV1ToV2$c1$c2'(type: 'no type of binding') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$ElkType"]'.
+------
+
+2. The following errors are no longer flagged by the typedefchecker. 
+      -- , "MissingExternalPropertyValue"
+      -- , "MissingInternalPropertyValue"
+      -- , "IncompatiblePrototype"
+      -- , "CannotOverideBooleanRolProperty"

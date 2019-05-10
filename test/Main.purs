@@ -17,6 +17,7 @@ import Test.Perspectives.ModelBasedTripleGetters (theSuite) as MBTG
 import Test.Perspectives.ObjectGetterConstructors (theSuite) as OGC
 import Test.Perspectives.QueryCombinators (theSuite) as QC
 import Test.Perspectives.QueryCompiler (theSuite) as CQR
+import Test.Perspectives.StringTripleGetterConstructors as STGC
 import Test.Perspectives.TestBotActie as TBA
 import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
@@ -45,6 +46,7 @@ main = runTest do
   ResRet.theSuite
   DEPS.theSuite
   THC.theSuite
+  STGC.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP setupUser)

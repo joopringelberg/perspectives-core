@@ -41,7 +41,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "TestBotActie" do
+theSuite = suiteSkip "TestBotActie" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
@@ -129,8 +129,7 @@ theSuite = suite "TestBotActie" do
       [Value "aap"]
       1000.0
 
-  testOnly "tearDownBotActions" do
-    loadTestModel "testBotActie.crl"
+  test "tearDownBotActions" do
     loadTestModel "testbotInstantie.crl"
 
     assertEqualWithPropagation "After tearing down, a new value for $v1 will not be copied to $v2"
