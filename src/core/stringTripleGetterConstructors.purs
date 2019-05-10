@@ -100,8 +100,9 @@ searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getContextRol rn))
 searchRolInContext :: String -> StringTypedTripleGetter
 searchRolInContext = searchContextRol
 
+-- TODO. Waarom eerst de context nemen?
 searchUnqualifiedRol :: Id.LocalName -> StringTypedTripleGetter
-searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (DTG.genericContext >-> (getUnqualifiedContextRol rn))
+searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (getUnqualifiedContextRol rn)
 
 -----------------------------------------------------------
 -- GET A ROLDEFINITION FROM A CONTEXT DEFINITION
@@ -113,10 +114,7 @@ getUnqualifiedRolDefinition ln = (QC.filter_
   (getUnqualifiedContextRol "rolInContext" >-> DTG.genericBinding >-> DTG.genericContext))
 
 searchUnqualifiedRolDefinition :: Id.LocalName -> StringTypedTripleGetter
-searchUnqualifiedRolDefinition ln = searchInAspectsAndPrototypes f
-  where
-    f :: (String **> String)
-    f = DTG.genericContext >-> getUnqualifiedRolDefinition ln
+searchUnqualifiedRolDefinition ln = searchInAspectsAndPrototypes (getUnqualifiedRolDefinition ln)
 
 -----------------------------------------------------------
 -- GET A PROPERTY FROM A ROLE TELESCOPE
@@ -173,10 +171,7 @@ getUnqualifiedPropertyDefinition ln = (QC.filter_
   (getUnqualifiedContextRol "rolInContext" >-> DTG.genericBinding >-> DTG.genericContext))
 
 searchUnqualifiedPropertyDefinition :: Id.LocalName -> StringTypedTripleGetter
-searchUnqualifiedPropertyDefinition ln = searchInAspectsAndPrototypes f
-  where
-    f :: StringTypedTripleGetter
-    f = DTG.genericContext >-> getUnqualifiedPropertyDefinition ln
+searchUnqualifiedPropertyDefinition ln = searchInAspectsAndPrototypes (getUnqualifiedPropertyDefinition ln)
 
 -----------------------------------------------------------
 -- INVERSE ROL
@@ -188,4 +183,4 @@ constructInverseRolGetter pn = (OGC.genericGetRoleBinders pn) `trackedAs` (pn <>
 
 -- | The PropertyReferences of the View. Again, the typing is imprecise.
 propertyReferenties :: StringTypedTripleGetter
-propertyReferenties = typeWithPerspectivesTypes searchUnqualifiedRolDefinition "propertyReferentie"
+propertyReferenties = typeWithPerspectivesTypes searchUnqualifiedRol "propertyReferentie"
