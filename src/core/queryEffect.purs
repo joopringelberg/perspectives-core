@@ -1,7 +1,10 @@
 module Perspectives.QueryEffect where
 
 import Control.Monad.Trans.Class (lift)
+import Effect (Effect)
 import Effect.Class (liftEffect)
+import Perspectives.ApiTypes (CorrelationIdentifier, Response(..), ResponseRecord)
+import Perspectives.ApiTypes (convertResponse, ApiEffect) as Api
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, registerTriple)
@@ -11,7 +14,18 @@ type QueryEffect a = NamedFunction (PerspectivesEffect a)
 
 type PerspectivesEffect a = Array a -> MonadPerspectives Unit
 
--- | Make an effect function (QueryEffect) dependent on the objects of a TypedTripleGetter.
+-- | Make a PerspectivesEffect from an ApiEffect.
+-- | In pushesObjectsTo we tie a TripleGetter to a PerspectivesEffect.
+-- | So we need a function that converts the ApiEffect callback we receive through the API into a
+-- | PerspectivesEffect.
+sendResult :: CorrelationIdentifier -> Api.ApiEffect -> PerspectivesEffect String
+sendResult corrId pe as = liftEffect $ pe (Api.convertResponse $ Result corrId as)
+
+-- | Apply an ApiEffect to a Response, in effect sending it through the API to the caller.
+sendResponse :: Response -> Api.ApiEffect -> MonadPerspectives Unit
+sendResponse r ae = liftEffect $ ae (Api.convertResponse r)
+
+-- | Make an effect function (QueryEffect = named PerspectivesEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.
 -- | Remove the effect function's dependency on the tripleGetter by using unsubscribeFromObjects.
 pushesObjectsTo :: forall s o.
