@@ -1,14 +1,14 @@
 module Perspectives.QueryEffect where
 
 import Control.Monad.Trans.Class (lift)
-import Effect (Effect)
 import Effect.Class (liftEffect)
-import Perspectives.ApiTypes (CorrelationIdentifier, Response(..), ResponseRecord)
+import Perspectives.ApiTypes (CorrelationIdentifier, Response(..))
 import Perspectives.ApiTypes (convertResponse, ApiEffect) as Api
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, pure, ($), (<>))
+import Unsafe.Coerce (unsafeCoerce)
 
 type QueryEffect a = NamedFunction (PerspectivesEffect a)
 
@@ -19,11 +19,11 @@ type PerspectivesEffect a = Array a -> MonadPerspectives Unit
 -- | So we need a function that converts the ApiEffect callback we receive through the API into a
 -- | PerspectivesEffect.
 sendResult :: CorrelationIdentifier -> Api.ApiEffect -> PerspectivesEffect String
-sendResult corrId pe as = liftEffect $ pe (Api.convertResponse $ Result corrId as)
+sendResult corrId pe as = liftEffect $ (unsafeCoerce pe) (Api.convertResponse $ Result corrId as)
 
 -- | Apply an ApiEffect to a Response, in effect sending it through the API to the caller.
 sendResponse :: Response -> Api.ApiEffect -> MonadPerspectives Unit
-sendResponse r ae = liftEffect $ ae (Api.convertResponse r)
+sendResponse r ae = liftEffect $ (unsafeCoerce ae) (Api.convertResponse r)
 
 -- | Make an effect function (QueryEffect = named PerspectivesEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.

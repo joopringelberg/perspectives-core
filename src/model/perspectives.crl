@@ -166,6 +166,10 @@ psp:Context psp:Rol
 		psp:Rol $constraint
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Function
+	$rolInContext =>
+		psp:Rol $binding
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
 
 psp:Context psp:View
 	$rolInContext =>
