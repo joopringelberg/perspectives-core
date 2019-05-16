@@ -15,6 +15,13 @@ DEZE WEEK
 	- bedenk een taal voor schermbeschrijving
 
 10. Los de problemen met de typeDefChecker op.
+O.a.: de controle op het aanmaken van een nieuwe context is niet goed (er wordt geklaagd over het afwezig zijn van een binnenRolBeschrijving).
+
+11. Maak syntax in perspectives.crl voor het maken van een Rol en een Context.
+
+12. Maak gevallen in Actions.constructActionFunction voor het maken van een Rol en een Context.
+
+13. Verander de code in constructActionFunction zodat objecten en indirect objecten met meerdere waarden goed gehanteerd worden.
 
 DONE
 1. Verbouw in Action constructActionFunction zodat die geen Action, maar een QueryEffect oplevert.

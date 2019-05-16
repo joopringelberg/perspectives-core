@@ -13,7 +13,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "StringTripleGetterConstructors" do
+theSuite = suiteSkip "StringTripleGetterConstructors" do
   -- test "Setting up" do
   --   loadTestModel "perspectives.crl"
   test "propertyReferenties" do

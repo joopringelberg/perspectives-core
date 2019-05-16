@@ -1,0 +1,49 @@
+ACTIES EN SCHERMEN
+
+1. Cors schermen en dialogen kun je opvatten als een specialisatie van de geneste acties van Perspectives I.
+2. Wat Cor een dialoog noemt, was een view in Perspectives I.
+3. Ik streef ernaar om dialogen/views te gaan genereren op basis van kenmerken van acties, in plaats van ze expliciet op te nemen als onderdeel van een actie zoals in Perspectives I.
+4. De eenheid die door de core naar de client verstuurd wordt, is een scherm en dat is een Consult/Create/Change van een Context. 
+5. Een scherm(deel) voor een actie bestaat uit velden voor de view van de actie en omkaderde delen voor de subacties.
+6. Een scherm wordt gemaakt voor een gebruikerrol. Alleen voor subacties waarin die rol het subject kan zijn, maken we geneste schermdelen. 
+7. Of de actie beschikbaar is of niet ten tijde van het maken van het scherm, maakt niet uit. De beschikbaarheid wordt bepaald op basis van de toestand en wordt uitgedrukt in een berekende Boolean property van het actietype. Het schermdeel maken we in React zichtbaar op basis van die boolean.
+8. Het scherm dat we genereren, bevat de componenten uit de React bibliotheek. Zo'n scherm werkt dus expliciet *niet* met Consult acties om delen op te bouwen. Consult acties worden gebruikt in scherm-compile-time, niet runtime.
+9. Ook change- en delete acties worden gebruikt in scherm-compile-time.
+10. Doet een gebruiker een handeling waarmee hij aangeeft dat hij een Context wil consulteren, dan voert hij een consult-actie uit. De schermcompiler construeert een scherm en stuurt dat aan de client.
+11. De verhouding tussen scherm en actie is dus:
+	* het scherm is opgebouwd uit React componenten
+	* sommige van die componenten corresponderen met basisacties/assignment operatoren
+	* actie-typen worden gebruikt om een scherm op te bouwen
+12. Er hoeft dus geen spoor van geïnstantieerde acties te ontstaan (anders dan de Delta's, die je als geïnstantieerde basisacties kunt beschouwen).
+13. Een context kan op topniveau een consult of change actie bevatten voor een rol. Deze actie is dus geen onderdeel van de consult van de context zelf. Voor zulke acties moet een aparte bedieningsmogelijkheid gemaakt worden, anders kan de gebruiker ze niet uitvoeren. In Perspectives I waren dit bijvoorbeeld 'opties'. Maar er zijn meer mogelijkheden, zoals een context menu of een window menu.
+De vraag is: genereren we deze bedieningsmogelijkheden? En hebben we criteria om automatisch te beslissen hoe een bepaalde actie ontsloten wordt?
+Tot de bedieningsmogelijkheden horen:
+	* klik
+	* dubbelklik
+	* zwevend menu
+	* optielijst
+	* schermmenu
+14. Acties op een rol:
+	* consulteer de properties
+	* bewerk de properties
+	* bind aan de rol
+	* verwijder de binding van de rol
+	* verwijder de rol
+15. De buitenrol is wat we vroeger de samenvatting noemden. Een buitenrol kunnen we visueel representeren met een kaartje. Dus consulteren van een buitenrol geeft een kaartje - misschien afhankelijk van de view?
+16. Dubbelklikken op een kaartje moet altijd leiden tot het consulteren van de context.
+17. Een kaartje droppen moet altijd leiden tot binden. Je moet dus droppen op een rol. Maar hoe visualiseren we een rol?
+Je zou de bind-actie van een rol kunnen visualiseren met een vlak voor die rol. In dat vlak wordt de rolbinding weergegeven.
+Dat werkt prima voor een lege rol. De vraag is: waar komt die lege rol vandaan?
+18. Als je een consult hebt voor een rol en een create en een bind voor die rol, kun je een scherm genereren met een (leeg) vlak voor die rol (hoeft niet leeg te zijn als de view properties heeft). Drop er een kaartje in en de create en bind worden uitgevoerd.
+Heb je alleen een consult, dan blijft het vlak leeg als er geen rollen zijn.
+19. Consulteer een relationele ContextRol. Genest in die actie consulteer je de binding, dus de buitenRol.
+Hiervoor zou ik een lijst van kaartjes tonen. Wil je dan de properties van de rol zelf consulteren, dan heb je een aparte dialoog nodig, die ik zou ontsluiten vanuit een zwevend menu.
+20. Consulteer een berekende rol, die uit buitenrollen bestaat. Nu kan je geen rollen toevoegen. 
+21. Hoe creeer je een context? Met een actie met een view. Die geeft je een formulier. Maar maak je eerst de context en vul je dan de properties van binnen- en buitenrol? 
+22. En hoe creeer je een rol? Wordt dat een optie?
+23. Een nadeel van acties in elkaar nesten is dat daarmee de subjecten die mogen uitvoeren en de nesting samenhangen. 
+Door containers te gebruiken die acties en andere containers kunnen bevatten, trek je beide los. 
+Acties kunnen dan éénmalig in de context worden gedefinieerd. 
+Je moet dan weer wel aangeven welke container gebruikt wordt door welke rol en bij welk werkwoord, als het object een context is. 
+Maar ik denk dat dit te ingewikkeld wordt. Bovendien moet je naar acties kunnen verwijzen. En hoe doe je dat? Een mnemonische naam voor een actie komt al snel dicht in de buurt van de hele actiedefinitie zelf! Althans, in Arc.
+Ik houd het op geneste acties.

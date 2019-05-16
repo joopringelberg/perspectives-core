@@ -1,0 +1,130 @@
+DEBUGGING TESTBOTACTIE IN REACT-INTEGRATED-CLIENT
+
+1. Bij ExternalViewOfBoundContext werkte het wel, maar bij InternalViewOfBoundContext niet.
+De inbedding is als volgt:
+	<Context type="model:Perspectives$PerspectivesSysteem" contextinstance="model:User$MijnSysteem">
+		<Rollen rollen={[
+            "gebruiker",
+            "modellen",
+            "trustedCluster",
+            "zaken"
+          ]}>
+          	...
+          	<InternalViewOfBoundContext rolname="zaken" viewname="allProps">
+              <TestBotActie/>
+            </InternalViewOfBoundContext> 
+        </Rollen>
+    </Context>
+
+function InternalViewOfBoundContext(props)
+{
+  return (<RolBinding rolname={props.rolname} rolinstance={props.rolinstance}>
+    <ContextOfRole>
+      <ViewOnInternalRole viewname={props.viewname}>{props.children}</ViewOnInternalRole>
+    </ContextOfRole>
+  </RolBinding>);
+}
+
+function ViewOnInternalRole(props)
+{
+  return (<InternalRole contextinstance={props.contextinstance} namespace={props.namespace}>
+      <View viewname={props.viewname}>{props.children}</View>
+    </InternalRole>)
+}
+
+
+ANDER PROBLEEM
+In View mis ik 'namespace' en 'rolname' in de props.
+
+            <RolBinding rolname="trustedCluster">
+              <ContextOfRole>
+                <ViewOnExternalRole viewname="Kaartje">// Error hier door "Kaartje"
+                  <TrustedCluster_BuitenRol_Kaartje />
+                </ViewOnExternalRole>
+              </ContextOfRole>
+            </RolBinding>
+
+function ViewOnExternalRole(props)
+{
+  return (<ExternalRole contextinstance={props.contextinstance} namespace={props.namespace}>
+      <View viewname={props.viewname}>{props.children}</View>
+    </ExternalRole>)
+}
+
+ExternalRole moet de namespace doorgeven aan View.
+ExternalRole roept getRolType van: "model:User$MijnSysteem$MijnCluster_buitenRol"
+Hij ontvangt een prop.contextinstance gelijk aan "model:User$MijnSysteem$MijnCluster".
+Die bestaat. Maar er komt niets terug.
+Het type moet zijn: "model:Perspectives$TrustedCluster$buitenRolBeschrijving"
+Dit zou de namespace zijn die hij doorgeeft aan zijn children, casu quo View.
+En dan wordt in View de qualifiedView gelijk aan:
+"model:Perspectives$TrustedCluster$buitenRolBeschrijving$Kaartje"
+En die bestaat.
+
+Dus: waarom komt getRolType niet terug?
+OPGELOST.
+
+V1 ZETTEN FAALT
+Het request heeft:
+	predicate "undefined$undefined$v1"
+	subject undefined
+	
+setProperty blijkt geen prop namespace en geen prop rolinstance te hebben. Alleen propertyname	
+
+Dit is de inbedding:
+            <InternalViewOfBoundContext rolname="zaken" viewname="allProps">
+              <TestBotActie/>
+            </InternalViewOfBoundContext>
+
+function TestBotActie (props)
+{
+  return (
+    <div>
+      <p><label>v2:</label>{props.v2}</p>
+      <SetProperty propertyname="v1">
+        <V1Input/>
+      </SetProperty>
+    </div>
+  );
+}
+
+function InternalViewOfBoundContext(props)
+{
+  return (<RolBinding rolname={props.rolname} rolinstance={props.rolinstance}>
+    <ContextOfRole>
+      <ViewOnInternalRole viewname={props.viewname}>{props.children}</ViewOnInternalRole>
+    </ContextOfRole>
+  </RolBinding>);
+}
+
+Wat geeft ViewOnInternalRole door? Dat wat InternalRole doorgeeft:
+// namespace
+// rolinstance
+
+Waarschijnlijk blijft het dus hangen in TestBotActie.
+Daar geef ik het nu door, maar het lijkt erop dat TestBotActie zelf de waarden niet ontvangt.
+
+View ontvangt de props van InternalRole.
+Maar vermoedelijk geeft View alleen de props door die properties zijn in de view.
+Dus dat betekent dat TestBotActie ze niet ontvangt.
+
+Ik ga View ook namespace en rolinstance laten doorgeven.
+
+TWEEMAAL EEN INSTANTIE VAN TBA:TEST MAKEN FAALT
+[(IncorrectContextRolBinding) In de context 'model:User$MijnSysteem' is de ContextRol 'model:User$MijnSysteemzaken0' gebonden aan 'model:User$c9e4e9a71_510d_46fc_ac1a_4e8850cdf644'(type: 'model:TestBotActie$Test') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$Zaak"]'.]
+Dit is de eerstgemaakte binding. Kennelijk wordt die opnieuw gecontroleerd bij het aanmaken van een tweede instantie.
+
+
+EEN NIEUWE INSTANTIE VAN TBA:TEST KOMT NIET DOOR OP DE USER INTERFACE
+
+
+DE BOT IS NIET OPGEZET VOOR DE TESTCONTEXT
+setupBotActions wordt wel aangeroepen, maar komt niet tot het toepassen van de actie. 
+Hij vindt geen actions.
+En dat klopt. Hij probeert het te doen voor de binnenrol!
+Gecorrigeerd. 
+Maar nu staat de trigger nog niet aan!
+
+EEN PROPERTY DIE MEEGEGEVEN WORDT BIJ HET AANMAKEN VAN EEN CONTEXT KOMT NIET OVER
+Overigens: bij het nogmaals zetten wordt de waarde een lege string.
+
