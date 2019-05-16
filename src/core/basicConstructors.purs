@@ -49,10 +49,11 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           removeFromCache ident
           pure $ Left messages
         (Right _) -> do
-          (m :: Array UserMessage) <- checkAContext $ Context ident
+          -- (m :: Array UserMessage) <- checkAContext $ Context ident
+          m <- pure []
           case length m of
             0 -> pure $ Right ident
-            otherwise -> do
+            otherwise -> do 
               removeFromCache ident
               pure $ Left m
           -- pure $ Right ident
@@ -135,7 +136,7 @@ constructRol rolType contextId rolId i (RolSerialization {properties, binding: b
       { _id = rolInstanceId
       , pspType = rolType -- TODO: dit is verkeerd: hier wordt de context id gebruikt
       , context = contextId
-      , binding = Just $ expandDefaultNamespaces bnd
+      , binding = maybe Nothing (Just <<< expandDefaultNamespaces) bnd
       , properties = constructProperties properties
       })
   pure rolInstanceId
