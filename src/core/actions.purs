@@ -16,7 +16,7 @@ import Perspectives.ApiTypes (Value)
 import Perspectives.BasicActionFunctions (storeDomeinFile)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>), (##>>), (%%))
-import Perspectives.DataTypeObjectGetters (context, contextType, rolBindingDef)
+import Perspectives.DataTypeObjectGetters (context, contextType, genericContext, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
 import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
@@ -83,8 +83,8 @@ updatePerspectEntiteit' changeEntity cid value = do
   if (isUserEntiteitID cid)
     then do
       -- Change the entity in cache:
-      void $ cacheCachedEntiteit cid (changeEntity value entity)
-      void $ saveVersionedEntiteit cid entity
+      changedEntity <- cacheCachedEntiteit cid (changeEntity value entity)
+      void $ saveVersionedEntiteit cid changedEntity
     else do
       let dfId = (unsafePartial (fromJust (deconstructModelName cid)))
       addDomeinFileToTransactie dfId
@@ -146,13 +146,13 @@ setBinding rid boundRol = do
   updatePerspectEntiteit' changeRol_binding rid boundRol
   case head oldBinding of
     Nothing -> pure unit
-    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (psp "binding") rid
-  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol (psp "binding") rid
+    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (psp "Rol$binding") rid
+  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol (psp "Rol$binding") rid
   cid <- (RolInContext rid) ##>> context
   setupBotActions cid
   addDelta $ Delta
     { id : rid
-    , memberName: psp "binding"
+    , memberName: psp "Rol$binding"
     , deltaType: Change
     , value: (Just boundRol)
     , isContext: false
@@ -209,6 +209,13 @@ setUpBotActionsAfter g mn mid cid = do
   pure r
 
 
+setUpBotActionsAfterRolAction :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
+setUpBotActionsAfterRolAction g mn mid rid = do
+  r <- g mn mid rid
+  cid <- rid ##>> genericContext
+  setupBotActions cid
+  pure r
+
 removeRol' :: RolName -> RolID -> ObjectsGetter
 removeRol' =
   updatePerspectEntiteitMember
@@ -255,7 +262,7 @@ addProperty' =
         })
 
 addProperty :: RolName -> RolID -> ObjectsGetter
-addProperty = setUpBotActionsAfter addProperty'
+addProperty = setUpBotActionsAfterRolAction addProperty'
 
 removeProperty' :: PropertyName -> Value -> ObjectsGetter
 removeProperty' =
@@ -271,7 +278,7 @@ removeProperty' =
         })
 
 removeProperty :: RolName -> RolID -> ObjectsGetter
-removeProperty = setUpBotActionsAfter removeProperty'
+removeProperty = setUpBotActionsAfterRolAction removeProperty'
 
 setProperty' :: PropertyName -> Value -> ObjectsGetter
 setProperty' =
@@ -287,7 +294,7 @@ setProperty' =
         })
 
 setProperty :: PropertyName -> Value -> ObjectsGetter
-setProperty = setUpBotActionsAfter setProperty'
+setProperty = setUpBotActionsAfterRolAction setProperty'
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -350,10 +357,12 @@ constructActionFunction actionInstanceID objectGetter = do
 
       action <- pure (\f contextId bools -> case head bools of
         Just "true" -> do
+          -- TODO. Indien de relatie relationeel is, ken dan alle waarden toe!
           val <- (runTypedTripleGetterToMaybeObject contextId valueComputer)
           case val of
             Nothing -> pure unit
             (Just v) -> do
+              -- TODO. Voer de actie uit voor elk (indirect) object!
               object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
               case object of
                 Nothing -> pure unit
