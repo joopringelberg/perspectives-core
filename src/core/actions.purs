@@ -65,14 +65,18 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -}
 -- | Create update functions on PerspectContext or PerspectRol.
 -- | The result is an ObjectsGetter that always returns the (ID of the) PerspectEntiteit.
+-- | Sets up the Bot actions for a Context.
 updatePerspectEntiteit :: forall a. PerspectEntiteit a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
   Value -> ObjectsGetter
 updatePerspectEntiteit changeEntity createDelta value cid = do
   updatePerspectEntiteit' changeEntity cid value
-  addDelta $ createDelta cid value
-  setupBotActions cid
+  d@(Delta{isContext}) <- pure $ createDelta cid value
+  addDelta d
+  if (isContext)
+    then setupBotActions cid
+    else pure unit
   pure [cid]
 
 updatePerspectEntiteit' :: forall a. PerspectEntiteit a =>
@@ -89,12 +93,6 @@ updatePerspectEntiteit' changeEntity cid value = do
       let dfId = (unsafePartial (fromJust (deconstructModelName cid)))
       addDomeinFileToTransactie dfId
       cacheInDomeinFile dfId (changeEntity value entity)
-
-  -- rev <- lift $ onNothing' ("updatePerspectEntiteit: context has no revision, deltas are impossible: " <> cid) (getRevision' context)
-  -- -- Store the changed entity in couchdb.
-  -- newRev <- lift $ modifyResourceInCouchdb cid rev (encode context)
-  -- -- Set the new revision in the entity.
-  -- lift $ cacheCachedEntiteit cid (setRevision newRev context)
 
 setContextType :: ID -> ObjectsGetter
 setContextType = updatePerspectEntiteit
@@ -199,18 +197,17 @@ addRol' =
         })
 
 addRol :: RolName -> RolID -> ObjectsGetter
-addRol = setUpBotActionsAfter addRol'
+addRol = setupBotActionsAfter addRol'
 
-setUpBotActionsAfter :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
--- setUpBotActionsAfter g mn mid cid = g mn mid cid <* setupBotActions cid
-setUpBotActionsAfter g mn mid cid = do
+setupBotActionsAfter :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
+setupBotActionsAfter g mn mid cid = do
   r <- g mn mid cid
   setupBotActions cid
   pure r
 
 
-setUpBotActionsAfterRolAction :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
-setUpBotActionsAfterRolAction g mn mid rid = do
+setupBotActionsAfterRolAction :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
+setupBotActionsAfterRolAction g mn mid rid = do
   r <- g mn mid rid
   cid <- rid ##>> genericContext
   setupBotActions cid
@@ -230,7 +227,7 @@ removeRol' =
         })
 
 removeRol :: RolName -> RolID -> ObjectsGetter
-removeRol = setUpBotActionsAfter removeRol'
+removeRol = setupBotActionsAfter removeRol'
 
 setRol' :: RolName -> RolID -> ObjectsGetter
 setRol' =
@@ -246,7 +243,7 @@ setRol' =
         })
 
 setRol :: RolName -> RolID -> ObjectsGetter
-setRol = setUpBotActionsAfter setRol'
+setRol = setupBotActionsAfter setRol'
 
 addProperty' :: PropertyName -> Value -> ObjectsGetter
 addProperty' =
@@ -262,7 +259,7 @@ addProperty' =
         })
 
 addProperty :: RolName -> RolID -> ObjectsGetter
-addProperty = setUpBotActionsAfterRolAction addProperty'
+addProperty = setupBotActionsAfterRolAction addProperty'
 
 removeProperty' :: PropertyName -> Value -> ObjectsGetter
 removeProperty' =
@@ -278,7 +275,7 @@ removeProperty' =
         })
 
 removeProperty :: RolName -> RolID -> ObjectsGetter
-removeProperty = setUpBotActionsAfterRolAction removeProperty'
+removeProperty = setupBotActionsAfterRolAction removeProperty'
 
 setProperty' :: PropertyName -> Value -> ObjectsGetter
 setProperty' =
@@ -294,7 +291,7 @@ setProperty' =
         })
 
 setProperty :: PropertyName -> Value -> ObjectsGetter
-setProperty = setUpBotActionsAfterRolAction setProperty'
+setProperty = setupBotActionsAfterRolAction setProperty'
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -303,6 +300,8 @@ type Action = (PBool ~~> Value)
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
+-- | As this function is used exclusively in setting up bot actions, we do not set up bot actions in this function
+-- | itself!
 constructActionFunction :: ContextID -> StringTypedTripleGetter -> MonadPerspectives (ContextID -> PerspectivesEffect String)
 constructActionFunction actionInstanceID objectGetter = do
   actionType <- onNothing (errorMessage "no type found" "")
@@ -331,7 +330,7 @@ constructActionFunction actionInstanceID objectGetter = do
               object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
               case object of
                 Nothing -> pure unit
-                (Just o) -> f rol v o *> setupBotActions contextId
+                (Just o) -> void $ f rol v o
 
         _ -> pure unit)
 

@@ -26,6 +26,9 @@ type StringTypedTripleGetter = (String **> String)
 searchInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchInPrototypeHierarchy getter = typeWithPerspectivesTypes DTG.buitenRol >-> TGC.searchInRolTelescope getter
 
+-- TODO. Hier is een probleem. Als de eerste stap faalt, wordt de tweede als resultaat opgeleverd.
+-- Maar dat levert een onvoldoende dependency tracking op. Verandert de theorie waardoor de eerste tak
+-- zou slagen, dan komt dat resultaat nooit door.
 searchLocallyAndInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchLocallyAndInPrototypeHierarchy getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
   f :: StringTripleGetter

@@ -17,7 +17,7 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (addRol, setBinding, setProperty)
+import Perspectives.Actions (addRol, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
@@ -111,7 +111,6 @@ consumeRequest :: Consumer Request MonadPerspectives Unit
 consumeRequest = forever do
   request <- await
   lift $ dispatchOnRequest (unwrap request)
-  lift $ runTransactie
 
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription} =
@@ -133,6 +132,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (Left messages) -> sendResponse (Error corrId (show messages)) setter
           (Right id) -> do
             saveUserContext id
+            setupBotActions id
             sendResponse (Result corrId [buitenRol id]) setter
     Api.CreateRol -> do
       rol <- constructAnotherRol predicate subject (unsafePartial $ fromJust rolDescription)
@@ -161,7 +161,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
 type ReactStateSetter = Array String -> Effect Unit
 
 
-type QueryUnsubscriber e = Effect Unit 
+type QueryUnsubscriber e = Effect Unit
 
 -- | Runs a the query and adds the ApiEffect to the result.
 subscribeToObjects :: Subject -> StringTypedTripleGetter -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit

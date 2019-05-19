@@ -39,6 +39,7 @@ import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<
 import Simple.JSON (writeJSON)
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
+-- TODO: gebruik runTransactie!
 runTransactie :: MonadPerspectives Unit
 runTransactie = do
   user <- getUser
@@ -59,6 +60,7 @@ distributeTransactie t = do
   _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
+-- TODO wordt nog niet gebruikt.
 addContextToTransactie :: PerspectContext ->
   MonadPerspectives Unit
 addContextToTransactie c = do
@@ -66,6 +68,7 @@ addContextToTransactie c = do
   setTransactie $ Transactie tf {createdContexts = cons c createdContexts}
   -- put $ Transactie tf {createdContexts = cons c createdContexts}
 
+-- TODO wordt nog niet gebruikt.
 addRolToTransactie :: PerspectRol -> MonadPerspectives Unit
 addRolToTransactie c = do
   (Transactie tf@{createdRoles}) <- transactie
@@ -107,6 +110,9 @@ addDomeinFileToTransactie dfId = do
 -- 	Indien gevonden: verwijder de oude.
 -- 	Anders: voeg de nieuwe toe.
 
+-- | Add a Delta to the Transaction.
+-- | Modify a Triple that represents a basic fact in the TripleAdministration.
+-- | Add that Triple to the TripleQueue.
 addDelta :: Delta -> MonadPerspectives Unit
 addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   t@(Transactie tf@{deltas}) <- transactie
