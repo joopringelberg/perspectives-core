@@ -1,6 +1,6 @@
 module Perspectives.TripleGetterComposition where
 
-import Data.Array (cons, difference, foldM, head, intersect, nub, uncons)
+import Data.Array (cons, difference, foldM, head, intersect, nub, null, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, sequence) as Trav
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), applyTypedTripleGetter, tripleObjects)
@@ -218,3 +218,37 @@ composeMonoidal (TypedTripleGetter nameOfp p) f n = memorize getter name where
 
   name :: String
   name = "composeMonoidal(" <>  nameOfp <> "," <> n <> ")"
+
+-- | Compose two queries. If the left query has a non-empty result, use that result; otherwise use the result of the
+-- | right query.
+preferLeft :: forall s o.
+  TypedTripleGetter s o ->
+  (Unit -> TypedTripleGetter s o) ->
+  String ->
+  TypedTripleGetter s o
+preferLeft (TypedTripleGetter nameOfp p) lazyQ nameOfq =
+  memorize getter name
+    where
+    getter :: TripleGetter s o
+    getter id = do
+      (tp@(Triple{object : objectsOfP}) :: Triple s o) <- p id
+      if (null objectsOfP)
+        then do
+          (TypedTripleGetter _ q) <- pure $ lazyQ unit
+          (tq@(Triple{object : objectsOfQ}) :: Triple s o) <- q id
+          pure $ Triple { subject: id
+                        , predicate : name
+                        , object : objectsOfQ
+                        , dependencies : []
+                        , supports : [(getRef (typeWithPerspectivesTypes tp)), (getRef (typeWithPerspectivesTypes tq))]
+                        , tripleGetter : getter}
+        else
+          pure $ Triple { subject: id
+            , predicate : name
+            , object : objectsOfP
+            , dependencies : []
+            , supports : [(getRef (typeWithPerspectivesTypes tp))]
+            , tripleGetter : getter}
+
+    name :: String
+    name = "preferLeft(" <> nameOfp <> ", " <> nameOfq <> ")"

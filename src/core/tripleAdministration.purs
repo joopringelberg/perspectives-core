@@ -9,6 +9,8 @@ module Perspectives.TripleAdministration
   , unRegisterTriple
   , memorize
   , removeDependency_
+  , removeDependency
+  , addDependency
   , setSupports_
   , detectCycles
   , lookupSubject

@@ -2,16 +2,14 @@ module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addT
 
 import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
 import Effect (Effect)
-import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TripleQueue, TripleQueueElement(..), TripleRef(..))
 import Perspectives.PerspectivesState (addToRecomputed, setTripleQueue, tripleQueue)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
-import Perspectives.TripleAdministration (lookupInTripleIndex, setSupports_)
+import Perspectives.TripleAdministration (addDependency, getRef, lookupInTripleIndex, removeDependency, setSupports_)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Prelude (Ordering(..), Unit, bind, discard, identity, join, map, pure, void, ($), (*>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -69,12 +67,18 @@ propagateTheoryDeltas :: TripleQueue -> MonadPerspectives (Array String)
 propagateTheoryDeltas q = case popFromQueue q of
   Nothing -> pure []
   (Just {head, tail}) -> do
-    tr@(Triple{dependencies}) <- pure $ tripleQueueElementToTriple head
+    tr@(Triple{dependencies, supports: oldSupports}) <- pure $ tripleQueueElementToTriple head
     -- Note: the recomputed triple will not have dependencies. These are computed on adding other triples,
     -- from their supports. And when triples are removed, their supports should lose a depencency.
     t@(Triple{object, supports} :: Triple String String) <- recompute tr
-    _ <- liftAff $ liftEffect $ saveChangedObject tr object
-    _ <- liftAff $ liftEffect $ setSupports_ tr supports
+    -- For each triple that no longer supports tr, remove tr as a dependency.
+    liftEffect $ for_ (difference oldSupports supports)
+      (removeDependency (getRef tr))
+    -- For each new triple that supports tr, add tr as a dependency
+    liftEffect $ for_ (difference supports oldSupports)
+      (addDependency (getRef tr))
+    _ <- liftEffect $ saveChangedObject tr object
+    _ <- liftEffect $ setSupports_ tr supports
     propagateTheoryDeltas (addToQueue tail (map tripleRefToTripleQueueElement dependencies))
 
 getDependencies :: Triple String String ->  Effect (Array (Triple String String))
@@ -87,7 +91,7 @@ getDependencies (Triple{dependencies}) = do
 
 recompute :: Triple String String -> MonadPerspectives (Triple String String)
 recompute (Triple{subject, predicate, tripleGetter}) =
-  -- addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *> 
+  addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *>
   runMonadPerspectivesQuery subject tripleGetter
 
 -- Change the object of the triple to the array of IDs passed to the function.

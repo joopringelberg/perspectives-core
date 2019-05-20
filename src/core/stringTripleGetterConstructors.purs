@@ -12,11 +12,11 @@ import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetRoleBinders) as OGC
 import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_) as QC
-import Perspectives.TripleGetterComposition (before, (>->))
+import Perspectives.TripleGetterComposition (before, (>->), preferLeft)
 import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles, getInternalProperty) as TGC
 import Perspectives.TripleGetterConstructors (closure, unlessNull, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
-import Prelude (flip, (<>))
+import Prelude (flip, (<>), ($))
 -----------------------------------------------------------
 -- COMBINATORS
 -----------------------------------------------------------
@@ -26,16 +26,8 @@ type StringTypedTripleGetter = (String **> String)
 searchInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchInPrototypeHierarchy getter = typeWithPerspectivesTypes DTG.buitenRol >-> TGC.searchInRolTelescope getter
 
--- TODO. Hier is een probleem. Als de eerste stap faalt, wordt de tweede als resultaat opgeleverd.
--- Maar dat levert een onvoldoende dependency tracking op. Verandert de theorie waardoor de eerste tak
--- zou slagen, dan komt dat resultaat nooit door.
 searchLocallyAndInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
-searchLocallyAndInPrototypeHierarchy getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
-  f :: StringTripleGetter
-  f (cid :: String) =
-    TGC.unlessNull getter cid
-    <|>
-    (cid @@ (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter))
+searchLocallyAndInPrototypeHierarchy getter = getter `preferLeft` (\_ -> (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter)) $ "searchLocallyAndInPrototypeHierarchy"
 
 searchInAspectsAndPrototypes :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
