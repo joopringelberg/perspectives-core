@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Control.Monad.Trans.Class (lift)
 import Effect.Aff (Milliseconds(..), delay)
-import Perspectives.Actions (setProperty')
+import Perspectives.Actions (removeProperty', setProperty')
 import Perspectives.ModelBasedTripleGetters (hasType)
 import Perspectives.PerspectivesTypes (PBool(PBool))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
@@ -25,7 +25,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "TripleGetterComposition" do
+theSuite = suite "TripleGetterComposition" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ theSuite = suiteSkip "TripleGetterComposition" do
       [PBool "true"]
 
   test "preferLeft" do
-    -- loadTestModel "testBotActie.crl"
+    loadTestModel "testBotActie.crl"
     t1 <- pure """{ "id": "u:mc1"
       , "ctype": "model:TestBotActie$Test"
       , "rollen": {}
@@ -64,9 +64,30 @@ theSuite = suiteSkip "TripleGetterComposition" do
         (u "mc1" ##= preferLeft (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v1") (\_ -> (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v2")) "v2")
       ["noot"]
       500.0
+    assertEqualWithPropagation "Verwijder de waarde van $v1; v1 `preferLeft` $v2 is nu weer gelijk aan 'aap'."
+      do
+        void $ removeProperty' (tba "Test$binnenRolBeschrijving$v1") "noot" (u "mc1_binnenRol")
+        lift $ delay (Milliseconds 100.0)
+        (u "mc1" ##= preferLeft (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v1") (\_ -> (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v2")) "v2")
+      ["aap"]
+      500.0
+    assertEqualWithPropagation "Maak $v2 nu gelijk aan 'mies'. v1 `preferLeft` v2 is nu gelijk aan 'mies'."
+      do
+        void $ setProperty' (tba "Test$binnenRolBeschrijving$v2") "mies" (u "mc1_binnenRol")
+        lift $ delay (Milliseconds 100.0)
+        (u "mc1" ##= preferLeft (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v1") (\_ -> (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v2")) "v2")
+      ["mies"]
+      500.0
+    assertEqualWithPropagation "Maak $v1 nu gelijk aan 'teun'. v1 `preferLeft` v2 is nu gelijk aan 'teun'."
+      do
+        void $ setProperty' (tba "Test$binnenRolBeschrijving$v1") "teun" (u "mc1_binnenRol")
+        lift $ delay (Milliseconds 100.0)
+        (u "mc1" ##= preferLeft (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v1") (\_ -> (getInternalProperty "model:TestBotActie$Test$binnenRolBeschrijving$v2")) "v2")
+      ["teun"]
+      500.0
 
     (removeTestContext (u "mc1"))
-    unLoadTestModel "model:TestBotActie"
+    -- unLoadTestModel "model:TestBotActie"
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

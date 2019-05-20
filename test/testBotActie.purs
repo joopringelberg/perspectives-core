@@ -26,6 +26,7 @@ import Perspectives.QueryEffect ((~>))
 import Perspectives.RunMonadPerspectivesQuery ((##), (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
 import Perspectives.TheoryChange (propagate)
+import Perspectives.TripleAdministration (clearTripleIndex)
 import Perspectives.TripleGetterComposition (followedBy)
 import Perspectives.Utilities (onNothing)
 import Test.Perspectives.Utils (assertEqual, loadTestModel, unLoadTestModel, p, u, assertEqualWithPropagation)
@@ -72,9 +73,12 @@ theSuite = suiteSkip "TestBotActie" do
           (error "Cannot find condition")
           (tba "Test$botCopiesV1ToV2" ##> getBindingOfRol (psp "Actie$condition"))
         conditionQuery <- constructQueryFunction condition
-        (u "test1") ##= conditionQuery
+        r <- (u "test1") ##= conditionQuery
+        -- liftEffect clearTripleIndex
+        pure r
       ["false"]
 
+  -- NOTE. This test runs perfectly in isolation, but not in the suite.
   test "compileBotAction" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
@@ -85,6 +89,7 @@ theSuite = suiteSkip "TestBotActie" do
         propsEqualWithEffect <- pure $ propsEqual ~> NamedFunction "propsEqualWithEffect" \vals -> liftEffect $ log ("propsEqual is now: " <>  show vals)
         void ((u "test1") ## propsEqualWithEffect)
         void ((u "test1") ## botaction)
+        lift $ delay (Milliseconds 100.0)
         getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
       [Value "aap"]
       1000.0

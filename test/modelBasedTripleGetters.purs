@@ -14,7 +14,7 @@ import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, getUnqualifiedRolDefinition, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
 import Test.Perspectives.Utils (assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -275,7 +275,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "tba:Test has a single action for the contextBot."
       (ContextDef (tba "Test") ##= botActiesInContext)
       [ContextDef $ tba "Test$botCopiesV1ToV2"]
-    unLoadTestModel "model:TestBotActie"
+    -- unLoadTestModel "model:TestBotActie"
 
   test "Tearing down" do
     unLoadTestModel "model:TestBotActie"

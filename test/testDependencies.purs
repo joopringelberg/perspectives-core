@@ -52,37 +52,37 @@ theSuite = suiteSkip "Dependencies" do
         case tr of
           (Just (Triple{dependencies})) -> pure $ map show dependencies
           _ -> pure []
-      ["<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)>"]
+      ["<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1>"]
 
   test "Support construction for `not`" do
     assertEqual "A Triple obtained with a query beginning with `not` should have a single support."
       (((u "test1") ## not (getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$trigger") `followedBy` (unwrap >>> PBool))) >>= \(Triple{supports}) -> pure $ map show supports)
-      ["<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger)>"]
+      ["<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger>"]
     assertEqual "A Triple obtained with a query with double `not` should have a single support."
       (((u "test1") ## not (not (getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$trigger") `followedBy` (unwrap >>> PBool)))) >>= \(Triple{supports}) -> pure $ map show supports)
-      ["<model:User$test1 - not((model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger))>"]
+      ["<model:User$test1 - not(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger)>"]
     assertEqual "<usr:test1 - psp:binnenRol> now has two dependencies"
       do
         tr <- liftEffect $ getTriple (TripleRef{subject: u "test1", predicate: p "binnenRol"})
         case tr of
           (Just (Triple{dependencies})) -> pure $ map show dependencies
           _ -> pure []
-      ["<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)>"
-      ,"<model:User$test1 - (model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger)>"]
+      ["<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1>"
+      ,"<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger>"]
     assertEqual "<test1 - (binnenRol >-> trigger)> should have a single dependency."
       do
-        tr <- liftEffect $ getTriple (TripleRef{subject: u "test1", predicate: "(model:Perspectives$binnenRol >->\
-        \ model:TestBotActie$Test$binnenRolBeschrijving$trigger)"})
+        tr <- liftEffect $ getTriple (TripleRef{subject: u "test1", predicate: "model:Perspectives$binnenRol >->\
+        \ model:TestBotActie$Test$binnenRolBeschrijving$trigger"})
         case tr of
           (Just (Triple{dependencies})) -> pure $ map show dependencies
           _ -> pure []
-      ["<model:User$test1 - not((model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger))>"]
+      ["<model:User$test1 - not(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger)>"]
     assertEqual "<test1 - not(binnenRol >-> trigger)> should have a single dependency: the double negated trigger."
       do
-        tr <- liftEffect $ getTriple (TripleRef{subject: u "test1", predicate: "not((model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger))"})
+        tr <- liftEffect $ getTriple (TripleRef{subject: u "test1", predicate: "not(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger)"})
         -- s <- liftEffect $ lookupSubject (u "test1")
         -- liftEffect $ log (show s)
         case tr of
           (Just (Triple{dependencies})) -> pure $ map show dependencies
           _ -> pure ["failure"] -- Het triple wordt niet gevonden.
-      ["<model:User$test1 - not(not((model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger)))>"]
+      ["<model:User$test1 - not(not(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger))>"]
