@@ -19,7 +19,7 @@ import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, Any
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains, cond, union) as QC
 import Perspectives.StringTripleGetterConstructors (closure, directAspects, getPrototype)
 import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, (>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, unlessFalse)
+import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some, unlessFalse)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
 import Prelude (pure, show, ($), (<<<), (<>), (==), (>>>))
 
@@ -84,7 +84,7 @@ objectViewDef = searchUnqualifiedRolDefinition "objectView"
 
 -- | The PropertyReferences of the View. Again, the typing is imprecise.
 propertyReferenties :: (RolDef **> ContextRol)
-propertyReferenties = typeWithPerspectivesTypes searchUnqualifiedRolDefinition "propertyReferentie"
+propertyReferenties =  typeWithPerspectivesTypes searchUnqualifiedRol "propertyReferentie"
 
 -- | Tests whether the type of the Rol has a specific local name. Used to test if a Rol is a BuitenRol type or a BinnenRol type.
 rolHasTypeWithLocalName :: ID.LocalName -> TypedTripleGetter String PBool
