@@ -32,3 +32,15 @@ exports["delete"] = function (m) {
     };
   };
 };
+
+exports["clear"] = function(m) {
+  return function ()
+  {
+    Object.keys(m).forEach(
+      function(k)
+      {
+        delete m[k];
+      }
+    );
+  }
+}

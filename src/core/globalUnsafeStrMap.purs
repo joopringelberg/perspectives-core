@@ -7,6 +7,7 @@ module Perspectives.GlobalUnsafeStrMap
   , peek
   , poke
   , delete
+  , clear
   ) where
 
 import Data.Maybe (Maybe(..))
@@ -42,3 +43,6 @@ foreign import delete :: forall a. GLStrMap a -> String -> Effect (GLStrMap a)
 
 instance showGLStrMap :: Show a => Show (GLStrMap a) where
   show s = show (unsafeCoerce s :: Object a)
+
+-- | Remove all keys and values.
+foreign import clear :: forall a. GLStrMap a -> Effect (GLStrMap a)

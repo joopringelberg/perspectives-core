@@ -14,6 +14,7 @@ module Perspectives.TripleAdministration
   , setSupports_
   , detectCycles
   , lookupSubject
+  , clearTripleIndex
   )
   where
 
@@ -27,7 +28,7 @@ import Effect.Aff (Aff, error, throwError)
 import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke, clear)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (==), (<>), show, (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -53,6 +54,10 @@ type PredicateIndex = GLStrMap (Triple String String)
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 tripleIndex :: TripleIndex
 tripleIndex = new unit
+
+-- | A very destructive action! Only used for testing purposes.
+clearTripleIndex :: Effect Unit
+clearTripleIndex = void $ clear tripleIndex
 
 lookupSubject :: Subject -> Effect (Maybe PredicateIndex)
 lookupSubject = peek tripleIndex
