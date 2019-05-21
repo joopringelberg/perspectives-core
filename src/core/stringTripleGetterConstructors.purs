@@ -4,7 +4,6 @@ module Perspectives.StringTripleGetterConstructors
 )
 where
 
-import Control.Alt ((<|>))
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@), MPQ, Triple)
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext, binding, context) as DTG
@@ -13,10 +12,10 @@ import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspe
 import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_) as QC
 import Perspectives.TripleGetterComposition (before, (>->), preferLeft)
-import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, unlessNull, directAspects, searchRolInContext, directAspectRoles, getInternalProperty) as TGC
-import Perspectives.TripleGetterConstructors (closure, unlessNull, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
+import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, searchRolInContext, directAspectRoles, getInternalProperty) as TGC
+import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
-import Prelude (flip, (<>), ($))
+import Prelude (flip, (<>), ($), const)
 -----------------------------------------------------------
 -- COMBINATORS
 -----------------------------------------------------------
@@ -27,25 +26,15 @@ searchInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchInPrototypeHierarchy getter = typeWithPerspectivesTypes DTG.buitenRol >-> TGC.searchInRolTelescope getter
 
 searchLocallyAndInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
-searchLocallyAndInPrototypeHierarchy getter = getter `preferLeft` (\_ -> (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter)) $ "searchLocallyAndInPrototypeHierarchy"
+searchLocallyAndInPrototypeHierarchy getter = getter `preferLeft` const (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter) $ "searchLocallyAndInPrototypeHierarchy"
 
 searchInAspectsAndPrototypes :: StringTypedTripleGetter -> StringTypedTripleGetter
-searchInAspectsAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
-  f :: StringTripleGetter
-  f contextId =
-    TGC.unlessNull (searchLocallyAndInPrototypeHierarchy getter) contextId
-    <|>
-    (contextId @@ (TGC.directAspects >-> searchInAspectsAndPrototypes getter))
+searchInAspectsAndPrototypes getter = (searchLocallyAndInPrototypeHierarchy getter `preferLeft` const (TGC.directAspects >-> searchInAspectsAndPrototypes getter)) "searchInAspectsAndPrototypes"
 
 -- | Applies the StringTypedTripleGetter to the RolDef and all its prototypes and recursively to all its aspects.
 -- Test.Perspectives.ModelBasedTripleGetters, via propertiesDef
 searchInAspectRolesAndPrototypes :: StringTypedTripleGetter -> StringTypedTripleGetter
-searchInAspectRolesAndPrototypes getter@(TypedTripleGetter n _) = TypedTripleGetter n f where
-  f :: StringTripleGetter
-  f rolDefId =
-    TGC.unlessNull (searchLocallyAndInPrototypeHierarchy getter) rolDefId
-    <|>
-    (rolDefId @@ (RolDef `before` TGC.directAspectRoles >-> unwrap `before` searchInAspectRolesAndPrototypes getter))
+searchInAspectRolesAndPrototypes getter = (searchLocallyAndInPrototypeHierarchy getter `preferLeft` const (RolDef `before` TGC.directAspectRoles >-> unwrap `before` searchInAspectRolesAndPrototypes getter)) "searchInAspectRolesAndPrototypes"
 
 directAspectRoles :: StringTypedTripleGetter
 directAspectRoles = typeWithPerspectivesTypes OGC.directAspectRoles `trackedAs` "model:Perspectives$Rol$directAspectRoles"

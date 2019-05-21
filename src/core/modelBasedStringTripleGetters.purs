@@ -1,7 +1,6 @@
 module Perspectives.ModelBasedStringTripleGetters where
 
 import Control.Alt ((<|>))
-import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@))
 import Perspectives.DataTypeTripleGetters (genericBinding, genericContext)
 import Perspectives.EntiteitAndRDFAliases (RolName)
@@ -9,9 +8,10 @@ import Perspectives.ModelBasedTripleGetters (isContextTypeOf, isOrHasAspect, isR
 import Perspectives.PerspectivesTypes (AnyDefinition, PBool, RolInContext)
 import Perspectives.QueryCombinators (notEmpty, conj) as QC
 import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndPrototypes, searchRolInContext)
-import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TripleGetterConstructors (unlessFalse, all)
-import Prelude ((<>))
+import Perspectives.TripleGetterConstructors (unlessFalse) as TGC
+import Perspectives.TripleGetterComposition (unlessFalse, (>->))
+import Perspectives.TripleGetterConstructors (all)
+import Prelude (const, (<>))
 
 -- | allowedBinding `hasOnEachRolTelescopeTheContextTypeOf` boundValue
 -- | allowedBinding `hasOnEachRolTelescopeTheContextTypeOf` boundValue
@@ -23,36 +23,28 @@ import Prelude ((<>))
 -- | Or: boundValue is on each rolTelescope that starts with allowedBinding
 -- | Formulated this way, 'hasOnEachRolTelescopeTheContextTypeOf' has it backwards.
 hasOnEachRolTelescopeTheContextTypeOf :: String -> (String **> PBool)
-hasOnEachRolTelescopeTheContextTypeOf boundValue = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> boundValue) f
-  where
-    f :: TripleGetter String PBool
-    f allowedBinding = unlessFalse (isContextTypeOf boundValue) allowedBinding
-      -- this is: allowedBinding ## (isContextTypeOf boundValue)
-      -- read as: allowedBinding `isContextTypeOf` boundValue
-      -- or: boundValue `hasType` allowedBinding
-      <|>
-      (allowedBinding @@
-        (QC.conj
-          (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-          (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheContextTypeOf boundValue)))))
+hasOnEachRolTelescopeTheContextTypeOf boundValue = ((isContextTypeOf boundValue) `unlessFalse`
+  const
+    (QC.conj
+      (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
+      (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheContextTypeOf boundValue)))))
+  "hasOnEachRolTelescopeTheContextTypeOf"
 
 hasOnEachRolTelescopeTheRolTypeOf :: RolInContext -> (String **> PBool)
-hasOnEachRolTelescopeTheRolTypeOf boundValue = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> (unwrap boundValue)) f
-  where
-    f :: TripleGetter String PBool
-    f allowedBinding = unlessFalse (isRolTypeOf boundValue) allowedBinding
-      <|>
-      (allowedBinding @@
-        (QC.conj
-          (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-          (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheRolTypeOf boundValue)))))
+hasOnEachRolTelescopeTheRolTypeOf boundValue = ((isRolTypeOf boundValue) `unlessFalse`
+  const
+    (QC.conj
+      (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
+      (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheRolTypeOf boundValue)))))
+  "hasOnEachRolTelescopeTheContextTypeOf"
 
+-- TODO. Bij updates wordt de berekende waarheidswaarde niet (altijd) aangepast.
 -- | aspect ## (isSubsumedOnEachRolTelescopeOf allowedBinding)
 isSubsumedOnEachRolTelescopeOf :: String -> (String **> PBool)
 isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> allowedBinding) f
   where
     f :: TripleGetter String PBool
-    f aspect = unlessFalse (isOrHasAspect aspect) allowedBinding
+    f aspect = TGC.unlessFalse (isOrHasAspect aspect) allowedBinding
       -- this is: allowedBinding ## (isOrHasAspect aspect)
       -- read as: allowedBinding `isOrHasAspect` aspect
       <|>

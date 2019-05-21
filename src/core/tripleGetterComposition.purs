@@ -1,10 +1,10 @@
 module Perspectives.TripleGetterComposition where
 
-import Data.Array (cons, difference, foldM, head, intersect, nub, null, uncons)
+import Data.Array (cons, difference, elemIndex, foldM, head, intersect, nub, null, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, sequence) as Trav
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), applyTypedTripleGetter, tripleObjects)
-import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (PBool(..), typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Prelude (class Eq, class Ord, Unit, bind, join, map, pure, unit, ($), (<$>), (<<<), (<>), (>=>), (>>=))
 
@@ -252,3 +252,33 @@ preferLeft (TypedTripleGetter nameOfp p) lazyQ nameOfq =
 
     name :: String
     name = "preferLeft(" <> nameOfp <> ", " <> nameOfq <> ")"
+
+unlessFalse :: forall s.
+  TypedTripleGetter s PBool ->
+  (Unit -> TypedTripleGetter s PBool) ->
+  String ->
+  TypedTripleGetter s PBool
+unlessFalse (TypedTripleGetter nameOfp p) lazyQ nameOfq =
+  memorize getter name where
+    getter :: (TripleGetter s PBool)
+    getter id = do
+      (tp@(Triple{object : objectsOfP}) :: Triple s PBool) <- p id
+      case (elemIndex (PBool "false") objectsOfP) of
+        Nothing -> pure $ Triple { subject: id
+          , predicate : name
+          , object : objectsOfP
+          , dependencies : []
+          , supports : [(getRef (typeWithPerspectivesTypes tp))]
+          , tripleGetter : getter}
+        otherwise -> do
+          (TypedTripleGetter _ q) <- pure $ lazyQ unit
+          (tq@(Triple{object : objectsOfQ}) :: Triple s PBool) <- q id
+          pure $ Triple { subject: id
+                        , predicate : name
+                        , object : objectsOfQ
+                        , dependencies : []
+                        , supports : [(getRef (typeWithPerspectivesTypes tp)), (getRef (typeWithPerspectivesTypes tq))]
+                        , tripleGetter : getter}
+
+    name :: String
+    name = "unlessFalse(" <> nameOfp <> ", " <> nameOfq <> ")"

@@ -1,6 +1,5 @@
 module Perspectives.ModelBasedTripleGetters where
 
-import Control.Alt ((<|>))
 import Data.Foldable (foldMap)
 import Data.Maybe (maybe)
 import Data.Monoid.Disj (Disj(..))
@@ -9,19 +8,19 @@ import Perspectives.CoreTypes (type (**>), TypedTripleGetter(..), TripleGetter, 
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
 import Perspectives.DataTypeTripleGetters (contextType, genericRolType) as DTTG
+import Perspectives.DataTypeTripleGetters (identity)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.Identifiers as Id
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRolBeschrijvingDef, contextDef, rolDef) as MBOG
-import Perspectives.ObjectGetterConstructors (alternatives, unlessNull) as OGC
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, contains, cond, union) as QC
 import Perspectives.StringTripleGetterConstructors (closure, directAspects, getPrototype)
-import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, (>->))
-import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some, unlessFalse)
+import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, preferLeft, (>->), unlessFalse)
+import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some, alternatives)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
-import Prelude (pure, show, ($), (<<<), (<>), (==), (>>>))
+import Prelude (const, show, ($), (<<<), (<>), (==), (>>>))
 
 -----------------------------------------------------------
 -- GETTERS BASED ON MODEL:PERSPECTIVES$
@@ -264,22 +263,18 @@ hasAspect :: AnyDefinition -> (AnyDefinition **> PBool)
 hasAspect q = some (closure directAspects >-> agreesWithType q)
 
 sumToSequence :: (AnyDefinition **> AnyDefinition)
-sumToSequence = f `trackedAs` "sumToSequence" where
-  f t = OGC.unlessNull OGC.alternatives t <|> pure [t]
+sumToSequence = (alternatives `preferLeft` const identity) "sumToSequence"
 
 -- | True iff t (the first parameter)ither agrees with the head of the graph, or if it is in the rol telescope
 -- | for each of its mogelijkeBindingen
 -- | (is in each rol telescope that starts with the head of the graph).
 hasOnEachRolTelescopeTheContextTypeOf :: RolDef -> (RolDef **> PBool)
-hasOnEachRolTelescopeTheContextTypeOf t = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> unwrap t) f
-  where
-    f :: TripleGetter RolDef PBool
-    f headOfGraph = unlessFalse (unwrap `before` isContextTypeOf (unwrap t)) headOfGraph
-      <|>
-      (headOfGraph @@
-        (QC.conj
-          (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-          (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasOnEachRolTelescopeTheContextTypeOf t)))))
+hasOnEachRolTelescopeTheContextTypeOf t = ((unwrap `before` isContextTypeOf (unwrap t)) `unlessFalse`
+  const
+    (QC.conj
+      (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
+      (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasOnEachRolTelescopeTheContextTypeOf t)))))
+  "hasOnEachRolTelescopeTheContextTypeOf"
 
 -- | Collect all definitions of a Property with the local name, in the RolDef and its Aspects
 -- | and in all their prototypes and on the rolGraph of the RolDef. Notice there may be more than one!
