@@ -11,7 +11,7 @@ import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndProtot
 import Perspectives.TripleGetterConstructors (unlessFalse) as TGC
 import Perspectives.TripleGetterComposition (unlessFalse, (>->))
 import Perspectives.TripleGetterConstructors (all)
-import Prelude (const, (<>))
+import Prelude ((<>))
 
 -- | allowedBinding `hasOnEachRolTelescopeTheContextTypeOf` boundValue
 -- | allowedBinding `hasOnEachRolTelescopeTheContextTypeOf` boundValue
@@ -24,7 +24,7 @@ import Prelude (const, (<>))
 -- | Formulated this way, 'hasOnEachRolTelescopeTheContextTypeOf' has it backwards.
 hasOnEachRolTelescopeTheContextTypeOf :: String -> (String **> PBool)
 hasOnEachRolTelescopeTheContextTypeOf boundValue = ((isContextTypeOf boundValue) `unlessFalse`
-  const
+  \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
       (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheContextTypeOf boundValue)))))
@@ -32,7 +32,7 @@ hasOnEachRolTelescopeTheContextTypeOf boundValue = ((isContextTypeOf boundValue)
 
 hasOnEachRolTelescopeTheRolTypeOf :: RolInContext -> (String **> PBool)
 hasOnEachRolTelescopeTheRolTypeOf boundValue = ((isRolTypeOf boundValue) `unlessFalse`
-  const
+  \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
       (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheRolTypeOf boundValue)))))

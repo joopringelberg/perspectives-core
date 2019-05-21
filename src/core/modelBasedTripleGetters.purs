@@ -270,7 +270,7 @@ sumToSequence = (alternatives `preferLeft` const identity) "sumToSequence"
 -- | (is in each rol telescope that starts with the head of the graph).
 hasOnEachRolTelescopeTheContextTypeOf :: RolDef -> (RolDef **> PBool)
 hasOnEachRolTelescopeTheContextTypeOf t = ((unwrap `before` isContextTypeOf (unwrap t)) `unlessFalse`
-  const
+  \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
       (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasOnEachRolTelescopeTheContextTypeOf t)))))

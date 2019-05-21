@@ -25,7 +25,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "TripleGetterComposition" do
+theSuite = suiteSkip "TripleGetterComposition" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------

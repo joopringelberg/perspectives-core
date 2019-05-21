@@ -1,7 +1,7 @@
 module Perspectives.TripleGetterConstructors where
 
 import Control.Plus (empty)
-import Data.Array (elemIndex, union, difference, cons, null, nub, foldMap) as Arr
+import Data.Array (elemIndex, union, difference, cons, nub, foldMap) as Arr
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Additive (Additive(..))
 import Data.Monoid.Conj (Conj(..))
@@ -74,7 +74,7 @@ unlessFalse tg id = (id @@ tg) >>= \r@(Triple{object}) -> case (Arr.elemIndex (P
 
 searchInRolTelescope :: (String **> String) -> (String **> String)
 -- Test.Perspectives.TripleGetterConstructors, via searchProperty
-searchInRolTelescope getter = (getter `preferLeft` const (DTG.genericBinding >-> searchInRolTelescope getter)) "searchInRolTelescope"
+searchInRolTelescope getter = (getter `preferLeft` \_ -> (DTG.genericBinding >-> searchInRolTelescope getter)) "searchInRolTelescope"
 
 -- | Applies the TypedTripleGetter to each higher prototype until it succeeds or there is no prototype.
 -- | Does *not* apply the getter to the ContextType that is passed in!
@@ -86,13 +86,14 @@ searchInPrototypeHierarchy :: forall o.
   (AnyContext **> o)
 searchInPrototypeHierarchy getter = DTG.buitenRol >-> typeWithPerspectivesTypes searchInRolTelescope getter
 
+-- TODO hier ontstaat een loop.
 -- Test.Perspectives.ModelBasedTripleGetters, via buitenRolBeschrijvingDef
 searchLocallyAndInPrototypeHierarchy :: forall o.
   Eq o =>
   Ord o =>
   (AnyContext **> o) ->
   (AnyContext **> o)
-searchLocallyAndInPrototypeHierarchy getter = (getter `preferLeft` const (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter)) "searchLocallyAndInPrototypeHierarchy"
+searchLocallyAndInPrototypeHierarchy getter = (getter `preferLeft` \_ -> (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter)) "searchLocallyAndInPrototypeHierarchy"
 
 -- | Applies the getter (s ~~> o) to the ContextType and all its prototypes and recursively to all its aspects.
 -- Test.Perspectives.ModelBasedTripleGetters, via buitenRolBeschrijvingDef
@@ -101,7 +102,7 @@ searchInAspectsAndPrototypes :: forall o.
   Ord o =>
   (AnyContext **> o) ->
   (AnyContext **> o)
-searchInAspectsAndPrototypes getter = ((searchLocallyAndInPrototypeHierarchy getter) `preferLeft` const (directAspects >-> searchInAspectsAndPrototypes getter)) "searchInAspectsAndPrototypes"
+searchInAspectsAndPrototypes getter = ((searchLocallyAndInPrototypeHierarchy getter) `preferLeft` \_ -> (directAspects >-> searchInAspectsAndPrototypes getter)) "searchInAspectsAndPrototypes"
 
 -- | Applies the getter (s **> o) to the RolDef and all its prototypes and recursively to all its aspects.
 -- Test.Perspectives.TripleGetterConstructors (also via searchUnqualifiedPropertyDefinition).
@@ -110,7 +111,7 @@ searchInAspectRolesAndPrototypes :: forall o.
   Ord o =>
   (AnyContext **> o) ->
   (AnyContext **> o)
-searchInAspectRolesAndPrototypes getter = ((searchLocallyAndInPrototypeHierarchy getter) `preferLeft` const (RolDef `before` directAspectRoles >-> unwrap `before` searchInAspectRolesAndPrototypes getter)) "searchInAspectRolesAndPrototypes"
+searchInAspectRolesAndPrototypes getter = ((searchLocallyAndInPrototypeHierarchy getter) `preferLeft` \_ -> (RolDef `before` directAspectRoles >-> unwrap `before` searchInAspectRolesAndPrototypes getter)) "searchInAspectRolesAndPrototypes"
 
 -- | Applies the getter (s **> o) to the RolDef and all its prototypes and recursively to all its aspects.
 -- Test.Perspectives.TripleGetterConstructors via searchUnqualifiedPropertyDefinition.
@@ -119,7 +120,7 @@ searchInAspectPropertiesAndPrototypes :: forall o.
   Ord o =>
   (AnyContext **> o) ->
   (AnyContext **> o)
-searchInAspectPropertiesAndPrototypes getter = ((searchLocallyAndInPrototypeHierarchy getter) `preferLeft` const (PropertyDef `before` directAspectProperties >-> unwrap `before` searchInAspectPropertiesAndPrototypes getter)) "searchInAspectPropertiesAndPrototypes"
+searchInAspectPropertiesAndPrototypes getter = ((searchLocallyAndInPrototypeHierarchy getter) `preferLeft` \_ -> (PropertyDef `before` directAspectProperties >-> unwrap `before` searchInAspectPropertiesAndPrototypes getter)) "searchInAspectPropertiesAndPrototypes"
 
 -- Test.Perspectives.TripleGetterConstructors
 localAspects :: (AnyContext **> AnyContext)
@@ -361,7 +362,7 @@ getInternalUnqualifiedProperty ln = binnenRol >-> getUnqualifiedProperty ln `tra
 -- | Look for the property with the given local name on the binnenRol of the ContextType c and on its telescope.
 -- Test.Perspectives.TripleGetterConstructors
 searchInternalUnqualifiedProperty :: Id.LocalName -> (AnyContext **> Value)
-searchInternalUnqualifiedProperty ln = ((getInternalUnqualifiedProperty ln) `preferLeft` const (searchExternalUnqualifiedProperty ln)) "searchInternalUnqualifiedProperty"
+searchInternalUnqualifiedProperty ln = ((getInternalUnqualifiedProperty ln) `preferLeft` \_ -> (searchExternalUnqualifiedProperty ln)) "searchInternalUnqualifiedProperty"
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
 -- | it as their binding).

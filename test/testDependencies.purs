@@ -13,7 +13,7 @@ import Perspectives.DataTypeTripleGetters (binnenRol)
 import Perspectives.PerspectivesTypes (PropertyDef(..), PBool(..))
 import Perspectives.QueryCombinators (not)
 import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.TripleAdministration (getTriple, lookupSubject)
+import Perspectives.TripleAdministration (clearTripleIndex, getTriple, lookupSubject)
 import Perspectives.TripleGetterComposition (followedBy)
 import Perspectives.TripleGetterConstructors (getInternalProperty)
 import Test.Perspectives.Utils (assertEqual, loadTestModel, p, u)
@@ -30,6 +30,7 @@ theSuite = suiteSkip "Dependencies" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
+    liftEffect clearTripleIndex
 
   test "Support construction for `trackedAs`" do
     assertEqual "A triple obtained with a getter constructed with `trackedAs` has no supports."
@@ -67,8 +68,7 @@ theSuite = suiteSkip "Dependencies" do
         case tr of
           (Just (Triple{dependencies})) -> pure $ map show dependencies
           _ -> pure []
-      ["<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1>"
-      ,"<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger>"]
+      ["<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1>", "<model:User$test1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger>"]
     assertEqual "<test1 - (binnenRol >-> trigger)> should have a single dependency."
       do
         tr <- liftEffect $ getTriple (TripleRef{subject: u "test1", predicate: "model:Perspectives$binnenRol >->\
