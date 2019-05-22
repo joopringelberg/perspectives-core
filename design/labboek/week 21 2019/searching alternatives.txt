@@ -67,3 +67,26 @@ Het is simpelweg een kwestie van tweemaal het verschil berekenen tussen twee arr
 * wat zit in de oude supports wat niet in de nieuwe zit - die supports verliezen een dependency;
 * wat zit in de nieuwe supports wat niet in de oude zit - die supports krijgen het nieuwe triple als dependency erbij.
 
+TEST VAN PREFERLEFT
+Definieer een Context met een binnenrol met twee properties, v1 en v2. 
+Maak een instantie met een waarde voor v2.
+Vraag op: ($v1 `preferLeft` $v2)
+Het resultaat moet de waarde van $v2 zijn.
+Geef dan $v1 een waarde.
+Vraag nogmaals de waarde van ($v1 `preferLeft` $v2).
+Het resultaat moet nu de waarde van $v1 zijn.
+
+Ik kan TestBotActie.crl gebruiken.
+Haal de binnenRol property op met: getInternalProperty
+
+Maak de test in TripleGetterComposition.
+
+DEBUGGING
+[<model:User$mc1 - 
+	preferLeft(
+		model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1, 
+		v2)>,
+<model:User$mc1 - model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1>]
+
+APPLY THE CHANGE THROUGHOUT THE CODE
+Ik heb in de TripleGetters zowel unlessFalse als unlessNull vervangen, op één geval na, in ModelBasedStringTripleGetters.

@@ -15,7 +15,7 @@ ACTIES EN SCHERMEN
 	* sommige van die componenten corresponderen met basisacties/assignment operatoren
 	* actie-typen worden gebruikt om een scherm op te bouwen
 12. Er hoeft dus geen spoor van geïnstantieerde acties te ontstaan (anders dan de Delta's, die je als geïnstantieerde basisacties kunt beschouwen).
-13. Een context kan op topniveau een consult of change actie bevatten voor een rol. Deze actie is dus geen onderdeel van de consult van de context zelf. Voor zulke acties moet een aparte bedieningsmogelijkheid gemaakt worden, anders kan de gebruiker ze niet uitvoeren. In Perspectives I waren dit bijvoorbeeld 'opties'. Maar er zijn meer mogelijkheden, zoals een context menu of een window menu.
+13. Een context kan op topniveau een consult of change actie bevatten voor een rol. Deze actie is dan dus geen onderdeel van de consult van de context zelf. Voor zulke acties moet een aparte bedieningsmogelijkheid gemaakt worden, anders kan de gebruiker ze niet uitvoeren. In Perspectives I waren dit bijvoorbeeld 'opties'. Maar er zijn meer mogelijkheden, zoals een context menu of een window menu.
 De vraag is: genereren we deze bedieningsmogelijkheden? En hebben we criteria om automatisch te beslissen hoe een bepaalde actie ontsloten wordt?
 Tot de bedieningsmogelijkheden horen:
 	* klik

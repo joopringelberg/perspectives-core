@@ -1,8 +1,7 @@
 TODO
 
-VAN WEEK 17
+VAN WEEK 20
 
-DEZE WEEK
 6. Bestudeer de vormgeving van schermen.
 
 7. Geef TestBotActie vorm.
@@ -21,18 +20,4 @@ O.a.: de controle op het aanmaken van een nieuwe context is niet goed (er wordt 
 
 13. Verander de code in constructActionFunction zodat objecten en indirect objecten met meerdere waarden goed gehanteerd worden.
 
-DONE
-1. Verbouw in Action constructActionFunction zodat die geen Action, maar een QueryEffect oplevert.
-2. Controleer waarom in testBotActie.purs propsEqualWithEffect niet werkt.
-3. Schoon de code op van debugging statements:
-	- logging in tripleAdministration/theoryChange
-	- triples in state pushen bij theorychange
-4. Maak de naamgeving van TypedTripleGetters consistent.
-
-3. Controleer/Herschrijf ModelBasedTripleGetters.botActiesInContext
-	- test setupBotActions.
-4. Bedenk hoe je de acties die opgezet zijn voor een ContextInstantie, weer weg kunt halen.
-1. Implementeer setBinnenRolType.
-
-5. Maak een scherm voor TestBotActie.
-
+14. Maak een verwijder knop voor de test instanties.

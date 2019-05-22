@@ -7,14 +7,14 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Data.Array (head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
 import Perspectives.BasicActionFunctions (storeDomeinFile)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
+import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>), (##>>), (%%))
 import Perspectives.DataTypeObjectGetters (context, contextType, genericContext, rolBindingDef)
 import Perspectives.DataTypeTripleGetters (contextType) as DTG
@@ -32,6 +32,7 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
+import Perspectives.Syntax (PerspectRol(..))
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
@@ -155,6 +156,29 @@ setBinding rid boundRol = do
     , value: (Just boundRol)
     , isContext: false
     }
+
+-- | Removes the binding R of the rol, if any.
+-- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
+removeBinding :: ID -> MonadPerspectives (Maybe Delta)
+removeBinding rid = do
+  oldBinding <- genericBinding rid
+  case head oldBinding of
+    Nothing -> pure Nothing
+    (Just ob) -> do
+      updatePerspectEntiteit' ((\_ r -> removeRol_binding r) :: (Value -> PerspectRol -> PerspectRol)) rid ""
+      updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (psp "Rol$binding") rid
+      cid <- (RolInContext rid) ##>> context
+      setupBotActions cid
+      pure $ Just $ Delta
+        { id : rid
+        , memberName: psp "Rol$binding"
+        , deltaType: Change
+        , value: Nothing
+        , isContext: false
+        }
+
+removeBindingWithDelta :: ID -> MonadPerspectives Unit
+removeBindingWithDelta = removeBinding >=> maybe (pure unit) addDelta
 
 -----------------------------------------------------------
 -- UPDATEPERSPECTENTITEITMEMBER

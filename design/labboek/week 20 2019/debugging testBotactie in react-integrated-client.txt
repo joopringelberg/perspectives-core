@@ -170,12 +170,51 @@ Tijdelijk opgelost door checkAContext uit te zetten.
 EEN PROPERTY DIE MEEGEGEVEN WORDT BIJ HET AANMAKEN VAN EEN CONTEXT KOMT NIET OVER (OPGELOST)
 "[(PropertyNotDefined) De Rol 'model:User$MijnSysteem$gebruiker_1' van de context 'model:User$MijnSysteem' geeft een waarde aan Property 'model:Perspectives$PerspectivesSysteem$voornaam' maar die is niet gedefinieerd voor 'model:Perspectives$PerspectivesSysteem$gebruiker'.]"
 
-==================== NOG OPLOSSEN ====================
+DE EERSTE TESTCONTEXT VERSCHIJNT NIET DIRECT OP HET SCHERM (OPGELOST)
+Alle volgende wel. Delta's worden gemaakt.
+"conj(model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$trigger not((equal model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v2 model:Perspectives$binnenRol >-> model:TestBotActie$Test$binnenRolBeschrijving$v1)))"
+Dit is de conditie.
+En die gaat een EffectFun in. Dat klopt, dat is voor de bot die opgezet wordt voor de nieuwe context.
+Maar alhoewel de "zaken" zijn opgevraagd, worden ze niet doorgegeven.
 
-RESULTATEN VAN DE BOTACTIE VAN EEN NIEUW AANGEMAAKTE TESTCONTEXT KOMEN NIET DOOR OP DE GUI
+Er wordt een goede Delta aan modifyTriple aangeboden.
+
+In modifyTriple wordt het onderliggende Triple opgezocht en aangepast.
+Dit blijkt echter geen dependencies te hebben en ook geen supports. Dat verklaart waarom er geen propagation plaatsvindt.
+Maar waarom niet?
+
+Dit triple moet zijn aangelegd bij het opvragen van de rol "zaken" bij "model:User$MijnSysteem"
+
+predicate: "model:Perspectives$PerspectivesSysteem$zaken"
+
+Ik zie bij registerTriple wel dit langskomen:
+"model:Perspectives$buitenRol >-> model:Perspectives$binding >-> model:Perspectives$context >-> model:Perspectives$PerspectivesSysteem$zaken"
+en:
+
+"model:Perspectives$PerspectivesSysteem$zaken ~> 3"
+en deze heeft de vorige als support.
+
+Als er wèl een TestContext is, dan is de support "model:Perspectives$PerspectivesSysteem$zaken"
+Zo hoort het.
+
+De lange is de neerslag van de poging om 'zaken' bij het prototype te vinden. Het is niet gelukt bij Systeem zelf. En daar is ook geen support voor aangelegd, zodat, als er een instantie bijkomt, er niets gebeurt.
+
+Dit heeft te maken met de manier waarop support wordt geregistreerd in >->.
+
+Als er geen zaak is, wordt er geen triple geregistreerd.
+
+NEEN, toch niet. Het zit in searchLocallyAndInPrototypeHierarchy. De unlessNull veroorzaakt het probleem. Als de eerste tak faalt, levert de tweede tak op.
+Het resultaat heeft dan niet de dependencies van de eerste tak. Maar als later de theorie wijzigt waardoor de eerste tak wèl een resultaat levert, komt dat niet door bij de propagation.
+Je wil dat de eerste tak prevaleert. Maar als er geen resultaat uitkomt, dan probeer je de tweede tak.
+Mocht er later een resultaat uit de eerste tak komen, dan prevaleert dat alsnog.
+
+RESULTATEN VAN DE BOTACTIE VAN EEN NIEUW AANGEMAAKTE TESTCONTEXT KOMEN NIET DOOR OP DE GUI (OPGELOST)
 De botacties worden wel opgezet bij aanmaak van een nieuwe context.
 En dan nog een keer bij het zetten van de property.
 De acties worden ook uitgevoerd (want resultaten komen in de database). Maar het resultaat komt niet door naar de GUI.
+
+==================== NOG OPLOSSEN ====================
+
 
 
 

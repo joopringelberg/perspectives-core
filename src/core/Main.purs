@@ -48,7 +48,7 @@ main = void $ runAff handleError do
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
   void $ forkAff $ forever do
-    delay (Milliseconds 5000.0)
+    delay (Milliseconds 100.0)
     -- liftEffect $ log "propagating"
     runPerspectivesWithState propagate state
   where

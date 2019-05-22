@@ -23,7 +23,6 @@ import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..))
 import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
-import Perspectives.Deltas (runTransactie)
 import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
@@ -31,7 +30,7 @@ import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.SaveUserData (saveUserContext)
+import Perspectives.SaveUserData (removeUserContext, saveUserContext)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
@@ -134,6 +133,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             saveUserContext id
             setupBotActions id
             sendResponse (Result corrId [buitenRol id]) setter
+    Api.DeleteContext -> do
+      removeUserContext subject
+      sendResponse (Result corrId []) setter
     Api.CreateRol -> do
       rol <- constructAnotherRol predicate subject (unsafePartial $ fromJust rolDescription)
       case rol of

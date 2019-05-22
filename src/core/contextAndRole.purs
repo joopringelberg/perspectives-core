@@ -149,6 +149,9 @@ rol_binding (PerspectRol{binding}) = binding
 changeRol_binding :: RolID -> PerspectRol -> PerspectRol
 changeRol_binding b (PerspectRol cr) = PerspectRol $ cr {binding = (Just b)}
 
+removeRol_binding :: PerspectRol -> PerspectRol
+removeRol_binding (PerspectRol cr) = PerspectRol $ cr {binding = Nothing}
+
 rol_context :: PerspectRol -> ContextID
 rol_context (PerspectRol{context}) = context
 
