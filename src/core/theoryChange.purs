@@ -1,6 +1,6 @@
-module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addTripleToQueue) where
+module Perspectives.TheoryChange (updateFromSeeds, modifyTriple, propagate, addTripleToQueue, addToQueue, tripleRefToTripleQueueElement, tripleToTripleQueueElement) where
 
-import Data.Array (cons, delete, difference, elemIndex, foldr, snoc, sortBy, uncons, union)
+import Data.Array (cons, delete, difference, elemIndex, foldr, null, snoc, sortBy, uncons, union)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Traversable (for_, traverse)
 import Effect (Effect)
@@ -9,13 +9,16 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TripleQueue, TripleQueueElement(..), TripleRef(..))
 import Perspectives.PerspectivesState (addToRecomputed, setTripleQueue, tripleQueue)
 import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
-import Perspectives.TripleAdministration (addDependency, getRef, lookupInTripleIndex, removeDependency, setSupports_)
+import Perspectives.TripleAdministration (addDependency, getRef, lookupInTripleIndex, removeDependency, setSupports_, unRegisterBasicTriple)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
-import Prelude (Ordering(..), Unit, bind, discard, identity, join, map, pure, void, ($), (*>))
+import Prelude (Ordering(..), Unit, bind, discard, identity, join, map, pure, unit, void, ($), (*>))
 import Unsafe.Coerce (unsafeCoerce)
 
 tripleToTripleQueueElement :: Triple String String -> TripleQueueElement
 tripleToTripleQueueElement = unsafeCoerce
+
+tripleToTripleRef :: Triple String String -> TripleRef
+tripleToTripleRef = unsafeCoerce
 
 tripleQueueElementToTripleRef :: TripleQueueElement -> TripleRef
 tripleQueueElementToTripleRef = unsafeCoerce
@@ -79,6 +82,10 @@ propagateTheoryDeltas q = case popFromQueue q of
       (addDependency (getRef tr))
     _ <- liftEffect $ saveChangedObject tr object
     _ <- liftEffect $ setSupports_ tr supports
+    -- If the new triple has no supports, we can remove it, as we only have computed triples here.
+    if (null supports)
+      then void $ liftEffect $ unRegisterBasicTriple $ tripleToTripleRef t
+      else pure unit
     propagateTheoryDeltas (addToQueue tail (map tripleRefToTripleQueueElement dependencies))
 
 getDependencies :: Triple String String ->  Effect (Array (Triple String String))

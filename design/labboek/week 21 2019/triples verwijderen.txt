@@ -1,0 +1,139 @@
+BIJWERKEN TRIPLE ADMINISTRATIE NA VERWIJDEREN VAN EEN CONTEXT OF ROL
+
+Op basis van operaties op de primaire representatie van PerspectContext en PerspectRol worden, door `trackedAs`, triples aangemaakt die geen supports hebben. Als de primaire representatie verandert doordat een context of rol verwijderd worden, moeten deze triples opgeruimd worden. Ik noem deze triples BasisTriples.
+
+Als een Rol wordt verwijderd, levert de berekening van een property van die rol vervolgens een leeg resultaat op.
+Een interne property wordt berekend met:
+
+	getInternalProperty pn = binnenRol >-> getProperty pn `trackedAs` (unwrap pn)
+
+De definitie van binnenRol luidt:
+
+	binnenRol = DTOG.binnenRol `trackedAs` "model:Perspectives$binnenRol"
+
+Oftewel, als uit de primaire representatie van PerspectContext in de cache de binnenRol wordt afgelezen, wordt dat gerepresenteerd met het eerste triple, in `trackedAs`.
+
+Hoe is de tripleadministratie voor zo'n berekening?
+
+De supports van de property $v1 van een binnenrol zien er zo uit:
+
+	[
+        "<model:User$test1 - model:Perspectives$binnenRol>",
+        "<model:User$test1_binnenRol - model:TestBotActie$Test$binnenRolBeschrijving$v1>"
+      ]
+
+Het eerste triple representeert de relatie tussen de context test1 en zijn binnenRol.
+Het tweede triple representeert de relatie tussen de binnenrol en zijn property $v1.
+
+
+We kunnen de binnenRol niet verwijderen. Maar als het een willekeurige rolInContext was, kon dat wel en dat zou voor de tripleadministratie hetzelfde proces en effect opleveren.
+
+Het eerste triple moet dan verdwijnen. Het is het triple waarin de rol het object is.
+
+Alle dependencies van dat triple moeten herberekend worden. Bovendien moet het triple voor al zijn dependencies als support verwijderd worden. Nou gebeurt dat automatisch bij herberekenen, dus we moeten simpelweg de dependencies in de queue stoppen zodat ze worden herberekend.
+
+Over het tweede triple.
+Het komt tot stand door de berekening 
+	
+	getProperty pn `trackedAs` (unwrap pn)
+
+Ook hier wordt uit een primaire representatie - een PerspectRol dit keer - een waarde afgelezen en door `trackedAs` met een triple gerepresenteerd.
+
+Omdat de rol verwijderd wordt, moet elk triple met die rol als subject verwijderd worden.
+
+Generaliserend:
+als een PerspectRol verdwijnt, 
+	* moet het triple waarin die rol als object voorkomt, verwijderd worden. Dat is er precies één, want een Rol hoort bij één Context, in de primaire representatie. Het triple wordt toegevoegd aan de queue. KLAAR
+	* moeten alle triples waarin die rol als subject voorkomt, verdwijnen. Deze triples worden toegevoegd aan de queue. KLAAR
+
+Als een PerspectContext verdwijnt, moeten de triples waarin de context als subject voorkomt, verdwijnen. KLAAR
+
+
+ROL VERWIJDEREN
+Hoe vind je de triples waarin een Rol als subject voorkomt? Dat is simpel: met TripleAdministration.lookupSubject.
+
+Hoe vind je het triple waarin een Rol als object voorkomt? Je kunt uit de primaire representatie van de Rol aflezen wat de context is. Je kunt ook aflezen wat zijn type is. Met de context en het type rol, dat het predicate is van het gezochte triple, kun je met TripleAdministration.lookupInTripleIndex het bewuste triple vinden.
+
+CONTEXT VERWIJDEREN
+Hoe vind je de triples waarin de context als subject voorkomt: met TripleAdministration.lookupSubject.
+
+BASISTRIPLE VERWIJDEREN
+Als je een BasisTriple verwijdert, moeten al zijn dependencies opnieuw berekend worden en dus aan de queue toegevoegd worden.
+
+Zijn er cascaderende effecten? Moet een triple verwijderd worden omdat een supporting BasisTriple is verdwenen?
+
+Een non-BasisTriple zonder supports mag verwijderd worden. Immers, alleen BasisTriples hebben geen supports.
+Hoe stel je vast of iets een BasisTriple is?
+Je kunt het niet zien aan het subject.
+Je kunt het evenmin zien aan het object.
+Het criterium is dat het predicate een well-formed identifier is.
+Bovendien moet dat predicate ofwel een Rol, ofwel een Property representeren. Maar ik vermoed dat well-formedness een voldoende criterium is. Alle andere triples representeren immers samengestelde berekeningen en die hebben samengestelde predicaatnamen.
+
+Overigens mag je een Triple zonder supports alleen verwijderen nadat het is herberekend. Dus, als na herberekening geen supports gevonden zijn. 
+
+Kortom:
+* controleer de supports van een Triple na herberekening
+* als er geen supports zijn, èn het is een BasisTriple, verwijder dan het triple (en voeg alle dependencies toe aan de queue).
+
+Herberekenen we ook BasisTriples? Zo nee, dan hoeven we niet te controleren op BasisTriple-zijn.
+Helaas doen we dat wel. Maar er is een algoritmische oplossing waarmee we vermijden dat we van een triple moeten vaststellen of het een BasisTriple is of niet.
+
+ALGORITMISCHE OPLOSSING
+1. Onderhoud twee queues: de BasisTripleQueue en de ComputedTripleQueue.
+2. Laat modifyTriple alleen toevoegen aan de BasisTripleQueue.
+3. Als een triple verwijderd wordt, voeg je zijn dependencies toe aan de ComputedTripleQueue.
+4. propagateTheoryDeltas werkt éérst de BasisTripleQueue af, daarna de ComputedTripleQueue.
+5. Triples zonder support in de BasisTripleQueue worden nooit verwijderd.
+6. Triples zonder support in de ComputedTripleQueue worden altijd verwijderd.
+7. De dependencies van triples in beide queues worden toegevoegd aan de ComputedTripleQueue.
+
+VOORTSCHRIJDEND INZICHT
+De tripleQueue in PerspectivesState bevat BasicTriples die veranderd zijn.
+In de functie TheoryChange.propagate lees ik de queue uit en installeer een lege in de state. Vervolgens, in updateFromSeeds, bepaal ik van elk BasisTriple de dependencies. En die rij gaat vervolgens het recursieve propagatie-algorithme in. 
+Met andere woorden, de queue in dat algorithme bevat nooit BasisTriples.
+
+Oftewel: ik kan volstaan met
+	* het basistriple uit de administratie verwijderen
+	* het vervolgens toevoegen aan de queue in PerspectivesState
+	* het propagatie-algorithme aanpassen zodat het triples zonder supports weggooit.
+
+NOTA BENE. Door propagation kunnen nieuwe effecten bewerkstelligd worden. Hierdoor kan de BasisTripleQueue weer gevuld worden. De afhandeling van deze gewijzigde BasisTriples kan wachten tot de volgende ronde van propagation. Maar we moeten er wel zeker van zijn dat het toevoegen niet interfereert met het afwerken van de queue. 
+Oftewel, we moeten de queue kopiëren naar een queue voor het algoritme, en de oorspronkelijke leegmaken. Dit is geregeld.
+
+ANDERE TRIPLES VERWIJDEREN
+Wanneer verdwijnt een triple?
+unregisterTriple wordt toegepast in:
+	* Actions.tearDownBotActions
+	* PerspectivesApi.unsubscribeFromObjects en dat wordt alleen aangeroepen door de API - nu dus nog niet.
+Kortom, deze functie wordt ingezet als we niet langer geïnteresseerd zijn in een bepaald resultaat.
+
+unRegisterTriple ruimt één kant op op: zijn supports verliezen het bewuste triple als dependency. We ruimen daarmee 'van bovenaf' op.
+
+Als een triple geen dependencies meer heeft, kunnen we het opruimen. Immers, niemand is geïnteresseerd in het resultaat van zijn berekening.
+
+DEBUGGEN
+De buitenRol verdwijnt, maar de context zelf en de binnenrol niet.
+De rol 'zaken' blijft bestaan (en dat klopt) en heeft geen binding (en dat klopt).
+En er is een foutmelding.
+Waarschijnlijk gaat het fout in removeUserRol toegepast op de buitenrol.
+Het gaat fout in unRegisterSubject.
+
+BINDING
+Als van een rol de binding verwijderd wordt, moet dat consequenties hebben. Wat moeten we doen om het propagation mechanisme het verdwijnen van een binding te laten oppakken?
+
+Hoe figureert de binding in de tripleAdministratie?
+Kijk naar de operator die een binding ophaalt:
+
+	binding = PT.binding `trackedAs` "model:Perspectives$binding"
+
+Er zijn dus triples van de vorm <rol1 - "model:Perspectives$binding" - rol2>
+
+Als de binding van rol1 verdwijnt, moet bovenstaand triple uit de administratie, op dezelfde manier als dat andere basistriples weg moeten bij verwijderen van een context of rol.
+
+Dit heb ik nu geïmplementeerd, maar dan loopt het vast in de component RolBinding in React. 
+
+
+
+
+
+

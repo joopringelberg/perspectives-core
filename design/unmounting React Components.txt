@@ -1,0 +1,8 @@
+UNMOUNTING REACT COMPONENTS
+
+Wanneer unmount je een react component? Bijvoorbeeld als een binding verdwijnt en er staat een RolBinding component op het scherm, dan unmount die component.
+
+Maar ook als je een scherm sluit!
+Dat is een andere situatie. De gebruiker geeft dan aan dat hij niet langer is geïnteresseerd in de onderliggende query. Dus in de tripleAdministration mag het effectTriple verdwijnen. Dat kan gevolgen hebben in de rest van het netwerk.
+
+De vraag is dus: hoe kan een component via de API aangeven dat 'zijn' effectTriple opgeruimd mag worden?

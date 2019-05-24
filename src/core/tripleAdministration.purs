@@ -1,31 +1,16 @@
 module Perspectives.TripleAdministration
-  ( memorizeQueryResults
-  , setMemorizeQueryResults
-  , getRef
-  , lookupInTripleIndex
-  , getTriple
-  , addToTripleIndex
-  , registerTriple
-  , unRegisterTriple
-  , memorize
-  , removeDependency_
-  , removeDependency
-  , addDependency
-  , setSupports_
-  , detectCycles
-  , lookupSubject
-  , clearTripleIndex
-  )
+
   where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.State (lift)
-import Data.Array (cons)
+import Data.Array (cons, null)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Effect (Effect, foreachE)
 import Effect.Aff (Aff, error, throwError)
 import Effect.Class (liftEffect)
+import Foreign.Object (foldMap, values)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke, clear)
@@ -114,6 +99,7 @@ registerTriple triple@(Triple{subject, predicate, supports}) = do
   pure triple
 
 -- | Remove the triple identified by the reference from the index (removes the dependency from its supports, too)
+-- | Recursively remove the supports if they have no dependencies left.
 unRegisterTriple :: TripleRef -> Effect Unit
 unRegisterTriple (TripleRef{subject, predicate}) = do
   preds <- peek tripleIndex subject
@@ -127,7 +113,45 @@ unRegisterTriple (TripleRef{subject, predicate}) = do
           pure unit
         (Just t@(Triple{supports})) -> do
           void $ delete p predicate
-          foreachE supports (removeDependency (getRef t))
+          foreachE supports
+            \s -> do
+              removeDependency (getRef t) s
+              b <- (hasDependencies s)
+              if b
+                then (pure unit)
+                else (unRegisterTriple s)
+
+-- | Remove the triple and return all its dependencies.
+unRegisterBasicTriple :: TripleRef -> Effect (Maybe (Triple String String))
+unRegisterBasicTriple (TripleRef{subject, predicate}) = do
+  preds <- peek tripleIndex subject
+  case preds of
+    Nothing ->
+      pure Nothing
+    (Just (p :: PredicateIndex)) -> do
+      objls <- peek p predicate
+      case objls of
+        Nothing -> pure Nothing
+        (Just t@(Triple{dependencies})) -> do
+          void $ delete p predicate
+          pure $ Just t
+
+-- | Remove the subject and all its relations from the TripleIndex.
+-- | Remove all triples with the given subject from the TripleIndex.
+-- | Returns all removed triples.
+unRegisterSubject :: Subject -> Effect (Array TripleRef)
+unRegisterSubject subject = do
+  preds <- peek tripleIndex subject
+  case preds of
+    Nothing ->
+      pure []
+    (Just (p :: PredicateIndex)) -> do
+      void $ delete tripleIndex subject
+      -- For all predicates, return all triples.
+      -- TODO. triples is geen array! Dus we moeten hier van een GlStrMap naar een array
+      pure $ values (unsafeCoerce p)
+      -- foldMap (\pred triples -> triples) (unsafeCoerce p)
+
 
 -- | Make sure an entry for the given resource identifier is in the tripleIndex. Return the PredicateIndex for the
 -- | resource.
@@ -188,6 +212,13 @@ getDependents tr = do
   case ms of
     (Just (Triple{dependencies})) -> pure dependencies
     Nothing -> pure []
+
+hasDependencies :: TripleRef -> Effect Boolean
+hasDependencies tr = do
+  ms <- getTriple tr
+  case ms of
+    (Just (Triple{dependencies})) -> pure $ null dependencies
+    Nothing -> pure false
 
 -- | Remove the dependentRef (first argument) as a dependency from the triple identified by the supportingRef (second argument).
 removeDependency :: TripleRef -> TripleRef -> Effect Unit
