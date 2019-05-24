@@ -7,7 +7,7 @@ import Perspectives.ApiTypes (convertResponse, ApiEffect) as Api
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives)
 import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (getRef, registerTriple)
-import Prelude (Unit, bind, pure, ($), (<>))
+import Prelude (Unit, bind, pure, ($))
 import Unsafe.Coerce (unsafeCoerce)
 
 type QueryEffect a = NamedFunction (PerspectivesEffect a)
@@ -33,7 +33,7 @@ pushesObjectsTo :: forall s o.
   QueryEffect String ->
   (s **> o)
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
-  TypedTripleGetter name pushesObjectsTo' where
+  TypedTripleGetter effectName pushesObjectsTo' where
 
     pushesObjectsTo' :: TripleGetter s o
     pushesObjectsTo' id = do
@@ -42,7 +42,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
       _ <- liftEffect $ registerTriple (typeWithPerspectivesTypes et)
       pure et
       -- To unsubscribe the effect, de-register the effect triple. Find the triple
-      -- by its subject (=id) and predicate (=name)
+      -- by its subject (=id) and predicate (=effectName)
 
     -- propagateTheoryDeltas will use the tripleGetter to recompute,
     -- i.e. to sort the effect again and it will use the resulting triple to
@@ -53,14 +53,11 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
       queryResult@(Triple{subject, object}) <- tg id
       _ <- lift $ effect (typeWithPerspectivesTypes object)
       pure $ Triple { subject: subject
-                    , predicate : name
+                    , predicate : effectName
                     , object : object
                     , dependencies : []
                     , supports : [getRef $ typeWithPerspectivesTypes queryResult]
                     , tripleGetter : effectFun}
-
-    name :: String
-    name = tgName <> " ~> " <> effectName
 
 -- high precedence!
 infixl 9 pushesObjectsTo as ~>

@@ -151,7 +151,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.SetBinding -> catchError
       ((setBinding subject object) *> (sendResponse (Result corrId ["ok"]) setter))
       (\e -> sendResponse (Error corrId (show e)) setter)
-    Api.Unsubscribe -> unsubscribeFromObjects subject predicate corrId
+    Api.Unsubscribe -> unsubscribeFromObjects subject corrId
     Api.WrongRequest -> sendResponse (Error corrId subject) setter
     otherwise -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)
   where
@@ -171,11 +171,8 @@ subscribeToObjects subject query setter corrId = do
   (effectInReact :: QueryEffect String) <- pure $ NamedFunction (show corrId) (sendResult corrId setter)
   void $ (subject ## query ~> effectInReact)
 
-unsubscribeFromObjects :: Subject -> Predicate -> CorrelationIdentifier -> MonadPerspectives Unit
-unsubscribeFromObjects subject predicate corrId = lift $ liftEffect $ unRegisterTriple $ TripleRef {subject, predicate: effectPredicate}
-  where
-    effectPredicate :: String
-    effectPredicate = "(" <>  predicate <> " ~> " <> show corrId <> ")"
+unsubscribeFromObjects :: Subject -> CorrelationIdentifier -> MonadPerspectives Unit
+unsubscribeFromObjects subject corrId = lift $ liftEffect $ unRegisterTriple $ TripleRef {subject, predicate: show corrId}
 
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: ContextID -> RolName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
