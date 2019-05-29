@@ -11,7 +11,7 @@ t :: String -> String
 t s = "model:TestTDC$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "TypeDefChecker" do
+theSuite = suiteSkip "TypeDefChecker" do
   test "All error situations that the TypeDefChecker can find, except for MissingType, MissingAspect, RolWithoutContext and PropertyWithoutRol (we cannot upload a CRL file with those error situations)." do
     typeDefCheckerNotifies "testTypeDefChecker.crl"
       [ "MissingMogelijkeBinding"

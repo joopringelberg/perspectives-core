@@ -27,7 +27,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "ModelBasedTripleGetters" do
+theSuite = suite "ModelBasedTripleGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   ---------------------------------------------------------------------------------
@@ -251,7 +251,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     loadTestModel "testBotActie.crl"
   test "expressionType" do
     assertEqual "tba:Test$botCopiesV1ToV2$self is a Function"
-      (("model:Perspectives$Function") ##= (hasContextType "model:TestBotActie$Test$botCopiesV1ToV2$self"))
+      ("model:TestBotActie$Test$botCopiesV1ToV2$self" ##= (isContextTypeOf "model:Perspectives$Function"))
       [PBool "true"]
     assertEqual "tba:Test$botCopiesV1ToV2$self expressionType psp:Actie"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= expressionType)
