@@ -44,8 +44,8 @@ isSubsumedOnEachRolTelescopeOf :: String -> (String **> PBool)
 isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("isSubsumedOnEachRolTelescopeOf" <> allowedBinding) f
   where
     f :: TripleGetter String PBool
-    f aspect = TGC.unlessFalse (isOrHasAspect aspect) allowedBinding
-      -- this is: allowedBinding ## (isOrHasAspect aspect)
+    f aspect = TGC.unlessFalse (isOrHasAspect allowedBinding) aspect
+      -- this is: aspect ## (isOrHasAspect allowedBinding)
       -- read as: allowedBinding `isOrHasAspect` aspect
       <|>
       (allowedBinding @@
