@@ -11,7 +11,7 @@ t :: String -> String
 t s = "model:TestTDC$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "TypeDefChecker" do
+theSuite = suite "TypeDefChecker" do
   test "All error situations that the TypeDefChecker can find, except for MissingType, MissingAspect, RolWithoutContext and PropertyWithoutRol (we cannot upload a CRL file with those error situations)." do
     typeDefCheckerNotifies "testTypeDefChecker.crl"
       [ "MissingMogelijkeBinding"
@@ -19,8 +19,8 @@ theSuite = suiteSkip "TypeDefChecker" do
       , "IncorrectRolinContextBinding"
       , "RolNotDefined"
       , "MissingPropertyValue"
-      -- , "MissingExternalPropertyValue"
-      -- , "MissingInternalPropertyValue"
+      , "MissingExternalPropertyValue"
+      , "MissingInternalPropertyValue"
       , "IncorrectPropertyValue"
       , "TooManyPropertyValues"
       , "PropertyNotDefined"
@@ -37,7 +37,7 @@ theSuite = suiteSkip "TypeDefChecker" do
       , "AspectPropertyNotFromAspectRol"
       , "BindingPropertyNotAvailable"
       , "BindingPropertyCannotOverrideBooleanAspectProperty"
-      -- , "IncompatiblePrototype"
+      , "IncompatiblePrototype"
       -- , "CannotOverideBooleanRolProperty"
         --  Not testable because the parser fails on the testfile:
         -- "MissingType"

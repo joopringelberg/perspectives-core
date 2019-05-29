@@ -125,15 +125,17 @@ rolDef = unwrap >>> (buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$R
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 ownRollenDef :: (AnyContext ~~> RolDef)
-ownRollenDef = (filter (hasType "model:Perspectives$Rol") (iedereRolInContext >=> (pure <<< map ContextRol) /-/ binding /-/ context)) >=> pure <<< map RolDef
+ownRollenDef = (filter (hasContextType "model:Perspectives$Rol") (iedereRolInContext >=> (pure <<< map ContextRol) /-/ binding /-/ context)) >=> pure <<< map RolDef
 
 
 isContextTypeOf :: AnyContext -> (AnyDefinition ~~> PBool)
 isContextTypeOf x = some (expressionType /-/ closure_ directAspects /-/ (agreesWithType x) )
 
-hasType :: AnyDefinition -> (AnyContext ~~> PBool)
-hasType q = contextType /-/ isOrHasAspect q
+hasContextType :: AnyDefinition -> (AnyContext ~~> PBool)
+hasContextType q = contextType /-/ isOrHasAspect q
 
+-- | q is the left parameter when used infix: TODO: nee hoor! andersom!!!
+-- | q isOrHasAspect p
 isOrHasAspect :: AnyDefinition -> (AnyDefinition ~~> PBool)
 isOrHasAspect q = some (closure_ directAspects /-/ agreesWithType q)
 
@@ -144,7 +146,7 @@ sumToSequence :: (AnyDefinition ~~> AnyDefinition)
 sumToSequence t = unlessNull alternatives t <|> pure [t]
 
 expressionType :: (AnyContext ~~> AnyDefinition)
-expressionType = cond (hasType "model:Perspectives$Function") getFunctionResultType contextType
+expressionType = cond (hasContextType "model:Perspectives$Function") getFunctionResultType contextType
 
 getFunctionResultType :: (AnyContext ~~> AnyDefinition)
 getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$result") /-/ rolBindingDef

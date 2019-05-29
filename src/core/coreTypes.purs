@@ -293,8 +293,9 @@ type SimpleValueName = String
 data UserMessage =
   -- TypeDefChecker messages
     MissingAspect TypeID Aspect
+  | MissingType TypeID TypeID
   | MissingMogelijkeBinding TypeID
-  | MissingType ContextID
+  | NoType ContextID
   | MissingRolInstance RolName ContextID
   | IncorrectRolinContextBinding ContextID RolName TypeID TypeID TypeID
   | IncorrectContextRolBinding ContextID RolName TypeID TypeID TypeID
@@ -341,13 +342,14 @@ instance showUserMessage :: Show UserMessage where
   show (MissingVariableDeclaration s) = "(MissingVariableDeclaration) De variabele '" <> s <> "' wordt gebruikt voor hij is gedefinieerd."
   show (VariableAlreadyDeclaredAs var tp) = "(VariableAlreadyDeclaredAs) De variabele '" <> var <> "' is al gedeclareerd als een waarde van het type '" <> tp <> "'"
   show (MissingAspect tp as) = "(MissingAspect) Het type '" <> tp <> "' mist het aspect '" <> as <> "'."
+  show (MissingType tp as) = "(MissingType) Het type '" <> tp <> "' heeft niet het type '" <> as <> "'."
   show (MissingMogelijkeBinding tp) = "(MissingMogelijkeBinding) Voor Rol '" <> tp <> "' is geen mogelijkeBinding gedefinieerd."
   show (MultipleDefinitions ln aspectArray) = "(MultipleDefinitions) Elk van de volgende Aspecten heeft een definitie voor '" <> ln <> "': " <> show aspectArray
   show (MissingUnqualifiedProperty ln rn) = "(MissingUnqualifiedProperty) Er is geen definitie voor de property '" <> ln <> "' voor de rol '" <> rn <> "'."
   show (MissingQualifiedProperty pn rn) = "(MissingQualifiedProperty) Er is geen definitie voor de property '" <> pn <> "' voor de rol '" <> rn <> "'."
   show (MissingQualifiedRol rn cid) = "(MissingQualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
   show (MissingUnqualifiedRol rn cid) = "(MissingUnqualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
-  show (MissingType cid) = "(MissingType) De context '" <> cid <> "' heeft geen type."
+  show (NoType cid) = "(NoType) De context '" <> cid <> "' heeft geen type."
   show (MissingRolInstance rn cid) = "(MissingRolInstance) De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."
   show (IncorrectRolinContextBinding cid rn bd tp mb) = "(IncorrectRolinContextBinding) In de context '" <> cid <> "' is de RolInContext '" <> rn <> "' gebonden aan '" <> bd <> "'(type: '" <> tp <> "') maar moet worden gebonden aan een instantie van (één van de) type(s) '" <> mb <> "'."
   show (IncorrectContextRolBinding cid rn bd tp mb) = "(IncorrectContextRolBinding) In de context '" <> cid <> "' is de ContextRol '" <> rn <> "' gebonden aan '" <> bd <> "'(type: '" <> tp <> "') maar moet worden gebonden aan een instantie van (één van de) type(s) '" <> mb <> "'."

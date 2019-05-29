@@ -306,7 +306,6 @@ searchProperty pd = typeWithPerspectivesTypes searchInRolTelescope g
     g = getProperty pd `trackedAs` (unwrap pd)
 
 -- | The value of the unqualified property pd, wherever in the telescope it is represented.
--- | NOTE: this function cannot be applied to a BinnenRol.
 -- Test.Perspectives.TripleGetterConstructors
 searchUnqualifiedProperty :: forall b. RolClass b => Id.LocalName -> (b **> Value)
 searchUnqualifiedProperty pd = typeWithPerspectivesTypes searchInRolTelescope g

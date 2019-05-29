@@ -21,12 +21,14 @@ import Perspectives.Actions (addRol, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..))
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>))
 import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
-import Perspectives.EntiteitAndRDFAliases (ContextID, Predicate, PropertyName, RolID, RolName, Subject)
+import Perspectives.DataTypeObjectGetters (contextType) as DTO
+import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol)
-import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction)
+import Perspectives.Identifiers (LocalName, buitenRol)
+import Perspectives.ModelBasedStringTripleGetters (searchView)
+import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##))
@@ -118,11 +120,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetBinding -> subscribeToObjects subject DTG.genericBinding setter corrId
     Api.GetBindingType -> subscribeToObjects subject (DTG.genericBinding >-> DTG.genericRolType) setter corrId
     Api.GetRol -> getRol subject predicate setter corrId
+    Api.GetUnqualifiedRol -> getRolFromLocalName subject predicate setter corrId
     Api.GetRolContext -> subscribeToObjects subject DTG.genericContext setter corrId
     Api.GetContextType -> subscribeToObjects subject DTG.contextType setter corrId
     Api.GetRolType -> subscribeToObjects subject DTG.genericRolType setter corrId
     Api.GetProperty -> getProperty subject predicate setter corrId
-    Api.GetViewProperties -> subscribeToObjects subject (propertyReferenties >-> DTG.genericBinding >-> DTG.genericContext) setter corrId
+    Api.GetViewProperties -> subscribeToObjects subject (searchView predicate >-> propertyReferenties >-> DTG.genericBinding >-> DTG.genericContext) setter corrId
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
@@ -181,10 +184,16 @@ getRolBinding cid rn setter corrId = do
   subscribeToObjects cid (rf >-> DTG.genericBinding) setter corrId
   -- subscribeToObjects cid (rf >-> DTG.genericBinding) (setter <<< Result corrId)
 
--- | Retrieve the rol from the context, subscribe to it. NOTE: only for ContextInRol, not BinnenRol or BuitenRol.
+-- | Retrieve the rol from the context, subscribe to it. NOTE: only for RolInContext/ContextRol, not BinnenRol or BuitenRol.
 getRol :: ContextID -> RolName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
 getRol cid rn setter corrId = do
   qf <- getRolFunction rn
+  subscribeToObjects cid qf setter corrId
+
+getRolFromLocalName :: ContextID -> LocalName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
+getRolFromLocalName cid ln setter corrId = do
+  contextType <- cid ##>> DTO.contextType 
+  qf <- getUnqualifiedRolFunction ln contextType
   subscribeToObjects cid qf setter corrId
 
 -- | Retrieve the property from the rol, subscribe to it.

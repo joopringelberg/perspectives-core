@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Control.Monad.Trans.Class (lift)
 import Effect.Aff (Milliseconds(..), delay)
 import Perspectives.Actions (removeProperty', setProperty')
-import Perspectives.ModelBasedTripleGetters (hasType)
+import Perspectives.ModelBasedTripleGetters (hasContextType)
 import Perspectives.PerspectivesTypes (PBool(PBool))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.StringTripleGetterConstructors (getInternalProperty)
@@ -36,10 +36,10 @@ theSuite = suiteSkip "TripleGetterComposition" do
       (t "myContextDef" ##= closure_ directAspects)
       ["model:TestOGC$myContextDef","model:TestOGC$myAspect","model:TestOGC$myUrAspect","model:Perspectives$Context"]
     assertEqual "t:myContextDef has none of its Aspects as type, except psp:Context."
-      (t "myContextDef" ##= traverse hasType "hasType" (closure_ directAspects))
+      (t "myContextDef" ##= traverse hasContextType "hasContextType" (closure_ directAspects))
       [PBool "false", PBool "true"]
     assertEqual "t:myContextDef has some of its (indirect) Aspects as its type."
-      (t "myContextDef" ##= some (traverse hasType "hasType" (closure_ directAspects)))
+      (t "myContextDef" ##= some (traverse hasContextType "hasContextType" (closure_ directAspects)))
       [PBool "true"]
 
   test "preferLeft" do

@@ -1,16 +1,15 @@
 module Perspectives.QueryCompiler where
 
-import Effect.Exception (Error, error)
 import Control.Monad.Error.Class (throwError)
 import Data.Array (foldl, head, unsnoc)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+import Effect.Exception (Error, error)
 import Perspectives.CoreTypes (type (**>), type (~~>), MP, MonadPerspectives, runMonadPerspectivesQueryCompiler, (##>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, genericContext)
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, contextType, genericBinding, genericContext, genericRolType, identity, iedereRolInContext, label) as DTG
-
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace)
 import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty) as OGC
@@ -40,6 +39,12 @@ getRolFunction ::
   MonadPerspectives StringTypedTripleGetter
 getRolFunction = constructGetter QualifiedRol
 
+getUnqualifiedRolFunction ::
+  String ->
+  String ->
+  MonadPerspectives StringTypedTripleGetter
+getUnqualifiedRolFunction = constructUnqualifiedGetter UnqualifiedRol
+
 -- | Returns a getter, lookup function or compiled query.
 constructGetter ::
   (String -> ElementaryQueryStep) ->
@@ -58,10 +63,22 @@ constructGetter queryAstConstructor pn = do
         (Left m) -> throwError $ error $ show m
         (Right descriptionId) -> constructQueryFunction descriptionId
 
+-- | Returns a getter, lookup function or compiled query.
+constructUnqualifiedGetter ::
+  (String -> ElementaryQueryStep) ->
+  String ->
+  String ->
+  MonadPerspectives StringTypedTripleGetter
+constructUnqualifiedGetter queryAstConstructor rn ct = do
+  r <- runMonadPerspectivesQueryCompiler ct (compileElementaryQueryStep (queryAstConstructor rn) (rn <> "_getterDescription"))
+  case r of
+    (Left m) -> throwError $ error $ show m
+    (Right descriptionId) -> constructQueryFunction descriptionId
+
 -- | From the id of a context that is a description of a Query, construct a function that computes the value of that
 -- | query from the id of an entity.
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
-constructQueryFunction :: forall s o.
+constructQueryFunction ::
   AnyContext ->
   MonadPerspectives ((String **> String))
 constructQueryFunction typeDescriptionID = do
@@ -167,7 +184,7 @@ constructQueryFunction typeDescriptionID = do
     _ -> throwError (error $ "constructQueryFunction: unknown type description: '" <> typeDescriptionID <> "'")
 
   where
-    equal' ::
+    equal' :: forall s.
       (s **> String) ->
       (s **> String) ->
       (s **> PBool)

@@ -1,0 +1,45 @@
+hasOnEachRolTelescopeTheContextTypeOf
+
+In TypeDefChecker.checkBindingOfContextRol testen we of de boundValue wel toegelaten is, door:
+	* alle mogelijke bindingen (possibleBinding) die zijn toegestaan langs te lopen
+	* en te controleren dat voor minstens één geldt: 
+		
+		boundValue `hasOnEachRolTelescopeTheContextTypeOf` possibleBinding
+
+Dit lijkt mij, in de aanroep, precies verkeerd om geïmplementeerd. Immers, we zoeken een x op de roltelescoop van elke possibleBinding, waarvoor geldt:
+
+		x `isContextTypeOf` boundValue.
+		of:
+		boundValue `hasType` x
+
+Maar hoe is hasOnEachRolTelescopeTheContextTypeOf geïmplementeerd?
+
+Wat is de geïmplementeerde betekenis van 
+
+		boundValue `hasOnEachRolTelescopeTheContextTypeOf` possibleBinding
+
+Er zijn twee gevallen. Ik benoem daarbij het tweede, niet beschreven argument 'possibleBinding':
+
+	a. isContextTypeOf boundValue possibleBinding <==> boundValue `isContextTypeOf` possibleBinding
+		DIT GEVAL IS VERKEERD OM
+
+	b. Neem de mogelijkeBindingen van possibleBinding en voer recursief dezelfde test uit.
+		Daarmee lopen we de roltelescoop van possibleBinding af en dat is OK.
+
+Nu is isContextTypeOf zo geïmplementeerd, dat de argumenten de facto zijn omgedraaid. Daarmee wordt geval a onbedoeld en onbewust gerepareerd. Daarmee zou hasOnEachRolTelescopeTheContextTypeOf goed zijn geïmplementeerd.
+
+REFACTORING hasOnEachRolTelescopeTheContextTypeOf
+Beter ware het om 'isContextTypeOf' te vervangen door zijn tegendeel, d.w.z. hasType.
+Daarmee wordt het veel beter leesbaar.
+Als we 'hasType' gaan verwisselen met 'isContextTypeOf', komt dat vanzelf goed.
+
+Blijft overeind dat checkBindingOfContextRol verkeerd is gemaakt.
+Maar misschien is het zo. 
+De naam hasOnEachRolTelescopeTheContextTypeOf klopt niet met wat hij doet.
+Immers, na refactoring toetst hij of geldt:
+
+		boundValue `hasType` possibleBinding
+
+Dat is goed. Dus moet de naam zijn: boundValue `hasTypeOnEachRolTelescopeOf` possibleBinding.
+
+Dan handhaven we de aanroep in checkBindingOfContextRol. De facto verandert er dan niets.

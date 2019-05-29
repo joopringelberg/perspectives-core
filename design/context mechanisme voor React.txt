@@ -1,0 +1,97 @@
+REACT CONTEXT
+
+Terminologie. Omdat we in Perspectives het begrip Context hanteren, en in React dat begrip óók gebruikt wordt, hanteer ik de volgende termen:
+
+	* Context voor de Perspectives Context;
+	* ReactContext voor de React Context.
+
+Een Component die een Context, Rol of View bij de Core opvraagt en beschikbaar maakt, noem ik een Context-, Rol- of ViewSource.
+Dit om het begrip 'Provider' te reserveren voor de betekenis die React eraan geeft.
+Voor het gemak munt ik de term 'Sink' voor een Component die een context, rol of view nodig heeft: ContextSink, RolSink en ViewSink. 
+Dit om het begrip 'Consumer' te reserveren voor de betekenis die React eraan geeft.
+
+We hebben drie soorten React contexten (gemaakt met React.createContext):
+
+	* PSContext, met members contextinstance en contexttype;
+	* PSRol, met alle PSContext members en met rolinstance en roltype;
+	* PSView, met alle PSRol members en met viewproperties en een member voor elke viewproperty.
+
+Dat betekent dat een RolSource een PSRol ReactContext aanmaakt, die met PSRol.Provider in de render functie een waarde gegeven wordt in de RolSource component, en via een PSRol.Consumer in een RolSink met een functie kan worden uitgelezen.
+
+Maar alle Componenten die een contextinstance nodig hebben (een ContextSink), declareren we met een static contextType van PSContext. Dus b.v. een RolSource kan de contextinstance óók uitlezen uit this.context.contextinstance, en het type met this.context.contexttype.
+Verwarrend is hier dat de term 'context' in deze expressies naar de ReactContext verwijst, en contextinstance natuurlijk naar een instantie van een Perspectives Context.
+
+Kortom:
+	* een ContextSource maakt een PSContext ReactContext;
+	* een RolSource maakt een PSRol ReactContext;
+	* een ViewSource maakt een PSView ReactContext.
+
+En:
+	* Een ContextSink heeft contextType PSContext en creeert een PSRol ReactContext;
+	* een RolSink heeft contextType PSRol en creeert typisch een PSView ReactContext (of een PSContext ReactContext, of een PSRol ReactContext);
+	* een ViewSink heeft contextType PSView. Een ViewSink is typisch een component die html op het scherm zet.
+
+Merk op dat een Component uit de Perspectives React bibliotheek meestal in twee categorieën valt:
+	* ExternalRole is een ContextSink, maar een RolSource
+	* View is een RolSink, maar een ViewSource
+	* RolBinding is een RolSink en een RolSource
+	enz.
+
+Context is alleen een ContextSource (en geen Sink).
+Rollen is een ContextSink en een RolSource (maar zijn children moeten een rol kiezen).
+
+DYNAMIEK	
+Een ContextSource, die een PSContext.Provider beschikbaar maakt, kan best tijdens zijn bestaan een andere context instantie ontvangen. Denk aan BoundContext en ContextOfRole. Zo'n nieuwe instantie moet doorgegeven worden via de provider. Dat kunnen we bereiken door
+	
+	* contextinstance een state member te maken;
+	* PSContext een waarde te geven die gekoppeld is aan state:
+	
+		<PSContext.Provider value={this.state.contextinstance}
+	
+	waar 'this' de component refereert (en dat schijnt in de render-functie gewoon 'this' te zijn).
+
+Maar we moeten twéé props doorgeven, namelijk contextinstance en contexttype. Dat doen we als volgt:
+
+	In de constructor:
+	
+	this.state.value = {contextinstance: "", contexttype: ""};
+
+	en dan:
+	
+		<PSContext.Provider value={this.state.value}
+
+Een Component die een ContextSink is en ook een RolProvider, zoals ExternalRole, heeft dus PSContext als contextType en stelt de Provider van PSRol ter beschikking in zijn render functie. 
+
+Hij vult de contextinstance en contexttype member van PSRol uit zijn this.context. Dus:
+
+this.state.value = {contextinstance: this.context.contextinstance, contexttype: this.context.contexttype }
+
+In zijn componentDidMount functie bevraagt hij de Core en zet members van state.value.
+
+OPEN VRAAG
+Als we op state een value object zetten, dat de props heeft van het contextType dat via de Provider doorgegeven wordt, wordt dan niet teveel gerenderd, omdat we het hele object vervangen als er één property verandert?
+
+CASES
+1. RolBinding maakt een nieuwe rol beschikbaar, terwijl de Context er nog niet is.
+	Daar zal de programmeur zich bewust van moeten zijn.
+
+2. ContextOfRole maakt een nieuwe Context beschikbaar. Dan moet dus opnieuw een ContextProvider gemaakt worden.
+
+INVENTARISATIE VAN PROPERTIES IN COMPONENTEN
+
+* namespace.
+
+	Doorgegeven door :	context, namespace, rollen, rolbinding, boundContext
+	Ontvangen door: 	rollen, rolbinding, 
+
+	Ik vermoed dat namespace vervangen moet worden door contexttype en roltype.
+
+* key. Deze property moeten we waarschijnlijk handhaven.
+
+VERVANGEN VAN PROPS
+Ik stel dat de members van de ContextType's de (verplichte) props gaan vervangen. 
+
+IMPLEMENTATIE
+1. Is Rollen wel zo'n handige component? Kan ik niet eenvoudiger met Rol uit?
+
+2. Hoe zit het met keys? Ik itereer in een Rol over de instances, en ook over de children. Waar moeten keys uitgedeeld worden?

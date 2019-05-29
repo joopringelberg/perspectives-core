@@ -4,44 +4,44 @@ import Control.Alt ((<|>))
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@))
 import Perspectives.DataTypeTripleGetters (genericBinding, genericContext)
 import Perspectives.EntiteitAndRDFAliases (RolName)
-import Perspectives.ModelBasedTripleGetters (isContextTypeOf, isOrHasAspect, isRolTypeOf, sumToSequence)
-import Perspectives.PerspectivesTypes (AnyDefinition, PBool, RolInContext)
+import Perspectives.Identifiers (LocalName)
+import Perspectives.ModelBasedTripleGetters (hasContextType, hasRolType, isOrHasAspect, sumToSequence)
+import Perspectives.PerspectivesTypes (class RolClass, AnyDefinition, PBool)
 import Perspectives.QueryCombinators (notEmpty, conj) as QC
-import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndPrototypes, searchRolInContext)
-import Perspectives.TripleGetterConstructors (unlessFalse) as TGC
+import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition)
 import Perspectives.TripleGetterComposition (unlessFalse, (>->))
 import Perspectives.TripleGetterConstructors (all)
+import Perspectives.TripleGetterConstructors (unlessFalse) as TGC
 import Prelude ((<>))
 
--- | allowedBinding `hasOnEachRolTelescopeTheContextTypeOf` boundValue
--- | allowedBinding `hasOnEachRolTelescopeTheContextTypeOf` boundValue
--- | allowedBinding ## (`hasOnEachRolTelescopeTheContextTypeOf` boundValue)
+-- | allowedBinding `hasContextTypeOnEachRolTelescopeOf` boundValue
+-- | allowedBinding ## (`hasContextTypeOnEachRolTelescopeOf` boundValue) !!!OMGEKEERD
 -- | Means (i.e. this is how it is implemented):
 -- | On each path through the mogelijkeBinding graph of allowedBinding there is a type x for which holds:
 -- | x isContextTypeOf boundValue, or:
--- | boundValue hasType x
+-- | boundValue isContextTypeOf x
 -- | Or: boundValue is on each rolTelescope that starts with allowedBinding
--- | Formulated this way, 'hasOnEachRolTelescopeTheContextTypeOf' has it backwards.
-hasOnEachRolTelescopeTheContextTypeOf :: String -> (String **> PBool)
-hasOnEachRolTelescopeTheContextTypeOf boundValue = ((isContextTypeOf boundValue) `unlessFalse`
+-- | Formulated this way, 'hasContextTypeOnEachRolTelescopeOf' has it backwards.
+hasContextTypeOnEachRolTelescopeOf :: String -> (String **> PBool)
+hasContextTypeOnEachRolTelescopeOf boundValue = ((hasContextType boundValue) `unlessFalse`
   \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-      (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheContextTypeOf boundValue)))))
-  "hasOnEachRolTelescopeTheContextTypeOf"
+      (all (mogelijkeBinding >-> sumToSequence >-> (hasContextTypeOnEachRolTelescopeOf boundValue)))))
+  "hasContextTypeOnEachRolTelescopeOf"
 
-hasOnEachRolTelescopeTheRolTypeOf :: RolInContext -> (String **> PBool)
-hasOnEachRolTelescopeTheRolTypeOf boundValue = ((isRolTypeOf boundValue) `unlessFalse`
+hasRolTypeOnEachRolTelescopeOf :: forall r. RolClass r => r -> (String **> PBool)
+hasRolTypeOnEachRolTelescopeOf boundValue = ((hasRolType boundValue) `unlessFalse`
   \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-      (all (mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheRolTypeOf boundValue)))))
-  "hasOnEachRolTelescopeTheContextTypeOf"
+      (all (mogelijkeBinding >-> sumToSequence >-> (hasRolTypeOnEachRolTelescopeOf boundValue)))))
+  "hasRolTypeOnEachRolTelescopeOf"
 
 -- TODO. Bij updates wordt de berekende waarheidswaarde niet (altijd) aangepast.
 -- | aspect ## (isSubsumedOnEachRolTelescopeOf allowedBinding)
 isSubsumedOnEachRolTelescopeOf :: String -> (String **> PBool)
-isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("hasOnEachRolTelescopeTheContextTypeOf_" <> allowedBinding) f
+isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("isSubsumedOnEachRolTelescopeOf" <> allowedBinding) f
   where
     f :: TripleGetter String PBool
     f aspect = TGC.unlessFalse (isOrHasAspect aspect) allowedBinding
@@ -62,3 +62,8 @@ mogelijkeBinding = searchInAspectRolesAndPrototypes f
 
     f :: (String **> AnyDefinition)
     f = searchRolInContext "model:Perspectives$Rol$mogelijkeBinding" >-> genericBinding >-> genericContext
+
+-- | Given a local name for a View, looks for a matching View in the Rol definition,
+-- | in its prototypes and in its AspectRoles.
+searchView :: LocalName -> (RolName **> AnyDefinition)
+searchView lvn = searchUnqualifiedRolDefinition lvn

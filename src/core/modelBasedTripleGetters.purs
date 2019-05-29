@@ -7,7 +7,7 @@ import Data.Newtype (alaF, unwrap, wrap)
 import Perspectives.CoreTypes (type (**>), TypedTripleGetter(..), TripleGetter, (@@))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
-import Perspectives.DataTypeTripleGetters (contextType, genericRolType) as DTTG
+import Perspectives.DataTypeTripleGetters (contextType, genericRolType, rolType) as DTTG
 import Perspectives.DataTypeTripleGetters (identity)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
@@ -134,7 +134,7 @@ mogelijkeBinding = unwrap `before` mbinding
 
 -- | All Rollen defined for a Context type, excluding Aspects.
 ownRollenDef :: (AnyContext **> RolDef)
-ownRollenDef = (QC.filter (hasType "model:Perspectives$Rol") (DTG.iedereRolInContext `followedBy` ContextRol >-> DTG.binding >-> DTG.context)) `followedBy` RolDef
+ownRollenDef = (QC.filter (isContextTypeOf "model:Perspectives$Rol") (DTG.iedereRolInContext `followedBy` ContextRol >-> DTG.binding >-> DTG.context)) `followedBy` RolDef
 
 -- All Rollen defined for a Context type, locally or in Aspects.
 rollenDef :: (AnyContext **> RolDef)
@@ -208,41 +208,42 @@ type Instance = String
 -- | q is a type of p
 -- | q `isContextTypeOf` p
 -- | AnyDefinition `isContextTypeOf` AnyContext
-isContextTypeOf :: AnyContext -> (AnyDefinition **> PBool)
-isContextTypeOf i = TypedTripleGetter ("isTypeOf_" <> i) f where
-  -- x ## (isContextTypeOf i) should be understood as:
-  -- some y in aspects (type i) `agreesWithType` x
-  -- (type i) `isOrHasAspect` x
-  -- x is a type of i.
+hasContextType :: AnyContext -> (AnyDefinition **> PBool)
+hasContextType p = TypedTripleGetter ("hasContextType_" <> p) f where
+  -- q ## (isContextTypeOf p) should be understood as:
+  -- some y in aspects (type p) `agreesWithType` q
+  -- (type p) `isOrHasAspect` q
+  -- q is a type of p.
   f :: TripleGetter AnyDefinition PBool
-  f x = i @@ some (expressionType >-> closure_ directAspects >-> (agreesWithType x) )
+  f x = p @@ some (expressionType >-> closure_ directAspects >-> (agreesWithType x) )
 
 -- | True iff AnyDefinition is a type of r.
 -- | AnyDefinition `isRolTypeOf` r
-isRolTypeOf :: forall r. RolClass r => r -> (AnyDefinition **> PBool)
-isRolTypeOf r = TypedTripleGetter ("isTypeOf_" <> unwrap r) f where
+hasRolType :: forall r. RolClass r => r -> (AnyDefinition **> PBool)
+hasRolType r = TypedTripleGetter ("hasRolType_" <> unwrap r) f where
   f :: TripleGetter AnyDefinition PBool
   f tp = unwrap r @@ some (DTTG.genericRolType >-> closure_ (RolDef `before` directAspectRoles `followedBy` unwrap) >-> (agreesWithType tp))
 
--- | p `hasType` q shoud be written:
--- | p ## (hasType q)
+-- | p `hasContextType` q shoud be written:
+-- | p ## (hasContextType q)
 -- | True iff the **type** of AnyContext
 -- |  - equals AnyDefinition, or if
 -- |  - one of its Aspects is AnyDefinition.
--- | AnyContext `hasType` AnyDefinition
--- | p ## (hasType q)
+-- | AnyContext `hasContextType` AnyDefinition
+-- | p ## (hasContextType q)
 -- | (type of p) ## (isOrHasAspect q)
 -- | (type of p) `isOrHasAspect` q
--- | p `hasType` q
--- | AnyContext `hasType` AnyDefinition
-hasType :: AnyDefinition -> (AnyContext **> PBool)
-hasType q = DTTG.contextType >-> isOrHasAspect q
+-- | p `hasContextType` q
+-- | AnyContext `hasContextType` AnyDefinition
+isContextTypeOf :: AnyDefinition -> (AnyContext **> PBool)
+isContextTypeOf q = DTTG.contextType >-> isOrHasAspect q
 
 -- | p `isOrHasAspect` q should be written:
 -- | p ## (isOrHasAspect q)
 -- | p `isOrHasAspect` q means either:
 -- |  * p `agreesWithType` q
 -- |  * for some Aspect a of p: a `agreesWithType` q
+-- TODO de argumenten zijn omgedraaid.
 isOrHasAspect :: AnyDefinition -> (AnyDefinition **> PBool)
 isOrHasAspect q = some (closure_ directAspects >-> agreesWithType q)
 -- | p ## (isOrHasAspect q)
@@ -259,6 +260,7 @@ isOrHasAspect q = some (closure_ directAspects >-> agreesWithType q)
 isOrHasSuperType :: AnyDefinition -> (AnyDefinition **> PBool)
 isOrHasSuperType = isOrHasAspect
 
+-- TODO de argumenten zijn omgedraaid.
 hasAspect :: AnyDefinition -> (AnyDefinition **> PBool)
 hasAspect q = some (closure directAspects >-> agreesWithType q)
 
@@ -268,13 +270,13 @@ sumToSequence = (alternatives `preferLeft` const identity) "sumToSequence"
 -- | True iff t (the first parameter)ither agrees with the head of the graph, or if it is in the rol telescope
 -- | for each of its mogelijkeBindingen
 -- | (is in each rol telescope that starts with the head of the graph).
-hasOnEachRolTelescopeTheContextTypeOf :: RolDef -> (RolDef **> PBool)
-hasOnEachRolTelescopeTheContextTypeOf t = ((unwrap `before` isContextTypeOf (unwrap t)) `unlessFalse`
+hasTypeOnEachRolTelescopeOf :: RolDef -> (RolDef **> PBool)
+hasTypeOnEachRolTelescopeOf t = ((unwrap `before` hasContextType (unwrap t)) `unlessFalse`
   \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
-      (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasOnEachRolTelescopeTheContextTypeOf t)))))
-  "hasOnEachRolTelescopeTheContextTypeOf"
+      (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasTypeOnEachRolTelescopeOf t)))))
+  "hasTypeOnEachRolTelescopeOf"
 
 -- | Collect all definitions of a Property with the local name, in the RolDef and its Aspects
 -- | and in all their prototypes and on the rolGraph of the RolDef. Notice there may be more than one!
@@ -295,4 +297,4 @@ getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$res
 -- | Instead, we return the type of the **result** of the function. The result is explicitly given as
 -- | the value bound to the role psp:Function$result.
 expressionType :: (AnyContext **> AnyDefinition)
-expressionType = QC.cond (hasType "model:Perspectives$Function") (getFunctionResultType >-> DTTG.contextType) DTTG.contextType
+expressionType = QC.cond (isContextTypeOf "model:Perspectives$Function") (getFunctionResultType >-> DTTG.contextType) DTTG.contextType

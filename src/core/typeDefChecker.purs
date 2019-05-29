@@ -23,8 +23,8 @@ import Perspectives.DomeinFile (DomeinFile(..))
 
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol, binnenRol)
-import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf, hasOnEachRolTelescopeTheRolTypeOf, isSubsumedOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, hasType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, hasRolTypeOnEachRolTelescopeOf, isSubsumedOnEachRolTelescopeOf)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, hasContextType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, BuitenRol, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (contains, toBoolean)
@@ -53,7 +53,7 @@ checkAContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkConte
   where
     checkContext' :: Context -> TDChecker Unit
     checkContext' def = ifNothing (lift (unwrap def @@> DTG.contextType `followedBy` ContextDef))
-      (tell [MissingType $ unwrap def])
+      (tell [NoType $ unwrap def])
       -- \(tp :: ContextDef) -> checkContext def tp
       \(tp :: ContextDef) -> checksForEachContext def tp *> mandatoryRolesInstantiated def tp
 
@@ -64,7 +64,7 @@ checkAContext cid = runMonadPerspectivesQuery cid \x -> execWriterT $ checkConte
 -- | based on the **type** of the definition.
 checkDefinition :: ContextDef -> TDChecker Unit
 checkDefinition def = ifNothing (lift (unwrap def @@> DTG.contextType `followedBy` ContextDef))
-  (tell [MissingType $ unwrap def])
+  (tell [NoType $ unwrap def])
   \(tp :: ContextDef) -> do
     ifM (tp `isa` (ContextDef "model:Perspectives$Context"))
       (checksForEachContext (Context (unwrap def)) tp *> checkContextDef def tp)
@@ -201,11 +201,11 @@ mogelijkeBindingSubsumedByAspect def = do
             \aspectRol -> do
               (bools :: Array Boolean) <- (lift (aspectRol @@= ownMogelijkeBinding >-> sumToSequence)) >>= (traverse
                 \alternative -> lift (toBoolean (isSubsumedOnEachRolTelescopeOf localMbinding) alternative))
-                -- read as: localMbinding ## (hasOnEachRolTelescopeTheContextTypeOf alternative)
+                -- read as: localMbinding ## (hasTypeOnEachRolTelescopeOf alternative)
                 -- means: alternative is on each rolTelescope that starts with localMbinding.
                 -- | On each path through the mogelijkeBinding graph of localMbinding there is a type x for which holds:
-                -- | x isContextTypeOf alternative, or:
-                -- | alternative hasType x
+                -- | x hasContextType alternative, or:
+                -- | alternative isContextTypeOf x
                 -- maar het moet zijn:
                 -- | x isOrHasAspect x
               if ala Disj foldMap bools
@@ -409,7 +409,7 @@ checksForEachContext def deftype = do
 checkPrototype :: Context -> ContextDef -> TDChecker Unit
 checkPrototype def deftype = ifNothing (lift $ lift (unwrap def ##> getPrototype >-> DTG.contextType))
   (pure unit)
-  (\ptType -> ifM (lift (toBoolean (hasType ptType) (unwrap def)))
+  (\ptType -> ifM (lift (toBoolean (hasContextType ptType) (unwrap def)))
     (pure unit)
     (tell [IncompatiblePrototype (unwrap def) (unwrap deftype) ptType]))
 
@@ -550,7 +550,7 @@ compareRolInstancesToDefinition def rolType =
     -- Check a ContextRol as follows. We assume that the bound value represents a definition of some kind.
     -- Because its type can be a RolDef, we involve the mogelijkeBinding of that RolDef in the type checking.
     --  - find the values of mogelijkeBinding of the type of the rolInstance: the possibleBindings;
-    --  - then there must be at least one possibleBinding for which holds: there must be a type x on each rolTelescope starting at that possibleBinding, for which (x `isContextTypeOf` boundValue).
+    --  - then there must be at least one possibleBinding for which holds: there must be a type x on each rolTelescope starting at that possibleBinding, for which (x `hasContextType` boundValue).
     -- Note that because we include the head of the rolGraph in the check, if we do not have a RolDef, it will merely
     -- check the bound value against each of the possibleBindings.
     checkBindingOfContextRol :: ContextRol -> TDChecker Unit
@@ -559,7 +559,7 @@ compareRolInstancesToDefinition def rolType =
       case mBoundValue of
         Nothing -> pure unit
         (Just boundValue) -> do
-          (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheContextTypeOf boundValue)))
+          (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasContextTypeOnEachRolTelescopeOf boundValue)))
           case r of
             (Just (PBool "false")) -> do
               typeOfTheBinding <- ifNothing (lift (boundValue @@> expressionType)) (pure "no type of binding") (pure <<< identity)
@@ -570,7 +570,7 @@ compareRolInstancesToDefinition def rolType =
     -- Check a RolInContext in the same way as a ContextRol, but compare the *type* of the bound value to the possibleBindings.
     checkBindingOfRolInContext :: RolInContext -> RolInContext -> TDChecker Unit
     checkBindingOfRolInContext rolInstance boundValue = do
-      (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasOnEachRolTelescopeTheRolTypeOf boundValue)))
+      (r :: Maybe PBool) <- lift (rolInstance @@> STGC.some (DTG.rolType >-> mogelijkeBinding >-> sumToSequence >-> (hasRolTypeOnEachRolTelescopeOf boundValue)))
       case r of
         (Just (PBool "false")) -> do
           typeOfTheBinding <- ifNothing (lift (boundValue @@> DTG.rolType)) (pure "no type of binding") (pure <<< unwrap)

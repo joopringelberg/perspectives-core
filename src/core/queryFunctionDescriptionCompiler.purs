@@ -136,8 +136,8 @@ compileElementaryQueryStep s contextId = case s of
       case aspectOrMessage of
         (Left um) -> pure $ Left um
         (Right aspect) -> do
-          let qn = aspect <> "$" <> ln
-          (qualifiedRol qn)
+          let qn = aspect
+          (qualifiedRol aspect)
   where
 
   qualifiedProperty :: String -> String -> MonadPerspectivesQueryCompiler FD
@@ -184,7 +184,7 @@ compileElementaryQueryStep s contextId = case s of
     -> MonadPerspectivesQueryCompiler FD
   ensureAspect aspect mv = do
     dom <- getQueryStepDomain
-    ifM (lift $ (PT.ContextDef dom) `isOrHasAspect` (PT.ContextDef aspect))
+    ifM (lift $ dom `contextHasType` (PT.ContextDef aspect))
       mv
       (pure $ Left $ MissingAspect dom aspect)
 

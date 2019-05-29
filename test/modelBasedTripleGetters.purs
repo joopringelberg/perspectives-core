@@ -7,8 +7,8 @@ import Data.Array (length)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
-import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf)
-import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasType, isContextTypeOf, isOrHasAspect, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf)
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasRolType, hasContextType, isContextTypeOf, isOrHasAspect, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
@@ -110,6 +110,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "isOrHasAspect" do
     assertEqual "t:myContextDef is or has aspect psp:Context"
       (t "myContextDef" ##= isOrHasAspect (p "Context"))
+      -- isOrHasAspect (t "myContextDef") (p "Context")
       [PBool "true"]
     assertEqual "t:myContextDef is or has aspect t:myAspect"
       (t "myContextDef" ##= isOrHasAspect (t "myAspect"))
@@ -121,21 +122,35 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       (t "myContextDef" ##= isOrHasAspect (p "Property"))
       [PBool "false"]
 
-  test "hasType" do
+  test "hasContextType" do
     assertEqual "t:myContextPrototype has type psp:Context"
-      (t "myContextPrototype" ##= hasType (p "Context"))
+      (p "Context" ##= hasContextType (t "myContextPrototype"))
       [PBool "true"]
     assertEqual "t:myContextPrototype has type t:myAspect"
-      (t "myContextPrototype" ##= hasType (t "myAspect"))
+      (t "myAspect" ##= hasContextType (t "myContextPrototype"))
       [PBool "true"]
     assertEqual "t:myContextPrototype has type t:myUrAspect"
-      (t "myContextPrototype" ##= hasType (t "myUrAspect"))
+      (t "myUrAspect" ##= hasContextType (t "myContextPrototype"))
       [PBool "true"]
     assertEqual "t:myContextPrototype does not have type psp:Property"
-      (t "myContextPrototype" ##= hasType (p "Property"))
+      (p "Property" ##= hasContextType (t "myContextPrototype"))
       [PBool "false"]
     assertEqual "psp:SimpleValue should have type psp:Context"
-      (p "SimpleValue" ##= hasType (p "Context"))
+      (p "Context" ##= hasContextType (p "SimpleValue"))
+      [PBool "true"]
+    assertEqual "psp:PerspectivesSysteem should have type psp:Context"
+      (p "Context" ##= hasContextType (p "PerspectivesSysteem"))
+      [PBool "true"]
+
+  test "isContextTypeOf" do
+    assertEqual "ActieAspect `isContextTypeOf` RaadpleegtClusterGenoot is false"
+      (p "TrustedCluster$RaadpleegtClusterGenoot" ##= (isContextTypeOf (p "ActieAspect")))
+      [PBool "false"]
+    assertEqual "RaadpleegtClusterGenoot `isOrHasAspect` ActieAspect is true"
+      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (isOrHasAspect (p "ActieAspect")))
+      [PBool "true"]
+    assertEqual "psp:Context is a type of psp:PerspectivesSysteem"
+      (p "PerspectivesSysteem" ##= isContextTypeOf (p "Context"))
       [PBool "true"]
 
   test "sumToSequence" do
@@ -148,17 +163,10 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "isRolTypeOf" do
     r <- runP (t "myContextPrototype" ##>> searchUnqualifiedRol "rol1")
     assertEqual "$rol1 of t:myContextPrototype has type t:myContextDef$rol1"
-      ((t "myContextDef$rol1") ##= (isRolTypeOf r))
+      ((t "myContextDef$rol1") ##= (hasRolType r))
       [PBool "true"]
     assertEqual "$rol1 of t:myContextPrototype has type t:myAspect$myAspectRol1"
-      ((t "myAspect$myAspectRol1") ##= (isRolTypeOf r))
-      [PBool "true"]
-  test "isContextTypeOf" do
-    assertEqual "ActieAspect `isContextTypeOf` RaadpleegtClusterGenoot is false"
-      (p "ActieAspect" ##= (isContextTypeOf (p "TrustedCluster$RaadpleegtClusterGenoot")))
-      [PBool "false"]
-    assertEqual "RaadpleegtClusterGenoot `isOrHasAspect` ActieAspect is true"
-      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (isOrHasAspect (p "ActieAspect")))
+      ((t "myAspect$myAspectRol1") ##= (hasRolType r))
       [PBool "true"]
   test "collectUnqualifiedPropertyDefinitions" do
     assertEqual "t:myContextDef9$rol1 does not by itself a property defined."
@@ -243,7 +251,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     loadTestModel "testBotActie.crl"
   test "expressionType" do
     assertEqual "tba:Test$botCopiesV1ToV2$self is a Function"
-      (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= (hasType "model:Perspectives$Function"))
+      (("model:Perspectives$Function") ##= (hasContextType "model:TestBotActie$Test$botCopiesV1ToV2$self"))
       [PBool "true"]
     assertEqual "tba:Test$botCopiesV1ToV2$self expressionType psp:Actie"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= expressionType)
@@ -260,13 +268,13 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       do
         allowedBinding <- pure (p "PerspectivesSysteem$gebruiker")
         boundValue <- ((tba "Test") ##>> getRolInContext (RolDef $ p "Context$gebruikerRol") >-> binding)
-        (allowedBinding ##= isRolTypeOf boundValue)
+        (allowedBinding ##= hasRolType boundValue)
       [PBool "true"]
-    assertEqual "PerspectivesSysteem$gebruiker `hasOnEachRolTelescopeTheContextTypeOf` usr:MijnSysteem$gebruiker(1)"
+    assertEqual "PerspectivesSysteem$gebruiker `hasContextTypeOnEachRolTelescopeOf` usr:MijnSysteem$gebruiker(1)"
       do
         allowedBinding <- pure (p "PerspectivesSysteem$gebruiker")
         boundValue <- ((tba "Test") ##>> getRolInContext (RolDef $ p "Context$gebruikerRol") >-> binding)
-        (allowedBinding ##= hasOnEachRolTelescopeTheContextTypeOf (unwrap boundValue))
+        (allowedBinding ##= hasContextTypeOnEachRolTelescopeOf (unwrap boundValue))
       [PBool "true"]
 
   test "botActiesInContext" do

@@ -3,8 +3,8 @@ module Test.Perspectives.ModelBasedStringTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Perspectives.ModelBasedStringTripleGetters (hasOnEachRolTelescopeTheContextTypeOf, mogelijkeBinding)
-import Perspectives.ModelBasedTripleGetters (hasType, sumToSequence)
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding)
+import Perspectives.ModelBasedTripleGetters (hasContextType, sumToSequence)
 import Perspectives.PerspectivesTypes (PBool(..))
 import Perspectives.QueryCombinators (notEmpty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
@@ -25,29 +25,29 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "TestOGC.crl"
   ---------------------------------------------------------------------------------
-  test "hasType" do
+  test "hasContextType" do
     assertEqual "t:myContextPrototype has type psp:Context"
-      (t "myContextPrototype" ##= hasType (p "Context"))
+      (t "myContextPrototype" ##= hasContextType (p "Context"))
       [PBool "true"]
     assertEqual "t:myContextPrototype has type t:myAspect"
-      (t "myContextPrototype" ##= hasType (t "myAspect"))
+      (t "myContextPrototype" ##= hasContextType (t "myAspect"))
       [PBool "true"]
     assertEqual "t:myContextPrototype has type t:myUrAspect"
-      (t "myContextPrototype" ##= hasType (t "myUrAspect"))
+      (t "myContextPrototype" ##= hasContextType (t "myUrAspect"))
       [PBool "true"]
     assertEqual "t:myContextPrototype does not have type psp:Property"
-      (t "myContextPrototype" ##= hasType (p "Property"))
+      (t "myContextPrototype" ##= hasContextType (p "Property"))
       [PBool "false"]
 
-  test "hasOnEachRolTelescopeTheContextTypeOf (allowedBinding ## (`hasOnEachRolTelescopeTheContextTypeOf` t))" do
+  test "hasContextTypeOnEachRolTelescopeOf (allowedBinding ## (`hasContextTypeOnEachRolTelescopeOf` t))" do
     assertEqual "psp:SimpleValue should have type psp:Context"
-      (p "SimpleValue" ##= hasType (p "Context"))
+      (p "SimpleValue" ##= hasContextType (p "Context"))
       [PBool "true"]
     assertEqual "psp:SimpleValue should have type psp:Context"
-      (p "Context" ##= hasOnEachRolTelescopeTheContextTypeOf (p "SimpleValue"))
+      (p "Context" ##= hasContextTypeOnEachRolTelescopeOf (p "SimpleValue"))
       [PBool "true"]
     -- assertEqual "t:myContextDef6$rol1 is in its own rolTelescope."
-    --   ((t "myContextDef6$rol1") ##= (hasOnEachRolTelescopeTheContextTypeOf (t "myContextDef6$rol1")))
+    --   ((t "myContextDef6$rol1") ##= (hasContextTypeOnEachRolTelescopeOf (t "myContextDef6$rol1")))
     --   [PBool "true"]
     assertEqual "t:myContextDef6$rol1 does have a value for mogelijkeBinding"
       ((t "myContextDef6$rol1") ##= mogelijkeBinding)
@@ -56,19 +56,19 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
       ((t "myContextDef6$rol1") ##= (notEmpty (mogelijkeBinding >-> sumToSequence)))
       [PBool "true"]
     -- assertEqual "On each path through the mogelijkeBinding graph of myContextDef6$rol1 there is a type x for which holds: x isContextTypeOf myContextDef5$rol1"
-    --   ((t "myContextDef6$rol1") ##= (hasOnEachRolTelescopeTheContextTypeOf (t "myContextDef5$rol1")))
+    --   ((t "myContextDef6$rol1") ##= (hasContextTypeOnEachRolTelescopeOf (t "myContextDef5$rol1")))
     --   [PBool "true"]
     assertEqual "t:myContextDef$rol1 is NOT in each rolTelescope that starts with t:myContextDef6$rol1"
-      ((t "myContextDef6$rol1") ##= (hasOnEachRolTelescopeTheContextTypeOf (t "myContextDef$rol1")))
+      ((t "myContextDef6$rol1") ##= (hasContextTypeOnEachRolTelescopeOf (t "myContextDef$rol1")))
       [PBool "false"]
     assertEqual "t:myContextDef5$rol1 is NOT in each rolTelescope that starts with t:myContextDef7$rol1"
-      ((t "myContextDef7$rol1") ##= (hasOnEachRolTelescopeTheContextTypeOf (t "myContextDef5$rol1")))
+      ((t "myContextDef7$rol1") ##= (hasContextTypeOnEachRolTelescopeOf (t "myContextDef5$rol1")))
       [PBool "false"]
     -- assertEqual "t:myContextDef5$rol1 is in each rolTelescope that starts with t:myContextDef9$rol1"
-    --   ((t "myContextDef9$rol1") ##= (hasOnEachRolTelescopeTheContextTypeOf (t "myContextDef5$rol1")))
+    --   ((t "myContextDef9$rol1") ##= (hasContextTypeOnEachRolTelescopeOf (t "myContextDef5$rol1")))
     --   [PBool "true"]
     -- assertEqual "psp:PerspectivesSysteem$gebruiker is in each rolTelescope that starts with psp:TrustedCluster$clusterGenoot"
-    --   ((p "TrustedCluster$clusterGenoot") ##= (hasOnEachRolTelescopeTheContextTypeOf (p "PerspectivesSysteem$gebruiker")))
+    --   ((p "TrustedCluster$clusterGenoot") ##= (hasContextTypeOnEachRolTelescopeOf (p "PerspectivesSysteem$gebruiker")))
     --   [PBool "true"]
 
   -- testOnly "" do

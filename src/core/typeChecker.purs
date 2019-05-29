@@ -8,12 +8,12 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>))
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
-
 import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
+import Perspectives.ModelBasedObjectGetters (isOrHasAspect) as MBOG
 import Perspectives.ObjectGetterConstructors (agreesWithType, alternatives, closureOfAspect, closureOfAspectRol, closure_, contains, directAspects, getUnqualifiedContextRol, mogelijkeBinding, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class RolClass, AnyContext, ContextDef(..), PropertyDef, RolDef(..), AnyDefinition, typeWithPerspectivesTypes)
-import Prelude (bind, ifM, join, pure, ($), (&&), (<$>), (<*>), (<<<), (==), (>>=), (||), (=<<), map, (>=>))
+import Prelude (bind, flip, ifM, join, map, pure, ($), (&&), (<$>), (<*>), (<<<), (=<<), (==), (>=>), (>>=), (||))
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
 -- erft een context interne- of externe properties van aspecten? Ja, dat kan.
@@ -73,7 +73,8 @@ checkRolForUnQualifiedProperty ln rn = do
     1 -> pure $ Right $ unwrap $ unsafePartial $ fromJust $ head propdefs
     otherwise -> pure $ Left $ MultipleDefinitions ln (map unwrap propdefs)
 
--- | Looks for the Aspect(s) that define an unqualified Rol with the given local name.
+-- | Looks in the Aspect(s) for a Rol with the given local name. Returns the qualified
+-- | Rol if found.
 checkContextForUnQualifiedRol :: LocalName -> ContextDef -> MonadPerspectives FD
 checkContextForUnQualifiedRol ln cn = do
   (roldefs :: Array RolDef) <- searchUnqualifiedRolDefinition ln cn
@@ -85,8 +86,12 @@ checkContextForUnQualifiedRol ln cn = do
 -- | True when both parameters are equal and also when the first has the second as aspect.
 -- | If the aspect is a sum type, tries each of the alternatives.
 -- | subtype `isOrHasAspect` aspect
+isOrHasAspect_ :: ContextDef -> ContextDef -> MonadPerspectives Boolean
+-- isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> some (closure_ directAspects /-/ agreesWithType (unwrap subtype))
+isOrHasAspect_ subtype = toBoolean $ pure <<< unwrap >=> MBOG.isOrHasAspect (unwrap subtype)
+
 isOrHasAspect :: ContextDef -> ContextDef -> MonadPerspectives Boolean
-isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> some (closure_ directAspects /-/ agreesWithType (unwrap subtype))
+isOrHasAspect = flip isOrHasAspect_
 
 -- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
 -- | context `contextHasType` type

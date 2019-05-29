@@ -21,6 +21,7 @@ import Test.Perspectives.StringTripleGetterConstructors as STGC
 import Test.Perspectives.TestBotActie as TBA
 import Test.Perspectives.TripleGetterComposition (theSuite) as TGCO
 import Test.Perspectives.TripleGetterConstructors (theSuite) as TGC
+import Test.Perspectives.TypeChecker (theSuite) as TC
 import Test.Perspectives.TypeDefChecker (theSuite) as TDC
 import Test.Perspectives.Utils (runP)
 import Test.Perspectives.ResourceRetrieval (theSuite) as ResRet
@@ -47,6 +48,7 @@ main = runTest do
   DEPS.theSuite
   THC.theSuite
   STGC.theSuite
+  TC.theSuite
 
 -- Running other tests:
 -- main = runAff handleError (runP setupUser)

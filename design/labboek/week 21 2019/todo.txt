@@ -20,4 +20,6 @@ O.a.: de controle op het aanmaken van een nieuwe context is niet goed (er wordt 
 
 13. Verander de code in constructActionFunction zodat objecten en indirect objecten met meerdere waarden goed gehanteerd worden.
 
+
+DONE
 14. Maak een verwijder knop voor de test instanties.

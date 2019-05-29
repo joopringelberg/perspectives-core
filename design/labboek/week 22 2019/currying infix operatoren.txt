@@ -1,0 +1,212 @@
+ORDER OF ARGUMENTS FOR hasType ETC
+
+Ik denk dat ik de volgorde van argumenten van als infix operator gebruikte functies niet goed inzet in situaties waarin ik functies van één argument creeer met currying.
+
+IN DE MODULE Perspectives.ModelBasedObjectGetters
+
+ISORHASASPECT HEEFT EEN INGEBOUWDE FLIP
+Neem isOrHasAspect.
+Bij 
+
+	q isOrHasAspect p
+	oftewel
+	isOrHasAspect q p
+	
+bedoelen we dat q gelijk moet zijn aan p, of dat q het aspect p moet hebben. Anders geformuleerd: q is een subtype, p een supertype (alle instanties van q zijn óók een p).
+
+Maar in deze definitie:
+
+	isOrHasAspect q = some (closure_ directAspects /-/ agreesWithType q)
+
+zien we dat het de aspecten van p zijn die vergeleken worden met q.
+Is er een aspect van p dat gelijk is aan q?
+
+Oftewel, p wordt als subtype gezien, q als supertype.
+
+Kortom: de implementatie van isOrHasAspect is zodanig dat het eerste argument wordt ingezet als het tweede.
+Er zit een automatische flip in!
+
+	isOrHasAspect q p === p is of heeft aspect q
+
+HASASPECT HEEFT EEN INGEBOUWDE FLIP
+
+	hasAspect q = some (closure directAspects /-/ agreesWithType q)
+
+	hasAspect q p === p is of heeft aspect q
+
+Ook hier zien we de omkering.
+
+ISCONTEXTTYPEOF KLOPT WEL
+
+	isContextTypeOf x = some (expressionType /-/ closure_ directAspects /-/ (agreesWithType x) )
+
+	x isContextTypeOf y == isContextTypeOf x y
+	
+	is er een aspect van y dat agrees with x? == is x een aspect van y?
+
+Dit klopt dus wel.
+
+HASTYPE HEEFT EEN INGEBOUWDE FLIP
+Uiteraard ook, want gebouwd op isOrHasAspect
+
+	hasType q = contextType /-/ isOrHasAspect q
+
+
+
+IN DE MODULE Perspectives.TypeChecker
+isOrHasAspect is gebaseerd op isOrHasAspect van de ModelBasedObjectGetters, dus heeft dezelfde impliciete omkering.
+
+	isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> MBOG.isOrHasAspect (unwrap subtype)
+	
+contextHasType is gebaseerd op isOrHasAspect, dus: ook hier de omkering.
+
+rolHasType: hetzelfde.
+
+IN DE MODULE MODELBASEDTRIPLEGETTERS
+isContextTypeOf - omgedraaid!
+
+isRolTypeOf - omgedraaid
+
+isOrHasAspect == isOrHasSuperType - omgedraaid
+
+hasType - omgedraaid
+
+hasAspect - omgedraaid:
+
+	hasAspect q = some (closure directAspects >-> agreesWithType q
+	
+	q hasAspect p == hasAspect q p
+	
+	heeft p aspecten die overeenkomen met q
+	
+maar dat zou je willen opschrijven als
+	
+	p hasAspect q
+
+Dus: omgedraaid.
+
+SAMENVATTING VAN DE FOUTEN
+
+Perspectives.ModelBasedObjectGetters
+	isOrHasAspect
+	hasAspect
+	hasType
+
+Perspectives.ModelBasedTripleGetters
+	isOrHasAspect = isOrHasSuperType
+	hasAspect
+	hasType
+	isContextTypeOf
+	isRolTypeOf
+
+Perspectives.TypeChecker GEREPAREERD. Deze functies werken nu goed.
+	isOrHasAspect
+	contextHasType
+	rolHasType
+
+	
+DE TESTS
+ModelBasedTripleGetters: isOrHasAspect
+	(t "myContextDef" ##= isOrHasAspect (p "Context"))
+	
+	==
+	
+	isOrHasAspect (p "Context") (t "myContextDef")
+	
+	== 
+	
+	(p "Context") isOrHasAspect (t "myContextDef")
+	
+en omdat isOrHasAspect een ingebouwde flip heeft, is dit alsof er staat:
+	
+	(t "myContextDef") isOrHasAspect (p "Context") 
+
+en dat klopt precies. Dus de test slaagt. En hij leest goed vanwege de ##= syntax.
+
+ModelBasedTripleGetters: hasType
+
+	(t "myContextPrototype" ##= hasType (p "Context"))
+	
+Net als bij isOrHasAspect leest dit goed en klopt de test.	
+
+GEBRUIK
+TypeChecker.isOrHasAspect								KLAAR
+	QueryFunctionDescriptionCompiler.compileElementaryQueryStep
+
+	TypeDefChecker.checkDefinition
+	TypeDefChecker.mogelijkeBindingSubsumedByAspect
+	TypeDefChecker.checkRangeDef
+
+TypeChecker.contextHasType								KLAAR
+	QueryFunctionDescriptionCompiler.qualifiedProperty
+	QueryFunctionDescriptionCompiler.qualifiedRol
+	QueryFunctionDescriptionCompiler.ensureAspect
+
+ModelBasedTripleGetters.isContextTypeOf					KLAAR
+	ModelBasedStringTripleGetters.hasOnEachRolTelescopeTheContextTypeOf 
+	ModelBasedTripleGetters.hasOnEachRolTelescopeTheContextTypeOf 
+
+ModelBasedTripleGetters.hasType							GECONTROLEERD, NIETS VERANDERD.
+	TypeDefChecker.checkPrototype
+
+ModelBasedTripleGetters.isRolTypeOf						FUNCTIE IS OPGEHEVEN
+	ModelBasedStringTripleGetters.hasOnEachRolTelescopeTheRolTypeOf
+
+
+CONTROLEREN
+ModelBasedTripleGetters.isOrHasAspect
+	ModelBasedStringTripleGetters.isSubsumedOnEachRolTelescopeOf
+
+EXPERIMENT IN MODELBASEDTRIPLEGETTERS
+Het lijkt mij dat deze gelijkheid geldt:
+
+	p isContextTypeOf q === q hasType p
+
+Ik heb dat getest, en het klopt.
+
+Maar als hasType geflipt is, dan moet isContextTypeOf dat óók zijn.
+
+Ik denk nu dat isContextTypeOf óók geflipt is. In dat geval kan ik de definities handhaven, maar de namen omdraaien!
+
+Maar wat te doen met isRolTypeOf?
+Ik had de oorspronkelijke hasType kunnen hernoemen naar hasContextType en dan had ik een hasRolType gemaakt. 
+Dan had ik isContextTypeOf kunnen verwisselen met hasContextType
+En dan isRolTypeOf met hasRolType.
+
+## SYNTAX
+Is het zo dat ## syntax de omkering compenseert?
+
+	q ## (isContextTypeOf p)
+	
+Ja. Want dit wordt dus:
+
+	p isContextTypeOf q
+
+Het leest precies andersom. Dus de ## syntax suggereert een volgorde, maar die wordt precies andersom toegepast!
+
+REFACTOR ACTIES
+1. ModelBasedTripleGetters.hasType => ModelBasedTripleGetters.isContextTypeOf
+2. ModelBasedTripleGetters.isContextTypeOf => ModelBasedTripleGetters.hasType
+Ik doe dat in drie slagen:
+	1. Vervang hasType door XXXX
+	2. Vervang isContextTypeOf door hasType
+	3. Vervang XXXX door isContextTypeOf.
+En dit moet alleen voor ModelBasedTripleGetters!
+Bovenstaande is klaar.
+Helaas, het moet weer terug - behalve in de sourcefile.
+1. Vervang isContextTypeOf door XXXX
+2. Vervang hasType door isContextTypeOf
+3. Vervang XXXX door hasType
+KLAAR
+
+3. hasOnEachRolTelescopeTheContextTypeOf => hasTypeOnEachRolTelescopeOf. KLAAR
+
+4. In hasTypeOnEachRolTelescopeOf heb ik isContextTypeOf vervangen door hasType.
+
+5. In hasOnEachRolTelescopeTheRolTypeOf heb ik isRolTypeOf vervangen door hasType.
+
+6. hasOnEachRolTelescopeTheRolTypeOf => hasRolTypeOnEachTelescopeOf
+
+7. Uiteindelijk hasRolTypeOnEachTelescopeOf verwijderd, want hasTypeOnEachRolTelescopeOf dekt nu beide gevallen.
+
+8. isRolTypeOf: opgeheven.
