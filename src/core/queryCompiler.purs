@@ -70,7 +70,9 @@ constructUnqualifiedGetter ::
   String ->
   MonadPerspectives StringTypedTripleGetter
 constructUnqualifiedGetter queryAstConstructor rn ct = do
-  r <- runMonadPerspectivesQueryCompiler ct (compileElementaryQueryStep (queryAstConstructor rn) (rn <> "_getterDescription"))
+  -- TODO. De id (rn <> "_getterDescription") is niet gekwalificeerd, omdat rn lokaal is.
+  -- We weten hier nog niet wat de namespace zal zijn.
+  r <- runMonadPerspectivesQueryCompiler ct (compileElementaryQueryStep (queryAstConstructor rn) (ct <> "$" <> rn <> "_getterDescription"))
   case r of
     (Left m) -> throwError $ error $ show m
     (Right descriptionId) -> constructQueryFunction descriptionId

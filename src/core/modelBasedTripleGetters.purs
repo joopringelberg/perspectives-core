@@ -218,13 +218,13 @@ hasContextType p = TypedTripleGetter ("hasContextType_" <> p) f where
   f x = p @@ some (expressionType >-> closure_ directAspects >-> (agreesWithType x) )
 
 -- | True iff AnyDefinition is a type of r.
--- | AnyDefinition `isRolTypeOf` r
+-- | r `hasRolType` AnyDefinition
 hasRolType :: forall r. RolClass r => r -> (AnyDefinition **> PBool)
 hasRolType r = TypedTripleGetter ("hasRolType_" <> unwrap r) f where
   f :: TripleGetter AnyDefinition PBool
   f tp = unwrap r @@ some (DTTG.genericRolType >-> closure_ (RolDef `before` directAspectRoles `followedBy` unwrap) >-> (agreesWithType tp))
 
--- | p `hasContextType` q shoud be written:
+-- | p `hasContextType` q should be written:
 -- | p ## (hasContextType q)
 -- | True iff the **type** of AnyContext
 -- |  - equals AnyDefinition, or if
