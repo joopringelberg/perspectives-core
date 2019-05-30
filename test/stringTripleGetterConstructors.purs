@@ -13,7 +13,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "StringTripleGetterConstructors" do
+theSuite = suite "StringTripleGetterConstructors" do
   -- test "Setting up" do
   --   loadTestModel "perspectives.crl"
   test "propertyReferenties" do
@@ -35,6 +35,17 @@ theSuite = suiteSkip "StringTripleGetterConstructors" do
     assertEqual "psp:PerspectivesSysteem$gebruiker$VolledigeNaam has two roles $propertyReferentie"
       (((p "PerspectivesSysteem$gebruiker$VolledigeNaam") ##= (searchLocallyAndInPrototypeHierarchy (getUnqualifiedContextRol "propertyReferentie"))) >>= (pure <<< length))
       2
+
+  testOnly "getUnqualifiedRolDefinition" do
+    assertEqual "model:Perspectives$PerspectivesSysteem$gebruiker has a view VolledigeNaam"
+      ((p "PerspectivesSysteem$gebruiker") ##= getUnqualifiedRolDefinition "VolledigeNaam")
+      [p "PerspectivesSysteem$gebruiker$VolledigeNaam"]
+
+  test "searchUnqualifiedRolDefinition" do
+    assertEqual "model:Perspectives$PerspectivesSysteem$gebruiker has a view VolledigeNaam"
+      ((p "PerspectivesSysteem$gebruiker") ##= searchUnqualifiedRolDefinition "VolledigeNaam")
+      [p "PerspectivesSysteem$gebruiker$VolledigeNaam"]
+
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

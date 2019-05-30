@@ -3,7 +3,7 @@ module Test.Perspectives.ModelBasedStringTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding)
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding, searchView)
 import Perspectives.ModelBasedTripleGetters (hasContextType, sumToSequence)
 import Perspectives.PerspectivesTypes (PBool(..))
 import Perspectives.QueryCombinators (notEmpty)
@@ -70,6 +70,11 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
     -- assertEqual "psp:PerspectivesSysteem$gebruiker is in each rolTelescope that starts with psp:TrustedCluster$clusterGenoot"
     --   ((p "TrustedCluster$clusterGenoot") ##= (hasContextTypeOnEachRolTelescopeOf (p "PerspectivesSysteem$gebruiker")))
     --   [PBool "true"]
+
+  testOnly "searchUnqualifiedRolDefinition" do
+    assertEqual "model:Perspectives$PerspectivesSysteem$gebruiker has a view VolledigeNaam"
+      ((p "PerspectivesSysteem$gebruiker") ##= searchView "VolledigeNaam")
+      [p "PerspectivesSysteem$gebruiker$VolledigeNaam"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

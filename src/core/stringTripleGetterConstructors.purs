@@ -91,15 +91,20 @@ searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy (getUnqualifiedCo
 -----------------------------------------------------------
 -- GET A ROLDEFINITION FROM A CONTEXT DEFINITION
 -----------------------------------------------------------
-getUnqualifiedRolDefinition :: Id.LocalName -> StringTypedTripleGetter
-getUnqualifiedRolDefinition ln = (QC.filter_
+getGeneralUnqualifiedRolDefinition :: Id.LocalName -> Id.LocalName -> StringTypedTripleGetter
+getGeneralUnqualifiedRolDefinition rn ln = (QC.filter_
   (flip Id.hasLocalName ln)
   ("hasLocalName_" <> ln)
-  (getUnqualifiedContextRol "rolInContext" >-> DTG.genericBinding >-> DTG.genericContext))
+  (getUnqualifiedContextRol rn >-> DTG.genericBinding >-> DTG.genericContext))
+
+getUnqualifiedRolDefinition :: Id.LocalName -> StringTypedTripleGetter
+getUnqualifiedRolDefinition = getGeneralUnqualifiedRolDefinition "rolinContext"
+
+searchGeneralUnqualifiedRolDefinition :: Id.LocalName -> Id.LocalName -> StringTypedTripleGetter
+searchGeneralUnqualifiedRolDefinition rn ln = searchInAspectsAndPrototypes (getGeneralUnqualifiedRolDefinition rn ln)
 
 searchUnqualifiedRolDefinition :: Id.LocalName -> StringTypedTripleGetter
-searchUnqualifiedRolDefinition ln = searchInAspectsAndPrototypes (getUnqualifiedRolDefinition ln)
-
+searchUnqualifiedRolDefinition = searchGeneralUnqualifiedRolDefinition "rolInContext"
 -----------------------------------------------------------
 -- GET A PROPERTY FROM A ROLE TELESCOPE
 -----------------------------------------------------------

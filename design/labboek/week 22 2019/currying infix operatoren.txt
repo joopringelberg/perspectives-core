@@ -149,13 +149,12 @@ ModelBasedTripleGetters.isContextTypeOf					KLAAR
 ModelBasedTripleGetters.hasType							GECONTROLEERD, NIETS VERANDERD.
 	TypeDefChecker.checkPrototype
 
-ModelBasedTripleGetters.isRolTypeOf						FUNCTIE IS OPGEHEVEN
+ModelBasedTripleGetters.isRolTypeOf						
 	ModelBasedStringTripleGetters.hasOnEachRolTelescopeTheRolTypeOf
 
-
-CONTROLEREN
 ModelBasedTripleGetters.isOrHasAspect
-	ModelBasedStringTripleGetters.isSubsumedOnEachRolTelescopeOf
+	ModelBasedStringTripleGetters.isSubsumedOnEachRolTelescopeOf	 ARGUMENTEN OMGEDRAAID
+
 
 EXPERIMENT IN MODELBASEDTRIPLEGETTERS
 Het lijkt mij dat deze gelijkheid geldt:
@@ -210,3 +209,17 @@ KLAAR
 7. Uiteindelijk hasRolTypeOnEachTelescopeOf verwijderd, want hasTypeOnEachRolTelescopeOf dekt nu beide gevallen.
 
 8. isRolTypeOf: opgeheven.
+
+Maar dat blijkt een fout. hasType werkt niet voor rollen.
+
+9. hasType moet hasContextType zijn. KLAAR.
+
+
+TODO
+1. Loop de commentaren na in 
+	ModelBasedTripleGetters
+	ModelBasedStringTripleGetters
+	TypeChecker
+2. Onderzoek ModelBasedObjectGetters
+	* doe tests
+	* loop het gebruik na

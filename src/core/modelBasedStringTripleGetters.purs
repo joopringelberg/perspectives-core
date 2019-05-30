@@ -8,7 +8,7 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.ModelBasedTripleGetters (hasContextType, hasRolType, isOrHasAspect, sumToSequence)
 import Perspectives.PerspectivesTypes (class RolClass, AnyDefinition, PBool)
 import Perspectives.QueryCombinators (notEmpty, conj) as QC
-import Perspectives.StringTripleGetterConstructors (searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition)
+import Perspectives.StringTripleGetterConstructors (searchGeneralUnqualifiedRolDefinition, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition)
 import Perspectives.TripleGetterComposition (unlessFalse, (>->))
 import Perspectives.TripleGetterConstructors (all)
 import Perspectives.TripleGetterConstructors (unlessFalse) as TGC
@@ -66,4 +66,4 @@ mogelijkeBinding = searchInAspectRolesAndPrototypes f
 -- | Given a local name for a View, looks for a matching View in the Rol definition,
 -- | in its prototypes and in its AspectRoles.
 searchView :: LocalName -> (RolName **> AnyDefinition)
-searchView lvn = searchUnqualifiedRolDefinition lvn
+searchView = searchGeneralUnqualifiedRolDefinition "viewInRol"
