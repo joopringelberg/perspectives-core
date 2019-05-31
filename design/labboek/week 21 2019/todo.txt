@@ -2,10 +2,6 @@ TODO
 
 VAN WEEK 20
 
-6. Bestudeer de vormgeving van schermen.
-
-7. Geef TestBotActie vorm.
-
 8. Maak een scherm voor het uploaden van een Model, inclusief vormgeving.
 
 9. Begin aan de schermgenerator.
@@ -20,6 +16,13 @@ O.a.: de controle op het aanmaken van een nieuwe context is niet goed (er wordt 
 
 13. Verander de code in constructActionFunction zodat objecten en indirect objecten met meerdere waarden goed gehanteerd worden.
 
+14. TODO's in currying infix operatoren.
+
 
 DONE
 14. Maak een verwijder knop voor de test instanties.
+
+6. Bestudeer de vormgeving van schermen.
+
+7. Geef TestBotActie vorm.
+

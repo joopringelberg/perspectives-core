@@ -642,7 +642,7 @@ enclosingContext = withRoleCounting enclosingContext' where
         (PerspectContext defaultContextRecord
           { _id = textName
           , displayName  = textName
-          , pspType = "model:Perspectives$Context"
+          , pspType = "model:Perspectives$Model"
           , binnenRol = binnenRol textName
           , buitenRol = buitenRol textName
           , rolInContext = FO.fromFoldable defs

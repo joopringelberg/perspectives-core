@@ -4,17 +4,17 @@ ONTWERP GUI GEINDEXEERDE CONTEXTEN
 
 2. De applicatie InPlace heeft een GUI waarvan de hoofdindeling gevormd wordt door de lijst van geïndexeerde contexten. Deze lijst vormt het startpunt voor de gebruiker. Elk element van de lijst is als het ware een applicatie.
 
-3. Geïndexeerde contexten zijn gebonden in de rol psp:PerspectivesSysteem$geïndexeerdeContexten. Later kan ik een betere naam kiezen.
+3. Geïndexeerde contexten zijn gebonden in de rol psp:PerspectivesSysteem$indexedContexts.
 
-4. Elk model heeft een type dat de beschrijving geeft van de geïndexeerde context van dat model. Voor elk model X is de identifier van dat type model:X$GeïndexeerdeContext. Dit type - een Context - heeft op de buitenrol de properties 'auteur' en 'beschrijving'.
+4. Elk model heeft één of meerdere types die de beschrijving van de geïndexeerde contexten van dat model geven (b.v. psp:PerspectivesSysteem). Voor elk model is dat een andere gekwalificeerde identifier. Dit type wordt gebonden aan de rol $indexedContextTypes van het model zelf (b.v. model:Perspectives). Het model is een instantie van psp:Model en heeft dus een rol $indexedContextTypes. Later geef ik psp:Model op de buitenrol de properties 'auteur' en 'beschrijving'.
 
-5. De computed rol psp:PerspectivesSysteem$modellen verander ik zodanig dat hij voor elk model de identifier van de GeïndexeerdeContext van dat model oplevert.
+5. Ik maak een query compositie van de computed rol psp:PerspectivesSysteem$modellen en van de rolGetter voor $indexedContextTypes. Daarmee heb ik de lijst van **types** van geïndexeerde contexten in handen.
 
-6. Ik voeg de rol psp:PerspectivesSysteem$modellenInGebruik toe. Deze rol heeft als binding een geïndexeerde context. Ik laat nog even in het midden of we dergelijke rollen een gezamenlijk aspect geven. Een mogelijke property is 'inGebruikSinds'.
+6. Ik voeg de rol psp:PerspectivesSysteem$modelsInUse toe. Deze rol heeft als binding een geïndexeerde context. Ik laat nog even in het midden of we dergelijke rollen een gezamenlijk aspect geven. Een mogelijke property is 'inGebruikSinds'.
 
 7. psp:PerspectivesSysteem krijgt een Actie waarvan de bot het subject is. De conditie van deze Actie is:
-	* er is een instantie van de rol psp:PerspectivesSysteem$modellenInGebruik met binding X
-	* maar er is geen instantie van de rol psp:PerspectivesSysteem$geïndexeerdeContexten met een binding waarvan het type X is
+	* er is een instantie van de rol psp:PerspectivesSysteem$modelsInUse met binding X
+	* maar er is geen instantie van de rol psp:PerspectivesSysteem$indexedContexts met een binding waarvan het type X is
 Het effect van deze actie is:
 	* er wordt een instantie van psp:PerspectivesSysteem$geïndexeerdeContexten gemaakt
 	* er wordt een instantie van model:X$GeïndexeerdeContext gemaakt
@@ -22,7 +22,7 @@ Het effect van deze actie is:
 
 8. Ik maak in InPlace een scherm voor de context MijnSysteem met de volgende indeling:
 	* de rol psp:PerspectivesSysteem$modellen is zichtbaar als een lijst van Views op de buitenRol waarin 'auteur' en 'beschrijving' te zien zijn.
-	* daarnaast is de rol psp:PerspectivesSysteem$modellenInGebruik zichtbaar.
+	* daarnaast is de rol psp:PerspectivesSysteem$modelsInUse zichtbaar.
 	* een model kan naar de modellen in gebruik gesleept worden. Dan wordt een nieuwe rol aangemaakt en gebonden.
 Door een model in gebruik te nemen, wordt de actie gestart die de geïndexeerde context van het model maakt.
 Hierdoor verschijnt in de hoofdindeling de geïndexeerde context van het zojuist in gebruik genomen model.

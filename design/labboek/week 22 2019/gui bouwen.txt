@@ -1,0 +1,25 @@
+TODO
+
+1. Ontwerp de rol psp:PerspectivesSysteem$indexedContexts. KLAAR
+2. Ontwerp de rol psp:Model$indexedContextTypes. KLAAR
+2. Check model:Perspectives.
+3. Maak in de initiele versie van MijnSysteem de geïndexeerde context MijnSysteem. KLAAR
+4. Herlaad systeemInstanties.crl in de react-integrated-client (gooi de database leeg en herlaad de client). KLAAR
+
+Herontwerp
+psp:PerspectivesSysteem is het type van de geïndexeerde context u:MijnSysteem.
+Ik kan dus niet nog een type hiervoor introduceren!
+Ik zou een rol indexedContextTypes kunnen maken bij model:Perspectives.
+Maar kan ik die ophalen?
+Bovendien, dan moet ik een beschrijving maken van model:Perspectives. 
+Ik zou psp:Model kunnen modelleren, met een rol $indexedContextTypes.
+
+Dat kan ik testen:
+1. Modelleer psp:Model.
+2. Pas de parser aan zodat het type van de omhullende context psp:Model wordt.
+3. Verzin een truc waardoor psp:PerspectivesSysteem de geïndexeerde context van model:Perspectives wordt.
+Dat moet een sectie worden: de sectie psp:Model$indexedContextTypes.
+4. Vraag de binding van model:Perspectives$Model$indexedContextTypes op.
+GELUKT!
+
+Nu verder.

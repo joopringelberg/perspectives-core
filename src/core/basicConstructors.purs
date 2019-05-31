@@ -53,7 +53,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           m <- pure []
           case length m of
             0 -> pure $ Right ident
-            otherwise -> do 
+            otherwise -> do
               removeFromCache ident
               pure $ Left m
           -- pure $ Right ident
@@ -153,7 +153,8 @@ constructAnotherRol rolType id rolSerialisation = do
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
       void $ addRol rolType rolId ident
-      (m :: Array UserMessage) <- checkAContext $ Context ident
+      -- (m :: Array UserMessage) <- checkAContext $ Context ident
+      m <- pure []
       case length m of
         0 -> do
           pure $ Right rolId

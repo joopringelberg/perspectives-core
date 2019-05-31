@@ -354,51 +354,6 @@ psp:Systeem psp:SysteemPrototype
 			$mogelijkeBinding => psp:Rol
 	$bot => ()
 
-psp:Systeem psp:PerspectivesSysteem
-	psp:Context$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
-			$rolProperty =>
-				psp:Property $modelOphaalTeller
-					extern $isFunctioneel = true
-					extern $isVerplicht = true
-					$range => psp:Number
-	psp:Context$rolInContext =>
-		psp:Rol $trustedCluster
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:TrustedCluster
-	psp:Context$rolInContext =>
-		psp:Rol $gebruiker
-			-- wat is de mogelijkeBinding van gebruiker?
-			-- we gaan niets binden, dus geen enkel type.
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Niets
-			$viewInRol =>
-				psp:View $VolledigeNaam
-					$propertyReferentie => $$voornaam
-						$volgNummer = 1
-					$propertyReferentie => $$achternaam
-						$volgNummer = 2
-			$rolProperty =>
-				psp:Property $achternaam
-					extern $isFunctioneel = false
-					extern $isVerplicht = true
-					$range => psp:String
-			$rolProperty =>
-				psp:Property $voornaam
-					extern $isFunctioneel = false
-					extern $isVerplicht = true
-					$range => psp:String
-	psp:Context$rolInContext =>
-		psp:Rol $zaken
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:Zaak
-	psp:Context$rolInContext =>
-		q:ComputedRolGetter $modellen
-			extern $functionName = "modellenM"
-			psp:Function$result => psp:Context
-
 psp:Zaak psp:TrustedCluster
 	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
@@ -554,3 +509,63 @@ psp:Context psp:effectFullFunction
 		psp:Rol $parameter
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
+
+psp:Context psp:Model
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$rolInContext =>
+		psp:Rol $indexedContextTypes
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:ElkType
+
+Section psp:Model$indexedContextTypes
+
+psp:Systeem psp:PerspectivesSysteem
+	psp:Context$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $modelOphaalTeller
+					extern $isFunctioneel = true
+					extern $isVerplicht = true
+					$range => psp:Number
+	psp:Context$rolInContext =>
+		psp:Rol $trustedCluster
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:TrustedCluster
+	psp:Context$rolInContext =>
+		psp:Rol $gebruiker
+			-- wat is de mogelijkeBinding van gebruiker?
+			-- we gaan niets binden, dus geen enkel type.
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Niets
+			$viewInRol =>
+				psp:View $VolledigeNaam
+					$propertyReferentie => $$voornaam
+						$volgNummer = 1
+					$propertyReferentie => $$achternaam
+						$volgNummer = 2
+			$rolProperty =>
+				psp:Property $achternaam
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $voornaam
+					extern $isFunctioneel = false
+					extern $isVerplicht = true
+					$range => psp:String
+	psp:Context$rolInContext =>
+		psp:Rol $zaken
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Zaak
+	psp:Context$rolInContext =>
+		q:ComputedRolGetter $modellen
+			extern $functionName = "modellenM"
+			psp:Function$result => psp:Context
+	psp:Context$rolInContext =>
+		psp:Rol $indexedContexts
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:ElkType
+

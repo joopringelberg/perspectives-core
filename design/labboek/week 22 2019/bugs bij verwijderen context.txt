@@ -1,0 +1,7 @@
+BUG BIJ VERWIJDEREN CONTEXT
+Als je in TestBotActie een instantie van de context verwijderd, verdwijnen netjes de context, buitenrol en binnenrol.
+Tevens wordt de binding van de instantie van de rol 'zaken' verwijderd.
+
+Maar vervolgens struikelt het systeem bij herladen. OPGELOST in rolBinding. Als er geen binding terugkomt, geen ReactContext publiceren!
+
+Bovendien wordt het scherm niet gerefreshd na verwijderen (de context is er ogenschijnlijk nog).

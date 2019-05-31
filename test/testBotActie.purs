@@ -42,7 +42,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "TestBotActie" do
+theSuite = suiteSkip "TestBotActie" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
@@ -93,7 +93,7 @@ theSuite = suite "TestBotActie" do
 
 
   -- NOTE. This test runs perfectly in isolation, but not in the suite.
-  testOnly "compileBotAction" do
+  test "compileBotAction" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
     assertEqualWithPropagation "Apply the botAction to the context usr:test1 to copy the value of $v1 to $v2"

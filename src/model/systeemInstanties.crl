@@ -13,3 +13,4 @@ psp:PerspectivesSysteem usr:MijnSysteem
 			extern $naam = "Het cluster van Joop"
 			$clusterGenoot -> $$gebruiker(1)
 				$url = "http://localhost"
+	$indexedContexts => usr:MijnSysteem

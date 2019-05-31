@@ -3,7 +3,7 @@ Context model:TestBotActie als tba:
 import model:Perspectives als psp:
 import model:QueryAst als q:
 
-Section $rolInContext
+Section psp:Model$indexedContextTypes
 
 psp:Zaak tba:Test
 	?binnenRolBeschrijving =>
