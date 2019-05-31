@@ -42,10 +42,42 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "TestBotActie" do
+theSuite = suite "TestBotActie" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
+
+  -- OK
+  test "nAryOperator-defined property $propsEqual of usr:test1_binnenRol is false" do
+    assertEqual "$propsEqual"
+      do
+        propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
+        (u "test1_binnenRol") ##= propsEqual
+      ["false"]
+
+  -- OK
+  test "The object of the action" do
+    assertEqual "The object of tba:Test$botCopiesV1ToV2 applied to usr:test1 is tba:Test_binnenRol"
+      do
+        condition <- onNothing
+          (error "Cannot find object")
+          (tba "Test$botCopiesV1ToV2" ##> getBindingOfRol (psp "Actie$object"))
+        objectQuery <- constructQueryFunction condition
+        r <- (u "test1") ##= objectQuery
+        pure r
+      [u "test1_binnenRol"]
+
+  -- OK
+  test "testing the action condition" do
+    assertEqual "The condition of botCopiesV1ToV2 evalates to true for test1."
+      do
+        condition <- onNothing
+          (error "Cannot find condition")
+          (tba "Test$botCopiesV1ToV2" ##> getBindingOfRol (psp "Actie$condition"))
+        conditionQuery <- constructQueryFunction condition
+        r <- (u "test1") ##= conditionQuery
+        pure r
+      ["true"]
 
   test "constructActionFunction" do
     assertEqual "The action function copies the value of $v1 into $v2"
@@ -59,27 +91,9 @@ theSuite = suiteSkip "TestBotActie" do
             getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
       [Value "aap"]
 
-  test "nAryOperator-defined property $propsEqual of usr:test1 is false" do
-    assertEqual "$propsEqual"
-      do
-        propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
-        (u "test1") ##= propsEqual
-      ["true"]
-
-  test "testing the action condition" do
-    assertEqual "The condition of botCopiesV1ToV2 evalates to true for test1."
-      do
-        condition <- onNothing
-          (error "Cannot find condition")
-          (tba "Test$botCopiesV1ToV2" ##> getBindingOfRol (psp "Actie$condition"))
-        conditionQuery <- constructQueryFunction condition
-        r <- (u "test1") ##= conditionQuery
-        -- liftEffect clearTripleIndex
-        pure r
-      ["false"]
 
   -- NOTE. This test runs perfectly in isolation, but not in the suite.
-  test "compileBotAction" do
+  testOnly "compileBotAction" do
     loadTestModel "testBotActie.crl"
     loadTestModel "testbotInstantie.crl"
     assertEqualWithPropagation "Apply the botAction to the context usr:test1 to copy the value of $v1 to $v2"
@@ -87,7 +101,7 @@ theSuite = suiteSkip "TestBotActie" do
         botaction <- (compileBotAction (ContextDef $ tba "Test$botCopiesV1ToV2") (u "test1"))
         propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
         propsEqualWithEffect <- pure $ propsEqual ~> NamedFunction "propsEqualWithEffect" \vals -> liftEffect $ log ("propsEqual is now: " <>  show vals)
-        void ((u "test1") ## propsEqualWithEffect)
+        void ((u "test1_binnenRol") ## propsEqualWithEffect)
         void ((u "test1") ## botaction)
         lift $ delay (Milliseconds 100.0)
         getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2") (u "test1")
@@ -96,14 +110,14 @@ theSuite = suiteSkip "TestBotActie" do
     assertEqual "$propsEqual should now be true"
       do
         propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
-        (u "test1") ##= propsEqual
+        (u "test1_binnenRol") ##= propsEqual
       ["true"]
     assertEqualWithPropagation "Setting $v1 to a new value should cause $propsEqual to be false, but the bot immediately copies the new value to $v2 so it is true again."
       do
         void $ setProperty' (tba "Test$binnenRolBeschrijving$v1") "noot" (u "test1_binnenRol")
         lift $ delay (Milliseconds 100.0)
         propsEqual <- constructQueryFunction (tba "Test$binnenRolBeschrijving$propsEqual")
-        (u "test1") ##= propsEqual
+        (u "test1_binnenRol") ##= propsEqual
         -- pure ["false"]
       ["true"]
       1000.0
@@ -123,7 +137,7 @@ theSuite = suiteSkip "TestBotActie" do
         pure r
       [Value "noot"]
 
-  test "setupBotActions" do
+  testSkip "setupBotActions" do
     loadTestModel "testbotInstantie.crl"
 
     assertEqualWithPropagation "setupBotActions"
@@ -134,7 +148,7 @@ theSuite = suiteSkip "TestBotActie" do
       [Value "aap"]
       1000.0
 
-  test "tearDownBotActions" do
+  testSkip "tearDownBotActions" do
     loadTestModel "testbotInstantie.crl"
 
     assertEqualWithPropagation "After tearing down, a new value for $v1 will not be copied to $v2"

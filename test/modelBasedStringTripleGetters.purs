@@ -71,7 +71,7 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
     --   ((p "TrustedCluster$clusterGenoot") ##= (hasContextTypeOnEachRolTelescopeOf (p "PerspectivesSysteem$gebruiker")))
     --   [PBool "true"]
 
-  testOnly "searchUnqualifiedRolDefinition" do
+  test "searchUnqualifiedRolDefinition" do
     assertEqual "model:Perspectives$PerspectivesSysteem$gebruiker has a view VolledigeNaam"
       ((p "PerspectivesSysteem$gebruiker") ##= searchView "VolledigeNaam")
       [p "PerspectivesSysteem$gebruiker$VolledigeNaam"]

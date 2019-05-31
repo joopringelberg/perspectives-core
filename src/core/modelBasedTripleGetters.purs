@@ -7,7 +7,7 @@ import Data.Newtype (alaF, unwrap, wrap)
 import Perspectives.CoreTypes (type (**>), TypedTripleGetter(..), TripleGetter, (@@))
 import Perspectives.DataTypeObjectGetters (rolType)
 import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
-import Perspectives.DataTypeTripleGetters (contextType, genericRolType, rolType) as DTTG
+import Perspectives.DataTypeTripleGetters (contextType, genericRolType) as DTTG
 import Perspectives.DataTypeTripleGetters (identity)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)

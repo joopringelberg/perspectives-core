@@ -21,13 +21,15 @@ import Perspectives.Actions (addRol, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>))
-import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>))
 import Perspectives.DataTypeObjectGetters (contextType) as DTO
+import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.ModelBasedStringTripleGetters (searchView)
+import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition)
+import Perspectives.PerspectivesTypes (ContextDef(..))
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.ResourceRetrieval (saveEntiteit)
@@ -147,6 +149,18 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           -- save the rol.
           void (saveEntiteit id :: MonadPerspectives PerspectRol)
           sendResponse (Result corrId [id]) setter
+    Api.CreateRolWithLocalName -> do
+      mqrolname <- (ContextDef object) ##> (getUnqualifiedRolDefinition predicate)
+      case mqrolname of
+        Nothing -> sendResponse (Error corrId ("Cannot find Rol with local name '" <> predicate <> "' on contex type '" <> object <> "'!")) setter
+        (Just qrolname) -> do
+          rol <- constructAnotherRol (unwrap qrolname) subject (unsafePartial $ fromJust rolDescription)
+          case rol of
+            (Left messages) -> sendResponse (Error corrId (show messages)) setter
+            (Right id) -> do
+              -- save the rol.
+              void (saveEntiteit id :: MonadPerspectives PerspectRol)
+              sendResponse (Result corrId [id]) setter
     Api.AddRol -> void $ addRol predicate object subject
     Api.SetProperty -> catchError
       ((setProperty predicate object subject) *> sendResponse (Result corrId ["ok"]) setter)
@@ -192,7 +206,7 @@ getRol cid rn setter corrId = do
 
 getRolFromLocalName :: ContextID -> LocalName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
 getRolFromLocalName cid ln setter corrId = do
-  contextType <- cid ##>> DTO.contextType 
+  contextType <- cid ##>> DTO.contextType
   qf <- getUnqualifiedRolFunction ln contextType
   subscribeToObjects cid qf setter corrId
 

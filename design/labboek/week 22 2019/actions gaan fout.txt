@@ -1,0 +1,30 @@
+ACTIONS
+
+Er gaat iets fout in TestBotActie als ik de onafhankelijke property zet.
+Dat lukt nog wel - het komt goed aan in de database, d.w.z. $v1 krijgt een andere waarde.
+Maar dan wordt de Actie getriggered en dat gaat fout.
+
+HOE HET MOET ZIJN
+Hoe heb ik Acties opgezet?
+
+1. De gecompileerde Actie is een StringTypedTripleGetter die wordt toegepast op de context.
+2. De conditie wordt ook toegepast op de context.
+3. Het effect wordt toegepast op de context.
+4. De waarde-berekening (van de setter) wordt toegepast op de context.
+5. Het object - waar de setter op wordt uitgevoerd - wordt berekend door de functie die gecompileerd wordt uit de waarde van $object van de actie. Deze functie wordt óók toegepast op de context.
+
+Kortom, uit de context wordt berekend:
+	- de conditie-waarde
+	- de waarde die wordt gezet
+	- het object waar de waarde op wordt gezet.
+Vervolgens krijgt het object voor de betreffende property/rol de waarde door de setter toe te passen.
+
+TESTS
+Test.Perspectives.TestBotActie. Testresultaten.
+	* het object is de binnenrol. Toegepast op de context, klopt.
+
+	* propsEqual. Toegepast op de binnenrol, levert true maar moet false zijn. 
+	
+		1. Hoe moet ik de property van een rol nemen? Met PropertyGetter, functie "searchProperty".
+
+Opgelost door de modellering van TestBotActie aan te passen.

@@ -31,12 +31,12 @@ psp:Zaak tba:Test
 					extern $functionName = "equal"
 					$operand (1) =>
 						q:PropertyGetter _
-							extern $functionName = "getInternalPropery"
+							extern $functionName = "searchProperty"
 							$property => tba:Test$binnenRolBeschrijving$v1
 							?result => psp:String -- matcht met psp:SimpleValue.
 					$operand (2) =>
 						q:PropertyGetter $n2
-							extern $functionName = "getInternalPropery"
+							extern $functionName = "searchProperty"
 							$property => tba:Test$binnenRolBeschrijving$v2
 							?result => psp:String
 					?result => psp:Boolean
@@ -60,17 +60,21 @@ psp:Zaak tba:Test
 			--$subject -> $$Context$contextBot(1) -- Dit werkt voor psp:Context$contextBot
 			$subject -> $$contextBot(1) -- Dit werkt voor ?contextBot
 			$werkwoord => psp:Beheert
-			$object =>
-				q:DataTypeGetter $self -- deze query wordt toegepast op de context en MOET een rol opleveren.
+			$object => -- deze query wordt toegepast op de context en MOET de binnenrol opleveren.
+				q:DataTypeGetter $self
 					extern $functionName = "binnenRol"
 					?result => tba:Test
-			$condition =>
-				q:nAryCombinator _ -- deze query wordt toegepast op de context.
+			$condition => -- deze query wordt toegepast op de context.
+				q:nAryCombinator _
 					extern $functionName = "conj"
 					$operand (1) =>
 						q:UnaryCombinator _
 							extern $functionName = "not"
-							$query => tba:Test$binnenRolBeschrijving$propsEqual
+							$query =>
+								q:PropertyGetter _
+									extern $functionName = "getInternalPropery"
+									$property => tba:Test$binnenRolBeschrijving$propsEqual
+									$result => psp:Boolean
 					$operand (2) =>
 						q:PropertyGetter _
 							extern $functionName = "getInternalPropery"
@@ -81,8 +85,8 @@ psp:Zaak tba:Test
 				psp:assignToProperty _
 					extern $operation = "set"
 					$property => tba:Test$binnenRolBeschrijving$v2
-					$value =>
-						q:PropertyGetter _ -- This getter will be applied to the $object.
+					$value => -- deze query wordt toegepast op de context.
+						q:PropertyGetter $GetterOfV1
 							extern $functionName = "getInternalPropery"
 							$property => tba:Test$binnenRolBeschrijving$v1
 							?result => psp:String
