@@ -245,9 +245,12 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       2
 
   test "effectiveRolType" do
-    assertEqual "psp:PerspectivesSysteem$modellen should have as effective roltype the type of psp:Model_buitenRol"
+    assertEqual "psp:PerspectivesSysteem$modellen should have as effective roltype the type of psp:ContextPrototype$buitenRolBeschrijving"
       ((p "PerspectivesSysteem$modellen") ##= effectiveRolType)
       ["model:Perspectives$ContextPrototype$buitenRolBeschrijving"]
+    assertEqual "psp:PerspectivesSysteem$modelsInUse should have as effective roltype the type of psp:PerspectivesSysteem$modelsInUse"
+      ((p "PerspectivesSysteem$modelsInUse") ##= effectiveRolType)
+      ["model:Perspectives$PerspectivesSysteem$modelsInUse"]
 
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "testBotActie.crl"

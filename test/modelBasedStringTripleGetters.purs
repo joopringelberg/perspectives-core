@@ -4,11 +4,13 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
+import Perspectives.DataTypeTripleGetters (identity)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijving)
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding, propertiesDef, searchView)
-import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, hasContextType, sumToSequence)
+import Perspectives.ModelBasedStringTripleGetters (buitenRolBeschrijvingDef) as MBST
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, hasContextType, isContextTypeOf, sumToSequence)
 import Perspectives.PerspectivesTypes (PBool(..))
-import Perspectives.QueryCombinators (notEmpty)
+import Perspectives.QueryCombinators (notEmpty, cond)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Test.Perspectives.Utils (assertEqual, loadTestModel, p, unLoadTestModel)
@@ -78,17 +80,46 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
       ((p "PerspectivesSysteem$gebruiker") ##= searchView "VolledigeNaam")
       [p "PerspectivesSysteem$gebruiker$VolledigeNaam"]
 
-  test "propertiesDef" do
+  test "propertiesDef1" do
+    assertEqual "psp:Systeem$modelsInUse heeft als effectieve mogelijkeBinding de beschrijving van de buitenrol van psp:Context"
+      ((p "PerspectivesSysteem$modelsInUse") ##= (mogelijkeBinding >-> sumToSequence >-> cond (isContextTypeOf "model:Perspectives$Context") MBST.buitenRolBeschrijvingDef identity))
+      ["model:Perspectives$ContextPrototype$buitenRolBeschrijving"]
+
+  test "propertiesDef2" do
     assertEqual "psp:Context has an external property with local name 'contextLabel'."
       ((p "Context") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
-      [p "BuitenRolPrototype$contextLabel"]
+      ["model:Perspectives$BuitenRolPrototype$contextLabel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"]
     assertEqual "psp:Systeem has an external property with local name 'contextLabel'."
       ((p "Systeem") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
-      [p "BuitenRolPrototype$contextLabel"]
+      ["model:Perspectives$BuitenRolPrototype$contextLabel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"]
     assertEqual "psp:PerspectivesSysteem has an external property with local name 'contextLabel'."
       -- ((p "PerspectivesSysteem") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
       ("model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving" ##= propertiesDef)
-      [p "PerspectivesSysteem$buitenRolBeschrijving$modelOphaalTeller", p "BuitenRolPrototype$contextLabel"]
+      [p "PerspectivesSysteem$buitenRolBeschrijving$modelOphaalTeller"
+      , "model:Perspectives$BuitenRolPrototype$contextLabel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"]
+    assertEqual "psp:Model has an external property with local name 'contextLabel'."
+      ((p "Model") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
+      ["model:Perspectives$BuitenRolPrototype$contextLabel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"]
+    assertEqual "The mogelijkeBinding of psp:PerspectivesSysteem$modelsInUse is psp:Model."
+      ((p "PerspectivesSysteem$modelsInUse") ##= mogelijkeBinding )
+      [p "Model"]
+    assertEqual "The buitenRolBeschrijving of the mogelijkeBinding of psp:PerspectivesSysteem$modelsInUse should have a property with local name 'contextLabel'."
+      ((p "PerspectivesSysteem$modelsInUse") ##= mogelijkeBinding >-> buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
+      ["model:Perspectives$BuitenRolPrototype$contextLabel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+      ,"model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"]
+    assertEqual "psp:PerspectivesSysteem$modelsInUse should have a property with local name 'contextLabel'."
+      ((p "PerspectivesSysteem$modelsInUse") ##= propertiesDef)
+      [p "BuitenRolPrototype$contextLabel"]
+
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

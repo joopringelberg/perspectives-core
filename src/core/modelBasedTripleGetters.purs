@@ -166,10 +166,12 @@ propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
   defsInAspectsAndPrototypes = closure_ directAspectRoles >-> unwrap `before` (closure_ STGC.getPrototype) `followedBy` RolDef >-> ownPropertiesDef
 
   defsInMogelijkeBinding :: (RolDef **> PropertyDef)
-  defsInMogelijkeBinding = lazyUnionOfTripleObjects
-    (mogelijkeBinding >-> sumToSequence `followedBy` RolDef)
-    (\_ -> propertiesDef)
-    "propertiesDef"
+  defsInMogelijkeBinding = QC.cond (unwrap `before` isContextTypeOf "model:Perspectives$Context")
+    (unwrap `before` buitenRolBeschrijvingDef >-> defsInAspectsAndPrototypes)
+    (lazyUnionOfTripleObjects
+      (mogelijkeBinding >-> sumToSequence `followedBy` RolDef)
+      (\_ -> propertiesDef)
+      "propertiesDef")
 
 -- | All mandatory properties defined for a Rol in Aspects and prototypes, that are not used as AspectProperty in one of the others.
 mandatoryProperties :: (RolDef **> PropertyDef)
@@ -204,10 +206,10 @@ bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Prop
 type Instance = String
 
 -- | True iff AnyDefinition is a type of AnyContext.
--- | q ## (isContextTypeOf p) should be understood as:
+-- | q ## (hasContextType p) should be understood as:
 -- | q is a type of p
 -- | q `isContextTypeOf` p
--- | AnyDefinition `isContextTypeOf` AnyContext
+-- | AnyDefinition `hasContextType` AnyContext
 hasContextType :: AnyContext -> (AnyDefinition **> PBool)
 hasContextType p = TypedTripleGetter ("hasContextType_" <> p) f where
   -- q ## (isContextTypeOf p) should be understood as:
