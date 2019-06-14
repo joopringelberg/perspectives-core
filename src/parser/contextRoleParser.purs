@@ -6,7 +6,7 @@ import Control.Alt (void, (<|>))
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, many, snoc, length, fromFoldable) as AR
+import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
 import Data.Array (dropEnd, head, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
@@ -552,7 +552,7 @@ context = withRoleCounting context' where
   collect (Cons (Tuple rname id) r) = let map = collect r in
     case FO.lookup rname map of
       Nothing -> FO.insert rname [id] map
-      (Just ids) -> FO.insert rname (AR.cons id ids) map
+      (Just ids) -> FO.insert rname (AR.insert id ids) map
 
   prototypeDeclaration :: IP (Maybe ID)
   prototypeDeclaration = do

@@ -2,17 +2,17 @@ module Perspectives.ModelBasedStringTripleGetters where
 
 import Control.Alt ((<|>))
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@))
-import Perspectives.DataTypeTripleGetters (genericBinding, genericContext)
-import Perspectives.EntiteitAndRDFAliases (RolName)
+import Perspectives.DataTypeTripleGetters (genericBinding, genericContext, genericRolBindingDef)
+import Perspectives.EntiteitAndRDFAliases (RolName, PropertyName)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.ModelBasedTripleGetters (hasContextType, hasRolType, isOrHasAspect, sumToSequence)
 import Perspectives.PerspectivesTypes (class RolClass, AnyDefinition, PBool)
 import Perspectives.QueryCombinators (notEmpty, conj) as QC
-import Perspectives.StringTripleGetterConstructors (searchGeneralUnqualifiedRolDefinition, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition)
-import Perspectives.TripleGetterComposition (unlessFalse, (>->))
-import Perspectives.TripleGetterConstructors (all)
+import Perspectives.StringTripleGetterConstructors (concat, directAspectRoles, getContextRol, getPrototype, searchGeneralUnqualifiedRolDefinition, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedRolDefinition)
+import Perspectives.TripleGetterComposition (lazyUnionOfTripleObjects, unlessFalse, (>->))
+import Perspectives.TripleGetterConstructors (all, closure_)
 import Perspectives.TripleGetterConstructors (unlessFalse) as TGC
-import Prelude ((<>))
+import Prelude ((<>), ($))
 
 -- | allowedBinding `hasContextTypeOnEachRolTelescopeOf` boundValue
 -- | allowedBinding ## (`hasContextTypeOnEachRolTelescopeOf` boundValue) !!!OMGEKEERD
@@ -67,3 +67,22 @@ mogelijkeBinding = searchInAspectRolesAndPrototypes f
 -- | in its prototypes and in its AspectRoles.
 searchView :: LocalName -> (RolName **> AnyDefinition)
 searchView = searchGeneralUnqualifiedRolDefinition "viewInRol"
+
+-- | All properties defined in the namespace of the Rol.
+ownPropertiesDef :: (RolName **> PropertyName)
+ownPropertiesDef = (getContextRol "model:Perspectives$Rol$rolProperty") >-> genericRolBindingDef
+
+-- | All properties defined for the Rol, in the same namespace, or on aspects, or on the MogelijkeBinding. Note that some of these may be an AspectProperty of others.
+-- Test.Perspectives.ModelBasedTripleGetters
+propertiesDef :: (RolName **> PropertyName)
+propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
+  where
+
+  defsInAspectsAndPrototypes :: (RolName **> PropertyName)
+  defsInAspectsAndPrototypes = closure_ directAspectRoles >-> (closure_ getPrototype) >-> ownPropertiesDef
+
+  defsInMogelijkeBinding :: (PropertyName **> PropertyName)
+  defsInMogelijkeBinding = lazyUnionOfTripleObjects
+    (mogelijkeBinding >-> sumToSequence)
+    (\_ -> propertiesDef)
+    "propertiesDef"

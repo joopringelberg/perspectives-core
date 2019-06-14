@@ -85,15 +85,6 @@ psp:Context psp:Context
 					$alternative => psp:Rol
 					$alternative => psp:Context
 					$alternative => psp:Sum
-	-- Hebben we dit werkelijk nodig? Een view op de buitenrol zou volstaan.
-	$rolInContext =>
-		psp:Rol $interneView
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:View
-	$rolInContext =>
-		psp:Rol $externeView
-			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:View
 	-- Deze roldefinitie is overbodig.
 	$rolInContext =>
 		psp:Rol $prototype
@@ -123,14 +114,25 @@ psp:Context psp:ContextPrototype
 			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			prototype psp:BuitenRolPrototype
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 
+psp:Rol psp:BuitenRolPrototype
+	$rolProperty =>
+		q:nAryCombinator $contextLabel
+			extern $functionName = "compose"
+			$operand (1) =>
+				q:DataTypeGetter _
+					extern $functionName = "context"
+					?result => psp:Context
+			$operand (2) =>
+				q:DataTypeGetter _
+					extern $functionName = "label"
+					?result => psp:String
+			?result => psp:String
+
 psp:Context psp:Rol
-	$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
 	$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
 			extern $isFunctioneel = true
@@ -344,14 +346,7 @@ psp:Context psp:Systeem
 			$mogelijkeBinding => psp:Niets
 
 psp:Systeem psp:SysteemPrototype
-	psp:Context$binnenRolBeschrijving =>
-		psp:Rol $binnenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
-	psp:Context$buitenRolBeschrijving =>
-		psp:Rol $buitenRolBeschrijving
-			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Rol
+	prototype psp:ContextPrototype
 	$bot => ()
 
 psp:Zaak psp:TrustedCluster
@@ -523,6 +518,7 @@ Section psp:Model$indexedContextTypes
 psp:Systeem psp:PerspectivesSysteem
 	psp:Context$buitenRolBeschrijving =>
 		psp:Rol $buitenRolBeschrijving
+			prototype psp:BuitenRolPrototype
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
 			$rolProperty =>
@@ -568,4 +564,9 @@ psp:Systeem psp:PerspectivesSysteem
 		psp:Rol $indexedContexts
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
+	psp:Context$rolInContext =>
+		psp:Rol $modelsInUse
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:ElkType
+
 

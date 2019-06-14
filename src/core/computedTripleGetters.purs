@@ -14,9 +14,8 @@ import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives, (@@>>))
 import Perspectives.DomeinCache (documentNamesInDatabase)
-
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Identifiers (isQualifiedWithDomein)
+import Perspectives.Identifiers (buitenRol, isQualifiedWithDomein)
 import Perspectives.PerspectivesTypes (PropertyDef(..))
 import Perspectives.QueryCache (queryCacheInsert)
 import Perspectives.Resource (getPerspectEntiteit)
@@ -26,13 +25,13 @@ import Perspectives.TripleGetterComposition (followedBy)
 import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructTripleGetterWithArbitrarySupport)
 import Perspectives.TypeDefChecker (checkDomeinFile)
 
--- | This TypedTripleGetter computes a list of the IDs of all models that are available to this system.
+-- | This TypedTripleGetter computes a list of the buitenrol-IDs of all models that are available to this system.
 modellenM :: StringTypedTripleGetter
 modellenM = constructTripleGetterWithArbitrarySupport
   "model:Perspectives$PerspectivesSysteem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller") `followedBy` unwrap)
   where
     getListOfModels :: ID -> MonadPerspectivesQuery (Array String)
-    getListOfModels id = lift $ lift $ catchError (documentNamesInDatabase "perspect_models") \_ -> pure []
+    getListOfModels id = lift $ lift $ catchError ((documentNamesInDatabase "perspect_models") >>= pure <<< map buitenRol) \_ -> pure []
 
 -- | Given the ID of a context of type model:CrlText$Text, computes an array of strings that are either the identifier
 -- | of the model, or the identifiers of the BuitenRollen of the userdata, or error messages from the attempt to parse

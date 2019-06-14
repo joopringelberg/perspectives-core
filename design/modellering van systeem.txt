@@ -1,0 +1,43 @@
+SYSTEEM MODELLERING
+
+DE BASIS
+psp:Context psp:Systeem
+	$aspect => psp:Context
+
+psp:Systeem psp:PerspectivesSysteem
+
+psp:PerspectivesSysteem u:MijnSysteem
+
+Omdat psp:Systeem een subclass is van psp:Context, kan ik in psp:PerspectivesSysteem alle rollen van psp:Context inzetten. Dat is opzet want ik wil in PerspectivesSysteem een aantal rollen beschrijven.
+
+Het is echter niet zinvol om psp:PerspectivesSysteem een instantie van psp:Systeem te maken. Immers, psp:Systeem voegt niets toe aan psp:Context. Maar we breiden psp:Systeem uit.
+
+UITBREIDING
+psp:Context psp:Systeem
+	$aspect => psp:Context
+	$defaultPrototype => psp:SysteemPrototype
+	$rolInContext =>
+		psp:Rol $bot
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			$mogelijkeBinding => psp:Niets
+
+psp:Systeem psp:SysteemPrototype
+	prototype psp:ContextPrototype
+	$bot => ()
+
+Nu kunnen we in psp:PerspectivesSysteem de rol $bot gebruiken. D.w.z. we kunnen $bot instantiëren en eventueel binden aan een rol.
+
+Dat doen we in psp:SysteemPrototype, een instantie van psp:Systeem. We maken de rol $bot aan en binden hem niet.
+
+Door psp:Systeem een defaultprototype te geven, krijgt elke instantie van psp:Systeem waarvoor we geen eigen prototype hebben gedefinieerd, het default prototype. psp:PerspectivesSysteem is zo'n instantie en heeft dus de rolinstantie $bot van psp:SysteemPrototype.
+
+Maar let op:
+1. Er is vooralsnog maar één instantie van psp:Systeem.
+2. Alle instanties van psp:Systeem (zonder eigen prototype) zullen dezelfde instantie van $bot delen!
+3. Instanties van psp:PerspectivesSysteem, zoals u:MijnSysteem, beschikken niet over die rolinstantie $bot.
+4. Evenmin kun je in u:MijnSysteem de rol $bot gebruiken. Immers, instanties van psp:PerspectivesSysteem zijn geen instanties van psp:Systeem!
+
+Bovendien, in de modellen komt $bot maar één keer voor, namelijk als mogelijkeBinding van psp:Context$contextBot.
+
+Ik vermoed dat ik dit zo heb gemodelleerd, om op het niveau van types van systemen (zoals PerspectivesSysteem) een ànder programma als 'bot' te kunnen koppelen. Dus stel je modelleert een extern systeem (bijvoorbeeld voor betalingen). Dan kun je dat systeem aan zijn typebeschrijving koppelen. Dat kan zinvol zijn als je zo de API van dat systeem beschikbaar maakt. De API calls kun je modelleren als acties van de bot in het systeem. De binding van de bot zou de informatie kunnen bevatten om de calls te maken, b.v. het adres van een service entrypoint.

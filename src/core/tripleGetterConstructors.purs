@@ -11,6 +11,7 @@ import Data.Traversable (traverse)
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), MPQ, (@@))
 import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, context) as DTG
 import Perspectives.DataTypeTripleGetters (binnenRol, identity)
+import Perspectives.EntiteitAndRDFAliases (RolID)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders, agreesWithType, alternatives, localAspects) as OGC
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
@@ -72,10 +73,12 @@ unlessFalse tg id = (id @@ tg) >>= \r@(Triple{object}) -> case (Arr.elemIndex (P
   Nothing -> pure r
   otherwise -> empty
 
-searchInRolTelescope :: (String **> String) -> (String **> String)
+-- | Apply the getter to the Rolinstance. If this yields no result, apply it recursively to its binding.
+searchInRolTelescope :: (RolID **> String) -> (RolID **> String)
 -- Test.Perspectives.TripleGetterConstructors, via searchProperty
 searchInRolTelescope getter = (getter `preferLeft` \_ -> (DTG.genericBinding >-> searchInRolTelescope getter)) "searchInRolTelescope"
 
+-- | Applies to a Context instance. Applies the getter to the rol telescope of its buitenrol.
 -- | Applies the TypedTripleGetter to each higher prototype until it succeeds or there is no prototype.
 -- | Does *not* apply the getter to the ContextType that is passed in!
 -- Test.Perspectives.TripleGetterConstructors
@@ -86,7 +89,6 @@ searchInPrototypeHierarchy :: forall o.
   (AnyContext **> o)
 searchInPrototypeHierarchy getter = DTG.buitenRol >-> typeWithPerspectivesTypes searchInRolTelescope getter
 
--- TODO hier ontstaat een loop.
 -- Test.Perspectives.ModelBasedTripleGetters, via buitenRolBeschrijvingDef
 searchLocallyAndInPrototypeHierarchy :: forall o.
   Eq o =>

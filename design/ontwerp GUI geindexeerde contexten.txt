@@ -8,7 +8,7 @@ ONTWERP GUI GEINDEXEERDE CONTEXTEN
 
 4. Elk model heeft één of meerdere types die de beschrijving van de geïndexeerde contexten van dat model geven (b.v. psp:PerspectivesSysteem). Voor elk model is dat een andere gekwalificeerde identifier. Dit type wordt gebonden aan de rol $indexedContextTypes van het model zelf (b.v. model:Perspectives). Het model is een instantie van psp:Model en heeft dus een rol $indexedContextTypes. Later geef ik psp:Model op de buitenrol de properties 'auteur' en 'beschrijving'.
 
-5. Ik maak een query compositie van de computed rol psp:PerspectivesSysteem$modellen en van de rolGetter voor $indexedContextTypes. Daarmee heb ik de lijst van **types** van geïndexeerde contexten in handen.
+5. Ik maak een query compositie van de computed rol psp:PerspectivesSysteem$modellen en van de rolGetter voor $indexedContextTypes. Daarmee heb ik de lijst van **types** van geïndexeerde contexten in handen. Deze query is een berekende rol van psp:PerspectivesSysteem met de naam psp:PerspectivesSysteem$availableModels.
 
 6. Ik voeg de rol psp:PerspectivesSysteem$modelsInUse toe. Deze rol heeft als binding een geïndexeerde context. Ik laat nog even in het midden of we dergelijke rollen een gezamenlijk aspect geven. Een mogelijke property is 'inGebruikSinds'.
 
@@ -21,7 +21,7 @@ Het effect van deze actie is:
 	* de buitenRol van deze instantie wordt gebonden in de zojuist aangemaakte rolinstantie.
 
 8. Ik maak in InPlace een scherm voor de context MijnSysteem met de volgende indeling:
-	* de rol psp:PerspectivesSysteem$modellen is zichtbaar als een lijst van Views op de buitenRol waarin 'auteur' en 'beschrijving' te zien zijn.
+	* de rol psp:PerspectivesSysteem$availableModels is zichtbaar als een lijst van Views op de buitenRol waarin 'auteur' en 'beschrijving' te zien zijn.
 	* daarnaast is de rol psp:PerspectivesSysteem$modelsInUse zichtbaar.
 	* een model kan naar de modellen in gebruik gesleept worden. Dan wordt een nieuwe rol aangemaakt en gebonden.
 Door een model in gebruik te nemen, wordt de actie gestart die de geïndexeerde context van het model maakt.

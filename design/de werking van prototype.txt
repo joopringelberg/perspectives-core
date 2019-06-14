@@ -1,0 +1,70 @@
+DE WERKING VAN PROTOTYPE
+
+Een context kan een prototype hebben. Dat betekent dat zijn buitenRol gevuld is met de buitenRol van een andere context met hetzelfde type.
+
+Dankzij een prototype verwerft een context meer rollen. Een context heeft al zijn eigen rollen, plus die van zijn prototype.
+
+Prototypes vormen een hierarchie, omdat op de buitenrol net als op andere rollen een roltelescoop gevestigd kan worden.
+
+Zo vind je alle rollen van een context, rekening houdend met zijn prototype:
+
+	* neem de buitenrol;
+	* pas dan recursief op de hele telescoop toe:
+	* neem de context en neem dan alle rollen.
+
+Zo vind je een bepaalde rol in een context, rekening houdend met zijn prototype:
+
+	* neem de buitenrol;
+	*pas dan recursief op de hele telescoop toe, tot je de rol gevonden hebt:
+	* neem de context en zoek dan de rol in die context.
+
+PROTOTYPE EN TYPES
+Wanneer een context een type beschrijft, geven zijn rollen details van dat type.
+	* als het een context-type betreft, geven de rollen de mogelijke rollen van de context
+	* als het een rol-type betreft, geven de rollen de mogelijke properties van de rol
+	* als het een view betreft, geven de rollen de properties van de view.
+
+Met een prototype voeg je dus rollen of properties toe aan een type.
+
+Door een context-type een prototype te geven, voeg je mogelijke rollen aan het context-type toe.
+Door een rol-type een prototype te geven, voeg je mogelijke properties aan het rol-type toe.
+Door een view een prototype te geven, voeg je mogelijke properties aan de view toe.
+
+DEFAULT PROTOTYPE
+Het default prototype van psp:Context is psp:ContextPrototype. Dat betekent dat een instantie van psp:Context die niet zelf een prototype heeft (de prototype-expressie komt niet voor in zijn definitie), dat prototype krijgt.
+
+psp:ContextPrototype voegt een binnenRolBeschrijving en een buitenRolBeschrijving toe aan een context. Deze beschrijvingen zijn elementair: ze zeggen dat deze rollen functioneel zijn en gebonden kunnen worden aan een Rol. 
+
+Op deze manier heeft elke instantie van psp:Context altijd een binnen- en buitenRolBeschrijving. Dat is een handig mechanisme, want beide rollen zijn verplicht!
+
+Neem b.v. psp:Rol. Dat is een instantie van psp:Context, maar heeft geen prototype. Kortom, het prototype van psp:Rol is psp:ContextPrototype. psp:Rol verwerft zo een 'vanilla' binnenRolBeschrijving. 
+psp:Rol definieert zelf een $buitenRolBeschrijving, die twee properties heeft: $isFunctioneel en $isVerplicht. Deze beschrijving bevat meer detail dan de beschrijving uit het prototype.
+
+CASE STUDY: LABEL VAN CONTEXT OP BUITENROL ('CONTEXTLABEL')
+Ik wil dat elke buitenrol een berekende property heeft die het label van de context ophaalt.
+
+Dat kan je doen door aan de beschrijving van een buitenrol die property te geven. Maar dat werkt dan voor één context. Een algemenere oplossing is een prototype te maken met die property en die aan alle buitenrollen te geven. Kan dat?
+
+1. De beschrijving van een buitenRol hoort bij een context die als type psp:Context heeft (een context-type).
+2. Je voegt die beschrijving toe aan zo'n context-type met de rol psp:Context$buitenRolBeschrijving.
+3. Zo'n beschrijving is gewoon een psp:Rol (zijn type is psp:Rol).
+4. We moeten dus een prototype toevoegen aan een rol (een context met type psp:Rol), om de property contextlabel toe te voegen aan die rol.
+5. Dat prototype is zelf dus óók een psp:Rol - anders mogen we het niet als prototype voor een instantie van psp:Rol gebruiken!
+
+Dat introduceert misschien een *moeilijkheid*: we moeten op toplevel in een modelfile een psp:Rol definieren.
+
+psp:Rol psp:buitenRolPrototype
+	$rolProperty =>
+		psp:Property $contextLabel
+			...
+
+Dan wil ik op efficiënte wijze bereiken dat buitenRolBeschrijvingen dit prototype hebben. Kan ik dat doen in psp:ContextPrototype?
+
+psp:Context psp:ContextPrototype
+	$buitenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			prototype psp:buitenRolPrototype
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+
+Zou dit werken, dan heeft elke instantie van psp:Context (dus ook instanties van types die psp:Context als Aspect hebben) een buitenRol met de property $contextLabel.

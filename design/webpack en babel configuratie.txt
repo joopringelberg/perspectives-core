@@ -51,3 +51,20 @@ module: {
   }
 
 Ik ga @babel/preset-env opsporen en installeren en dan configureren in Webpack.
+Zie https://babeljs.io/docs/en/babel-preset-env voor een handleiding
+
+Geknipt uit deze pagina:
+	@babel/preset-env takes any target environments you've specified and checks them against its mappings to compile a list of plugins and passes it to Babel.
+	
+	For browser- or Electron-based projects, we recommend using a .browserslistrc file to specify targets
+
+Hier is browserlist: https://github.com/browserslist/browserslist
+
+UITVOERING
+1. Ik heb een .browserslistrc file gemaakt met deze inhoud:
+
+	# Browsers supported by Perspectives
+
+	last 2 Electron versions
+
+2. npm install --save-dev @babel/preset-env in perspectives-react-integrated-client

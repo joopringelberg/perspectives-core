@@ -1,7 +1,7 @@
 module Perspectives.QueryCompiler where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (foldl, head, unsnoc)
+import Data.Array (foldr, head, unsnoc)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -12,7 +12,7 @@ import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, genericCo
 import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, contextType, genericBinding, genericContext, genericRolType, identity, iedereRolInContext, label) as DTG
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructNamespace)
-import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty) as OGC
+import Perspectives.ObjectGetterConstructors (searchContextRol, searchExternalProperty, getInternalProperty, getContextRol) as OGC
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, PBool, PropertyDef(..), RolDef(..), Value, genericBinding, typeWithPerspectivesTypes)
 import Perspectives.QueryAST (ElementaryQueryStep(..))
@@ -208,11 +208,11 @@ constructQueryFunction typeDescriptionID = do
       ID ->
       MP ((String **> String))
     applyBinaryCombinator c queryStepType = do
-      (operandIds :: Array AnyContext) <- (OGC.searchContextRol (RolDef "model:QueryAst$nAryCombinator$operand") /-/ rolBindingDef) typeDescriptionID
+      (operandIds :: Array AnyContext) <- (OGC.getContextRol (RolDef "model:QueryAst$nAryCombinator$operand") /-/ rolBindingDef) typeDescriptionID
       operands <- traverse constructQueryFunction operandIds
       {init, last} <- onNothing' (errorMessage "no operands" queryStepType) (unsnoc operands)
       scnd <- onNothing' (errorMessage "just one operand" queryStepType) (head init)
-      pure $ foldl c last init
+      pure $ foldr c last init
 
     errorMessage :: String -> String -> Error
     errorMessage s t = error ("constructQueryFunction: " <> s <> " for: " <> t <> " " <> typeDescriptionID)

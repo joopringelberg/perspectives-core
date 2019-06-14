@@ -3,12 +3,14 @@ module Test.Perspectives.ModelBasedStringTripleGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding, searchView)
-import Perspectives.ModelBasedTripleGetters (hasContextType, sumToSequence)
+import Data.Newtype (unwrap)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijving)
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding, propertiesDef, searchView)
+import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, hasContextType, sumToSequence)
 import Perspectives.PerspectivesTypes (PBool(..))
 import Perspectives.QueryCombinators (notEmpty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Test.Perspectives.Utils (assertEqual, loadTestModel, p, unLoadTestModel)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -71,10 +73,22 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
     --   ((p "TrustedCluster$clusterGenoot") ##= (hasContextTypeOnEachRolTelescopeOf (p "PerspectivesSysteem$gebruiker")))
     --   [PBool "true"]
 
-  test "searchUnqualifiedRolDefinition" do
+  testSkip "searchUnqualifiedRolDefinition" do
     assertEqual "model:Perspectives$PerspectivesSysteem$gebruiker has a view VolledigeNaam"
       ((p "PerspectivesSysteem$gebruiker") ##= searchView "VolledigeNaam")
       [p "PerspectivesSysteem$gebruiker$VolledigeNaam"]
+
+  test "propertiesDef" do
+    assertEqual "psp:Context has an external property with local name 'contextLabel'."
+      ((p "Context") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
+      [p "BuitenRolPrototype$contextLabel"]
+    assertEqual "psp:Systeem has an external property with local name 'contextLabel'."
+      ((p "Systeem") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
+      [p "BuitenRolPrototype$contextLabel"]
+    assertEqual "psp:PerspectivesSysteem has an external property with local name 'contextLabel'."
+      -- ((p "PerspectivesSysteem") ##= buitenRolBeschrijvingDef `followedBy` unwrap >-> propertiesDef)
+      ("model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving" ##= propertiesDef)
+      [p "PerspectivesSysteem$buitenRolBeschrijving$modelOphaalTeller", p "BuitenRolPrototype$contextLabel"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

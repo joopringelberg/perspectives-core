@@ -22,4 +22,140 @@ Dat moet een sectie worden: de sectie psp:Model$indexedContextTypes.
 4. Vraag de binding van model:Perspectives$Model$indexedContextTypes op.
 GELUKT!
 
+NAVIGATIE
+Ik kies een Tab.Container met een Nav om de hoofdstructuur op te zetten. In eerste instantie bouw ik de schermen rechtstreeks in de Tab.Content in. Later probeer ik dan on demand te laden. 
+Dat is gelukt.
+
 Nu verder.
+
+5. Maak het hoofdscherm van InPlace zo dat links de rol psp:PerspectivesSysteem$indexedContexts van u:MijnSysteem zichtbaar is.
+	* Context: MijnSysteem
+	* Rol: $indexedContexts
+	
+
+In de Tab.Container bed ik Context in voor MijnSysteem. In de Nav in de linker Col bed ik dan Rol voor $indexedContexts in. Daarbinnen Binding (alternatief: maak berekende rol in PerspectivesSysteem) en laat als child Nav.Item reproduceren voor (de buitenrol van) elke indexedContext. Het label van die context komt in de Nav.Link. De rolinstance komt in eventKey. KLAAR
+
+PROBLEEM: LABEL VAN DE CONTEXT
+1. Ik wil het label laten zien op de BuitenRol van de Context die het label heeft.
+2. Ik heb daartoe een berekende property gemaakt bij psp:ContextPrototype.
+3. Ik heb een "allProperties" view gedefinieerd die je van elke rol kunt opvragen, via PerspectivesAPI.
+Maar ik zie niets. 
+VRAGEN:
+	* als ik de view van een Rol ophaal, doe ik dat dan van de instantie of van het type van de Rol?
+		ANTWOORD: van het type.
+	* Werkt 'propertiesDef' goed op een roltype?
+	* Wat is het roltype van de buitenrol van MijnSysteem?
+		ANTWOORD: model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving, gedefinieerd lokaal in psp:PerspectivesSysteem
+	* Wat is het resultaat van 'propertiesDef' op model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving?
+PROBLEEM OPGELOST.
+	
+
+In de Tab.Content in de rechter Col bed ik weer Rol in. Ik reproduceer dan Tab.Pane voor elke rolinstantie, weer met eventKey gelijk aan rolinstance. KLAAR
+
+Dan komt de magie. In Tab.Pane moet als child ingebed worden de juiste Loadable. 
+
+VOORALSNOG kan ik het alleen maar voor elkaar krijgen door de webpack dev server de content vanuit de root te laten opleveren (publicPath: "/"). Ik kan dan de modulenaam gebruiken (Perspectives). Die module komt tot stand doordat ik een extra entrypoint heb gedefinieerd voor Webpack.
+
+Maar waar komen de Loadables vandaan?
+
+Ik kan hem ter plekke maken:
+
+	Loadable({
+		  loader: () => import('./testBotactie.js'),
+		  loading: Loading,
+		})
+
+De import moet dan een javascript filenaam zijn die we kunnen afleiden uit de naam van de indexedContext.
+Precies die naam moet ik ook aan het bestand hebben gegeven (dat moet je dus met de hand doen).
+
+Punt van aandacht: nu substitueert react-loadable of Webpack de naam van de file ("module"!) met een naam bestaand uit een volgnummer en ".bundle.js". Maar als straks een auteur een model maakt met schermen en Webpack gebruikt om de dynamisch laadbare files te maken, gaat Webpack natuurlijk opnieuw bij 0 beginnen met indexeren en krijg je duplicaten.
+Dat zou kunnen worden voorkomen door
+	* te bepalen welke namen voor de output gebruikt worden
+	* de output per model in een folder te plaatsen.
+
+Ik kan daar mee experimenteren door testBotActie.js in een aparte folder te plaatsen en zien wat voor filenaam gegenereerd wordt. Ik kan ook de documentatie lezen.
+
+Extra complicatie: Webpack maakt ook 'chunks': sub-bundles die gedeeld worden door meerdere bundles. Dus voor een bepaalde module kunnen meer dan één bundle geladen worden. 
+Je kunt daarover meer lezen op: https://webpack.js.org/concepts/manifest.
+
+"You might be wondering how webpack and its plugins seem to "know" what files are being generated. The answer is in the manifest that webpack keeps to track how all the modules map to the output bundles. If you're interested in managing webpack's output in other ways, the manifest would be a good place to start.
+
+The manifest data can be extracted into a json file for easy consumption using the WebpackManifestPlugin."
+
+OUTPUT.FILENAME / OUTPUT.CHUNKFILENAME
+Note this option is called filename but you are still allowed to use something like 'js/[name]/bundle.js' to create a folder structure.
+
+	module.exports = {
+	  //...
+	  output: {
+		filename: (chunkData) => {
+		  return chunkData.chunk.name === 'main' ? '[name].js': '[name]/[name].js';
+		},
+	  }
+	};
+
+SCENARIOS
+Als je een App maakt, maak je
+	* een model
+	* (maximaal) per userrol in een context een scherm
+
+Waarvoor gebruiken we dynamisch laden? Minstens om per App te kunnen laden. Is het van belang om schermen per App apart te laden? Vaak niet. En waar dat wel nodig is, kan de bouwer zelf, b.v. met dynamisch laden, code splitting afdwingen.
+
+We hebben twee scenarios:
+1. Ik maak zelf een nieuwe App;
+2. Een ander maakt een App.
+
+Als ik zelf een App maakt, kan ik een nieuw entrypoint maken voor die App. Alle schermen die erbij horen, komen dan in dezelfde bundel. Ik kan Webpack dan laten 'dedupen'. Maar als ik dat doe, ontstaan afhankelijkheden tussen Apps. Dus: beter van niet. Eventueel kan ik bestuderen of afhankelijkheden die alle Apps hebben, zoals React, toch afgesplitst kunnen worden - en op die manier gedeeld door Apps die niet door mij gemaakt zijn.
+
+Wat als een ander een App maakt? 
+Hij heeft perspectives-react nodig en dat heeft op zijn beurt perspectivesApiProxy nodig. Maar Perspectives (de core) is geen dependency.
+Alhoewel... 
+perspectivesApiProxy exporteert een Promise en de functies die de Core gebruikt om verbinding te leggen (createRequestEmitterImpl). Daarmee wordt de Promise ingelost. De Promise wordt door de core opgevangen.
+perspectives-react gebruikt dezelfde Promise.
+
+Dit betekent dat de Webpack runtime dezelfde instantiatie van de PerspectivesApiProxy moet gebruiken om alle importerende modules te bedienen. Anders krijgen zij geen verbinding met de Core (die éénmaal verbinding legt).
+Maar ik denk dat dat goed gaat.
+
+Kortom: de bundels voor aparte Apps hebben (hoogstwaarschijnlijk) de Core niet als gebundelde dependency.
+
+Tenslotte: met "externals" kan de App ontwikkelaar aangeven dat bijvoorbeeld 'react' en 'react-bootstrap' al aanwezig zijn.
+
+Als een ander een App maakt, heeft hij één entrypoint.
+
+Hij moet ervoor zorgen dat de output van zijn project in de dist folder van zijn Perspectives installatie terechtkomt - in een subfolder die de naam van zijn model draagt. Dat is mogelijk.
+De loader die voor zijn App gemaakt wordt, moet uit deze directory laden.
+
+output.path moet inderdaad een absoluut pad zijn.
+Je kunt path.resolve gebruiken. Om bijvoorbeeld vanuit ~/Code/testBotActie naar de dist folder van ~/Code/perspectives-integrated-client te komen, gebruik je:
+
+	path.resolve(__dirname, '../perspectives-integrated-client/public')
+
+Deze loader wordt door InPlace on the fly gemaakt. Maar InPlace weet de directorynaam (dat is het model zelf, of een daarvan afgeleide naam). Wat rest is dat de (hoofd)bundle ofwel een standaard naam heeft voor elke App (maar in een aparte folder), of een unieke en door InPlace weer af te leiden naam.
+
+TODO (VERDER)
+
+6. Maak de query psp:PerspectivesSysteem$availableModels.
+
+7. Voeg de rol psp:PerspectivesSysteem$modelsInUse toe.
+
+8. Maak een nieuw project voor een nieuwe App.
+
+9. Laat de output naar de dist folder van de InPlace installatie gaan. Je hebt daar een absoluut pad voor nodig:
+	path.resolve(__dirname, '../perspectives-integrated-client/public'
+	
+10. gebruik externals: 
+
+	externals: {
+		react: 'react'
+		}
+
+	of om alle subfiles van react-bootstrap uit te sluiten:
+	
+	externals: [
+		{react: 'react'}, 
+		/^react-bootstrap\/.+$/
+		]
+
+11. InPlace moet dan, als het het model laadt, de module met de React componenten dynamisch kunnen bijladen.
+
+56051

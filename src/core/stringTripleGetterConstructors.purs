@@ -98,7 +98,7 @@ getGeneralUnqualifiedRolDefinition rn ln = (QC.filter_
   (getUnqualifiedContextRol rn >-> DTG.genericBinding >-> DTG.genericContext))
 
 getUnqualifiedRolDefinition :: Id.LocalName -> StringTypedTripleGetter
-getUnqualifiedRolDefinition = getGeneralUnqualifiedRolDefinition "rolinContext"
+getUnqualifiedRolDefinition = getGeneralUnqualifiedRolDefinition "rolInContext"
 
 searchGeneralUnqualifiedRolDefinition :: Id.LocalName -> Id.LocalName -> StringTypedTripleGetter
 searchGeneralUnqualifiedRolDefinition rn ln = searchInAspectsAndPrototypes (getGeneralUnqualifiedRolDefinition rn ln)

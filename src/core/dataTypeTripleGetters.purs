@@ -1,7 +1,9 @@
 module Perspectives.DataTypeTripleGetters where
 
+import Perspectives.ApiTypes (ContextID)
 import Perspectives.CoreTypes (type (**>), type (~~>))
 import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
+import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value)
 import Perspectives.PerspectivesTypes (genericBinding, binding, getUnqualifiedProperty) as PT
@@ -65,11 +67,14 @@ rolBindingDef = binding >-> context
 context :: forall r. RolClass r => (r **> String)
 context = DTOG.context `trackedAs` "model:Perspectives$context"
 
-genericContext :: (String **> String)
+genericContext :: (RolName **> ContextID)
 genericContext = DTOG.genericContext `trackedAs` "model:Perspectives$context"
 
-genericBinding :: (String **> String)
+genericBinding :: (RolName **> RolName)
 genericBinding = PT.genericBinding `trackedAs` "model:Perspectives$binding"
+
+genericRolBindingDef :: (RolName **> AnyContext)
+genericRolBindingDef = genericBinding >-> genericContext
 
 getUnqualifiedProperty :: forall r. RolClass r => LocalName -> (r **> Value)
 getUnqualifiedProperty ln = (PT.getUnqualifiedProperty ln) `trackedAs` ln

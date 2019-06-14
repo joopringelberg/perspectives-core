@@ -1,0 +1,25 @@
+OPZET SCHERMEN, PROJECTEN EN MODELLEN VOOR INPLACE
+
+1. Bij elk model voegen we één attachment toe: screens.js.
+
+2. De schermen van een model maken we in een apart project. Dit project
+	* levert een library(file), met de naam "screens.js"
+	* exporteert voor elke rol (in een context) waar we een scherm voor willen hebben, een React component onder die naam.
+	* elke (scherm)component mag een willekeurige interne naam hebben;
+	* ze mogen zelfs allemaal dezelfde naam hebben en per sourcefile als default worden geëxporteerd;
+	* zolang de library maar de rolnamen gebruikt.
+
+3. Bij het dynamisch laden
+	* krijgen we een rolnaam aangeboden;
+	* het model-deel daarvan gebruiken we om de attachment 'screens.'js van dat model uit Couchdb op te halen;
+	* het andere deel gebruiken we om de juiste component uit de module te halen.
+
+Gemak voor de onwikkelomgeving:
+* bij elke mutatie van de output (screens.js) wordt dat bestand als attachment ge-upload naar couchdb, onder de modelfile.
+* hier hebben we een gulp taak voor nodig.
+
+WERKWIJZE
+1. Maak een nieuw model, inclusief een indexedContext.
+2. Upload dat met InPlace.
+3. Maak de screens library en start de Gulp taak die begint met automatisch uploaden.
+4. Neem in gebruik in InPlace.

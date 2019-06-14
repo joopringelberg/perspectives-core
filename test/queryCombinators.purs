@@ -3,12 +3,16 @@ module Test.Perspectives.QueryCombinators (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Perspectives.DataTypeTripleGetters (context, genericContext, label)
 import Perspectives.ModelBasedTripleGetters (rollenDef)
-import Perspectives.PerspectivesTypes (PBool(..), PropertyDef(..))
+import Perspectives.PerspectivesTypes (BuitenRol(..), PBool(..), PropertyDef(..))
+import Perspectives.QueryAST (ElementaryQueryStep(..)) as QA
 import Perspectives.QueryCombinators (not, notEmpty, conj, equal) as QC
+import Perspectives.QueryCompiler (constructQueryFunction, constructUnqualifiedGetter, getPropertyFunction)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (getInternalProperty)
-import Test.Perspectives.Utils (assertEqual, loadTestModel, removeTestContext, u, unLoadTestModel)
+import Test.Perspectives.Utils (assertEqual, loadTestModel, removeTestContext, u, unLoadTestModel, p)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 t :: String -> String
@@ -68,6 +72,16 @@ theSuite = suiteSkip "QueryCombinators" do
 
     unLoadTestModel "model:TestBotActie"
 
+  test "contextLabel" do
+    assertEqual "The contextLabel of the buitenRol of u:MijnSysteem should be 'MijnSysteem'"
+      do
+        ((u "MijnSysteem_buitenRol") ##= genericContext >-> label)
+      ["MijnSysteem"]
+    assertEqual "The contextLabel of the buitenRol of u:MijnSysteem should be 'MijnSysteem'"
+      do
+        getter <- constructQueryFunction $ p "BuitenRolPrototype$contextLabel"
+        ((u "MijnSysteem_buitenRol") ##= getter)
+      ["MijnSysteem"]
 
   -- testOnly "" do
   --   loadTestModel "TestOGC.crl"

@@ -1,0 +1,84 @@
+VRAGEN OVER WEBPACK EN ELECTRON
+
+1. Hoe kan ik InPlace draaien zonder webpack-dev-server?
+2. Hoe verhoudt zich de directorystructuur van waaruit Electron files ophaalt, tot het publicPath en de contentBase van webpack-dev-server?
+3. Hoe kan ik onafhankelijke auteurs een scherm laten bijdragen?
+4. Kan ik met import() een module bijladen die niet door webpack is gezien?
+	- deze vraag voor serveren met webpack-dev-server
+	- en voor serveren vanaf het filesysteem.
+5. Is webpack-dev-server wel nuttig voor mij? Of kan ik net zo goed telkens de browser verversen?
+
+VOLGORDE
+0. hoe run je webpack van de command line (zonder watch) KLAAR
+1. Zoek uit hoe je zonder webpack-dev-server draait. KLAAR
+2. Bepaal of je zo dan ook prettig kunt ontwikkelen (door de browser telkens te verversen). JA
+ZO JA:
+3. Bepaal hoe je met de hand een module kunt maken die met import() door InPlace geladen kan worden. KLAAR
+4. Waar moet je zo'n module neerzetten? KLAAR, in de public folder.
+5. Bepaal hoe je met Webpack zo'n module kunt laten maken. KLAAR
+6. Bepaal hoe je automatisch zo'n module op de goede plek krijgt.
+7. Veralgemeniseer de export. Nu haal ik specifiek het scherm voor Perspectives op in app.js KLAAR
+
+ANTWOORDEN/RESULTATEN
+0. hoe run je webpack van de command line (zonder watch)
+	npx webpack activeert direct de watcher - maar niet als ik in de configuratie 'watch=false' heb!
+
+1. In app-starter.js:
+
+	  // mainWindow.loadURL("http://localhost:" + port + "/index.html");
+	  mainWindow.loadURL("file://" + path.join(__dirname, "../public/index.html" ));
+	In public/index.html:
+	
+		<script type="text/javascript" src="./index.bundle.js"></script>
+	
+	Hij laadt netjes alle bundels, ook de met een separate entry gemaakte Perspectives.bundle.js
+
+7. Hoe kan ik webpack de html en .crl files laten negeren?
+	ANTWOORD: met https://github.com/cherrry/ignore-loader
+
+2. Door webpack te laten watchen en InPlace te verversen heb je een prima werkwijze!
+
+3. Wat telt als een module voor Webpack?
+
+Het probleem is dat WebPack "import()" een speciale behandeling geeft. Hij vertaalt zo'n statement naar het laden van een chunk/bundle. 
+Dat moet ik vermijden.
+Vermoedelijk ondersteunt Chromium "import()".
+Dus ik moet mijn modules laden via een module die niet gezien wordt door webpack.
+Maar die module moet wel geladen kunnen worden met webpack!
+Vermoedelijk moet ik 'm dan 'external' verklaren: https://webpack.js.org/configuration/externals/#root 
+Dat is gelukt. Ik heb 'myImporter.js' en dat is een externe module, die import aanroept.
+
+Ad 3 en 5. Ik heb een project gemaakt, 'inplace-screens', dat dit voor elkaar krijgt.
+
+Een complicatie is dat de productieversie van InPlace het file protocol zal gebruiken om zulke modules op te halen. En Chromium staat niet toe dat het file protocol een script file verwerkt.
+Daarom heb ik een custom protocol gemaakt, dat dat wel toestaat.
+
+Nu kan ik zien dat modules opgehaald worden, maar de 'import' geeft een standaard module terug: 
+
+	Symbol(Symbol.toStringTag): "Module"
+
+Bij nalopen van de evaluatie van de geïmporteerde module blijkt dat webpackUniversalModuleDefinition (de functie die bovenin is gedefineerd) onder de naam 'default' de geexporteerde functie aan de globale namespace toevoegt!
+Op een manier die ik niet goed begrijp, wordt dan bovenstaand "Module" symbool teruggegeven.
+
+Er moet duidelijk iets anders gebeuren. Ik heb in 'inplace-screens' module type "umd" opgegeven, maar dat werkt niet.
+
+Een oplossing wordt gegeven in https://paultavares.wordpress.com/2018/07/02/webpack-how-to-generate-an-es-module-bundle/
+Met een extra plugin voor Webpack wordt een exports statement toegevoegd aan de gegenereerde bundel voor het scherm, waardoor de module herkend wordt.
+
+Het resterende probleem is nu om react, die als external is gedefinieerd voor het scherm, op te laten pikken.
+
+			perspectives-integrated-client				inplace-screens
+externals:	react: "react" (fout bij start)				react: "react"				FOUT
+			react: "React" (fout bij start)				react: "React"				WERKT!!!!!		
+			
+
+AD 7
+OPGELOST met export default. App.js pakt nu de default van de module.
+Later kan ik proberen om een object met schermen voor een model te exporteren. Dat vergt een andere aanpak van 'Screen', waarin de modelnaam gebruikt wordt om het object op te halen en een (deel van) de naam om het juiste scherm te nemen.
+			
+6. Bepaal hoe je automatisch zo'n module op de goede plek krijgt.
+			
+OM TE PROBEREN
+Maak een module die React, perspectives-react, etc. importeert en als globale objecten beschikbaar maakt op window.
+Verklaar elk als extern met de op window gepubliceerde naam.			
+			
