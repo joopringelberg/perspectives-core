@@ -29,6 +29,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolNa
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.ModelBasedStringTripleGetters (searchView, propertiesDef)
+import Perspectives.ModelBasedTripleGetters (effectiveRolType)
 import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition) as OGC
 import Perspectives.PerspectivesTypes (ContextDef(..))
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
@@ -131,8 +132,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetProperty -> getProperty subject predicate setter corrId
     Api.GetViewProperties -> -- subject is the roltype.
       if (predicate == "allProperties")
-        then subscribeToObjects subject propertiesDef setter corrId
-        else subscribeToObjects subject (searchView predicate >-> propertyReferenties >-> genericRolBindingDef) setter corrId
+        then subscribeToObjects subject (effectiveRolType >-> propertiesDef) setter corrId
+        else subscribeToObjects subject (effectiveRolType >-> searchView predicate >-> propertyReferenties >-> genericRolBindingDef) setter corrId
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do

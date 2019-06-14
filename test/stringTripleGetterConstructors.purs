@@ -14,7 +14,7 @@ t :: String -> String
 t s = "model:TestOGC$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "StringTripleGetterConstructors" do
+theSuite = suiteSkip "StringTripleGetterConstructors" do
   -- test "Setting up" do
   --   loadTestModel "perspectives.crl"
   test "propertyReferenties" do
@@ -37,7 +37,7 @@ theSuite = suite "StringTripleGetterConstructors" do
       (((p "PerspectivesSysteem$gebruiker$VolledigeNaam") ##= (searchLocallyAndInPrototypeHierarchy (getUnqualifiedContextRol "propertyReferentie"))) >>= (pure <<< length))
       2
 
-  testOnly "getUnqualifiedRolDefinition" do
+  test "getUnqualifiedRolDefinition" do
     assertEqual "model:Perspectives$PerspectivesSysteem has a rol 'modelsInUse'"
       ((p "PerspectivesSysteem") ##= getUnqualifiedRolDefinition "modelsInUse")
       [p "PerspectivesSysteem$modelsInUse"]

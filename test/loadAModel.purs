@@ -17,7 +17,7 @@ import Test.Perspectives.Utils (assertEqual, runP, p)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Loading the model:" do
+theSuite = suite "Loading the model:" do
   test "loadCRLFile" do
     void $ runP $ loadCRLFile withoutSemanticChecks "perspectives.crl"
     -- void $ runP $ loadCRLFile withSemanticChecks "query.crl"

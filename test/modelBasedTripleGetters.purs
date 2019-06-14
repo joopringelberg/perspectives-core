@@ -8,7 +8,7 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, expressionType, getFunctionResultType, hasRolType, hasContextType, isContextTypeOf, isOrHasAspect, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, effectiveRolType, expressionType, getFunctionResultType, hasContextType, hasRolType, isContextTypeOf, isOrHasAspect, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (contains, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
@@ -243,6 +243,11 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "psp:PerspectivesSysteem$gebruiker$VolledigeNaam has two roles $propertyReferentie"
       (((RolDef $ p "PerspectivesSysteem$gebruiker$VolledigeNaam") ##= propertyReferenties) >>= (pure <<< length))
       2
+
+  test "effectiveRolType" do
+    assertEqual "psp:PerspectivesSysteem$modellen should have as effective roltype the type of psp:Model_buitenRol"
+      ((p "PerspectivesSysteem$modellen") ##= effectiveRolType)
+      ["model:Perspectives$ContextPrototype$buitenRolBeschrijving"]
 
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "testBotActie.crl"

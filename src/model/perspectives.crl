@@ -559,7 +559,7 @@ psp:Systeem psp:PerspectivesSysteem
 	psp:Context$rolInContext =>
 		q:ComputedRolGetter $modellen
 			extern $functionName = "modellenM"
-			psp:Function$result => psp:Context
+			psp:Function$result => psp:Model
 	psp:Context$rolInContext =>
 		psp:Rol $indexedContexts
 			extern $isFunctioneel = false
@@ -567,6 +567,6 @@ psp:Systeem psp:PerspectivesSysteem
 	psp:Context$rolInContext =>
 		psp:Rol $modelsInUse
 			extern $isFunctioneel = false
-			$mogelijkeBinding => psp:ElkType
+			$mogelijkeBinding => psp:Model
 
 
