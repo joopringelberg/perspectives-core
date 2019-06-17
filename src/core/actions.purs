@@ -25,6 +25,7 @@ import Perspectives.ModelBasedTripleGetters (botActiesInContext)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
+import Perspectives.PerspectivesState (rolDefinitionsRemove)
 import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool, PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryEffect (PerspectivesEffect, (~>))
@@ -237,9 +238,13 @@ setupBotActionsAfterRolAction g mn mid rid = do
   setupBotActions cid
   pure r
 
-removeRol' :: RolName -> RolID -> ObjectsGetter
-removeRol' =
-  updatePerspectEntiteitMember
+-- Implementation note. The complex setup is caused by a design that fits most
+-- mutations, but not the removal of a role. We need to eject it from the cache.
+-- However, we cannot do that inside updatePerspectEntiteitMember unless we detect
+-- the special case we're removing a role. 
+removeRol' :: RolName -> RolID -> ID -> MonadPerspectives (Array ID)
+removeRol' rolName' rolId' cid' =
+  (updatePerspectEntiteitMember
     removeContext_rolInContext
     (\rolName rolId cid ->
       Delta
@@ -248,7 +253,7 @@ removeRol' =
         , deltaType: Remove
         , value: (Just rolId)
         , isContext: true
-        })
+        }) rolName' rolId' cid') <* (rolDefinitionsRemove rolId')
 
 removeRol :: RolName -> RolID -> ObjectsGetter
 removeRol = setupBotActionsAfter removeRol'

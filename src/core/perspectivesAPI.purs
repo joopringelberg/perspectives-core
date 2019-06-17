@@ -17,7 +17,7 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (addRol, setBinding, setProperty, setupBotActions)
+import Perspectives.Actions (addRol, removeBinding, removeRol, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
@@ -147,6 +147,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.DeleteContext -> do
       removeUserContext subject
       sendResponse (Result corrId []) setter
+    Api.RemoveRol -> do
+        void $ removeRol predicate object subject
+        sendResponse (Result corrId []) setter
     Api.CreateRol -> do
       rol <- constructAnotherRol predicate subject (unsafePartial $ fromJust rolDescription)
       case rol of
@@ -173,6 +176,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (\e -> sendResponse (Error corrId (show e)) setter)
     Api.SetBinding -> catchError
       ((setBinding subject object) *> (sendResponse (Result corrId ["ok"]) setter))
+      (\e -> sendResponse (Error corrId (show e)) setter)
+    Api.RemoveBinding -> catchError
+      ((removeBinding subject) *> (sendResponse (Result corrId ["ok"]) setter))
       (\e -> sendResponse (Error corrId (show e)) setter)
     Api.BindInNewRol -> catchError
       (do
