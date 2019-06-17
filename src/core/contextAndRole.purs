@@ -1,15 +1,19 @@
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, delete, elemIndex)
+import Data.Array (cons, delete, elemIndex, insert, snoc) as Arr
+import Data.Array (last)
+import Data.Int (floor, fromString, toNumber)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Ord (Ordering, compare)
+import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, insert, lookup, pop)
+import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, propertyValue)
-import Prelude (identity, ($))
+import Prelude (identity, ($), (/), (<>), show, (+))
 
 -- CONTEXT
 
@@ -63,8 +67,8 @@ addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
   case lookup rolName rolInContext of
     Nothing -> PerspectContext cr {rolInContext = insert rolName [rolID] rolInContext}
     (Just roles) -> do
-      case elemIndex rolID roles of
-        Nothing -> PerspectContext cr {rolInContext = insert rolName (cons rolID roles) rolInContext}
+      case Arr.elemIndex rolID roles of
+        Nothing -> PerspectContext cr {rolInContext = insert rolName (Arr.snoc roles rolID) rolInContext}
         otherwise -> ct
 
 removeContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
@@ -72,9 +76,9 @@ removeContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID 
   case lookup rolName rolInContext of
     Nothing -> ct
     (Just (roles :: Array RolID)) -> do
-      case elemIndex rolID roles of
+      case Arr.elemIndex rolID roles of
         Nothing -> ct
-        otherwise -> PerspectContext cr {rolInContext = insert rolName (delete rolID roles) rolInContext}
+        otherwise -> PerspectContext cr {rolInContext = insert rolName (Arr.delete rolID roles) rolInContext}
 
 setContext_rolInContext :: PerspectContext -> RolName -> RolID -> PerspectContext
 setContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
@@ -172,10 +176,10 @@ addRol_property rl@(PerspectRol rp@{properties}) propertyName value =
       (PropertyValueWithComments {value: [value], commentBefore: [], commentAfter: [] })
       properties}
     (Just (PropertyValueWithComments pvc@{value: values})) -> do
-      case elemIndex value values of
+      case Arr.elemIndex value values of
         Nothing -> PerspectRol rp {properties = insert
           propertyName
-          (PropertyValueWithComments pvc {value = (cons value values)})
+          (PropertyValueWithComments pvc {value = (Arr.cons value values)})
           properties}
         otherwise -> rl
 
@@ -184,11 +188,11 @@ removeRol_property rl@(PerspectRol rp@{properties}) propertyName value =
   case lookup propertyName properties of
     Nothing -> rl
     (Just (PropertyValueWithComments pvc@{value: values})) -> do
-      case elemIndex value values of
+      case Arr.elemIndex value values of
         Nothing -> rl
         otherwise -> PerspectRol rp {properties = insert
           propertyName
-          (PropertyValueWithComments pvc {value = (delete value values)})
+          (PropertyValueWithComments pvc {value = (Arr.delete value values)})
           properties}
 
 setRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
@@ -215,8 +219,8 @@ addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
   case lookup rolName gevuldeRollen of
     Nothing -> PerspectRol cr {gevuldeRollen = insert rolName [rolID] gevuldeRollen}
     (Just roles) -> do
-      case elemIndex rolID roles of
-        Nothing -> PerspectRol cr {gevuldeRollen = insert rolName (cons rolID roles) gevuldeRollen}
+      case Arr.elemIndex rolID roles of
+        Nothing -> PerspectRol cr {gevuldeRollen = insert rolName (Arr.snoc roles rolID) gevuldeRollen}
         otherwise -> ct
 
 removeRol_gevuldeRollen :: PerspectRol -> RolName -> RolID -> PerspectRol
@@ -224,12 +228,31 @@ removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
   case lookup rolName gevuldeRollen of
     Nothing -> ct
     (Just (roles :: Array RolID)) -> do
-      case elemIndex rolID roles of
+      case Arr.elemIndex rolID roles of
         Nothing -> ct
-        otherwise -> PerspectRol cr {gevuldeRollen = insert rolName (delete rolID roles) gevuldeRollen}
+        otherwise -> PerspectRol cr {gevuldeRollen = insert rolName (Arr.delete rolID roles) gevuldeRollen}
 
 rol_comments :: PerspectRol -> Comments
 rol_comments (PerspectRol{comments}) = comments
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)
+
+-- Returns a string representation of the integer, left padded with zero's.
+rol_padOccurrence :: Int -> String
+rol_padOccurrence n =  case floor( log( toNumber n) / ln10 ) of
+  0 -> "000" <> show n -- 1 position
+  1 -> "00" <> show n
+  2 -> "0" <> show n
+  _ -> show n
+
+-- Assume the Array is sorted alphabetically. Role index numbers follow the (last) underscore ("_") and are left padded with zeroes.
+getNextRolIndex :: Array RolID -> Int
+getNextRolIndex rolIds = case last rolIds of
+  Nothing -> 0
+  (Just id) -> case lastIndexOf (Pattern "_") id of
+    Nothing -> 0
+    (Just n) -> let {after} = splitAt (n + 1) id in
+      case fromString after of
+        Nothing -> 0
+        (Just x) -> x + 1

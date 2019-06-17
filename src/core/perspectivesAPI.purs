@@ -36,7 +36,7 @@ import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqua
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.ResourceRetrieval (saveEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##))
-import Perspectives.SaveUserData (removeUserContext, saveUserContext)
+import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties, searchUnqualifiedRolDefinition)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
@@ -148,7 +148,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       removeUserContext subject
       sendResponse (Result corrId []) setter
     Api.RemoveRol -> do
-        void $ removeRol predicate object subject
+        removeUserRol object
+        -- void $ removeRol predicate object subject
         sendResponse (Result corrId []) setter
     Api.CreateRol -> do
       rol <- constructAnotherRol predicate subject (unsafePartial $ fromJust rolDescription)

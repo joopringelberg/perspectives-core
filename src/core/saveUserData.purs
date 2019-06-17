@@ -5,7 +5,7 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (for_)
 import Effect.Class (liftEffect)
-import Perspectives.Actions (tearDownBotActions, updatePerspectEntiteit', updatePerspectEntiteitMember')
+import Perspectives.Actions (removeRol, tearDownBotActions, updatePerspectEntiteit', updatePerspectEntiteitMember')
 import Perspectives.ContextAndRole (context_id, removeRol_binding, removeRol_gevuldeRollen, rol_id)
 import Perspectives.CoreTypes (MP, MonadPerspectives, TripleRef(..))
 import Perspectives.DataTypeObjectGetters (iedereRolInContext)
@@ -44,8 +44,8 @@ removeUserContext id = do
   tearDownBotActions id
   (_ :: PerspectContext) <- getPerspectEntiteit id
   rollen <- iedereRolInContext id
-  for_ rollen \(rol :: String) -> removeUserRol rol
-  removeUserRol (ID.buitenRol id)
+  for_ rollen \(rol :: String) -> removeUserRol_ rol
+  void $ removeUserRol_ (ID.buitenRol id)
   (_ :: PerspectRol) <- removeEntiteit (ID.binnenRol id)
   (_ :: PerspectContext) <- removeEntiteit id
   -- For this subject, for all predicates, unregister the BasicTriples and enter them
@@ -56,27 +56,34 @@ removeUserContext id = do
 -- Removes the rol from the cache and from the database.
 -- Removes the rol from the inverse administration of its binding.
 -- Removes the rol as binding from all its binders.
-removeUserRol :: String -> MonadPerspectives Unit
-removeUserRol pr = do
-  (PerspectRol{context, gevuldeRollen, binding, pspType}) <- removeEntiteit pr :: MonadPerspectives PerspectRol
+removeUserRol_ :: String -> MonadPerspectives PerspectRol
+removeUserRol_ pr = do
+  -- Remove from couchdb, remove from the cache.
+  rl@(PerspectRol{context, gevuldeRollen, binding, pspType}) <- removeEntiteit pr :: MonadPerspectives PerspectRol
+  -- Remove the rol from the inverse administration of its binding.
   case binding of
     Nothing -> pure unit
     (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob pspType pr
+  -- Now handle all Roles that have this Role as binding.
+  -- For all Role types,
   forWithIndex_ gevuldeRollen \rol filledRollen ->
+    -- for each filledRol instance:
     for_ filledRollen \filledRol -> do
-      -- wat is het triple dat de binding van filledRol representeert?
-      -- de ref is natuurlijk TripleRef({subject: filledRol, predicate "model:Perspectives$binding"})
+      -- Remove the basic triple with the filledRol as subject and the binding from the Triple Administration.
+      -- "model:Perspectives$binding" is used to track bindings in the Triple Administration.
       mt <- liftEffect $ unRegisterBasicTriple $ TripleRef{subject: filledRol, predicate: "model:Perspectives$binding"}
       maybe (pure unit) (addTripleToQueue <<< tripleToTripleQueueElement) mt
+      -- Then remove the binding from the filledRol.
       updatePerspectEntiteit'
         ((\_ (r :: PerspectRol) -> removeRol_binding r) )
         filledRol
         ""
-  -- Remove the triple that holds the Rol as object. NOTE: when called from
-  -- removeUserContext, this is no longer needed.
-  -- Remove all triples that hold the Rol as subject.
-  -- Add all these triples to the queue.
-  t <- liftEffect $ unRegisterBasicTriple (TripleRef{subject: context, predicate: pspType})
-  maybe (pure unit) (addTripleToQueue <<< tripleToTripleQueueElement) t
+  -- Remove the triple that holds the Role as subject. Add all triples to the queue for propagation.
   void $ liftEffect $ unRegisterSubject pr >>=
         map tripleRefToTripleQueueElement >>> addToQueue >>> pure
+  pure rl
+
+removeUserRol :: String -> MonadPerspectives Unit
+removeUserRol pr = do
+  (PerspectRol{pspType, context}) <- removeUserRol_ pr
+  void $ removeRol pspType pr context

@@ -25,7 +25,6 @@ import Perspectives.ModelBasedTripleGetters (botActiesInContext)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
-import Perspectives.PerspectivesState (rolDefinitionsRemove)
 import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool, PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
 import Perspectives.QueryCompiler (constructQueryFunction)
 import Perspectives.QueryEffect (PerspectivesEffect, (~>))
@@ -33,7 +32,7 @@ import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.ResourceRetrieval (saveVersionedEntiteit)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter)
-import Perspectives.Syntax (PerspectRol(..))
+import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
@@ -199,12 +198,18 @@ updatePerspectEntiteitMember changeEntityMember createDelta memberName value cid
 updatePerspectEntiteitMember' :: forall a. PerspectEntiteit a =>
   (a -> MemberName -> Value -> a) ->
   ID -> MemberName -> Value -> MonadPerspectives Unit
-updatePerspectEntiteitMember' changeEntityMember pid memberName value = do
-  (pe :: a) <- getPerspectEntiteit pid
-  -- Change the entity in cache:
-  (changedEntity :: a) <- cacheCachedEntiteit pid (changeEntityMember pe memberName value)
-  -- And save it to Couchdb.
-  void $ saveVersionedEntiteit pid changedEntity
+updatePerspectEntiteitMember' changeEntityMember mid memberName value = do
+  (pe :: a) <- getPerspectEntiteit mid
+  if (isUserEntiteitID mid)
+    then do
+      -- Change the entity in cache:
+      (changedEntity :: a) <- cacheCachedEntiteit mid (changeEntityMember pe memberName value)
+      -- And save it to Couchdb.
+      void $ saveVersionedEntiteit mid changedEntity
+    else do
+      let dfId = (unsafePartial (fromJust (deconstructModelName mid)))
+      addDomeinFileToTransactie dfId
+      cacheInDomeinFile dfId (changeEntityMember pe memberName value)
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
@@ -238,13 +243,9 @@ setupBotActionsAfterRolAction g mn mid rid = do
   setupBotActions cid
   pure r
 
--- Implementation note. The complex setup is caused by a design that fits most
--- mutations, but not the removal of a role. We need to eject it from the cache.
--- However, we cannot do that inside updatePerspectEntiteitMember unless we detect
--- the special case we're removing a role. 
-removeRol' :: RolName -> RolID -> ID -> MonadPerspectives (Array ID)
-removeRol' rolName' rolId' cid' =
-  (updatePerspectEntiteitMember
+removeRol' :: RolName -> RolID -> ObjectsGetter
+removeRol' =
+  updatePerspectEntiteitMember
     removeContext_rolInContext
     (\rolName rolId cid ->
       Delta
@@ -253,7 +254,7 @@ removeRol' rolName' rolId' cid' =
         , deltaType: Remove
         , value: (Just rolId)
         , isContext: true
-        }) rolName' rolId' cid') <* (rolDefinitionsRemove rolId')
+        })
 
 removeRol :: RolName -> RolID -> ObjectsGetter
 removeRol = setupBotActionsAfter removeRol'

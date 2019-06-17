@@ -148,10 +148,7 @@ unRegisterSubject subject = do
     (Just (p :: PredicateIndex)) -> do
       void $ delete tripleIndex subject
       -- For all predicates, return all triples.
-      -- TODO. triples is geen array! Dus we moeten hier van een GlStrMap naar een array
       pure $ values (unsafeCoerce p)
-      -- foldMap (\pred triples -> triples) (unsafeCoerce p)
-
 
 -- | Make sure an entry for the given resource identifier is in the tripleIndex. Return the PredicateIndex for the
 -- | resource.

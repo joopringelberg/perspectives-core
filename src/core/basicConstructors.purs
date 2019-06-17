@@ -12,13 +12,13 @@ import Effect.Aff (error, throwError)
 import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Perspectives.Actions (addRol, removeRol)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
-import Perspectives.PerspectivesTypes (Context(..), RolDef(..))
+import Perspectives.PerspectivesTypes (RolDef(..), typeWithPerspectivesTypes)
 import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkAContext)
@@ -130,14 +130,15 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
 
 constructRol :: RolName -> ContextID -> RolID -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RolID
 constructRol rolType contextId rolId i (RolSerialization {properties, binding: bnd}) = do
-  rolInstanceId <- pure (expandDefaultNamespaces rolId <> (show i))
+  rolInstanceId <- pure (expandDefaultNamespaces rolId <> "_" <> (rol_padOccurrence i))
   lift$ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
-      , pspType = rolType -- TODO: dit is verkeerd: hier wordt de context id gebruikt
+      , pspType = rolType
       , context = contextId
       , binding = maybe Nothing (Just <<< expandDefaultNamespaces) bnd
       , properties = constructProperties properties
+      , occurrence = i
       })
   pure rolInstanceId
 
@@ -148,7 +149,7 @@ constructAnotherRol :: RolName -> ContextID -> RolSerialization -> MonadPerspect
 constructAnotherRol rolType id rolSerialisation = do
   ident <- pure $ expandDefaultNamespaces id
   rolInstances <- getRolInContext (RolDef rolType) ident
-  candidate <- runExceptT $ constructRol rolType ident (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (length rolInstances) rolSerialisation
+  candidate <- runExceptT $ constructRol rolType ident (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (typeWithPerspectivesTypes getNextRolIndex rolInstances) rolSerialisation
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do

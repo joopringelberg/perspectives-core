@@ -1,19 +1,18 @@
 module Perspectives.QueryFunctionDescriptionCompiler where
 
-import Effect.Exception (error)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (find, head, singleton)
 import Data.Either (Either(..), either, fromLeft, fromRight, isLeft)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Foreign.Object (fromFoldable)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..), snd)
+import Effect.Exception (error)
+import Foreign.Object (fromFoldable)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, rol_padOccurrence)
 import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserMessage(..), getQueryStepDomain, getQueryVariableType, putQueryStepDomain, putQueryVariableType, withQueryCompilerEnvironment, (##>), (##>>), (##=))
 import Perspectives.DataTypeObjectGetters (context, contextType) as DTG
-
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace, q, psp)
 import Perspectives.ModelBasedObjectGetters (ownRollenDef)
@@ -336,7 +335,7 @@ createRolGetterDescription contextId functionName rolName = do
 createRol :: RolName -> ContextID -> ID -> Int -> MonadPerspectivesQueryCompiler ID
 createRol rolName contextId bindingValue i = do
   rolLn <- guardWellFormedNess deconstructLocalNameFromDomeinURI rolName
-  rolInstanceName <- pure (contextId <> "$" <> rolLn <> (show i)) -- qualified name of rol instance
+  rolInstanceName <- pure (contextId <> "$" <> rolLn <> (rol_padOccurrence i)) -- qualified name of rol instance
   lift $ cacheEntiteitPreservingVersion rolInstanceName
     (PerspectRol defaultRolRecord
       { _id = rolInstanceName

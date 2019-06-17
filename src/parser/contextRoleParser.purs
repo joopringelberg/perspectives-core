@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (AVar, put, take)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_pspType)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_padOccurrence, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, (##>), MP)
 import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -362,7 +362,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
 
       -- Naming
       nrOfRoleOccurrences <- getRoleOccurrences (show rname) -- The position in the sequence.
-      rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (show (roleIndex occurrence nrOfRoleOccurrences)))
+      rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
       cacheRol rolId
@@ -431,7 +431,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
   ident <- (sameLine *> relativeRolInstanceID <|> rolReference)
   occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
   cmt <- inLineComment
-  pure $ Tuple cmt (Just (ident <> "_" <> (maybe "1" show occurrence)))
+  pure $ Tuple cmt (Just (ident <> "_" <> (rol_padOccurrence (maybe 1 identity occurrence))))
   where
     rolReference :: IP RolName
     rolReference = do
@@ -603,7 +603,7 @@ definition = do
   _ <- incrementRoleInstances (show prop)
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
-  rolId <- pure $ enclContext <> "$" <> localName <> maybe "0" show nrOfRoleOccurrences
+  rolId <- pure $ enclContext <> "$" <> localName <> "_" <> rol_padOccurrence (maybe 0 identity nrOfRoleOccurrences)
   cacheRol rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
