@@ -23,7 +23,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suite "ModelBasedObjectGetters" do
+theSuite = suiteSkip "ModelBasedObjectGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rolIsVerplicht" do
@@ -165,7 +165,7 @@ theSuite = suite "ModelBasedObjectGetters" do
       ((p "Systeem") `isContextTypeOf` (p "Property"))
       [PBool "false"]
 
-  testOnly "hasContextType" do
+  test "hasContextType" do
     assertEqual "psp:Context is a (context) type of psp:Systeem"
       (p "Systeem" `hasContextType` (p "Context"))
       [PBool "true"]

@@ -8,9 +8,9 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, effectiveRolType, expressionType, getFunctionResultType, hasContextType, hasRolType, isContextTypeOf, isOrHasAspect, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, effectiveRolType, equalsOrIsAspectOf, expressionType, getFunctionResultType, hasContextType, hasRolType, isAspectOf, isContextTypeOf, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
-import Perspectives.QueryCombinators (contains, ignoreCache)
+import Perspectives.QueryCombinators (containedIn, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
 import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
@@ -107,19 +107,19 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "t:myContextDef does not agree with type psp:Niets"
       (t "myContextDef" ##= agreesWithType (p "Niets"))
       [PBool "false"]
-  test "isOrHasAspect" do
+  test "equalsOrIsAspectOf" do
     assertEqual "t:myContextDef is or has aspect psp:Context"
-      (t "myContextDef" ##= isOrHasAspect (p "Context"))
-      -- isOrHasAspect (t "myContextDef") (p "Context")
+      (t "myContextDef" ##= equalsOrIsAspectOf (p "Context"))
+      -- equalsOrIsAspectOf (t "myContextDef") (p "Context")
       [PBool "true"]
     assertEqual "t:myContextDef is or has aspect t:myAspect"
-      (t "myContextDef" ##= isOrHasAspect (t "myAspect"))
+      (t "myContextDef" ##= equalsOrIsAspectOf (t "myAspect"))
       [PBool "true"]
     assertEqual "t:myContextDef is or has aspect t:myUrAspect"
-      (t "myContextDef" ##= isOrHasAspect (t "myUrAspect"))
+      (t "myContextDef" ##= equalsOrIsAspectOf (t "myUrAspect"))
       [PBool "true"]
     assertEqual "t:myContextDef is not nor has aspect psp:Property"
-      (t "myContextDef" ##= isOrHasAspect (p "Property"))
+      (t "myContextDef" ##= equalsOrIsAspectOf (p "Property"))
       [PBool "false"]
 
   test "hasContextType" do
@@ -146,8 +146,8 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "ActieAspect `isContextTypeOf` RaadpleegtClusterGenoot is false"
       (p "TrustedCluster$RaadpleegtClusterGenoot" ##= (isContextTypeOf (p "ActieAspect")))
       [PBool "false"]
-    assertEqual "RaadpleegtClusterGenoot `isOrHasAspect` ActieAspect is true"
-      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (isOrHasAspect (p "ActieAspect")))
+    assertEqual "RaadpleegtClusterGenoot `equalsOrIsAspectOf` ActieAspect is true"
+      ((p "TrustedCluster$RaadpleegtClusterGenoot") ##= (equalsOrIsAspectOf (p "ActieAspect")))
       [PBool "true"]
     assertEqual "psp:Context is a type of psp:PerspectivesSysteem"
       (p "PerspectivesSysteem" ##= isContextTypeOf (p "Context"))
@@ -163,11 +163,20 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "isRolTypeOf" do
     r <- runP (t "myContextPrototype" ##>> searchUnqualifiedRol "rol1")
     assertEqual "$rol1 of t:myContextPrototype has type t:myContextDef$rol1"
-      ((t "myContextDef$rol1") ##= (hasRolType r))
+      (unwrap r ##= (isRolTypeOf $ (t "myContextDef$rol1")))
       [PBool "true"]
     assertEqual "$rol1 of t:myContextPrototype has type t:myAspect$myAspectRol1"
-      ((t "myAspect$myAspectRol1") ##= (hasRolType r))
+      (unwrap r ##= (isRolTypeOf (t "myAspect$myAspectRol1")))
       [PBool "true"]
+  test "hasRolType" do
+    r <- runP (t "myContextPrototype" ##>> searchUnqualifiedRol "rol1")
+    assertEqual "$rol1 of t:myContextPrototype has type t:myContextDef$rol1"
+      ((t "myContextDef$rol1") ##= (hasRolType $ unwrap r))
+      [PBool "true"]
+    assertEqual "$rol1 of t:myContextPrototype has type t:myAspect$myAspectRol1"
+      ((t "myAspect$myAspectRol1") ##= (hasRolType $ unwrap r))
+      [PBool "true"]
+
   test "collectUnqualifiedPropertyDefinitions" do
     assertEqual "t:myContextDef9$rol1 does not by itself a property defined."
       ((RolDef $ t "myContextDef9$rol1") ##= searchUnqualifiedPropertyDefinition "rol1Property")
@@ -252,6 +261,56 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       ((p "PerspectivesSysteem$modelsInUse") ##= effectiveRolType)
       ["model:Perspectives$PerspectivesSysteem$modelsInUse"]
 
+  test "isAspectOf" do
+    assertEqual "psp:Context is an aspect of psp:Context"
+      ((p "Context") ##= isAspectOf (p "Context"))
+      [PBool "false"]
+    assertEqual "psp:Context is an aspect of psp:Systeem"
+      ((p "Systeem") ##= isAspectOf (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Property is not an aspect of psp:Systeem"
+      ((p "Systeem") ##= isAspectOf (p "Property"))
+      [PBool "false"]
+
+  test "equalsOrIsAspectOf" do
+    assertEqual "psp:Context is an aspect of psp:Context"
+      (p "Context" ##= equalsOrIsAspectOf (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Context is an aspect of psp:Systeem"
+      ((p "Systeem") ##= equalsOrIsAspectOf (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Property is not an aspect of psp:Systeem"
+      ((p "Systeem") ##= equalsOrIsAspectOf (p "Property"))
+      [PBool "false"]
+
+  test "isContextTypeOf" do
+    assertEqual "psp:Context is a (context) type of psp:Systeem"
+      ((p "Systeem") ##= isContextTypeOf (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Systeem is not a (context) type of psp:Context"
+      ((p "Systeem") ##= isContextTypeOf (p "PerspectivesSysteem"))
+      [PBool "false"]
+    assertEqual "psp:Context is a (context) type of psp:PerspectivesSysteem"
+      ((p "PerspectivesSysteem") ##= isContextTypeOf (p "Systeem"))
+      [PBool "true"]
+    assertEqual "psp:Property is not a (context) type of psp:Systeem"
+      ((p "Property") ##= isContextTypeOf (p "Systeem"))
+      [PBool "false"]
+
+  test "hasContextType" do
+    assertEqual "psp:Context is a (context) type of psp:Systeem"
+      (p "Context" ##= hasContextType (p "Systeem"))
+      [PBool "true"]
+    assertEqual "psp:Systeem is not a (context) type of psp:Context"
+      (p "PerspectivesSysteem" ##= hasContextType (p "Systeem"))
+      [PBool "false"]
+    assertEqual "psp:Context is a (context) type of psp:PerspectivesSysteem"
+      ((p "Systeem") ##= hasContextType (p "PerspectivesSysteem"))
+      [PBool "true"]
+    assertEqual "psp:Property is not a (context) type of psp:Systeem"
+      ((p "Systeem") ##= hasContextType (p "Property"))
+      [PBool "false"]
+
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "testBotActie.crl"
   ---------------------------------------------------------------------------------
@@ -276,7 +335,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       do
         allowedBinding <- pure (p "PerspectivesSysteem$gebruiker")
         boundValue <- ((tba "Test") ##>> getRolInContext (RolDef $ p "Context$gebruikerRol") >-> binding)
-        (allowedBinding ##= hasRolType boundValue)
+        (allowedBinding ##= hasRolType (unwrap boundValue))
       [PBool "true"]
     assertEqual "PerspectivesSysteem$gebruiker `hasContextTypeOnEachRolTelescopeOf` usr:MijnSysteem$gebruiker(1)"
       do
@@ -298,4 +357,4 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
 -- part of the definition of nonQueryRollen, we need it here to test it seperately.
 -- returns true iff the inclusive closure of aspectRol of the RolDef contains psp:Rol.
 isNotAQuery :: forall e. (RolDef **> PBool)
-isNotAQuery = contains (RolDef "model:Perspectives$Rol") (unwrap `before` (closure_ directAspects) `followedBy` RolDef)
+isNotAQuery = containedIn (RolDef "model:Perspectives$Rol") (unwrap `before` (closure_ directAspects) `followedBy` RolDef)
