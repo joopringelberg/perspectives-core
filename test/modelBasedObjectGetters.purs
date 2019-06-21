@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (~~>))
 import Perspectives.DataTypeObjectGetters (buitenRol)
-import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, propertyIsFunctioneel, propertyIsVerplicht, rolDef, rolIsVerplicht)
+import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, equalsOrIsAspectOf, hasAspect, hasContextType, isAspectOf, isContextTypeOf, isOrHasAspect, propertyIsFunctioneel, propertyIsVerplicht, rolDef, rolIsVerplicht)
 import Perspectives.ObjectGetterConstructors (directAspectProperties, getRoleBinders)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (BuitenRol, ContextRol(..), PBool(..), PropertyDef(..), RolDef(..))
@@ -23,7 +23,7 @@ tba :: String -> String
 tba s = "model:TestBotActie$" <> s
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "ModelBasedObjectGetters" do
+theSuite = suite "ModelBasedObjectGetters" do
   test "Setting up" do
     loadTestModel "TestOGC.crl"
   test "rolIsVerplicht" do
@@ -109,6 +109,75 @@ theSuite = suiteSkip "ModelBasedObjectGetters" do
     assertEqual "psp:Sum has a buitenRolBeschrijving through its prototype."
       (buitenRolBeschrijvingDef (p "Sum"))
       [RolDef (p "ContextPrototype$buitenRolBeschrijving")]
+
+  test "isAspectOf" do
+    assertEqual "psp:Context is an aspect of psp:Context"
+      (p "Context" `isAspectOf` (p "Context"))
+      [PBool "false"]
+    assertEqual "psp:Context is an aspect of psp:Systeem"
+      (p "Context" `isAspectOf` (p "Systeem"))
+      [PBool "true"]
+    assertEqual "psp:Property is not an aspect of psp:Systeem"
+      (p "Property" `isAspectOf` (p "Systeem"))
+      [PBool "false"]
+
+  test "hasAspect" do
+    assertEqual "psp:Context is an aspect of psp:Systeem"
+      ((p "Systeem") `hasAspect` (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Property is not an aspect of psp:Systeem"
+      ((p "Systeem") `hasAspect` (p "Property"))
+      [PBool "false"]
+
+  test "equalsOrIsAspectOf" do
+    assertEqual "psp:Context is an aspect of psp:Context"
+      (p "Context" `equalsOrIsAspectOf` (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Context is an aspect of psp:Systeem"
+      (p "Context" `equalsOrIsAspectOf` (p "Systeem"))
+      [PBool "true"]
+    assertEqual "psp:Property is not an aspect of psp:Systeem"
+      (p "Property" `equalsOrIsAspectOf` (p "Systeem"))
+      [PBool "false"]
+
+  test "isOrHasAspect" do
+    assertEqual "psp:Context is an aspect of psp:Context"
+      (p "Context" `isOrHasAspect` (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Context is an aspect of psp:Systeem"
+      ((p "Systeem") `isOrHasAspect` (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Property is not an aspect of psp:Systeem"
+      ((p "Systeem") `isOrHasAspect` (p "Property"))
+      [PBool "false"]
+
+  test "isContextTypeOf" do
+    assertEqual "psp:Context is a (context) type of psp:Systeem"
+      (p "Context" `isContextTypeOf` (p "Systeem"))
+      [PBool "true"]
+    assertEqual "psp:Systeem is not a (context) type of psp:Context"
+      (p "PerspectivesSysteem" `isContextTypeOf` (p "Systeem"))
+      [PBool "false"]
+    assertEqual "psp:Context is a (context) type of psp:PerspectivesSysteem"
+      ((p "Systeem") `isContextTypeOf` (p "PerspectivesSysteem"))
+      [PBool "true"]
+    assertEqual "psp:Property is not a (context) type of psp:Systeem"
+      ((p "Systeem") `isContextTypeOf` (p "Property"))
+      [PBool "false"]
+
+  testOnly "hasContextType" do
+    assertEqual "psp:Context is a (context) type of psp:Systeem"
+      (p "Systeem" `hasContextType` (p "Context"))
+      [PBool "true"]
+    assertEqual "psp:Systeem is not a (context) type of psp:Context"
+      (p "Systeem" `hasContextType` (p "PerspectivesSysteem"))
+      [PBool "false"]
+    assertEqual "psp:Context is a (context) type of psp:PerspectivesSysteem"
+      ((p "PerspectivesSysteem") `hasContextType` (p "Systeem"))
+      [PBool "true"]
+    assertEqual "psp:Property is not a (context) type of psp:Systeem"
+      ((p "Property") `hasContextType` (p "Systeem"))
+      [PBool "false"]
 
   test "Tearing down" do
     unLoadTestModel "model:TestBotActie"

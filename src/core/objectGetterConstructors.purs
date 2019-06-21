@@ -72,10 +72,13 @@ unlessFalse og id = og id >>= \r -> case (elemIndex (PBool "false") r) of
   otherwise -> empty
 
 -- Test.Perspectives.ObjectGetterConstructors
-contains :: forall s o. Eq o => o -> (s ~~> o) -> (s ~~> PBool)
-contains o getter = getter >=> \(os :: Array o) -> case elemIndex o os of
+containedIn :: forall s o. Eq o => o -> (s ~~> o) -> (s ~~> PBool)
+containedIn o getter = getter >=> \(os :: Array o) -> case elemIndex o os of
   Nothing -> pure [PBool "false"]
   otherwise -> pure [PBool "true"]
+
+contains :: forall s o. Eq o => (s ~~> o) -> o -> (s ~~> PBool)
+contains = flip containedIn
 
 -- | A selection of the results of the second query using the first (boolean) query as a criterium.
 -- | `psp:Constraint -> psp:Function -> psp:Function`
@@ -230,6 +233,11 @@ searchInMogelijkeBinding f roldef =
   <|>
   ((mogelijkeBinding >=> pure <<< map RolDef) /-/ searchInMogelijkeBinding f) roldef -- single type
 
+-- | Compares two types.
+-- | If either of them is psp:ElkType, succeeds.
+-- | If either of them is psp:Niets, fails.
+-- | If they are identical, succeeds.
+-- | Otherwise fails.
 agreesWithType :: AnyDefinition -> (AnyDefinition ~~> PBool)
 agreesWithType t = if t == "model:Perspectives$ElkType"
   then const (pure [PBool "true"])
@@ -376,7 +384,7 @@ searchUnqualifiedRolDefinition ln = unwrap >>> searchInAspectsAndPrototypes f
 -----------------------------------------------------------
 -- Test.Perspectives.ObjectGetterConstructors
 hasLocalRolDefinition :: RolDef -> (ContextDef ~~> PBool)
-hasLocalRolDefinition qn = unwrap >>> contains (unwrap qn) (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context)
+hasLocalRolDefinition qn = unwrap >>> containedIn (unwrap qn) (getUnqualifiedContextRol "rolInContext" /-/ binding /-/ context)
 
 -- Test.Perspectives.ObjectGetterConstructors
 hasRolDefinition :: RolDef -> (ContextDef ~~> PBool)

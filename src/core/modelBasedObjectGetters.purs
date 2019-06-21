@@ -7,7 +7,7 @@ import Perspectives.DataTypeObjectGetters (buitenRol, context, contextType, iede
 import Perspectives.ObjectGetterConstructors (agreesWithType, all, alternatives, closure, closureOfAspectProperty, closureOfAspectRol, closure_, concat, cond, conj, directAspectProperties, directAspects, filter, getContextRol, getRolInContext, getRoleBinders, getUnqualifiedRoleBinders, mogelijkeBinding, notEmpty, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectsAndPrototypes, some, unlessFalse, unlessNull)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (AnyContext, AnyDefinition, BuitenRol, ContextDef, ContextRol(..), PBool, PropertyDef, RolDef(..), SimpleValueDef(..), binding, typeWithPerspectivesTypes)
-import Prelude (($), (>=>), (<<<), pure, map, (>>>))
+import Prelude (flip, map, pure, ($), (<<<), (>=>), (>>>))
 
 
 -- | True iff the RolDef or one of its AspectRollen has given property "isVerplicht" the value "true".
@@ -127,26 +127,83 @@ rolDef = unwrap >>> (buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$R
 ownRollenDef :: (AnyContext ~~> RolDef)
 ownRollenDef = (filter (hasContextType "model:Perspectives$Rol") (iedereRolInContext >=> (pure <<< map ContextRol) /-/ binding /-/ context)) >=> pure <<< map RolDef
 
+-- KLOPT
+-- | Inverse of isContextTypeOf
+-- | hasContextType subinstance supertype
+-- | subinstance `hasContextType` supertype
+-- | The type of subinstance should be equal to, or have as aspect, the supertype,
+-- | for this expression to be true.
+-- | In pseudo syntax:
+-- | (contextType subinstance) `isOrHasAspect` supertype
+hasContextType :: AnyContext -> (AnyDefinition ~~> PBool)
+hasContextType = flip isContextTypeOf
 
-isContextTypeOf :: AnyContext -> (AnyDefinition ~~> PBool)
-isContextTypeOf x = some (expressionType /-/ closure_ directAspects /-/ (agreesWithType x) )
+-- KLOPT
+-- | Inverse of hasContextType.
+-- | isContextTypeOf supertype subinstance
+-- | supertype `isContextTypeOf` subinstance
+-- | The type of subinstance should be equal to, or have as aspect, the supertype,
+-- | for this expression to be true.
+-- | In pseudo syntax:
+-- | supertype `equalsOrIsAspectOf` (contextType subinstance)
+-- | E.g.:
+-- | psp:Context psp:Systeem
+-- |	$aspect => psp:Context
+-- | and:
+-- | psp:Systeem psp:PerspectivesSysteem
+-- | then:
+-- | psp:Context `isContextTypeOf` psp:PerspectivesSysteem
+isContextTypeOf :: AnyDefinition -> (AnyContext ~~> PBool)
+isContextTypeOf supertype = expressionType /-/ equalsOrIsAspectOf supertype
 
-hasContextType :: AnyDefinition -> (AnyContext ~~> PBool)
-hasContextType q = contextType /-/ isOrHasAspect q
-
--- | q is the left parameter when used infix: TODO: nee hoor! andersom!!!
--- | q isOrHasAspect p
+-- KLOPT
+-- | Inverse of equalsOrIsAspectOf, compares to hasAspect (but excludes equality).
+-- | isOrHasAspect sub super
+-- | sub `isOrHasAspect` super
+-- | The second parameter (super) must eqaul the first (sub) or one of its aspects,
+-- | for this expression to be true
 isOrHasAspect :: AnyDefinition -> (AnyDefinition ~~> PBool)
-isOrHasAspect q = some (closure_ directAspects /-/ agreesWithType q)
+isOrHasAspect = flip equalsOrIsAspectOf
 
+-- KLOPT
+-- | Inverse of isOrHasAspect, compares to isAspectOf (but excludes equality).
+-- | equalsOrIsAspectOf super sub
+-- | super `equalsOrIsAspectOf` sub
+-- | The first parameter (super) must equal the second (sub) or one of its aspects,
+-- | for this expression to be true
+equalsOrIsAspectOf :: AnyDefinition -> (AnyDefinition ~~> PBool)
+equalsOrIsAspectOf super = some (closure_ directAspects /-/ agreesWithType super)
+
+-- KLOPT
+-- | Inverse of isAspectOf.
+-- | hasAspect sub super
+-- | sub `hasAspect` super
+-- | The second parameter (super) must be an aspect of the first (sub),
+-- | for this expression to be true
 hasAspect :: AnyDefinition -> (AnyDefinition ~~> PBool)
-hasAspect q = some (closure directAspects /-/ agreesWithType q)
+hasAspect = flip isAspectOf
+-- This definition comes close, but it misses psp:Niets and psp:ElkType.
+-- hasAspect = containedIn (closure directAspects)
+
+-- KLOPT
+-- | Inverse of hasAspect.
+-- | isAspectOf super sub
+-- | super `isAspectOf` sub
+-- | The first parameter (super) must equal one of the aspects of the second (sub),
+-- | for this expression to be true.
+isAspectOf :: AnyDefinition -> (AnyDefinition ~~> PBool)
+isAspectOf super = some (closure directAspects /-/ agreesWithType super)
 
 sumToSequence :: (AnyDefinition ~~> AnyDefinition)
 sumToSequence t = unlessNull alternatives t <|> pure [t]
 
 expressionType :: (AnyContext ~~> AnyDefinition)
-expressionType = cond (hasContextType "model:Perspectives$Function") getFunctionResultType contextType
+expressionType = cond (hasContextType' "model:Perspectives$Function") getFunctionResultType contextType
+  where
+    -- We need this slightly less powerful definition of isContextTypeOf built from contextType
+    -- because we cannot use expressionType without creating a cyclic definition.
+    isContextTypeOf' supertype = contextType /-/ equalsOrIsAspectOf supertype
+    hasContextType' = flip isContextTypeOf'
 
 getFunctionResultType :: (AnyContext ~~> AnyDefinition)
 getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$result") /-/ rolBindingDef
