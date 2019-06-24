@@ -1,0 +1,14 @@
+CONTEXTROL EN ROLINCONTEXT IN DE MODELLERING OPNEMEN
+
+1. Defineer de vier roltypes in perspectives.crl.
+2. Definieer $contextRol.
+3. Gebruik de nieuwe rol en de vier types in 
+	- perspectives.crl
+	- query.crl
+	- testBotActie.crl
+	- testOGC.crl
+	- testTypeDefChecker.crl
+4. Implementeer de nabewerking in de parser voor de ContextRol types.
+5. Maak in TypeChecker.checkBinding onderscheid tussen ContextRol, RolInContext en BuitenRol.
+6. Vervang (het binding-toets gedeelte van) TypeDefChecker.compareRolInstanceToDefinition door TypeChecker.checkBinding.
+7. Ga in de tests na welke testcontexten aangepast moeten worden zodat $contextRol en $rolInContext goed gebruikt worden.

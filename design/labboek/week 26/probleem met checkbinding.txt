@@ -1,0 +1,9 @@
+PROBLEEM MET CHECKBINDING
+
+We moeten onderscheid maken naar ContextRollen en RollenInContext. De uiteindelijke reden daarvoor is dat we rollen en contexten apart opslaan en ophalen (met andere functies) in couchdb. De dichter bij gelegen reden is dat we ofwel hasRolTypeOnEachRolTelescopeOf, ofwel hasContextTypeOnEachRolTelescopeOf moeten gebruiken.
+
+VRAAG 1: hoe testen we of een bepaald roltype een ContextRol of een RolInContext definitie is?
+
+Dan volgt een kwestie over contexten en buitenrollen. Als mogelijke binding van een ContextRol geven we een ContextDef op. Maar als we gaan binden, doen we dat met een buitenRol. Dat wringt.
+
+VRAAG 2. 

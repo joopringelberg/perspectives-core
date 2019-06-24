@@ -1,0 +1,38 @@
+ONDERZOEK TYPECHECKER
+
+Functies:
+
+* checkRolForQualifiedProperty
+	- QueryFunctionDescriptionCompiler.compileElementaryQueryStep.ensureRolHasProperty.
+	
+* checkRolForUnQualifiedProperty
+	- QueryFunctionDescriptionCompiler.compileElementaryQueryStep
+	
+* checkContextForUnQualifiedRol
+	- QueryFunctionDescriptionCompiler.compileElementaryQueryStep
+	
+* isOrHasAspect
+	- QueryFunctionDescriptionCompiler.compileElementaryQueryStep
+	- TypeDefChecker (3x)
+
+* contextHasType
+	- QueryFunctionDescriptionCompiler.compileElementaryQueryStep
+
+* rolHasType (wordt niet gebruikt)
+
+* mostSpecificCommonAspect
+	- QueryFunctionDescriptionCompiler.compileCombinatorQueryStep
+
+* checkBinding
+	- PerspectivesApi
+
+Kortom, gebruikt in:
+	* QueryFunctionDescriptionCompiler
+	* TypeDefChecker
+	* PerspectivesApi
+
+Maar de algemene controle van een context die in TypeDefChecker aanwezig is, vinden we niet in TypeChecker. Overigens wordt die dus alleen gebruikt in de TypeDefChecker zelf en (via checkAContext) in BasicConstructors.
+
+ONDERZOEKSVRAGEN:
+1. Welk van bovenstaande functies zijn ook al gedefinieerd in de TypeDefChecker?
+2. Kunnen we isOrHasAspect en contextHasType, die ook zijn gedefineerd als ObjectGetter en TripleGetter, niet vervangen?
