@@ -1,12 +1,13 @@
 module Perspectives.ModelBasedStringTripleGetters where
 
 import Control.Alt ((<|>))
+import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@))
 import Perspectives.DataTypeTripleGetters (genericBinding, genericContext, genericRolBindingDef)
 import Perspectives.EntiteitAndRDFAliases (RolName, PropertyName)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef) as MBOG
-import Perspectives.ModelBasedTripleGetters (hasContextType, hasRolType, isContextTypeOf, isOrHasAspect, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (hasContextType, hasRolType, isContextTypeOf, equalsOrIsAspectOf, sumToSequence)
 import Perspectives.PerspectivesTypes (class RolClass, AnyDefinition, PBool, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (notEmpty, conj, cond) as QC
 import Perspectives.StringTripleGetterConstructors (concat, directAspectRoles, getContextRol, getPrototype, searchGeneralUnqualifiedRolDefinition, searchInAspectRolesAndPrototypes, searchRolInContext)
@@ -33,7 +34,7 @@ hasContextTypeOnEachRolTelescopeOf boundValue = ((hasContextType boundValue) `un
   "hasContextTypeOnEachRolTelescopeOf"
 
 hasRolTypeOnEachRolTelescopeOf :: forall r. RolClass r => r -> (String **> PBool)
-hasRolTypeOnEachRolTelescopeOf boundValue = ((hasRolType boundValue) `unlessFalse`
+hasRolTypeOnEachRolTelescopeOf boundValue = ((hasRolType (unwrap boundValue)) `unlessFalse`
   \_ ->
     (QC.conj
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
@@ -46,9 +47,9 @@ isSubsumedOnEachRolTelescopeOf :: String -> (String **> PBool)
 isSubsumedOnEachRolTelescopeOf allowedBinding = TypedTripleGetter ("isSubsumedOnEachRolTelescopeOf" <> allowedBinding) f
   where
     f :: TripleGetter String PBool
-    f aspect = TGC.unlessFalse (isOrHasAspect allowedBinding) aspect
-      -- this is: aspect ## (isOrHasAspect allowedBinding)
-      -- read as: allowedBinding `isOrHasAspect` aspect
+    f aspect = TGC.unlessFalse (equalsOrIsAspectOf allowedBinding) aspect
+      -- this is: aspect ## (equalsOrIsAspectOf allowedBinding)
+      -- read as: allowedBinding `equalsOrIsAspectOf` aspect
       <|>
       (allowedBinding @@
         (QC.conj

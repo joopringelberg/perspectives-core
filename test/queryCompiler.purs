@@ -26,6 +26,7 @@ theSuite = suiteSkip "QueryCompiler" do
   test "Setting up" do
     loadTestModel "testBotActie.crl"
 
+------ NOTE: THIS TEST SEEMS NOT TO BE WELL CONSTRUCTED.
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "queryCompiler.crl"
   ---------------------------------------------------------------------------------

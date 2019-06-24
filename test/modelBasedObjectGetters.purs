@@ -75,7 +75,7 @@ theSuite = suiteSkip "ModelBasedObjectGetters" do
   test "rolDef" do
     assertEqual ""
       ((unwrap >>> (buitenRol /-/ (getRoleBinders (RolDef "model:Perspectives$Rol$rolProperty")) :: (BuitenRol ~~> ContextRol))) (PropertyDef $ t2 "myContextDef6$rol1$myContextDef6Prop3"))
-      [ContextRol "model:TestTDC$myContextDef6$rol1$rolProperty_3"]
+      [ContextRol "model:TestTDC$myContextDef6$rol1$rolProperty_0003"]
     assertEqual "$myContextDef6Prop3 should have Rol $rol1 as defining Rol."
       (rolDef (PropertyDef $ t2 "myContextDef6$rol1$myContextDef6Prop3"))
       [(RolDef $ t2 "myContextDef6$rol1")]

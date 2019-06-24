@@ -160,7 +160,7 @@ isContextTypeOf supertype = expressionType /-/ equalsOrIsAspectOf supertype
 -- | Inverse of equalsOrIsAspectOf, compares to hasAspect (but excludes equality).
 -- | isOrHasAspect sub super
 -- | sub `isOrHasAspect` super
--- | The second parameter (super) must eqaul the first (sub) or one of its aspects,
+-- | The second parameter (super) must equal the first (sub) or one of its aspects,
 -- | for this expression to be true
 isOrHasAspect :: AnyDefinition -> (AnyDefinition ~~> PBool)
 isOrHasAspect = flip equalsOrIsAspectOf
@@ -197,6 +197,8 @@ isAspectOf super = some (closure directAspects /-/ agreesWithType super)
 sumToSequence :: (AnyDefinition ~~> AnyDefinition)
 sumToSequence t = unlessNull alternatives t <|> pure [t]
 
+-- | Type of the context, but when it is a psp:Function, returns psp:Function$result.
+-- | This holds for e.g. roles defined by q:RolGetter.
 expressionType :: (AnyContext ~~> AnyDefinition)
 expressionType = cond (hasContextType' "model:Perspectives$Function") getFunctionResultType contextType
   where

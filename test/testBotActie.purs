@@ -137,7 +137,7 @@ theSuite = suiteSkip "TestBotActie" do
         pure r
       [Value "noot"]
 
-  testSkip "setupBotActions" do
+  test "setupBotActions" do
     loadTestModel "testbotInstantie.crl"
 
     assertEqualWithPropagation "setupBotActions"
@@ -148,7 +148,7 @@ theSuite = suiteSkip "TestBotActie" do
       [Value "aap"]
       1000.0
 
-  testSkip "tearDownBotActions" do
+  test "tearDownBotActions" do
     loadTestModel "testbotInstantie.crl"
 
     assertEqualWithPropagation "After tearing down, a new value for $v1 will not be copied to $v2"

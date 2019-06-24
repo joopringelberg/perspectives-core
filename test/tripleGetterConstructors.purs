@@ -9,7 +9,7 @@ import Perspectives.DataTypeTripleGetters (binding, buitenRol, context, genericB
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding)
 import Perspectives.ModelBasedTripleGetters (sumToSequence)
 import Perspectives.PerspectivesTypes (BuitenRol(..), ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), Value(..))
-import Perspectives.QueryCombinators (contains, notEmpty)
+import Perspectives.QueryCombinators (containedIn, notEmpty)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.StringTripleGetterConstructors (all, directAspects, getContextRol, searchInAspectsAndPrototypes, searchLocallyAndInPrototypeHierarchy, some)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
@@ -40,14 +40,14 @@ theSuite = suiteSkip "TripleGetterConstructors" do
     assertEqual "The inclusive closure of directAspects of t:myContextDef has four members!"
       ((t "myContextDef") ##= closure_ directAspects )
       [t "myContextDef", t "myAspect", t "myUrAspect", p "Context"]
-  test "contains" do
+  test "containedIn" do
     assertEqual "The directAspects of t:myContextDef include t:myAspect"
-      ((t "myContextDef") ##= contains (t "myAspect") directAspects)
+      ((t "myContextDef") ##= containedIn (t "myAspect") directAspects)
       [PBool "true"]
   test "searchInPrototypeHierarchy" do
     assertEqual "The prototype hierarchy of t:myContext includes t:myUrAspect, which instantiates the role t:myContextDef$rol1"
       ((t "myContext") ##= searchInPrototypeHierarchy (context >-> (getUnqualifiedRolInContext "rol1")))
-      [RolInContext $ t "myContextPrototype$rol1_1"]
+      [RolInContext $ t "myContextPrototype$rol1_0001"]
   test "directAspects" do
     assertEqual "t:myContextDef should have direct aspect t:myAspect"
       ((t "myContextDef") ##= directAspects )
@@ -81,14 +81,14 @@ theSuite = suiteSkip "TripleGetterConstructors" do
   test "getRolInContext" do
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       ((t "myContextDef") ##= getRolInContext (RolDef (p "Context$rolInContext")))
-      [RolInContext $ t "myContextDef$rolInContext_1"]
+      [RolInContext $ t "myContextDef$rolInContext_0001"]
   test "getUnqualifiedRolInContext" do
     assertEqual "t:myContextDef has a single RolInContext: $rol1."
       ((t "myContextDef") ##= getUnqualifiedRolInContext "rolInContext")
-      [RolInContext $ t "myContextDef$rolInContext_1"]
+      [RolInContext $ t "myContextDef$rolInContext_0001"]
     assertEqual "t:myContextPrototype has a binding for $myAspectRol2, which is defined in an Aspect."
       ((t "myContextPrototype") ##= getUnqualifiedRolInContext "myAspectRol2")
-      [RolInContext $ t "myContextPrototype$myAspect$myAspectRol2_1"]
+      [RolInContext $ t "myContextPrototype$myAspect$myAspectRol2_0001"]
   test "searchContextRol" do
     assertEqual "t:myUrAspect has an instance of psp:Context$binnenRolBeschrijving"
       ((t "myUrAspect") ##= searchContextRol (RolDef $ p "Context$binnenRolBeschrijving"))
@@ -96,7 +96,7 @@ theSuite = suiteSkip "TripleGetterConstructors" do
   test "searchUnqualifiedRol" do
     assertEqual "t:myContext has $rol1 through its prototype"
       ((t "myContext") ##= (searchUnqualifiedRol "rol1") )
-      [ContextRol $ t "myContextPrototype$rol1_1"]
+      [ContextRol $ t "myContextPrototype$rol1_0001"]
     assertEqual "t:myContextPrototype has $binnenRolBeschrijving through its prototype"
       ((t "myContextPrototype") ##= (searchUnqualifiedRol "binnenRolBeschrijving") )
       [ContextRol $ p "ContextPrototype$binnenRolBeschrijving_1"]
@@ -171,12 +171,14 @@ theSuite = suiteSkip "TripleGetterConstructors" do
   test "getRoleBinders (From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have it as their binding))" do
     assertEqual "The buitenRol of t:myContextWithExternalPropertyPrototype is bound to two Contexts that have declared it as their prototype"
       ((t "myContextWithExternalPropertyPrototype") ##= (buitenRol >-> getRoleBinders (RolDef $ t "myContextDefWithExternalProperty$buitenRolBeschrijving")) )
-      ([BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol", BuitenRol $ t "myContextWithExternalProperty_buitenRol"])
+      ([BuitenRol $ t "myContextWithExternalProperty_buitenRol"
+      , BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol"])
   test "getUnqualifiedRoleBinders (From the instance of a Rol of any kind, find the instances of the Rol with the given local name that bind it (that have it as their binding). The type of ln can be buitenRolBeschrijving)"
     do
       assertEqual "The buitenRol of t:myContextWithExternalPropertyPrototype is bound to two Contexts that have declared it as their prototype"
         ((t "myContextWithExternalPropertyPrototype") ##= (buitenRol >-> getUnqualifiedRoleBinders "buitenRolBeschrijving"))
-        ([BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol", BuitenRol $ t "myContextWithExternalProperty_buitenRol"])
+        ([BuitenRol $ t "myContextWithExternalProperty_buitenRol"
+        , BuitenRol $ t "myContextWithShadowedExternalProperty_buitenRol"])
   test "getUnqualifiedPropertyDefinition" do
     assertEqual "myAspectRol1 has a local definition for the property myAspectRol1Property."
       ((RolDef $ t "myAspect$myAspectRol1") ##= getUnqualifiedPropertyDefinition "myAspectRol1Property")

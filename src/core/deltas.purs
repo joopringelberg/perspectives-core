@@ -26,7 +26,7 @@ import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, rolIsFunctio
 import Perspectives.ModelBasedTripleGetters (actiesInContextDef, actiesOfRol, enclosingDefinition, inverse_subjectRollenDef, objectRollenDef, objectViewDef, propertyReferenties, rolUser)
 import Perspectives.PerspectivesState (setTransactie, transactie)
 import Perspectives.PerspectivesTypes (ActieDef, AnyContext, ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), UserRolDef)
-import Perspectives.QueryCombinators (contains, filter, intersect, notEmpty)
+import Perspectives.QueryCombinators (containedIn, filter, intersect, notEmpty)
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>))
 import Perspectives.Syntax (PerspectContext(..), PerspectRol(..))
 import Perspectives.TheoryChange (addTripleToQueue, modifyTriple)
@@ -235,7 +235,7 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
   -- Tests an Actie for having memberName in the view that is its objectView.
   -- psp:Actie -> psp:Boolean
   hasRelevantView :: PropertyDef -> (ActieDef **> PBool)
-  hasRelevantView id = contains id (objectViewDef >-> propertyReferenties >-> DTG.rolBindingDef `followedBy` PropertyDef)
+  hasRelevantView id = id `containedIn` (objectViewDef >-> propertyReferenties >-> DTG.rolBindingDef `followedBy` PropertyDef)
 
 
 -- Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.

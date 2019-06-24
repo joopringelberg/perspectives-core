@@ -261,13 +261,13 @@ toBoolean tg = flip applyTypedTripleGetterToMaybeObject tg >=> pure <<< maybe fa
 
 -- | This query constructor takes an argument that can be an PerspectEntiteit id or a simpleValue, and returns
 -- | a triple whose object is boolean value.
-contains :: forall s o.
+containedIn :: forall s o.
   Eq o => Show s =>
   o ->
   TypedTripleGetter s o ->
   TypedTripleGetter s PBool
 -- Test.Perspectives.TripleGetterConstructors
-contains id' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("contains(" <> typeWithPerspectivesTypes id' <> ")") f where
+containedIn id' tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("containedIn(" <> typeWithPerspectivesTypes id' <> ")") f where
   f :: Array o -> s -> Array PBool
   f os _ = do
     case Arr.elemIndex id' os of
@@ -281,8 +281,8 @@ containsMatching criterium criteriumName tg@(TypedTripleGetter nameOfp p) = trip
 
 -- | Apply to a query and retrieve a boolean query that returns true iff its subject occurs in its result.
 -- | `psp:Function -> psp:Constraint`
-containedIn :: forall o. Eq o => Show o => (o **> o) -> (o **> PBool)
-containedIn tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("containedIn(" <> nameOfp <> ")") f where
+contains :: forall o. Eq o => Show o => (o **> o) -> (o **> PBool)
+contains tg@(TypedTripleGetter nameOfp p) = tripleGetterFromTripleGetter tg ("containedIn(" <> nameOfp <> ")") f where
   f :: Array o -> o -> Array PBool
   f os id = do
     case Arr.elemIndex id os of

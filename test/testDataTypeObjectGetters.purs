@@ -3,6 +3,7 @@ module Test.Perspectives.DataTypeObjectGetters (theSuite) where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Data.Array (length)
 import Data.Maybe (Maybe(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DataTypeObjectGetters (buitenRol, buitenRol', context, contextType, iedereRolInContext, isBuitenRol, label, propertyTypen, rolBindingDef, rolType, toSingle, typeVanIedereRolInContext)
@@ -44,8 +45,8 @@ theSuite = suiteSkip "DataTypeObjectGetters" do
       (Nothing :: Maybe BuitenRol)
   test "iedereRolInContext" do
     assertEqual "u:myContext has a single role in context"
-      (iedereRolInContext (u "myContext"))
-      [(u "myContext$rolInContext_0")]
+      ((iedereRolInContext (u "myContext")) >>= (pure <<< length))
+      1
   test "typeVanIedereRolInContext" do
     assertEqual "u:myContext has a single type of role in context"
       (typeVanIedereRolInContext (u "myContext"))

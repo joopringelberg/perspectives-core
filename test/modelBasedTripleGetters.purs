@@ -8,7 +8,7 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, effectiveRolType, equalsOrIsAspectOf, expressionType, getFunctionResultType, hasContextType, hasRolType, isAspectOf, isContextTypeOf, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, effectiveRolType, equalsOrIsAspectOf, expressionType, getFunctionResultType, hasContextType, hasRolType, isAspectOf, isContextTypeOf, isOrHasAspect, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
 import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (containedIn, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
@@ -44,9 +44,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       , RolDef "model:Perspectives$Property$buitenRolBeschrijving"
       , RolDef "model:Perspectives$ContextPrototype$buitenRolBeschrijving"
       , RolDef "model:Perspectives$ContextPrototype$binnenRolBeschrijving"]
-    assertEqual "myContextDef defines 16 roles"
+    assertEqual "myContextDef defines 14 roles"
       ((t "myContextDef") ##= count rollenDef)
-      ([16])
+      ([14])
     assertEqual "q:ComputedRolGetter has no defined Roles through Aspects."
       (q "ComputedRolGetter" ##= closureOfAspect >-> rollenDef)
       (RolDef <$>
@@ -73,6 +73,12 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       [ PropertyDef $ t "myContextDef$rol1$rol1Property",
       PropertyDef $ t "myAspect$myAspectRol1$myAspectRol1Property",
       PropertyDef $ t "myUrAspect$myUrAspectRol1$myUrAspectRol1Property"]
+      -- (PropertyDef <$>
+      --   [ "model:TestOGC$myContextDef$rol1$rol1Property"
+      --   , "model:TestOGC$myAspect$myAspectRol1$myAspectRol1Property"
+      --   , "model:TestOGC$myUrAspect$myUrAspectRol1$myUrAspectRol1Property"
+      --   , "model:Perspectives$Rol$buitenRolBeschrijving$isFunctioneel"
+      --   , "model:Perspectives$Rol$buitenRolBeschrijving$isVerplicht"])
   test "buitenRolBeschrijvingDef" do
     assertEqual "From a context that is a definition, get the definition of its BuitenRol."
       ((t "myContextDef") ##= buitenRolBeschrijvingDef)
@@ -93,7 +99,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "contextBot" do
     assertEqual "t:myContext6 has a contextBot"
       ((ContextDef $ t "myContext6") ##= contextBot)
-      [RolInContext $ t "myContext6$contextBot_1"]
+      [RolInContext $ t "myContext6$contextBot_0001"]
   test "agreesWithType" do
     assertEqual "t:myContextDef agrees with type t:myContextDef"
       (t "myContextDef" ##= agreesWithType (t "myContextDef"))
@@ -213,17 +219,17 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   -- TESTS ON THE FILE "testTypeDefChecker.crl"
   ---------------------------------------------------------------------------------
   test "rollenDef" do
-    assertEqual "myContextDef2 defines a single rol and inherits many from Context"
+    assertEqual "myContextDef2 has a total of 13 roles."
       (t2 "myContextDef2" ##= count rollenDef)
-      ([15])
+      ([13])
   test "isNotAQuery" do
     assertEqual "t:myContextDef2$rol1 is not a query-rol"
       ((RolDef $ t2 "myContextDef2$rol1") ##= isNotAQuery)
       [PBool "false"]
   test "nonQueryRollen" do
-    assertEqual "myContextDef2 defines a single non-query rol and inherits many from Context"
+    assertEqual "myContextDef2 has a total of 13 non-query roles."
       (t2 "myContextDef2" ##= count nonQueryRollen)
-      ([15])
+      ([13])
   test "mandatoryProperties" do
     assertEqual "psp:Rol has a single mandatory external property."
       ((p "Rol") ##= buitenRolBeschrijvingDef >-> mandatoryProperties)
@@ -246,7 +252,7 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "getFunctionResultType" do
     assertEqual "The function result type of psp:PerspectivesSysteem$modellen is psp:Context"
       ((p "PerspectivesSysteem$modellen") ##= getFunctionResultType)
-      [p "Context"]
+      [p "Model"]
 
   test "propertyReferenties" do
     assertEqual "psp:PerspectivesSysteem$gebruiker$VolledigeNaam has two roles $propertyReferentie"
@@ -254,9 +260,9 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
       2
 
   test "effectiveRolType" do
-    assertEqual "psp:PerspectivesSysteem$modellen should have as effective roltype the type of psp:ContextPrototype$buitenRolBeschrijving"
+    assertEqual "psp:PerspectivesSysteem$modellen should have as effective roltype the type of psp:Model"
       ((p "PerspectivesSysteem$modellen") ##= effectiveRolType)
-      ["model:Perspectives$ContextPrototype$buitenRolBeschrijving"]
+      ["model:Perspectives$Model"]
     assertEqual "psp:PerspectivesSysteem$modelsInUse should have as effective roltype the type of psp:PerspectivesSysteem$modelsInUse"
       ((p "PerspectivesSysteem$modelsInUse") ##= effectiveRolType)
       ["model:Perspectives$PerspectivesSysteem$modelsInUse"]
@@ -287,15 +293,24 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "psp:Context is a (context) type of psp:Systeem"
       ((p "Systeem") ##= isContextTypeOf (p "Context"))
       [PBool "true"]
-    assertEqual "psp:Systeem is not a (context) type of psp:Context"
+    assertEqual "psp:PerspectivesSysteem is not a (context) type of psp:Systeem"
       ((p "Systeem") ##= isContextTypeOf (p "PerspectivesSysteem"))
       [PBool "false"]
-    assertEqual "psp:Context is a (context) type of psp:PerspectivesSysteem"
+    assertEqual "psp:Systeem is a (context) type of psp:PerspectivesSysteem"
       ((p "PerspectivesSysteem") ##= isContextTypeOf (p "Systeem"))
       [PBool "true"]
-    assertEqual "psp:Property is not a (context) type of psp:Systeem"
+    assertEqual "psp:Systeem is not a (context) type of psp:Property"
       ((p "Property") ##= isContextTypeOf (p "Systeem"))
       [PBool "false"]
+    -- deze tests falen omdat het effectieve roltype van 'modellen' psp:Model is.
+    -- Dat is geen instantie van q:ComputedRolGetter of psp:Function.
+    -- assertEqual "q:ComputedRolGetter is a (context) type of psp:PerspectivesSysteem$modellen."
+    --   ((p "PerspectivesSysteem$modellen") ##= (isContextTypeOf (q "ComputedRolGetter")))
+    --   [PBool "true"]
+    -- assertEqual "psp:Function is a (context) type of psp:PerspectivesSysteem$modellen."
+    --   ((p "PerspectivesSysteem$modellen") ##= (isContextTypeOf "model:Perspectives$Function"))
+    --   [PBool "true"]
+
 
   test "hasContextType" do
     assertEqual "psp:Context is a (context) type of psp:Systeem"
@@ -317,13 +332,10 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
   test "Loading testBotActie.crl" do
     loadTestModel "testBotActie.crl"
   test "expressionType" do
-    assertEqual "tba:Test$botCopiesV1ToV2$self is a Function"
-      ("model:TestBotActie$Test$botCopiesV1ToV2$self" ##= (isContextTypeOf "model:Perspectives$Function"))
-      [PBool "true"]
-    assertEqual "tba:Test$botCopiesV1ToV2$self expressionType psp:Actie"
-      (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= expressionType)
-      [p "Zaak"]
-    assertEqual "tba:Test$botCopiesV1ToV2$self has no value for getFunctionResultType"
+    assertEqual "The expression type of tba:Test$botCopiesV1ToV2$self is a Function"
+      ("model:TestBotActie$Test$botCopiesV1ToV2$self" ##= expressionType)
+      [tba "Test"]
+    assertEqual "tba:Test$botCopiesV1ToV2$self a function result type of tba:Test"
       (("model:TestBotActie$Test$botCopiesV1ToV2$self") ##= getFunctionResultType)
       ["model:TestBotActie$Test"]
 

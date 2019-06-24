@@ -6,13 +6,20 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>))
+import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>), MP)
 import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
+import Perspectives.DataTypeTripleGetters (context)
+import Perspectives.EntiteitAndRDFAliases (RolID)
 import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
 import Perspectives.ModelBasedObjectGetters (isOrHasAspect) as MBOG
-import Perspectives.ObjectGetterConstructors (agreesWithType, alternatives, closureOfAspect, closureOfAspectRol, closure_, contains, directAspects, getUnqualifiedContextRol, mogelijkeBinding, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, some, toBoolean)
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, hasRolTypeOnEachRolTelescopeOf)
+import Perspectives.ModelBasedTripleGetters (sumToSequence, mogelijkeBinding, equalsOrIsAspectOf) as MBTG
+import Perspectives.ObjectGetterConstructors (alternatives, closureOfAspect, closureOfAspectRol, containedIn, getUnqualifiedContextRol, mogelijkeBinding, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (class RolClass, AnyContext, ContextDef(..), PropertyDef, RolDef(..), AnyDefinition, typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (class RolClass, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef, RolDef(..), RolInContext(..), typeWithPerspectivesTypes)
+import Perspectives.RunMonadPerspectivesQuery ((##=), (##>), (##>>))
+import Perspectives.StringTripleGetterConstructors (some) as STGC
+import Perspectives.TripleGetterComposition ((>->))
 import Prelude (bind, flip, ifM, join, map, pure, ($), (&&), (<$>), (<*>), (<<<), (=<<), (==), (>=>), (>>=), (||))
 
 -- TODO. DIT WERKT NIET VOOR INTERNE EN EXTERNE CONTEXT PROPERTIES.
@@ -50,16 +57,16 @@ checkRolForQualifiedProperty pn rn = do
 
     -- | Does the RolDef or one of its prototypes have a $rolProperty bound to (the BuitenRol of) the propertyDef?
     checkRolHasProperty :: RolDef -> PropertyDef -> MonadPerspectives Boolean
-    checkRolHasProperty rn' pn' = (toBoolean (contains (unwrap pn') (getUnqualifiedContextRol "rolProperty" /-/ rolBindingDef)) (unwrap rn'))
+    checkRolHasProperty rn' pn' = (toBoolean ((unwrap pn') `containedIn` (getUnqualifiedContextRol "rolProperty" /-/ rolBindingDef)) (unwrap rn'))
 
--- | True if the first RolDef recursively has the second RolDef as AspectRol, or if they are the same.
-isOrHasAspectRol :: RolDef -> RolDef -> MonadPerspectives Boolean
-isOrHasAspectRol subtype aspectRol =
-  if aspectRol == subtype
-    then pure true
-    else if aspectRol == RolDef "model:Perspectives$ElkType"
-      then pure true
-      else (toBoolean (contains aspectRol closureOfAspectRol)) subtype
+    -- | True if the first RolDef recursively has the second RolDef as AspectRol, or if they are the same.
+    isOrHasAspectRol :: RolDef -> RolDef -> MonadPerspectives Boolean
+    isOrHasAspectRol subtype aspectRol =
+      if aspectRol == subtype
+        then pure true
+        else if aspectRol == RolDef "model:Perspectives$ElkType"
+          then pure true
+          else (toBoolean (aspectRol `containedIn` closureOfAspectRol)) subtype
 
 -- | Returns the Aspect that defines the property, or a usermessage indicating that property with the given
 -- | local name can be found, or that several have been found.
@@ -86,12 +93,12 @@ checkContextForUnQualifiedRol ln cn = do
 -- | True when both parameters are equal and also when the first has the second as aspect.
 -- | If the aspect is a sum type, tries each of the alternatives.
 -- | subtype `isOrHasAspect` aspect
-isOrHasAspect_ :: ContextDef -> ContextDef -> MonadPerspectives Boolean
--- isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> some (closure_ directAspects /-/ agreesWithType (unwrap subtype))
-isOrHasAspect_ subtype = toBoolean $ pure <<< unwrap >=> MBOG.isOrHasAspect (unwrap subtype)
-
 isOrHasAspect :: ContextDef -> ContextDef -> MonadPerspectives Boolean
-isOrHasAspect = flip isOrHasAspect_
+-- isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> some (closure_ directAspects /-/ agreesWithType (unwrap subtype))
+isOrHasAspect subtype = toBoolean $ pure <<< unwrap >=> MBOG.isOrHasAspect (unwrap subtype)
+
+-- isOrHasAspect :: ContextDef -> ContextDef -> MonadPerspectives Boolean
+-- isOrHasAspect = flip isOrHasAspect_
 
 -- | True iff the type of the context equals the given type, or if its type has the given type as aspect.
 -- | context `contextHasType` type
@@ -102,10 +109,10 @@ contextHasType ctxt tp = do
 
 -- | True iff the type of the role equals the given type, or if its type has the given type as aspect.
 -- | `psp:RolInstance -> psp:Rol -> Boolean`
-rolHasType :: forall r. RolClass r => r -> RolDef -> MonadPerspectives Boolean
-rolHasType rol tp = do
-  (typeOfBinding :: RolDef) <- rol %%>> rolType
-  (ContextDef $ unwrap typeOfBinding) `isOrHasAspect` (ContextDef $ unwrap tp)
+-- rolHasType :: forall r. RolClass r => r -> RolDef -> MonadPerspectives Boolean
+-- rolHasType rol tp = do
+--   (typeOfBinding :: RolDef) <- rol %%>> rolType
+--   (ContextDef $ unwrap typeOfBinding) `isOrHasAspect` (ContextDef $ unwrap tp)
 
 mostSpecificCommonAspect :: Array AnyDefinition -> MonadPerspectives ContextDef
 mostSpecificCommonAspect types = do
@@ -114,3 +121,24 @@ mostSpecificCommonAspect types = do
   foldM (\msca t -> ifM (t `isOrHasAspect` msca) (pure msca) (pure t))
     (ContextDef "model:Perspectives$ElkType")
     (map ContextDef aspects)
+
+-- | Compare the mogelijkeBinding of the typeOfRolToBindTo with the type of the rol instance.
+-- | The former must be a (super)type of the latter.
+checkBinding :: RolDef -> RolID -> MP Boolean
+checkBinding typeOfRolToBindTo valueToBind = do
+  (isRolInContext :: Maybe PBool) <- typeOfRolToBindTo ##> MBTG.mogelijkeBinding >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Rol")
+  case isRolInContext of
+    (Just (PBool "true")) -> checkBindingOfRolInContext (RolInContext valueToBind)
+    _ -> checkBindingOfContextRol (ContextRol valueToBind)
+
+  where
+    checkBindingOfRolInContext :: RolInContext -> MP Boolean
+    checkBindingOfRolInContext valueToBind' = do
+      (r :: Array PBool) <- (typeOfRolToBindTo ##= STGC.some (MBTG.mogelijkeBinding >-> MBTG.sumToSequence >-> (hasRolTypeOnEachRolTelescopeOf valueToBind')))
+      pure (r == [(PBool "true")])
+
+    checkBindingOfContextRol :: ContextRol -> MP Boolean
+    checkBindingOfContextRol valueToBind' = do
+      theContext <- valueToBind' ##>> context
+      (r :: Array PBool) <- (typeOfRolToBindTo ##= STGC.some (MBTG.mogelijkeBinding >-> MBTG.sumToSequence >-> (hasContextTypeOnEachRolTelescopeOf theContext)))
+      pure (r == [(PBool "true")])

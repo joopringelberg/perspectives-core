@@ -70,7 +70,7 @@ theSuite = suiteSkip "QueryCombinators" do
         (getInternalProperty (PropertyDef $ tba "Test$binnenRolBeschrijving$v2"))))
       [PBool "false"]
 
-    unLoadTestModel "model:TestBotActie"
+    -- unLoadTestModel "model:TestBotActie"
 
   test "contextLabel" do
     assertEqual "The contextLabel of the buitenRol of u:MijnSysteem should be 'MijnSysteem'"

@@ -4,13 +4,15 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Newtype (unwrap)
-import Perspectives.DataTypeTripleGetters (identity)
+import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, identity)
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijving)
-import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding, propertiesDef, searchView)
 import Perspectives.ModelBasedStringTripleGetters (buitenRolBeschrijvingDef) as MBST
+import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, mogelijkeBinding, propertiesDef, searchView)
 import Perspectives.ModelBasedTripleGetters (buitenRolBeschrijvingDef, hasContextType, isContextTypeOf, sumToSequence)
-import Perspectives.PerspectivesTypes (PBool(..))
+import Perspectives.PerspectivesTypes (BuitenRol(..), PBool(..))
 import Perspectives.QueryCombinators (notEmpty, cond)
+import Perspectives.QueryCompiler (getPropertyFunction)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.TripleGetterComposition (followedBy, (>->))
 import Test.Perspectives.Utils (assertEqual, loadTestModel, p, unLoadTestModel)
@@ -31,21 +33,21 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
   ---------------------------------------------------------------------------------
   test "hasContextType" do
     assertEqual "t:myContextPrototype has type psp:Context"
-      (t "myContextPrototype" ##= hasContextType (p "Context"))
+      (p "Context" ##= hasContextType (t "myContextPrototype"))
       [PBool "true"]
     assertEqual "t:myContextPrototype has type t:myAspect"
-      (t "myContextPrototype" ##= hasContextType (t "myAspect"))
+      ((t "myAspect") ##= hasContextType (t "myContextPrototype"))
       [PBool "true"]
     assertEqual "t:myContextPrototype has type t:myUrAspect"
-      (t "myContextPrototype" ##= hasContextType (t "myUrAspect"))
+      ((t "myUrAspect") ##= hasContextType (t "myContextPrototype"))
       [PBool "true"]
     assertEqual "t:myContextPrototype does not have type psp:Property"
-      (t "myContextPrototype" ##= hasContextType (p "Property"))
+      ((p "Property") ##= hasContextType (t "myContextPrototype"))
       [PBool "false"]
 
   test "hasContextTypeOnEachRolTelescopeOf (allowedBinding ## (`hasContextTypeOnEachRolTelescopeOf` t))" do
     assertEqual "psp:SimpleValue should have type psp:Context"
-      (p "SimpleValue" ##= hasContextType (p "Context"))
+      (p "Context" ##= hasContextType (p "SimpleValue"))
       [PBool "true"]
     assertEqual "psp:SimpleValue should have type psp:Context"
       (p "Context" ##= hasContextTypeOnEachRolTelescopeOf (p "SimpleValue"))
@@ -119,6 +121,11 @@ theSuite = suiteSkip "ModelBasedStringTripleGetters" do
     assertEqual "psp:PerspectivesSysteem$modelsInUse should have a property with local name 'contextLabel'."
       ((p "PerspectivesSysteem$modelsInUse") ##= propertiesDef)
       [p "BuitenRolPrototype$contextLabel"]
+    assertEqual "The contextLabel value of the BuitenRol of psp:Perspectives is "
+      do
+        contextLabel <- getPropertyFunction (p "BuitenRolPrototype$contextLabel")
+        (buitenRol "model:Perspectives" ##= contextLabel)
+      ["model:Perspectives"]
 
 
   -- testOnly "" do
