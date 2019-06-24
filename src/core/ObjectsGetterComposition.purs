@@ -46,5 +46,6 @@ composeMonoidal :: forall s o a.
   -> (s ~~> a)
 composeMonoidal p f = p >=> pure <<< singleton <<< f
 
-contains :: forall s o. Eq o => o -> (s ~~> o) -> (s ~~> PBool)
-contains obj p = p `composeMonoidal` (alaF Disj foldMap ((==) obj) >>> show >>> PBool)
+-- Example: contains. A more efficient implementation is available in Perspectives.ObjectGetterConstructrors.
+-- contains :: forall s o. Eq o => o -> (s ~~> o) -> (s ~~> PBool)
+-- contains obj p = p `composeMonoidal` (alaF Disj foldMap ((==) obj) >>> show >>> PBool)
