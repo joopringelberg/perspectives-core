@@ -17,7 +17,7 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (addRol, removeBinding, removeRol, setBinding, setProperty, setupBotActions)
+import Perspectives.Actions (addRol, removeBinding, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
@@ -31,16 +31,17 @@ import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.ModelBasedStringTripleGetters (searchView, propertiesDef)
 import Perspectives.ModelBasedTripleGetters (effectiveRolType)
 import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition) as OGC
-import Perspectives.PerspectivesTypes (ContextDef(..))
+import Perspectives.PerspectivesTypes (ContextDef(..), RolDef(..))
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.ResourceRetrieval (saveEntiteit)
-import Perspectives.RunMonadPerspectivesQuery ((##))
+import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties, searchUnqualifiedRolDefinition)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
+import Perspectives.TypeChecker (checkBinding)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
 
 -----------------------------------------------------------
@@ -120,7 +121,9 @@ consumeRequest = forever do
 dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription} =
   case request of
+    -- Given the qualified name of the RolType.
     Api.GetRolBinding -> getRolBinding subject predicate setter corrId
+    -- Given the rolinstance;
     Api.GetBinding -> subscribeToObjects subject DTG.genericBinding setter corrId
     Api.GetBindingType -> subscribeToObjects subject (DTG.genericBinding >-> DTG.genericRolType) setter corrId
     Api.GetRol -> getRol subject predicate setter corrId
@@ -159,10 +162,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           -- save the rol.
           void (saveEntiteit id :: MonadPerspectives PerspectRol)
           sendResponse (Result corrId [id]) setter
+    -- Check whether a role exists for ContextDef with the localRolName and then create a new instance of it according to the rolDescription.
+    -- subject :: Context, predicate :: localRolName, object :: ContextDef. rolDescription must be present!
     Api.CreateRolWithLocalName -> do
       mqrolname <- (ContextDef object) ##> (OGC.getUnqualifiedRolDefinition predicate)
       case mqrolname of
-        Nothing -> sendResponse (Error corrId ("Cannot find Rol with local name '" <> predicate <> "' on contex type '" <> object <> "'!")) setter
+        Nothing -> sendResponse (Error corrId ("Cannot find Rol with local name '" <> predicate <> "' on context type '" <> object <> "'!")) setter
         (Just qrolname) -> do
           rol <- constructAnotherRol (unwrap qrolname) subject (unsafePartial $ fromJust rolDescription)
           case rol of
@@ -181,6 +186,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.RemoveBinding -> catchError
       ((removeBinding subject) *> (sendResponse (Result corrId ["ok"]) setter))
       (\e -> sendResponse (Error corrId (show e)) setter)
+    -- Create a new instance of the roletype RolDef in Context and fill the role with RolID.
+    -- subject :: Context, predicate :: RolDef, object :: RolID
     Api.BindInNewRol -> catchError
       (do
         rol <- constructAnotherRol predicate subject (unsafePartial $ fromJust rolDescription)
@@ -193,6 +200,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             sendResponse (Result corrId ["ok"]) setter
             )
       (\e -> sendResponse (Error corrId (show e)) setter)
+    -- Check whether a role exists for ContextDef with the localRolName and whether it allows RolID as binding.
+    -- subject :: ContextDef, predicate :: localRolName, object :: RolID
+    Api.CheckBinding -> do
+      mtypeOfRolToBindTo <- subject RP.##> (searchUnqualifiedRolDefinition predicate)
+      case mtypeOfRolToBindTo of
+        Nothing -> sendResponse (Error corrId ("No roltype found for '" <> predicate <> "'.")) setter
+        (Just typeOfRolToBindTo) -> do
+          ok <- checkBinding (RolDef typeOfRolToBindTo) object
+          sendResponse (Result corrId [(show ok)]) setter
     Api.Unsubscribe -> unsubscribeFromObjects subject corrId
     Api.WrongRequest -> sendResponse (Error corrId subject) setter
     otherwise -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)
@@ -211,7 +227,7 @@ type QueryUnsubscriber e = Effect Unit
 subscribeToObjects :: Subject -> StringTypedTripleGetter -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
 subscribeToObjects subject query setter corrId = do
   (effectInReact :: QueryEffect String) <- pure $ NamedFunction (show corrId) (sendResult corrId setter)
-  void $ (subject ## query ~> effectInReact)
+  void $ (subject RP.## query ~> effectInReact)
 
 unsubscribeFromObjects :: Subject -> CorrelationIdentifier -> MonadPerspectives Unit
 unsubscribeFromObjects subject corrId = lift $ liftEffect $ unRegisterTriple $ TripleRef {subject, predicate: show corrId}
