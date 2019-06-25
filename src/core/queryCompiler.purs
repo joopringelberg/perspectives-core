@@ -173,11 +173,11 @@ constructQueryFunction typeDescriptionID = do
       constant <$> onNothing (errorMessage "no constant value provided" queryStepType) (typeDescriptionID ##> (OGC.searchExternalProperty (PropertyDef "model:QueryAst$Constant$value") >=> pure <<< map unwrap ))
     "model:QueryAst$Variable" -> do
       variableName <- onNothing (errorMessage "no variable name found" queryStepType)
-        (typeDescriptionID ##> (OGC.getInternalProperty $ PropertyDef "model:QueryAst$Variable$name"))
+        (typeDescriptionID ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$Variable$name"))
       pure $ ref $ unwrap variableName
     "model:QueryAst$setVariable" -> do
       variableName <- onNothing (errorMessage "no variable name found" queryStepType)
-        (typeDescriptionID ##> (OGC.getInternalProperty $ PropertyDef "model:QueryAst$Variable$name"))
+        (typeDescriptionID ##> (OGC.searchExternalProperty $ PropertyDef "model:QueryAst$Variable$name"))
       valueDescriptionID <- onNothing (errorMessage "no value found" queryStepType)
         (typeDescriptionID ##> getBindingOfRol "model:QueryAst$setVariable$value" /-/ genericBinding /-/ genericContext)
       valueQuery <- constructQueryFunction valueDescriptionID
