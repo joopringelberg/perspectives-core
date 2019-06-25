@@ -1,0 +1,39 @@
+HERONTWERP ACTIE
+
+Ik versimpel Actie. We hebben het type Actie, met een $subject, $object, enz.
+In een psp:Zaak bind je de rol $actie aan een instantie van psp:Actie.
+De rol $subject bind je aan:
+
+	* de rol psp:Context$contextBot, of
+	* een gebruikerrol van de Context waarbinnen de Actie is gedefinieerd (dus met de gekwalificeerde naam van die rol, of met $$$ syntax).
+
+1. We vinden de botacties in een Zaak door de acties van de context te filteren op zijn $subject: degenen die gebonden zijn aan psp:Context$contextBot moeten we hebben.
+
+2. Als we later voor de schermgenerator willen weten welke Acties bij een gebruikerRol horen, volgen we vanuit die rol in omgekeerde richting de rol $subject.
+
+3. Hoe definieer je een gebruikerRol in psp:Zaak? Met de rol psp:Context$gebruikerRol. Wat bind je daaraan? Een nieuwe psp:ContextRol, met als mogelijkeBinding een andere gebruikerRol of psp:PerspectivesSysteem$gebruiker.
+
+4. psp:Actie$subject kunnen we dus binden aan een gebruikerRol of aan psp:Context$contextBot. Dat zijn ContextRol instanties:
+	- $contextBot is een ContextRol
+	- mogelijkeBinding is psp:Systeem$bot, dat is óók een ContextRol, dus dat klopt.
+	
+	- er is een ContextRol $gebruikerRol, met mogelijkeBinding psp:PerspectivesSysteem$gebruiker
+	- dat is een ContextRol, met mogelijkeBinding psp:Niets
+	- klopt qua types.
+
+CONSEQUENTIES
+1. TestBotActie moet veranderen. 
+	- Er hoeft geen instantie van ?contextBot te komen.
+	- $botCopiesV1ToV2$subject moet worden gebonden aan psp:Context$contextBot
+2. ModelBasedTripleGetters.botActiesInContext moet worden aangepast.
+
+3. Wat is nu de mogelijkeBinding van psp:Actie$Subject? De sum van
+	- psp:Context$gebruikerRol
+	- psp:Context$contextBot
+	KLAAR
+
+4. psp:ActieAspect kan verdwijnen. KLAAR
+
+5. psp:ActiePrototype kan verdwijnen. KLAAR
+
+6. TestBotActie aanpassen. KLAAR
