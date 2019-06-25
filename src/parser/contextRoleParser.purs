@@ -22,12 +22,12 @@ import Effect.Aff.AVar (AVar, put, take)
 import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_padOccurrence, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, (##>), MP)
+import Perspectives.CoreTypes (MonadPerspectives, (##>), MP, (##>>))
 import Perspectives.DataTypeObjectGetters (contextType)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol, deconstructBuitenRol)
 import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
-import Perspectives.ModelBasedObjectGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, getDefaultPrototype)
+import Perspectives.ModelBasedObjectGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, equalsOrIsAspectOf, getDefaultPrototype)
 import Perspectives.ObjectGetterConstructors (getPrototype, notEmpty, searchUnqualifiedRolDefinition, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
@@ -724,11 +724,25 @@ parseAndCache text = do
         for_ (FO.values contexts) \ctxt -> do
           setBuitenRolType ctxt
           setBinnenRolType ctxt
+        -- If the binding of the Role exists and the context of that binding has the aspect psp:Context,
+        -- change the binding of the Role to the External Role of the definition of the External Role of that Context.
+        for_ (FO.values roles) \rol -> do
+          if (rol_pspType rol) == "model:Perspectives$Rol$mogelijkeBinding"
+            then
+              case rol_binding rol of
+                Nothing -> pure unit
+                (Just bnd) -> do
+                  modify <- toBoolean (equalsOrIsAspectOf "model:Perspectives$Context") (deconstructBuitenRol bnd)
+                  if modify
+                    then setBindingToBuitenRolBeschrijving (rol_id rol) (deconstructBuitenRol bnd)
+                    else pure unit
+            else pure unit
         actualisedDomeinFile <- actualiseDomeinFile domeinFile
         pure $ Right (Tuple r actualisedDomeinFile)
       \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
   where
 
+    -- Construct a new DomeinFile with the contents of the cache.
     actualiseDomeinFile :: DomeinFile -> MP DomeinFile
     actualiseDomeinFile df@(DomeinFile {_id, _rev, contexts, roles}) = do
       (ac :: FO.Object PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
@@ -807,3 +821,13 @@ parseAndCache text = do
           lift $ void $ do
             bRol <- take av
             put (changeRol_type (unwrap brtype) bRol) av
+
+    -- The PerspectRol in cache may have been changed by now, so retrieve it again.
+    -- id represents an External Role.
+    -- Replace the binding of the Rol by the buitenRol of the BuitenRolBeschrijving of its binding.
+    setBindingToBuitenRolBeschrijving :: RolID -> ContextID -> MonadPerspectives Unit
+    setBindingToBuitenRolBeschrijving id contextDef = do
+      (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit id
+      rol <- lift $ take av
+      brb <- contextDef ##>> buitenRolBeschrijvingDef
+      lift $ put (changeRol_binding (buitenRol $ unwrap brb) rol) av
