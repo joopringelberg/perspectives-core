@@ -8,7 +8,6 @@ Section $rolInContext
 -- SIMPLE VALUES
 --------------------------------------------------------------------------------
 psp:Context psp:SimpleValue
-	$aspect => psp:Context
 	$defaultPrototype => psp:SimpleValuePrototype
 
 psp:SimpleValue psp:SimpleValuePrototype
@@ -194,15 +193,14 @@ psp:Context psp:View
 -- ACTIES
 --------------------------------------------------------------------------------
 psp:Context psp:Actie
-	$aspect => psp:Context
-	$defaultPrototype => psp:ActiePrototype
+	$defaultPrototype => psp:ContextPrototype
 	$rolInContext =>
 		psp:Rol $subject
 			extern $isFunctioneel = true
 			extern $isVerplicht = true
 			$mogelijkeBinding =>
 				psp:Sum $rolOrBot
-					$alternative => psp:Rol
+					$alternative => psp:Context$gebruikerRol
 					$alternative => psp:Context$contextBot
 	$rolInContext =>
 		psp:Rol $werkwoord
@@ -250,22 +248,7 @@ psp:Context psp:Actie
 					$alternative (2) => psp:assignToProperty
 					$alternative (3) => psp:effectFullFunction
 
-psp:Actie psp:ActieAspect
-	$subject =>
-		psp:Rol $subject
-			extern $isFunctioneel = true
-			$mogelijkeBinding =>
-				psp:Sum $botOrUser
-					$alternative => psp:PerspectivesSysteem$gebruiker
-					$alternative => psp:Context$contextBot
-
-psp:Actie psp:ActiePrototype
-	prototype psp:ContextPrototype
-	?aspect => psp:ActieAspect
-	$subject => ()
-
 psp:Context psp:Werkwoord
-	$aspect => psp:Context
 	$defaultPrototype => psp:WerkwoordPrototype
 
 psp:Werkwoord psp:WerkwoordPrototype
@@ -291,6 +274,7 @@ psp:Werkwoord psp:Verwijdert
 --------------------------------------------------------------------------------
 psp:Context psp:Zaak
 	$aspect => psp:Context
+	$defaultPrototype => psp:ZaakPrototype
 	$rolInContext =>
 		psp:Rol $zaakInContext
 			extern $isFunctioneel = false
@@ -299,6 +283,10 @@ psp:Context psp:Zaak
 		psp:Rol $actie
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Actie
+
+psp:Zaak psp:ZaakPrototype
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
 
 --------------------------------------------------------------------------------
 -- FUNCTION
@@ -347,6 +335,7 @@ psp:Context psp:Systeem
 
 psp:Systeem psp:SysteemPrototype
 	prototype psp:ContextPrototype
+	$aspect => psp:Context
 	$bot => ()
 
 psp:Zaak psp:TrustedCluster
@@ -367,7 +356,7 @@ psp:Zaak psp:TrustedCluster
 		psp:Rol $binnenRolBeschrijving
 			extern $isFunctioneel = true
 			$mogelijkeBinding => psp:Rol
-	psp:Context$rolInContext =>
+	?gebruikerRol =>
 		psp:Rol $clusterGenoot
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:PerspectivesSysteem$gebruiker
@@ -384,10 +373,7 @@ psp:Zaak psp:TrustedCluster
 						$volgNummer = 2
 	$actie =>
 		psp:Actie $RaadpleegtClusterGenoot
-			$subject =>
-				psp:Rol $subject
-					$aspectRol => psp:ActieAspect$subject
-					$mogelijkeBinding => psp:TrustedCluster$clusterGenoot
+			$subject => psp:TrustedCluster$clusterGenoot
 
 --------------------------------------------------------------------------------
 -- ASSIGNMENT
@@ -506,12 +492,25 @@ psp:Context psp:effectFullFunction
 			$mogelijkeBinding => psp:ElkType
 
 psp:Context psp:Model
-	prototype psp:ContextPrototype
+	prototype psp:ModelPrototype
 	$aspect => psp:Context
 	$rolInContext =>
 		psp:Rol $indexedContextTypes
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:ElkType
+
+psp:Context psp:ModelPrototype
+	prototype psp:ContextPrototype
+	$aspect => psp:Context
+	$buitenRolBeschrijving =>
+		psp:Rol $buitenRolBeschrijving
+			extern $isFunctioneel = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $auteur
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
 
 Section psp:Model$indexedContextTypes
 
@@ -559,7 +558,7 @@ psp:Systeem psp:PerspectivesSysteem
 	psp:Context$rolInContext =>
 		q:ComputedRolGetter $modellen
 			extern $functionName = "modellenM"
-			psp:Function$result => psp:Model
+			?result => psp:Model
 	psp:Context$rolInContext =>
 		psp:Rol $indexedContexts
 			extern $isFunctioneel = false
@@ -568,5 +567,3 @@ psp:Systeem psp:PerspectivesSysteem
 		psp:Rol $modelsInUse
 			extern $isFunctioneel = false
 			$mogelijkeBinding => psp:Model
-
-
