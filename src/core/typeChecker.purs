@@ -124,16 +124,19 @@ mostSpecificCommonAspect types = do
 
 -- | Compare the mogelijkeBinding of the typeOfRolToBindTo with the type of the rol instance.
 -- | The former must be a (super)type of the latter.
+-- | There are two cases:
+-- | * the mogelijkeBinding has type psp:Context. This is a non-ARC case.
+-- | * the mogelijkeBinding has type psp:Rol. This can be either an ARC ContextRol or RolInContext.
 checkBinding :: RolDef -> RolID -> MP Boolean
 checkBinding typeOfRolToBindTo valueToBind = do
-  (isRolInContext :: Maybe PBool) <- typeOfRolToBindTo ##> MBTG.mogelijkeBinding >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Rol")
-  case isRolInContext of
-    (Just (PBool "true")) -> checkBindingOfRolInContext (RolInContext valueToBind)
-    _ -> checkBindingOfContextRol (ContextRol valueToBind)
+  (isContextRol :: Maybe PBool) <- typeOfRolToBindTo ##> MBTG.mogelijkeBinding >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Context")
+  case isContextRol of
+    (Just (PBool "true")) -> checkBindingOfContextRol (ContextRol valueToBind)
+    _ -> checkBindingOfRolInContextOrBuitenRolBeschrijving (RolInContext valueToBind)
 
   where
-    checkBindingOfRolInContext :: RolInContext -> MP Boolean
-    checkBindingOfRolInContext valueToBind' = do
+    checkBindingOfRolInContextOrBuitenRolBeschrijving :: RolInContext -> MP Boolean
+    checkBindingOfRolInContextOrBuitenRolBeschrijving valueToBind' = do
       (r :: Array PBool) <- (typeOfRolToBindTo ##= STGC.some (MBTG.mogelijkeBinding >-> MBTG.sumToSequence >-> (hasRolTypeOnEachRolTelescopeOf valueToBind')))
       pure (r == [(PBool "true")])
 
