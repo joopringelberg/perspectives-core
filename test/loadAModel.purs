@@ -19,7 +19,7 @@ import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 theSuite :: Free TestF Unit
 theSuite = suite "Loading the model:" do
   test "loadCRLFile" do
-    void $ runP $ loadCRLFile withoutSemanticChecks "query.crl"
+    void $ runP $ loadCRLFile withoutSemanticChecks "perspectives.crl"
     -- void $ runP $ loadCRLFile withSemanticChecks "query.crl"
   -- test "Unloading the model" do
     -- unLoadTestModel "model:Perspectives"

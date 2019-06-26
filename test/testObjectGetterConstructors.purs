@@ -131,6 +131,9 @@ theSuite = suiteSkip "ObjectGetterConstructors" do
     assertEqual "Found through three layers."
       (buitenRolBeschrijvingDef (t "myContextDef3"))
       [RolDef $ p "ContextPrototype$buitenRolBeschrijving"]
+    assertEqual "From psp:Property"
+      (buitenRolBeschrijvingDef (p "Property"))
+      [RolDef $ p "Property$buitenRolBeschrijving"]
   test "getUnqualifiedPropertyDefinition" do
     assertEqual "The Rol t:myUrAspect$myUrAspectRol1 has the definition of property $myUrAspectRol1Property"
       ((getUnqualifiedPropertyDefinition "myUrAspectRol1Property") (RolDef $ t "myUrAspect$myUrAspectRol1"))

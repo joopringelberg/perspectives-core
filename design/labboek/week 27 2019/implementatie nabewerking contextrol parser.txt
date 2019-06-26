@@ -7,6 +7,8 @@ Cor verbindt in Perspectives de ExterneRol van een Context met een ContextRol. M
 
 Dat is een implementatie op het niveau van types.
 
+Let op, dat het hier exclusief gaat om de rol $mogelijkeBinding. Dus alleen de $mogelijkeBinding van een Rol vullen we met de (buitenRol van) de ExterneRol van een Context.
+
 
 HUIDIGE SITUATIE
 1. Een Rol heeft als binding de buitenRol van de Context die in de tekst is gegeven.
@@ -115,9 +117,9 @@ Kan de toets isOrHasAspect uitgevoerd worden vóór de voorbewerking voltooid is
 Deze functie is geïmplementeerd in termen van directAspects, en dat is uiteindelijk in termen van getContextRol. Daarin wordt geen gebruik van rolbinding gemaakt.
 
 IMPLEMENTATIE
-1. Doorzoek alle ContextRollen;
+1. Doorzoek alle rollen;
 
-	dat betekent: doorzoek alle rollen, behandel degenen waarvan het type psp:ContextRol is.
+	dat betekent: doorzoek alle rollen, behandel de instanties van psp:Rol$mogelijkeBinding
 	
 2. Als de binding de buitenRol is van een Context die psp:Context als Aspect heeft,
 
@@ -128,3 +130,12 @@ IMPLEMENTATIE
 	buitenRolBeschrijvingDef
 
 VOLTOOID.
+
+DEBUGGEN
+Bij inlezen van perspectives.crl probeert de parser deze rol:
+model:Perspectives$Property$buitenRolBeschrijving$mogelijkeBinding_0001 
+als Context in te lezen.
+
+Dit gebeurt als je de instantie van de rol $mogelijkeBinding van de buitenRolBeschrijving van psp:Property probeert te lezen.
+
+OPGELOST, door te filteren op rollen die $mogelijkeBinding instanties zijn.

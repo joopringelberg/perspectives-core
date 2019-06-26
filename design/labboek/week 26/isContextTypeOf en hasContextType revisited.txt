@@ -109,6 +109,10 @@ En dat klopt, want:
 
 Dan wordt uitgevoerd: checkBindingOfContextRol (ContextRol valueToBind)
 
-De typering van model:Perspectives$_buitenRol klopt niet, want het is natuurlijk een buitenrol. Maar is dat erg?
+De typering van model:Perspectives$_buitenRol klopt niet, want het is natuurlijk een buitenrol. Maar is dat erg? Ik denk van niet.
+
+Maar dan wordt 
+	(hasContextTypeOnEachRolTelescopeOf (unwrap valueToBind'))
+geevalueerd. En in de implementatie daarvan wordt valueToBind' = model:Perspectives$_buitenRol verondersteld een context(instantie) te zijn. En dat klopt niet.
 
 

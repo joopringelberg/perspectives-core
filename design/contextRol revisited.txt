@@ -16,6 +16,9 @@ CENTRALE IDEE
 
 8. Je test dan of een type een ContextRol is met: 'hasType "psp:ContextRol"'
 
+DIT KLOPT, maar het geldt alleen voor Context en zijn subtype (dingen die Context als Aspect hebben).
+Dus: alleen waar mogelijkeBinding als waarde de buitenRol heeft van een Context die Context als Aspect heeft, moeten we die waarde vervangen (door de buitenRol van BuitenRolBeschrijving van de Context).
+
 IMPLEMENTATIE IN DE PARSER
 1. De mogelijkeBinding van een ContextRol moet dan de *beschrijving* van de ExterneRol van een Context zijn. 
 2. Hoewel we een schema voor naamgeving van dergelijke beschrijvingen hebben (en merk op dat het zelf natuurlijk contexten zijn, als types!), is het niet eenvoudig om bij het schrijven van een model te weten welke beschrijving je voor een bepaalde Context moet hebben, vanwege het gebruik van prototypes.

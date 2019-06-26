@@ -1,0 +1,52 @@
+MOGELIJKEBINDING
+
+De $mogelijkeBinding van Rol R (instantie van psp:Rol, dus een *type* rol) kan gevuld zijn met de buitenRol van:
+
+1. een psp:Rol (R ## mogelijkeBinding /-/ hasType psp:Rol). Dit is in ARC de situatie dat R een RolInContext is.
+
+2. een psp:Context (R ## mogelijkeBinding /-/ hasType psp:Context). Dit komt in ARC niet voor, wel in CRL, b.v. als R $propertyReferentie is.
+
+3. een psp:BuitenRol is (R ## mogelijkeBinding /-/ hasType psp:BuitenRol). Dit is in ARC de situatie dat R een ContextRol is.
+
+NB: ik loop hier vooruit op de introductie van psp:BuitenRol, te gebruiken in deze situaties:
+
+	$buitenRolBeschrijving =>
+		psp:BuitenRol $buitenRolBeschrijving
+
+
+mogelijkeBinding = binding /-/ context
+
+Dan herkennen we bovenstaande situaties zo:
+
+1. ROLINCONTEXT: mogelijkeBinding /-/ hasType psp:Rol
+
+		psp:Rol $clusterGenoot
+			$mogelijkeBinding => psp:PerspectivesSysteem$gebruiker
+
+en
+
+		psp:Rol $gebruiker
+
+
+2. mogelijkeBinding /-/ hasType psp:Context
+
+	psp:Context psp:View
+		$rolInContext =>
+			psp:Rol $propertyReferentie
+				$mogelijkeBinding => psp:Property
+
+(eigenlijk psp:SimpleValueOrProperty)
+Dit is voor allerlei verbindingen tussen types op CRL niveau.
+
+
+3. CONTEXTROL: mogelijkeBinding /-/ hasType psp:BuitenRol
+
+		psp:Rol $modelsInUse
+			extern $isFunctioneel = false
+			$mogelijkeBinding => psp:Model
+
+		psp:Context psp:Model
+			prototype psp:ModelPrototype
+			$aspect => psp:Context
+
+psp:Model heeft psp:Context als $aspect. Daarom heeft de parser de $mogelijkeBinding van $modelsInUse de waarde gegeven van de buitenrol van de BuitenRol (beschrijving) van psp:Model.

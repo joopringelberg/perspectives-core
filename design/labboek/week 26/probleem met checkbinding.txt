@@ -6,4 +6,4 @@ VRAAG 1: hoe testen we of een bepaald roltype een ContextRol of een RolInContext
 
 Dan volgt een kwestie over contexten en buitenrollen. Als mogelijke binding van een ContextRol geven we een ContextDef op. Maar als we gaan binden, doen we dat met een buitenRol. Dat wringt.
 
-VRAAG 2. 
+VRAAG 2. Kan ik de buitenRol vervangen door zijn context?
