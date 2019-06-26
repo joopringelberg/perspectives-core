@@ -411,7 +411,7 @@ checksForEachContext def deftype = do
 checkPrototype :: Context -> ContextDef -> TDChecker Unit
 checkPrototype def deftype = ifNothing (lift $ lift (unwrap def ##> getPrototype >-> DTG.contextType))
   (pure unit)
-  (\ptType -> ifM (lift (toBoolean (hasContextType ptType) (unwrap def)))
+  (\ptType -> ifM (lift (toBoolean (hasContextType (unwrap def)) ptType))
     (pure unit)
     (tell [IncompatiblePrototype (unwrap def) (unwrap deftype) ptType]))
 
