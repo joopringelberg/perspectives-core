@@ -15,7 +15,7 @@ import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
-import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
+import Perspectives.Identifiers (LocalName, binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
 import Perspectives.PerspectivesTypes (RolDef(..), typeWithPerspectivesTypes)
@@ -128,9 +128,9 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
             rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen'
             pure rolIds
 
-constructRol :: RolName -> ContextID -> RolID -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RolID
-constructRol rolType contextId rolId i (RolSerialization {properties, binding: bnd}) = do
-  rolInstanceId <- pure (expandDefaultNamespaces rolId <> "_" <> (rol_padOccurrence i))
+constructRol :: RolName -> ContextID -> LocalName -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RolID
+constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
+  rolInstanceId <- pure (expandDefaultNamespaces localName <> "_" <> (rol_padOccurrence i))
   lift$ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
@@ -149,7 +149,7 @@ constructAnotherRol :: RolName -> ContextID -> RolSerialization -> MonadPerspect
 constructAnotherRol rolType id rolSerialisation = do
   ident <- pure $ expandDefaultNamespaces id
   rolInstances <- getRolInContext (RolDef rolType) ident
-  candidate <- runExceptT $ constructRol rolType ident (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType)) (typeWithPerspectivesTypes getNextRolIndex rolInstances) rolSerialisation
+  candidate <- runExceptT $ constructRol rolType ident (ident  <> "$" <> (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType))) (typeWithPerspectivesTypes getNextRolIndex rolInstances) rolSerialisation
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
