@@ -8,12 +8,12 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>))
 import Perspectives.DataTypeTripleGetters (binding, identity, rolType)
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, collectUnqualifiedPropertyDefinitions, contextBot, effectiveRolType, equalsOrIsAspectOf, expressionType, getFunctionResultType, hasContextType, hasRolType, isAspectOf, isContextTypeOf, isOrHasAspect, isRolTypeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
-import Perspectives.PerspectivesTypes (ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
+import Perspectives.ModelBasedTripleGetters (botActiesInContext, buitenRolBeschrijvingDef, canBeBoundToRolType, collectUnqualifiedPropertyDefinitions, contextBot, contextInstanceCanBeBoundToRolType, effectiveRolType, equalsOrIsAspectOf, expressionType, getFunctionResultType, hasContextType, hasRolType, isAspectOf, isContextTypeOf, isOrHasAspect, isRolTypeOf, isTypeOfRolOnTelescopeOf, mandatoryProperties, mogelijkeBinding, nonQueryRollen, ownPropertiesDef, propertiesDef, propertyReferenties, rollenDef, sumToSequence)
+import Perspectives.PerspectivesTypes (ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..))
 import Perspectives.QueryCombinators (containedIn, ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetterComposition (before, followedBy, (>->), (<<-<))
-import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol)
+import Perspectives.TripleGetterConstructors (agreesWithType, closureOfAspect, closure_, count, directAspects, getRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, some)
 import Test.Perspectives.Utils (assertEqual, loadTestModel, p, runP, unLoadTestModel, q)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 
@@ -325,6 +325,57 @@ theSuite = suiteSkip "ModelBasedTripleGetters" do
     assertEqual "psp:Property is not a (context) type of psp:Systeem"
       ((p "Systeem") ##= hasContextType (p "Property"))
       [PBool "false"]
+
+  test "isTypeOfRolOnTelescopeOf" do
+    assertEqual "The rolinstance $binnenRolBeschrijving of psp:Property has type psp:Context$binnenRolBeschrijving"
+      do
+        -- r = "model:Perspectives$Property$binnenRolBeschrijving_0001"
+        r <- p "Property" ##>> searchUnqualifiedRol "binnenRolBeschrijving"
+        unwrap r ##= isTypeOfRolOnTelescopeOf (p "Context$binnenRolBeschrijving")
+      [PBool "true"]
+    assertEqual "The rolinstance $binnenRolBeschrijving of psp:Property has type psp:Rol$buitenRolBeschrijving"
+      do
+        -- r = "model:Perspectives$Property$binnenRolBeschrijving_0001"
+        -- binding r = "model:Perspectives$Property$binnenRolBeschrijving_buitenRol"
+        r <- p "Property" ##>> searchUnqualifiedRol "binnenRolBeschrijving"
+        unwrap r ##= isTypeOfRolOnTelescopeOf (p "Rol$buitenRolBeschrijving")
+      [PBool "true"]
+    assertEqual "The rolinstance $binnenRolBeschrijving of psp:Property does not have type psp:Property$range"
+      do
+        r <- p "Property" ##>> searchUnqualifiedRol "binnenRolBeschrijving"
+        unwrap r ##= isTypeOfRolOnTelescopeOf (p "Property$range")
+      [PBool "false"]
+    assertEqual "The rolinstance $binnenRolBeschrijving of psp:ContextPrototype does have type psp:Property$range"
+      do
+        r <- p "Property" ##>> searchUnqualifiedRol "binnenRolBeschrijving"
+        unwrap r ##= isTypeOfRolOnTelescopeOf (p "Property$range")
+      [PBool "false"]
+
+  test "contextInstanceCanBeBoundToRolType" do
+    assertEqual "psp:ContextPrototype$binnenRolBeschrijving `contextInstanceCanBeBoundToRolType` psp:Context$binnenRolBeschrijving"
+      ((RolDef $ p "Context$binnenRolBeschrijving") ##= contextInstanceCanBeBoundToRolType (p "ContextPrototype$binnenRolBeschrijving"))
+      [PBool "true"]
+    assertEqual "psp:PerspectivesSysteem$modelsInUse `contextInstanceCanBeBoundToRolType` psp:PerspectivesSysteem$Context$rolInContext"
+      do
+        rt <- ContextRol "model:Perspectives$PerspectivesSysteem$Context$rolInContext_0006" ##>> rolType
+        (rt ##= contextInstanceCanBeBoundToRolType (p "PerspectivesSysteem$modelsInUse"))
+      [PBool "true"]
+    assertEqual "De mogelijkeBinding van het type van model:Perspectives$PerspectivesSysteem$Context$rolInContext_0006 is een Context type."
+      do
+        rt <- ContextRol "model:Perspectives$PerspectivesSysteem$Context$rolInContext_0006" ##>> rolType
+        (rt ##= some (mogelijkeBinding >-> sumToSequence >-> (equalsOrIsAspectOf "model:Perspectives$Context")))
+      [PBool "true"]
+    assertEqual "psp:PerspectivesSysteem$buitenRolBeschrijving `contextInstanceCanBeBoundToRolType` rolType psp:PerspectivesSysteem$Context$buitenRolBeschrijving_0001"
+      do
+        rt <- ContextRol "model:Perspectives$PerspectivesSysteem$Context$buitenRolBeschrijving_0001" ##>> rolType
+        (rt ##= contextInstanceCanBeBoundToRolType "model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving")
+      [PBool "true"]
+    assertEqual "De mogelijkeBinding van het type van model:Perspectives$PerspectivesSysteem$Context$buitenRolBeschrijving_0001 is een Context type."
+      do
+        rt <- ContextRol "model:Perspectives$PerspectivesSysteem$Context$buitenRolBeschrijving_0001" ##>> rolType
+        -- rt = model:Perspectives$Context$buitenRolBeschrijving
+        (rt ##= some (mogelijkeBinding >-> sumToSequence >-> (equalsOrIsAspectOf "model:Perspectives$Context")))
+      [PBool "true"]
 
   ---------------------------------------------------------------------------------
   -- TESTS ON THE FILE "testBotActie.crl"
