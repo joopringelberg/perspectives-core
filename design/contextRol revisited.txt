@@ -62,6 +62,10 @@ compareRolInstanceToDefinition heeft als parameter
 
 Deze twee parametersets zijn dus vergelijkbaar; maar bij checkBinding is de binding nog niet tot stand gekomen.
 
+Afbeelding:
+checkBinding.typeOfRolToBindTo === compareRolInstanceToDefinition.rolType
+checkBinding.valueToBind === compareRolInstanceToDefinition.bnd
+
 Dan volgt een GEVALSONDERSCHEIDING.
 
 	* checkBinding test of de mogelijkeBinding van het RolType een subtype is van Rol.

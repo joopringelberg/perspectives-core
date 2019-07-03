@@ -1,0 +1,78 @@
+HERONTWERP MODELLEN
+
+Ad hoc pseudo syntax voor ProtoContext:
+ProtoContext XX
+	external properties:
+	aspects:
+	parts:
+
+NB: achter elk van deze labels volgen de voor die ProtoContext geldige *definities* van properties, aspects en parts, met uitzondering van aspects. Daar staan de toegevoegde aspects.
+
+Elke gedefinieerde Part moet type Rol hebben.
+Bij filling geven we altijd de naam van een Encapsulated. 
+Het moet namelijk de naam van een type zijn. Een type is altijd een container. Maar we kunnen een part niet vullen met een container; daar hebben we zijn representatie in de vorm van ExternalRole voor nodig.
+
+Vervang:
+	* RoleContainer door Container
+	* role door part
+	* rollen door parts
+	* ContextAsRole door Encapsulated
+	* TypeClass door Composition
+	* Role door Part
+
+BASISMODEL
+ProtoContext Container
+	parts:
+		- part, filling = Encapsulated || Part
+ProtoContext Composition
+	parts:
+		- aspect, filling = Encapsulated
+ProtoContext Encapsulated
+	parts:
+		- externalRole, filling = ExternalRole
+ProtoContext ProtoContext, met aspects:
+	aspects:
+		- Container
+		- Composition
+		- Encapsulated
+	parts:
+		- defaultPrototype, filling = ExternalRole
+ProtoContext Part
+	external properties:
+		- isVerplicht
+		- isFunctioneel
+	aspects:
+		- Composition
+	parts:
+		- property, filling = Property
+		- filling, filling = Encapsulated
+ProtoContext ExternalRole
+	aspects: Part
+	filling => ExternalRole
+ProtoContext Property
+	parts: 
+		- range
+		- bindingProperty
+	aspects:
+		- Composition
+Encapsulated Null
+Encapsulated All
+
+ProtoContext heeft verder de 'prototype' faciliteit. Dat is suikersyntax om zijn buitenRol te binden aan een ExternalRole.
+
+PERSPECTIVES
+ProtoContext Context
+	aspects:
+		- Composition
+		- Encapsulated
+	parts:
+		- contextRol
+		- rolInContext
+		- gebruikerRol
+
+ProtoContext Zaak
+	aspects: Context
+
+NAAMGEVING
+Er zijn tussen de 100 en 200 voorkomens van namen van model:Perspectives en model:Query in de code.
+De minst verstorende aanpassing is dat ik Perspectives modelleer in een nieuwe namespace, b.v. model:arc.

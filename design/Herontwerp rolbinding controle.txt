@@ -1,0 +1,204 @@
+ROL BINDING CONTROLE
+
+We binden een rolinstantie b van Rol B aan een instantie a van Rol A.
+A is de combinatie van een Rol en een type T, de *mogelijke binding* van A.
+T kan een sumtype zijn.
+
+De check is: b is een T.
+Oftewel: B is T of heeft T als aspect: B isOrHasAspect T.
+
+We hebben een functie isOrHasAspect, maar die houdt geen rekening met de volgende mogelijkheden:
+	* T is een sum type
+	* b heeft een binding (is gevuld door) c en C isOrHasAspect T.
+
+HET BELANG VAN DE BINDING VAN DE TE BINDEN ROL
+Stel, T = Gebruiker (A heeft als mogelijke binding Gebruiker).
+Rolinstantie b is een PersoneelsLid.
+Maar b is gevuld door een instantie van Gebruiker.
+In b zijn dus alle properties van Gebruiker beschikbaar.
+Dus hoewel b zelf niet het type Gebruiker heeft, voldoet hij als instantie toch aan de eis van A.
+
+Het is alsof b, door zijn binding aan een instantie van Gebruiker, óók het type Gebruiker heeft verworven.
+
+HET VERSCHIL TUSSEN a hasContextType T EN A isOrHasAspect T
+Stel, Ziekenhuis.Patient is het sum type van Man en Vrouw.
+In een Context BaarmoederHalsOnderzoek is óók een rol Patient. 
+We geven BaarmoederHalsOnderzoek.Patient als mogelijke binding Vrouw.
+We gebruiken BaarmoederHalsOnderzoek als aspect voor een onderzoekscontext en geven een rol R daarin het aspect BaarmoederHalsOnderzoek.Patient.
+Nu kunnen we R niet meer vullen met Ziekenhuis.Patient.
+
+Maar, een gegeven *instantie* van Ziekenhuis.Patient, mevrouw Jansen, kan wel degelijk aan R gebonden worden.
+Dat geldt natuurlijk niet voor de instantie menéér Jansen.
+
+Oftewel:
+	mevrouw Jansen hasContextType Vrouw
+slaagt, maar
+	R isOrHasAspect Vrouw 
+faalt.
+
+TOETSEN OF EEN INSTANTIE EEN ROLTYPE HEEFT
+We bepalen eerst het type van de instantie. Dat gaat anders voor een rol dan voor een context, daarom hebben we twee functies die toetsen of iets een type heeft: hasContextType en hasRolType (beter zouden de namen contextHasType en rolHasType zijn geweest).
+
+Namen:
+rolInstance = de instantie van de rol waarvan we willen controleren of hij een type heeft;
+rolType = het type waarvan we willen controleren of rolInstance het heeft.
+
+Dan is deze expressie:
+
+	rolInstance `hasRolType` rolType
+
+een eerste benadering van onze test. Maar als hij faalt, kunnen we het nog proberen met de binding van rolInstance. Laten we beginnen met de closure van binding
+
+	closure_ binding
+
+Dit is een verzameling rolInstances. Eén van hen moet voldoen aan het type. 
+
+We draaien de test om:
+
+	rolType `isRolTypeOf` rolInstance
+
+zodat 
+
+	isRolTypeOf rolType
+
+een getter is. Nu kunnen we schrijven:
+
+	(closure_ binding) >-> (isRolTypeOf rolType)
+
+om een serie van PBool waarden te verkrijgen. Eén ervan moet waar zijn:
+
+	some (closure_ binding) >-> (isRolTypeOf rolType)
+
+en dat is onze functie! Nu nog een goede naam:
+
+isTypeOfRolOnTelescopeOf rolType = some (closure_ binding) >-> (isRolTypeOf rolType)
+
+Toepassen:
+
+	rolType `isTypeOfRolOnTelescopeOf` rolInstance
+
+En dit is een TripleGetter van een rolInstance naar PBool.
+
+TOETSEN OF EEN ROLTYPE DE BINDING VAN EEN ROLINSTANTIE TOELAAT
+Namen:
+rolType = het type van de Rol waar we aan willen binden.
+rolInstance = de rol instantie die we willen binden.
+
+We bepalen eerst de mogelijkeBinding van het RolType
+
+	mogelijkeBinding
+
+Dat kan een sum-type zijn, wat we uitpakken tot een sequence van types T met:
+
+	mogelijkeBinding >-> sumToSequence
+
+Voor één van deze types T moet gelden: 
+
+	T `isTypeOfRolOnTelescopeOf` rolInstance
+
+Eerst flippen we isTypeOfRolOnTelescopeOf:
+
+	rolInstance `hasInstanceOnTelescopeOfType` T
+
+Dan:
+
+	mogelijkeBinding >-> sumToSequence >-> isTypeOfRolOnTelescopeOf rolInstance
+
+en dit is een functie van het rolType:
+
+canBeBoundToRolType rolInstance rolType =  mogelijkeBinding >-> sumToSequence >-> isTypeOfRolOnTelescopeOf rolInstance
+
+rolInstance `canBeBoundToRolType` rolType
+
+DEBUGGEN
+(IncorrectContextRolBinding) In de context 'model:Perspectives$SimpleValue' is de ContextRol 'model:Perspectives$ContextPrototype$binnenRolBeschrijving_0001' gebonden aan 'model:Perspectives$ContextPrototype$binnenRolBeschrijving'(type: 'model:Perspectives$Rol') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$Rol"]'.
+
+[IncorrectContextRolBinding (unwrap def) (unwrap rolInstance) boundValue typeOfTheBinding (show possibleBindings)]
+
+show (IncorrectContextRolBinding cid rn bd tp mb) = "(IncorrectContextRolBinding) In de context '" <> cid <> "' is de ContextRol '" <> rn <> "' gebonden aan '" <> bd <> "'(type: '" <> tp <> "') maar moet worden gebonden aan een instantie van (één van de) type(s) '" <> mb <> "'."
+
+def 				= cid 	= model:Perspectives$SimpleValue
+rolInstance 		= rn 	= model:Perspectives$ContextPrototype$binnenRolBeschrijving_0001
+boundValue 			= bd 	= model:Perspectives$ContextPrototype$binnenRolBeschrijving
+typeOfTheBinding 	= tp 	= model:Perspectives$Rol
+possibleBindings 	= mb 	= ["model:Perspectives$Rol"]
+
+((toBoolean (telescopeHasType (unwrap rolType))) (unwrap bnd))
+
+((toBoolean (telescopeHasType (unwrap rolType))) (unwrap bnd))
+
+rolType 	= type rolInstance 		= model:Perspectives$Context$binnenRolBeschrijving
+bnd			= binding rolInstance	= model:Perspectives$ContextPrototype$binnenRolBeschrijving_buitenRol
+
+bnd `canBeBoundToRolType` rolType
+
+Dus dit is de test:
+
+	psp:ContextPrototype$binnenRolBeschrijving_buitenRol `canBeBoundToRolType` psp:Context$binnenRolBeschrijving
+
+psp:Context$binnenRolBeschrijving heeft als mogelijkeBinding psp:Rol.
+Dus: is psp:ContextPrototype$binnenRolBeschrijving_buitenRol een instantie van psp:Rol?
+Het type van die buitenrol is model:Perspectives$Rol$buitenRolBeschrijving. De rol heeft geen binding.
+Dus: heeft model:Perspectives$Rol$buitenRolBeschrijving psp:Rol als aspect?
+Nee. Het is een psp:Rol.
+
+Het probleem is, dat de rol model:Perspectives$ContextPrototype$binnenRolBeschrijving_0001 niet echt gebonden is aan 
+model:Perspectives$ContextPrototype$binnenRolBeschrijving, maar aan zijn buitenRol.
+Maar ik kan
+
+	psp:ContextPrototype$binnenRolBeschrijving `canBeBoundToRolType` psp:Context$binnenRolBeschrijving
+
+niet uitvoeren, want dan probeert ie psp:ContextPrototype$binnenRolBeschrijving op te halen als rol, uit Couchdb.
+
+Kortom, dit werkt wel voor rollen, maar niet voor contexten. Het werkt niet voor de manier waarop ik in CLR contexten bindt aan rollen. Er moet een interpretatieslag bovenop. Je moet op het juiste moment de context nemen. En dan op ContextTypes testen.
+
+TOETSEN OF EEN ROLTYPE DE BINDING VAN EEN CONTEXTINSTANTIE TOELAAT
+De gevalsonderscheiding die ik toepas in de TypeChecker, is of de mogelijke binding van rolType (een subtype van) psp:Context is:
+
+	rolType ##> MBTG.mogelijkeBinding >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Context")
+
+De interpretatie is, dat we dan niet moeten toetsen of die buitenRol past, maar of zijn context - ook een instance - past.
+We willen dus eigenlijk de context binden aan de rolinstance.
+Dan moet de mogelijke binding van het rolType passen bij de context.
+Oftewel, de context moet een instantie zijn van dat type.
+In eerste benadering, pseudo syntax:
+
+	context rolInstance `hasContextType` mogelijkeBinding rolType
+
+	contextInstance `contextInstanceCanBeBoundToRolType` rolType
+	
+	contextInstanceCanBeBoundToRolType :: ContextID -> (RolName **> PBool)
+	contextInstanceCanBeBoundToRolType contextInstance = some (mogelijkeBinding >-> sumToSequence >-> (hasContextType contextInstance))
+	
+Hier hebben we niet te maken met een telescoop. Immers de contextInstance heeft geen telescoop. Hooguit zijn buitenRol, maar die is dan per constructie gebonden aan een buitenRol van hetzelfde type (het prototype mechanisme).
+
+DEBUGGEN
+(IncorrectContextRolBinding) In de context 'model:Perspectives$PerspectivesSysteem' is de ContextRol 'model:Perspectives$PerspectivesSysteem$Context$rolInContext_0006' gebonden aan 'model:Perspectives$PerspectivesSysteem$modelsInUse'(type: 'model:Perspectives$Rol') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$Rol","model:Perspectives$Context","model:Perspectives$Sum"]'.
+
+Ik heb nodig:
+contextInstance = boundValue = bd (= wat achter "gebonden aan" staat) = model:Perspectives$PerspectivesSysteem$modelsInUse
+rolInstance = rn (= wat achter "de ContextRol" staat) = model:Perspectives$PerspectivesSysteem$Context$rolInContext_0006
+en dan is
+rolType = rolType rolInstance
+
+p "PerspectivesSysteem$modelsInUse" contextInstanceCanBeBoundToRolType rolType
+
+rolType ##= contextInstanceCanBeBoundToRolType contextInstance
+rolType ##= contextInstanceCanBeBoundToRolType (p "PerspectivesSysteem$modelsInUse")
+
+Test de toets die isContextRol oplevert:
+ rolType ##> MBTG.mogelijkeBinding >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Context")
+Hier zit een tekortkoming in, namelijk de mogelijke binding kan een sum type zijn. OPGELOST.
+
+(IncorrectContextRolBinding) In de context 'model:Perspectives$PerspectivesSysteem' is de ContextRol 'model:Perspectives$PerspectivesSysteem$Context$buitenRolBeschrijving_0001' gebonden aan 'model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving'(type: 'model:Perspectives$Rol') maar moet worden gebonden aan een instantie van (één van de) type(s) '["model:Perspectives$Rol"]'.
+
+contextInstance (= wat achter "gebonden aan" staat) = model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving
+rolInstance (= wat achter "de ContextRol" staat) = model:Perspectives$PerspectivesSysteem$Context$buitenRolBeschrijving_0001
+
+rolType ##= contextInstanceCanBeBoundToRolType contextInstance
+rolType ##= contextInstanceCanBeBoundToRolType model:Perspectives$PerspectivesSysteem$buitenRolBeschrijving
+
+WRAP VAN DE DAG
+1. De gevalsonderscheiding is van groot belang. Ik denk dat de meeste fouten daaruit komen.
+2. Vreemd: hoewel de gevalsonderscheiding problematisch is, komt niet meer voor dat een rol als context op gehaald wordt of vv.
+3. Ga na: wordt werkelijk rekening gehouden met psp:ElkType en psp:Niets?
