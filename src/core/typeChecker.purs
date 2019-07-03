@@ -7,16 +7,18 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (FD, MonadPerspectives, UserMessage(..), (%%>>), MP)
-import Perspectives.DataTypeObjectGetters (contextType, rolBindingDef, rolType)
+import Perspectives.DataTypeObjectGetters (contextType, isBuitenRol, rolBindingDef, rolType)
 import Perspectives.DataTypeTripleGetters (context)
 import Perspectives.EntiteitAndRDFAliases (RolID)
 import Perspectives.Identifiers (deconstructNamespace, guardWellFormedNess, LocalName)
 import Perspectives.ModelBasedObjectGetters (isOrHasAspect) as MBOG
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, hasRolTypeOnEachRolTelescopeOf)
+import Perspectives.ModelBasedTripleGetters (canBeBoundToRolType, contextInstanceCanBeBoundToRolType)
 import Perspectives.ModelBasedTripleGetters (sumToSequence, mogelijkeBinding, equalsOrIsAspectOf) as MBTG
 import Perspectives.ObjectGetterConstructors (alternatives, closureOfAspect, closureOfAspectRol, containedIn, getUnqualifiedContextRol, mogelijkeBinding, searchUnqualifiedPropertyDefinition, searchUnqualifiedRolDefinition, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectivesTypes (class RolClass, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef, RolDef(..), RolInContext(..), typeWithPerspectivesTypes)
+import Perspectives.PerspectivesTypes (class RolClass, AnyContext, AnyDefinition, BuitenRol(..), ContextDef(..), ContextRol(..), PBool(..), PropertyDef, RolDef(..), RolInContext(..), typeWithPerspectivesTypes)
+import Perspectives.QueryCombinators (toBoolean) as QC
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>), (##>>))
 import Perspectives.StringTripleGetterConstructors (some) as STGC
 import Perspectives.TripleGetterComposition ((>->))
@@ -129,10 +131,24 @@ mostSpecificCommonAspect types = do
 -- | * the mogelijkeBinding has type psp:Rol. This can be either an ARC ContextRol or RolInContext.
 checkBinding :: RolDef -> RolID -> MP Boolean
 checkBinding typeOfRolToBindTo valueToBind = do
-  (isContextRol :: Maybe PBool) <- typeOfRolToBindTo ##> MBTG.mogelijkeBinding >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Context")
+  (isContextRol :: Maybe PBool) <- typeOfRolToBindTo ##> (STGC.some (MBTG.mogelijkeBinding >-> MBTG.sumToSequence >-> (MBTG.equalsOrIsAspectOf "model:Perspectives$Context")))
+  -- isContextRol <- isBuitenRol $ ContextRol valueToBind
   case isContextRol of
-    (Just (PBool "true")) -> checkBindingOfContextRol (ContextRol valueToBind)
-    _ -> checkBindingOfRolInContextOrBuitenRolBeschrijving (RolInContext valueToBind)
+    (Just (PBool "true")) -> do
+    -- true -> do
+      contextInstance <- BuitenRol valueToBind ##>> context
+      r <- typeOfRolToBindTo ##> contextInstanceCanBeBoundToRolType contextInstance
+      case r of
+        (Just (PBool "true")) -> pure true
+        _ -> pure false
+    _ -> do
+      r <- typeOfRolToBindTo ##> (canBeBoundToRolType valueToBind)
+      case r of
+        (Just (PBool "true")) -> pure true
+        _ -> pure false
+    -- (Just (PBool "true")) -> checkBindingOfContextRol (ContextRol valueToBind)
+    -- _ -> checkBindingOfRolInContextOrBuitenRolBeschrijving (RolInContext valueToBind)
+
 
   where
     checkBindingOfRolInContextOrBuitenRolBeschrijving :: RolInContext -> MP Boolean

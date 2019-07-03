@@ -17,13 +17,13 @@ import Foreign.Object (keys)
 import Perspectives.ContextAndRole (rol_id, rol_pspType)
 import Perspectives.CoreTypes (type (**>), MP, MonadPerspectivesQuery, Triple(..), UserMessage(..), (@@), (@@=), (@@>), (@@>>))
 import Perspectives.DataTypeObjectGetters (isBuitenRol, propertyTypen)
-import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, propertyTypen, contextType, typeVanIedereRolInContext, buitenRol, binnenRol, rolType, binding) as DTG
+import Perspectives.DataTypeTripleGetters (getUnqualifiedProperty, rolBindingDef, propertyTypen, contextType, typeVanIedereRolInContext, buitenRol, binnenRol, rolType, binding, genericBinding) as DTG
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName)
 import Perspectives.Identifiers (LocalName, buitenRol, binnenRol)
 import Perspectives.ModelBasedStringTripleGetters (hasContextTypeOnEachRolTelescopeOf, hasRolTypeOnEachRolTelescopeOf, isSubsumedOnEachRolTelescopeOf)
-import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, contextDef, enclosingDefinition, expressionType, hasContextType, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
+import Perspectives.ModelBasedTripleGetters (bindingProperty, binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, canBeBoundToRolType, contextDef, enclosingDefinition, expressionType, hasContextType, isTypeOfRolOnTelescopeOf, mandatoryProperties, mandatoryRollen, mogelijkeBinding, nonQueryRollen, ownMogelijkeBinding, ownRangeDef, propertiesDef, propertyIsFunctioneel, rangeDef, rolDef, rollenDef, sumToSequence)
 import Perspectives.ObjectGetterConstructors (searchContextRol)
 import Perspectives.PerspectivesTypes (AnyContext, BuitenRol, Context(..), ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), Value(..))
 import Perspectives.QueryCombinators (containedIn, toBoolean)
@@ -35,6 +35,7 @@ import Perspectives.StringTripleGetterConstructors (getPrototype)
 import Perspectives.Syntax (PerspectRol)
 import Perspectives.TripleGetterComposition (before, followedBy, (>->))
 import Perspectives.TripleGetterConstructors (closureOfAspectProperty, closureOfAspectRol, directAspectProperties, directAspectRoles, getInternalProperty, searchExternalUnqualifiedProperty, searchInAspectRolesAndPrototypes, searchProperty)
+import Perspectives.TypeChecker (checkBinding)
 import Perspectives.TypeChecker (isOrHasAspect) as TC
 import Perspectives.Utilities (ifNothing)
 import Prelude (Unit, bind, const, discard, identity, ifM, map, pure, show, unit, ($), (*>), (<), (<<<), (==), (>=>), (>>=), (>>>))
@@ -544,12 +545,23 @@ compareRolInstancesToDefinition def rolType =
       -- The rolInstance can be both a ContextRol and a RolInContext.
       -- We do not distinghuish the two as types. However, the former is, by definition, bound to a
       -- BuitenRol, while the latter - again by definition - is not.
-      (mBnd :: Maybe BuitenRol) <- lift (rolInstance @@> DTG.binding)
-      case mBnd of
+      mbnd <- lift (rolInstance @@> DTG.binding)
+      case mbnd of
         Nothing -> pure unit
-        (Just bnd) -> ifM (lift $ lift $ isBuitenRol bnd)
-          (checkBindingOfContextRol def rolType rolInstance)
-          (checkBindingOfRolInContext def rolType (RolInContext $ unwrap rolInstance) (RolInContext $ unwrap bnd))
+        (Just bnd) -> do
+          matches <- lift $ lift $ checkBinding rolType (unwrap bnd)
+          -- matches <- lift ((toBoolean (canBeBoundToRolType (unwrap bnd))) rolType)
+          if matches
+            then pure unit
+            else do
+              boundValue <- lift (rolInstance @@>> DTG.rolBindingDef)
+              typeOfTheBinding <- ifNothing (lift (boundValue @@> expressionType)) (pure "no type of binding") (pure <<< identity)
+              possibleBindings <- (lift (rolType @@= mogelijkeBinding >-> sumToSequence))
+              (tell [IncorrectContextRolBinding (unwrap def) (unwrap rolInstance) boundValue typeOfTheBinding (show possibleBindings)])
+
+        -- (Just bnd) -> ifM (lift $ lift $ isBuitenRol bnd)
+        --   (checkBindingOfContextRol def rolType rolInstance)
+        --   (checkBindingOfRolInContext def rolType (RolInContext $ unwrap rolInstance) (RolInContext $ unwrap bnd))
 
     checkPropertyAvailable ::
       ContextDef ->

@@ -92,7 +92,7 @@ psp:Context psp:Context
 	$rolInContext =>
 		psp:Rol $defaultPrototype
 			extern $isFunctioneel = true
-			$mogelijkeBinding => psp:Context
+			$mogelijkeBinding => psp:ElkType
 	$rolInContext =>
 		psp:Rol $aspect
 			extern $isFunctioneel = false
