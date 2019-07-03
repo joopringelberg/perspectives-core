@@ -95,7 +95,7 @@ searchLocallyAndInPrototypeHierarchy :: forall o.
   Ord o =>
   (AnyContext **> o) ->
   (AnyContext **> o)
-searchLocallyAndInPrototypeHierarchy getter = (getter `preferLeft` \_ -> (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter)) "searchLocallyAndInPrototypeHierarchy"
+searchLocallyAndInPrototypeHierarchy getter = (getter `preferLeft` \_ -> (getPrototype >-> searchLocallyAndInPrototypeHierarchy getter)) "searchLocallyAndInPrototypeHierarchy"
 
 -- | Applies the getter (s ~~> o) to the ContextType and all its prototypes and recursively to all its aspects.
 -- Test.Perspectives.ModelBasedTripleGetters, via buitenRolBeschrijvingDef

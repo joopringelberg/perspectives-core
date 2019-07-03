@@ -217,6 +217,7 @@ hasOnEachRolTelescopeTheContextTypeOf t headOfGraph = unlessFalse (isContextType
   <|>
   ((conj
     (notEmpty (mogelijkeBinding /-/ sumToSequence))
+    -- TODO. Missen we hier niet mogelijkeBinding?
     (all (unwrap >>> alternatives >=> (pure <<< map RolDef) /-/ (hasOnEachRolTelescopeTheContextTypeOf t))))
     headOfGraph)
 

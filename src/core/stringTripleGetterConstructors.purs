@@ -6,13 +6,13 @@ where
 
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@), MPQ, Triple)
-import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext, binding, context) as DTG
+import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext) as DTG
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetRoleBinders) as OGC
 import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_) as QC
 import Perspectives.TripleGetterComposition (before, (>->), preferLeft)
-import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, searchRolInContext, directAspectRoles, getInternalProperty) as TGC
+import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, searchRolInContext, directAspectRoles, getInternalProperty, getPrototype) as TGC
 import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (flip, (<>), ($))
@@ -26,7 +26,7 @@ searchInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchInPrototypeHierarchy getter = typeWithPerspectivesTypes DTG.buitenRol >-> TGC.searchInRolTelescope getter
 
 searchLocallyAndInPrototypeHierarchy :: StringTypedTripleGetter -> StringTypedTripleGetter
-searchLocallyAndInPrototypeHierarchy getter = getter `preferLeft` (\_ -> (DTG.buitenRol >-> DTG.binding >-> DTG.context >-> searchLocallyAndInPrototypeHierarchy getter)) $ "searchLocallyAndInPrototypeHierarchy"
+searchLocallyAndInPrototypeHierarchy getter = getter `preferLeft` (\_ -> (TGC.getPrototype >-> searchLocallyAndInPrototypeHierarchy getter)) $ "searchLocallyAndInPrototypeHierarchy"
 
 searchInAspectsAndPrototypes :: StringTypedTripleGetter -> StringTypedTripleGetter
 searchInAspectsAndPrototypes getter = (searchLocallyAndInPrototypeHierarchy getter `preferLeft` \_ -> (TGC.directAspects >-> searchInAspectsAndPrototypes getter)) "searchInAspectsAndPrototypes"

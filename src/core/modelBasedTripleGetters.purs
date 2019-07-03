@@ -4,12 +4,11 @@ import Data.Foldable (foldMap)
 import Data.Maybe (maybe)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap, wrap)
+import Perspectives.ApiTypes (ContextID)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@))
 import Perspectives.DataTypeObjectGetters (rolType)
-import Perspectives.DataTypeTripleGetters (binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol) as DTG
-import Perspectives.DataTypeTripleGetters (contextType, genericRolType, identity) as DTTG
-import Perspectives.DataTypeTripleGetters (identity)
-import Perspectives.EntiteitAndRDFAliases (RolID)
+import Perspectives.DataTypeTripleGetters (genericRolType, contextType, binding, iedereRolInContext, label, context, genericBinding, rolBindingDef, buitenRol, identity) as DTG
+import Perspectives.EntiteitAndRDFAliases (RolID, RolName)
 import Perspectives.Identifiers (LocalName) as ID
 import Perspectives.Identifiers (deconstructLocalNameFromDomeinURI)
 import Perspectives.Identifiers as Id
@@ -17,7 +16,7 @@ import Perspectives.ModelBasedObjectGetters (buitenRolBeschrijvingDef, binnenRol
 import Perspectives.ObjectsGetterComposition (composeMonoidal)
 import Perspectives.PerspectivesTypes (class RolClass, ActieDef, AnyContext, AnyDefinition, ContextDef(..), ContextRol(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), SimpleValueDef(..), UserRolDef, ZaakDef, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (closure', filter, notEmpty, difference, conj, containedIn, cond, union) as QC
-import Perspectives.StringTripleGetterConstructors (closure, directAspects, getPrototype, getRolInContext) as STGC
+import Perspectives.StringTripleGetterConstructors (closure, directAspects, getPrototype) as STGC
 import Perspectives.TripleGetterComposition (before, followedBy, lazyIntersectionOfTripleObjects, lazyUnionOfTripleObjects, preferLeft, (>->), unlessFalse)
 import Perspectives.TripleGetterConstructors (agreesWithType, all, closureOfAspectProperty, closureOfAspectRol, closure_, concat, directAspectProperties, directAspectRoles, getContextRol, getRolInContext, getRoleBinders, searchContextRol, searchExternalUnqualifiedProperty, searchInAspectPropertiesAndPrototypes, searchInAspectRolesAndPrototypes, searchRolInContext, searchUnqualifiedPropertyDefinition, searchUnqualifiedRol, searchUnqualifiedRolDefinition, some, alternatives)
 import Perspectives.TripleGetterFromObjectGetter (constructInverseRolGetter, trackedAs)
@@ -149,7 +148,7 @@ mandatoryRollen = QC.difference f (f >-> directAspectRoles)
     f = QC.filter rolIsVerplicht (closure_ STGC.directAspects >-> (closure_ STGC.getPrototype) >-> ownRollenDef)
 
 nonQueryRollen :: (AnyContext **> RolDef)
-nonQueryRollen = QC.filter (unwrap `before` DTTG.contextType >-> isNotAQuery) rollenDef where
+nonQueryRollen = QC.filter (unwrap `before` DTG.contextType >-> isNotAQuery) rollenDef where
   isNotAQuery :: (AnyDefinition **> PBool)
   isNotAQuery = QC.containedIn "model:Perspectives$Rol" (closure_ STGC.directAspects)
 
@@ -170,7 +169,7 @@ propertiesDef = concat defsInAspectsAndPrototypes defsInMogelijkeBinding
   defsInMogelijkeBinding = mogelijkeBinding >-> sumToSequence >-> QC.cond (isOrHasAspect "model:Perspectives$Context")
     (buitenRolBeschrijvingDef >-> defsInAspectsAndPrototypes)
     (lazyUnionOfTripleObjects
-      (identity `followedBy` RolDef)
+      (DTG.identity `followedBy` RolDef)
       (\_ -> propertiesDef)
       "propertiesDef")
 
@@ -214,13 +213,6 @@ bindingProperty = unwrap `before` getContextRol (RolDef "model:Perspectives$Prop
 
 type Instance = String
 
-
--- Oude definitie. KLOPT NIET!!
--- hasContextType_oud :: AnyContext -> (AnyDefinition **> PBool)
--- hasContextType_oud p = TypedTripleGetter ("hasContextType_" <> p) f where
---   f :: TripleGetter AnyDefinition PBool
---   f x = p @@ some (expressionType >-> closure_ STGC.directAspects >-> (agreesWithType x) )
-
 -- KLOPT
 -- | Inverse of hasContextType.
 -- | isContextTypeOf supertype subinstance
@@ -248,10 +240,7 @@ isContextTypeOf supertype = expressionType >-> equalsOrIsAspectOf supertype
 -- | In pseudo syntax:
 -- | (contextType subinstance) `isOrHasAspect` supertype
 hasContextType :: AnyContext -> (AnyDefinition **> PBool)
-hasContextType subinstance = TypedTripleGetter ("hasContextType_" <> subinstance) f
-  where
-    f :: TripleGetter AnyContext PBool
-    f supertype = subinstance @@ (isContextTypeOf supertype)
+hasContextType = flipTripleGetter isContextTypeOf "hasContextType"
 
 -- KLOPT
 -- | Inverse of isRolTypeOf
@@ -264,7 +253,7 @@ hasContextType subinstance = TypedTripleGetter ("hasContextType_" <> subinstance
 hasRolType :: RolID -> (AnyDefinition **> PBool)
 hasRolType subinstance = TypedTripleGetter ("hasRolType_" <> subinstance) f where
   f :: TripleGetter AnyDefinition PBool
-  f supertype = subinstance @@ some (DTTG.genericRolType >-> closure_ (RolDef `before` directAspectRoles `followedBy` unwrap) >-> (agreesWithType supertype))
+  f supertype = subinstance @@ some (DTG.genericRolType >-> closure_ (RolDef `before` directAspectRoles `followedBy` unwrap) >-> (agreesWithType supertype))
 
 -- KLOPT
 -- | Inverse of hasRolType.
@@ -306,6 +295,9 @@ isOrHasSuperType = equalsOrIsAspectOf
 isOrHasAspect :: AnyDefinition -> (AnyDefinition **> PBool)
 isOrHasAspect = flipTripleGetter equalsOrIsAspectOf "isOrHasAspect"
 
+-- When super is a sum type:
+-- f sub = all (sumToSequence >-> (isOrHasAspect sub))
+
 -- KLOPT
 -- | Inverse of hasAspect (not yet implemented).
 -- | isAspectOf super sub
@@ -316,7 +308,7 @@ isAspectOf :: AnyDefinition -> (AnyDefinition **> PBool)
 isAspectOf q = some (STGC.closure STGC.directAspects >-> agreesWithType q)
 
 sumToSequence :: (AnyDefinition **> AnyDefinition)
-sumToSequence = (alternatives `preferLeft` const identity) "sumToSequence"
+sumToSequence = (alternatives `preferLeft` const DTG.identity) "sumToSequence"
 
 -- | True iff t (the first parameter)ither agrees with the head of the graph, or if it is in the rol telescope
 -- | for each of its mogelijkeBindingen
@@ -328,6 +320,27 @@ hasTypeOnEachRolTelescopeOf t = ((unwrap `before` hasContextType (unwrap t)) `un
       (QC.notEmpty (mogelijkeBinding >-> sumToSequence))
       (all (mogelijkeBinding >-> sumToSequence `followedBy` RolDef >-> (hasTypeOnEachRolTelescopeOf t)))))
   "hasTypeOnEachRolTelescopeOf"
+
+-- | isTypeOfRolOnTelescopeOf rolType rolInstance
+-- | rolType `isTypeOfRolOnTelescopeOf` rolInstance
+-- | True, if the rolInstance has RolName as type, or if (recursively) its binding has.
+isTypeOfRolOnTelescopeOf :: RolName -> (RolID **> PBool)
+isTypeOfRolOnTelescopeOf rolType = some ((closure_ DTG.genericBinding) >-> (isRolTypeOf rolType))
+
+-- | Flipped version of isTypeOfRolOnTelescopeOf.
+-- | rolInstance `hasInstanceOnTelescopeOfType` rolType
+hasInstanceOnTelescopeOfType :: RolID -> (RolName **> PBool)
+hasInstanceOnTelescopeOfType = flipTripleGetter isTypeOfRolOnTelescopeOf "hasInstanceOnTelescopeOfType"
+
+-- | canBeBoundToRolType rolInstance rolType
+-- | rolInstance `canBeBoundToRolType` rolType
+-- | True iff the rolInstance has any of the types that are allowed by rolType, or if its binding (recursively) has.
+canBeBoundToRolType :: RolID -> (RolDef **> PBool)
+canBeBoundToRolType rolInstance = mogelijkeBinding >-> sumToSequence >-> hasInstanceOnTelescopeOfType rolInstance
+
+-- | contextInstance `contextInstanceCanBeBoundToRolType` rolType
+contextInstanceCanBeBoundToRolType :: ContextID -> (RolDef **> PBool)
+contextInstanceCanBeBoundToRolType contextInstance = some (mogelijkeBinding >-> sumToSequence >-> (hasContextType contextInstance))
 
 -- | Collect all definitions of a Property with the local name, in the RolDef and its Aspects
 -- | and in all their prototypes and on the rolGraph of the RolDef. Notice there may be more than one!
@@ -348,16 +361,16 @@ getFunctionResultType = getRolInContext (RolDef "model:Perspectives$Function$res
 -- | Instead, we return the type of the **result** of the function. The result is explicitly given as
 -- | the value bound to the role psp:Function$result.
 expressionType :: (AnyContext **> AnyDefinition)
-expressionType = QC.cond (hasContextType' "model:Perspectives$Function") getFunctionResultType DTTG.contextType
+expressionType = QC.cond (hasContextType' "model:Perspectives$Function") getFunctionResultType DTG.contextType
   where
   -- We need this slightly less powerful definition of isContextTypeOf built from contextType
   -- because we cannot use expressionType without creating a cyclic definition.
-  hasContextType' q = DTTG.contextType >-> equalsOrIsAspectOf q
+  hasContextType' q = DTG.contextType >-> equalsOrIsAspectOf q
 
 -- | Applied to a type of Rol, this function will return the same type if the *type of the roltype* is psp:Rol.
 -- | However, if the type of the roltype is psp:Function, it will return the value of psp:Function$Result of the roltype.
 effectiveRolType :: (AnyContext **> AnyDefinition)
-effectiveRolType = QC.cond (isContextTypeOf' "model:Perspectives$Function") getFunctionResultType DTTG.identity
+effectiveRolType = QC.cond (isContextTypeOf' "model:Perspectives$Function") getFunctionResultType DTG.identity
   where
     isContextTypeOf' :: AnyDefinition -> (AnyContext **> PBool)
-    isContextTypeOf' supertype = DTTG.contextType >-> equalsOrIsAspectOf supertype
+    isContextTypeOf' supertype = DTG.contextType >-> equalsOrIsAspectOf supertype
