@@ -22,6 +22,7 @@ newPerspectivesState uinfo tr av =
   -- Aanvullen met Perspectives types
   , contexts: new unit
   , enumeratedRoles: new unit
+  , calculatedRoles: new unit
 
   , domeinCache: new unit
   , userInfo: uinfo

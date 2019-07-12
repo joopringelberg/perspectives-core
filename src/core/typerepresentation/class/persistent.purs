@@ -22,10 +22,11 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (deconstructModelName, deconstructNamespace)
 import Perspectives.InstanceRepresentation (Revision) as B
 import Perspectives.PerspectivesState (insert, lookup, remove)
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Revision (class Revision, changeRevision, rev)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..))
 
 -- | Members of Persistent trade identifiers for a representation.
 
@@ -181,3 +182,16 @@ instance persistentEnumeratedRole :: Persistent EnumeratedRole EnumeratedRoleTyp
     (\(DomeinFile dff@{enumeratedRoles}) -> DomeinFile dff {enumeratedRoles = FO.insert (unwrap i) v enumeratedRoles})
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{enumeratedRoles}) -> FO.lookup (unwrap i) enumeratedRoles)
+
+instance persistentCalculatedRole :: Persistent CalculatedRole CalculatedRoleType where
+  identifier = _._id <<< unwrap
+  cache _ = gets _.calculatedRoles
+  representInternally c = do
+    av <- liftAff empty
+    insert (cache (CalculatedRoleType "")) (unwrap c) av
+  retrieveInternally i = lookup (cache (CalculatedRoleType "")) (unwrap i)
+  removeInternally i = remove (cache (CalculatedRoleType "")) (unwrap i)
+  cacheInDomeinFile i v = ifNamespace i
+    (\(DomeinFile dff@{calculatedRoles}) -> DomeinFile dff {calculatedRoles = FO.insert (unwrap i) v calculatedRoles})
+  retrieveFromDomein i = retrieveFromDomein_ i
+    (\(DomeinFile{calculatedRoles}) -> FO.lookup (unwrap i) calculatedRoles)

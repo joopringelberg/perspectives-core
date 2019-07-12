@@ -10,9 +10,9 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextT
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
-newtype CalculatedRole = CalculatedRole ComputedRoleRecord
+newtype CalculatedRole = CalculatedRole CalculatedRoleRecord
 
-type ComputedRoleRecord =
+type CalculatedRoleRecord =
   { _id :: CalculatedRoleType
   , _rev :: Revision
   , displayName :: String
@@ -22,20 +22,20 @@ type ComputedRoleRecord =
   , context :: ContextType
   }
 
-derive instance genericRepComputedRole :: Generic CalculatedRole _
+derive instance genericRepCalculatedRole :: Generic CalculatedRole _
 
-instance showComputedRole :: Show CalculatedRole where
+instance showCalculatedRole :: Show CalculatedRole where
   show = genericShow
 
-instance eqComputedRole :: Eq CalculatedRole where
+instance eqCalculatedRole :: Eq CalculatedRole where
   eq (CalculatedRole {_id : id1}) (CalculatedRole {_id : id2}) = id1 == id2
 
-derive instance newtypeComputedRole :: Newtype CalculatedRole _
+derive instance newtypeCalculatedRole :: Newtype CalculatedRole _
 
-derive newtype instance writeForeignComputedRole :: WriteForeign CalculatedRole
+derive newtype instance writeForeignCalculatedRole :: WriteForeign CalculatedRole
 
-derive newtype instance readForeignComputedRole :: ReadForeign CalculatedRole
+derive newtype instance readForeignCalculatedRole :: ReadForeign CalculatedRole
 
-instance revisionComputedRole :: Revision CalculatedRole where
+instance revisionCalculatedRole :: Revision CalculatedRole where
   rev = _._rev <<< unwrap
   changeRevision s = over CalculatedRole (\vr -> vr {_rev = s})
