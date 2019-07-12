@@ -5,7 +5,8 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType)
+import Perspectives.Representation.QueryFunction (QueryFunction)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType, RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -15,7 +16,9 @@ type ComputedRoleRecord =
   { _id :: CalculatedRoleType
   , _rev :: Revision
   , displayName :: String
+  , kindOfRole :: RoleKind
 
+  , calculation :: QueryFunction
   , context :: ContextType
   }
 

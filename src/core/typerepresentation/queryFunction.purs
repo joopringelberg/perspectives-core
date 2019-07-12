@@ -14,27 +14,27 @@ import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON)
 
 type FunctionName = String
 
-data QueryFunction_
+data QueryFunction
   = DataTypeGetter FunctionName
   | PropertyGetter FunctionName PropertyType
   | RolGetter FunctionName EnumeratedRoleType
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
-  | UnaryCombinator FunctionName QueryFunction_
-  | NaryCombinator FunctionName (Array QueryFunction_)
-  | Filter QueryFunction_ QueryFunction_
+  | UnaryCombinator FunctionName QueryFunction
+  | NaryCombinator FunctionName (Array QueryFunction)
+  | Filter QueryFunction QueryFunction
 
-derive instance genericRepQueryFunction :: Generic QueryFunction_ _
+derive instance genericRepQueryFunction :: Generic QueryFunction _
 
-instance showQueryFunction :: Show QueryFunction_ where
+instance showQueryFunction :: Show QueryFunction where
   show x = genericShow x
 
-instance eqQueryFunction :: Eq QueryFunction_ where
+instance eqQueryFunction :: Eq QueryFunction where
   eq x = genericEq x
 
 type ConstructorRep = {tag :: String, dat :: Array String}
 
-instance writeForeignQueryFunction :: WriteForeign QueryFunction_ where
+instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (DataTypeGetter f) = unsafeToForeign $ writeJSON {tag: "DataTypeGetter", dat: f}
   writeImpl (PropertyGetter f p) = unsafeToForeign $ writeJSON {tag: "PropertyGetter", dat: [f, unwrap p]}
   writeImpl (RolGetter f p) = unsafeToForeign $ writeJSON {tag: "RolGetter", dat: [f, unwrap p]}
@@ -45,9 +45,9 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction_ where
   writeImpl (Filter c q) = unsafeToForeign $ writeJSON {tag: "Filter", dat: [writeJSON c, writeJSON q]}
 
 
-instance readForeignQueryFunction :: ReadForeign QueryFunction_ where
+instance readForeignQueryFunction :: ReadForeign QueryFunction where
   readImpl q = case readJSON (unsafeFromForeign q) of
-    (Left e) -> fail (ForeignError "Could not parse QueryFunction_ data")
+    (Left e) -> fail (ForeignError "Could not parse QueryFunction data")
     (Right ({tag, dat} :: ConstructorRep)) -> case tag of
       "DataTypeGetter" -> pure $ unsafePartial $ DataTypeGetter $ head dat
       "PropertyGetter" -> pure $ unsafePartial $ PropertyGetter (head dat) (PropertyType (head $ tail dat))
@@ -65,4 +65,4 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction_ where
         (Right c) -> case (readJSON (unsafePartial (head $ tail dat))) of
           (Left e) -> fail $ ForeignError $ show e
           (Right sq) -> pure $ unsafePartial $ Filter c sq
-      x -> fail $ ForeignError ("Unknown case in ReadForeign QueryFunction_: " <> show x)
+      x -> fail $ ForeignError ("Unknown case in ReadForeign QueryFunction: " <> show x)
