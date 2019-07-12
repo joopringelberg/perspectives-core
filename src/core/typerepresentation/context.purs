@@ -7,7 +7,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Object (Object)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRolType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -26,9 +26,9 @@ type ContextRecord =
 
   , rolInContext :: Object RoleType
   , contextRol :: Object RoleType
-  , externeRol :: EnumeratedRolType
-  , gebruikerRol :: Object EnumeratedRolType
-  , botRol :: Object EnumeratedRolType
+  , externeRol :: EnumeratedRoleType
+  , gebruikerRol :: Object EnumeratedRoleType
+  , botRol :: Object EnumeratedRoleType
   }
 
 derive instance genericRepContext :: Generic Context _

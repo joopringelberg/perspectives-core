@@ -6,7 +6,7 @@ import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRolType, RoleType, RoleKind)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, RoleKind) 
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -16,12 +16,12 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 newtype EnumeratedRole = EnumeratedRole EnumeratedRoleRecord
 
 type EnumeratedRoleRecord =
-  { _id :: EnumeratedRolType
+  { _id :: EnumeratedRoleType
   , _rev :: Revision
   , displayName :: String
   , kindOfRole :: RoleKind
 
-  , roleAspects :: Array EnumeratedRolType
+  , roleAspects :: Array EnumeratedRoleType
   , defaultPrototype :: Maybe String
 
   , context :: ContextType

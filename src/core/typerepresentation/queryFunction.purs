@@ -5,49 +5,19 @@ import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Newtype (class Newtype, over, unwrap)
+import Data.Newtype (unwrap)
 import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Graph.TypeIdentifiers (ComputedRolType, EnumeratedRolType(..), PropertyType(..), ContextType)
-import Perspectives.InstanceRepresentation (Revision)
-import Perspectives.Representation.Class.Revision (class Revision)
-import Prelude (class Eq, class Show, pure, ($), (<>), show, (<<<), (==))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..))
+import Prelude (class Eq, class Show, pure, ($), (<>), show)
 import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON)
-
-newtype ComputedRole = ComputedRole ComputedRoleRecord
-
-type ComputedRoleRecord =
-  { _id :: ComputedRolType
-  , _rev :: Revision
-  , displayName :: String
-
-  , context :: ContextType
-  }
-
-derive instance genericRepComputedRole :: Generic ComputedRole _
-
-instance showComputedRole :: Show ComputedRole where
-  show = genericShow
-
-instance eqComputedRole :: Eq ComputedRole where
-  eq (ComputedRole {_id : id1}) (ComputedRole {_id : id2}) = id1 == id2
-
-derive instance newtypeComputedRole :: Newtype ComputedRole _
-
-derive newtype instance writeForeignComputedRole :: WriteForeign ComputedRole
-
-derive newtype instance readForeignComputedRole :: ReadForeign ComputedRole
-
-instance revisionComputedRole :: Revision ComputedRole where
-  rev = _._rev <<< unwrap
-  changeRevision s = over ComputedRole (\vr -> vr {_rev = s})
 
 type FunctionName = String
 
 data QueryFunction_
   = DataTypeGetter FunctionName
   | PropertyGetter FunctionName PropertyType
-  | RolGetter FunctionName EnumeratedRolType
+  | RolGetter FunctionName EnumeratedRoleType
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
   | UnaryCombinator FunctionName QueryFunction_
@@ -81,7 +51,7 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction_ where
     (Right ({tag, dat} :: ConstructorRep)) -> case tag of
       "DataTypeGetter" -> pure $ unsafePartial $ DataTypeGetter $ head dat
       "PropertyGetter" -> pure $ unsafePartial $ PropertyGetter (head dat) (PropertyType (head $ tail dat))
-      "RolGetter" -> pure $ unsafePartial $ RolGetter (head dat) (EnumeratedRolType (head $ tail dat))
+      "RolGetter" -> pure $ unsafePartial $ RolGetter (head dat) (EnumeratedRoleType (head $ tail dat))
       "ComputedRoleGetter" -> pure $ unsafePartial $ ComputedRoleGetter $ head dat
       "ComputedPropertyGetter" -> pure $ unsafePartial $ ComputedPropertyGetter $ head dat
       "UnaryCombinator" -> case (readJSON (unsafePartial (head $ tail dat))) of

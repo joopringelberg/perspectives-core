@@ -26,7 +26,7 @@ import Perspectives.Representation.Class.Revision (class Revision, changeRevisio
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRolType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 
 -- | Members of Persistent trade identifiers for a representation.
 
@@ -135,7 +135,7 @@ addContextToDomeinFile :: Context -> DomeinFile -> DomeinFile
 addContextToDomeinFile c (DomeinFile dff@{contexts}) = DomeinFile dff {contexts = FO.insert (unwrap $ (identifier c :: ContextType)) c contexts}
 
 addEnumeratedRoleToDomeinFile :: EnumeratedRole -> DomeinFile -> DomeinFile
-addEnumeratedRoleToDomeinFile c (DomeinFile dff@{enumeratedRoles}) = DomeinFile dff {enumeratedRoles = FO.insert (unwrap $ (identifier c :: EnumeratedRolType)) c enumeratedRoles}
+addEnumeratedRoleToDomeinFile c (DomeinFile dff@{enumeratedRoles}) = DomeinFile dff {enumeratedRoles = FO.insert (unwrap $ (identifier c :: EnumeratedRoleType)) c enumeratedRoles}
 
 -- addQueryFunctionToDomeinFile :: String -> QueryFunction -> DomeinFile -> DomeinFile
 -- addQueryFunctionToDomeinFile id c (DomeinFile dff@{queries}) = DomeinFile dff {queries = FO.insert (unwrap $ (identifier c :: QueryFunctionType)) c queries}
@@ -170,14 +170,14 @@ instance persistentContext :: Persistent Context ContextType where
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{contexts}) -> FO.lookup (unwrap i) contexts)
 
-instance persistentEnumeratedRole :: Persistent EnumeratedRole EnumeratedRolType where
+instance persistentEnumeratedRole :: Persistent EnumeratedRole EnumeratedRoleType where
   identifier = _._id <<< unwrap
   cache _ = gets _.enumeratedRoles
   representInternally c = do
     av <- liftAff empty
-    insert (cache (EnumeratedRolType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (EnumeratedRolType "")) (unwrap i)
-  removeInternally i = remove (cache (EnumeratedRolType "")) (unwrap i)
+    insert (cache (EnumeratedRoleType "")) (unwrap c) av
+  retrieveInternally i = lookup (cache (EnumeratedRoleType "")) (unwrap i)
+  removeInternally i = remove (cache (EnumeratedRoleType "")) (unwrap i)
   cacheInDomeinFile i v = ifNamespace i
     (\(DomeinFile dff@{enumeratedRoles}) -> DomeinFile dff {enumeratedRoles = FO.insert (unwrap i) v enumeratedRoles})
   retrieveFromDomein i = retrieveFromDomein_ i

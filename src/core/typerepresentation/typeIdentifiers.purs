@@ -51,35 +51,35 @@ instance showContextType :: Show ContextType where
 instance eqContextType :: Eq ContextType where
   eq (ContextType id1) (ContextType id2) = id1 == id2
 
-newtype EnumeratedRolType = EnumeratedRolType String
-derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRolType _
-derive instance genericRepEnumeratedRolType :: Generic EnumeratedRolType _
-derive newtype instance writeForeignEnumeratedRolType :: WriteForeign EnumeratedRolType
-derive newtype instance readForeignEnumeratedRolType :: ReadForeign EnumeratedRolType
-instance showEnumeratedRolType :: Show EnumeratedRolType where
+newtype EnumeratedRoleType = EnumeratedRoleType String
+derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
+derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
+derive newtype instance writeForeignEnumeratedRolType :: WriteForeign EnumeratedRoleType
+derive newtype instance readForeignEnumeratedRolType :: ReadForeign EnumeratedRoleType
+instance showEnumeratedRolType :: Show EnumeratedRoleType where
   show = show <<< unwrap
-instance encodeEnumeratedRolType :: Encode EnumeratedRolType where
+instance encodeEnumeratedRolType :: Encode EnumeratedRoleType where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeEnumeratedRolType :: Decode EnumeratedRolType where
+instance decodeEnumeratedRolType :: Decode EnumeratedRoleType where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqEnumeratedRolType :: Eq EnumeratedRolType where
-  eq (EnumeratedRolType id1) (EnumeratedRolType id2) = id1 == id2
+instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
+  eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
 
-newtype ComputedRolType = ComputedRolType String
-derive instance newtypeComputedRolType :: Newtype ComputedRolType _
-derive instance genericRepComputedRolType :: Generic ComputedRolType _
-derive newtype instance writeForeignComputedRolType :: WriteForeign ComputedRolType
-derive newtype instance readForeignComputedRolType :: ReadForeign ComputedRolType
-instance showComputedRolType :: Show ComputedRolType where
+newtype CalculatedRoleType = CalculatedRoleType String
+derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
+derive instance genericRepComputedRolType :: Generic CalculatedRoleType _
+derive newtype instance writeForeignComputedRolType :: WriteForeign CalculatedRoleType
+derive newtype instance readForeignComputedRolType :: ReadForeign CalculatedRoleType
+instance showComputedRolType :: Show CalculatedRoleType where
   show = show <<< unwrap
-instance encodeComputedRolType :: Encode ComputedRolType where
+instance encodeComputedRolType :: Encode CalculatedRoleType where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeComputedRolType :: Decode ComputedRolType where
+instance decodeComputedRolType :: Decode CalculatedRoleType where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqComputedRolType :: Eq ComputedRolType where
-  eq (ComputedRolType id1) (ComputedRolType id2) = id1 == id2
+instance eqComputedRolType :: Eq CalculatedRoleType where
+  eq (CalculatedRoleType id1) (CalculatedRoleType id2) = id1 == id2
 
-data RoleType = ENR EnumeratedRolType | CR ComputedRolType
+data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
 instance writeForeignRoleType :: WriteForeign RoleType where
   writeImpl (ENR r) = writeImpl r
