@@ -25,6 +25,7 @@
     "uri",
     "node-fs-aff",
     "simple-json",
-    "kishimen"
+    "kishimen",
+    "validation"
   ]
 }

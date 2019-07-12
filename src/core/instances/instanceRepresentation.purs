@@ -5,13 +5,28 @@ import Perspectives.EntiteitAndRDFAliases
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object) as F
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Prelude (class Show, class Eq, (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON')
+
+-----------------------------------------------------------
+-- PERSPECTCONTEXT TYPE CLASS
+-----------------------------------------------------------
+class PerspectContextClass c where
+  identifier :: c -> String
+  pspType :: c -> ContextType
+  externalRole :: c -> String
+  roles :: c -> F.Object (Array ID)
+
+instance perspectContextPerspectContextClass :: PerspectContextClass PerspectContext where
+  identifier c = (unwrap c)._id
+  pspType c = (unwrap c).pspType
+  externalRole c = (unwrap c).buitenRol
+  roles c = (unwrap c).rolInContext
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
