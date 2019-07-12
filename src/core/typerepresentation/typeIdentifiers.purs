@@ -11,33 +11,6 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
-newtype VertexType = VertexType String
-derive instance newtypeVertexType :: Newtype VertexType _
-derive instance genericRepVertexType :: Generic VertexType _
-derive newtype instance writeForeignVertexType :: WriteForeign VertexType
-instance showVertexType :: Show VertexType where
-  show = show <<< unwrap
-instance encodeVertexType :: Encode VertexType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeVertexType :: Decode VertexType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqVertexType :: Eq VertexType where
-  eq (VertexType id1) (VertexType id2) = id1 == id2
-
-
-newtype EdgeType = EdgeType String
-derive instance newtypeEdgeType :: Newtype EdgeType _
-derive instance genericRepEdgeType :: Generic EdgeType _
-derive newtype instance writeForeignEdgeType :: WriteForeign EdgeType
-instance showEdgeType :: Show EdgeType where
-  show = show <<< unwrap
-instance encodeEdgeType :: Encode EdgeType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeEdgeType :: Decode EdgeType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqEdgeType :: Eq EdgeType where
-  eq (EdgeType id1) (EdgeType id2) = id1 == id2
-
 newtype PropertyType = PropertyType String
 derive instance newtypePropertyType :: Newtype PropertyType _
 derive instance genericRepPropertyType :: Generic PropertyType _
