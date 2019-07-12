@@ -20,6 +20,9 @@ instance calculatedPropertyViewClass :: ViewClass View where
   role r = (unwrap r).role
   propertyReferences r = (unwrap r).propertyReferences
 
+-----------------------------------------------------------
+-- VIEW
+-----------------------------------------------------------
 newtype View = View ViewRecord
 
 type ViewRecord =

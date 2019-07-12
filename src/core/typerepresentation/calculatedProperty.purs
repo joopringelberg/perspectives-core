@@ -21,6 +21,9 @@ instance calculatedPropertyCalculatedPropertyClass :: CalculatedPropertyClass Ca
   role r = (unwrap r).role
   calculation r = (unwrap r).calculation
 
+-----------------------------------------------------------
+-- CALCULATEDPROPERTY
+-----------------------------------------------------------
 newtype CalculatedProperty = CalculatedProperty CalculatedPropertyRecord
 
 type CalculatedPropertyRecord =

@@ -23,6 +23,9 @@ instance calculatedRoleCalculatedRoleClass :: CalculatedRoleClass CalculatedRole
   calculation r = (unwrap r).calculation
   context r = (unwrap r).context
 
+-----------------------------------------------------------
+-- CALCULATEDROLE
+-----------------------------------------------------------
 newtype CalculatedRole = CalculatedRole CalculatedRoleRecord
 
 type CalculatedRoleRecord =

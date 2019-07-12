@@ -2,13 +2,27 @@ module Perspectives.Representation.EnumeratedRole where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, RoleKind) 
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
+
+-----------------------------------------------------------
+-- ENUMERATEDROLE TYPE CLASS
+-----------------------------------------------------------
+class EnumeratedRoleClass r where
+  kindOfRole :: r -> RoleKind
+  roleAspects :: r -> Array EnumeratedRoleType
+  context :: r -> ContextType
+  binding :: r -> RoleType
+
+instance calculatedRoleCalculatedRoleClass :: EnumeratedRoleClass EnumeratedRole where
+  kindOfRole r = (unwrap r).kindOfRole
+  roleAspects r = (unwrap r).roleAspects
+  context r = (unwrap r).context
+  binding r = (unwrap r).binding
 
 -----------------------------------------------------------
 -- ENUMERATEDROLE
@@ -22,7 +36,6 @@ type EnumeratedRoleRecord =
   , kindOfRole :: RoleKind
 
   , roleAspects :: Array EnumeratedRoleType
-  , defaultPrototype :: Maybe String
 
   , context :: ContextType
   , binding :: RoleType
