@@ -26,6 +26,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
@@ -48,6 +49,7 @@ type CalculatedRoles = GLStrMap (AVar CalculatedRole)
 type EnumeratedProperties = GLStrMap (AVar EnumeratedProperty)
 type CalculatedProperties = GLStrMap (AVar CalculatedProperty)
 type Views = GLStrMap (AVar View)
+type Actions = GLStrMap (AVar Action)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 type QueryCache = GLStrMap (TypedTripleGetter String String)
 
@@ -61,6 +63,7 @@ type PerspectivesState = CouchdbState (
   , enumeratedProperties :: EnumeratedProperties
   , calculatedProperties :: CalculatedProperties
   , views :: Views
+  , actions :: Actions
 
   , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean

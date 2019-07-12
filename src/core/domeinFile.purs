@@ -6,6 +6,7 @@ import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object, empty)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
@@ -24,6 +25,7 @@ newtype DomeinFile = DomeinFile
   , enumeratedProperties :: Object EnumeratedProperty
   , calculatedProperties :: Object CalculatedProperty
   , views :: Object View
+  , actions :: Object Action
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -40,7 +42,7 @@ derive newtype instance writeForeignDomeinFile :: WriteForeign DomeinFile
 derive newtype instance readForeignDomeinFile :: ReadForeign DomeinFile
 
 defaultDomeinFile :: DomeinFile
-defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty}
+defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}
 
 -- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
 type DomeinFileContexts = Object Context

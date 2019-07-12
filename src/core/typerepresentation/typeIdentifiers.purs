@@ -112,3 +112,13 @@ instance showViewType :: Show ViewType where
   show = show <<< unwrap
 instance eqViewType :: Eq ViewType where
   eq (ViewType id1) (ViewType id2) = id1 == id2
+
+newtype ActionType = ActionType String
+derive instance newtypeActionType :: Newtype ActionType _
+derive instance genericRepActionType :: Generic ActionType _
+derive newtype instance writeForeignActionType :: WriteForeign ActionType
+derive newtype instance readForeignActionType :: ReadForeign ActionType
+instance showActionType :: Show ActionType where
+  show = show <<< unwrap
+instance eqActionType :: Eq ActionType where
+  eq (ActionType id1) (ActionType id2) = id1 == id2

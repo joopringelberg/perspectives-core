@@ -22,13 +22,14 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (deconstructModelName, deconstructNamespace)
 import Perspectives.InstanceRepresentation (Revision) as B
 import Perspectives.PerspectivesState (insert, lookup, remove)
+import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Revision (class Revision, changeRevision, rev)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
 import Perspectives.Representation.View (View)
 
 -- | Members of Persistent trade identifiers for a representation.
@@ -237,3 +238,16 @@ instance persistentView :: Persistent View ViewType where
     (\(DomeinFile dff@{views}) -> DomeinFile dff {views = FO.insert (unwrap i) v views})
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{views}) -> FO.lookup (unwrap i) views)
+
+instance persistentAction :: Persistent Action ActionType where
+  identifier = _._id <<< unwrap
+  cache _ = gets _.actions
+  representInternally c = do
+    av <- liftAff empty
+    insert (cache (ActionType "")) (unwrap c) av
+  retrieveInternally i = lookup (cache (ActionType "")) (unwrap i)
+  removeInternally i = remove (cache (ActionType "")) (unwrap i)
+  cacheInDomeinFile i v = ifNamespace i
+    (\(DomeinFile dff@{actions}) -> DomeinFile dff {actions = FO.insert (unwrap i) v actions})
+  retrieveFromDomein i = retrieveFromDomein_ i
+    (\(DomeinFile{actions}) -> FO.lookup (unwrap i) actions)
