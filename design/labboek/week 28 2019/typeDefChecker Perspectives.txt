@@ -82,9 +82,15 @@ Functie
 REPRESENTATIE IN PURESCRIPT
 We hebben nodig:
 	* Context
-	* EnumeratedRolType
-	* EnumeratedPropertyType
-	* Property
+	* EnumeratedRole
+	* CalculatedRole (met QueryFunction)
+	* EnumeratedProperty
+	* CalculatedProperty (met QueryFunction)
 	* View
 	* Actie
-	* Functie
+
+Types als newtype voor elk van de bovenstaande en dan nog:
+	* RoleType (de sum van EnumeratedRoleType en CalculatedRoleType)
+	* PropertyType (de sum van EnumeratedProperty en CalculatedProperty)
+
+En dan hebben we RoleKind om in de representatie van een rol (EnumeratedRole, CalculatedRole) de functie van de rol zijn context aan te geven: ExternalRole, RoleInContext, ContextRole, UserRole, BotRole

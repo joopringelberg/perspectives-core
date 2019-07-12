@@ -11,36 +11,6 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
-newtype PropertyType = PropertyType String
-derive instance newtypePropertyType :: Newtype PropertyType _
-derive instance genericRepPropertyType :: Generic PropertyType _
-derive newtype instance writeForeignPropertyType :: WriteForeign PropertyType
-instance showPropertyType :: Show PropertyType where
-  show = show <<< unwrap
-instance encodePropertyType :: Encode PropertyType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodePropertyType :: Decode PropertyType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqPropertyType :: Eq PropertyType where
-  eq (PropertyType id1) (PropertyType id2) = id1 == id2
-
--- A type that matches every other type.
-newtype EveryType = EveryType String
-derive instance newtypeEveryType :: Newtype EveryType _
-derive instance genericRepEveryType :: Generic EveryType _
-derive newtype instance writeForeignEveryType :: WriteForeign EveryType
-instance showEveryType :: Show EveryType where
-  show = show <<< unwrap
-instance encodeEveryType :: Encode EveryType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeEveryType :: Decode EveryType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance eqEveryType :: Eq EveryType where
-  eq (EveryType id1) (EveryType id2) = id1 == id2
-
------------------------------------------------------------
--- PERSPECTIVES TYPES
------------------------------------------------------------
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
 derive instance genericRepContextType :: Generic ContextType _
@@ -117,3 +87,50 @@ instance encodeRoleKind :: Encode RoleKind where
   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 instance decodeRoleKind :: Decode RoleKind where
   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+
+newtype EnumeratedPropertyType = EnumeratedPropertyType String
+derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
+derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyType _
+derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
+instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
+  show = show <<< unwrap
+instance encodeEnumeratedPropertyType :: Encode EnumeratedPropertyType where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance decodeEnumeratedPropertyType :: Decode EnumeratedPropertyType where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
+  eq (EnumeratedPropertyType id1) (EnumeratedPropertyType id2) = id1 == id2
+
+newtype CalculatedPropertyType = CalculatedPropertyType String
+derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
+derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyType _
+derive newtype instance writeForeignCalculatedPropertyType :: WriteForeign CalculatedPropertyType
+instance showCalculatedPropertyType :: Show CalculatedPropertyType where
+  show = show <<< unwrap
+instance encodeCalculatedPropertyType :: Encode CalculatedPropertyType where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance decodeCalculatedPropertyType :: Decode CalculatedPropertyType where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
+  eq (CalculatedPropertyType id1) (CalculatedPropertyType id2) = id1 == id2
+
+data PropertyType = ENP EnumeratedPropertyType | CP CalculatedPropertyType
+
+derive instance genericRepPropertyType :: Generic PropertyType _
+instance writeForeignPropertyType :: WriteForeign PropertyType where
+  writeImpl (ENP r) = writeImpl r
+  writeImpl (CP r) = writeImpl r
+instance readForeignPropertyType :: ReadForeign PropertyType where
+  readImpl r = readImpl r
+instance showPropertyType :: Show PropertyType where
+  show (ENP r) = show r
+  show (CP r) = show r
+instance encodePropertyType :: Encode PropertyType where
+  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance decodePropertyType :: Decode PropertyType where
+  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance eqPropertyType :: Eq PropertyType where
+  eq (ENP _) (CP _) = false
+  eq (CP _) (ENP _) = false
+  eq (CP r1) (CP r2) = r1 == r2
+  eq (ENP r1) (ENP r2) = r1 == r2

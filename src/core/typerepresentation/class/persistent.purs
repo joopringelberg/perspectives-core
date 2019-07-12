@@ -25,7 +25,6 @@ import Perspectives.PerspectivesState (insert, lookup, remove)
 import Perspectives.Representation.Class.Revision (class Revision, changeRevision, rev)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 
 -- | Members of Persistent trade identifiers for a representation.
