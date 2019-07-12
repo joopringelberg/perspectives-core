@@ -18,9 +18,10 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), binding)
 import Perspectives.Token (token)
 import Prelude (class Show, Unit, bind, discard, identity, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
@@ -346,7 +347,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         (PerspectRol defaultRolRecord
           { _id = rolId
           , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
-          , pspType = show rname
+          , pspType = EnumeratedRoleType $ show rname
           , binding = binding (maybe "" identity bindng)
           , context = show cname
           , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
@@ -496,22 +497,14 @@ context = withRoleCounting context' where
               (PerspectContext defaultContextRecord
                 { _id = (show instanceName)
                 , displayName  = localName
-                , pspType = show typeName
+                , pspType = ContextType $ show typeName
                 , buitenRol = buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
               })
-            cacheRol (binnenRol (show instanceName))
-              (PerspectRol defaultRolRecord
-                { _id = binnenRol (show instanceName)
-                , pspType = show typeName <> "$binnenRolBeschrijving"
-                , context = (show instanceName)
-                , binding = binding $ buitenRol (show instanceName)
-                , properties = FO.fromFoldable privateProps
-                })
             cacheRol (buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = buitenRol (show instanceName)
-                , pspType = show typeName <> "$buitenRolBeschrijving"
+                , pspType = EnumeratedRoleType $ show typeName <> "$buitenRolBeschrijving"
                 , context = (show instanceName)
                 , binding = binding $ maybe "" buitenRol prototype
                 , properties = FO.fromFoldable publicProps
@@ -578,7 +571,7 @@ definition = do
     (PerspectRol defaultRolRecord
       { _id = rolId
       , occurrence = maybe 0 identity nrOfRoleOccurrences
-      , pspType = (show prop)
+      , pspType = EnumeratedRoleType (show prop)
       , binding = binding bindng
       , context = enclContext
       })
@@ -594,45 +587,6 @@ importExpression = do
   case mpre of
     Nothing -> pure unit
     (Just pre) -> setPrefix pre mn
-
------------------------------------------------------------
--- Text
------------------------------------------------------------
-enclosingContext ::  IP ParseRoot
-enclosingContext = withRoleCounting enclosingContext' where
-  enclosingContext' = do
-    cmtBefore <- manyOneLineComments
-    withPos do
-      (EnclosingContextDeclaration textName cmt) <- enclosingContextDeclaration
-      _ <- AR.many importExpression
-      (publicProps :: List (Tuple PropertyName (Array Value))) <- withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment)
-      (privateProps :: List (Tuple PropertyName (Array Value))) <- withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment)
-      (defs :: Array ((Tuple String (Array ID)))) <- AR.many section
-      cacheContext textName
-        (PerspectContext defaultContextRecord
-          { _id = textName
-          , displayName  = textName
-          , pspType = "model:Perspectives$Model"
-          , buitenRol = buitenRol textName
-          , rolInContext = FO.fromFoldable defs
-          })
-      cacheRol (binnenRol textName)
-        (PerspectRol defaultRolRecord
-          { _id = binnenRol textName
-          , pspType = "model:Perspectives$Context$binnenRolBeschrijving"
-          , context = textName
-          , binding = binding $ buitenRol textName
-          , properties = FO.fromFoldable privateProps
-          })
-      cacheRol (buitenRol textName)
-        (PerspectRol defaultRolRecord
-          { _id = buitenRol textName
-          , pspType = "model:Perspectives$Context$buitenRolBeschrijving"
-          , context = textName
-          , properties = FO.fromFoldable publicProps
-          , binding = binding "model:Perspectives$ContextPrototype_buitenRol"
-          })
-      pure $ RootContext textName
 
 -----------------------------------------------------------
 -- User data
@@ -655,9 +609,6 @@ userData = do
 -- Parse Root
 -----------------------------------------------------------
 data ParseRoot = UserData (Array ID) | RootContext ID
-
-rootParser ::  IP ParseRoot
-rootParser = enclosingContext <|> userData
 
 -----------------------------------------------------------
 -- ParseAndCache

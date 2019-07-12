@@ -5,21 +5,19 @@ import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Class (class Encode, class Decode)
-import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', changeContext_type, changeRol_rev, changeRol_rev', changeRol_type, context_id, context_pspType, context_rev', rol_id, rol_pspType, rol_rev')
+import Foreign.Class (class Decode, class Encode)
+import Perspectives.ContextAndRole (changeContext_rev, changeContext_rev', changeRol_rev, changeRol_rev', context_id, context_rev', rol_id, rol_rev')
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.PerspectivesState (contextDefinitionsInsert, contextDefinitionsLookup, contextDefinitionsRemove, rolDefinitionsInsert, rolDefinitionsLookup, rolDefinitionsRemove)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol, Revision)
+import Perspectives.PerspectivesState (contextDefinitionsInsert, contextDefinitionsLookup, contextDefinitionsRemove, rolDefinitionsInsert, rolDefinitionsLookup, rolDefinitionsRemove)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<<<), (<>), (>>=), (>=>))
-import Simple.JSON (class WriteForeign)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
-class (WriteForeign a, Encode a, Decode a) <=  PerspectEntiteit a where
+class (Encode a, Decode a, WriteForeign a, ReadForeign a) <=  PerspectEntiteit a where
   getRevision' :: a -> Revision
   setRevision' :: Revision -> a -> a
   setRevision :: String -> a -> a
-  getType :: a -> ID
-  setType :: ID -> a -> a
   getId :: a -> ID
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: ID -> MonadPerspectives (AVar a)
@@ -30,8 +28,6 @@ instance perspectEntiteitContext :: PerspectEntiteit PerspectContext where
   getRevision' = context_rev'
   setRevision' = changeContext_rev'
   setRevision = changeContext_rev
-  getType = context_pspType
-  setType = changeContext_type
   getId = context_id
   representInternally c = (liftAff empty) >>= contextDefinitionsInsert c
   retrieveInternally = contextDefinitionsLookup
@@ -41,8 +37,6 @@ instance perspectEntiteitRol :: PerspectEntiteit PerspectRol where
   getRevision' = rol_rev'
   setRevision' = changeRol_rev'
   setRevision = changeRol_rev
-  getType = rol_pspType
-  setType = changeRol_type
   getId = rol_id
   representInternally c = (liftAff empty) >>= rolDefinitionsInsert c
   retrieveInternally = rolDefinitionsLookup

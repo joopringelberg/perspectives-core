@@ -28,7 +28,7 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.TypesForDeltas (Delta, encodeDefault)
+import Perspectives.TypesForDeltas (Delta)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=), unit)
 import Simple.JSON (class WriteForeign)
 import Unsafe.Coerce (unsafeCoerce)
@@ -430,9 +430,6 @@ derive instance genericRepTransactie :: Generic Transactie _
 
 instance showTransactie :: Show Transactie where
   show = genericShow
-
-instance encodeTransactie :: Encode Transactie where
-  encode = encodeDefault
 
 derive newtype instance writeForeignTransactie :: WriteForeign Transactie
 

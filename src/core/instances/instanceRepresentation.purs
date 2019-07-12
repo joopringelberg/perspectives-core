@@ -6,10 +6,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Foreign (unsafeFromForeign, unsafeToForeign)
+import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object) as F
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Show, class Eq, (==))
-import Simple.JSON (class ReadForeign, class WriteForeign)
+import Prelude (class Show, class Eq, (==), (>>>))
+import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON')
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT
@@ -30,11 +32,11 @@ derive instance genericRepPerspectContext :: Generic PerspectContext _
 instance showPerspectContext :: Show PerspectContext where
   show = genericShow
 
--- instance encodePerspectContext :: Encode PerspectContext where
---   encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
---
--- instance decodePerspectContext :: Decode PerspectContext where
---   decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+instance encodePerspectContext :: Encode PerspectContext where
+  encode = writeJSON >>> unsafeToForeign
+
+instance decodePerspectContext :: Decode PerspectContext where
+  decode = unsafeFromForeign >>> readJSON'
 
 instance eqPerspectContext :: Eq PerspectContext where
   eq (PerspectContext {_id : id1}) (PerspectContext {_id : id2}) = id1 == id2
@@ -68,6 +70,12 @@ instance showPerspectRol :: Show PerspectRol where
   show = genericShow
 
 derive instance newtypePerspectRol :: Newtype PerspectRol _
+
+instance encodePerspectRol :: Encode PerspectRol where
+  encode = writeJSON >>> unsafeToForeign
+
+instance decodePerspectRol :: Decode PerspectRol where
+  decode = unsafeFromForeign >>> readJSON'
 
 derive newtype instance writeForeignPerspectRol :: WriteForeign PerspectRol
 
