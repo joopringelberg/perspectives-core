@@ -102,3 +102,13 @@ instance eqPropertyType :: Eq PropertyType where
   eq (CP _) (ENP _) = false
   eq (CP r1) (CP r2) = r1 == r2
   eq (ENP r1) (ENP r2) = r1 == r2
+
+newtype ViewType = ViewType String
+derive instance newtypeViewType :: Newtype ViewType _
+derive instance genericRepViewType :: Generic ViewType _
+derive newtype instance writeForeignViewType :: WriteForeign ViewType
+derive newtype instance readForeignViewType :: ReadForeign ViewType
+instance showViewType :: Show ViewType where
+  show = show <<< unwrap
+instance eqViewType :: Eq ViewType where
+  eq (ViewType id1) (ViewType id2) = id1 == id2

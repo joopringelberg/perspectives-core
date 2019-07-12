@@ -28,7 +28,8 @@ import Perspectives.Representation.Class.Revision (class Revision, changeRevisio
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
+import Perspectives.Representation.View (View)
 
 -- | Members of Persistent trade identifiers for a representation.
 
@@ -223,3 +224,16 @@ instance persistentCalculatedProperty :: Persistent CalculatedProperty Calculate
     (\(DomeinFile dff@{calculatedProperties}) -> DomeinFile dff {calculatedProperties = FO.insert (unwrap i) v calculatedProperties})
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{calculatedProperties}) -> FO.lookup (unwrap i) calculatedProperties)
+
+instance persistentView :: Persistent View ViewType where
+  identifier = _._id <<< unwrap
+  cache _ = gets _.views
+  representInternally c = do
+    av <- liftAff empty
+    insert (cache (ViewType "")) (unwrap c) av
+  retrieveInternally i = lookup (cache (ViewType "")) (unwrap i)
+  removeInternally i = remove (cache (ViewType "")) (unwrap i)
+  cacheInDomeinFile i v = ifNamespace i
+    (\(DomeinFile dff@{views}) -> DomeinFile dff {views = FO.insert (unwrap i) v views})
+  retrieveFromDomein i = retrieveFromDomein_ i
+    (\(DomeinFile{views}) -> FO.lookup (unwrap i) views)

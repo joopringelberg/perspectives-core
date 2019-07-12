@@ -31,6 +31,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.View (View)
 import Perspectives.TypesForDeltas (Delta)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
 import Simple.JSON (class WriteForeign)
@@ -46,6 +47,7 @@ type EnumeratedRoles = GLStrMap (AVar EnumeratedRole)
 type CalculatedRoles = GLStrMap (AVar CalculatedRole)
 type EnumeratedProperties = GLStrMap (AVar EnumeratedProperty)
 type CalculatedProperties = GLStrMap (AVar CalculatedProperty)
+type Views = GLStrMap (AVar View)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 type QueryCache = GLStrMap (TypedTripleGetter String String)
 
@@ -58,6 +60,7 @@ type PerspectivesState = CouchdbState (
   , calculatedRoles :: CalculatedRoles
   , enumeratedProperties :: EnumeratedProperties
   , calculatedProperties :: CalculatedProperties
+  , views :: Views
 
   , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean
