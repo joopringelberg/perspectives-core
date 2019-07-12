@@ -13,6 +13,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), Revision, RolRecord)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Prelude (identity, ($), (/), (<>), show, (+))
 
 -- CONTEXT
@@ -44,10 +45,10 @@ context_displayName (PerspectContext{displayName})= displayName
 changeContext_displayName :: String -> PerspectContext -> PerspectContext
 changeContext_displayName dn (PerspectContext cr) = PerspectContext $ cr {displayName = dn}
 
-context_pspType :: PerspectContext -> ContextID
+context_pspType :: PerspectContext -> ContextType
 context_pspType (PerspectContext{pspType})= pspType
 
-changeContext_type :: ContextID -> PerspectContext -> PerspectContext
+changeContext_type :: ContextType -> PerspectContext -> PerspectContext
 changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = tp}
 
 context_buitenRol :: PerspectContext -> RolID
@@ -92,7 +93,7 @@ defaultContextRecord =
   { _id: ""
   , _rev: Nothing
   , displayName: ""
-  , pspType: ""
+  , pspType: ContextType ""
   , buitenRol: ""
   , rolInContext: empty
   }
@@ -100,7 +101,7 @@ defaultContextRecord =
 defaultRolRecord :: RolRecord
 defaultRolRecord =
   { _id: ""
-  , pspType: ""
+  , pspType: EnumeratedRoleType ""
   , context: ""
   , _rev: Nothing
   , binding: Nothing
@@ -129,10 +130,10 @@ changeRol_rev' rev (PerspectRol cr) = PerspectRol $ cr {_rev = rev}
 rol_occurrence :: PerspectRol -> Int
 rol_occurrence (PerspectRol{occurrence}) = occurrence
 
-rol_pspType :: PerspectRol -> ContextID
+rol_pspType :: PerspectRol -> EnumeratedRoleType
 rol_pspType (PerspectRol{pspType}) = pspType
 
-changeRol_type :: ContextID -> PerspectRol -> PerspectRol
+changeRol_type :: EnumeratedRoleType -> PerspectRol -> PerspectRol
 changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = tp}
 
 rol_binding :: PerspectRol -> Maybe RolID

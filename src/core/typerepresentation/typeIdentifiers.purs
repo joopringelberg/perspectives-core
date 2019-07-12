@@ -7,8 +7,6 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign (unsafeToForeign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 newtype ContextType = ContextType String
@@ -28,10 +26,6 @@ derive newtype instance writeForeignEnumeratedRolType :: WriteForeign Enumerated
 derive newtype instance readForeignEnumeratedRolType :: ReadForeign EnumeratedRoleType
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
   show = show <<< unwrap
-instance encodeEnumeratedRolType :: Encode EnumeratedRoleType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeEnumeratedRolType :: Decode EnumeratedRoleType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
   eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
 
@@ -42,10 +36,6 @@ derive newtype instance writeForeignComputedRolType :: WriteForeign CalculatedRo
 derive newtype instance readForeignComputedRolType :: ReadForeign CalculatedRoleType
 instance showComputedRolType :: Show CalculatedRoleType where
   show = show <<< unwrap
-instance encodeComputedRolType :: Encode CalculatedRoleType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeComputedRolType :: Decode CalculatedRoleType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqComputedRolType :: Eq CalculatedRoleType where
   eq (CalculatedRoleType id1) (CalculatedRoleType id2) = id1 == id2
 
@@ -59,10 +49,6 @@ instance readForeignRoleType :: ReadForeign RoleType where
 instance showRoleType :: Show RoleType where
   show (ENR r) = show r
   show (CR r) = show r
-instance encodeRoleType :: Encode RoleType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeRoleType :: Decode RoleType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqRoleType :: Eq RoleType where
   eq (ENR _) (CR _) = false
   eq (CR _) (ENR _) = false
@@ -83,10 +69,6 @@ instance showRoleKind :: Show RoleKind where
   show = genericShow
 instance eqRoleKind :: Eq RoleKind where
   eq = genericEq
-instance encodeRoleKind :: Encode RoleKind where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeRoleKind :: Decode RoleKind where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
@@ -94,10 +76,6 @@ derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyTy
 derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
   show = show <<< unwrap
-instance encodeEnumeratedPropertyType :: Encode EnumeratedPropertyType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeEnumeratedPropertyType :: Decode EnumeratedPropertyType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
   eq (EnumeratedPropertyType id1) (EnumeratedPropertyType id2) = id1 == id2
 
@@ -107,10 +85,6 @@ derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyTy
 derive newtype instance writeForeignCalculatedPropertyType :: WriteForeign CalculatedPropertyType
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
   show = show <<< unwrap
-instance encodeCalculatedPropertyType :: Encode CalculatedPropertyType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodeCalculatedPropertyType :: Decode CalculatedPropertyType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
   eq (CalculatedPropertyType id1) (CalculatedPropertyType id2) = id1 == id2
 
@@ -125,10 +99,6 @@ instance readForeignPropertyType :: ReadForeign PropertyType where
 instance showPropertyType :: Show PropertyType where
   show (ENP r) = show r
   show (CP r) = show r
-instance encodePropertyType :: Encode PropertyType where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-instance decodePropertyType :: Decode PropertyType where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 instance eqPropertyType :: Eq PropertyType where
   eq (ENP _) (CP _) = false
   eq (CP _) (ENP _) = false
