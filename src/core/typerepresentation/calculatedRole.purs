@@ -10,6 +10,19 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextT
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
+-----------------------------------------------------------
+-- CALCULATED ROLE TYPE CLASS
+-----------------------------------------------------------
+class CalculatedRoleClass r where
+  kindOfRole :: r -> RoleKind
+  calculation :: r -> QueryFunction
+  context :: r -> ContextType
+
+instance calculatedRoleCalculatedRoleClass :: CalculatedRoleClass CalculatedRole where
+  kindOfRole r = (unwrap r).kindOfRole
+  calculation r = (unwrap r).calculation
+  context r = (unwrap r).context
+
 newtype CalculatedRole = CalculatedRole CalculatedRoleRecord
 
 type CalculatedRoleRecord =

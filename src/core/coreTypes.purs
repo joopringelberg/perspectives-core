@@ -26,8 +26,10 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.TypesForDeltas (Delta)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
@@ -42,6 +44,8 @@ type RolDefinitions = GLStrMap (AVar PerspectRol)
 type Contexts = GLStrMap (AVar Context)
 type EnumeratedRoles = GLStrMap (AVar EnumeratedRole)
 type CalculatedRoles = GLStrMap (AVar CalculatedRole)
+type EnumeratedProperties = GLStrMap (AVar EnumeratedProperty)
+type CalculatedProperties = GLStrMap (AVar CalculatedProperty)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 type QueryCache = GLStrMap (TypedTripleGetter String String)
 
@@ -52,6 +56,8 @@ type PerspectivesState = CouchdbState (
   , contexts :: Contexts
   , enumeratedRoles :: EnumeratedRoles
   , calculatedRoles :: CalculatedRoles
+  , enumeratedProperties :: EnumeratedProperties
+  , calculatedProperties :: CalculatedProperties
 
   , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean

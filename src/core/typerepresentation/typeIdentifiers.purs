@@ -6,7 +6,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
-import Foreign (unsafeToForeign)
+import Kishimen (genericSumToVariant)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 newtype ContextType = ContextType String
@@ -58,11 +58,7 @@ instance eqRoleType :: Eq RoleType where
 data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
 derive instance genericRepRoleKind :: Generic RoleKind _
 instance writeForeignRoleKind :: WriteForeign RoleKind where
-  writeImpl RoleInContext = unsafeToForeign "RoleInContext"
-  writeImpl ContextRole = unsafeToForeign "ContextRole"
-  writeImpl ExternalRole = unsafeToForeign "ExternalRole"
-  writeImpl UserRole = unsafeToForeign "UserRole"
-  writeImpl BotRole = unsafeToForeign "BotRole"
+  writeImpl = writeImpl <<< genericSumToVariant
 instance readForeignRoleKind :: ReadForeign RoleKind where
   readImpl f = readImpl f
 instance showRoleKind :: Show RoleKind where
@@ -74,6 +70,7 @@ newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
 derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyType _
 derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
+derive newtype instance readForeignEnumeratedPropertyType :: ReadForeign EnumeratedPropertyType
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
   show = show <<< unwrap
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
@@ -83,6 +80,7 @@ newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
 derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyType _
 derive newtype instance writeForeignCalculatedPropertyType :: WriteForeign CalculatedPropertyType
+derive newtype instance readForeignCalculatedPropertyType :: ReadForeign CalculatedPropertyType
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
   show = show <<< unwrap
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where

@@ -23,6 +23,8 @@ newPerspectivesState uinfo tr av =
   , contexts: new unit
   , enumeratedRoles: new unit
   , calculatedRoles: new unit
+  , enumeratedProperties: new unit
+  , calculatedProperties: new unit
 
   , domeinCache: new unit
   , userInfo: uinfo

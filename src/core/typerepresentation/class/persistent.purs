@@ -22,11 +22,13 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (deconstructModelName, deconstructNamespace)
 import Perspectives.InstanceRepresentation (Revision) as B
 import Perspectives.PerspectivesState (insert, lookup, remove)
-import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
+import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Revision (class Revision, changeRevision, rev)
 import Perspectives.Representation.Context (Context)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
 
 -- | Members of Persistent trade identifiers for a representation.
 
@@ -195,3 +197,29 @@ instance persistentCalculatedRole :: Persistent CalculatedRole CalculatedRoleTyp
     (\(DomeinFile dff@{calculatedRoles}) -> DomeinFile dff {calculatedRoles = FO.insert (unwrap i) v calculatedRoles})
   retrieveFromDomein i = retrieveFromDomein_ i
     (\(DomeinFile{calculatedRoles}) -> FO.lookup (unwrap i) calculatedRoles)
+
+instance persistentEnumeratedProperty :: Persistent EnumeratedProperty EnumeratedPropertyType where
+  identifier = _._id <<< unwrap
+  cache _ = gets _.enumeratedProperties
+  representInternally c = do
+    av <- liftAff empty
+    insert (cache (EnumeratedPropertyType "")) (unwrap c) av
+  retrieveInternally i = lookup (cache (EnumeratedPropertyType "")) (unwrap i)
+  removeInternally i = remove (cache (EnumeratedPropertyType "")) (unwrap i)
+  cacheInDomeinFile i v = ifNamespace i
+    (\(DomeinFile dff@{enumeratedProperties}) -> DomeinFile dff {enumeratedProperties = FO.insert (unwrap i) v enumeratedProperties})
+  retrieveFromDomein i = retrieveFromDomein_ i
+    (\(DomeinFile{enumeratedProperties}) -> FO.lookup (unwrap i) enumeratedProperties)
+
+instance persistentCalculatedProperty :: Persistent CalculatedProperty CalculatedPropertyType where
+  identifier = _._id <<< unwrap
+  cache _ = gets _.calculatedProperties
+  representInternally c = do
+    av <- liftAff empty
+    insert (cache (CalculatedPropertyType "")) (unwrap c) av
+  retrieveInternally i = lookup (cache (CalculatedPropertyType "")) (unwrap i)
+  removeInternally i = remove (cache (CalculatedPropertyType "")) (unwrap i)
+  cacheInDomeinFile i v = ifNamespace i
+    (\(DomeinFile dff@{calculatedProperties}) -> DomeinFile dff {calculatedProperties = FO.insert (unwrap i) v calculatedProperties})
+  retrieveFromDomein i = retrieveFromDomein_ i
+    (\(DomeinFile{calculatedProperties}) -> FO.lookup (unwrap i) calculatedProperties)
