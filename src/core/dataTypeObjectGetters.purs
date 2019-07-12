@@ -14,8 +14,11 @@ import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, t
 import Perspectives.Identifiers (binnenRol) as PI
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), RolDef, binding, typeWithPerspectivesTypes)
-import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.Instances (getPerspectEntiteit)
 import Prelude (bind, join, pure, ($), (>=>), (<<<), map)
+
+identity :: forall o. (o ~~> o)
+identity x = pure [x]
 
 -- | Some ObjectsGetters will return an array with a single ID. Some of them represent contexts (such as the result
 -- | of context), others roles (such as the result of binding). The Partial function below returns that

@@ -10,10 +10,9 @@ import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as F
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinFile (DomeinFile, addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
+import Perspectives.DomeinFile (DomeinFile, defaultDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (Prefix, QualifiedName(..))
-import Perspectives.Syntax (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
@@ -171,12 +170,3 @@ setPrefix pre exp = do
 
 getPrefix :: Prefix -> IP (Maybe String)
 getPrefix pre = lift (lift (gets (\{prefixes} -> F.lookup pre prefixes)))
-
------------------------------------------------------------
--- Domeinfile
------------------------------------------------------------
-addRol :: PerspectRol -> IP Unit
-addRol rol = void $ lift $ lift $ modify \s@{domeinFile} -> s {domeinFile = addRolToDomeinFile rol domeinFile }
-
-addContext :: PerspectContext -> IP Unit
-addContext ctxt = void $ lift (lift (modify \s@{domeinFile} -> s {domeinFile = addContextToDomeinFile ctxt domeinFile }))

@@ -1,0 +1,90 @@
+CONTROLES VAN EEN PERSPECTIVES MODEL
+
+Om misverstanden te voorkomen: we controleren alle types die zijn gedefineerd in een model dat is opgesteld in termen van Perspectives, d.w.z. Context, ExterneRol, RolInContext, ContextRol, GebruikerRol, BotRol, Property, View, Aktie en Functie.
+
+HOOFDSTRUCTUUR PERSPECTIVES
+Dit zijn de members die de tien primitieve concepten hebben:
+
+Context
+	* rolInContext -> RolInContext of Functie
+	* contextRol -> ContextRol of Functie
+	* externeRol -> ExterneRol of Functie
+	* gebruikerRol -> GebruikerRol
+	* botRol -> BotRol
+	* aspectContext -> Context
+	* defaultPrototype -> een instantie van het type context zelf.
+
+ExterneRol, RolInContext, ContextRol, GebruikerRol, BotRol. Geen van de leden is verplicht.
+	* property -> Property
+	* aspectRol -> hetzelfde type rol.
+	* binding -> hetzelfde type rol, m.u.v. ContextRol (ExterneRol en ContextRol) en BotRol (GebruikerRol).
+	* boundInRole -> hetzelfde type rol, m.u.v. ExterneRol (ContextRol en ExterneRol) en GebruikerRol (BotRol)
+
+Property
+	* functional -> boolean
+	* mandatory -> boolean
+	* range -> SimpleValue
+	* aspectProperty -> Property
+	* bindingProperty -> Property
+
+View
+	* property -> Property
+		- volgnummer -> Int
+		- lokaleNaam -> String (tbv api, los conflicten op die ontstaan door dezelfde namen in verschillende namespaces)
+
+Actie
+	* subject -> GebruikerRol, BotRol
+	* werkwoord -> String
+	* object -> ExterneRol, RolInContext, ContextRol, GebruikerRol, BotRol
+	* objectView -> View
+	* indirectObject -> ExterneRol, RolInContext, ContextRol, GebruikerRol, BotRol
+	* indirectObjectView -> View
+	* conditie -> Functie
+
+Functie even buiten beschouwing gelaten.
+
+CONTROLES VOOR EEN PERSPECTIVES MODEL
+
+Context C
+	* controleer de types van alle leden
+	* de aspectContext-graaf mag niet cyclisch zijn.
+	* er moet een gebruikerRol zijn.
+
+ExterneRol, RolInContext, ContextRol, GebruikerRol, BotRol
+	* controleer de types van alle leden
+	* functional en mandatory moeten zijn gespecificeerd (of we nemen een default aan)
+	* de aspectRol graaf mag niet cyclisch zijn
+	* de aspectRol moet een rol zijn van de aspectContext van de omhullende Context
+	* binding moet de binding van elke aspectRol als aspect hebben
+	* functional en mandatory moeten in overeenstemming zijn met de waarden op elk van de aspectRollen (false mag overschreven worden met true)
+
+Property P
+	* controleer de types van alle leden
+	* functional en mandatory moeten zijn gespecificeerd (of we nemen een default aan)
+	* range moet beschikbaar zijn op de Property of op een aspectProperty
+	* range moet gelijk zijn aan of een specialisatie zijn van de range van de aspectProperties.
+	* als een bindingProperty is gegeven, moet er ook een aspectProperty zijn.
+	* range, functional en mandatory van de bindingProperty moeten in overeenstemming zijn met de aspectProperties.
+	* bindingProperty moet een property zijn van binding (recursief)
+
+Aktie A
+	* controleer de types van alle leden.
+	* elke property in objectView moet beschikbaar zijn op de binding van object. Een property is beschikbaar als
+		- hij gedefinieerd is voor de binding van object
+		- hij gedefinieerd is voor één van de aspecten van de binding van object, recursief.
+	* hetzelfde voor indirectObjectView.
+	* het type van conditie moet Boolean zijn.
+
+View 
+
+Functie
+
+REPRESENTATIE IN PURESCRIPT
+We hebben nodig:
+	* Context
+	* EnumeratedRolType
+	* EnumeratedPropertyType
+	* Property
+	* View
+	* Actie
+	* Functie

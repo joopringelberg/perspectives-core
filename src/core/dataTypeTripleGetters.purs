@@ -2,7 +2,7 @@ module Perspectives.DataTypeTripleGetters where
 
 import Perspectives.ApiTypes (ContextID)
 import Perspectives.CoreTypes (type (**>), type (~~>))
-import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType) as DTOG
+import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, contextType, genericContext, iedereRolInContext, label, propertyTypen, rolType, typeVanIedereRolInContext, genericRolType, identity) as DTOG
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol, BuitenRol, RolDef, Value)
@@ -11,12 +11,9 @@ import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (class Show, pure)
 
-identity_ :: forall o.  Show o => (o ~~> o)
-identity_ x = pure [x]
-
 -- | Identity for all values, contexts and roles.
 identity :: forall o.  Show o => (o **> o)
-identity = identity_ `trackedAs` "model:Perspectives$identity"
+identity = DTOG.identity `trackedAs` "model:Perspectives$identity"
 
 -- | The type of the context instance.
 contextType :: (AnyContext **> AnyDefinition)

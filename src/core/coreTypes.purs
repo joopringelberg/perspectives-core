@@ -21,13 +21,15 @@ import Foreign (unsafeToForeign)
 import Foreign.Class (class Encode)
 import Foreign.Object (Object, empty, insert, lookup) as O
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CouchdbState (CouchdbState)
+import Perspectives.CouchdbState (CouchdbState, UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.Syntax (PerspectContext, PerspectRol)
+import Perspectives.Representation.Context (Context)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.TypesForDeltas (Delta, encodeDefault)
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
+import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=), unit)
 import Simple.JSON (class WriteForeign)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -36,18 +38,46 @@ import Unsafe.Coerce (unsafeCoerce)
 -----------------------------------------------------------
 type ContextDefinitions = GLStrMap (AVar PerspectContext)
 type RolDefinitions = GLStrMap (AVar PerspectRol)
+type Contexts = GLStrMap (AVar Context)
+type EnumeratedRoles = GLStrMap (AVar EnumeratedRole)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 type QueryCache = GLStrMap (TypedTripleGetter String String)
 
 type PerspectivesState = CouchdbState (
   rolDefinitions :: RolDefinitions
   , contextDefinitions :: ContextDefinitions
+  -- Perspectives types aanvullen
+  , contexts :: Contexts
+  , enumeratedRoles :: EnumeratedRoles
+
   , domeinCache :: DomeinCache
   , memorizeQueryResults :: Boolean
   , transactie :: Transactie
   , tripleQueue :: TripleQueue
   , recomputed :: Array TripleRef
   )
+
+newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
+newPerspectivesState uinfo tr av =
+  {
+  -- weghalen:
+  rolDefinitions: new unit
+  , contextDefinitions: new unit
+  -- Aanvullen met Perspectives types
+  , contexts: new unit
+  , enumeratedRoles: new unit
+
+  , domeinCache: new unit
+  , userInfo: uinfo
+  , couchdbSessionStarted: false
+  , sessionCookie: av
+  , memorizeQueryResults: true
+  , transactie: tr
+  , tripleQueue: []
+  -- For debugging purposes only:
+  , recomputed: []
+  -- , queryCache: new unit
+  }
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVES

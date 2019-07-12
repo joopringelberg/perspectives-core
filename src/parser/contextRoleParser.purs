@@ -2,42 +2,30 @@ module Perspectives.ContextRoleParser where
 
 import Perspectives.EntiteitAndRDFAliases
 
-import Control.Alt (void, (<|>))
-import Control.Monad.Error.Class (catchError, throwError)
+import Control.Alt ((<|>))
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
-import Data.Array (dropEnd, head, intercalate)
+import Data.Array (dropEnd, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
-import Data.Foldable (elem, fold, for_)
+import Data.Foldable (elem, fold)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (unwrap)
-import Data.String (Pattern(..), drop, split)
-import Data.String.CodeUnits (charAt, fromCharArray)
-import Data.Traversable (traverse)
+import Data.String (Pattern(..), split)
+import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
-import Effect.Aff.AVar (AVar, put, take)
-import Effect.Exception (error)
-import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeRol_binding, changeRol_type, context_buitenRol, context_changeRolIdentifier, context_id, context_pspType, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_id, rol_padOccurrence, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, (##>), MP, (##>>))
-import Perspectives.DataTypeObjectGetters (contextType)
-import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol, deconstructBuitenRol)
-import Perspectives.IndentParser (IP, addContext, addRol, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
-import Perspectives.ModelBasedObjectGetters (binnenRolBeschrijvingDef, buitenRolBeschrijvingDef, equalsOrIsAspectOf, getDefaultPrototype)
-import Perspectives.ObjectGetterConstructors (getPrototype, notEmpty, searchUnqualifiedRolDefinition, toBoolean)
-import Perspectives.ObjectsGetterComposition ((/-/))
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, rol_padOccurrence)
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), binnenRol, buitenRol)
+import Perspectives.IndentParser (IP, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
-import Perspectives.PerspectivesTypes (BuitenRol, ContextDef(..))
-import Perspectives.Resource (getAVarRepresentingPerspectEntiteit, getPerspectEntiteit)
-import Perspectives.Syntax (Comments(..), ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
+import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..), PerspectContext(..), PerspectRol(..), binding)
 import Perspectives.Token (token)
-import Prelude (class Show, Unit, bind, discard, identity, ifM, map, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<<<), (<>), (==), (>), (>=>))
+import Prelude (class Show, Unit, bind, discard, identity, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
-import Text.Parsing.Parser (ParseState(..), fail, ParseError(..))
+import Text.Parsing.Parser (ParseState(..), fail, ParseError)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
 import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
@@ -298,37 +286,26 @@ contextDeclaration = (ContextDeclaration <$> typeContextName <*> (anonymousConte
       pure $ QualifiedName namespace ("c" <> (show n))
 
 
--- | Apply to a single line parser. Will parse a block of contiguous line comments before the line and
--- | the comment after the expression on the line.
-withComments :: forall a. IP a -> IP (Tuple Comments a)
-withComments p = do
-  before <- manyOneLineComments
-  withPos do
-    a <- p
-    after <- inLineComment
-    pure $ Tuple (Comments{ commentBefore: before, commentAfter: after}) a
-
-typedPropertyAssignment ::  IP Unit -> IP (Tuple ID PropertyValueWithComments)
-typedPropertyAssignment scope = go (try (withComments
-  (withPos
-    (Tuple
-      <$> (scope *> (propertyName <* (sameLine *> reservedOp "=")))
-      <*> (sameLine *> (simpleValue `sepBy` (STRING.string ",")))))))
+typedPropertyAssignment ::  IP Unit -> IP (Tuple ID (Array Value))
+typedPropertyAssignment scope = go (try (withPos
+  (Tuple
+    <$> (scope *> (propertyName <* (sameLine *> reservedOp "=")))
+    <*> (sameLine *> (simpleValue `sepBy` (STRING.string ","))))))
   where
     go x = do
-      (Tuple (Comments {commentBefore, commentAfter}) (Tuple pname value)) <- x
-      pure $ Tuple (show pname) (PropertyValueWithComments {value: AR.fromFoldable value, commentBefore: commentBefore, commentAfter: commentAfter})
+      (Tuple pname value) <- x
+      pure $ Tuple (show pname) (AR.fromFoldable value)
 
 -- | publicContextPropertyAssignment = 'extern' propertyName '=' simpleValue
-publicContextPropertyAssignment ::  IP (Tuple ID PropertyValueWithComments)
+publicContextPropertyAssignment ::  IP (Tuple ID (Array Value))
 publicContextPropertyAssignment = (typedPropertyAssignment (reserved "extern")) <?> "extern propertyname = value"
 
 -- | privateContextPropertyAssignment = 'intern' propertyName '=' simpleValue
-privateContextPropertyAssignment ::  IP (Tuple ID PropertyValueWithComments)
+privateContextPropertyAssignment ::  IP (Tuple ID (Array Value))
 privateContextPropertyAssignment = (typedPropertyAssignment (reserved "intern")) <?> "intern propertyname = value"
 
 -- | rolePropertyAssignment = propertyName '=' simpleValue
-rolePropertyAssignment ::  IP (Tuple ID PropertyValueWithComments)
+rolePropertyAssignment ::  IP (Tuple ID (Array Value))
 rolePropertyAssignment = (typedPropertyAssignment (pure unit)) <?> "intern propertyname = value"
 
 isRoleDeclaration ::  IP Unit
@@ -373,7 +350,6 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           , binding = binding (maybe "" identity bindng)
           , context = show cname
           , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
-          , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt }
           })
 
       pure $ Tuple (show rname) rolId))
@@ -387,14 +363,10 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         Nothing -> 0
 
 cacheRol ::  RolID -> PerspectRol -> IP Unit
-cacheRol rolId rol = do
-  addRol rol
-  liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
+cacheRol rolId rol = liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
 
 cacheContext ::  ContextID -> PerspectContext -> IP Unit
-cacheContext contextId ctxt = do
-  addContext ctxt
-  liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
+cacheContext contextId ctxt = liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
@@ -515,8 +487,8 @@ context = withRoleCounting context' where
           do
             -- Parsing the body
             (prototype :: Maybe ContextID) <- option Nothing (indented *> prototypeDeclaration)
-            (publicProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment))
-            (privateProps :: List (Tuple ID PropertyValueWithComments)) <- option Nil (indented *> withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment))
+            (publicProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment))
+            (privateProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment))
             (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
             -- Storing
@@ -525,10 +497,8 @@ context = withRoleCounting context' where
                 { _id = (show instanceName)
                 , displayName  = localName
                 , pspType = show typeName
-                , binnenRol = (binnenRol (show instanceName))
                 , buitenRol = buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
-                , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
               })
             cacheRol (binnenRol (show instanceName))
               (PerspectRol defaultRolRecord
@@ -635,18 +605,16 @@ enclosingContext = withRoleCounting enclosingContext' where
     withPos do
       (EnclosingContextDeclaration textName cmt) <- enclosingContextDeclaration
       _ <- AR.many importExpression
-      (publicProps :: List (Tuple PropertyName PropertyValueWithComments)) <- withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment)
-      (privateProps :: List (Tuple PropertyName PropertyValueWithComments)) <- withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment)
+      (publicProps :: List (Tuple PropertyName (Array Value))) <- withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment)
+      (privateProps :: List (Tuple PropertyName (Array Value))) <- withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment)
       (defs :: Array ((Tuple String (Array ID)))) <- AR.many section
       cacheContext textName
         (PerspectContext defaultContextRecord
           { _id = textName
           , displayName  = textName
           , pspType = "model:Perspectives$Model"
-          , binnenRol = binnenRol textName
           , buitenRol = buitenRol textName
           , rolInContext = FO.fromFoldable defs
-          , comments = Comments { commentBefore: cmtBefore, commentAfter: cmt}
           })
       cacheRol (binnenRol textName)
         (PerspectRol defaultRolRecord
@@ -696,138 +664,9 @@ rootParser = enclosingContext <|> userData
 -----------------------------------------------------------
 -- catchError :: forall a. m a -> (e -> m a) -> m a
 
-parseAndCache ::  String -> MonadPerspectives (Either ParseError (Tuple ParseRoot DomeinFile))
+parseAndCache ::  String -> MonadPerspectives (Either ParseError ParseRoot)
 parseAndCache text = do
-  (Tuple parseResult {domeinFile}) <- runIndentParser' text rootParser
+  (Tuple parseResult {domeinFile}) <- runIndentParser' text userData
   case parseResult of
     (Left e) -> pure $ Left e
-    (Right r) -> catchError
-      do
-        let (DomeinFile{roles, contexts}) = domeinFile
-        for_ (FO.values contexts) setDefaultPrototype
-        -- change value in cache.
-        for_ (FO.values roles) \rol -> do
-          case rol_binding rol of
-            Nothing -> pure unit
-            (Just bndg) -> vultRol bndg (rol_pspType rol) (rol_id rol)
-        -- this must read the cache, not use the roles themselves, as they have been changed in the cache!
-        for_ (FO.values roles) \rol -> do
-          if (isRelativeRolTypeNameOutsideNamespace (rol_pspType rol))
-            then addNamespaceToLocalName (rol_id rol)
-            else pure unit
-        -- We must correct the type of the buitenRollen here. This is because the default type set by the parser
-        -- may be wrong if the type T of the context has an Aspect and uses the buitenRolBeschrijving of a prototype
-        -- of that Aspect. Then the local name "buitenRolBeschrijving" will be in the namespace of that Aspect,
-        -- rather than in the namespace T.
-        -- The same holds for the type of the binnenRollen.
-        -- We cannot find the correct types before all contexts in the entire modelfile have been parsed.
-        for_ (FO.values contexts) \ctxt -> do
-          setBuitenRolType ctxt
-          setBinnenRolType ctxt
-        -- If the binding of the Role exists and the context of that binding has the aspect psp:Context,
-        -- change the binding of the Role to the External Role of the definition of the External Role of that Context.
-        for_ (FO.values roles) \rol -> do
-          if (rol_pspType rol) == "model:Perspectives$Rol$mogelijkeBinding"
-            then
-              case rol_binding rol of
-                Nothing -> pure unit
-                (Just bnd) -> do
-                  modify <- toBoolean (equalsOrIsAspectOf "model:Perspectives$Context") (deconstructBuitenRol bnd)
-                  if modify
-                    then setBindingToBuitenRolBeschrijving (rol_id rol) (deconstructBuitenRol bnd)
-                    else pure unit
-            else pure unit
-        actualisedDomeinFile <- actualiseDomeinFile domeinFile
-        pure $ Right (Tuple r actualisedDomeinFile)
-      \e -> pure $ Left $ ParseError (show e) (Position {line: 0, column: 0})
-  where
-
-    -- Construct a new DomeinFile with the contents of the cache.
-    actualiseDomeinFile :: DomeinFile -> MP DomeinFile
-    actualiseDomeinFile df@(DomeinFile {_id, _rev, contexts, roles}) = do
-      (ac :: FO.Object PerspectContext) <- traverse (getPerspectEntiteit <<< context_id) contexts
-      (ar :: FO.Object PerspectRol) <- traverse (getPerspectEntiteit <<< rol_id) roles
-      pure $ DomeinFile {_id: _id, _rev: _rev, contexts: ac, roles: ar}
-
-    setDefaultPrototype :: PerspectContext -> MonadPerspectives Unit
-    setDefaultPrototype ctxt = ifM (toBoolean (notEmpty getPrototype) (context_id ctxt))
-      (pure unit)
-      (do
-        (mdefprot :: Maybe BuitenRol) <- (context_pspType ctxt) ##> getDefaultPrototype
-        case mdefprot of
-          Nothing -> pure unit
-          (Just defProt) -> if (context_buitenRol ctxt) == (unwrap defProt)
-            then pure unit
-            else do
-              (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (context_buitenRol ctxt)
-              (brol :: PerspectRol) <- lift $ take av
-              lift $ put (changeRol_binding (unwrap defProt) brol) av
-        )
-
-    -- True for an uncapitalizedString that starts with a question mark.
-    isRelativeRolTypeNameOutsideNamespace :: String -> Boolean
-    isRelativeRolTypeNameOutsideNamespace s = case charAt 0 s of
-      (Just '?') -> true
-      otherwise -> false
-
-    -- Change the type of the rol to the qualified name, and change the key
-    -- in the context's rolinContext FO.Object, too.
-    -- NOTE. The id of the Role that is constructed, is based on the namespace as constructed during the parse phase.
-    -- However, when a direct reference to that Role is made (using $$-syntax), precisely that name must be re-used,
-    -- otherwise the binding cannot be constructed. See "testBotActie.crl" for an example
-    addNamespaceToLocalName :: RolID -> MonadPerspectives Unit
-    addNamespaceToLocalName rolId = do
-      (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit rolId
-      (rol :: PerspectRol) <- lift $ take av
-      localRolName' <- pure $ drop 2 (rol_pspType rol)
-      mrolType <- (rol_context rol) ##> (contextType >=> (pure <<< map ContextDef) /-/ (searchUnqualifiedRolDefinition localRolName'))
-      case mrolType of
-        Nothing -> throwError (error ("addNamespaceToLocalName: cannot find qualified name for '" <> localRolName' <> "' in the context of '" <> (rol_context rol) <> "'!" ))
-        (Just rolType) -> do
-          lift $ void $ put (changeRol_type (unwrap rolType) rol) av
-          (cav :: AVar PerspectContext) <- getAVarRepresentingPerspectEntiteit (rol_context rol)
-          lift $ void $ do
-            ctxt <- take cav
-            put (context_changeRolIdentifier ctxt (rol_pspType rol) (unwrap rolType)) cav
-
-    -- Ensure we have an AVar for the RolInstance that is represented by vuller.
-    -- Take the Rol out of that AVar in a Forked Aff and add rolId to its gevuldeRollen.
-    vultRol :: RolID -> RolName -> RolID -> MonadPerspectives Unit
-    vultRol vuller rolName gevuldeRol = do
-      (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit vuller
-      lift $ void $ do
-        vullerRol <- take av
-        put (addRol_gevuldeRollen vullerRol rolName gevuldeRol) av
-
-    -- reads BuitenRol from cache before changing it.
-    setBuitenRolType :: PerspectContext ->  MonadPerspectives Unit
-    setBuitenRolType ctxt = do
-      abrtype <- buitenRolBeschrijvingDef (context_pspType ctxt)
-      case head abrtype of
-        Nothing -> throwError (error ("setBuitenRolType: no buitenRolBeschrijving for '" <> (context_pspType ctxt) <> "'!"))
-        (Just brtype) -> do
-          (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (buitenRol (context_id ctxt))
-          lift $ void $ do
-            bRol <- take av
-            put (changeRol_type (unwrap brtype) bRol) av
-
-    setBinnenRolType :: PerspectContext ->  MonadPerspectives Unit
-    setBinnenRolType ctxt = do
-      abrtype <- binnenRolBeschrijvingDef (context_pspType ctxt)
-      case head abrtype of
-        Nothing -> throwError (error ("setBinnenRolType: no binnenRolBeschrijving for '" <> (context_pspType ctxt) <> "'!"))
-        (Just brtype) -> do
-          (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit (binnenRol (context_id ctxt))
-          lift $ void $ do
-            bRol <- take av
-            put (changeRol_type (unwrap brtype) bRol) av
-
-    -- The PerspectRol in cache may have been changed by now, so retrieve it again.
-    -- id represents an External Role.
-    -- Replace the binding of the Rol by the buitenRol of the BuitenRolBeschrijving of its binding.
-    setBindingToBuitenRolBeschrijving :: RolID -> ContextID -> MonadPerspectives Unit
-    setBindingToBuitenRolBeschrijving id contextDef = do
-      (av :: AVar PerspectRol) <- getAVarRepresentingPerspectEntiteit id
-      rol <- lift $ take av
-      brb <- contextDef ##>> buitenRolBeschrijvingDef
-      lift $ put (changeRol_binding (buitenRol $ unwrap brb) rol) av
+    (Right r) -> pure $ Right r

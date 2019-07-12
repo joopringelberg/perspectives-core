@@ -15,8 +15,8 @@ import Perspectives.ContextAndRole (rol_binding, rol_properties)
 import Perspectives.ContextRolAccessors (getRolMember)
 import Perspectives.CoreTypes (type (~~>), ObjectsGetter)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.Syntax (PerspectRol(..), propertyValue)
-import Prelude (class Eq, class Ord, class Show, compare, show, ($), (<>), (==))
+import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Prelude (class Eq, class Ord, class Show, compare, identity, show, ($), (<>), (==))
 import Unsafe.Coerce (unsafeCoerce)
 
 typeWithPerspectivesTypes :: forall a b. a -> b
@@ -161,14 +161,14 @@ class (Newtype rol String, Eq rol, Show rol) <= RolClass rol where
   getUnqualifiedProperty :: LocalName -> (rol ~~> Value)
 
 genericGetProperty :: String -> (String ~~> String)
-genericGetProperty pn = getRolMember \(rol :: PerspectRol) -> maybe [] propertyValue (lookup pn (rol_properties rol))
+genericGetProperty pn = getRolMember \(rol :: PerspectRol) -> maybe [] identity (lookup pn (rol_properties rol))
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r.
 -- | NOTICE that this does not return AspectProperties! These are not qualified with
 -- | The name of the rol.
 -- | E.g. getUnqualifiedProperty "voornaam"
 genericGetUnqualifiedLocalProperty :: LocalName -> (String ~~> String)
-genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] propertyValue (lookup (ln `qualifiedWith` rol) (rol_properties rol))
+genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] identity (lookup (ln `qualifiedWith` rol) (rol_properties rol))
   where
     qualifiedWith :: LocalName -> PerspectRol -> String
     qualifiedWith ln' (PerspectRol {pspType}) = pspType <> "$" <> ln'
@@ -182,7 +182,7 @@ getUnQualifiedPropertyFromPerspectRol :: LocalName -> PerspectRol -> Array Strin
 getUnQualifiedPropertyFromPerspectRol ln rol =
   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
     Nothing -> []
-    (Just i) -> maybe [] propertyValue (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
+    (Just i) -> maybe [] identity (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
 
 -----------------------------------------------------------
 -- THE CLASS BINDING

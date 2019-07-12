@@ -1,24 +1,28 @@
-module Perspectives.PerspectivesState where 
+module Perspectives.PerspectivesState where
 
-import Effect.Aff.AVar (AVar, put, read, take, tryRead)
-import Effect.Aff.Class (liftAff)
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Effect.Class (liftEffect)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons)
 import Data.Maybe (Maybe)
+import Effect.Aff.AVar (AVar, put, read, take, tryRead)
+import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, TripleQueue, TripleRef)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
-
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
-import Perspectives.Syntax (PerspectContext, PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
 newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
 newPerspectivesState uinfo tr av =
-  { rolDefinitions: new unit
+  {
+  -- weghalen:
+  rolDefinitions: new unit
   , contextDefinitions: new unit
+  -- Aanvullen met Perspectives types
+  , contexts: new unit
+  , enumeratedRoles: new unit
+
   , domeinCache: new unit
   , userInfo: uinfo
   , couchdbSessionStarted: false
@@ -103,6 +107,9 @@ domeinCacheInsert = insert domeinCache
 domeinCacheRemove :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheRemove = remove domeinCache
 
+-----------------------------------------------------------
+-- FUNCTIONS TO MODIFY GLOBAL UNSAFE STRMAPS IN PERSPECTIVESSTATE
+-----------------------------------------------------------
 insert :: forall a.
   MonadPerspectives (GLStrMap a) ->
   String ->
@@ -110,7 +117,7 @@ insert :: forall a.
   MonadPerspectives a
 insert g ns av = do
   (dc :: (GLStrMap a)) <- g
-  _ <- liftAff $ liftEffect $ (poke dc ns av)
+  _ <- liftEffect $ (poke dc ns av)
   pure av
 
 lookup :: forall a.
@@ -119,7 +126,7 @@ lookup :: forall a.
   MonadPerspectives (Maybe a)
 lookup g k = do
   dc <- g
-  liftAff $ liftEffect $ peek dc k
+  liftEffect $ peek dc k
 
 remove :: forall a.
   MonadPerspectives (GLStrMap a) ->
@@ -127,8 +134,8 @@ remove :: forall a.
   MonadPerspectives (Maybe a)
 remove g k = do
   (dc :: (GLStrMap a)) <- g
-  ma <- liftAff $ liftEffect $ peek dc k
-  _ <- liftAff $ liftEffect $ (delete dc k)
+  ma <- liftEffect $ peek dc k
+  _ <- liftEffect $ (delete dc k)
   pure ma
 
 -----------------------------------------------------------

@@ -1,0 +1,81 @@
+Vertex model:CRL als crl:
+
+Section $edge
+
+crl:Vertex crl:Vertex
+	?aspect => crl:Type
+	?aspect => crl:Qualia
+	?edge => 
+		crl:Edge $edge
+			?mandatory = false
+			?functional = false
+			$binding => crl:Edge
+
+crl:Vertex crl:Edge
+	?aspect => crl:Type
+	?aspect => crl:Qualia
+	?aspect => crl:Cardinality
+	$edge => 
+		crl:Edge $binding
+			?mandatory = true
+			?functional = false
+			$binding => crl:Vertex
+			$binding => crl:Edge
+
+crl:Vertex crl:Property
+	?aspect => crl:Type
+	?aspect => crl:Cardinality
+	$edge =>
+		crl:Edge $range
+			?mandatory = true
+			?functional = true
+			$binding => crl:SimpleValue
+
+crl:Vertex crl:SimpleValue
+
+crl:SimpleValue crl:Boolean
+
+crl:Vertex crl:Cardinality
+	?aspect => crl:Qualia
+	?property =>
+		crl:Property $mandatory
+			?mandatory = true
+			?functional = true
+			$range => crl:Boolean
+	?property =>
+		crl:Property $functional
+			?mandatory = true
+			?functional = true
+			$range => crl:Boolean
+
+crl:Vertex crl:Qualia
+	$edge => 
+		crl:Edge $property
+			?mandatory = false
+			?functional = false
+			$binding => crl:Property
+
+crl:Vertex crl:Type
+	$edge =>
+		crl:Edge $type
+			mandatory = true
+			functional = true
+			$range => crl:Vertex
+	$edge =>
+		crl:Edge $aspect
+			mandatory = false
+			functional = false
+			$range => crl:Vertex
+	$edge =>
+		crl:Edge $prototype
+			mandatory = false
+			functional = true
+			$range => crl:EveryType
+	$edge =>
+		crl:Edge $defaultPrototype
+			mandatory = false
+			functional = true
+			$range => crl:EveryType
+
+crl:Vertex crl:EveryType
+crl:Vertex crl:NoType

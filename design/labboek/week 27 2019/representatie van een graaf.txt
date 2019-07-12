@@ -1,0 +1,26 @@
+REPRESENTATIE VAN EEN GRAAF
+
+1. Rollen zonder properties kun je representeren als direct links.
+	- type
+	- prototype
+	- defaultPrototype
+	en
+	- edgesOut
+	- edgesIn
+	- aspect
+	- binding
+
+2. Noem de basisonderdelen Edge en Vertex.
+
+3. Een directe link is simpelweg een identifier, of een array van identifiers.
+
+4. Een Edge is een object met properties en misschien met een type, een bron en een bestemming.
+
+5. Een netwerk kun je op diverse manieren representeren. Dit speelt:
+	- bidirectionaliteit (twee kanten op navigeren?)
+	- heeft de link properties? Zo ja, dan heb je ook een beschrijving van die properties nodig:
+	- een type bij de link.
+	- directe indexering van vertex naar vertex (dus impliciete edges) of een tabel van edges en referenties daar naartoe vanuit de vertices?
+	- cardinaliteit.
+
+6. Als de cardinaliteit groter is dan 1, heb je een (ronde) tussen-vertex nodig tussen twee vertices. Dat is orthogonaal met al dan niet properties.

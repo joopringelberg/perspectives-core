@@ -24,6 +24,7 @@
     "test-unit",
     "uri",
     "node-fs-aff",
-    "simple-json"
+    "simple-json",
+    "kishimen"
   ]
 }

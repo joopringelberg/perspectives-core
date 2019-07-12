@@ -1,0 +1,29 @@
+SYNTAX FOR QUERIES
+
+ComputedRole = RolePath | RolePath RoleFunctionExpression
+RolePath = Role [binding* | binding+ 'context' rolePath]
+Role = 'ExternalRole' | <roleName>
+RoleFunctionExpression = 
+	'filter' PropertyExpression |
+	'concat' RolePath+ |
+	'closure'
+
+Examples of RolePath:
+
+	rol1
+	rol1 binding
+	rol1 binding context rol2
+	rol1 binding context ExternalRole
+	rol1 'filter' <propExpr> 
+	rol1 binding context rol2 'filter' <propExpr> 
+	
+PropertyExpression = 'property' <propertyName>
+
+Examples of a Path:
+
+	ExternalRole property $functional
+	$teamlid binding context ExternalRole property bedrijfsnaam
+	$verdachte
+
+ComputedRole = Path | LetExpression
+LetExpression = 'let' VarBinding+ 

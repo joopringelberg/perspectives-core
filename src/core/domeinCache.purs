@@ -4,11 +4,10 @@ module Perspectives.DomeinCache
 where
 
 import Affjax (Request, request, put) as AX
-import Affjax (ResponseFormatError, printResponseFormatError)
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.Except (class MonadError, runExcept, throwError)
+import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
@@ -16,19 +15,16 @@ import Data.Newtype (unwrap)
 import Effect.Aff (Aff, catchError)
 import Effect.Aff.AVar (AVar, empty, put, read, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error, Error)
-import Foreign (MultipleErrors)
-import Foreign.Class (class Decode, encode)
-import Foreign.Object (lookup)
+import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.EntiteitAndRDFAliases (ContextID, RolID, ID)
+import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
-import Perspectives.Syntax (PerspectContext, PerspectRol, revision)
+import Perspectives.InstanceRepresentation (revision)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=))
 import Simple.JSON (writeJSON)
 
@@ -41,8 +37,8 @@ storeDomeinFileInCache ns df= do
   pure ev
 
 -- | Change the domeinfile in cache. NOTA BENE: does not store the modified file in Couchdb!
-modifyDomeinFileInCache :: Namespace -> (DomeinFile -> DomeinFile) -> MonadPerspectives Unit
-modifyDomeinFileInCache ns modifier = do
+modifyDomeinFileInCache :: (DomeinFile -> DomeinFile) -> Namespace -> MonadPerspectives Unit
+modifyDomeinFileInCache modifier ns = do
   mAvar <- domeinCacheLookup ns
   case mAvar of
     Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
@@ -50,27 +46,9 @@ modifyDomeinFileInCache ns modifier = do
       df <- liftAff $ take avar
       liftAff $ put (modifier df) avar
 
--- | Fetch a PerspectContext asynchronously from its Domein, loading the Domein file if necessary.
-retrieveContextFromDomein ::
-  ContextID
-  -> Namespace
-  -> (MonadPerspectives PerspectContext)
-retrieveContextFromDomein id ns = do
-  (DomeinFile {contexts}) <- retrieveDomeinFile ns
-  case lookup id contexts of
-    Nothing -> throwError $ error ("retrieveContextFromDomein: cannot find definition of " <> id <> " in retrieveContextFromDomein for " <> ns)
-    (Just context) -> pure context
-
--- | Fetch a PerspectRol asynchronously from its Domein, loading the Domein file if necessary.
-retrieveRolFromDomein ::
-  RolID
-  -> Namespace
-  -> (MonadPerspectives PerspectRol)
-retrieveRolFromDomein id ns = do
-  (DomeinFile {roles}) <- retrieveDomeinFile ns
-  case lookup id roles of
-    Nothing -> throwError $ error ("retrieveRolFromDomein: cannot find definition of " <> id <> " in retrieveRolFromDomein for " <> ns)
-    (Just rol) -> pure rol
+-----------------------------------------------------------
+--
+-----------------------------------------------------------
 
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
 retrieveDomeinFile ns = do

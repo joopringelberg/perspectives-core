@@ -23,7 +23,7 @@ import Perspectives.DataTypeObjectGetters (binnenRol, buitenRol, context, rolBin
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/), (\-\))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, AnyDefinition, binding, genericBinding, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
-import Perspectives.Syntax (PerspectContext, PerspectRol(..))
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Prelude (class Eq, class Ord, bind, const, flip, identity, join, map, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -- | This module only exports constructors that search roles or properties,

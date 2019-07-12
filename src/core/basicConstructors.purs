@@ -19,8 +19,8 @@ import Perspectives.Identifiers (LocalName, binnenRol, buitenRol, deconstructLoc
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
 import Perspectives.PerspectivesTypes (RolDef(..), typeWithPerspectivesTypes)
-import Perspectives.Resource (getPerspectEntiteit, tryGetPerspectEntiteit)
-import Perspectives.Syntax (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
+import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
+import Perspectives.InstanceRepresentation (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
 import Perspectives.TypeDefChecker (checkAContext)
 import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 

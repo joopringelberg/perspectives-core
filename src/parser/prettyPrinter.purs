@@ -14,16 +14,16 @@ import Data.Traversable (traverse)
 import Data.Tuple (snd)
 import Foreign.Object (Object, foldM, values) as F
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_binnenRol, context_buitenRol, context_comments, context_displayName, context_id, context_iedereRolInContext, context_pspType, rol_binding, rol_comments, rol_context, rol_id, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_buitenRol, context_displayName, context_id, context_iedereRolInContext, context_pspType, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
-import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName)
+import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName, Value)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
+import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..))
 import Perspectives.QueryCombinators (ignoreCache)
-import Perspectives.Resource (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.Syntax (Comments(..), PerspectContext, PerspectRol(..), PropertyValueWithComments(..), propertyValue)
+import Perspectives.Syntax (PerspectContext, PerspectRol(..))
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TripleGetterConstructors (getContextRol)
 import Prelude (Unit, bind, discard, identity, join, pure, unit, ($), (*>), (+), (-), (<<<), (<>), (==), (||))
@@ -86,50 +86,16 @@ indent p a = do
   _ <- modify (\i -> i - 1)
   pure result
 
-withComments :: forall a. (a -> Comments) -> PrettyPrinter a -> PrettyPrinter a
-withComments getComments p el = do
-  let (Comments{commentBefore, commentAfter}) = getComments el
-  traverse_ comment commentBefore
-  p el
-  space
-  traverse_ comment' commentAfter
-  newline
+property :: PerspectText -> PropertyName -> Array Value -> PerspectText
+property keyword prop = indent (\pvcomments -> (keyword *> identifier' (prop <> " =") *> simpleValue pvcomments))
 
--- Prints each of the comments before on a separate line. Then executes the given PerspectText
--- and follows that with the comment after, terminated by a newline.
-withComments' :: Comments -> PerspectText -> PerspectText
-withComments' (Comments{commentBefore, commentAfter}) p = do
-  traverse_ comment commentBefore
-  p
-  traverse_ comment' commentAfter
-  newline
-
-getCommentBefore :: Comments -> Array Comment
-getCommentBefore (Comments {commentBefore}) = commentBefore
-
-getCommentAfter :: Comments -> Array Comment
-getCommentAfter (Comments {commentAfter}) = commentAfter
-
-property :: PerspectText -> PropertyName -> PropertyValueWithComments -> PerspectText
-property keyword prop = indent (\pvcomments ->
-  do
-    withPVComments pvcomments
-      (keyword *> identifier' (prop <> " =") *> simpleValue (propertyValue pvcomments)))
-  where
-    withPVComments :: PropertyValueWithComments -> PerspectText -> PerspectText
-    withPVComments (PropertyValueWithComments{commentBefore, commentAfter}) p = do
-      traverse_ comment commentBefore
-      p
-      traverse_ comment' commentAfter
-      newline
-
-publicProperty :: PropertyName -> PropertyValueWithComments -> PerspectText
+publicProperty :: PropertyName -> (Array Value) -> PerspectText
 publicProperty = property (identifier "extern")
 
-privateProperty :: PropertyName -> PropertyValueWithComments -> PerspectText
+privateProperty :: PropertyName -> (Array Value) -> PerspectText
 privateProperty = property (identifier "intern")
 
-roleProperty :: PropertyName -> PropertyValueWithComments -> PerspectText
+roleProperty :: PropertyName -> (Array Value) -> PerspectText
 roleProperty = property (identifier "")
 
 contextDeclaration :: PerspectContext -> PerspectText
@@ -140,9 +106,8 @@ fullContextDeclaration x = identifier (context_pspType x) *> identifier' (contex
 
 context :: Array BuitenRol -> PrettyPrinter PerspectContext
 context definedResources c = do
-  withComments context_comments contextDeclaration c
+  contextDeclaration c
   publicProperties
-  privateProperties
   -- Sort the roles according to, first, their type, second, their occurrence.
   (bindings :: Array PerspectRol) <- traverse (lift <<< lift <<< getPerspectEntiteit) (join (F.values (context_iedereRolInContext c)))
   traverse_ (indent roleBinding) (sortBy compareOccurrences bindings)
@@ -152,10 +117,6 @@ context definedResources c = do
       -- LET OP: de buitenrol is geen integraal onderdeel van de context!
       buitenRol <- lift $ lift $ getPerspectEntiteit $ context_buitenRol c
       strMapTraverse_ publicProperty (rol_properties buitenRol)
-
-    privateProperties = do
-      binnenRol <- lift $ lift $ getPerspectEntiteit $ context_binnenRol c
-      strMapTraverse_ privateProperty (rol_properties binnenRol)
 
     roleBinding :: PerspectRol -> PerspectText
     roleBinding role = do
@@ -173,7 +134,7 @@ context definedResources c = do
                   then
                     do
                       contxt <- lift $ lift $ getPerspectEntiteit $ rol_context boundRol
-                      withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => ")
+                      (identifier $ (rol_pspType role) <> " => ")
                       -- Only if in namespace of c!
                       indent (context definedResources) contxt
                   -- boundRol is not in the namespace of context c.
@@ -187,7 +148,7 @@ context definedResources c = do
       strMapTraverse_ roleProperty (rol_properties role)
 
     reference :: PerspectRol -> PerspectRol -> PerspectText
-    reference role binding = withComments' (rol_comments role) (identifier $ (rol_pspType role) <> " => " <> (rol_context binding))
+    reference role binding = identifier $ (rol_pspType role) <> " => " <> (rol_context binding)
 
 strMapTraverse_ :: forall a m. Monad m => (String -> a -> m Unit) -> F.Object a -> m Unit
 strMapTraverse_ f map = F.foldM (\z s a -> f s a) unit map
@@ -195,7 +156,7 @@ strMapTraverse_ f map = F.foldM (\z s a -> f s a) unit map
 enclosingContext :: PrettyPrinter PerspectContext
 enclosingContext theText = do
   -- TODO. Merk op dat we hier niet over de prefixes beschikken. Dat zijn namelijk eigenschappen van de tekst!
-  withComments' (context_comments theText) (identifier ("Context " <> (context_displayName theText)))
+  (identifier ("Context " <> (context_displayName theText)))
   newline
   sectionIds <- lift $ lift ((context_id theText) ##= (ignoreCache DTG.typeVanIedereRolInContext))
   traverse_ (section <<< RolDef) sectionIds
@@ -219,5 +180,5 @@ enclosingContext theText = do
           context definedContexts c
           newline
         else do
-          withComments context_comments fullContextDeclaration c
+          fullContextDeclaration c
           newline

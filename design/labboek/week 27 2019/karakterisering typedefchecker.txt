@@ -1,0 +1,92 @@
+KARAKTERISERING VAN DE TYPEDEFCHECKER
+
+Het (getekende) model van CRL beschrijft zichzelf en is minimaal.
+We kunnen de correctheid van dit model controleren met een programma dat gebruik maakt van nog elementairder begrippen, namelijk
+	* Vertex, en
+	* de vier edges
+		* rol 
+		* property
+		* type 
+		* binding
+	* de twee properties
+		* isFunctioneel
+		* isVerplicht
+
+Merk op dat we geen onderscheid maken tussen Rol en Context!
+
+Verder moeten we van een Vertex kunnen opvragen:
+	* zijn edge labels
+	* de waarde van de bovengenoemde edges
+	* zijn property labels
+	* de waarde van een property voor een label
+	* de waarde van de property isVerplicht
+	* de waarde van de property isFunctioneel
+
+De controles die uitgevoerd moeten worden om het CRL model te controleren:
+1. Mag een edge label gebruikt worden op een vertex?
+2. Heeft de edge eindpunt het juiste type, voor de combinatie van Vertex en Edge?
+3. Mag een property label gebruikt worden op een vertex?
+4. Heeft de property waarde het juiste type, voor de combinatie van Vertex en Property?
+en
+5. Heeft elke Vertex de voor zijn type verplichte rollen?
+6. Heeft elke Vertex de voor zijn type verplichte properties?
+en
+7. Is er een vertex voor elke identifier die gebruikt wordt in edges?
+
+Om het (getekende) model van Perspectives te controleren, moet de checker iets meer kunnen.
+We moeten gebruik maken van de edges
+	* aspect
+	* prototype
+	* defaultPrototype
+Die edges gebruiken we om
+	* vast te stellen wat de rollen zijn van een context en de properties van een rol (aspect)
+
+ALLE CONTROLES IN TYPEDEFCHECKER
+-----------------------------------------------------------
+-- CHECKCONTEXTDEF
+-----------------------------------------------------------
+-- | Is the Aspect relation not cyclic?
+-- | Have all mandatory external properties a value?
+-- | Have all mandatory internal properties a value?
+-- | Have all mandatory roles been instantiated?
+
+-----------------------------------------------------------
+-- CHECKROLDEF
+-----------------------------------------------------------
+-- | Is each AspectRol a role of an Aspect of the defining ContextDef of this RolDef?
+-- | Does the mogelijkeBinding have the mogelijkeBinding of each of its AspectRollen as an Aspect?
+-- | Does the RolDef provide all mandatory internal and external properties with a value?
+-- | Are the values given to the properties isFunctioneel and isVerplicht in accordance to values
+-- | given to the Aspects? (see checkPropertyDef for an explanation)
+-- | Is there no cycle in AspectRol? If there is such a cycle, the other
+-- | tests will not be carried out.
+
+-----------------------------------------------------------
+-- CHECKPROPERTYDEF
+-----------------------------------------------------------
+-- | Is there no cycle in AspectProperty?
+-- | The properties isFunctioneel and isVerplicht have default values (false),
+-- | so we need not check whether there is a value.
+-- | But when these properties have a local value equal to false, none of their
+-- | AspectProperties may assign true to them!
+-- | Is the range of the Property given with the PropertyDef, or one of its AspectProperties?
+-- | Is the range of the Property subsumed by the ranges of its AspectProperties?
+-- | Are all AspectProperties Properties of AspectRollen of the defining Rol?
+-- | If a BindingProperty is specified, at least one AspectProperty should be given, too.
+-- | The BindingProperty that is bound to an AspectProperty should have a range that is subsumed by
+-- | the AspectProperties range. The same restrictions apply to the isFunctioneel and isVerplicht properties
+-- | of the BindingProperty as to a locally defined Property with an AspectProperty.
+-- | The BindingProperty should be a Property of the mogelijkeBinding (recursively).
+
+-----------------------------------------------------------
+-- CHECKSFOREACHCONTEXT
+-- This is about instances of a type whose type is PerspectContext (i.e. Context as defined for Perspectives).
+-----------------------------------------------------------
+-- | Is there a definition with the ContextDef for each role of Context?
+-- | Is there a definition on the buitenRolBeschrijving of ContextDef for each external property that
+-- | has been given a value?
+-- | Have all external properties been assigned the right type of value?
+-- | Is the number of values assigned to external properties in accordance with the cardinality of their
+-- | definitions?
+-- | The same checks for internal properties.
+-- | Is the prototype of the same type as the context?

@@ -1,0 +1,9 @@
+PERSPECTENTITEIT REFACTOREN
+
+Perspectives.PerspectEntiteit wordt geïmporteerd in de volgende files:
+	* actions
+	* basicConstructors
+	* queryFunctionDescriptionCompiler
+	* resource
+	* resourceRetrieval
+	* contextRoleParser

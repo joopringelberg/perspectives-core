@@ -1,6 +1,6 @@
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, delete, elemIndex, insert, snoc) as Arr
+import Data.Array (cons, delete, elemIndex, snoc) as Arr
 import Data.Array (last)
 import Data.Int (floor, fromString, toNumber)
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -12,7 +12,7 @@ import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Value)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
-import Perspectives.Syntax (Comments(..), ContextRecord, PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), Revision, RolRecord, propertyValue)
+import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), Revision, RolRecord)
 import Prelude (identity, ($), (/), (<>), show, (+))
 
 -- CONTEXT
@@ -49,9 +49,6 @@ context_pspType (PerspectContext{pspType})= pspType
 
 changeContext_type :: ContextID -> PerspectContext -> PerspectContext
 changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = tp}
-
-context_binnenRol :: PerspectContext -> RolID
-context_binnenRol (PerspectContext{binnenRol})= binnenRol
 
 context_buitenRol :: PerspectContext -> RolID
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
@@ -90,23 +87,15 @@ context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newNa
     Nothing -> ct
     (Just (Tuple vs cr')) -> PerspectContext cr {rolInContext = insert newName vs cr'}
 
-context_comments :: PerspectContext -> Comments
-context_comments (PerspectContext{comments})= comments
-
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
   { _id: ""
   , _rev: Nothing
   , displayName: ""
   , pspType: ""
-  , binnenRol: ""
   , buitenRol: ""
   , rolInContext: empty
-  , comments: defaultComments
   }
-
-defaultComments :: Comments
-defaultComments = Comments { commentBefore: [], commentAfter: []}
 
 defaultRolRecord :: RolRecord
 defaultRolRecord =
@@ -118,7 +107,6 @@ defaultRolRecord =
   , properties: empty
   , gevuldeRollen: empty
   , occurrence: 0
-  , comments: defaultComments
   }
 
 -- ROL
@@ -162,24 +150,24 @@ rol_context (PerspectRol{context}) = context
 changeRol_context :: ContextID -> PerspectRol -> PerspectRol
 changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 
-rol_properties :: PerspectRol -> Object PropertyValueWithComments
+rol_properties :: PerspectRol -> Object (Array Value)
 rol_properties (PerspectRol{properties}) = properties
 
 rol_property :: PerspectRol -> PropertyName -> Array Value
-rol_property (PerspectRol{properties}) pn = maybe [] propertyValue (lookup pn properties)
+rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup pn properties)
 
 addRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
 addRol_property rl@(PerspectRol rp@{properties}) propertyName value =
   case lookup propertyName properties of
     Nothing -> PerspectRol rp {properties = insert
       propertyName
-      (PropertyValueWithComments {value: [value], commentBefore: [], commentAfter: [] })
+      [value]
       properties}
-    (Just (PropertyValueWithComments pvc@{value: values})) -> do
+    (Just values) -> do
       case Arr.elemIndex value values of
         Nothing -> PerspectRol rp {properties = insert
           propertyName
-          (PropertyValueWithComments pvc {value = (Arr.cons value values)})
+          (Arr.cons value values)
           properties}
         otherwise -> rl
 
@@ -187,12 +175,12 @@ removeRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
 removeRol_property rl@(PerspectRol rp@{properties}) propertyName value =
   case lookup propertyName properties of
     Nothing -> rl
-    (Just (PropertyValueWithComments pvc@{value: values})) -> do
+    (Just values) -> do
       case Arr.elemIndex value values of
         Nothing -> rl
         otherwise -> PerspectRol rp {properties = insert
           propertyName
-          (PropertyValueWithComments pvc {value = (Arr.delete value values)})
+          (Arr.delete value values)
           properties}
 
 setRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
@@ -200,12 +188,12 @@ setRol_property rl@(PerspectRol rp@{properties}) propertyName value =
   case lookup propertyName properties of
     Nothing -> PerspectRol rp {properties = insert
       propertyName
-      (PropertyValueWithComments {value: [value], commentBefore: [], commentAfter: [] })
+      [value]
       properties}
-    (Just (PropertyValueWithComments pvc)) -> do
+    (Just pvc) -> do
       PerspectRol rp {properties = insert
           propertyName
-          (PropertyValueWithComments pvc {value = [value]})
+          [value]
           properties}
 
 rol_gevuldeRollen :: PerspectRol -> Object (Array RolID)
@@ -231,9 +219,6 @@ removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
       case Arr.elemIndex rolID roles of
         Nothing -> ct
         otherwise -> PerspectRol cr {gevuldeRollen = insert rolName (Arr.delete rolID roles) gevuldeRollen}
-
-rol_comments :: PerspectRol -> Comments
-rol_comments (PerspectRol{comments}) = comments
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)

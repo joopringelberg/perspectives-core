@@ -5,8 +5,8 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter)
 
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Resource (getPerspectEntiteit)
-import Perspectives.Syntax (PerspectContext, PerspectRol)
+import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Prelude (pure, (>=>), (<<<), (>>=))
 
 -- Can we safely assume that the PerspectContext will exist? If it does not because there is no model holding it,

@@ -5,39 +5,57 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Foreign.Object (lookup)
-import Perspectives.ContextAndRole (context_binnenRol, context_buitenRol, context_id, context_rev)
+import Perspectives.ContextAndRole (context_buitenRol, context_rev)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataTypeTripleGetters (iedereRolInContext) as DTG
-import Perspectives.DomeinFile (DomeinFile(..), addContextToDomeinFile, addRolToDomeinFile, defaultDomeinFile)
+import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
+import Perspectives.Representation.Class.Persistent (getPerspectType, addContextToDomeinFile, addEnumeratedRoleToDomeinFile)
+import Perspectives.Representation.TypeIdentifiers (RoleType)
 import Perspectives.Identifiers (isInNamespace)
+import Perspectives.InstanceRepresentation (PerspectContext)
+import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.ModelBasedTripleGetters (boundContexts)
 import Perspectives.PerspectivesTypes (ContextDef)
-import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.Representation.Class.Persistent (identifier)
+import Perspectives.Representation.Class.Revision (rev)
+import Perspectives.Representation.Context (Context(..))
 import Perspectives.RunMonadPerspectivesQuery ((##=))
-import Perspectives.Syntax (PerspectContext)
 import Prelude (Unit, bind, const, discard, flip, ifM, pure, unit, void, ($), (<<<), (==), (>>=))
 
--- | From a context, create a DomeinFile (a record that holds an id, maybe a revision and a StrMap of CouchdbResources).
-domeinFileFromContext :: PerspectContext -> MonadPerspectives DomeinFile
+-- | From a context, create a DomeinFile.
+domeinFileFromContext :: Context -> MonadPerspectives DomeinFile
 domeinFileFromContext enclosingContext = do
   (DomeinFile df) <- execStateT (collect enclosingContext false) defaultDomeinFile
-  pure $ DomeinFile $ df {_rev = (context_rev enclosingContext), _id = (context_id enclosingContext)}
+  pure $ DomeinFile $ df {_rev = (rev enclosingContext), _id = (context_id enclosingContext)}
   where
-    collect :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives) Unit
+    context_id :: Context -> String
+    context_id = unwrap <<< identifier
+
+    collect :: Context -> Boolean -> StateT DomeinFile (MonadPerspectives) Unit
     collect c definedAtToplevel =
       ifM (saveContext c definedAtToplevel)
         do
-          boundContexts <- lift $ ((context_id c) ##= boundContexts)
-          for_ boundContexts recursiveCollect
+          for_ (unwrap c).contextAspects
+            flip saveContext false <<< getPerspectType
+          for_ (unwrap c).rolInContext
+            saveRol
+
+          -- boundContexts <- lift $ ((context_id c) ##= boundContexts)
+          -- for_ boundContexts recursiveCollect
         (pure unit)
       where
+        saveRol :: RoleType -> StateT DomeinFile MonadPerspectives Unit
+        saveRol rt = ifM (inDomeinFile (unwrap rt))
+          (pure unit)
+          (getPerspectType rt >>= addEnumeratedRoleToDomeinFile)
+
         -- On recursively collecting a bound context, it may happen that the binding is not available in cache
         -- and neither is a DomeinFile available that holds a definition. We then accept an error
         -- thrown by getPerspectEntiteit.
-        recursiveCollect :: ContextDef -> StateT DomeinFile (MonadPerspectives) Unit
-        recursiveCollect subContextId = (lift $ getPerspectEntiteit $ unwrap subContextId) >>= (flip collect ((context_id c) == (context_id enclosingContext)))
-        saveContext :: PerspectContext -> Boolean -> StateT DomeinFile (MonadPerspectives) Boolean
+        recursiveCollect :: Context -> StateT DomeinFile (MonadPerspectives) Unit
+        recursiveCollect subContextId = (lift $ getPerspectType subContextId) >>= (flip collect ((context_id c) == (context_id enclosingContext)))
+        saveContext :: Context -> Boolean -> StateT DomeinFile (MonadPerspectives) Boolean
         saveContext ctxt definedAtToplevel' = if (context_id ctxt) `isInNamespace` (context_id enclosingContext)
           then
             ifM (inDomeinFile (context_id ctxt))
@@ -45,22 +63,17 @@ domeinFileFromContext enclosingContext = do
               do
                 void $ modify $ addContextToDomeinFile ctxt
                 -- As a context and its buitenRol are always created together, we can safely assume the latter exists.
-                void $ (lift $ getPerspectEntiteit (context_buitenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
-                void $ (lift $ getPerspectEntiteit (context_binnenRol ctxt)) >>= (modify <<< addRolToDomeinFile)
-                rollen <- lift $ ((context_id ctxt) ##= DTG.iedereRolInContext)
-                for_ rollen
-                  \rolID ->
-                    -- A context is constructed together with its roles. It seems reasonable to assume the rol will exist.
-                    (lift $ getPerspectEntiteit rolID) >>= (modify <<< addRolToDomeinFile)
+                void $ (lift $ getPerspectType (_.externeRol $ unwrap ctxt)) >>= (modify <<< \rol-> addEnumeratedRoleToDomeinFile rol)
+                -- TODO: add all the other roles and the aspects.
                 pure true
           else pure false
 
         inDomeinFile :: ID -> StateT DomeinFile (MonadPerspectives) Boolean
         inDomeinFile id = do
-          (DomeinFile {contexts, roles}) <- get
+          (DomeinFile {contexts, enumeratedRoles}) <- get
           case lookup id contexts of
             (Just _) -> pure true
-            Nothing -> case lookup id roles of
+            Nothing -> case lookup id enumeratedRoles of
               (Just _) -> pure true
               otherwise -> pure false
 

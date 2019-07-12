@@ -8,7 +8,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##>>))
 
 storeDomeinFile :: ID -> MonadPerspectives Unit

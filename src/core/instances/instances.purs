@@ -1,11 +1,12 @@
-module Perspectives.ResourceRetrieval
-( fetchPerspectEntiteitFromCouchdb
-, saveUnversionedEntiteit
-, saveVersionedEntiteit
+module Perspectives.Instances
+( saveVersionedEntiteit
 , saveEntiteit
 , saveEntiteitPreservingVersion
 , fetchEntiteit
 , removeEntiteit
+, getPerspectEntiteit
+, tryGetPerspectEntiteit
+, getAVarRepresentingPerspectEntiteit
   )
 where
 
@@ -27,26 +28,48 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (ensureAuthentication, defaultPerspectRequest, retrieveDocumentVersion)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein, isUserURI)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, encode, getRevision', readEntiteitFromCache, removeInternally, representInternally, retrieveFromDomein, retrieveInternally, setRevision)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, getRevision', readEntiteitFromCache, removeInternally, representInternally, retrieveInternally, setRevision)
 import Perspectives.User (entitiesDatabase)
+import Simple.JSON (writeJSON)
 
+getPerspectEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
+getPerspectEntiteit id =
+  do
+    (av :: Maybe (AVar a)) <- retrieveInternally id
+    case av of
+      (Just avar) -> do
+        pe <- liftAff $ read avar
+        pure pe
+      Nothing -> fetchEntiteit id
 
--- | Fetch the definition of the resource asynchronously, either from a Domein file or from the user database.
-fetchPerspectEntiteitFromCouchdb :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
-fetchPerspectEntiteitFromCouchdb id = if isUserURI id
-  then fetchEntiteit id
-  else if isQualifiedWithDomein id
-    then case deconstructModelName id of
-      Nothing -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: Cannot construct namespace out of id " <> id)
-      (Just ns) -> catchError
-        do
-          ent <- retrieveFromDomein id ns
-          v <- representInternally id
-          liftAff $ put ent v
-          pure ent
-        \e -> throwError $ error ("fetchPerspectEntiteitFromCouchdb: cannot retrieve " <> id <> " from model. " <> show e)
-    else throwError $ error ("fetchPerspectEntiteitFromCouchdb: Unknown URI structure for " <> id)
+tryGetPerspectEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives (Maybe a)
+tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
+  \_ -> do
+    (_ :: Maybe (AVar a)) <- removeInternally id
+    pure Nothing
+
+getAVarRepresentingPerspectEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives (AVar a)
+getAVarRepresentingPerspectEntiteit id =
+  do
+    (av :: Maybe (AVar a)) <- retrieveInternally id
+    case av of
+      (Just avar) -> pure avar
+      Nothing -> do
+        (_ :: a) <- fetchEntiteit id
+        mavar <- retrieveInternally id
+        pure $ unsafePartial $ fromJust mavar
+
+removeEntiteit :: forall a. PerspectEntiteit a => String -> MonadPerspectives a
+removeEntiteit entId = do
+  entiteit <- getPerspectEntiteit entId
+  ensureAuthentication $ do
+    case (getRevision' entiteit) of
+      Nothing -> throwError $ error ("removeEntiteit: entiteit has no revision, removal is impossible: " <> entId)
+      (Just rev) -> do
+        ebase <- entitiesDatabase
+        (rq :: (Request String)) <- defaultPerspectRequest
+        res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> entId <> "?rev=" <> rev)}
+        onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit
 
 -- | Fetch the definition of a resource asynchronously.
 fetchEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
@@ -88,7 +111,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
       pe <- liftAff $ take avar
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> id), content = Just $ RequestBody.string (encode pe)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> id), content = Just $ RequestBody.string (writeJSON pe)}
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion (ebase <> id) >>= pure <<< (flip setRevision pe) >>= saveVersionedEntiteit id
         else do
@@ -103,21 +126,10 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
     (Just rev) -> do
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (encode entiteit)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (writeJSON entiteit)}
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion entId >>= pure <<< (flip setRevision entiteit) >>= saveVersionedEntiteit entId
         else do
           void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
             (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust (unwrap a).rev) entiteit)))
           pure entiteit
-
-
-removeEntiteit :: forall a. PerspectEntiteit a => ID -> a -> MonadPerspectives a
-removeEntiteit entId entiteit = ensureAuthentication $ do
-  case (getRevision' entiteit) of
-    Nothing -> throwError $ error ("removeEntiteit: entiteit has no revision, removal is impossible: " <> entId)
-    (Just rev) -> do
-      ebase <- entitiesDatabase
-      (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> entId <> "?rev=" <> rev)}
-      onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit

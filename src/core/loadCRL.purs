@@ -22,9 +22,9 @@ import Perspectives.DomeinFile (DomeinFile(..))
 
 import Perspectives.Identifiers (Namespace)
 import Perspectives.PerspectivesState (domeinCacheRemove)
-import Perspectives.Resource (getPerspectEntiteit)
+import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.SaveUserData (saveDomeinFileAsUserData)
-import Perspectives.Syntax (PerspectContext)
+import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.TypeDefChecker (checkModel)
 
 modelDirectory :: String

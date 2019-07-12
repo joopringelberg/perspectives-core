@@ -34,11 +34,11 @@ import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition) as OG
 import Perspectives.PerspectivesTypes (ContextDef(..), RolDef(..))
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
-import Perspectives.ResourceRetrieval (saveEntiteit)
+import Perspectives.Instances (saveEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties, searchUnqualifiedRolDefinition)
-import Perspectives.Syntax (PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TypeChecker (checkBinding)
