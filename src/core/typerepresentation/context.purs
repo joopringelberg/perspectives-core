@@ -17,7 +17,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 class ContextClass c where
   contextAspects :: c -> Array ContextType
   defaultPrototype :: c -> Maybe String
-  rolInContext :: c -> Object RoleType
+  roleInContext :: c -> Object RoleType
   contextRole :: c -> Object RoleType
   externalRole :: c -> EnumeratedRoleType
   userRole :: c -> Object EnumeratedRoleType
@@ -26,7 +26,7 @@ class ContextClass c where
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
   defaultPrototype = _.defaultPrototype <<< unwrap
-  rolInContext = _.rolInContext <<< unwrap
+  roleInContext = _.rolInContext <<< unwrap
   contextRole = _.contextRol <<< unwrap
   externalRole = _.externeRol <<< unwrap
   userRole = _.gebruikerRol <<< unwrap
