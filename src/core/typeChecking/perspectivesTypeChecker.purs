@@ -14,8 +14,8 @@ import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.CalculatedRole (kindOfRole) as CR
-import Perspectives.Representation.Class.Persistent (ContextType, getPerspectType, identifier)
-import Perspectives.Representation.Context (Context, contextAspects, defaultPrototype, roleInContext)
+import Perspectives.Representation.Class.Persistent (ContextType, EnumeratedRoleType, getPerspectType, identifier)
+import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (kindOfRole) as ER
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
@@ -41,15 +41,27 @@ checkContext c = do
 
   -- 3. The RoleKind of each RoleType must equal the position of the RoleType in the context.
   -- E.g.: all EnumeratedRoles and CalculatedRoles in rolInContext must have RoleKind RolInContext.
-  for_
-    (values $ roleInContext c)
-    \(r :: RoleType) -> do
-      k <- lift $ rolekind r
-      if (k == RoleInContext)
-        then pure unit
-        else fail $ WrongRoleKind r RoleInContext k
+  for_ (values $ roleInContext c) (checkRoleKind RoleInContext)
+  for_ (values $ contextRole c) (checkRoleKind ContextRole)
+  for_ (values $ userRole c) (checkEnumeratedRole UserRole)
+  for_ (values $ botRole c) (checkEnumeratedRole BotRole)
+  checkEnumeratedRole ExternalRole (externalRole c)
 
   where
+    checkRoleKind :: RoleKind -> RoleType -> PF Unit
+    checkRoleKind kind (r :: RoleType) = do
+      k <- lift $ rolekind r
+      if (k == kind)
+        then pure unit
+        else fail $ WrongRoleKind r kind k
+
+    checkEnumeratedRole :: RoleKind -> EnumeratedRoleType -> PF Unit
+    checkEnumeratedRole kind r = do
+      (rr :: EnumeratedRole) <- lift $ getPerspectType r
+      if (ER.kindOfRole rr == kind)
+        then pure unit
+        else fail $ WrongRoleKind (ENR r) kind (ER.kindOfRole rr)
+
     throwOnCycle :: Array ContextType -> Context -> MP Unit
     throwOnCycle path next = if (isJust $ elemIndex (identifier next) path)
       then (throwError (error "cyclic"))
