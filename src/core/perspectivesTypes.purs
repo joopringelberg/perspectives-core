@@ -3,7 +3,7 @@ module Perspectives.PerspectivesTypes where
 import Data.Array (findIndex, index, singleton)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -171,7 +171,7 @@ genericGetUnqualifiedLocalProperty :: LocalName -> (String ~~> String)
 genericGetUnqualifiedLocalProperty ln = getRolMember \rol -> maybe [] identity (lookup (ln `qualifiedWith` rol) (rol_properties rol))
   where
     qualifiedWith :: LocalName -> PerspectRol -> String
-    qualifiedWith ln' (PerspectRol {pspType}) = pspType <> "$" <> ln'
+    qualifiedWith ln' (PerspectRol {pspType}) = unwrap pspType <> "$" <> ln'
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"

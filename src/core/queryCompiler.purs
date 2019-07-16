@@ -82,7 +82,7 @@ constructUnqualifiedGetter queryAstConstructor rn ct = do
 -- TODO: voeg state toe waarin bijgehouden wordt welke variabelen al gedefinieerd zijn, zodat je kunt stoppen als vooruit verwezen wordt. Houdt daar ook het domein van de querystap bij.
 constructQueryFunction ::
   AnyContext ->
-  MonadPerspectives ((String **> String))
+  MonadPerspectives (String **> String)
 constructQueryFunction typeDescriptionID = do
   queryStepType <- onNothing (errorMessage "no type found" "")
     (typeDescriptionID ##> contextType)

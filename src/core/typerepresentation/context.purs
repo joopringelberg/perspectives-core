@@ -1,14 +1,15 @@
 module Perspectives.Representation.Context where
 
+import Data.Array (null, uncons)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Object (Object)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType)
-import Prelude (class Eq, class Show, (<<<), (==))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
+import Prelude (class Eq, class Show, (<<<), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
@@ -17,11 +18,11 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 class ContextClass c where
   contextAspects :: c -> Array ContextType
   defaultPrototype :: c -> Maybe String
-  roleInContext :: c -> Object RoleType
-  contextRole :: c -> Object RoleType
+  roleInContext :: c -> Array RoleType
+  contextRole :: c -> Array RoleType
   externalRole :: c -> EnumeratedRoleType
-  userRole :: c -> Object EnumeratedRoleType
-  botRole :: c -> Object EnumeratedRoleType
+  userRole :: c -> Array EnumeratedRoleType
+  botRole :: c -> Array EnumeratedRoleType
 
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
@@ -32,6 +33,22 @@ instance contextContextClass :: ContextClass Context where
   userRole = _.gebruikerRol <<< unwrap
   botRole = _.botRol <<< unwrap
 
+-- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
+lookForRoleType :: String -> Context -> Maybe RoleType
+-- TODO: breid uit voor andere roltypen.
+-- TODO: breid uit voor Aspecten.
+lookForRoleType rn c = some (roleInContext c) (roleTypeIdentifier >>> ((==) rn))
+  where
+
+    roleTypeIdentifier :: RoleType -> String
+    roleTypeIdentifier (ENR (EnumeratedRoleType i)) = i
+    roleTypeIdentifier (CR (CalculatedRoleType i)) = i
+
+    some :: forall a. Array a -> (a -> Boolean) -> Maybe a
+    some candidates test | null candidates = Nothing
+    some candidates test = case uncons candidates of
+      Nothing -> Nothing
+      (Just {head, tail}) -> if (test head) then (Just head) else some tail test
 -----------------------------------------------------------
 -- CONTEXT
 -----------------------------------------------------------
@@ -45,11 +62,11 @@ type ContextRecord =
   , contextAspects :: Array ContextType
   , defaultPrototype :: Maybe String
 
-  , rolInContext :: Object RoleType
-  , contextRol :: Object RoleType
+  , rolInContext :: Array RoleType
+  , contextRol :: Array RoleType
   , externeRol :: EnumeratedRoleType
-  , gebruikerRol :: Object EnumeratedRoleType
-  , botRol :: Object EnumeratedRoleType
+  , gebruikerRol :: Array EnumeratedRoleType
+  , botRol :: Array EnumeratedRoleType
   }
 
 derive instance genericRepContext :: Generic Context _
@@ -69,3 +86,6 @@ derive newtype instance readForeignContext :: ReadForeign Context
 instance revisionContext :: Revision Context where
   rev = _._rev <<< unwrap
   changeRevision s = over Context (\vr -> vr {_rev = s})
+
+instance identifiableContext :: Identifiable Context ContextType where
+  identifier (Context{_id}) = _id

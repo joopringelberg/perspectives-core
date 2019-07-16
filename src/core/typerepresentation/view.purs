@@ -4,6 +4,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
@@ -51,3 +52,6 @@ derive newtype instance readForeignView :: ReadForeign View
 instance revisionView :: Revision View where
   rev = _._rev <<< unwrap
   changeRevision s = over View (\vr -> vr {_rev = s})
+
+instance identifiableView :: Identifiable View ViewType where
+  identifier (View{_id}) = _id

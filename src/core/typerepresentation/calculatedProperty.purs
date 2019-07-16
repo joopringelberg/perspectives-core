@@ -4,22 +4,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedRoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
-
------------------------------------------------------------
--- CALCULATED PROPERTY TYPE CLASS
------------------------------------------------------------
-class CalculatedPropertyClass r where
-  role :: r -> EnumeratedRoleType
-  calculation :: r -> QueryFunction
-
-instance calculatedPropertyCalculatedPropertyClass :: CalculatedPropertyClass CalculatedProperty where
-  role r = (unwrap r).role
-  calculation r = (unwrap r).calculation
 
 -----------------------------------------------------------
 -- CALCULATEDPROPERTY
@@ -31,7 +21,7 @@ type CalculatedPropertyRecord =
   , _rev :: Revision
   , displayName :: String
 
-  , calculation :: QueryFunction
+  , calculation :: QueryFunctionDescription
   , role :: EnumeratedRoleType
   }
 
@@ -52,3 +42,6 @@ derive newtype instance readForeignCalculatedProperty :: ReadForeign CalculatedP
 instance revisionCalculatedProperty :: Revision CalculatedProperty where
   rev = _._rev <<< unwrap
   changeRevision s = over CalculatedProperty (\vr -> vr {_rev = s})
+
+instance identifiableCalculatedProperty :: Identifiable CalculatedProperty CalculatedPropertyType where
+  identifier (CalculatedProperty{_id}) = _id

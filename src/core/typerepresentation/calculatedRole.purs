@@ -4,24 +4,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType, RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
-
------------------------------------------------------------
--- CALCULATED ROLE TYPE CLASS
------------------------------------------------------------
-class CalculatedRoleClass r where
-  kindOfRole :: r -> RoleKind
-  calculation :: r -> QueryFunction
-  context :: r -> ContextType
-
-instance calculatedRoleCalculatedRoleClass :: CalculatedRoleClass CalculatedRole where
-  kindOfRole r = (unwrap r).kindOfRole
-  calculation r = (unwrap r).calculation
-  context r = (unwrap r).context
 
 -----------------------------------------------------------
 -- CALCULATEDROLE
@@ -34,7 +22,7 @@ type CalculatedRoleRecord =
   , displayName :: String
   , kindOfRole :: RoleKind
 
-  , calculation :: QueryFunction
+  , calculation :: QueryFunctionDescription
   , context :: ContextType
   }
 
@@ -55,3 +43,6 @@ derive newtype instance readForeignCalculatedRole :: ReadForeign CalculatedRole
 instance revisionCalculatedRole :: Revision CalculatedRole where
   rev = _._rev <<< unwrap
   changeRevision s = over CalculatedRole (\vr -> vr {_rev = s})
+
+instance identifiableCalculatedRole :: Identifiable CalculatedRole CalculatedRoleType where
+  identifier (CalculatedRole{_id}) = _id

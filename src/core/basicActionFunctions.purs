@@ -1,9 +1,14 @@
+{-
+  TODO.
+  Deze file moet nieuwe inhoud krijgen nadat de ARC parser is gemaakt.
+  Tot die tijd is het gebruik ervan in Actions uitgecommentarieerd.
+-}
 module Perspectives.BasicActionFunctions where
 
 import Prelude
 
 import Perspectives.CollectDomeinFile (domeinFileFromContext)
-import Perspectives.ComputedTripleGetters (parserMessagesM, syntacticStateM)
+-- import Perspectives.ComputedTripleGetters (parserMessagesM, syntacticStateM)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 

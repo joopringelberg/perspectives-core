@@ -6,6 +6,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType)
@@ -66,6 +67,9 @@ derive newtype instance readForeignAction :: ReadForeign Action
 instance revisionAction :: Revision Action where
   rev = _._rev <<< unwrap
   changeRevision s = over Action (\vr -> vr {_rev = s})
+
+instance identifiableAction :: Identifiable Action ActionType where
+  identifier (Action{_id}) = _id
 
 -----------------------------------------------------------
 -- VERB

@@ -20,24 +20,26 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Actions (addRol, removeBinding, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
+
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>))
 import Perspectives.DataTypeObjectGetters (contextType) as DTO
 import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
 import Perspectives.DataTypeTripleGetters (genericRolBindingDef)
-import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
-import Perspectives.Guid (guid)
-import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.ModelBasedStringTripleGetters (searchView, propertiesDef)
 import Perspectives.ModelBasedTripleGetters (effectiveRolType)
 import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition) as OGC
 import Perspectives.PerspectivesTypes (ContextDef(..), RolDef(..))
 import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
-import Perspectives.Instances (saveEntiteit)
-import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties, searchUnqualifiedRolDefinition)
+
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>))
+import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
+import Perspectives.Guid (guid)
+import Perspectives.Identifiers (LocalName, buitenRol)
+import Perspectives.Instances (saveEntiteit)
+import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))

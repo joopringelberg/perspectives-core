@@ -16,7 +16,7 @@ type FunctionName = String
 data QueryFunction
   = DataTypeGetter FunctionName
   | PropertyGetter FunctionName PropertyType
-  | RolGetter FunctionName RoleType
+  | RolGetter RoleType
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
   | UnaryCombinator FunctionName QueryFunction
@@ -36,7 +36,7 @@ type ConstructorRep = {tag :: String, dat :: Array String}
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (DataTypeGetter f) = unsafeToForeign $ writeJSON {tag: "DataTypeGetter", dat: f}
   writeImpl (PropertyGetter f p) = unsafeToForeign $ writeJSON {tag: "PropertyGetter", dat: [f, writeJSON p]}
-  writeImpl (RolGetter f p) = unsafeToForeign $ writeJSON {tag: "RolGetter", dat: [f, writeJSON p]}
+  writeImpl (RolGetter p) = unsafeToForeign $ writeJSON {tag: "RolGetter", dat: writeJSON p}
   writeImpl (ComputedRoleGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedRoleGetter", dat: f}
   writeImpl (ComputedPropertyGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedPropertyGetter", dat: f}
   writeImpl (UnaryCombinator f q) = unsafeToForeign $ writeJSON {tag: "UnaryCombinator", dat: [f, writeJSON q]}
@@ -52,9 +52,9 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction where
       "PropertyGetter" -> case (readJSON (unsafePartial $ head $ tail dat)) of
         (Left e) -> fail $ ForeignError (show e)
         (Right r) -> pure $ unsafePartial $ PropertyGetter (head dat) r
-      "RolGetter" -> case (readJSON (unsafePartial $ head $ tail dat)) of
+      "RolGetter" -> case (readJSON (unsafePartial $ head dat)) of
         (Left e) -> fail $ ForeignError (show e)
-        (Right r) -> pure $ unsafePartial $ RolGetter (head dat) r
+        (Right r) -> pure $ unsafePartial $ RolGetter r
       "ComputedRoleGetter" -> pure $ unsafePartial $ ComputedRoleGetter $ head dat
       "ComputedPropertyGetter" -> pure $ unsafePartial $ ComputedPropertyGetter $ head dat
       "UnaryCombinator" -> case (readJSON (unsafePartial (head $ tail dat))) of

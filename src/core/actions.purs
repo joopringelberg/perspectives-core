@@ -13,7 +13,7 @@ import Effect.Class (liftEffect)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
-import Perspectives.BasicActionFunctions (storeDomeinFile)
+-- import Perspectives.BasicActionFunctions (storeDomeinFile)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>), (##>>), (%%))
 import Perspectives.DataTypeObjectGetters (context, contextType, genericContext, genericRolType, rolBindingDef)
@@ -24,9 +24,9 @@ import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID, psp)
 import Perspectives.ModelBasedTripleGetters (botActiesInContext)
 import Perspectives.ObjectGetterConstructors (getContextRol, searchExternalProperty)
 import Perspectives.ObjectsGetterComposition ((/-/))
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, cacheInDomeinFile)
+import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit)
 import Perspectives.PerspectivesTypes (ActieDef, ContextDef(..), PBool, PropertyDef(..), RolDef(..), RolInContext(..), genericBinding)
-import Perspectives.QueryCompiler (constructQueryFunction)
+import Perspectives.Query.Compiler (compileQuery)
 import Perspectives.QueryEffect (PerspectivesEffect, (~>))
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Instances (saveVersionedEntiteit)
@@ -85,15 +85,9 @@ updatePerspectEntiteit' :: forall a. PerspectEntiteit a =>
   ID -> Value -> MonadPerspectives Unit
 updatePerspectEntiteit' changeEntity cid value = do
   (entity) <- (getPerspectEntiteit cid)
-  if (isUserEntiteitID cid)
-    then do
-      -- Change the entity in cache:
-      changedEntity <- cacheCachedEntiteit cid (changeEntity value entity)
-      void $ saveVersionedEntiteit cid changedEntity
-    else do
-      let dfId = (unsafePartial (fromJust (deconstructModelName cid)))
-      addDomeinFileToTransactie dfId
-      cacheInDomeinFile dfId (changeEntity value entity)
+  -- Change the entity in cache:
+  changedEntity <- cacheCachedEntiteit cid (changeEntity value entity)
+  void $ saveVersionedEntiteit cid changedEntity
 
 setContextType :: ID -> ObjectsGetter
 setContextType = updatePerspectEntiteit
@@ -202,16 +196,10 @@ updatePerspectEntiteitMember' :: forall a. PerspectEntiteit a =>
   ID -> MemberName -> Value -> MonadPerspectives Unit
 updatePerspectEntiteitMember' changeEntityMember mid memberName value = do
   (pe :: a) <- getPerspectEntiteit mid
-  if (isUserEntiteitID mid)
-    then do
-      -- Change the entity in cache:
-      (changedEntity :: a) <- cacheCachedEntiteit mid (changeEntityMember pe memberName value)
-      -- And save it to Couchdb.
-      void $ saveVersionedEntiteit mid changedEntity
-    else do
-      let dfId = (unsafePartial (fromJust (deconstructModelName mid)))
-      addDomeinFileToTransactie dfId
-      cacheInDomeinFile dfId (changeEntityMember pe memberName value)
+  -- Change the entity in cache:
+  (changedEntity :: a) <- cacheCachedEntiteit mid (changeEntityMember pe memberName value)
+  -- And save it to Couchdb.
+  void $ saveVersionedEntiteit mid changedEntity
 
 -- | Add a rol to a context (and inversely register the context with the rol)
 -- | TODO In a functional rol, remove the old value if present.
@@ -376,7 +364,7 @@ constructActionFunction actionInstanceID objectGetter = do
         (errorMessage "no value provided to assign" actionType)
         (actionInstanceID ##> getBindingOfRol (psp "assignToRol$value"))
       -- The function that will compute the value from the context.
-      valueComputer <- constructQueryFunction value
+      valueComputer <- compileQuery value
 
       action <- pure (\f contextId bools -> case head bools of
         Just "true" -> do
@@ -409,7 +397,7 @@ constructActionFunction actionInstanceID objectGetter = do
         (errorMessage "no value provided to assign" actionType)
         (actionInstanceID ##> getBindingOfRol (psp "assignToProperty$value"))
       -- The function that will compute the value from the context.
-      valueComputer <- constructQueryFunction value
+      valueComputer <- compileQuery value
 
       action <- pure (\f contextId bools -> case head bools of
         Just "true" -> do
@@ -436,11 +424,12 @@ constructActionFunction actionInstanceID objectGetter = do
       -- The parameters
       (parameters :: Array String) <- (actionInstanceID %% getBindingOfRol (psp "effectFullFunction$parameter"))
       case unwrap functionName of
+        -- TODO. AS SOON AS we have the Arc parser online, this case can be re-activated.
         -- The Action is for the bot that plays a role in a model:CrlText$Text context.
         -- The contextId identifies this context, hence we need no parameters when calling this function.
-        "storeDomeinFileInCouchdb" -> pure $ \contextId bools -> case head bools of
-          Just "true" -> void $ storeDomeinFile contextId
-          _ -> pure unit
+        -- "storeDomeinFileInCouchdb" -> pure $ \contextId bools -> case head bools of
+        --   Just "true" -> void $ storeDomeinFile contextId
+        --   _ -> pure unit
 
         _ -> throwError (error $ "constructActionFunction: unknown functionName for effectFullFunction: '" <> (unwrap functionName) <> "'")
 
@@ -467,9 +456,9 @@ compileBotAction actionType contextId = do
   object <- onNothing
     (errorMessage "no effect provided in Action" (unwrap actionType))
     (unwrap actionType ##> getBindingOfRol (psp "Actie$object"))
-  (objectGetter :: StringTypedTripleGetter) <- constructQueryFunction object
+  (objectGetter :: StringTypedTripleGetter) <- compileQuery object
   (conditionalEffect :: (ContextID -> PerspectivesEffect String)) <- constructActionFunction action objectGetter
-  (conditionQuery :: StringTypedTripleGetter) <- constructQueryFunction condition
+  (conditionQuery :: StringTypedTripleGetter) <- compileQuery condition
   -- We can use the id of the Action to name the function. In the dependency network, the triple will
   -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
   pure $ (conditionQuery ~> (NamedFunction (unwrap actionType) (conditionalEffect contextId)))

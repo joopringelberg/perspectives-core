@@ -2,7 +2,7 @@ module Perspectives.Parser where
 
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Perspectives.ContextRoleParser (expression, enclosingContext)
+import Perspectives.ContextRoleParser (expression, userData)
 import Perspectives.CoreTypes (MonadPerspectives)
 
 import Perspectives.IndentParser (runIndentParser)
@@ -19,7 +19,7 @@ type AceError =
 
 parse :: String -> MonadPerspectives (Either (Array AceError) String)
 parse s = do
-  parseResult <- runIndentParser s enclosingContext
+  parseResult <- runIndentParser s userData
   case parseResult of
     (Left (ParseError message (Position{line, column}))) -> pure $ Left [
       { row: line - 1

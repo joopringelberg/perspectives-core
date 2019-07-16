@@ -26,12 +26,15 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.QueryAST (ElementaryQueryStep)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.QueryFunction (QueryFunction)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.Representation.View (View)
 import Perspectives.TypesForDeltas (Delta)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
@@ -92,51 +95,13 @@ type MPQ = MonadPerspectivesQuery
 
 type MonadPerspectivesObjects = MonadPerspectives (Array ID)
 
+type VariableName = String
+
 putQueryVariable :: VariableName -> TripleRef -> MonadPerspectivesQuery Unit
 putQueryVariable var t = void $ modify \env -> O.insert var t env
 
 readQueryVariable :: VariableName -> MonadPerspectivesQuery TripleRef
 readQueryVariable var = gets \env -> unsafePartial (fromJust (O.lookup var env))
------------------------------------------------------------
--- MONADPERSPECTIVESQUERYCOMPILER
------------------------------------------------------------
--- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
--- | an array of variables that have been declared.
-type Domain = String
-type Range = String
-type VariableName = String
-
-type QueryCompilerEnvironment =
-  { domain :: Domain
-  , declaredVariables :: O.Object ContextID
-  }
-
-type MonadPerspectivesQueryCompiler = StateT QueryCompilerEnvironment MonadPerspectives
-
-runMonadPerspectivesQueryCompiler :: forall a.
-  ContextID
-  -> (MonadPerspectivesQueryCompiler a)
-  -> MonadPerspectives a
-runMonadPerspectivesQueryCompiler domainId a = evalStateT a { domain: domainId, declaredVariables: O.empty}
-
-putQueryStepDomain :: Domain -> MonadPerspectivesQueryCompiler Unit
-putQueryStepDomain d = void $ modify \env -> env { domain = d}
-
-getQueryStepDomain :: MonadPerspectivesQueryCompiler Domain
-getQueryStepDomain = gets \{domain} -> domain
-
-putQueryVariableType :: VariableName -> ContextID -> MonadPerspectivesQueryCompiler Unit
-putQueryVariableType var typeId = void $ modify \s@{declaredVariables} -> s { declaredVariables = O.insert var typeId declaredVariables }
-
-getQueryVariableType :: VariableName -> MonadPerspectivesQueryCompiler (Maybe String)
-getQueryVariableType var = gets \{declaredVariables} -> O.lookup var declaredVariables
-
-withQueryCompilerEnvironment :: forall a. MonadPerspectivesQueryCompiler a -> MonadPerspectivesQueryCompiler a
-withQueryCompilerEnvironment a = do
-  env <- get
-  result <- a
-  put env
-  pure result
 
 -----------------------------------------------------------
 -- OBJECT(S)GETTER
@@ -359,8 +324,6 @@ data UserMessage =
   | NotAValidIdentifier String
   | NotWellFormedContextSerialization String
 
-type FD = Either UserMessage ID
-
 instance showUserMessage :: Show UserMessage where
   show (MissingVariableDeclaration s) = "(MissingVariableDeclaration) De variabele '" <> s <> "' wordt gebruikt voor hij is gedefinieerd."
   show (VariableAlreadyDeclaredAs var tp) = "(VariableAlreadyDeclaredAs) De variabele '" <> var <> "' is al gedeclareerd als een waarde van het type '" <> tp <> "'"
@@ -404,7 +367,6 @@ instance showUserMessage :: Show UserMessage where
   show (MissingAspectPropertyForBindingProperty property bindingproperty) = "(MissingAspectPropertyForBindingProperty) De property '" <> property <> "' heeft BindingProperty '" <> bindingproperty <> "' maar geen AspectProperty!"
   show (BindingPropertyNotAvailable pdef bindingproperty) = "(BindingPropertyNotAvailable) Property '" <> pdef <> "' definieert binding property '" <> bindingproperty <> "' maar die is niet beschikbaar in deze definitie!"
   show (IncompatiblePrototype def deftype ptype) = "(IncompatiblePrototype) Definition '" <> def <> "' has type '" <> deftype <> "', but its prototype '" <> ptype <> "' does not have that type!"
-
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------

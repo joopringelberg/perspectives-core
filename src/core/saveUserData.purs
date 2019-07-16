@@ -1,3 +1,6 @@
+{-
+  TODO. Restore the functionality to remove data once Actions is back on line.
+-}
 module Perspectives.SaveUserData where
 
 import Control.Monad.State (StateT)
@@ -5,7 +8,7 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (for_)
 import Effect.Class (liftEffect)
-import Perspectives.Actions (removeRol, tearDownBotActions, updatePerspectEntiteit', updatePerspectEntiteitMember')
+-- import Perspectives.Actions (removeRol, tearDownBotActions, updatePerspectEntiteit', updatePerspectEntiteitMember')
 import Perspectives.ContextAndRole (context_id, removeRol_binding, removeRol_gevuldeRollen, rol_id)
 import Perspectives.CoreTypes (MP, MonadPerspectives, TripleRef(..))
 import Perspectives.DataTypeObjectGetters (iedereRolInContext)
@@ -37,7 +40,7 @@ saveUserContext id = do
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.binnenRol id)
   pure unit
 
--- TODO:
+{-
 -- * remove tripleAdministration.
 removeUserContext :: ID -> MonadPerspectives Unit
 removeUserContext id = do
@@ -87,3 +90,4 @@ removeUserRol :: String -> MonadPerspectives Unit
 removeUserRol pr = do
   (PerspectRol{pspType, context}) <- removeUserRol_ pr
   void $ removeRol pspType pr context
+-}

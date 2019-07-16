@@ -4,17 +4,18 @@ import Data.Array (nub, singleton)
 import Data.Array.Partial (head) as ArrayPartial
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
-import Foreign.Object (keys, values)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Foreign.Object (keys, values)
 import Perspectives.ContextAndRole (context_buitenRol, context_displayName, context_pspType, context_iedereRolInContext, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getContextMember', getRolMember)
 import Perspectives.CoreTypes (MonadPerspectives, ObjectsGetter, ObjectGetter, type (~~>))
 import Perspectives.Identifiers (binnenRol) as PI
+import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BinnenRol(..), BuitenRol(..), RolDef, binding, typeWithPerspectivesTypes)
-import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Prelude (bind, join, pure, ($), (>=>), (<<<), map)
 
 identity :: forall o. (o ~~> o)
@@ -35,7 +36,7 @@ toSingle og id = do
 -- | In the same vein, the result of this function could be any of ContextDef, RolDef, PropertyDef and SimpleValueDef.
 -- | So at this level, we leave the Perspectives data untyped. We'll have to type the argument and result of this
 -- | function in the context of its application.
-contextType :: (AnyContext ~~> AnyDefinition)
+contextType :: (AnyContext ~~> ContextType)
 contextType = getContextMember \context -> [context_pspType context]
 
 -- | We know that, as long as we apply this function to an identifier that represents a PerspectContext, we'll
@@ -68,8 +69,8 @@ propertyTypen = getRolMember \rol -> keys (rol_properties rol)
 label :: ObjectsGetter
 label = getContextMember \context -> [(context_displayName context)]
 
-rolType :: forall r. RolClass r => (r ~~> RolDef)
-rolType = typeWithPerspectivesTypes $ getRolMember \rol -> [rol_pspType rol]
+rolType :: forall r. RolClass r => (r ~~> EnumeratedRoleType)
+rolType = getPerspectEntiteit >=> pure <<< rol_pspType
 
 genericRolType :: (String ~~> String)
 genericRolType = getRolMember \rol -> [rol_pspType rol]

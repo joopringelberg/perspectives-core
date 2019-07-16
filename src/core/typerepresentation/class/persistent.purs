@@ -25,6 +25,7 @@ import Perspectives.PerspectivesState (insert, lookup, remove)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.Revision (class Revision, changeRevision, rev)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
@@ -37,8 +38,7 @@ import Perspectives.Representation.View (View)
 type Identifier = String
 type Namespace = String
 
-class (Revision v, Newtype i String) <= Persistent v i where
-  identifier :: v -> i
+class (Identifiable v i, Revision v, Newtype i String) <= Persistent v i where
   cache :: i -> MonadPerspectives (GLStrMap (AVar v))
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: i -> MonadPerspectives (AVar v)
@@ -162,7 +162,7 @@ retrieveFromDomein_ id lookup ns = do
     (Just v) -> pure v
 
 instance persistentContext :: Persistent Context ContextType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.contexts
   representInternally c = do
     av <- liftAff empty
@@ -175,7 +175,7 @@ instance persistentContext :: Persistent Context ContextType where
     (\(DomeinFile{contexts}) -> FO.lookup (unwrap i) contexts)
 
 instance persistentEnumeratedRole :: Persistent EnumeratedRole EnumeratedRoleType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.enumeratedRoles
   representInternally c = do
     av <- liftAff empty
@@ -188,7 +188,7 @@ instance persistentEnumeratedRole :: Persistent EnumeratedRole EnumeratedRoleTyp
     (\(DomeinFile{enumeratedRoles}) -> FO.lookup (unwrap i) enumeratedRoles)
 
 instance persistentCalculatedRole :: Persistent CalculatedRole CalculatedRoleType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.calculatedRoles
   representInternally c = do
     av <- liftAff empty
@@ -201,7 +201,7 @@ instance persistentCalculatedRole :: Persistent CalculatedRole CalculatedRoleTyp
     (\(DomeinFile{calculatedRoles}) -> FO.lookup (unwrap i) calculatedRoles)
 
 instance persistentEnumeratedProperty :: Persistent EnumeratedProperty EnumeratedPropertyType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.enumeratedProperties
   representInternally c = do
     av <- liftAff empty
@@ -214,7 +214,7 @@ instance persistentEnumeratedProperty :: Persistent EnumeratedProperty Enumerate
     (\(DomeinFile{enumeratedProperties}) -> FO.lookup (unwrap i) enumeratedProperties)
 
 instance persistentCalculatedProperty :: Persistent CalculatedProperty CalculatedPropertyType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.calculatedProperties
   representInternally c = do
     av <- liftAff empty
@@ -227,7 +227,7 @@ instance persistentCalculatedProperty :: Persistent CalculatedProperty Calculate
     (\(DomeinFile{calculatedProperties}) -> FO.lookup (unwrap i) calculatedProperties)
 
 instance persistentView :: Persistent View ViewType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.views
   representInternally c = do
     av <- liftAff empty
@@ -240,7 +240,7 @@ instance persistentView :: Persistent View ViewType where
     (\(DomeinFile{views}) -> FO.lookup (unwrap i) views)
 
 instance persistentAction :: Persistent Action ActionType where
-  identifier = _._id <<< unwrap
+  -- identifier = _._id <<< unwrap
   cache _ = gets _.actions
   representInternally c = do
     av <- liftAff empty

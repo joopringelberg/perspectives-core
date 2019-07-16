@@ -591,7 +591,7 @@ importExpression = do
 -----------------------------------------------------------
 -- User data
 -----------------------------------------------------------
-userData ::  IP ParseRoot
+userData ::  IP (Array ID)
 userData = do
   cmtBefore <- manyOneLineComments
   withPos do
@@ -599,7 +599,7 @@ userData = do
     _ <- AR.many importExpression
     contexts <- AR.many context
     -- Hier kan ik ook de rollen van de domeinfile nemen.
-    pure $ UserData contexts
+    pure contexts
   where
 
     userDataDeclaration :: IP Unit
@@ -608,14 +608,14 @@ userData = do
 -----------------------------------------------------------
 -- Parse Root
 -----------------------------------------------------------
-data ParseRoot = UserData (Array ID) | RootContext ID
+data ParseRoot = UserData (Array ID)
 
 -----------------------------------------------------------
 -- ParseAndCache
 -----------------------------------------------------------
 -- catchError :: forall a. m a -> (e -> m a) -> m a
 
-parseAndCache ::  String -> MonadPerspectives (Either ParseError ParseRoot)
+parseAndCache ::  String -> MonadPerspectives (Either ParseError (Array ID))
 parseAndCache text = do
   (Tuple parseResult {domeinFile}) <- runIndentParser' text userData
   case parseResult of

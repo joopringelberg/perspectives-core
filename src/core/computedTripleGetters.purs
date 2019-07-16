@@ -1,3 +1,9 @@
+{-
+  TODO.
+  Nadat de Arc parser is gemaakt, kunnen we deze triple getters weer inhoud geven.
+  Tot die tijd heb ik de import ervan in Main uitgecommentarieerd.
+  BasicActionFunctions (die ook importeert) is ook tijdelijk uitgecommentarieerd in Actions.
+-}
 module Perspectives.ComputedTripleGetters where
 
 import Prelude
@@ -44,6 +50,7 @@ parserMessagesM = constructTripleGetterWithArbitrarySupport
     parseSourceText :: ID -> MonadPerspectivesQuery (Array String)
     parseSourceText textId = do
       sourceText <- (textId @@>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+      -- TODO. Here we connect the new ARC parser.
       parseResult <- lift $ parseAndCache sourceText
       case parseResult of
         (Right (Tuple parseRoot domeinFile)) -> case parseRoot of

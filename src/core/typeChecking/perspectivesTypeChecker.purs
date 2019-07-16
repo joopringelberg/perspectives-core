@@ -8,13 +8,13 @@ import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
-import Foreign.Object (values)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.CalculatedRole (kindOfRole) as CR
-import Perspectives.Representation.Class.Persistent (ContextType, EnumeratedRoleType, getPerspectType, identifier)
+import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.Class.Persistent (ContextType, EnumeratedRoleType, getPerspectType)
 import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (kindOfRole) as ER
@@ -41,10 +41,10 @@ checkContext c = do
 
   -- 3. The RoleKind of each RoleType must equal the position of the RoleType in the context.
   -- E.g.: all EnumeratedRoles and CalculatedRoles in rolInContext must have RoleKind RolInContext.
-  for_ (values $ roleInContext c) (checkRoleKind RoleInContext)
-  for_ (values $ contextRole c) (checkRoleKind ContextRole)
-  for_ (values $ userRole c) (checkEnumeratedRole UserRole)
-  for_ (values $ botRole c) (checkEnumeratedRole BotRole)
+  for_ (roleInContext c) (checkRoleKind RoleInContext)
+  for_ (contextRole c) (checkRoleKind ContextRole)
+  for_ (userRole c) (checkEnumeratedRole UserRole)
+  for_ (botRole c) (checkEnumeratedRole BotRole)
   checkEnumeratedRole ExternalRole (externalRole c)
 
   where

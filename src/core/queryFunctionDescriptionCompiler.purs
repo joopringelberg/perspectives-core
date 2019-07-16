@@ -15,13 +15,14 @@ import Perspectives.CoreTypes (FD, MonadPerspectivesQueryCompiler, TypeID, UserM
 import Perspectives.DataTypeObjectGetters (context, contextType) as DTG
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, guardWellFormedNess, isInNamespace, q, psp)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), binding)
 import Perspectives.ModelBasedObjectGetters (ownRollenDef)
 import Perspectives.ObjectGetterConstructors (hasRolDefinition, mogelijkeBinding, searchContextRol, toBoolean)
 import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
 import Perspectives.PerspectivesTypes (ContextDef(..), PropertyDef(..), RolDef(..), binding) as PT
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..), binding)
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.TypeChecker (checkContextForUnQualifiedRol, checkRolForQualifiedProperty, checkRolForUnQualifiedProperty, contextHasType, isOrHasAspect, mostSpecificCommonAspect)
 import Perspectives.Utilities (ifNothing, onNothing)
 import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>>=), map)
@@ -32,16 +33,16 @@ import Prelude (class Monad, bind, discard, ifM, pure, show, ($), (*>), (<$>), (
 -- | runMonadPerspectivesQueryCompiler.
 compileElementaryQueryStep :: ElementaryQueryStep -> String -> MonadPerspectivesQueryCompiler FD
 compileElementaryQueryStep s contextId = case s of
-  Constant tp v -> putQueryStepDomain tp *> createContextWithExternalProperty contextId (q "constant") v
-  Variable v -> ifNothing (getQueryVariableType v)
-    (pure $ Left $ MissingVariableDeclaration v)
-    \tp -> do
-      putQueryStepDomain tp
-      createContextWithExternalProperty contextId (q "variable") v
-  RolesOf cid -> ensureAspect (psp "Context")
-    do
-      putQueryStepDomain (psp "Rol")
-      createContextWithSingleRole contextId (q "rolesOf") cid
+  -- Constant tp v -> putQueryStepDomain tp *> createContextWithExternalProperty contextId (q "constant") v
+  -- Variable v -> ifNothing (getQueryVariableType v)
+  --   (pure $ Left $ MissingVariableDeclaration v)
+  --   \tp -> do
+  --     putQueryStepDomain tp
+  --     createContextWithExternalProperty contextId (q "variable") v
+  -- RolesOf cid -> ensureAspect (psp "Context")
+  --   do
+  --     putQueryStepDomain (psp "Rol")
+  --     createContextWithSingleRole contextId (q "rolesOf") cid
   Binding -> ensureAspect (psp "Rol")
     do
       dom <- getQueryStepDomain
@@ -49,38 +50,38 @@ compileElementaryQueryStep s contextId = case s of
         (pure $ Left $ MissingMogelijkeBinding dom)
         \bindingType -> do
           putQueryStepDomain bindingType
-          createDataTypeGetterDescription contextId "binding"
+          DataTypeGetter "binding"
   Context -> ensureAspect (psp "Rol")
     do
       rolType <- getQueryStepDomain
       putQueryStepDomain $ unsafePartial $ fromJust $ deconstructLocalNameFromDomeinURI rolType
-      createDataTypeGetterDescription contextId "context"
-  Identity -> createDataTypeGetterDescription contextId  "identity"
+      DataTypeGetter "context"
+  Identity -> DataTypeGetter  "identity"
   Type -> do
     dom <- getQueryStepDomain
     b <- (lift $ (PT.ContextDef dom) `isOrHasAspect` PT.ContextDef (psp "Context"))
     if b
       then (do
         tp <- lift (dom ##>> DTG.contextType) >>= putQueryStepDomain
-        createDataTypeGetterDescription contextId "contextType")
+        DataTypeGetter "contextType")
       else (do
         tp <- lift (dom ##>> DTG.contextType) >>= putQueryStepDomain
-        createDataTypeGetterDescription contextId "rolType")
+        DataTypeGetter "rolType")
   BuitenRol -> ensureAspect (psp "Context")
-    (putQueryStepDomain (psp "Rol") *> createDataTypeGetterDescription contextId "buitenRol")
+    (putQueryStepDomain (psp "Rol") *> DataTypeGetter "buitenRol")
   IedereRolInContext -> ensureAspect (psp "Context")
     do
       dom <- getQueryStepDomain
       tps <- lift (dom ##= ownRollenDef)
       sumtype <- createSumType (map unwrap tps)
       putQueryStepDomain sumtype
-      createDataTypeGetterDescription contextId "iedereRolInContext"
+      DataTypeGetter "iedereRolInContext"
   RolTypen -> ensureAspect (psp "Context")
     do
       getQueryStepDomain >>= lift <<< ownRollenDef >>= lift <<< mostSpecificCommonAspect <<< map unwrap >>= putQueryStepDomain <<< unwrap
-      createDataTypeGetterDescription contextId "typeVanIedereRolInContext"
+      DataTypeGetter "typeVanIedereRolInContext"
   Label -> ensureAspect (psp "Context")
-    (putQueryStepDomain (psp "String") *> createDataTypeGetterDescription contextId "label")
+    (putQueryStepDomain (psp "String") *> DataTypeGetter "label")
   -- TODO. Als de property bijgedragen wordt door een Aspect en niet afgebeeld is op een bindingProperty,
   -- is hij óók lokaal gerepresenteerd en moet dan dus door constructRolPropertyGetter gevonden worden.
   QualifiedProperty p -> do
@@ -144,12 +145,12 @@ compileElementaryQueryStep s contextId = case s of
     (do
       b <- (lift $ pn `contextHasType` (PT.ContextDef "model:QueryAst$ComputedPropertyGetter"))
       if b
-        then (createPropertyGetterDescription contextId "computedPropertyGetter" pn)
+        then (PropertyGetter "computedPropertyGetter" pn)
         else (do
           b' <- (lift $ pn `contextHasType` (PT.ContextDef "model:Perspectives$Function"))
           if b'
-            then createPropertyGetterDescription contextId "propertyQuery" pn
-            else createPropertyGetterDescription contextId pGetterConstructor pn))
+            then PropertyGetter "propertyQuery" pn
+            else PropertyGetter pGetterConstructor pn))
       `thenPutQueryStepDomain` pn
 
   qualifiedRol :: String -> MonadPerspectivesQueryCompiler FD
@@ -157,7 +158,7 @@ compileElementaryQueryStep s contextId = case s of
     (do
       b <- (lift $ rn `contextHasType` (PT.ContextDef "model:QueryAst$ComputedRolGetter"))
       if b
-        then (createRolGetterDescription contextId "computedRolGetter" rn)
+        then (ComputedRoleGetter "computedRolGetter" rn)
         else (do
           b' <- (lift $ rn `contextHasType` (PT.ContextDef "model:Perspectives$Function"))
           if b'
@@ -314,15 +315,6 @@ createContextWithExternalProperty :: String -> ContextID -> String -> MonadPersp
 createContextWithExternalProperty contextId contextType propVal = do
   propertyName <- onNothing (error $ "No parameter found for " <> contextType) (lift ((searchContextRol (PT.RolDef "model:Perspectives$Context$buitenRolBeschrijving$rolProperty") contextType) >>= pure <<< head)) -- qualified name of property
   createContext contextId contextType [] [Tuple (unwrap propertyName) [propVal]]
-
-createDataTypeGetterDescription :: ContextID -> String -> MonadPerspectivesQueryCompiler FD
-createDataTypeGetterDescription contextId functionName =
-  createContext contextId (q "DataTypeGetter") [] [Tuple (q "DataTypeGetter$buitenRolBeschrijvingfunctionName") [functionName]]
-
-createPropertyGetterDescription :: ContextID -> String -> PropertyName -> MonadPerspectivesQueryCompiler FD
-createPropertyGetterDescription contextId functionName propertyName = do
-  rolInstanceId <- createRol (q "PropertyGetter$property") contextId (buitenRol propertyName) 0
-  createContext contextId (q "PropertyGetter") [Tuple (q "PropertyGetter$property") [rolInstanceId]] [Tuple (q "PropertyGetter$buitenRolBeschrijving$functionName") [functionName]]
 
 createRolGetterDescription :: ContextID -> String -> RolName -> MonadPerspectivesQueryCompiler FD
 createRolGetterDescription contextId functionName rolName = do

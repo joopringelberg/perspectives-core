@@ -27,7 +27,7 @@ import Effect.Console (log)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
 import Perspectives.Api (setupApi, setupTcpApi)
-import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
+-- import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
 import Perspectives.CoreTypes (Transactie, createTransactie)
 
 import Perspectives.PerspectivesState (newPerspectivesState)
@@ -54,7 +54,7 @@ main = void $ runAff handleError do
   where
     f = do
       void $ setupUser
-      addComputedTripleGetters
+      -- addComputedTripleGetters
       setupApi
 
 handleError :: forall a. (Either Error a -> Effect Unit)
