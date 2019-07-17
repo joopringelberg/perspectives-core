@@ -10,11 +10,10 @@ import Data.Maybe (Maybe(..))
 import Effect (Effect, foreachE)
 import Effect.Aff (Aff, error, throwError)
 import Effect.Class (liftEffect)
-import Foreign.Object (foldMap, values)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..))
+import Foreign.Object (values)
+import Perspectives.CoreTypes (MonadPerspectivesQuery, StringTriple, StringTripleGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), StringTypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke, clear)
-import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (==), (<>), show, (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -26,7 +25,7 @@ memorizeQueryResults = lift $ gets _.memorizeQueryResults
 setMemorizeQueryResults :: Boolean -> MonadPerspectivesQuery Unit
 setMemorizeQueryResults b = lift $ modify \ps -> ps {memorizeQueryResults = b}
 
-getRef :: forall s o. Triple s o -> TripleRef
+getRef :: StringTriple -> TripleRef
 getRef = unsafeCoerce
 
 -- | An index of Predicate-Object combinations, indexed by Subject.
@@ -47,7 +46,7 @@ clearTripleIndex = void $ clear tripleIndex
 lookupSubject :: Subject -> Effect (Maybe PredicateIndex)
 lookupSubject = peek tripleIndex
 
-lookupInTripleIndex :: forall s o. Subject -> Predicate -> Effect (Maybe (Triple s o))
+lookupInTripleIndex :: Subject -> Predicate -> Effect (Maybe StringTriple)
 lookupInTripleIndex rid pid = do
   preds <- peek tripleIndex rid
   case preds of
@@ -58,7 +57,7 @@ lookupInTripleIndex rid pid = do
       case objls of
         Nothing ->
           pure Nothing
-        (Just o) -> pure (Just (typeWithPerspectivesTypes o))
+        (Just o) -> pure (Just ( o))
 
 getTriple :: TripleRef -> Effect (Maybe (Triple String String))
 getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicate
@@ -162,20 +161,20 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
-memorize :: forall s o. TripleGetter s o -> String -> TypedTripleGetter s o
+memorize :: StringTripleGetter -> String -> StringTypedTripleGetter
 memorize getter name = TypedTripleGetter name
-  \(id :: s) -> do
+  \id -> do
     remember <- memorizeQueryResults
     case remember of
       true -> do
-        mt <- lift $ liftEffect (lookupInTripleIndex (typeWithPerspectivesTypes id) name)
+        mt <- lift $ liftEffect (lookupInTripleIndex id name)
         case mt of
           Nothing -> do
             t <- getter id
-            (stringTriple :: Triple String String) <- pure $ typeWithPerspectivesTypes t
+            (stringTriple :: Triple String String) <- pure $  t
             _ <- lift $ liftEffect $ registerTriple stringTriple
             pure t
-          (Just t) -> pure $ typeWithPerspectivesTypes t
+          (Just t) -> pure $  t
       false -> getter id
 
 -- | Add the reference to the triple.

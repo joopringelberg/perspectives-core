@@ -8,16 +8,16 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Traversable (for_)
 import Effect.Class (liftEffect)
--- import Perspectives.Actions (removeRol, tearDownBotActions, updatePerspectEntiteit', updatePerspectEntiteitMember')
 import Perspectives.ContextAndRole (context_id, removeRol_binding, removeRol_gevuldeRollen, rol_id)
 import Perspectives.CoreTypes (MP, MonadPerspectives, TripleRef(..))
-import Perspectives.DataTypeObjectGetters (iedereRolInContext)
+import Perspectives.Instances.ObjectGetters (iedereRolInContext)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (binnenRol, buitenRol) as ID
+import Perspectives.Identifiers (deconstructBuitenRol)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, removeEntiteit)
 import Perspectives.Instances (saveEntiteitPreservingVersion)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.TheoryChange (addToQueue, addTripleToQueue, tripleRefToTripleQueueElement, tripleToTripleQueueElement)
 import Perspectives.TripleAdministration (unRegisterBasicTriple, unRegisterSubject)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (>>=), (>>>), (<<<))
@@ -26,10 +26,9 @@ type UserDataState = Array ID
 
 type MonadSaveUserData = StateT UserDataState MonadPerspectives
 
-saveDomeinFileAsUserData :: DomeinFile -> MonadPerspectives Unit
-saveDomeinFileAsUserData (DomeinFile{contexts, roles}) = do
-  for_ contexts (context_id >>> saveEntiteitPreservingVersion :: ID -> MP PerspectContext)
-  for_ roles (rol_id >>> saveEntiteitPreservingVersion :: ID -> MP PerspectRol)
+saveDomeinFileAsUserData :: Array ID -> MonadPerspectives Unit
+saveDomeinFileAsUserData ids = do
+  for_ ids (deconstructBuitenRol >>> saveEntiteitPreservingVersion :: ID -> MP PerspectContext)
 
 saveUserContext :: ID -> MonadPerspectives Unit
 saveUserContext id = do

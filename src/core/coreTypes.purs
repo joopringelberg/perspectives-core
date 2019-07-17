@@ -272,6 +272,13 @@ instance showTripleRef :: Show TripleRef where
   show (TripleRef {subject, predicate}) = "<" <> subject <> " - " <> predicate <> ">"
 
 -----------------------------------------------------------
+-- STRINGTYPEDTRIPLEGETTER
+-----------------------------------------------------------
+type StringTriple = Triple String String
+type StringTripleGetter = TripleGetter String String
+type StringTypedTripleGetter = (String **> String)
+
+-----------------------------------------------------------
 -- TYPE CHECKING
 -----------------------------------------------------------
 type Aspect = String

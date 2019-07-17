@@ -18,20 +18,21 @@ import Effect.Class (liftEffect)
 import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Transactie(..), Triple(..), createTransactie, transactieID, (%%>>), type (**>))
-import Perspectives.DataTypeObjectGetters (context)
-import Perspectives.DataTypeTripleGetters (identity, rolType, rolBindingDef) as DTG
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.ModelBasedObjectGetters (propertyIsFunctioneel, rolIsFunctioneel)
-import Perspectives.ModelBasedTripleGetters (actiesInContextDef, actiesOfRol, enclosingDefinition, inverse_subjectRollenDef, objectRollenDef, objectViewDef, propertyReferenties, rolUser)
-import Perspectives.PerspectivesState (setTransactie, transactie)
-import Perspectives.PerspectivesTypes (ActieDef, AnyContext, ContextDef(..), PBool(..), PropertyDef(..), RolDef(..), RolInContext(..), UserRolDef)
-import Perspectives.QueryCombinators (containedIn, filter, intersect, notEmpty)
-import Perspectives.RunMonadPerspectivesQuery ((##), (##>))
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Instances.ObjectGetters (context)
+import Perspectives.PerspectivesState (setTransactie, transactie)
+import Perspectives.QueryCombinators (containedIn, filter, intersect, notEmpty)
+import Perspectives.Representation.Class.Persistent (getPerspectType)
+import Perspectives.Representation.Class.Property (functional) as P
+import Perspectives.Representation.Class.Role (functional) as R
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.RunMonadPerspectivesQuery ((##), (##>))
 import Perspectives.TheoryChange (addTripleToQueue, modifyTriple)
-import Perspectives.TripleGetterComposition (before, followedBy, (>->))
-import Perspectives.TripleGetterConstructors (searchUnqualifiedRolDefinition, rolesOf)
+import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
@@ -56,8 +57,10 @@ runTransactie = do
 
 distributeTransactie :: Transactie -> MonadPerspectives Unit
 distributeTransactie t = do
-  (customizedTransacties :: FO.Object Transactie) <- transactieForEachUser t
-  _ <- forWithIndex customizedTransacties sendTransactieToUser
+  -- TODO: SLUIT DIT AAN NA REFACTOREN VAN transactieForEachUser
+  -- (customizedTransacties :: FO.Object Transactie) <- transactieForEachUser t
+  -- (customizedTransacties :: FO.Object Transactie) <- pure []
+  -- _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
 -- TODO wordt nog niet gebruikt.
@@ -120,12 +123,12 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
     (Just _) -> pure unit
     Nothing -> do
       maybeM (pure unit) addTripleToQueue (lift $ liftEffect $ modifyTriple newCD)
-      (isfunc :: Array PBool) <- case isContext of
-        true -> rolIsFunctioneel (RolDef memberName)
-        false -> propertyIsFunctioneel (PropertyDef memberName)
+      (isfunc :: Boolean) <- case isContext of
+        true -> getPerspectType (EnumeratedRoleType memberName) >>= \(r :: EnumeratedRole) -> R.functional r
+        false -> getPerspectType (EnumeratedPropertyType memberName) >>= \(p :: EnumeratedProperty) -> P.functional p 
       -- isfunc <- isFunctionalComputer memberName -- hier komt ie niet uit.
       -- (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
-      if (maybe false ((==) (PBool "true")) (head isfunc))
+      if (isfunc)
         then do
           x <- pure $ findIndex equalExceptRolID deltas
           case x of
@@ -174,6 +177,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
     remove i (Transactie tf@{deltas}) = Transactie tf {deltas = (delete i deltas)}
 
 
+{-
 sendTransactieToUser :: ID -> Transactie -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
@@ -257,3 +261,4 @@ transactieForEachUser t@(Transactie{deltas}) = do
           (Just (Transactie tr@{deltas: ds})) -> put $ FO.insert (unwrap user) (Transactie tr {deltas = cons d ds}) trs)
     transactieCloneWithJustDelta :: Transactie -> Delta -> Transactie
     transactieCloneWithJustDelta (Transactie tr) d = Transactie tr {deltas = [d]}
+-}

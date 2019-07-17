@@ -18,10 +18,8 @@ import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (LocalName, binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.ObjectGetterConstructors (getRolInContext)
 import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
-import Perspectives.PerspectivesTypes (RolDef(..), typeWithPerspectivesTypes)
 import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.InstanceRepresentation (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
-import Perspectives.TypeDefChecker (checkAContext)
 import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 
 -- | Construct contexts and roles from the serialisation.

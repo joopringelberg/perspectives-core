@@ -16,25 +16,21 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
-import Perspectives.CollectDomeinFile (domeinFileFromContext)
 import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives, (@@>>))
+import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives, (@@>>), StringTypedTripleGetter)
+import Perspectives.Instances.ObjectGetters (getProperty)
 import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol, isQualifiedWithDomein)
-import Perspectives.PerspectivesTypes (PropertyDef(..))
-import Perspectives.QueryCache (queryCacheInsert)
 import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.QueryCache (queryCacheInsert)
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
-import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, getInternalProperty)
-import Perspectives.TripleGetterComposition (followedBy)
-import Perspectives.TripleGetterFromObjectGetter (constructExternalPropertySearch, constructTripleGetterWithArbitrarySupport)
-import Perspectives.TypeDefChecker (checkDomeinFile)
+import Perspectives.TripleGetters.TrackedAs (constructTripleGetterWithArbitrarySupport, trackedAs)
 
 -- | This TypedTripleGetter computes a list of the buitenrol-IDs of all models that are available to this system.
 modellenM :: StringTypedTripleGetter
 modellenM = constructTripleGetterWithArbitrarySupport
-  "model:Perspectives$PerspectivesSysteem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller") `followedBy` unwrap)
+  "model:Perspectives$PerspectivesSysteem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller"))
   where
     getListOfModels :: ID -> MonadPerspectivesQuery (Array String)
     getListOfModels id = lift $ lift $ catchError ((documentNamesInDatabase "perspect_models") >>= pure <<< map buitenRol) \_ -> pure []
@@ -44,12 +40,12 @@ modellenM = constructTripleGetterWithArbitrarySupport
 -- | the file. Notice that the parseresult is stored automatically by the parser.
 parserMessagesM :: StringTypedTripleGetter
 parserMessagesM = constructTripleGetterWithArbitrarySupport
-  "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+  "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (getProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText") `trackedAs` "sourceText"
   where
 
     parseSourceText :: ID -> MonadPerspectivesQuery (Array String)
     parseSourceText textId = do
-      sourceText <- (textId @@>> getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+      sourceText <- (textId @@>> getProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText") `trackedAs` "sourceText"
       -- TODO. Here we connect the new ARC parser.
       parseResult <- lift $ parseAndCache sourceText
       case parseResult of

@@ -16,11 +16,9 @@ import Foreign.Object (Object, foldM, values) as F
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (compareOccurrences, context_Namespace, context_buitenRol, context_displayName, context_id, context_iedereRolInContext, context_pspType, rol_binding, rol_context, rol_id, rol_properties, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DataTypeTripleGetters (binding, context, typeVanIedereRolInContext) as DTG
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, PropertyName, Value)
 import Perspectives.Identifiers (isInNamespace, roleIndexNr)
 import Perspectives.Instances (getPerspectEntiteit)
-import Perspectives.PerspectivesTypes (BuitenRol(..), RolDef(..))
 import Perspectives.QueryCombinators (ignoreCache)
 import Perspectives.RunMonadPerspectivesQuery ((##=))
 import Perspectives.Syntax (PerspectContext, PerspectRol(..))
@@ -37,7 +35,7 @@ type PerspectText' = PerspectTextM MonadPerspectives
 type PerspectText = PerspectText' Unit
 
 type PrettyPrinter a = a -> PerspectText
-
+ 
 -- | Indents the line and prints the string s.
 identifier :: PrettyPrinter String
 identifier s = do

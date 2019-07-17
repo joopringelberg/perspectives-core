@@ -6,15 +6,12 @@ where
 
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (type (**>), TripleGetter, TypedTripleGetter(..), (@@), MPQ, Triple)
-import Perspectives.DataTypeTripleGetters (binnenRol, buitenRol, genericBinding, genericContext) as DTG
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, genericGetRoleBinders) as OGC
-import Perspectives.PerspectivesTypes (RolDef(..), genericGetProperty, genericGetUnqualifiedLocalProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_) as QC
 import Perspectives.TripleGetterComposition (before, (>->), preferLeft)
 import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, searchRolInContext, directAspectRoles, getInternalProperty, getPrototype) as TGC
 import Perspectives.TripleGetterConstructors (closure, searchInRolTelescope, directAspects, concat, some, all, closureOfAspect, getPrototype, closureOfPrototype) as TGCreExports
-import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (flip, (<>), ($))
 -----------------------------------------------------------
 -- COMBINATORS
@@ -112,7 +109,7 @@ searchProperty :: String -> StringTypedTripleGetter
 searchProperty pd = TGC.searchInRolTelescope g
   where
     g :: (String **> String)
-    g = genericGetProperty pd `trackedAs` pd
+    g = getProperty pd `trackedAs` pd
 
 searchUnqualifiedProperty :: Id.LocalName -> StringTypedTripleGetter
 searchUnqualifiedProperty pd = TGC.searchInRolTelescope g

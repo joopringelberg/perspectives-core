@@ -8,9 +8,9 @@ import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), tripleObjects, type (**>))
-import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
 import Perspectives.TripleAdministration (addToTripleIndex)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | Run the function in a QueryEnvironment that has s as the value of "#start".
 runMonadPerspectivesQuery :: forall s o.
@@ -18,28 +18,28 @@ runMonadPerspectivesQuery :: forall s o.
   -> (s -> MonadPerspectivesQuery o)
   -> (MonadPerspectives o)
 runMonadPerspectivesQuery a f = do
-  _ <- liftEffect $ typeWithPerspectivesTypes $ addToTripleIndex
-    (typeWithPerspectivesTypes a)
+  _ <- liftEffect $ unsafeCoerce $ addToTripleIndex
+    (unsafeCoerce a)
     "model:Perspectives$start"
-    [typeWithPerspectivesTypes a]
+    [unsafeCoerce a]
     []
     []
-    (typeWithPerspectivesTypes tripleGetter)
+    (unsafeCoerce tripleGetter)
   evalStateT (f a) (singleton "#start" tref)
   where
     tref :: TripleRef
     tref = TripleRef
-          { subject: (typeWithPerspectivesTypes a)
+          { subject: (unsafeCoerce a)
           , predicate: "model:Perspectives$start"
         }
     tripleGetter :: TripleGetter s o
-    tripleGetter id = liftEffect (typeWithPerspectivesTypes $ addToTripleIndex
-      (typeWithPerspectivesTypes id)
+    tripleGetter id = liftEffect (unsafeCoerce $ addToTripleIndex
+      (unsafeCoerce id)
       "model:Perspectives$start"
-      [typeWithPerspectivesTypes a]
+      [unsafeCoerce a]
       []
       []
-      (typeWithPerspectivesTypes tripleGetter))
+      (unsafeCoerce tripleGetter))
 
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A TRIPLE
@@ -82,7 +82,7 @@ infix 0 runTypedTripleGetterToMaybeObject as ##>
 runTypedTripleGetterToObject :: forall s o. s -> (s **> o) -> (MonadPerspectives) o
 runTypedTripleGetterToObject id ttg@(TypedTripleGetter n _) = runTypedTripleGetter ttg id >>= \(Triple({object})) ->
   case head object of
-  Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> (typeWithPerspectivesTypes id) <> "'."
+  Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> (unsafeCoerce id) <> "'."
   (Just obj) -> pure obj
 
 infix 0 runTypedTripleGetterToObject as ##>>

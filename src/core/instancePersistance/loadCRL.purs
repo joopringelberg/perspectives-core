@@ -4,13 +4,8 @@ import Prelude
 
 import Effect.Console (log)
 import Effect.Class (liftEffect)
-import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (null)
 import Data.Either (Either(..))
-import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
@@ -18,7 +13,6 @@ import Node.Process (cwd)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage)
 import Perspectives.SaveUserData (saveDomeinFileAsUserData)
-import Perspectives.InstanceRepresentation (PerspectContext)
 
 modelDirectory :: String
 modelDirectory = "./src/model"
@@ -37,7 +31,7 @@ loadCRLFile checkSemantics file = do
   case parseResult of
     (Right buitenRollen) -> do
       liftEffect $ log  "Attempting to save userdata..."
-      saveDomeinFileAsUserData domeinFile
+      saveDomeinFileAsUserData buitenRollen
       liftEffect $ log "Done. These are the items:\n"
       liftEffect $ log $ show buitenRollen
       liftEffect $ log "\n\n"

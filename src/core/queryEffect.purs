@@ -4,8 +4,7 @@ import Control.Monad.Trans.Class (lift)
 import Effect.Class (liftEffect)
 import Perspectives.ApiTypes (CorrelationIdentifier, Response(..))
 import Perspectives.ApiTypes (convertResponse, ApiEffect) as Api
-import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, NamedFunction(..), Triple(..), TripleGetter, TypedTripleGetter(..), MonadPerspectives)
-import Perspectives.PerspectivesTypes (typeWithPerspectivesTypes)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, NamedFunction(..), StringTriple, StringTypedTripleGetter, Triple(..), TypedTripleGetter(..), StringTripleGetter)
 import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, pure, ($))
 import Unsafe.Coerce (unsafeCoerce)
@@ -28,18 +27,18 @@ sendResponse r ae = liftEffect $ (unsafeCoerce ae) (Api.convertResponse r)
 -- | Make an effect function (QueryEffect = named PerspectivesEffect) dependent on the objects of a TypedTripleGetter.
 -- | Results in a TypedTripleGetter.
 -- | Remove the effect function's dependency on the tripleGetter by using unsubscribeFromObjects.
-pushesObjectsTo :: forall s o.
-  (s **> o) ->
+pushesObjectsTo ::
+  StringTypedTripleGetter ->
   QueryEffect String ->
-  (s **> o)
+  StringTypedTripleGetter
 pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
   TypedTripleGetter effectName pushesObjectsTo' where
 
-    pushesObjectsTo' :: TripleGetter s o
+    pushesObjectsTo' :: StringTripleGetter
     pushesObjectsTo' id = do
       et <- effectFun id
       -- Now register the effect triple et as a dependency of t:
-      _ <- liftEffect $ registerTriple (typeWithPerspectivesTypes et)
+      _ <- liftEffect $ registerTriple ( et)
       pure et
       -- To unsubscribe the effect, de-register the effect triple. Find the triple
       -- by its subject (=id) and predicate (=effectName)
@@ -48,15 +47,15 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
     -- i.e. to sort the effect again and it will use the resulting triple to
     --  - set new dependencies based on its supports;
     --  - copy its supports to the triple administration (in the old effect triple)
-    effectFun :: s -> MonadPerspectivesQuery (Triple s o)
+    effectFun :: String -> MonadPerspectivesQuery StringTriple
     effectFun id = do
       queryResult@(Triple{subject, object}) <- tg id
-      _ <- lift $ effect (typeWithPerspectivesTypes object)
+      _ <- lift $ effect ( object)
       pure $ Triple { subject: subject
                     , predicate : effectName
                     , object : object
                     , dependencies : []
-                    , supports : [getRef $ typeWithPerspectivesTypes queryResult]
+                    , supports : [getRef $  queryResult]
                     , tripleGetter : effectFun}
 
 -- high precedence!

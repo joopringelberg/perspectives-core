@@ -25,6 +25,9 @@ type EnumeratedRoleRecord =
 
   , context :: ContextType
   , binding :: RoleType
+
+  , functional :: Boolean
+  , mandatory :: Boolean
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

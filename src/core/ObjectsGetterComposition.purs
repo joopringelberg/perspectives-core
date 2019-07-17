@@ -4,7 +4,6 @@ import Data.Array (foldM, foldMap, intersect, singleton, union)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF)
 import Perspectives.CoreTypes (MP, type (~~>))
-import Perspectives.PerspectivesTypes (PBool(..))
 import Prelude (class Eq, pure, show, (<<<), (==), (>=>), (>>=), (>>>))
 
 unionOfObjects :: forall s o t.

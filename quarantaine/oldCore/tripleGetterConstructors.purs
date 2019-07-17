@@ -9,16 +9,12 @@ import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (type (**>), MonadPerspectivesQuery, Triple(..), TripleGetter, TypedTripleGetter(..), MPQ, (@@))
-import Perspectives.DataTypeTripleGetters (binding, buitenRol, genericBinding, context) as DTG
-import Perspectives.DataTypeTripleGetters (binnenRol, identity)
 import Perspectives.EntiteitAndRDFAliases (RolID)
 import Perspectives.Identifiers (LocalName, hasLocalName) as Id
 import Perspectives.ObjectGetterConstructors (directAspectProperties, directAspectRoles, getContextRol, getUnqualifiedContextRol, getRoleBinders, getUnqualifiedRoleBinders, agreesWithType, alternatives, localAspects) as OGC
-import Perspectives.PerspectivesTypes (class Binding, class RolClass, AnyContext, AnyDefinition, BuitenRol, ContextDef(..), ContextRol, PBool(..), PropertyDef(..), RolDef(..), RolInContext, Value, getProperty, getUnqualifiedProperty, typeWithPerspectivesTypes)
 import Perspectives.QueryCombinators (filter_)
 import Perspectives.TripleAdministration (getRef, memorize)
 import Perspectives.TripleGetterComposition (before, composeMonoidal, followedBy, preferLeft, (>->))
-import Perspectives.TripleGetterFromObjectGetter (trackedAs)
 import Prelude (class Eq, class Ord, class Show, bind, const, flip, join, map, pure, show, ($), (<>), (==), (>>=), (>>>))
 
 -----------------------------------------------------------

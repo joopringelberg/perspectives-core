@@ -22,19 +22,12 @@ import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationId
 import Perspectives.ApiTypes (RequestType(..)) as Api
 
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.DataTypeObjectGetters (contextType) as DTO
-import Perspectives.DataTypeTripleGetters (contextType, genericBinding, genericRolType, genericContext) as DTG
-import Perspectives.DataTypeTripleGetters (genericRolBindingDef)
-import Perspectives.ModelBasedStringTripleGetters (searchView, propertiesDef)
-import Perspectives.ModelBasedTripleGetters (effectiveRolType)
+import Perspectives.Instances.ObjectGetters (contextType) as DTO
 import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition) as OGC
-import Perspectives.PerspectivesTypes (ContextDef(..), RolDef(..))
-import Perspectives.QueryCompiler (getPropertyFunction, getRolFunction, getUnqualifiedRolFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
-import Perspectives.StringTripleGetterConstructors (StringTypedTripleGetter, propertyReferenties, searchUnqualifiedRolDefinition)
 
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>))
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>), StringTypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
@@ -43,7 +36,6 @@ import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
-import Perspectives.TypeChecker (checkBinding)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
 
 -----------------------------------------------------------
