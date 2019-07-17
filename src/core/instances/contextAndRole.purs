@@ -48,8 +48,8 @@ changeContext_displayName dn (PerspectContext cr) = PerspectContext $ cr {displa
 context_pspType :: PerspectContext -> ContextType
 context_pspType (PerspectContext{pspType})= pspType
 
-changeContext_type :: ContextType -> PerspectContext -> PerspectContext
-changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = tp}
+changeContext_type :: String -> PerspectContext -> PerspectContext
+changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = ContextType tp}
 
 context_buitenRol :: PerspectContext -> RolID
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
@@ -133,8 +133,8 @@ rol_occurrence (PerspectRol{occurrence}) = occurrence
 rol_pspType :: PerspectRol -> EnumeratedRoleType
 rol_pspType (PerspectRol{pspType}) = pspType
 
-changeRol_type :: EnumeratedRoleType -> PerspectRol -> PerspectRol
-changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = tp}
+changeRol_type :: String -> PerspectRol -> PerspectRol
+changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = EnumeratedRoleType tp}
 
 rol_binding :: PerspectRol -> Maybe RolID
 rol_binding (PerspectRol{binding}) = binding

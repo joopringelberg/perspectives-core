@@ -7,39 +7,33 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Data.Array (head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, error)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (Value)
-import Perspectives.BasicActionFunctions (storeDomeinFile)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_context, rol_pspType, setContext_rolInContext, setRol_property)
+import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.ContextRolAccessors (getRolMember)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>), (##>>), (%%), StringTypedTripleGetter)
-import Perspectives.Deltas (addDelta, addDomeinFileToTransactie)
+import Perspectives.CoreTypes ( MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>>), StringTypedTripleGetter)
+import Perspectives.Deltas (addDelta)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
-import Perspectives.Identifiers (deconstructModelName, isUserEntiteitID, psp)
+import Perspectives.Identifiers (psp)
 import Perspectives.InstanceRepresentation (PerspectRol)
-import Perspectives.Instances (getPerspectEntiteit)
-import Perspectives.Instances (saveVersionedEntiteit)
-import Perspectives.Instances.Aliases (AnyContext, PBool, RoleInstance)
+import Perspectives.Instances (getPerspectEntiteit, saveVersionedEntiteit)
+import Perspectives.Instances.Aliases (AnyContext, RoleInstance)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType)
-import Perspectives.ObjectsGetterComposition ((/-/))
 import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit)
 import Perspectives.Query.Compiler (compileQuery)
 import Perspectives.QueryEffect (PerspectivesEffect, (~>))
-import Perspectives.Representation.Action (Action(..), condition, effect, object)
+import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
-import Perspectives.Representation.Class.Persistent (ActionType(..), getPerspectType)
-import Perspectives.Representation.Class.Role (Role, calculation, getCalculation, getRole)
-import Perspectives.Representation.Context (Context(..), actions)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), RoleType)
-import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##), (##=))
+import Perspectives.Representation.Class.Persistent (ActionType, getPerspectType)
+import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
+import Perspectives.Representation.Context (Context, actions)
+import Perspectives.Representation.TypeIdentifiers (ContextType)
+import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##))
 import Perspectives.TripleAdministration (unRegisterTriple)
-import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
-import Perspectives.Utilities (onNothing)
 
 -----------------------------------------------------------
 -- UPDATEPERSPECTENTITEIT
@@ -140,16 +134,16 @@ setBinding :: ID -> ID -> MonadPerspectives Unit
 setBinding rid boundRol = do
   oldBinding <- binding rid
   updatePerspectEntiteit' changeRol_binding rid boundRol
-  rolType <- rid ##>> getRolMember rol_pspType
+  rolType <- getRolMember rol_pspType rid
   case head oldBinding of
     Nothing -> pure unit
-    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob rolType rid
-  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol rolType rid
+    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (unwrap rolType) rid
+  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol (unwrap rolType) rid
   cid <- rid ##>> context
   setupBotActions cid
   addDelta $ Delta
     { id : rid
-    , memberName: rolType
+    , memberName: unwrap rolType
     , deltaType: Change
     , value: (Just boundRol)
     , isContext: false
@@ -164,13 +158,13 @@ removeBinding rid = do
     Nothing -> pure Nothing
     (Just ob) -> do
       updatePerspectEntiteit' ((\_ r -> removeRol_binding r) :: (Value -> PerspectRol -> PerspectRol)) rid ""
-      rolType <- rid ##>>  getRolMember rol_pspType
-      updatePerspectEntiteitMember' removeRol_gevuldeRollen ob rolType rid
+      rolType <- getRolMember rol_pspType rid
+      updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (unwrap rolType) rid
       cid <- rid ##>> context
       setupBotActions cid
       pure $ Just $ Delta
         { id : rid
-        , memberName: rolType
+        , memberName: unwrap rolType
         , deltaType: Change
         , value: Nothing
         , isContext: false
