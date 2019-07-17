@@ -11,7 +11,7 @@ import Perspectives.Representation.Class.Persistent (CalculatedRoleType, Context
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind, RoleType(..))
-import Prelude (pure, (<>), show, (>=>))
+import Prelude (pure, (<>), show, (>=>), (>>=), (<<<))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -47,3 +47,13 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   calculation r = QD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (identifier r))
+
+data Role = E EnumeratedRole | C CalculatedRole
+
+getRole :: RoleType -> MonadPerspectives Role
+getRole (ENR e) = getPerspectType e >>= pure <<< E
+getRole (CR c) = getPerspectType c >>= pure <<< C
+
+getCalculation :: Role -> QueryFunctionDescription
+getCalculation (E r) = calculation r
+getCalculation (C r) = calculation r

@@ -8,7 +8,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -23,6 +23,7 @@ class ContextClass c where
   externalRole :: c -> EnumeratedRoleType
   userRole :: c -> Array EnumeratedRoleType
   botRole :: c -> Array EnumeratedRoleType
+  actions :: c -> Array ActionType
 
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
@@ -32,6 +33,7 @@ instance contextContextClass :: ContextClass Context where
   externalRole = _.externeRol <<< unwrap
   userRole = _.gebruikerRol <<< unwrap
   botRole = _.botRol <<< unwrap
+  actions = _.actions <<< unwrap
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> Context -> Maybe RoleType
@@ -67,6 +69,8 @@ type ContextRecord =
   , externeRol :: EnumeratedRoleType
   , gebruikerRol :: Array EnumeratedRoleType
   , botRol :: Array EnumeratedRoleType
+
+  , actions :: Array ActionType
   }
 
 derive instance genericRepContext :: Generic Context _

@@ -6,9 +6,10 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
 import Perspectives.InstanceRepresentation (Revision)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.Assignment (AssignmentStatement)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
@@ -22,7 +23,8 @@ class ActionClass c where
   object :: c -> RoleType
   indirectObject :: c -> RoleType
   requiredObjectProperties :: c -> Array PropertyType
-  condition :: c -> QueryFunction
+  condition :: c -> QueryFunctionDescription
+  effect :: c -> AssignmentStatement
 
 instance contextActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
@@ -31,6 +33,7 @@ instance contextActionClass :: ActionClass Action where
   indirectObject = _.indirectObject <<< unwrap
   requiredObjectProperties = _.requiredObjectProperties <<< unwrap
   condition = _.condition <<< unwrap
+  effect = _.effect <<< unwrap
 
 -----------------------------------------------------------
 -- ACTION
@@ -47,7 +50,8 @@ type ActionRecord =
   , object :: RoleType
   , requiredObjectProperties :: Array PropertyType
   , indirectObject :: RoleType
-  , condition :: QueryFunction
+  , condition :: QueryFunctionDescription
+  , effect :: AssignmentStatement
   }
 
 derive instance genericRepAction :: Generic Action _

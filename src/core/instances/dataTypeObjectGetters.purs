@@ -8,13 +8,15 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, rol_binding, rol_context, rol_properties)
+import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType, rol_binding, rol_context, rol_properties)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (ObjectsGetter)
+import Perspectives.CoreTypes (ObjectsGetter, MonadPerspectives)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectRol)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType)
-import Prelude (identity, join, ($), (<>))
+import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.Instances.Aliases (AnyContext)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType)
+import Prelude (identity, join, ($), (<>), (>=>), (<<<), pure)
 
 buitenRol :: ObjectsGetter
 buitenRol = (getContextMember \c -> [context_buitenRol c])
@@ -41,3 +43,6 @@ getUnQualifiedPropertyFromPerspectRol ln rol =
   case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ rol_properties rol) of
     Nothing -> []
     (Just i) -> maybe [] identity (lookup (unsafePartial $ fromJust (index (keys $ rol_properties rol) i)) (rol_properties rol))
+
+contextType :: AnyContext -> MonadPerspectives ContextType
+contextType = getPerspectEntiteit >=> pure <<< context_pspType
