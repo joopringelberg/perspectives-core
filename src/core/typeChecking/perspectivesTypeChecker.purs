@@ -12,12 +12,11 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.CalculatedRole (kindOfRole) as CR
+import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Persistent (ContextType, EnumeratedRoleType, getPerspectType)
 import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.EnumeratedRole (kindOfRole) as ER
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
 import Prelude (class Eq, class Show, Unit, bind, discard, pure, show, unit, ($), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -58,9 +57,9 @@ checkContext c = do
     checkEnumeratedRole :: RoleKind -> EnumeratedRoleType -> PF Unit
     checkEnumeratedRole kind r = do
       (rr :: EnumeratedRole) <- lift $ getPerspectType r
-      if (ER.kindOfRole rr == kind)
+      if (kindOfRole rr == kind)
         then pure unit
-        else fail $ WrongRoleKind (ENR r) kind (ER.kindOfRole rr)
+        else fail $ WrongRoleKind (ENR r) kind (kindOfRole rr)
 
     throwOnCycle :: Array ContextType -> Context -> MP Unit
     throwOnCycle path next = if (isJust $ elemIndex (identifier next) path)
@@ -70,8 +69,8 @@ checkContext c = do
         (getPerspectType >=> throwOnCycle (cons (identifier c) path))
 
     rolekind :: RoleType -> MP RoleKind
-    rolekind (ENR r) = (getPerspectType r :: MP EnumeratedRole) >>= pure <<< ER.kindOfRole
-    rolekind (CR r) = (getPerspectType r :: MP CalculatedRole) >>= pure <<< CR.kindOfRole
+    rolekind (ENR r) = (getPerspectType r :: MP EnumeratedRole) >>= pure <<< kindOfRole
+    rolekind (CR r) = (getPerspectType r :: MP CalculatedRole) >>= pure <<< kindOfRole
 
 -----------------------------------------------------------
 -- COLLECTING ERRORS DURING TYPE CHECKING
