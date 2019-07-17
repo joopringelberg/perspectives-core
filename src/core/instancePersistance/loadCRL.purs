@@ -22,8 +22,8 @@ type FileName = String
 -- | Loads a file from the directory "src/model" relative to the directory of the
 -- | active process.
 -- | All definitions are loaded into the cache. The file is parsed and stored in Couchdb.
-loadCRLFile :: Boolean -> FileName -> MonadPerspectives (Array UserMessage)
-loadCRLFile checkSemantics file = do
+loadCRLFile :: FileName -> MonadPerspectives (Array UserMessage)
+loadCRLFile file = do
   liftEffect $ log ("=========================Parse the file " <> file <> "===================")
   procesDir <- liftEffect cwd
   text <- lift $ readTextFile UTF8 (Path.concat [procesDir, modelDirectory, file])

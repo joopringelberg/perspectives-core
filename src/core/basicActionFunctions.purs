@@ -1,8 +1,3 @@
-{-
-  TODO.
-  Deze file moet nieuwe inhoud krijgen nadat de ARC parser is gemaakt.
-  Tot die tijd is het gebruik ervan in Actions uitgecommentarieerd.
--}
 module Perspectives.BasicActionFunctions where
 
 import Prelude

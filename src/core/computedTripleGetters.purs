@@ -14,45 +14,54 @@ import Data.Array (head, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
-import Perspectives.ContextRoleParser (ParseRoot(..), parseAndCache)
+import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
+import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives, (@@>>), StringTypedTripleGetter)
-import Perspectives.Instances.ObjectGetters (getProperty)
-import Perspectives.DomeinCache (documentNamesInDatabase)
+import Perspectives.DomeinCache (documentNamesInDatabase, retrieveDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol, isQualifiedWithDomein)
-import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.ObjectGetterConstructors (searchExternalProperty)
 import Perspectives.QueryCache (queryCacheInsert)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.RunMonadPerspectivesQuery ((##=), (##>>))
 import Perspectives.TripleGetters.TrackedAs (constructTripleGetterWithArbitrarySupport, trackedAs)
 
 -- | This TypedTripleGetter computes a list of the buitenrol-IDs of all models that are available to this system.
 modellenM :: StringTypedTripleGetter
-modellenM = constructTripleGetterWithArbitrarySupport
-  "model:Perspectives$PerspectivesSysteem$modellen" getListOfModels (constructExternalPropertySearch (PropertyDef "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller"))
+modellenM = constructTripleGetterWithArbitrarySupport "model:Perspectives$PerspectivesSysteem$modellen" getListOfModels ophaalTeller
   where
     getListOfModels :: ID -> MonadPerspectivesQuery (Array String)
     getListOfModels id = lift $ lift $ catchError ((documentNamesInDatabase "perspect_models") >>= pure <<< map buitenRol) \_ -> pure []
+
+    ophaalTeller :: StringTypedTripleGetter
+    ophaalTeller = searchExternalProperty (EnumeratedPropertyType ophaalTellerName) `trackedAs` ophaalTellerName
+
+    ophaalTellerName :: String
+    ophaalTellerName = "model:Perspectives$TrustedCluster$buitenRolBeschrijving$modelOphaalTeller"
 
 -- | Given the ID of a context of type model:CrlText$Text, computes an array of strings that are either the identifier
 -- | of the model, or the identifiers of the BuitenRollen of the userdata, or error messages from the attempt to parse
 -- | the file. Notice that the parseresult is stored automatically by the parser.
 parserMessagesM :: StringTypedTripleGetter
 parserMessagesM = constructTripleGetterWithArbitrarySupport
-  "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText (getProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText") `trackedAs` "sourceText"
+  "model:CrlText$Text$binnenRolBeschrijving$parserMessages" parseSourceText sourceText
   where
 
     parseSourceText :: ID -> MonadPerspectivesQuery (Array String)
     parseSourceText textId = do
-      sourceText <- (textId @@>> getProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText") `trackedAs` "sourceText"
+      txt <- textId @@>> sourceText
       -- TODO. Here we connect the new ARC parser.
-      parseResult <- lift $ parseAndCache sourceText
+      parseResult <- lift $ parseAndCache txt
       case parseResult of
-        (Right (Tuple parseRoot domeinFile)) -> case parseRoot of
-          (RootContext rootId) -> pure [rootId]
-          (UserData buitenRollen) -> pure buitenRollen
+        (Right buitenRollen) -> pure buitenRollen
         (Left e) -> pure [(show e)]
+
+sourceText :: StringTypedTripleGetter
+sourceText = searchExternalProperty (EnumeratedPropertyType sourceTextName) `trackedAs` sourceTextName
+
+sourceTextName :: String
+sourceTextName = "model:CrlText$Text$binnenRolBeschrijving$sourceText"
 
 syntacticStateM :: StringTypedTripleGetter
 syntacticStateM = constructTripleGetterWithArbitrarySupport
@@ -67,7 +76,7 @@ syntacticStateM = constructTripleGetterWithArbitrarySupport
 
 typeCheckerMessagesM :: StringTypedTripleGetter
 typeCheckerMessagesM = constructTripleGetterWithArbitrarySupport
-  "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" checkModel_ (getInternalProperty "model:CrlText$Text$binnenRolBeschrijving$sourceText")
+  "model:CrlText$Text$binnenRolBeschrijving$typeCheckerMessages" checkModel_ sourceText
   where
     checkModel_ :: ID -> MonadPerspectivesQuery (Array String)
     checkModel_ textId = do
@@ -75,11 +84,8 @@ typeCheckerMessagesM = constructTripleGetterWithArbitrarySupport
       case syntacticState of
         "false" -> pure ["The syntactic state does not allow type checking."]
         otherwise -> do
-          contextId <- lift (textId ##>> parserMessagesM)
-          -- As the syntactic state is ok, we can assume safely its root context exists in the cache.
-          ctxt <- lift $ getPerspectEntiteit contextId
-          df <- lift $ domeinFileFromContext ctxt
-          um <- checkDomeinFile df
+          df <- lift $ retrieveDomeinFile textId
+          um <- lift $ checkDomeinFile df
           if null um
             then pure []
             else pure (map show um)

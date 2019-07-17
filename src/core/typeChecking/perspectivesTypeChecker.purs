@@ -9,16 +9,23 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
+import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Persistent (ContextType, EnumeratedRoleType, getPerspectType)
+import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
 import Prelude (class Eq, class Show, Unit, bind, discard, pure, show, unit, ($), (<<<), (<>), (==), (>=>), (>>=))
+
+checkDomeinFile :: DomeinFile -> MonadPerspectives (Array PerspectivesError)
+checkDomeinFile df = pure []
+
+checkDomeinFile_ :: DomeinFile -> PF Unit
+checkDomeinFile_ df = pure unit
 
 checkContext :: Context -> PF Unit
 checkContext c = do
