@@ -4,6 +4,7 @@ module Perspectives.Query.QueryTypes where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.QueryFunction (QueryFunction)
@@ -14,6 +15,9 @@ import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 data QueryFunctionDescription = QD Domain QueryFunction Domain
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
+
+instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
+  eq = genericEq
 
 instance writeForeignQueryFunctionDescription :: WriteForeign QueryFunctionDescription where
   writeImpl q = unsafeToForeign (writeJSON q)
@@ -32,3 +36,6 @@ derive instance genericDomain :: Generic Domain _
 
 instance showDomain :: Show Domain where
   show = genericShow
+
+instance eqDomain :: Eq Domain where
+  eq = genericEq

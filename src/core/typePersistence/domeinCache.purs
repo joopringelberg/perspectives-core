@@ -25,7 +25,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
 import Perspectives.InstanceRepresentation (revision)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=), (<<<))
 import Simple.JSON (writeJSON)
 
 type URL = String
@@ -64,6 +64,13 @@ retrieveDomeinFile ns = do
       onAccepted res.status [200, 304] "retrieveDomeinFile"
         (onCorrectCallAndResponse "retrieveDomeinFile" res.body (\(a :: DomeinFile) -> liftAff $ put a ev))
     (Just avar) -> liftAff $ read avar
+
+retrieveDomeinFileFromCache :: Namespace -> MonadPerspectives (Maybe DomeinFile)
+retrieveDomeinFileFromCache ns = do
+  mAvar <- domeinCacheLookup ns
+  case mAvar of
+    Nothing -> pure Nothing
+    (Just avar) -> liftAff (read avar) >>= pure <<< Just
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String

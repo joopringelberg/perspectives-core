@@ -2,14 +2,14 @@ module Perspectives.BasicActionFunctions where
 
 import Prelude
 
--- import Perspectives.ComputedTripleGetters (parserMessagesM, syntacticStateM)
+import Data.Maybe (Maybe(..))
+import Perspectives.ComputedTripleGetters (parserMessagesM, syntacticStateM)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
-
+import Perspectives.DomeinCache (retrieveDomeinFileFromCache, storeDomeinFileInCouchdb)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.RunMonadPerspectivesQuery ((##>>))
 
+-- | Store the DomeinFile, if found in the cache.
 storeDomeinFile :: ID -> MonadPerspectives Unit
 storeDomeinFile textId = do
   syntacticState <- textId ##>> syntacticStateM
@@ -17,8 +17,10 @@ storeDomeinFile textId = do
     "false" -> pure unit
     otherwise -> do
       contextId <- textId ##>> parserMessagesM
+      -- This must be the model name.
       -- here, because the syntactic state is true, there must be a contextId in the cache.
-      ctxt <- getPerspectEntiteit contextId
-      df <- domeinFileFromContext ctxt
-      storeDomeinFileInCouchdb df
+      mdf <- retrieveDomeinFileFromCache contextId
+      case mdf of
+        Nothing -> pure unit
+        (Just df) -> storeDomeinFileInCouchdb df
 -- TODO: zet een timestamp!
