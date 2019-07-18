@@ -8,14 +8,14 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType, rol_binding, rol_context, rol_properties)
+import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_property)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (ObjectsGetter, MonadPerspectives)
 import Perspectives.Identifiers (LocalName)
-import Perspectives.InstanceRepresentation (PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Instances.Aliases (AnyContext)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (identity, join, ($), (<>), (>=>), (<<<), pure)
 
 buitenRol :: ObjectsGetter
@@ -31,7 +31,10 @@ binding :: ObjectsGetter
 binding = getRolMember \rol -> maybe [] singleton (rol_binding rol)
 
 getProperty :: EnumeratedPropertyType -> ObjectsGetter
-getProperty pn = getRolMember \(rol :: PerspectRol) -> maybe [] identity (lookup (unwrap pn) (rol_properties rol))
+getProperty pn = getRolMember \(rol :: PerspectRol) -> rol_property rol (unwrap pn)
+
+getRole :: EnumeratedRoleType -> ObjectsGetter
+getRole rn = getContextMember \(ctxt :: PerspectContext) -> (context_rolInContext ctxt (unwrap rn))
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"

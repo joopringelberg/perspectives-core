@@ -16,10 +16,11 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getN
 import Perspectives.CoreTypes (MonadPerspectives, UserMessage(..), MP)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
 import Perspectives.Identifiers (LocalName, binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
-import Perspectives.ObjectGetterConstructors (getRolInContext)
-import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
-import Perspectives.InstanceRepresentation (Comments(..), PerspectContext(..), PerspectRol(..), PropertyValueWithComments(..))
+import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 
 -- | Construct contexts and roles from the serialisation.
@@ -68,16 +69,14 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
         (PerspectContext defaultContextRecord
           { _id = ident
           , displayName  = localName
-          , pspType = expandDefaultNamespaces ctype
-          , binnenRol = binnenRol ident
+          , pspType = ContextType $ expandDefaultNamespaces ctype
           , buitenRol = buitenRol ident
           , rolInContext = rolIds
-          , comments = Comments { commentBefore: [], commentAfter: []}
         })
       lift $ cacheUncachedEntiteit (binnenRol ident)
         (PerspectRol defaultRolRecord
           { _id = binnenRol ident
-          , pspType = expandDefaultNamespaces ctype <> "$binnenRolBeschrijving"
+          , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$binnenRolBeschrijving"
           , binding = Just $ buitenRol ident
           , context = ident
           , properties = constructProperties interneProperties
@@ -88,7 +87,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
       lift $ cacheUncachedEntiteit (buitenRol ident)
         (PerspectRol defaultRolRecord
           { _id = buitenRol ident
-          , pspType = expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"
+          , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"
           , context = ident
           , binding = b
           , properties = constructProperties externeProperties
@@ -132,7 +131,7 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
   lift$ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
-      , pspType = rolType
+      , pspType = EnumeratedRoleType rolType
       , context = contextId
       , binding = maybe Nothing (Just <<< expandDefaultNamespaces) bnd
       , properties = constructProperties properties
@@ -146,8 +145,8 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
 constructAnotherRol :: RolName -> ContextID -> RolSerialization -> MonadPerspectives (Either (Array UserMessage) ID)
 constructAnotherRol rolType id rolSerialisation = do
   ident <- pure $ expandDefaultNamespaces id
-  rolInstances <- getRolInContext (RolDef rolType) ident
-  candidate <- runExceptT $ constructRol rolType ident (ident  <> "$" <> (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType))) (typeWithPerspectivesTypes getNextRolIndex rolInstances) rolSerialisation
+  rolInstances <- getRole (EnumeratedRoleType rolType) ident
+  candidate <- runExceptT $ constructRol rolType ident (ident  <> "$" <> (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType))) (getNextRolIndex rolInstances) rolSerialisation
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
@@ -161,11 +160,8 @@ constructAnotherRol rolType id rolSerialisation = do
           void $ removeRol rolType rolId ident
           pure $ Left m
 
-constructProperties :: PropertySerialization -> FO.Object PropertyValueWithComments
-constructProperties (PropertySerialization props) = ((FO.toUnfoldable :: FO.Object (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> FO.fromFoldable >>> map f) props
+constructProperties :: PropertySerialization -> FO.Object (Array String)
+constructProperties (PropertySerialization props) = ((FO.toUnfoldable :: FO.Object (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> FO.fromFoldable) props
   where
     keyValuePair :: Tuple String (Array String) -> (Tuple String (Array String))
     keyValuePair (Tuple key values) = Tuple (expandDefaultNamespaces key) values
-
-    f :: Array String -> PropertyValueWithComments
-    f v = PropertyValueWithComments {commentBefore: [], commentAfter: [], value: v}
