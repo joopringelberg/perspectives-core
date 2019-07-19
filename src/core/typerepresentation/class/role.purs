@@ -10,13 +10,13 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Persistent (CalculatedRoleType, ContextType, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind, RoleType(..))
-import Prelude (pure, (<>), show, (>=>), (>>=), (<<<))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleKind, RoleType(..))
+import Prelude (class Show, pure, show, (<<<), (<>), (>=>), (>>=))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
 -----------------------------------------------------------
-class RoleClass r where
+class Show r <= RoleClass r where
   kindOfRole :: r -> RoleKind
   roleAspects :: r -> Array EnumeratedRoleType
   context :: r -> ContextType
@@ -24,6 +24,7 @@ class RoleClass r where
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
   calculation :: r -> QueryFunctionDescription
+  properties :: r -> MonadPerspectives (Array PropertyType)
 
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole where
   kindOfRole r = (unwrap r).kindOfRole
@@ -33,6 +34,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole where
   functional = rangeOfCalculation >=> functional
   mandatory = rangeOfCalculation >=> mandatory
   calculation r = (unwrap r).calculation
+  properties = rangeOfCalculation >=> properties
 
 rangeOfCalculation :: CalculatedRole -> MonadPerspectives EnumeratedRole
 rangeOfCalculation cp = case calculation cp of
@@ -47,6 +49,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   calculation r = QD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (identifier r))
+  properties r = pure (unwrap r).properties
 
 data Role = E EnumeratedRole | C CalculatedRole
 

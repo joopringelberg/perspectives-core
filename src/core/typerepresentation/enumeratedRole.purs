@@ -6,7 +6,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, RoleKind)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -22,6 +22,7 @@ type EnumeratedRoleRecord =
   , kindOfRole :: RoleKind
 
   , roleAspects :: Array EnumeratedRoleType
+  , properties :: Array PropertyType
 
   , context :: ContextType
   , binding :: RoleType

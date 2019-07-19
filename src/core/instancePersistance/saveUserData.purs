@@ -6,11 +6,12 @@ module Perspectives.SaveUserData where
 import Control.Monad.State (StateT)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Effect.Class (liftEffect)
+import Perspectives.Actions (tearDownBotActions, updatePerspectEntiteitMember', updatePerspectEntiteit', removeRol)
 import Perspectives.ContextAndRole (context_id, removeRol_binding, removeRol_gevuldeRollen, rol_id)
 import Perspectives.CoreTypes (MP, MonadPerspectives, TripleRef(..))
-import Perspectives.Instances.ObjectGetters (iedereRolInContext)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (binnenRol, buitenRol) as ID
@@ -18,6 +19,7 @@ import Perspectives.Identifiers (deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, removeEntiteit)
 import Perspectives.Instances (saveEntiteitPreservingVersion)
+import Perspectives.Instances.ObjectGetters (iedereRolInContext)
 import Perspectives.TheoryChange (addToQueue, addTripleToQueue, tripleRefToTripleQueueElement, tripleToTripleQueueElement)
 import Perspectives.TripleAdministration (unRegisterBasicTriple, unRegisterSubject)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (>>=), (>>>), (<<<))
@@ -39,7 +41,6 @@ saveUserContext id = do
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.binnenRol id)
   pure unit
 
-{-
 -- * remove tripleAdministration.
 removeUserContext :: ID -> MonadPerspectives Unit
 removeUserContext id = do
@@ -65,7 +66,7 @@ removeUserRol_ pr = do
   -- Remove the rol from the inverse administration of its binding.
   case binding of
     Nothing -> pure unit
-    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob pspType pr
+    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (unwrap pspType) pr
   -- Now handle all Roles that have this Role as binding.
   -- For all Role types,
   forWithIndex_ gevuldeRollen \rol filledRollen ->
@@ -88,5 +89,4 @@ removeUserRol_ pr = do
 removeUserRol :: String -> MonadPerspectives Unit
 removeUserRol pr = do
   (PerspectRol{pspType, context}) <- removeUserRol_ pr
-  void $ removeRol pspType pr context
--}
+  void $ removeRol (unwrap pspType) pr context

@@ -8,7 +8,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_property)
+import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_property, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (ObjectsGetter, MonadPerspectives)
 import Perspectives.Identifiers (LocalName)
@@ -49,3 +49,6 @@ getUnQualifiedPropertyFromPerspectRol ln rol =
 
 contextType :: AnyContext -> MonadPerspectives ContextType
 contextType = getPerspectEntiteit >=> pure <<< context_pspType
+
+roleType :: AnyContext -> MonadPerspectives EnumeratedRoleType
+roleType = getPerspectEntiteit >=> pure <<< rol_pspType

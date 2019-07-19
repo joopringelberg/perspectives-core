@@ -7,6 +7,7 @@ import Control.Monad.State (lift)
 import Data.Array (cons, null)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, unwrap)
 import Effect (Effect, foreachE)
 import Effect.Aff (Aff, error, throwError)
 import Effect.Class (liftEffect)
@@ -29,6 +30,7 @@ getRef :: StringTriple -> TripleRef
 getRef = unsafeCoerce
 
 -- | An index of Predicate-Object combinations, indexed by Subject.
+-- | These are untyped, or rather, String-typed.
 type TripleIndex = GLStrMap PredicateIndex
 
 -- An index of objects indexed by Predicate (for a single Subject).
@@ -161,20 +163,20 @@ ensureResource rid = do
         pure m
     (Just m) -> pure m
 
-memorize :: StringTripleGetter -> String -> StringTypedTripleGetter
+memorize :: forall s t. Newtype s String => TripleGetter s t -> String -> TypedTripleGetter s t
 memorize getter name = TypedTripleGetter name
-  \id -> do
+  \(id :: s) -> do
     remember <- memorizeQueryResults
     case remember of
       true -> do
-        mt <- lift $ liftEffect (lookupInTripleIndex id name)
+        mt <- lift $ liftEffect (lookupInTripleIndex (unwrap id) name)
         case mt of
           Nothing -> do
-            t <- getter id
-            (stringTriple :: Triple String String) <- pure $  t
+            (t :: Triple s t) <- getter id
+            (stringTriple :: Triple String String) <- pure $ unsafeCoerce t
             _ <- lift $ liftEffect $ registerTriple stringTriple
             pure t
-          (Just t) -> pure $  t
+          (Just t) -> pure $ unsafeCoerce t
       false -> getter id
 
 -- | Add the reference to the triple.

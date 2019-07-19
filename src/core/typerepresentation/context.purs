@@ -5,6 +5,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision)
@@ -39,7 +40,15 @@ instance contextContextClass :: ContextClass Context where
 lookForRoleType :: String -> Context -> Maybe RoleType
 -- TODO: breid uit voor andere roltypen.
 -- TODO: breid uit voor Aspecten.
-lookForRoleType rn c = some (roleInContext c) (roleTypeIdentifier >>> ((==) rn))
+lookForRoleType = lookForRole_ (==)
+
+-- | We simply require the Pattern to match the end of the string.
+lookForUnqualifiedRoleType :: String -> Context -> Maybe RoleType
+lookForUnqualifiedRoleType = lookForRole_ isContainingNamespace
+
+type RoleTypeIdentifier = String
+lookForRole_ :: (RoleTypeIdentifier -> String -> Boolean) -> RoleTypeIdentifier -> Context -> (Maybe RoleType)
+lookForRole_ criterium rn c = some (roleInContext c) (roleTypeIdentifier >>> (criterium rn))
   where
 
     roleTypeIdentifier :: RoleType -> String

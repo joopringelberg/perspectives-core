@@ -20,20 +20,20 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Actions (addRol, removeBinding, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
-
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.Instances.ObjectGetters (contextType) as DTO
-import Perspectives.ObjectGetterConstructors (getUnqualifiedRolDefinition) as OGC
-import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
-import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
-
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>), StringTypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
-import Perspectives.Instances (saveEntiteit)
-import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.InstanceRepresentation (PerspectRol)
+import Perspectives.Instances (saveEntiteit)
+import Perspectives.Instances.TripleGetters (binding, context, roleType, contextType)
+import Perspectives.Instances.ObjectGetters (contextType) as DTO
+import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
+import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
+import Perspectives.Representation.Context (lookForUnqualifiedRoleType)
+import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
+import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TripleGetterComposition ((>->))
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
@@ -118,14 +118,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- Given the qualified name of the RolType.
     Api.GetRolBinding -> getRolBinding subject predicate setter corrId
     -- Given the rolinstance;
-    Api.GetBinding -> subscribeToObjects subject DTG.genericBinding setter corrId
-    Api.GetBindingType -> subscribeToObjects subject (DTG.genericBinding >-> DTG.genericRolType) setter corrId
+    Api.GetBinding -> subscribeToObjects subject binding setter corrId
+    Api.GetBindingType -> subscribeToObjects subject (binding >-> roleType) setter corrId
     Api.GetRol -> getRol subject predicate setter corrId
     Api.GetUnqualifiedRol -> getRolFromLocalName subject predicate setter corrId
-    Api.GetRolContext -> subscribeToObjects subject DTG.genericContext setter corrId
-    Api.GetContextType -> subscribeToObjects subject DTG.contextType setter corrId
-    Api.GetRolType -> subscribeToObjects subject DTG.genericRolType setter corrId
-    Api.GetUnqualifiedRolType -> subscribeToObjects subject (searchUnqualifiedRolDefinition predicate) setter corrId
+    Api.GetRolContext -> subscribeToObjects subject context setter corrId
+    Api.GetContextType -> subscribeToObjects subject contextType setter corrId
+    Api.GetRolType -> subscribeToObjects subject roleType setter corrId
+    Api.GetUnqualifiedRolType -> subscribeToObjects subject (lookForUnqualifiedRoleType predicate) setter corrId
     Api.GetProperty -> getProperty subject predicate setter corrId
     Api.GetViewProperties -> -- subject is the roltype.
       if (predicate == "allProperties")
@@ -159,7 +159,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- Check whether a role exists for ContextDef with the localRolName and then create a new instance of it according to the rolDescription.
     -- subject :: Context, predicate :: localRolName, object :: ContextDef. rolDescription must be present!
     Api.CreateRolWithLocalName -> do
-      mqrolname <- (ContextDef object) ##> (OGC.getUnqualifiedRolDefinition predicate)
+      mqrolname <- (ContextDef object) ##> (lookForUnqualifiedRoleType predicate)
       case mqrolname of
         Nothing -> sendResponse (Error corrId ("Cannot find Rol with local name '" <> predicate <> "' on context type '" <> object <> "'!")) setter
         (Just qrolname) -> do
@@ -229,20 +229,20 @@ unsubscribeFromObjects subject corrId = lift $ liftEffect $ unRegisterTriple $ T
 -- | Retrieve the binding of the rol from the context, subscribe to it.
 getRolBinding :: ContextID -> RolName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
 getRolBinding cid rn setter corrId = do
-  rf <- getRolFunction rn
-  subscribeToObjects cid (rf >-> DTG.genericBinding) setter corrId
-  -- subscribeToObjects cid (rf >-> DTG.genericBinding) (setter <<< Result corrId)
+  rf <- getRoleFunction rn
+  subscribeToObjects cid (rf >-> binding) setter corrId
+  -- subscribeToObjects cid (rf >-> binding) (setter <<< Result corrId)
 
 -- | Retrieve the rol from the context, subscribe to it. NOTE: only for RolInContext/ContextRol, not BinnenRol or BuitenRol.
 getRol :: ContextID -> RolName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
 getRol cid rn setter corrId = do
-  qf <- getRolFunction rn
+  qf <- getRoleFunction rn
   subscribeToObjects cid qf setter corrId
 
 getRolFromLocalName :: ContextID -> LocalName -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
 getRolFromLocalName cid ln setter corrId = do
   contextType <- cid ##>> DTO.contextType
-  qf <- getUnqualifiedRolFunction ln contextType
+  qf <- lookForUnqualifiedRoleType ln contextType
   subscribeToObjects cid qf setter corrId
 
 -- | Retrieve the property from the rol, subscribe to it.
