@@ -5,10 +5,10 @@ import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object, empty)
-import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.Class.Revision (Revision_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
@@ -17,7 +17,7 @@ import Prelude (($), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 newtype DomeinFile = DomeinFile
-  { _rev :: Revision
+  { _rev :: Revision_
   , _id :: String
   , contexts :: DomeinFileContexts
   , enumeratedRoles :: Object EnumeratedRole

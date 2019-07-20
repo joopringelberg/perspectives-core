@@ -1,26 +1,27 @@
 module Perspectives.InstanceRepresentation where
 
-import Perspectives.EntiteitAndRDFAliases
-
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (class Newtype, unwrap, over)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object) as F
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Show, class Eq, (==), (>>>))
+import Prelude (class Show, class Eq, (==), (>>>), (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON')
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT TYPE CLASS
 -----------------------------------------------------------
 class PerspectContextClass c where
-  identifier :: c -> String
+  identifier :: c -> ContextInstance
   pspType :: c -> ContextType
-  externalRole :: c -> String
-  roles :: c -> F.Object (Array ID)
+  externalRole :: c -> RoleInstance
+  roles :: c -> F.Object (Array RoleInstance)
 
 instance perspectContextPerspectContextClass :: PerspectContextClass PerspectContext where
   identifier c = (unwrap c)._id
@@ -34,12 +35,12 @@ instance perspectContextPerspectContextClass :: PerspectContextClass PerspectCon
 newtype PerspectContext = PerspectContext ContextRecord
 
 type ContextRecord =
-  { _id :: ID
-  , _rev :: Revision
+  { _id :: ContextInstance
+  , _rev :: Revision_
   , displayName :: String
   , pspType :: ContextType
-  , buitenRol :: ID
-  , rolInContext :: F.Object (Array ID)
+  , buitenRol :: RoleInstance
+  , rolInContext :: F.Object (Array RoleInstance)
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _
@@ -61,21 +62,28 @@ derive instance newtypePerspectContext :: Newtype PerspectContext _
 derive newtype instance writeForeignPerspectContext :: WriteForeign PerspectContext
 derive newtype instance readForeignPerspectContext :: ReadForeign PerspectContext
 
+instance identifiablePerspectContext :: Identifiable PerspectContext ContextInstance where
+  identifier (PerspectContext{_id}) = _id
+
+instance revisionPerspectContext :: Revision PerspectContext where
+  rev = _._rev <<< unwrap
+  changeRevision s = over PerspectContext (\vr -> vr {_rev = s})
+
 -----------------------------------------------------------
 -- PERSPECTROL
 -----------------------------------------------------------
 newtype PerspectRol = PerspectRol RolRecord
 
 type RolRecord =
-  { _id :: ID
+  { _id :: RoleInstance
   , pspType :: EnumeratedRoleType
-  , context :: ID
+  , context :: ContextInstance
   -- While the fields above occur in every role, those below do not.
-  , _rev :: Revision
+  , _rev :: Revision_
   , binding :: Binding
   -- The four fields below could also be modeled as Maybe values.
-  , properties :: F.Object (Array String)
-  , gevuldeRollen :: F.Object (Array RolID)
+  , properties :: F.Object (Array Value)
+  , gevuldeRollen :: F.Object (Array RoleInstance)
   , occurrence :: Int
   }
 
@@ -95,17 +103,20 @@ instance decodePerspectRol :: Decode PerspectRol where
 derive newtype instance writeForeignPerspectRol :: WriteForeign PerspectRol
 
 derive newtype instance readForeignPerspectRol :: ReadForeign PerspectRol
+
+instance revisionPerspectRol :: Revision PerspectRol where
+  rev = _._rev <<< unwrap
+  changeRevision s = over PerspectRol (\vr -> vr {_rev = s})
+
+instance identifiablePerspectRol :: Identifiable PerspectRol RoleInstance where
+  identifier (PerspectRol{_id}) = _id
+
 -----------------------------------------------------------
 -- REVISION, BINDING
 -----------------------------------------------------------
-type Revision = Maybe String
+type Binding = Maybe RoleInstance
 
-revision :: String -> Revision
-revision = Just
-
-type Binding = Maybe RolID
-
-binding :: RolID -> Binding
+binding :: RoleInstance -> Binding
 binding id = case id of
-  "" -> Nothing
+  RoleInstance "" -> Nothing
   otherwise -> (Just id)

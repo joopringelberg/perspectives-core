@@ -8,10 +8,10 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep)
-import Perspectives.Representation.Class.Persistent (EnumeratedRoleType(..), getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Context (lookForRoleType)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..))
 import Prelude (($), pure, bind, (>>=), (<<<))
 
 -- From an AST data constructor, create a QueryFunction data element after
@@ -27,7 +27,8 @@ compileElementaryStep currentDomain s@(QualifiedRol qn) = do
       mb <- getPerspectType c >>= pure <<< lookForRoleType qn
       case mb of
         Nothing -> pure $ Left $ ContextHasNoRole c qn
-        (Just et) -> pure $ Right $ QD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType qn)
+        (Just et) -> pure $ Right $ QD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType
+         qn)
     otherwise -> pure $ Left $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.

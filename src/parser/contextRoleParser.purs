@@ -1,7 +1,5 @@
 module Perspectives.ContextRoleParser where
 
-import Perspectives.EntiteitAndRDFAliases
-
 import Control.Alt ((<|>))
 import Control.Monad.State (get, gets)
 import Control.Monad.Trans.Class (lift)
@@ -18,14 +16,16 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
-import Perspectives.PerspectEntiteit (cacheEntiteitPreservingVersion)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Representation.Class.Persistent (cacheEntiteitPreservingVersion)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), binding)
 import Perspectives.Token (token)
-import Prelude (class Show, Unit, bind, discard, identity, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>))
+import Prelude (class Show, Unit, bind, discard, identity, pure, show, unit, ($), ($>), (*>), (+), (-), (/=), (<$>), (<*), (<*>), (<>), (==), (>), (>>=), map, (<<<))
 import Text.Parsing.Indent (block, checkIndent, indented, sameLine, withPos)
 import Text.Parsing.Parser (ParseState(..), fail, ParseError)
 import Text.Parsing.Parser.Combinators (choice, option, optionMaybe, sepBy, try, (<?>), (<??>))
@@ -33,6 +33,7 @@ import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (anyChar, oneOf, string) as STRING
 import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
 import Text.Parsing.Parser.Token (alphaNum, upper)
+
 -----------------------------------------------------------
 -- Comments
 -----------------------------------------------------------
@@ -292,7 +293,7 @@ typedPropertyAssignment ::  IP Unit -> IP (Tuple ID (Array Value))
 typedPropertyAssignment scope = go (try (withPos
   (Tuple
     <$> (scope *> (propertyName <* (sameLine *> reservedOp "=")))
-    <*> (sameLine *> (simpleValue `sepBy` (STRING.string ","))))))
+    <*> (sameLine *> (simpleValue `sepBy` (STRING.string ",")) >>= pure <<< map Value))))
   where
     go x = do
       (Tuple pname value) <- x
@@ -324,8 +325,8 @@ instance showArrow :: Show Arrow where
 roleBinding' ::
   QualifiedName ->
   Arrow ->
-  IP (Tuple (Array Comment) (Maybe ID)) ->
-  IP (Tuple RolName ID)
+  IP (Tuple (Array Comment) (Maybe RoleInstance)) ->
+  IP (Tuple RolName RoleInstance)
 roleBinding' cname arrow p = ("rolename => contextName" <??>
   (try do
     -- Parsing
@@ -341,7 +342,7 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
 
       -- Naming
       nrOfRoleOccurrences <- getRoleOccurrences (show rname) -- The position in the sequence.
-      rolId <- pure ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
+      rolId <- pure $ RoleInstance ((show cname) <> "$" <> localRoleName <> "_" <> (rol_padOccurrence (roleIndex occurrence nrOfRoleOccurrences)))
 
       -- Storing
       cacheRol rolId
@@ -349,8 +350,8 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
           { _id = rolId
           , occurrence = (roleIndex occurrence nrOfRoleOccurrences)
           , pspType = EnumeratedRoleType $ show rname
-          , binding = binding (maybe "" identity bindng)
-          , context = show cname
+          , binding = bindng
+          , context = ContextInstance $ show cname
           , properties = FO.fromFoldable ((\(Tuple en cm) -> Tuple en cm) <$> props)
           })
 
@@ -364,35 +365,35 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         (Just n) -> n
         Nothing -> 0
 
-cacheRol ::  RolID -> PerspectRol -> IP Unit
+cacheRol ::  RoleInstance -> PerspectRol -> IP Unit
 cacheRol rolId rol = liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
 
-cacheContext ::  ContextID -> PerspectContext -> IP Unit
+cacheContext ::  ContextInstance -> PerspectContext -> IP Unit
 cacheContext contextId ctxt = liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
 inlineContextBinding ::  QualifiedName
-  -> IP (Tuple RolName ID)
+  -> IP (Tuple RolName RoleInstance)
 inlineContextBinding cName = roleBinding' cName ContextBinding do
   cmt <- inLineComment
   _ <- nextLine
   (contextBuitenRol :: ID) <- indented *> context
-  pure $ Tuple cmt (Just contextBuitenRol)
+  pure $ Tuple cmt (Just $ RoleInstance contextBuitenRol)
 
 emptyBinding ::  QualifiedName
-  -> IP (Tuple RolName ID)
+  -> IP (Tuple RolName RoleInstance)
 emptyBinding cName = roleBinding' cName ContextBinding do
   _ <- token.parens whiteSpace
   cmt <- inLineComment
   pure $ Tuple cmt Nothing
 
 contextBindingByReference ::  QualifiedName
-  -> IP (Tuple RolName ID)
+  -> IP (Tuple RolName RoleInstance)
 contextBindingByReference cName = roleBinding' cName ContextBinding do
   ident <- (sameLine *> contextReference)
   cmt <- inLineComment
-  pure $ Tuple cmt (Just ident)
+  pure $ Tuple cmt (Just $ RoleInstance ident)
   where
     contextReference :: IP RolName
     contextReference = do
@@ -400,12 +401,12 @@ contextBindingByReference cName = roleBinding' cName ContextBinding do
       pure $ buitenRol (show qn)
 
 roleBindingByReference ::  QualifiedName
-  -> IP (Tuple RolName ID)
+  -> IP (Tuple RolName RoleInstance)
 roleBindingByReference cName = roleBinding' cName RoleBinding do
   ident <- (sameLine *> relativeRolInstanceID <|> rolReference)
   occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
   cmt <- inLineComment
-  pure $ Tuple cmt (Just (ident <> "_" <> (rol_padOccurrence (maybe 1 identity occurrence))))
+  pure $ Tuple cmt (Just $ RoleInstance (ident <> "_" <> (rol_padOccurrence (maybe 1 identity occurrence))))
   where
     rolReference :: IP RolName
     rolReference = do
@@ -447,7 +448,7 @@ butLastNNamespaceLevels ns n = do
 
 -- | roleBinding = roleName '=>' (contextName | context) rolePropertyAssignment*
 roleBinding ::  QualifiedName
-  -> IP (Tuple RolName ID)
+  -> IP (Tuple RolName RoleInstance)
 roleBinding cname =
   inlineContextBinding cname
   <|> contextBindingByReference cname
@@ -491,27 +492,27 @@ context = withRoleCounting context' where
             (prototype :: Maybe ContextID) <- option Nothing (indented *> prototypeDeclaration)
             (publicProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment))
             (privateProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment))
-            (rolebindings :: List (Tuple RolName ID)) <- option Nil (indented *> (block $ roleBinding instanceName))
+            (rolebindings :: List (Tuple RolName RoleInstance)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
             -- Storing
-            cacheContext (show instanceName)
+            cacheContext (ContextInstance (show instanceName))
               (PerspectContext defaultContextRecord
-                { _id = (show instanceName)
+                { _id = (ContextInstance $ show instanceName)
                 , displayName  = localName
                 , pspType = ContextType $ show typeName
-                , buitenRol = buitenRol (show instanceName)
+                , buitenRol = RoleInstance $ buitenRol (show instanceName)
                 , rolInContext = collect rolebindings
               })
-            cacheRol (buitenRol (show instanceName))
+            cacheRol (RoleInstance $ buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
-                { _id = buitenRol (show instanceName)
+                { _id = RoleInstance $ buitenRol (show instanceName)
                 , pspType = EnumeratedRoleType $ show typeName <> "$buitenRolBeschrijving"
-                , context = (show instanceName)
-                , binding = binding $ maybe "" buitenRol prototype
+                , context = (ContextInstance $ show instanceName)
+                , binding = Just $ RoleInstance $ maybe "" buitenRol prototype
                 , properties = FO.fromFoldable publicProps
                 })
             pure $ buitenRol (show instanceName)
-  collect :: List (Tuple RolName ID) -> FO.Object (Array ID)
+  collect :: List (Tuple RolName RoleInstance) -> FO.Object (Array RoleInstance)
   collect Nil = FO.empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
     case FO.lookup rname map of
@@ -548,7 +549,7 @@ expression = choice
 -----------------------------------------------------------
 -- Section and definition
 -----------------------------------------------------------
-section ::  IP (Tuple String (Array ID))
+section ::  IP (Tuple String (Array RoleInstance))
 section = do
   prop <- sectionHeading
   ids <- AR.many definition
@@ -560,21 +561,21 @@ sectionHeading = do
   setSection prop
   pure $ show prop
 
-definition ::  IP ID
+definition ::  IP RoleInstance
 definition = do
   bindng <- context
   prop@(QualifiedName _ localName) <- getSection
   _ <- incrementRoleInstances (show prop)
   nrOfRoleOccurrences <- getRoleOccurrences (show prop)
   enclContext <- getNamespace
-  rolId <- pure $ enclContext <> "$" <> localName <> "_" <> rol_padOccurrence (maybe 0 identity nrOfRoleOccurrences)
+  rolId <- pure $ RoleInstance $ enclContext <> "$" <> localName <> "_" <> rol_padOccurrence (maybe 0 identity nrOfRoleOccurrences)
   cacheRol rolId
     (PerspectRol defaultRolRecord
       { _id = rolId
       , occurrence = maybe 0 identity nrOfRoleOccurrences
       , pspType = EnumeratedRoleType (show prop)
-      , binding = binding bindng
-      , context = enclContext
+      , binding = Just $ RoleInstance $ bindng
+      , context = ContextInstance enclContext
       })
   pure rolId
 

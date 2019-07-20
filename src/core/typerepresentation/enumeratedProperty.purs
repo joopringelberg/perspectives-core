@@ -4,10 +4,9 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
-import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, writeImpl)
@@ -19,7 +18,7 @@ newtype EnumeratedProperty = EnumeratedProperty EnumeratedPropertyRecord
 
 type EnumeratedPropertyRecord =
   { _id :: EnumeratedPropertyType
-  , _rev :: Revision
+  , _rev :: Revision_
   , displayName :: String
 
   , role :: EnumeratedRoleType

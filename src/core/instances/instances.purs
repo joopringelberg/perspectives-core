@@ -7,6 +7,7 @@ module Perspectives.Instances
 , getPerspectEntiteit
 , tryGetPerspectEntiteit
 , getAVarRepresentingPerspectEntiteit
+, class PersistentInstance
   )
 where
 
@@ -23,16 +24,24 @@ import Data.Newtype (unwrap)
 import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
+import Foreign.Class (class Decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (ensureAuthentication, defaultPerspectRequest, retrieveDocumentVersion)
-import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit, getRevision', readEntiteitFromCache, removeInternally, representInternally, retrieveInternally, setRevision)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Representation.Class.Persistent (class Persistent, cacheCachedEntiteit, changeRevision, readEntiteitFromCache, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase)
-import Simple.JSON (writeJSON)
+import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON)
 
-getPerspectEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
+class (Persistent v i, WriteForeign v, ReadForeign v, Decode v) <= PersistentInstance v i
+
+instance persistentInstancePerspectContext :: PersistentInstance PerspectContext ContextInstance
+
+instance persistentInstancePerspectRol :: PersistentInstance PerspectRol RoleInstance
+
+getPerspectEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
   do
     (av :: Maybe (AVar a)) <- retrieveInternally id
@@ -42,13 +51,13 @@ getPerspectEntiteit id =
         pure pe
       Nothing -> fetchEntiteit id
 
-tryGetPerspectEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives (Maybe a)
+tryGetPerspectEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
   \_ -> do
     (_ :: Maybe (AVar a)) <- removeInternally id
     pure Nothing
 
-getAVarRepresentingPerspectEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives (AVar a)
+getAVarRepresentingPerspectEntiteit :: forall a i. PersistentInstance a i  => i -> MonadPerspectives (AVar a)
 getAVarRepresentingPerspectEntiteit id =
   do
     (av :: Maybe (AVar a)) <- retrieveInternally id
@@ -59,77 +68,77 @@ getAVarRepresentingPerspectEntiteit id =
         mavar <- retrieveInternally id
         pure $ unsafePartial $ fromJust mavar
 
-removeEntiteit :: forall a. PerspectEntiteit a => String -> MonadPerspectives a
+removeEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 removeEntiteit entId = do
   entiteit <- getPerspectEntiteit entId
   ensureAuthentication $ do
-    case (getRevision' entiteit) of
-      Nothing -> throwError $ error ("removeEntiteit: entiteit has no revision, removal is impossible: " <> entId)
+    case (rev entiteit) of
+      Nothing -> throwError $ error ("removeEntiteit: entiteit has no revision, removal is impossible: " <> unwrap entId)
       (Just rev) -> do
         ebase <- entitiesDatabase
         (rq :: (Request String)) <- defaultPerspectRequest
-        res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> entId <> "?rev=" <> rev)}
+        res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> unwrap entId <> "?rev=" <> rev)}
         onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit
 
 -- | Fetch the definition of a resource asynchronously.
-fetchEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
+fetchEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 fetchEntiteit id = ensureAuthentication $ catchError
   do
     v <- representInternally id
     -- _ <- forkAff do
     ebase <- entitiesDatabase
     (rq :: (Request String)) <- defaultPerspectRequest
-    res <- liftAff $ request $ rq {url = ebase <> id}
+    res <- liftAff $ request $ rq {url = ebase <> unwrap id}
     void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
       (onCorrectCallAndResponse "fetchEntiteit" res.body \(a :: a) -> put a v)
     liftAff $ read v
-  \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> id <> " from couchdb. " <> show e)
+  \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
 -- | Save a user Resource.
-saveEntiteitPreservingVersion :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
+saveEntiteitPreservingVersion :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 -- saveEntiteitPreservingVersion id = catchError do
 --     (_ :: a) <- fetchPerspectEntiteitFromCouchdb id
 --     saveEntiteit id
 --   \e -> saveEntiteit id
 saveEntiteitPreservingVersion = saveEntiteit
 
-saveEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
+saveEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 saveEntiteit id = do
   pe <- readEntiteitFromCache id
-  case getRevision' pe of
+  case rev pe of
     Nothing -> saveUnversionedEntiteit id
     otherwise -> saveVersionedEntiteit id pe
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
-saveUnversionedEntiteit :: forall a. PerspectEntiteit a => ID -> MonadPerspectives a
+saveUnversionedEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 saveUnversionedEntiteit id = ensureAuthentication $ do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> id)
+    Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> unwrap id)
     (Just avar) -> do
       pe <- liftAff $ take avar
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> id), content = Just $ RequestBody.string (writeJSON pe)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (writeJSON pe)}
       if res.status == (StatusCode 409)
-        then retrieveDocumentVersion (ebase <> id) >>= pure <<< (flip setRevision pe) >>= saveVersionedEntiteit id
+        then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) <<< Just >>= saveVersionedEntiteit id
         else do
           void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-            (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ liftAff $ put (setRevision (unsafePartial $ fromJust (unwrap a).rev) pe) avar))
+            (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ liftAff $ put (changeRevision (unwrap a).rev pe) avar))
           pure pe
 
-saveVersionedEntiteit :: forall a. PerspectEntiteit a => ID -> a -> MonadPerspectives a
+saveVersionedEntiteit :: forall a i. PersistentInstance a i => i -> a -> MonadPerspectives a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
-  case (getRevision' entiteit) of
-    Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> entId)
+  case (rev entiteit) of
+    Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)
     (Just rev) -> do
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (writeJSON entiteit)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (writeJSON entiteit)}
       if res.status == (StatusCode 409)
-        then retrieveDocumentVersion entId >>= pure <<< (flip setRevision entiteit) >>= saveVersionedEntiteit entId
+        then retrieveDocumentVersion (unwrap entId) >>= pure <<< (flip changeRevision entiteit) <<< Just >>= saveVersionedEntiteit entId
         else do
           void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
-            (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (setRevision (unsafePartial $ fromJust (unwrap a).rev) entiteit)))
+            (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (changeRevision (unwrap a).rev entiteit)))
           pure entiteit

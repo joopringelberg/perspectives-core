@@ -1,0 +1,13 @@
+GRAMMATICA VOOR ARC
+
+0. Engelse of Nederlandse sleutelwoorden? Later vertalen.
+1. Spaties in identifiers. Vervangen door (b.v.) underscore?
+2. Sectie headers?
+	contexten, rollen, properties, views, acties
+	of:
+	Domein, zaken, partijen, activiteiten, toestanden ipv contexten.
+	of:
+	een sleutelwoord vóór elk type context:
+	Domein, Partij, Zaak, Activiteit, Toestand
+3. Declaratie van prefixes.
+4. Tekst declaratie? Demarkeert aparte files.

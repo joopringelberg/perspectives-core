@@ -24,7 +24,7 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Instances.ObjectGetters (context)
 import Perspectives.PerspectivesState (setTransactie, transactie)
 import Perspectives.QueryCombinators (containedIn, filter, intersect, notEmpty)
-import Perspectives.Representation.Class.Persistent (getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (functional) as P
 import Perspectives.Representation.Class.Role (functional) as R
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -125,7 +125,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
       maybeM (pure unit) addTripleToQueue (lift $ liftEffect $ modifyTriple newCD)
       (isfunc :: Boolean) <- case isContext of
         true -> getPerspectType (EnumeratedRoleType memberName) >>= \(r :: EnumeratedRole) -> R.functional r
-        false -> getPerspectType (EnumeratedPropertyType memberName) >>= \(p :: EnumeratedProperty) -> P.functional p 
+        false -> getPerspectType (EnumeratedPropertyType memberName) >>= \(p :: EnumeratedProperty) -> P.functional p
       -- isfunc <- isFunctionalComputer memberName -- hier komt ie niet uit.
       -- (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
       if (isfunc)

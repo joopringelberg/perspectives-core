@@ -11,7 +11,7 @@ import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.Persistent (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), getPerspectType)
+import Perspectives.Representation.Class.PersistentType (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), getPerspectType)
 import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)

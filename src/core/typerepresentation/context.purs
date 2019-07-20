@@ -6,9 +6,9 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.Identifiers (isContainingNamespace)
-import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign)
@@ -18,7 +18,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -----------------------------------------------------------
 class ContextClass c where
   contextAspects :: c -> Array ContextType
-  defaultPrototype :: c -> Maybe String
+  defaultPrototype :: c -> Maybe ContextInstance
   roleInContext :: c -> Array RoleType
   contextRole :: c -> Array RoleType
   externalRole :: c -> EnumeratedRoleType
@@ -67,11 +67,11 @@ newtype Context = Context ContextRecord
 
 type ContextRecord =
   { _id :: ContextType
-  , _rev :: Revision
+  , _rev :: Revision_
   , displayName :: String
 
   , contextAspects :: Array ContextType
-  , defaultPrototype :: Maybe String
+  , defaultPrototype :: Maybe ContextInstance
 
   , rolInContext :: Array RoleType
   , contextRol :: Array RoleType

@@ -7,9 +7,7 @@ Domein model:Politie heeft
 		Aangifte heeft
 			import model:PersoonlijkDomein als per:
 			properties
-				intern
 					urgentie (String, Verplicht, Niet Functioneel)
-				extern
 					aantekening (String, Niet Verplicht, Functioneel)
 			rollen
 				UserRol (Functioneel, Verplicht) gevuld door per:Persoon heeft

@@ -22,12 +22,12 @@ import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances (getPerspectEntiteit, saveVersionedEntiteit)
 import Perspectives.Instances.Aliases (AnyContext, RoleInstance)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType)
-import Perspectives.PerspectEntiteit (class PerspectEntiteit, cacheCachedEntiteit)
+import Perspectives.Instances (class PersistentInstance, cacheCachedEntiteit)
 import Perspectives.Query.Compiler (compileQuery)
 import Perspectives.QueryEffect (PerspectivesEffect, (~>))
 import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
-import Perspectives.Representation.Class.Persistent (ActionType, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
 import Perspectives.Representation.Context (Context, actions)
 import Perspectives.Representation.TypeIdentifiers (ContextType)
@@ -62,9 +62,9 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
   - de gewijzigde context opslaan;
 -}
 -- | Create update functions on PerspectContext or PerspectRol.
--- | The result is an ObjectsGetter that always returns the (ID of the) PerspectEntiteit.
+-- | The result is an ObjectsGetter that always returns the (ID of the) PersistentInstance.
 -- | Sets up the Bot actions for a Context.
-updatePerspectEntiteit :: forall a. PerspectEntiteit a =>
+updatePerspectEntiteit :: forall a. PersistentInstance a =>
   (Value -> a -> a) ->
   (ID -> ID -> Delta) ->
   Value -> ObjectsGetter
@@ -77,7 +77,7 @@ updatePerspectEntiteit changeEntity createDelta value cid = do
     else pure unit
   pure [cid]
 
-updatePerspectEntiteit' :: forall a. PerspectEntiteit a =>
+updatePerspectEntiteit' :: forall a. PersistentInstance a =>
   (Value -> a -> a) ->
   ID -> Value -> MonadPerspectives Unit
 updatePerspectEntiteit' changeEntity cid value = do
@@ -176,9 +176,9 @@ removeBindingWithDelta = removeBinding >=> maybe (pure unit) addDelta
 -----------------------------------------------------------
 -- UPDATEPERSPECTENTITEITMEMBER
 -----------------------------------------------------------
--- | Create an ObjectsGetter from a function that modifies the member (such as a role or property) of a PerspectEntiteit (respectively a context or role).
--- | The result of this ObjectsGetter is always the (ID of the) PerspectEntiteit that is passed in.
-updatePerspectEntiteitMember :: forall a. PerspectEntiteit a =>
+-- | Create an ObjectsGetter from a function that modifies the member (such as a role or property) of a PersistentInstance (respectively a context or role).
+-- | The result of this ObjectsGetter is always the (ID of the) PersistentInstance that is passed in.
+updatePerspectEntiteitMember :: forall a. PersistentInstance a =>
   (a -> MemberName -> Value -> a) ->
   (ID -> MemberName -> Value -> Delta) ->
   MemberName -> Value -> ObjectsGetter
@@ -188,7 +188,7 @@ updatePerspectEntiteitMember changeEntityMember createDelta memberName value mid
   addDelta $ createDelta memberName value mid
   pure [mid]
 
-updatePerspectEntiteitMember' :: forall a. PerspectEntiteit a =>
+updatePerspectEntiteitMember' :: forall a. PersistentInstance a =>
   (a -> MemberName -> Value -> a) ->
   ID -> MemberName -> Value -> MonadPerspectives Unit
 updatePerspectEntiteitMember' changeEntityMember mid memberName value = do
@@ -228,7 +228,7 @@ addRol' =
 --   saveChangedEntity cid changedContext
 --   pure [cid]
 --
--- saveChangedEntity :: forall a. PerspectEntiteit a => ID -> a -> MonadPerspectives Unit
+-- saveChangedEntity :: forall a. PersistentInstance a => ID -> a -> MonadPerspectives Unit
 -- saveChangedEntity id entity =
 --   if (isUserEntiteitID id)
 --     then do

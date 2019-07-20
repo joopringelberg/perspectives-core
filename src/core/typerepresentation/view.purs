@@ -3,9 +3,8 @@ module Perspectives.Representation.View where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
-import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
@@ -28,7 +27,7 @@ newtype View = View ViewRecord
 
 type ViewRecord =
   { _id :: ViewType
-  , _rev :: Revision
+  , _rev :: Revision_
   , displayName :: String
 
   , propertyReferences :: Array PropertyType

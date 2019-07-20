@@ -19,7 +19,7 @@ import Perspectives.Identifiers (LocalName, binnenRol, buitenRol, deconstructLoc
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.PerspectEntiteit (cacheUncachedEntiteit, removeInternally)
+import Perspectives.Instances (cacheUncachedEntiteit, removeInternally)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
 

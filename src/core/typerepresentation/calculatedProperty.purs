@@ -3,10 +3,9 @@ module Perspectives.Representation.CalculatedProperty where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
-import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedRoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
@@ -18,7 +17,7 @@ newtype CalculatedProperty = CalculatedProperty CalculatedPropertyRecord
 
 type CalculatedPropertyRecord =
   { _id :: CalculatedPropertyType
-  , _rev :: Revision
+  , _rev :: Revision_
   , displayName :: String
 
   , calculation :: QueryFunctionDescription

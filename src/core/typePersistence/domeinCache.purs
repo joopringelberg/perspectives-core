@@ -24,7 +24,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
-import Perspectives.InstanceRepresentation (revision)
+import Perspectives.Representation.Class.Revision (revision)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=), (<<<))
 import Simple.JSON (writeJSON)
 

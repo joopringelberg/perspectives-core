@@ -5,11 +5,10 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
-import Perspectives.InstanceRepresentation (Revision)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Assignment (AssignmentStatement)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
@@ -42,7 +41,7 @@ newtype Action = Action ActionRecord
 
 type ActionRecord =
   { _id :: ActionType
-  , _rev :: Revision
+  , _rev :: Revision_
   , displayName :: String
 
   , subject :: Array EnumeratedRoleType
