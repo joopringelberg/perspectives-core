@@ -18,11 +18,12 @@ import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_iedereRolInContext)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), MP, ObjectsGetter)
+import Perspectives.CoreTypes (type (~~>), MP)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.Aliases (AnyContext, BuitenRol, RoleInstance, Value, LocalName)
+import Perspectives.Instances.Aliases (LocalName)
 import Perspectives.Instances.ObjectGetters (binding, buitenRol, context, getProperty, getUnqualifiedProperty)
 import Perspectives.ObjectsGetterComposition (composeMonoidal, (/-/))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (class Eq, class Ord, bind, flip, identity, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
@@ -145,26 +146,26 @@ notEmpty :: forall s o. (s ~~> o) -> (s ~~> String)
 notEmpty p = p >=> \os -> pure $ [show $ not (null os)]
 
 -- Test.Perspectives.ObjectGetterConstructors, via searchProperty
-searchInRolTelescope :: ObjectsGetter -> ObjectsGetter
+searchInRolTelescope :: forall a. Eq a => (RoleInstance ~~> a) -> (RoleInstance ~~> a)
 searchInRolTelescope getter rolId =
   unlessNull getter rolId
   <|>
-  (binding /-/ searchInRolTelescope getter) rolId
+  (binding /-/ (searchInRolTelescope getter)) rolId
 
 -- | Applies the ObjectsGetter to each higher prototype until it succeeds or there is no prototype.
 -- | Does *not* apply the getter to the ContextType that is passed in!
 -- Test.Perspectives.ObjectGetterConstructors
 searchInPrototypeHierarchy ::
-  (BuitenRol ~~> String) ->
-  (AnyContext ~~> String)
+  (RoleInstance ~~> Value) ->
+  (ContextInstance ~~> Value)
 searchInPrototypeHierarchy getter = buitenRol /-/  searchInRolTelescope getter
 
 -- | Applies the getter (AnyContext ~~> o) to any context and all its prototypes.
 -- Test.Perspectives.ObjectGetterConstructors, via buitenRolBeschrijvingDef
 searchLocallyAndInPrototypeHierarchy :: forall o.
   Eq o =>
-  (AnyContext ~~> o) ->
-  (AnyContext ~~> o)
+  (ContextInstance ~~> o) ->
+  (ContextInstance ~~> o)
 searchLocallyAndInPrototypeHierarchy getter c =
   unlessNull getter c
   <|>
@@ -193,15 +194,15 @@ all f = f `composeMonoidal` (alaF Conj foldMap ((==) ("true")) >>> show)
 -- | All role instances in the telescope, excluding the root.
 -- | A closure must be homogeneously typed. Here we require that the members of the collection are instances
 -- | of the class Binding.
-closureOfBinding :: ObjectsGetter
+closureOfBinding :: RoleInstance ~~> RoleInstance
 closureOfBinding = closure binding
 
 -- | The prototype of a ContextType.
-getPrototype :: ObjectsGetter
+getPrototype :: (ContextInstance ~~> ContextInstance)
 getPrototype = (buitenRol /-/ binding /-/ context)
 
 -- | All prototypes of a ContextType, excluding the ContextType itself. A homogeneous collection of AnyDefinition.
-closureOfPrototype :: ObjectsGetter
+closureOfPrototype :: ContextInstance ~~> ContextInstance
 closureOfPrototype = closure getPrototype
 
 -----------------------------------------------------------
@@ -210,17 +211,17 @@ closureOfPrototype = closure getPrototype
 -- | Get the ContextRol instances with the given rol name (RolDef) directly from the Context definition (not searching prototypes or Aspects).
 -- | E.g. getRol "model:Perspectives$View$rolProperty" will return all rol instances that bind a PropertyDef on an instance of psp:View.
 -- Test.Perspectives.ObjectGetterConstructors via getRolinContext
-getRol :: EnumeratedRoleType -> (AnyContext ~~> RoleInstance)
+getRol :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getRol rn = getContextMember \context -> maybe [] identity (lookup (unwrap rn) (context_iedereRolInContext context))
 
 -- | Get the ContextRol instances with the given local name directly from the Context.
 -- E.g. getUnqualifiedContextRol "rolProperty" will return the same result as getRol
 -- "model:Perspectives$View$rolProperty".
 -- Test.Perspectives.ObjectGetterConstructors via getUnqualifiedRolInContext
-getUnqualifiedContextRol :: LocalName -> (AnyContext ~~> RoleInstance)
+getUnqualifiedContextRol :: LocalName -> (ContextInstance ~~> RoleInstance)
 getUnqualifiedContextRol ln' =  (getContextMember $ getUnQualifiedRolFromPerspectContext ln')
   where
-  getUnQualifiedRolFromPerspectContext :: LocalName -> PerspectContext -> Array String
+  getUnQualifiedRolFromPerspectContext :: LocalName -> PerspectContext -> Array RoleInstance
   getUnQualifiedRolFromPerspectContext ln ctxt =
     case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys $ context_iedereRolInContext ctxt) of
       Nothing -> []
@@ -228,7 +229,7 @@ getUnqualifiedContextRol ln' =  (getContextMember $ getUnQualifiedRolFromPerspec
 
 -- | As getUnqualifiedContextRol, but for RolinContext (same function, differently typed).
 -- Test.Perspectives.ObjectGetterConstructors
-getUnqualifiedRolInContext :: LocalName -> (AnyContext ~~> RoleInstance)
+getUnqualifiedRolInContext :: LocalName -> (ContextInstance ~~> RoleInstance)
 getUnqualifiedRolInContext =  getUnqualifiedContextRol
 
 -----------------------------------------------------------
@@ -237,18 +238,18 @@ getUnqualifiedRolInContext =  getUnqualifiedContextRol
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
 -- searchLocallyAndInPrototypeHierarchy and getRol are tested.
 -- Test.Perspectives.ObjectGetterConstructors
-searchContextRol :: EnumeratedRoleType -> (AnyContext ~~> RoleInstance)
-searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getRol rn) :: (AnyContext ~~> RoleInstance))
+searchContextRol :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
+searchContextRol rn = searchLocallyAndInPrototypeHierarchy ((getRol rn) :: (ContextInstance ~~> RoleInstance))
 
 -- | Search for a qualified ContextRol both in the local context and all its prototypes.
 -- searchLocallyAndInPrototypeHierarchy and getRol are tested.
-searchRolInContext :: EnumeratedRoleType-> (AnyContext ~~> RoleInstance)
-searchRolInContext rn = searchLocallyAndInPrototypeHierarchy ((getRol rn) :: (AnyContext ~~> RoleInstance))
+searchRolInContext :: EnumeratedRoleType-> (ContextInstance ~~> RoleInstance)
+searchRolInContext rn = searchLocallyAndInPrototypeHierarchy ((getRol rn) :: (ContextInstance ~~> RoleInstance))
 
 -- | Search for an unqualified rol both in the local context and all its prototypes.
 -- Test.Perspectives.ObjectGetterConstructors
-searchUnqualifiedRol :: LocalName -> (AnyContext ~~> RoleInstance)
-searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualifiedContextRol rn) :: (AnyContext ~~> RoleInstance))
+searchUnqualifiedRol :: LocalName -> (ContextInstance ~~> RoleInstance)
+searchUnqualifiedRol rn = searchLocallyAndInPrototypeHierarchy ( (getUnqualifiedContextRol rn) :: (ContextInstance ~~> RoleInstance))
 
 -- TODO: hernoem naar searchUnqualfiedContextRol en maak searchUnqualfiedRolinContext.
 
@@ -281,33 +282,33 @@ searchUnqualifiedProperty pd =  searchInRolTelescope g
 -- | Searches the qualified property first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
 -- Test.Perspectives.ObjectGetterConstructors via searchExternalProperty
-searchPropertyOnContext :: (AnyContext ~~> RoleInstance) -> EnumeratedPropertyType -> (AnyContext ~~> Value)
+searchPropertyOnContext :: (ContextInstance ~~> RoleInstance) -> EnumeratedPropertyType -> (ContextInstance ~~> Value)
 searchPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
-    f :: (AnyContext ~~> Value)
+    f :: (ContextInstance ~~> Value)
     f = (rolgetter /-/ ((searchProperty p)))
 
 -- | Searches the property with the local name first in the telescope of the Role.
 -- | Then searches the property on the instance of the same role on the prototypes.
 -- Test.Perspectives.ObjectGetterConstructors via searchExternalUnqualifiedProperty
-searchUnqualifiedPropertyOnContext :: (AnyContext ~~> RoleInstance)  -> LocalName -> (AnyContext ~~> Value)
+searchUnqualifiedPropertyOnContext :: (ContextInstance ~~> RoleInstance)  -> LocalName -> (ContextInstance ~~> Value)
 searchUnqualifiedPropertyOnContext rolgetter p = searchLocallyAndInPrototypeHierarchy f
   where
-    f :: (AnyContext ~~> Value)
+    f :: (ContextInstance ~~> Value)
     f = (rolgetter /-/ ((searchUnqualifiedProperty p)))
 
 -- | Look for the property PropertyDef on the buitenRol of the ContextType c and on its telescope, shadowing any values
 -- | on the prototypes. This function is cumbersome to use, because the full name of an external
 -- | property includes 'buitenRolBeschrijving'.
 -- Test.Perspectives.ObjectGetterConstructors
-searchExternalProperty :: EnumeratedPropertyType -> (AnyContext ~~> Value)
+searchExternalProperty :: EnumeratedPropertyType -> (ContextInstance ~~> Value)
 searchExternalProperty pn = searchPropertyOnContext buitenRol pn
 -- searchExternalProperty pn = buitenRol /-/ searchProperty pn
 
 -- | Look for the property with the given local name on the buitenRol of the ContextType c and on its telescope,
 -- | shadowing any values on the prototypes.
 -- Test.Perspectives.ObjectGetterConstructors
-searchExternalUnqualifiedProperty :: LocalName -> (AnyContext ~~> Value)
+searchExternalUnqualifiedProperty :: LocalName -> (ContextInstance ~~> Value)
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buitenRol ln
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
@@ -324,6 +325,3 @@ getUnqualifiedRoleBinders ln = getRolMember \(PerspectRol{gevuldeRollen}) ->
     case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys gevuldeRollen) of
       Nothing -> []
       (Just i) -> maybe [] identity (lookup (unsafePartial $ fromJust (Arr.index (keys gevuldeRollen) i)) gevuldeRollen)
-
-genericGetRoleBinders :: String -> (String ~~> String)
-genericGetRoleBinders rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] identity (lookup rname gevuldeRollen)

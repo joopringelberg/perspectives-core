@@ -1,20 +1,21 @@
 module Perspectives.Instances.TripleGetters where
 
 import Data.Array (singleton)
-import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (StringTypedTripleGetter)
+import Perspectives.CoreTypes (type (**>))
 import Perspectives.Instances.ObjectGetters (context, binding, roleType, contextType) as OG
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Perspectives.TripleGetters.TrackedAs (trackedAs)
 import Prelude ((>=>), (<<<), pure)
 
-context :: StringTypedTripleGetter
+context :: RoleInstance **> ContextInstance
 context = OG.context `trackedAs` "context"
 
-binding :: StringTypedTripleGetter
+binding :: RoleInstance **> RoleInstance
 binding = OG.binding `trackedAs` "binding"
 
-roleType :: StringTypedTripleGetter
-roleType = (OG.roleType >=> pure <<< singleton <<< unwrap) `trackedAs` "roleType"
+roleType :: RoleInstance **> EnumeratedRoleType
+roleType = (OG.roleType >=> pure <<< singleton) `trackedAs` "roleType"
 
-contextType :: StringTypedTripleGetter
-contextType = (OG.contextType >=> pure <<< singleton <<< unwrap) `trackedAs` "contextType"
+contextType :: ContextInstance **> ContextType
+contextType = (OG.contextType >=> pure <<< singleton) `trackedAs` "contextType"

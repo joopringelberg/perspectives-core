@@ -14,6 +14,8 @@ instance showContextInstance :: Show ContextInstance where
   show = show <<< unwrap
 instance eqContextInstance :: Eq ContextInstance where
   eq (ContextInstance id1) (ContextInstance id2) = id1 == id2
+instance ordContextInstance :: Ord ContextInstance where
+  compare (ContextInstance a) (ContextInstance b) = compare a b
 
 newtype RoleInstance = RoleInstance String
 derive instance newtypeRoleInstance :: Newtype RoleInstance _
@@ -24,7 +26,7 @@ instance showRoleInstance :: Show RoleInstance where
   show = show <<< unwrap
 instance eqRoleInstance :: Eq RoleInstance where
   eq (RoleInstance id1) (RoleInstance id2) = id1 == id2
-instance orRoleInstance :: Ord RoleInstance where
+instance ordRoleInstance :: Ord RoleInstance where
   compare (RoleInstance a) (RoleInstance b) = compare a b
 
 newtype Value = Value String
