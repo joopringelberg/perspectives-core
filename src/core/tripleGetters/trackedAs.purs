@@ -70,10 +70,10 @@ tripleGetterFromTripleGetter (TypedTripleGetter nameOfp p) name f = memorize tri
 -- | Construct a TripleGetter from an ObjectsGetter, that is supported by a Triple returned by an arbitrary
 -- | TripleGetter. In this way we can insert a computed (rather than calculated by a query) Triple in the
 -- | dependency tracking store and have it recomputed when the support changes value.
-constructTripleGetterWithArbitrarySupport :: forall s o. Newtype s String =>
+constructTripleGetterWithArbitrarySupport :: forall s o p. Newtype s String =>
   Predicate ->
   (s -> MonadPerspectivesQuery (Array o)) ->
-  TypedTripleGetter s o ->
+  TypedTripleGetter s p ->
   TypedTripleGetter s o
 constructTripleGetterWithArbitrarySupport pn objectsGetter (TypedTripleGetter predicate supportGetter) = memorize tripleGetter pn where
   tripleGetter :: TripleGetter s o

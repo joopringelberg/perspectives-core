@@ -378,8 +378,8 @@ inlineContextBinding ::  QualifiedName
 inlineContextBinding cName = roleBinding' cName ContextBinding do
   cmt <- inLineComment
   _ <- nextLine
-  (contextBuitenRol :: ID) <- indented *> context
-  pure $ Tuple cmt (Just $ RoleInstance contextBuitenRol)
+  (contextBuitenRol :: RoleInstance) <- indented *> context
+  pure $ Tuple cmt (Just contextBuitenRol)
 
 emptyBinding ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
@@ -474,10 +474,10 @@ withRoleCounting p = do
 -- | The parser never backtracks over a Context. This means we can safely perform the side
 -- | effect of storing its constituent roles and contexts.
 -- | NOTE: we do not construct an inverse binding from an eventual prototype.
-context ::  IP ID
+context ::  IP RoleInstance
 context = withRoleCounting context' where
 
-  context' :: IP ID
+  context' :: IP RoleInstance
   context' = do
     -- Parsing
     cmtBefore <- manyOneLineComments
@@ -511,7 +511,7 @@ context = withRoleCounting context' where
                 , binding = Just $ RoleInstance $ maybe "" buitenRol prototype
                 , properties = FO.fromFoldable publicProps
                 })
-            pure $ buitenRol (show instanceName)
+            pure $ RoleInstance $ buitenRol (show instanceName)
   collect :: List (Tuple RolName RoleInstance) -> FO.Object (Array RoleInstance)
   collect Nil = FO.empty
   collect (Cons (Tuple rname id) r) = let map = collect r in
@@ -574,7 +574,7 @@ definition = do
       { _id = rolId
       , occurrence = maybe 0 identity nrOfRoleOccurrences
       , pspType = EnumeratedRoleType (show prop)
-      , binding = Just $ RoleInstance $ bindng
+      , binding = Just $ bindng
       , context = ContextInstance enclContext
       })
   pure rolId
@@ -593,7 +593,7 @@ importExpression = do
 -----------------------------------------------------------
 -- User data
 -----------------------------------------------------------
-userData ::  IP (Array ID)
+userData ::  IP (Array RoleInstance)
 userData = do
   cmtBefore <- manyOneLineComments
   withPos do
@@ -608,16 +608,11 @@ userData = do
     userDataDeclaration = reserved "GebruikerGegevens"
 
 -----------------------------------------------------------
--- Parse Root
------------------------------------------------------------
-data ParseRoot = UserData (Array ID)
-
------------------------------------------------------------
 -- ParseAndCache
 -----------------------------------------------------------
 -- catchError :: forall a. m a -> (e -> m a) -> m a
 
-parseAndCache ::  String -> MonadPerspectives (Either ParseError (Array ID))
+parseAndCache ::  String -> MonadPerspectives (Either ParseError (Array RoleInstance))
 parseAndCache text = do
   (Tuple parseResult {domeinFile}) <- runIndentParser' text userData
   case parseResult of
