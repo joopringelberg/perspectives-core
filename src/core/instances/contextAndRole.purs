@@ -60,8 +60,8 @@ context_buitenRol (PerspectContext{buitenRol})= buitenRol
 context_iedereRolInContext :: PerspectContext -> Object (Array RoleInstance)
 context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 
-context_rolInContext :: PerspectContext -> RolName -> Array RoleInstance
-context_rolInContext (PerspectContext{rolInContext}) rn = maybe [] identity (lookup rn rolInContext)
+context_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance
+context_rolInContext (PerspectContext{rolInContext}) rn = maybe [] identity (lookup (unwrap rn) rolInContext)
 
 addContext_rolInContext :: PerspectContext -> RolName -> RoleInstance -> PerspectContext
 addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =

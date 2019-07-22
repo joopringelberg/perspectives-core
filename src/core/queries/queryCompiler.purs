@@ -4,27 +4,34 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
+import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.ContextAndRole (context_rolInContext)
-import Perspectives.CoreTypes (MonadPerspectives, StringTypedTripleGetter)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, StringTypedTripleGetter)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.PersistentType (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.TripleGetters.TrackedAs (trackedAs)
+import Unsafe.Coerce (unsafeCoerce)
 
 compileQuery :: QueryFunctionDescription -> MonadPerspectives StringTypedTripleGetter
 
 -- ROLGETTER
 -- TODO: extend for prototypes.
-compileQuery (QD _ (RolGetter (ENR (EnumeratedRoleType r))) _) = pure $ (getPerspectEntiteit >=> pure <<< (flip context_rolInContext r)) `trackedAs` r
+compileQuery (QD _ (RolGetter (ENR r)) _) = pure $ unsafeCoerce (f `trackedAs` (unwrap r))
+  where
+    f :: (ContextInstance ~~> RoleInstance)
+    f = (getPerspectEntiteit >=> pure <<< (flip context_rolInContext r))
+
 compileQuery (QD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
   compileQuery (RC.calculation ct)
