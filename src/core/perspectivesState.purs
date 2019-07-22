@@ -6,11 +6,12 @@ import Data.Array (cons)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Effect.Class (liftEffect)
-import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, Transactie, TripleQueue, TripleRef)
+import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, TripleQueue, TripleRef)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Sync.Transactie (Transactie(..))
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
 newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState

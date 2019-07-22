@@ -4,41 +4,28 @@ import Perspectives.EntiteitAndRDFAliases
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
-import Control.Monad.State (StateT, evalStateT, gets, modify, get, put)
+import Control.Monad.State (StateT, gets, modify)
 import Data.Array (head)
-import Data.DateTime (DateTime)
-import Data.DateTime.Instant (toDateTime)
-import Data.Either (Either)
-import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..), fromJust)
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar)
-import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Effect.Now (now)
-import Foreign (unsafeToForeign)
-import Foreign.Class (class Encode)
-import Foreign.Object (Object, empty, insert, lookup) as O
+import Foreign.Object (Object, insert, lookup) as O
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.QueryAST (ElementaryQueryStep)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.QueryFunction (QueryFunction)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.Representation.View (View)
-import Perspectives.TypesForDeltas (Delta)
-import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
-import Simple.JSON (class WriteForeign)
+import Perspectives.Sync.Transactie (Transactie)
+import Prelude (class Eq, class Monad, class Show, Unit, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -374,47 +361,3 @@ instance showUserMessage :: Show UserMessage where
   show (MissingAspectPropertyForBindingProperty property bindingproperty) = "(MissingAspectPropertyForBindingProperty) De property '" <> property <> "' heeft BindingProperty '" <> bindingproperty <> "' maar geen AspectProperty!"
   show (BindingPropertyNotAvailable pdef bindingproperty) = "(BindingPropertyNotAvailable) Property '" <> pdef <> "' definieert binding property '" <> bindingproperty <> "' maar die is niet beschikbaar in deze definitie!"
   show (IncompatiblePrototype def deftype ptype) = "(IncompatiblePrototype) Definition '" <> def <> "' has type '" <> deftype <> "', but its prototype '" <> ptype <> "' does not have that type!"
------------------------------------------------------------
--- TRANSACTIE
------------------------------------------------------------
-newtype Transactie = Transactie
-  { author :: String
-  , timeStamp :: SerializableDateTime
-  , deltas :: Array Delta
-  , createdContexts :: Array PerspectContext
-  , createdRoles :: Array PerspectRol
-  , deletedContexts :: Array ID
-  , deletedRoles :: Array ID
-  , changedDomeinFiles :: Array ID
-  }
-
-derive instance genericRepTransactie :: Generic Transactie _
-
-instance showTransactie :: Show Transactie where
-  show = genericShow
-
-derive newtype instance writeForeignTransactie :: WriteForeign Transactie
-
-createTransactie :: String -> Aff Transactie
-createTransactie author =
-  do
-    n <- liftEffect $ now
-    pure $ Transactie{ author: author, timeStamp: SerializableDateTime (toDateTime n), deltas: [], createdContexts: [], createdRoles: [], deletedContexts: [], deletedRoles: [], changedDomeinFiles: []}
-
-transactieID :: Transactie -> String
-transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
-
------------------------------------------------------------
--- DATETIME
--- We need a newtype for DateTime in order to be able to serialize and show it.
------------------------------------------------------------
-newtype SerializableDateTime = SerializableDateTime DateTime
-
-instance encodeSerializableDateTime :: Encode SerializableDateTime where
-  encode d = unsafeToForeign $ show d
-
-instance showSerializableDateTime :: Show SerializableDateTime where
-  show (SerializableDateTime d) = "todo"
-
-instance writeForeignSerializableDateTime :: WriteForeign SerializableDateTime where
-  writeImpl (SerializableDateTime dt) = unsafeToForeign $ show dt

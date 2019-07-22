@@ -34,7 +34,7 @@ getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn = getRolMember \(rol :: PerspectRol) -> rol_property rol (unwrap pn)
 
 getRole :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
-getRole rn = getContextMember \(ctxt :: PerspectContext) -> (context_rolInContext ctxt (unwrap rn))
+getRole rn = getContextMember \(ctxt :: PerspectContext) -> (context_rolInContext ctxt rn)
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"

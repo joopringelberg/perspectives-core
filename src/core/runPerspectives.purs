@@ -1,13 +1,13 @@
 module Perspectives.RunPerspectives where
 
-import Effect.Aff (Aff, Milliseconds(..), delay, error, forkAff, joinFiber, killFiber)
-import Effect.Aff.AVar (AVar, new, read)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.Rec.Class (forever)
 import Data.Tuple (Tuple(..))
-import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState, Transactie, createTransactie)
-
+import Effect.Aff (Aff, Milliseconds(..), delay, error, forkAff, joinFiber, killFiber)
+import Effect.Aff.AVar (AVar, new, read)
+import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.PerspectivesState (newPerspectivesState)
+import Perspectives.Sync.Transactie (Transactie, createTransactie)
 import Perspectives.TheoryChange (propagate)
 import Prelude (bind, discard, pure, ($))
 
