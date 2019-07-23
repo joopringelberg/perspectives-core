@@ -7,37 +7,36 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Data.Array (head)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error, error)
 import Perspectives.ApiTypes (Value)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeContext_displayName, changeContext_type, changeRol_binding, changeRol_context, changeRol_type, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_pspType, setContext_rolInContext, setRol_property)
+import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.ContextRolAccessors (getRolMember)
-import Perspectives.CoreTypes ( MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>>), StringTypedTripleGetter)
+import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>>), StringTypedTripleGetter, type (~~>))
 import Perspectives.Deltas (addDelta)
 import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
 import Perspectives.Identifiers (psp)
-import Perspectives.InstanceRepresentation (PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol)
+import Perspectives.Instances (class PersistentInstance)
 import Perspectives.Instances (getPerspectEntiteit, saveVersionedEntiteit)
-import Perspectives.Instances.Aliases (AnyContext, RoleInstance)
+import Perspectives.Instances.Aliases (AnyContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType)
-import Perspectives.Instances (class PersistentInstance, cacheCachedEntiteit)
 import Perspectives.Query.Compiler (compileQuery)
 import Perspectives.QueryEffect (PerspectivesEffect, (~>))
 import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
+import Perspectives.Representation.Class.Persistent (EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheCachedEntiteit)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
 import Perspectives.Representation.Context (Context, actions)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##))
 import Perspectives.TripleAdministration (unRegisterTriple)
-import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
+import Perspectives.TypesForDeltas (BindingDelta(..), ContextDelta(..), Delta(..), DeltaType(..), InverseBindingDelta(..), PropertyDelta(..))
 
------------------------------------------------------------
--- UPDATEPERSPECTENTITEIT
------------------------------------------------------------
 {-
 Om een door de gebruiker aangebrachte wijziging door te voeren, moet je:
   - een Delta maken;
@@ -64,276 +63,171 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -- | Create update functions on PerspectContext or PerspectRol.
 -- | The result is an ObjectsGetter that always returns the (ID of the) PersistentInstance.
 -- | Sets up the Bot actions for a Context.
-updatePerspectEntiteit :: forall a. PersistentInstance a =>
-  (Value -> a -> a) ->
-  (ID -> ID -> Delta) ->
-  Value -> ObjectsGetter
-updatePerspectEntiteit changeEntity createDelta value cid = do
-  updatePerspectEntiteit' changeEntity cid value
-  d@(Delta{isContext}) <- pure $ createDelta cid value
-  addDelta d
-  if (isContext)
-    then setupBotActions cid
-    else pure unit
-  pure [cid]
 
-updatePerspectEntiteit' :: forall a. PersistentInstance a =>
-  (Value -> a -> a) ->
-  ID -> Value -> MonadPerspectives Unit
-updatePerspectEntiteit' changeEntity cid value = do
-  (entity) <- (getPerspectEntiteit cid)
-  -- Change the entity in cache:
-  changedEntity <- cacheCachedEntiteit cid (changeEntity value entity)
-  void $ saveVersionedEntiteit cid changedEntity
+-----------------------------------------------------------
+-- UPDATE A BINDING
+-----------------------------------------------------------
+setBinding :: RoleInstance -> (RoleInstance ~~> ContextInstance)
+setBinding rid bnd = do
+  (pe :: PerspectRol) <- getPerspectEntiteit rid
+  oldBinding <- binding pe
+  changedRole <- pure $ changeRol_binding pe bnd
+  addDelta $ BindingDelta
+              { id : rid
+              , binding: bnd
+              , deltaType: Change
+              }
 
-setContextType :: ID -> ObjectsGetter
-setContextType = updatePerspectEntiteit
-  changeContext_type
-  (\theType cid -> Delta
-    { id : cid
-    , memberName: psp "type"
-    , deltaType: Change
-    , value:  (Just theType)
-    , isContext: true
-    })
-
-setRolType :: ID -> ObjectsGetter
-setRolType = updatePerspectEntiteit
-  changeRol_type
-  (\theType cid -> Delta
-    { id : cid
-    , memberName: psp "type"
-    , deltaType: Change
-    , value:  (Just theType)
-    , isContext: false
-    })
-
-setContextDisplayName :: ID -> ObjectsGetter
-setContextDisplayName = updatePerspectEntiteit
-  changeContext_displayName
-  (\displayName cid -> Delta
-    { id : cid
-    , memberName: psp "label"
-    , deltaType: Change
-    , value: (Just displayName)
-    , isContext: true
-    })
-
-setContext :: ID -> ObjectsGetter
-setContext = updatePerspectEntiteit
-  changeRol_context
-  (\rol cid -> Delta
-    { id : cid
-    , memberName: psp "context"
-    , deltaType: Change
-    , value: (Just rol)
-    , isContext: false
-    })
-
-setBinding :: ID -> ID -> MonadPerspectives Unit
-setBinding rid boundRol = do
-  oldBinding <- binding rid
-  updatePerspectEntiteit' changeRol_binding rid boundRol
-  rolType <- getRolMember rol_pspType rid
+  -- Handle inverse binding.
   case head oldBinding of
     Nothing -> pure unit
-    (Just ob) -> updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (unwrap rolType) rid
-  updatePerspectEntiteitMember' addRol_gevuldeRollen boundRol (unwrap rolType) rid
-  cid <- rid ##>> context
-  setupBotActions cid
-  addDelta $ Delta
-    { id : rid
-    , memberName: unwrap rolType
-    , deltaType: Change
-    , value: (Just boundRol)
-    , isContext: false
-    }
+    (Just ob) -> do
+      -- Remove this roleinstance as a binding role from the old binding.
+      cob <- pure $ removeRol_gevuldeRollen ob (rol_pspType pe) rid
+      cacheCachedEntiteit ob cob
+      saveVersionedEntiteit ob cob
+      addDelta $ InverseBindingDelta
+                  { id : ob
+                  , binding: rid
+                  , role: (rol_pspType pe)
+                  , deltaType: Remove
+                  }
+      -- Add this roleinstance as a binding role for the new binding.
+      cbnd <- pure $ addRol_gevuldeRollen bnd rol_pspType pe rid
+      cacheCachedEntiteit bnd cbnd
+      saveVersionedEntiteit bnd cbnd
+      addDelta $ InverseBindingDelta
+                  { id : bnd
+                  , binding: rid
+                  , role: (rol_pspType pe)
+                  , deltaType: Add
+                  }
+
+  cacheCachedEntiteit rid changedRole
+  saveVersionedEntiteit rid changedRole
+  pure [context pe]
 
 -- | Removes the binding R of the rol, if any.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
-removeBinding :: ID -> MonadPerspectives (Maybe Delta)
+removeBinding :: (RoleInstance ~~> ContextInstance)
 removeBinding rid = do
-  oldBinding <- binding rid
+  (pe :: PerspectRol) <- getPerspectEntiteit rid
+  oldBinding <- binding pe
+  changedRole <- pure $ removeRol_binding pe
+  addDelta $ BindingDelta
+              { id : rid
+              , binding: oldBinding
+              , deltaType: Remove
+              }
+
+  -- Handle inverse binding.
   case head oldBinding of
-    Nothing -> pure Nothing
+    Nothing -> pure unit
     (Just ob) -> do
-      updatePerspectEntiteit' ((\_ r -> removeRol_binding r) :: (Value -> PerspectRol -> PerspectRol)) rid ""
-      rolType <- getRolMember rol_pspType rid
-      updatePerspectEntiteitMember' removeRol_gevuldeRollen ob (unwrap rolType) rid
-      cid <- rid ##>> context
-      setupBotActions cid
-      pure $ Just $ Delta
-        { id : rid
-        , memberName: unwrap rolType
-        , deltaType: Change
-        , value: Nothing
-        , isContext: false
-        }
+      -- Remove this roleinstance as a binding role from the old binding.
+      cob <- pure $ removeRol_gevuldeRollen ob (rol_pspType pe) rid
+      cacheCachedEntiteit ob cob
+      saveVersionedEntiteit ob cob
+      addDelta $ InverseBindingDelta
+                  { id : ob
+                  , binding: rid
+                  , role: (rol_pspType pe)
+                  , deltaType: Remove
+                  }
 
-removeBindingWithDelta :: ID -> MonadPerspectives Unit
-removeBindingWithDelta = removeBinding >=> maybe (pure unit) addDelta
+  cacheCachedEntiteit rid changedRole
+  saveVersionedEntiteit rid changedRole
+  pure [context pe]
 
 -----------------------------------------------------------
--- UPDATEPERSPECTENTITEITMEMBER
+-- UPDATE A ROLE
 -----------------------------------------------------------
--- | Create an ObjectsGetter from a function that modifies the member (such as a role or property) of a PersistentInstance (respectively a context or role).
--- | The result of this ObjectsGetter is always the (ID of the) PersistentInstance that is passed in.
-updatePerspectEntiteitMember :: forall a. PersistentInstance a =>
-  (a -> MemberName -> Value -> a) ->
-  (ID -> MemberName -> Value -> Delta) ->
-  MemberName -> Value -> ObjectsGetter
-updatePerspectEntiteitMember changeEntityMember createDelta memberName value mid = do
-  updatePerspectEntiteitMember' changeEntityMember mid memberName value
-  -- TODO. Om te proberen: maak alleen een delta als er echt iets verandert.
-  addDelta $ createDelta memberName value mid
-  pure [mid]
+addRol :: ContextInstance -> EnumeratedRoleType -> (RoleInstance ~~> ContextInstance)
+addRol cid rolName rolInstance = do
+  (pe :: PerspectContext) <- getPerspectEntiteit cid
+  changedContext <- pure $ addContext_rolInContext pe rolName rolInstance
+  addDelta $ ContextDelta
+              { id : cid
+              , role: rolName
+              , deltaType: Add
+              , instance: rolInstance
+              }
+  cacheCachedEntiteit cid changedContext
+  saveVersionedEntiteit cid changedContext
+  pure [cid]
 
-updatePerspectEntiteitMember' :: forall a. PersistentInstance a =>
-  (a -> MemberName -> Value -> a) ->
-  ID -> MemberName -> Value -> MonadPerspectives Unit
-updatePerspectEntiteitMember' changeEntityMember mid memberName value = do
-  (pe :: a) <- getPerspectEntiteit mid
-  -- Change the entity in cache:
-  (changedEntity :: a) <- cacheCachedEntiteit mid (changeEntityMember pe memberName value)
-  -- And save it to Couchdb.
-  void $ saveVersionedEntiteit mid changedEntity
+removeRol :: ContextInstance -> EnumeratedRoleType -> (RoleInstance ~~> ContextInstance)
+removeRol cid rolName rolInstance = do
+  (pe :: PerspectContext) <- getPerspectEntiteit cid
+  changedContext <- pure $ removeContext_rolInContext pe rolName rolInstance
+  addDelta $ ContextDelta
+              { id : cid
+              , role: rolName
+              , deltaType: Remove
+              , instance: rolInstance
+              }
+  cacheCachedEntiteit cid changedContext
+  saveVersionedEntiteit cid changedContext
+  pure [cid]
 
--- | Add a rol to a context (and inversely register the context with the rol)
--- | TODO In a functional rol, remove the old value if present.
-addRol' :: RolName -> RolID -> ObjectsGetter
-addRol' =
-  updatePerspectEntiteitMember
-    addContext_rolInContext
-    (\rolName rolId cid ->
-      Delta
-        { id : cid
-        , memberName: rolName
-        , deltaType: Add
-        , value: (Just rolId)
-        , isContext: true
-        })
+setRol :: ContextInstance -> EnumeratedRoleType -> (RoleInstance ~~> ContextInstance)
+setRol cid rolName rolInstance = do
+  (pe :: PerspectContext) <- getPerspectEntiteit cid
+  changedContext <- pure $ setContext_rolInContext pe rolName (rolInstance :: RoleInstance)
+  addDelta $ ContextDelta
+              { id : cid
+              , role: rolName
+              , deltaType: Change
+              , instance: rolInstance
+              }
+  cacheCachedEntiteit cid changedContext
+  saveVersionedEntiteit cid changedContext
+  pure [cid]
 
--- This implementation is slightly more readable.
--- addRol_ :: RolName -> RolID -> ObjectsGetter
--- addRol_ cid rolName rolInstance = do
---   (pe :: PerspectContext) <- getPerspectEntiteit cid
---   changedContext <- pure $ addContext_rolInContext pe rolName rolInstance
---   addDelta $ Delta
---               { id : cid
---               , memberName: rolName
---               , deltaType: Add
---               , value: (Just rolInstance)
---               , isContext: true
---               }
---   saveChangedEntity cid changedContext
---   pure [cid]
---
--- saveChangedEntity :: forall a. PersistentInstance a => ID -> a -> MonadPerspectives Unit
--- saveChangedEntity id entity =
---   if (isUserEntiteitID id)
---     then do
---       cacheCachedEntiteit id entity >>= void <<< saveVersionedEntiteit id
---     else do
---       let dfId = (unsafePartial (fromJust (deconstructModelName id)))
---       addDomeinFileToTransactie dfId
---       cacheInDomeinFile dfId entity
+-----------------------------------------------------------
+-- UPDATE A PROPERTY
+-----------------------------------------------------------
+addProperty :: RoleInstance -> EnumeratedPropertyType -> (Value ~~> ContextInstance)
+addProperty rid propertyName val = do
+  (pe :: PerspectRol) <- getPerspectEntiteit rid
+  changedContext <- pure $ addRol_property pe propertyName val
+  addDelta $ PropertyDelta
+              { id : rid
+              , property: propertyName
+              , deltaType: Add
+              , value: val
+              }
+  cacheCachedEntiteit rid changedContext
+  saveVersionedEntiteit rid changedContext
+  pure [context pe]
 
-addRol :: RolName -> RolID -> ObjectsGetter
-addRol = setupBotActionsAfter addRol'
+removeProperty :: RoleInstance -> EnumeratedPropertyType -> (Value ~~> ContextInstance)
+removeProperty rid propertyName val = do
+  (pe :: PerspectRol) <- getPerspectEntiteit rid
+  changedContext <- pure $ removeRol_property pe propertyName val
+  addDelta $ PropertyDelta
+              { id : rid
+              , property: propertyName
+              , deltaType: Remove
+              , value: val
+              }
+  cacheCachedEntiteit rid changedContext
+  saveVersionedEntiteit rid changedContext
+  pure [context rid]
 
-setupBotActionsAfter :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
-setupBotActionsAfter g mn mid cid = do
-  r <- g mn mid cid
-  setupBotActions cid
-  pure r
-
-
-setupBotActionsAfterRolAction :: (ID -> ID -> ObjectsGetter) -> ID -> ID -> (ObjectsGetter)
-setupBotActionsAfterRolAction g mn mid rid = do
-  r <- g mn mid rid
-  cid <- rid ##>> context
-  setupBotActions cid
-  pure r
-
-removeRol' :: RolName -> RolID -> ObjectsGetter
-removeRol' =
-  updatePerspectEntiteitMember
-    removeContext_rolInContext
-    (\rolName rolId cid ->
-      Delta
-        { id : cid
-        , memberName: rolName
-        , deltaType: Remove
-        , value: (Just rolId)
-        , isContext: true
-        })
-
-removeRol :: RolName -> RolID -> ObjectsGetter
-removeRol = setupBotActionsAfter removeRol'
-
-setRol' :: RolName -> RolID -> ObjectsGetter
-setRol' =
-  updatePerspectEntiteitMember
-    setContext_rolInContext
-    (\rolName rolId cid ->
-      Delta
-        { id : cid
-        , memberName: rolName
-        , deltaType: Change
-        , value: (Just rolId)
-        , isContext: true
-        })
-
-setRol :: RolName -> RolID -> ObjectsGetter
-setRol = setupBotActionsAfter setRol'
-
-addProperty' :: PropertyName -> Value -> ObjectsGetter
-addProperty' =
-  updatePerspectEntiteitMember
-    addRol_property
-    (\propertyName value rid ->
-      Delta
-        { id : rid
-        , memberName: propertyName
-        , deltaType: Add
-        , value: (Just value)
-        , isContext: false
-        })
-
-addProperty :: RolName -> RolID -> ObjectsGetter
-addProperty = setupBotActionsAfterRolAction addProperty'
-
-removeProperty' :: PropertyName -> Value -> ObjectsGetter
-removeProperty' =
-  updatePerspectEntiteitMember
-    removeRol_property
-    (\propertyName value rid ->
-      Delta
-        { id : rid
-        , memberName: propertyName
-        , deltaType: Remove
-        , value: (Just value)
-        , isContext: false
-        })
-
-removeProperty :: RolName -> RolID -> ObjectsGetter
-removeProperty = setupBotActionsAfterRolAction removeProperty'
-
-setProperty' :: PropertyName -> Value -> ObjectsGetter
-setProperty' =
-  updatePerspectEntiteitMember
-    setRol_property
-    (\propertyName value rid ->
-      Delta
-        { id : rid
-        , memberName: propertyName
-        , deltaType: Change
-        , value: (Just value)
-        , isContext: false
-        })
-
-setProperty :: PropertyName -> Value -> ObjectsGetter
-setProperty = setupBotActionsAfterRolAction setProperty'
+setProperty :: RoleInstance -> EnumeratedPropertyType -> (Value ~~> ContextInstance)
+setProperty rid propertyName val = do
+  (pe :: PerspectRol) <- getPerspectEntiteit rid
+  changedContext <- pure $ setRol_property pe propertyName val
+  addDelta $ PropertyDelta
+              { id : rid
+              , property: propertyName
+              , deltaType: Change
+              , value: val
+              }
+  cacheCachedEntiteit rid changedContext
+  saveVersionedEntiteit rid changedContext
+  pure [context rid]
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -352,7 +246,7 @@ constructActionFunction a objectGetter = case a of
       (Just "true") -> do
         (value :: Maybe Value) <- runTypedTripleGetterToMaybeObject contextId valueComputer
         (object :: Maybe RoleInstance) <- runTypedTripleGetterToMaybeObject contextId objectGetter
-        void $ pure $ setRol' <$> Just (unwrap rt) <*> object <*> value
+        void $ pure $ setRol <$> Just (unwrap rt) <*> object <*> value
       _ -> pure unit
 
   otherwise -> throwError (error ("Unknown AssignmentStatement in constructActionFunction: " <> show a))
