@@ -4,10 +4,13 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Variant (Variant, inj, on)
 import Effect.Exception (error)
 import Perspectives.ContextAndRole (context_rolInContext)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, StringTypedTripleGetter)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, StringTypedTripleGetter, TypedTripleGetter(..))
+import Perspectives.InstanceRepresentation (PerspectContext(..))
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -19,18 +22,27 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.Resource (Resource, _context, _role, _value, _contexts, _roles, _values, Subject, Objects)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.TripleGetters.TrackedAs (trackedAs)
 import Unsafe.Coerce (unsafeCoerce)
 
-compileQuery :: QueryFunctionDescription -> MonadPerspectives StringTypedTripleGetter
+compileQuery :: QueryFunctionDescription -> MonadPerspectives (TypedTripleGetter Subject Objects)
 
 -- ROLGETTER
 -- TODO: extend for prototypes.
-compileQuery (QD _ (RolGetter (ENR r)) _) = pure $ unsafeCoerce (f `trackedAs` (unwrap r))
+compileQuery (QD _ (RolGetter (ENR r)) _) = pure (f `trackedAs` (unwrap r))
   where
-    f :: (ContextInstance ~~> RoleInstance)
-    f = (getPerspectEntiteit >=> pure <<< (flip context_rolInContext r))
+    f :: forall r.
+      Variant (context :: ContextInstance | r)
+      -> MP (Variant (roles :: Array RoleInstance))
+    f v = do
+      (mc :: Maybe ContextInstance) <- pure $ (on _context Just \_ -> Nothing) v
+      case mc of
+        Nothing -> throwError (error "Runtime error: Not a context instance")
+        (Just c) -> do
+          (ct :: PerspectContext) <- getPerspectEntiteit c
+          pure (inj _roles (context_rolInContext ct r))
 
 compileQuery (QD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr

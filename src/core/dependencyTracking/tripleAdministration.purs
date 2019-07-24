@@ -1,6 +1,4 @@
-module Perspectives.TripleAdministration
-
-  where
+module Perspectives.TripleAdministration where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.State (lift)
@@ -15,6 +13,7 @@ import Foreign.Object (values)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, StringTriple, StringTripleGetter, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), StringTypedTripleGetter)
 import Perspectives.EntiteitAndRDFAliases (Predicate, Subject)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke, clear)
+import Perspectives.Representation.Resource (subjectString, Subject, Objects) as PRR
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (==), (<>), show, (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -68,16 +67,16 @@ getTriple (TripleRef{subject, predicate}) = lookupInTripleIndex subject predicat
 -- | Will add an entry for the Subject if it is not yet present.
 -- | Adds a dependency to each of the supports.
 addToTripleIndex ::
-  Subject ->
+  PRR.Subject ->
   Predicate ->
-  (Array String) ->
+  PRR.Objects ->
   Array TripleRef ->
   Array TripleRef ->
-  TripleGetter String String ->
-  Effect (Triple String String)
+  TripleGetter Subject PRR.Objects ->
+  Effect (Triple Subject PRR.Objects)
 addToTripleIndex rid pid val deps sups tripleGetter =
     do
-      (m :: PredicateIndex) <- ensureResource rid
+      (m :: PredicateIndex) <- ensureResource $ PRR.subjectString rid
       triple <- pure (Triple{ subject: rid
                 , predicate: pid
                 , object: val
@@ -125,7 +124,7 @@ unRegisterTriple (TripleRef{subject, predicate}) = do
 -- | Remove the triple and return all its dependencies.
 unRegisterBasicTriple :: TripleRef -> Effect (Maybe (Triple String String))
 unRegisterBasicTriple (TripleRef{subject, predicate}) = do
-  preds <- peek tripleIndex subject
+  preds <- peek tripleIndex (PRR.subjectString subject)
   case preds of
     Nothing ->
       pure Nothing

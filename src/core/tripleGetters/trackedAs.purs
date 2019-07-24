@@ -6,24 +6,25 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Perspectives.CoreTypes (Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), MonadPerspectivesQuery, type (~~>), type (**>))
+import Perspectives.CoreTypes (Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), MonadPerspectivesQuery, type (~~>), type (**>), MP)
 import Perspectives.EntiteitAndRDFAliases (Predicate)
+import Perspectives.Representation.Resource (Resource, Subject, Objects)
 import Perspectives.TripleAdministration (addToTripleIndex, detectCycles, lookupInTripleIndex, memorize, memorizeQueryResults)
 import Prelude (bind, flip, pure, ($), (<>), discard)
 import Unsafe.Coerce (unsafeCoerce)
 
-trackedAs :: forall s o. Newtype s String =>
+trackedAs ::
   (s ~~> o) ->
   Predicate ->
   TypedTripleGetter s o
 trackedAs = flip constructTripleGetter
 
-constructTripleGetter :: forall s o. Newtype s String =>
+constructTripleGetter ::
   Predicate ->
-  (s ~~> o) ->
-  TypedTripleGetter s o
+  (Subject -> MP Objects) ->
+  TypedTripleGetter Subject Objects
 constructTripleGetter pn objectsGetter = TypedTripleGetter pn tripleGetter where
-  tripleGetter :: TripleGetter s o
+  tripleGetter :: TripleGetter Subject Objects
   tripleGetter id = do
     b <- memorizeQueryResults
     if b
@@ -31,7 +32,7 @@ constructTripleGetter pn objectsGetter = TypedTripleGetter pn tripleGetter where
         mt <- liftEffect (lookupInTripleIndex (unsafeCoerce id) pn)
         case mt of
           Nothing -> do
-            (object :: Array o) <- lift $ objectsGetter id
+            (object :: Objects) <- lift $ objectsGetter id
             t <- liftEffect (addToTripleIndex
               (unsafeCoerce id)
               pn
@@ -43,7 +44,7 @@ constructTripleGetter pn objectsGetter = TypedTripleGetter pn tripleGetter where
             pure $ ((unsafeCoerce t) :: Triple s o)
           (Just t) -> pure ((unsafeCoerce t) :: Triple s o)
       else do
-        (object :: Array o) <- lift $ objectsGetter id
+        (object :: Objects) <- lift $ objectsGetter id
         pure (Triple{ subject: id
                   , predicate: pn
                   , object: object
@@ -52,20 +53,24 @@ constructTripleGetter pn objectsGetter = TypedTripleGetter pn tripleGetter where
                   , tripleGetter: tripleGetter
                   })
 
-tripleGetterFromTripleGetter :: forall s o t. Newtype s String => (s **> o) -> String -> (Array o -> s -> Array t) -> (s **> t)
+tripleGetterFromTripleGetter ::
+  (Subject **> Objects) ->
+  String ->
+  (Objects -> Subject -> Objects) ->
+  (Subject **> Objects)
 tripleGetterFromTripleGetter (TypedTripleGetter nameOfp p) name f = memorize tripleGetter name where
-  tripleGetter :: TripleGetter s t
+  tripleGetter :: TripleGetter Subject Objects
   tripleGetter id = do
     (Triple{subject, predicate, object}) <- p id
     t <- liftEffect (addToTripleIndex
-      (unsafeCoerce id)
+      id
       name
-      (unsafeCoerce (f object id))
+      (f object id)
       []
       [TripleRef {subject: unsafeCoerce subject, predicate: predicate}]
       (unsafeCoerce tripleGetter))
     lift $ lift $ detectCycles $ TripleRef {subject: unsafeCoerce id, predicate: name}
-    pure $ ((unsafeCoerce t) :: Triple s t)
+    pure t
 
 -- | Construct a TripleGetter from an ObjectsGetter, that is supported by a Triple returned by an arbitrary
 -- | TripleGetter. In this way we can insert a computed (rather than calculated by a query) Triple in the

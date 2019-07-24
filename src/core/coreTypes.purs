@@ -1,6 +1,6 @@
 module Perspectives.CoreTypes where
 
-import Perspectives.EntiteitAndRDFAliases
+import Perspectives.EntiteitAndRDFAliases (ID, Value, Predicate, ContextID, RolName, PropertyName, RolID) as Alias
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
@@ -23,6 +23,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.Resource (Object, Objects, Subject, firstObject, justObject, noObject)
 import Perspectives.Representation.View (View)
 import Perspectives.Sync.Transactie (Transactie)
 import Prelude (class Eq, class Monad, class Show, Unit, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
@@ -80,7 +81,7 @@ type MonadPerspectivesQuery =  StateT QueryEnvironment MonadPerspectives
 
 type MPQ = MonadPerspectivesQuery
 
-type MonadPerspectivesObjects = MonadPerspectives (Array ID)
+type MonadPerspectivesObjects = MonadPerspectives (Array Alias.ID)
 
 type VariableName = String
 
@@ -94,17 +95,17 @@ readQueryVariable var = gets \env -> unsafePartial (fromJust (O.lookup var env))
 -- OBJECT(S)GETTER
 -----------------------------------------------------------
 -- TODO: FASEER UIT.
-type ObjectsGetter = ID -> MonadPerspectives (Array Value)
+type ObjectsGetter = Alias.ID -> MonadPerspectives (Array Alias.Value)
 
-type ObjectGetter = ID -> MonadPerspectives String
+type ObjectGetter = Alias.ID -> MonadPerspectives String
 
-applyObjectsGetter :: ID -> ObjectsGetter -> MonadPerspectives (Array Value)
+applyObjectsGetter :: Alias.ID -> ObjectsGetter -> MonadPerspectives (Array Alias.Value)
 applyObjectsGetter id g = g id
 
 infix 0 applyObjectsGetter as %%
 infix 0 applyObjectsGetter as %%=
 
-applyObjectsGetterToMaybeObject :: ID -> ObjectsGetter -> MonadPerspectives (Maybe Value)
+applyObjectsGetterToMaybeObject :: Alias.ID -> ObjectsGetter -> MonadPerspectives (Maybe Alias.Value)
 applyObjectsGetterToMaybeObject id g = g id >>= pure <<< head
 
 infix 0 applyObjectsGetterToMaybeObject as %%>
@@ -159,8 +160,8 @@ data NamedFunction f = NamedFunction Name f
 -----------------------------------------------------------
 newtype Triple s o = Triple
   { subject :: s
-  , predicate :: Predicate
-  , object :: Array o
+  , predicate :: Alias.Predicate
+  , object :: o
   , dependencies :: Array TripleRef
   , supports :: Array TripleRef
   , tripleGetter :: TripleGetter s o}
@@ -171,24 +172,18 @@ instance showTriple :: (Show s, Show o) => Show (Triple s o) where
 instance eqTriple :: (Eq s, Eq o) => Eq (Triple s o) where
   eq (Triple({subject: s1, predicate: p1})) (Triple({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
-tripleObjects :: forall s o. Triple s o -> Array o
+tripleObjects :: forall s o. Triple s o -> o
 tripleObjects (Triple{object}) = object
 
-tripleObjects_  :: forall s o m. Monad m => (Triple s o) -> m (Array o)
+tripleObjects_  :: forall s o m. Monad m => (Triple s o) -> m o
 tripleObjects_ (Triple{object}) = pure object
-
-mtripleObject :: forall s o. Triple s o -> Maybe o
-mtripleObject = head <<< tripleObjects
-
-tripleObject :: forall s o. Triple s o -> o
-tripleObject (Triple{object}) = unsafePartial (fromJust (head object))
 
 -----------------------------------------------------------
 -- TRIPLEQUEUE
 -----------------------------------------------------------
 type TripleQueue = Array TripleQueueElement
 
-newtype TripleQueueElement = TripleQueueElement { subject :: Subject, predicate :: Predicate, dependencies :: Array TripleRef}
+newtype TripleQueueElement = TripleQueueElement { subject :: Subject, predicate :: Alias.Predicate, dependencies :: Array TripleRef}
 
 instance eqTripleQueueElement :: Eq TripleQueueElement where
   eq (TripleQueueElement({subject: s1, predicate: p1})) (TripleQueueElement({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
@@ -211,52 +206,53 @@ typedTripleGetterName (TypedTripleGetter n _) = n
 
 -- | NB. If the TripleGetter uses the #start queryvariable, this will not work, because
 -- | it will only be bound in runMonadPerspectivesQuery.
-applyTypedTripleGetter :: forall s o.
-  s
-  -> TypedTripleGetter s o
-  -> (MonadPerspectivesQuery) (Triple s o)
+applyTypedTripleGetter ::
+  Subject
+  -> TypedTripleGetter Subject Objects
+  -> (MonadPerspectivesQuery) (Triple Subject Objects)
 applyTypedTripleGetter a (TypedTripleGetter _ f) = f a
 
 infix 0 applyTypedTripleGetter as @@
 
-applyTypedTripleGetterToObjects :: forall s o.
-  s
-  -> TypedTripleGetter s o
-  -> (MonadPerspectivesQuery) (Array o)
+applyTypedTripleGetterToObjects ::
+  Subject
+  -> TypedTripleGetter Subject Objects
+  -> MonadPerspectivesQuery Objects
 applyTypedTripleGetterToObjects a (TypedTripleGetter _ f) = f a >>= pure <<< tripleObjects
 
 infix 0 applyTypedTripleGetterToObjects as @@=
 
-applyTypedTripleGetterToMaybeObject :: forall s o.
-  s
-  -> TypedTripleGetter s o
-  -> (MonadPerspectivesQuery) (Maybe o)
-applyTypedTripleGetterToMaybeObject a (TypedTripleGetter _ f) = f a >>= pure <<< head <<< tripleObjects
+applyTypedTripleGetterToMaybeObject ::
+  Subject
+  -> TypedTripleGetter Subject Objects
+  -> (MonadPerspectivesQuery) (Maybe Object)
+applyTypedTripleGetterToMaybeObject a (TypedTripleGetter _ f) = f a >>= \os -> if (noObject $ firstObject $ tripleObjects os)
+  then pure Nothing
+  else pure $ Just $ justObject $ firstObject $ tripleObjects os
 
 infix 0 applyTypedTripleGetterToMaybeObject as @@>
 
-applyTypedTripleGetterToObject :: forall s o.
-  Show s =>
-  s
-  -> TypedTripleGetter s o
-  -> (MonadPerspectivesQuery) o
+applyTypedTripleGetterToObject ::
+  Subject
+  -> TypedTripleGetter Subject Objects
+  -> (MonadPerspectivesQuery) Object
 applyTypedTripleGetterToObject a (TypedTripleGetter n f) = f a >>= \(Triple{object}) ->
-  case head object of
-    Nothing -> throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> show a <> "'."
-    (Just obj) -> pure obj
+  if (noObject $ firstObject object)
+    then  throwError $ error $ "TypedTripleGetter '" <> n <> "' returns no values for '" <> show a <> "'."
+    else pure $ justObject $ firstObject object
 
 infix 0 applyTypedTripleGetterToObject as @@>>
 
 -----------------------------------------------------------
 -- TRIPLEREF
 -----------------------------------------------------------
-newtype TripleRef = TripleRef { subject :: Subject, predicate :: Predicate}
+newtype TripleRef = TripleRef { subject :: Subject, predicate :: Alias.Predicate}
 
 instance eqTripleRef :: Eq TripleRef where
   eq (TripleRef({subject: s1, predicate: p1})) (TripleRef({subject: s2, predicate: p2})) = (s1 == s2) && (p1 == p2)
 
 instance showTripleRef :: Show TripleRef where
-  show (TripleRef {subject, predicate}) = "<" <> subject <> " - " <> predicate <> ">"
+  show (TripleRef {subject, predicate}) = "<" <> show subject <> " - " <> predicate <> ">"
 
 -----------------------------------------------------------
 -- STRINGTYPEDTRIPLEGETTER
@@ -277,44 +273,44 @@ data UserMessage =
     MissingAspect TypeID Aspect
   | MissingType TypeID TypeID
   | MissingMogelijkeBinding TypeID
-  | NoType ContextID
-  | MissingRolInstance RolName ContextID
-  | IncorrectRolinContextBinding ContextID RolName TypeID TypeID TypeID
-  | IncorrectContextRolBinding ContextID RolName TypeID TypeID TypeID
-  | RolNotDefined RolName ContextID TypeID
-  | MissingPropertyValue ContextID PropertyName RolName
-  | MissingExternalPropertyValue PropertyName ContextID
-  | MissingInternalPropertyValue PropertyName ContextID
-  | IncorrectPropertyValue ContextID PropertyName TypeID String
-  | TooManyPropertyValues ContextID PropertyName
-  | PropertyNotDefined ContextID PropertyName RolID RolName
-  | AspectRolNotFromAspect RolName RolName ContextID
-  | AspectPropertyNotFromAspectRol PropertyName PropertyName RolName
-  | CycleInAspects ContextID (Array TypeID)
-  | CycleInAspectRoles RolName (Array TypeID)
-  | CycleInAspectProperties PropertyName (Array TypeID)
-  | RolWithoutContext RolName
-  | PropertyWithoutRol PropertyName
-  | CannotOverrideBooleanAspectProperty PropertyName PropertyName
-  | BindingPropertyCannotOverrideBooleanAspectProperty PropertyName PropertyName PropertyName
-  | CannotOverideBooleanRolProperty RolName PropertyName
-  | MissingRange PropertyName
-  | RangeNotSubsumed SimpleValueName PropertyName SimpleValueName PropertyName
-  | RangeNotSubsumedByBindingProperty PropertyName SimpleValueName PropertyName SimpleValueName PropertyName
-  | MogelijkeBindingNotSubsumed String RolName String RolName
-  | MissingAspectPropertyForBindingProperty PropertyName PropertyName
-  | BindingPropertyNotAvailable PropertyName PropertyName
-  | IncompatiblePrototype ContextID ContextID ContextID
+  | NoType Alias.ContextID
+  | MissingRolInstance Alias.RolName Alias.ContextID
+  | IncorrectRolinContextBinding Alias.ContextID Alias.RolName TypeID TypeID TypeID
+  | IncorrectContextRolBinding Alias.ContextID Alias.RolName TypeID TypeID TypeID
+  | RolNotDefined Alias.RolName Alias.ContextID TypeID
+  | MissingPropertyValue Alias.ContextID Alias.PropertyName Alias.RolName
+  | MissingExternalPropertyValue Alias.PropertyName Alias.ContextID
+  | MissingInternalPropertyValue Alias.PropertyName Alias.ContextID
+  | IncorrectPropertyValue Alias.ContextID Alias.PropertyName TypeID String
+  | TooManyPropertyValues Alias.ContextID Alias.PropertyName
+  | PropertyNotDefined Alias.ContextID Alias.PropertyName Alias.RolID Alias.RolName
+  | AspectRolNotFromAspect Alias.RolName Alias.RolName Alias.ContextID
+  | AspectPropertyNotFromAspectRol Alias.PropertyName Alias.PropertyName Alias.RolName
+  | CycleInAspects Alias.ContextID (Array TypeID)
+  | CycleInAspectRoles Alias.RolName (Array TypeID)
+  | CycleInAspectProperties Alias.PropertyName (Array TypeID)
+  | RolWithoutContext Alias.RolName
+  | PropertyWithoutRol Alias.PropertyName
+  | CannotOverrideBooleanAspectProperty Alias.PropertyName Alias.PropertyName
+  | BindingPropertyCannotOverrideBooleanAspectProperty Alias.PropertyName Alias.PropertyName Alias.PropertyName
+  | CannotOverideBooleanRolProperty Alias.RolName Alias.PropertyName
+  | MissingRange Alias.PropertyName
+  | RangeNotSubsumed SimpleValueName Alias.PropertyName SimpleValueName Alias.PropertyName
+  | RangeNotSubsumedByBindingProperty Alias.PropertyName SimpleValueName Alias.PropertyName SimpleValueName Alias.PropertyName
+  | MogelijkeBindingNotSubsumed String Alias.RolName String Alias.RolName
+  | MissingAspectPropertyForBindingProperty Alias.PropertyName Alias.PropertyName
+  | BindingPropertyNotAvailable Alias.PropertyName Alias.PropertyName
+  | IncompatiblePrototype Alias.ContextID Alias.ContextID Alias.ContextID
 
   -- Other messages
   | MultipleDefinitions LocalName (Array TypeID)
   | MissingVariableDeclaration String
   | VariableAlreadyDeclaredAs VariableName TypeID
-  | MissingUnqualifiedProperty LocalName RolName
-  | MissingQualifiedProperty PropertyName RolName
-  | MissingQualifiedRol RolName ContextID
-  | MissingUnqualifiedRol RolName ContextID
-  | ContextExists ID
+  | MissingUnqualifiedProperty LocalName Alias.RolName
+  | MissingQualifiedProperty Alias.PropertyName Alias.RolName
+  | MissingQualifiedRol Alias.RolName Alias.ContextID
+  | MissingUnqualifiedRol Alias.RolName Alias.ContextID
+  | ContextExists Alias.ID
   | NotAValidIdentifier String
   | NotWellFormedContextSerialization String
 
