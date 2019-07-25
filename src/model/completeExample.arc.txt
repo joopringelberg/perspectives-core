@@ -1,0 +1,82 @@
+﻿
+
+	Context : Domain : D
+		Role : ContextRole : C in D
+		Role : ExternalRole : ExternalRole of D
+		Role : Role : R1
+			Mandatory : False
+			NonFunctional : True
+			Calculated : False
+			Property : BooleanProperty : B
+				Mandatory : False
+				Calculated : False
+			Property : NumberProperty : N
+				Mandatory : False
+				Calculated : False
+			Property : StringProperty : T
+				Mandatory : False
+				Calculated : False
+			View : View : V
+				Property : B
+				Property : T
+		Agent : UserRole : U1
+			Mandatory : False
+			Calculated : False
+			Perspective : LocalPerspective : ContextScreen of U1
+				ScreenLocationX : 490
+				ScreenLocationY : 294
+				ScreenWidth : 555
+				ScreenHeight : 305
+				ActionOnContextDialog : U1 Creates R1
+					ActionOnContextDialogLocationX : 295
+					ActionOnContextDialogLocationY : 17
+				ActionOnContextDialog : U1 Consults R1
+					ActionOnContextDialogLocationX : 23
+					ActionOnContextDialogLocationY : 28
+		Action : Consults : U1 Consults R1
+			ActionOnScreen : True
+			ActionObjectView : AllProperties
+			Role : ObjectRole : OR of Consults
+				Object : R1
+			Role : SubjectRole : SR of Consults
+				Subject : U1
+		Action : Creates : U1 Creates R1
+			ActionOnScreen : True
+			ActionObjectView : AllProperties
+			Role : ObjectRole : OR of Creates
+				Object : R1
+			Role : SubjectRole : SR of Creates
+				Subject : U1
+
+		Context : Case : C
+			Role : ExternalRole : ExternalRole of C
+			Role : MultiRole : R2
+				Mandatory : False
+				NonFunctional : False
+				Calculated : False
+				Property : DateTimeProperty : DT
+					Mandatory : False
+					Calculated : False
+			Agent : UserRole : U2
+				Mandatory : False
+				Calculated : False
+				FilledBy : U1
+				Perspective : LocalPerspective : ContextScreen of U2
+					ScreenLocationX : 100
+					ScreenLocationY : 100
+					ScreenWidth : 600
+					ScreenHeight : 400
+			Action : Consults : U2 Consults R2
+				ActionOnScreen : False
+				ActionObjectView : AllProperties
+				Role : ObjectRole : OR of Consults
+					Object : R2
+				Role : SubjectRole : SR of Consults
+					Subject : U2
+			Action : Creates : U2 Creates R2
+				ActionOnScreen : False
+				ActionObjectView : AllProperties
+				Role : ObjectRole : OR of Creates
+					Object : R2
+				Role : SubjectRole : SR of Creates
+					Subject : U2
