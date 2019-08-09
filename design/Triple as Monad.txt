@@ -1,0 +1,97 @@
+A DOUBLE MONAD SYSTEM
+Let's start with a simplified definition of Triple:
+	newtype Triple a b = Triple {arg :: a, fun :: (a -> b), res :: b}
+
+We specialise Triple a b twice to a type constructor that is a Functor:
+	* as Triple ContextInstance (CTriple)
+	* as Triple RoleInstance (RTriple)
+
+All computations on instances can be expressed in one of the two. Some examples:
+	* getRole :: RoleName -> ContextInstance -> CTriple RoleInstance
+	* getProperty :: PropertyName -> RoleInstance -> RTriple Value
+	* context :: RoleInstance -> RTriple Context
+
+We can create instances of the two for Functor, Applicative, Apply, Bind and Monad.
+
+THE TWO MONADS CANNOT BE SIMPLY COMPOSED
+We would like to be able to write expressions like this one:
+	(do
+		(r :: RoleInstance) <- getRole "role1" (c1 :: ContextInstance)
+		(v :: Value) <- getProperty "property1" r
+		pure v) :: CTriple Value
+
+Or, equivalently:
+	(getRole "role1") >>> (bind (getProperty "property1")) (c1 :: ContextInstance)
+
+However, we are confronted with a type mismatch. 'getRole' is a Kleisli in CTriple, 'getProperty' is a Kleisli in RTriple.
+
+NATURAL TRANSFORMATION TO THE RESCUE
+Let's assume we can write a function that performs a Natural Transformation between the two functors:
+	c2r :: CTriple ~> RTriple
+	r2c :: RTriple ~> CTriple
+
+This is not difficult:
+c2r (Triple {arg, fun, res}) = Triple { RoleInstance (unwrap arg), (unwrap >>> ContextInstance >>> fun), res }
+
+Now we can compose:
+	(getRole "role1") >>> c2r >>> (bind (getProperty "property1")) >>> r2c
+
+(leaving out application to c1).
+Or, if we consider (bind (getProperty "property1")) to be an instance of a Profunctor:
+	(getRole "role1") >>> dimap c2r r2c (bind (getProperty "property1"))
+
+CONVINCING THE COMPILER
+By construction, the 'arg' field of Triples will always be Newtypes. And any Kleisli that we compose with another Kleisli, will have a 'res' field that is a Newtype, too (leaving aside the complication that they are actually Arrays of Newtypes). We can see this demonstrated in the natural transformation we defined for c2r.
+
+The transformation actually is nothing but a lot of wrapping and unwrapping - all null operations in runtime. However, the compiler will probably not generate the optimal code that leaves all this wrapping and unwrapping completely out.
+
+Instead of (wrap <<< unwrap), we could inform the compiler that it is OK, by using unsafeCoerce. Or, rather, a typed version:
+
+c2r_ :: ContextInstance -> RoleInstance
+c2r_ = unsafeCoerce.
+
+and likewise a function r2c_. Now we can write:
+	c2r (Triple {arg, fun, res}) = Triple { c2r_ arg, (r2c_ >>> fun), res }	
+
+simplifying further:
+	c2r (Triple {arg, fun, res}) = Triple { c2r_ arg, (unsafeCoerce fun), res }	
+
+but why then not simply this?
+	c2r :: CTriple ~> RTriple
+	c2r = unsafeCoerce
+
+CONVERTING THE KLEISLI
+Could we construct a function coerce with this type?
+	coerce :: forall a. (RoleInstance -> RTriple a) -> (RoleInstance -> CTriple a)
+
+Maybe like so:
+	coerce f = f >>> r2c
+
+Because we type the unsafeCoerce, we get exactly the function we require. Then we could rewrite our do-expression like this:
+
+	(do
+		(r :: RoleInstance) <- getRole "role1" (c1 :: ContextInstance)
+		(v :: Value) <- (coerce $ getProperty "property1") r
+		pure v) :: CTriple Value
+
+We would still have the benefits of the compiler checking the argument types for us (c.q. check that r type-matches the required parameter of (coerce $ getProperty "property1"). 
+And we can compose both monads in a single do-expression as we like, as long as we 'coerce' the embedded other type to that of the surrounding expression.
+
+DEPENDENCY TRACKING
+Clouds appear on the horizon as soon as we try to bring in dependency tracking:
+
+	newtype Triple a b = Triple {arg :: Subject, fun :: (Subject -> b), res :: b, supports :: Array (Triple a b)}
+
+While this type is correct, it restricts us to noting dependencies for a Triple that are equally typed for a and b. And that is usually not the case.
+
+Consequently, we will hide the dependency tracking from sight. We can do that by transforming a Triple we wish to register as a support (later to be converted to dependencies) to a Foreign value. So our type becomes:
+
+	newtype Triple a b = Triple {arg :: Subject, fun :: (Subject -> b), res :: b, supports :: Array Foreign}
+
+and we use a function 
+	triple2foreign :: forall a b. Triple a b -> Foreign
+to do so (we can import this function from javascript, where it is just the identity function).
+
+As a consequence, computing dependencies from supports must be done in foreign functions, too.
+Similarly we have to compute the change to a theory in javascript. As this involves destructive operations on arg and res, that is all for the better.
+
