@@ -8,7 +8,7 @@ import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, Triple(..), TripleQueue, TripleQueueElement(..), TripleRef(..))
 import Perspectives.PerspectivesState (addToRecomputed, setTripleQueue, tripleQueue)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
+import Perspectives.RunMonadPerspectivesQuery (evalMonadPerspectivesQuery)
 import Perspectives.TripleAdministration (addDependency, getRef, lookupInTripleIndex, removeDependency, setSupports_, unRegisterBasicTriple)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Prelude (Ordering(..), Unit, bind, discard, identity, join, map, pure, unit, void, ($), (*>))
@@ -99,7 +99,7 @@ getDependencies (Triple{dependencies}) = do
 recompute :: Triple String String -> MonadPerspectives (Triple String String)
 recompute (Triple{subject, predicate, tripleGetter}) =
   addToRecomputed (TripleRef {subject: subject, predicate: predicate}) *>
-  runMonadPerspectivesQuery subject tripleGetter
+  evalMonadPerspectivesQuery subject tripleGetter
 
 -- Change the object of the triple to the array of IDs passed to the function.
 foreign import saveChangedObject :: Triple String String -> Array String -> Effect (Triple String String)

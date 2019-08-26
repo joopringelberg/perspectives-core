@@ -1,19 +1,19 @@
 module Perspectives.CoreTypes where
 
-import Perspectives.EntiteitAndRDFAliases (ID, Value, Predicate, ContextID, RolName, PropertyName, RolID) as Alias
-
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Reader (ReaderT)
-import Control.Monad.State (StateT, gets, modify)
+import Control.Monad.Writer (WriterT)
 import Data.Array (head)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple)
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar)
 import Effect.Exception (error)
-import Foreign.Object (Object, insert, lookup) as O
-import Partial.Unsafe (unsafePartial)
+import Foreign.Object as F
+import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DomeinFile (DomeinFile)
+import Perspectives.EntiteitAndRDFAliases (ID, Value, Predicate, ContextID, RolName, PropertyName, RolID) as Alias
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -26,7 +26,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.Resource (Object, Objects, Subject, firstObject, justObject, noObject)
 import Perspectives.Representation.View (View)
 import Perspectives.Sync.Transactie (Transactie)
-import Prelude (class Eq, class Monad, class Show, Unit, pure, show, void, ($), (&&), (<<<), (<>), (==), (>>=))
+import Prelude (class Eq, class Monad, class Show, pure, show, ($), (&&), (<<<), (<>), (==), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -44,10 +44,12 @@ type Actions = GLStrMap (AVar Action)
 type DomeinCache = GLStrMap (AVar DomeinFile)
 type QueryCache = GLStrMap (TypedTripleGetter String String)
 
-type PerspectivesState = CouchdbState (
-  rolDefinitions :: RolDefinitions
+type PerspectivesState = CouchdbState
+  -- Caching instances
+  ( rolDefinitions :: RolDefinitions
   , contextDefinitions :: ContextDefinitions
-  -- Perspectives types aanvullen
+
+  -- Caching type definitions
   , contexts :: Contexts
   , enumeratedRoles :: EnumeratedRoles
   , calculatedRoles :: CalculatedRoles
@@ -56,12 +58,30 @@ type PerspectivesState = CouchdbState (
   , views :: Views
   , actions :: Actions
 
+  -- Caching Domein files
   , domeinCache :: DomeinCache
-  , memorizeQueryResults :: Boolean
+
+  , memorizeQueryResults :: Boolean -- obsolete
   , transactie :: Transactie
   , tripleQueue :: TripleQueue
   , recomputed :: Array TripleRef
+  , assumptionRegister :: AssumptionRegister
   )
+
+-----------------------------------------------------------
+-- ASSUMPTIONS
+-----------------------------------------------------------
+-- | An Assumption is a combination of a resource (ContextInstance or RoleInstance) and a type
+-- | (EnumeratedRoleType, CalculatedRoleType, EnumeratedPropertyType or CalculatedPropertyType).
+-- | However, in the assumption administration we omit these newtypes.
+type Assumption = Tuple String String
+
+-- | The AssumptionRegister is indexed by the two elements of an Assumption, in order.
+-- | An instance of the AssumptionRegister is stored in PerspectivesState, so all functions operating on it
+-- | must be run in MonadPerspectives.
+-- | The CorrelationIdentifiers identify an effect and a query that depends (partly) on the assumption that it is
+-- | registered with.
+type AssumptionRegister = F.Object (F.Object (Array CorrelationIdentifier))
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVES
@@ -74,22 +94,15 @@ type MP = MonadPerspectives
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERY
 -----------------------------------------------------------
--- | The QueryEnvironment is a set of bindings of variableNames (Strings) to references to Triples.
-type QueryEnvironment = O.Object TripleRef
+-- | The QueryEnvironment accumulates Assumptions.
 
-type MonadPerspectivesQuery =  StateT QueryEnvironment MonadPerspectives
+type MonadPerspectivesQuery =  WriterT (Array Assumption) MonadPerspectives
 
 type MPQ = MonadPerspectivesQuery
 
 type MonadPerspectivesObjects = MonadPerspectives (Array Alias.ID)
 
 type VariableName = String
-
-putQueryVariable :: VariableName -> TripleRef -> MonadPerspectivesQuery Unit
-putQueryVariable var t = void $ modify \env -> O.insert var t env
-
-readQueryVariable :: VariableName -> MonadPerspectivesQuery TripleRef
-readQueryVariable var = gets \env -> unsafePartial (fromJust (O.lookup var env))
 
 -----------------------------------------------------------
 -- OBJECT(S)GETTER
@@ -205,7 +218,7 @@ typedTripleGetterName :: forall s o. TypedTripleGetter s o -> String
 typedTripleGetterName (TypedTripleGetter n _) = n
 
 -- | NB. If the TripleGetter uses the #start queryvariable, this will not work, because
--- | it will only be bound in runMonadPerspectivesQuery.
+-- | it will only be bound in evalMonadPerspectivesQuery.
 applyTypedTripleGetter ::
   Subject
   -> TypedTripleGetter Subject Objects

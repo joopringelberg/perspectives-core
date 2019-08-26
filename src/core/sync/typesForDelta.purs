@@ -41,6 +41,8 @@ data Delta' = CD ContextDelta | BD BindingDelta | PD PropertyDelta
 -----------------------------------------------------------
 -- CONTEXTDELTA
 -----------------------------------------------------------
+-- TODO: hernoem naar RoleDelta
+-- ContextDelta's betreffen aanmaken en verwijderen van een Context.
 newtype ContextDelta = ContextDelta
   { id :: ContextInstance
   , role :: EnumeratedRoleType

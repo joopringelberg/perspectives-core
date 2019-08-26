@@ -26,6 +26,7 @@
     "node-fs-aff",
     "simple-json",
     "kishimen",
-    "validation"
+    "validation",
+    "profunctor-lenses"
   ]
 }

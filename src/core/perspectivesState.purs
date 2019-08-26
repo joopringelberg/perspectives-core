@@ -6,12 +6,13 @@ import Data.Array (cons)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Effect.Class (liftEffect)
-import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, TripleQueue, TripleRef)
+import Foreign.Object (empty)
+import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, TripleQueue, TripleRef, AssumptionRegister)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Sync.Transactie (Transactie(..))
+import Perspectives.Sync.Transactie (Transactie)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
 newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
@@ -39,6 +40,7 @@ newPerspectivesState uinfo tr av =
   -- For debugging purposes only:
   , recomputed: []
   -- , queryCache: new unit
+  , assumptionRegister: empty
   }
 
 -----------------------------------------------------------
@@ -113,6 +115,11 @@ domeinCacheInsert = insert domeinCache
 domeinCacheRemove :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheRemove = remove domeinCache
 
+assumptionRegister :: MonadPerspectives AssumptionRegister
+assumptionRegister = gets _.assumptionRegister
+
+assumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
+assumptionRegisterModify f = modify \(s@{assumptionRegister}) -> s {assumptionRegister = f assumptionRegister}
 -----------------------------------------------------------
 -- FUNCTIONS TO MODIFY GLOBAL UNSAFE STRMAPS IN PERSPECTIVESSTATE
 -----------------------------------------------------------

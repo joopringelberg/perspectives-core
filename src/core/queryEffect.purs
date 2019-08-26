@@ -31,8 +31,8 @@ pushesObjectsTo ::
   StringTypedTripleGetter ->
   QueryEffect String ->
   StringTypedTripleGetter
-pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) =
-  TypedTripleGetter effectName pushesObjectsTo' where
+pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction correlationIdentifier effect) =
+  TypedTripleGetter correlationIdentifier pushesObjectsTo' where
 
     pushesObjectsTo' :: StringTripleGetter
     pushesObjectsTo' id = do
@@ -41,7 +41,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
       _ <- liftEffect $ registerTriple ( et)
       pure et
       -- To unsubscribe the effect, de-register the effect triple. Find the triple
-      -- by its subject (=id) and predicate (=effectName)
+      -- by its subject (=id) and predicate (=correlationIdentifier)
 
     -- propagateTheoryDeltas will use the tripleGetter to recompute,
     -- i.e. to sort the effect again and it will use the resulting triple to
@@ -52,7 +52,7 @@ pushesObjectsTo (TypedTripleGetter tgName tg) (NamedFunction effectName effect) 
       queryResult@(Triple{subject, object}) <- tg id
       _ <- lift $ effect ( object)
       pure $ Triple { subject: subject
-                    , predicate : effectName
+                    , predicate : correlationIdentifier
                     , object : object
                     , dependencies : []
                     , supports : [getRef $  queryResult]

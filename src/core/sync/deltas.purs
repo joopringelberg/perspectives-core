@@ -114,9 +114,11 @@ addDomeinFileToTransactie dfId = do
 -- 	Indien gevonden: verwijder de oude.
 -- 	Anders: voeg de nieuwe toe.
 
--- | Add a Delta to the Transaction.
+-- | Add a Delta to the Transaction. Tries to keep the Transaction as small as possible, by eliminating and integrating 
+-- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.
 -- | Add that Triple to the TripleQueue.
+-- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke ContextDelta, BindingDelta, enz.
 addDelta :: Delta -> MonadPerspectives Unit
 addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
   t@(Transactie tf@{deltas}) <- transactie
@@ -128,7 +130,7 @@ addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
         true -> getPerspectType (EnumeratedRoleType memberName) >>= \(r :: EnumeratedRole) -> R.functional r
         false -> getPerspectType (EnumeratedPropertyType memberName) >>= \(p :: EnumeratedProperty) -> P.functional p
       -- isfunc <- isFunctionalComputer memberName -- hier komt ie niet uit.
-      -- (isfunc :: Boolean) <- runMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
+      -- (isfunc :: Boolean) <- evalMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
       if (isfunc)
         then do
           x <- pure $ findIndex equalExceptRolID deltas

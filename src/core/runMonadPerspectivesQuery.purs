@@ -2,46 +2,33 @@ module Perspectives.RunMonadPerspectivesQuery where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (evalStateT)
+import Control.Monad.Writer (runWriterT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (singleton)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), tripleObjects, type (**>))
+import Perspectives.CoreTypes (type (**>), MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), Assumption, tripleObjects)
 import Perspectives.TripleAdministration (addToTripleIndex)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
 import Unsafe.Coerce (unsafeCoerce)
 
--- | Run the function in a QueryEnvironment that has s as the value of "#start".
 runMonadPerspectivesQuery :: forall s o.
   s
   -> (s -> MonadPerspectivesQuery o)
-  -> (MonadPerspectives o)
-runMonadPerspectivesQuery a f = do
-  _ <- liftEffect $ unsafeCoerce $ addToTripleIndex
-    (unsafeCoerce a)
-    "model:Perspectives$start"
-    [unsafeCoerce a]
-    []
-    []
-    (unsafeCoerce tripleGetter)
-  evalStateT (f a) (singleton "#start" tref)
-  where
-    tref :: TripleRef
-    tref = TripleRef
-          { subject: (unsafeCoerce a)
-          , predicate: "model:Perspectives$start"
-        }
-    tripleGetter :: TripleGetter s o
-    tripleGetter id = liftEffect (unsafeCoerce $ addToTripleIndex
-      (unsafeCoerce id)
-      "model:Perspectives$start"
-      [unsafeCoerce a]
-      []
-      []
-      (unsafeCoerce tripleGetter))
+  -> (MonadPerspectives (Tuple o (Array Assumption)))
+runMonadPerspectivesQuery a f = runWriterT (f a)
 
-------------------------------------------------------------------------------------------------------------------------
+evalMonadPerspectivesQuery :: forall s o.
+  s
+  -> (s -> MonadPerspectivesQuery o)
+  -> (MonadPerspectives o)
+evalMonadPerspectivesQuery a f = do
+    (Tuple result assumptions) <- runMonadPerspectivesQuery a f
+    pure result
+
+{------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A TRIPLE
 ------------------------------------------------------------------------------------------------------------------------
 -- Run the TypedTripleGetter in a QueryEnvironment that has Subject as the value of "#start".
@@ -49,7 +36,7 @@ runTypedTripleGetter :: forall s o.
   (s **> o)
   -> s
   -> MonadPerspectives (Triple s o)
-runTypedTripleGetter (TypedTripleGetter _ f) a = runMonadPerspectivesQuery a f
+runTypedTripleGetter (TypedTripleGetter _ f) a = evalMonadPerspectivesQuery a f
 
 runQuery :: forall s o.
   s
@@ -86,3 +73,4 @@ runTypedTripleGetterToObject id ttg@(TypedTripleGetter n _) = runTypedTripleGett
   (Just obj) -> pure obj
 
 infix 0 runTypedTripleGetterToObject as ##>>
+-}

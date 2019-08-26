@@ -1,0 +1,20 @@
+GUN RESEARCH
+1. Als het zo is dat elke peer elke node ontvangt, dan moeten we dat beperken.
+2. Moet je (programmeur, gebruiker) zelf bepalen met welke peers je direct verbonden bent?
+3. The Radisk Storage Engine (RAD) is an in-memory, as well as on-disk radix tree that saves the GUN database graph for fast and performant look-ups.
+	Conclusie: ik hoef niet óók nog te cachen in de PDR.
+
+AD HOC MESH NETWORK
+"if you want the network traffic to NOT be anonymous, you can tag the IDs of the peers in the msg envelope so that way receive peers do an exclusion from the peer list they rebroadcast to (this cuts the echo out)"
+
+Bijvoorbeeld: stuur met een Delta de trusted peers van de ontvanger mee. Als de ontvanger niet online is, ontvang je geen ACK. Als er minstens één online is, ontvang je uiteindelijk een ACK van de ontvanger (denk ik - hoewel ik niet weet hoe lang en door wie er geprobeerd wordt het bericht bij de ontvanger af te leveren). Een peer slaat namelijk alleen data op als hij op de betreffende key geabonneerd is. Daarover:
+
+"the peer that created the data and wants it replicated is SOLEY responsible for retries if it hasn't received ACKs that it wants. No other peer is responsible for retrying messages."
+
+Oftewel, je moet een Delta bewaren en opnieuw versturen totdat je een ACK krijgt. Maar: is dit de verantwoordelijkheid van de netwerk laag, of van de applicatie?
+
+Ah. Als we directe kanalen maken, zouden we een node zich kunnen laten abonneren op de kanalen van zijn trusted peers. Dat betekent, dat de kans dat je een ACK krijgt als je een Delta stuurt, veel groter is (alléén als geen enkele peer online is, krijg je geen ACK). Zo wordt je een postkantoor voor degenen die je als trusted peer hebben opgegeven.
+En zolang er maar één peer is die de Delta heeft opgevangen, krijgt de ontvanger, als hij weer online komt, de Delta binnen - want hij is op zijn eigen kanaal geabonneerd.
+KLOPT HET dat als je online komt, je alles binnenkrijgt waarop je geabonneerd bent? Vermoedelijk moet je opnieuw abonneren (ON) en dan gebeurt het.
+
+Het lijkt erop dat je (middels de Options) met elke gebruiker waarmee je een context deelt, moet connecten als peer. Of eigenlijk is er de opgave om de minimale set peers te vinden waarmee je één node in alle trusted networks hebt.
