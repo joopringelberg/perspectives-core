@@ -4,10 +4,9 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.DomeinCache (retrieveDomeinFileFromCache, storeDomeinFileInCouchdb)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, Value(..))
-import Perspectives.RunMonadPerspectivesQuery ((##>>))
 
 -- | Store the DomeinFile, if found in the cache.
 storeDomeinFile :: ContextInstance -> MonadPerspectives Unit

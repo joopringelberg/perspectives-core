@@ -9,23 +9,10 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (singleton)
-import Perspectives.CoreTypes (type (**>), MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), Assumption, tripleObjects)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, Assumption)
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
 import Unsafe.Coerce (unsafeCoerce)
-
-runMonadPerspectivesQuery :: forall s o.
-  s
-  -> (s -> MonadPerspectivesQuery o)
-  -> (MonadPerspectives (Tuple o (Array Assumption)))
-runMonadPerspectivesQuery a f = runWriterT (f a)
-
-evalMonadPerspectivesQuery :: forall s o.
-  s
-  -> (s -> MonadPerspectivesQuery o)
-  -> (MonadPerspectives o)
-evalMonadPerspectivesQuery a f = do
-    (Tuple result assumptions) <- runMonadPerspectivesQuery a f
-    pure result
 
 {------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A TRIPLE

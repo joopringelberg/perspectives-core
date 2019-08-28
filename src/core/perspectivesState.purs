@@ -2,12 +2,11 @@ module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty)
-import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, TripleQueue, TripleRef, AssumptionRegister)
+import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, AssumptionRegister)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
@@ -36,9 +35,9 @@ newPerspectivesState uinfo tr av =
   , sessionCookie: av
   , memorizeQueryResults: true
   , transactie: tr
-  , tripleQueue: []
+  -- , tripleQueue: []
   -- For debugging purposes only:
-  , recomputed: []
+  -- , recomputed: []
   -- , queryCache: new unit
   , assumptionRegister: empty
   }
@@ -69,12 +68,6 @@ setSessionCookie c = sessionCookie >>= (lift <<< put c)
 
 transactie :: MonadPerspectives Transactie
 transactie = gets _.transactie
-
-setTripleQueue :: TripleQueue -> MonadPerspectives Unit
-setTripleQueue t = modify \s -> s { tripleQueue = t }
-
-tripleQueue :: MonadPerspectives TripleQueue
-tripleQueue = gets _.tripleQueue
 
 setTransactie :: Transactie -> MonadPerspectives Unit
 setTransactie t = modify \s -> s { transactie = t }
@@ -150,17 +143,3 @@ remove g k = do
   ma <- liftEffect $ peek dc k
   _ <- liftEffect $ (delete dc k)
   pure ma
-
------------------------------------------------------------
--- FOR DEBUGGING ONLY
------------------------------------------------------------
-setRecomputed :: Array TripleRef -> MonadPerspectives Unit
-setRecomputed t = modify \s -> s { recomputed = t }
-
-getRecomputed :: MonadPerspectives (Array TripleRef)
-getRecomputed = gets _.recomputed
-
-addToRecomputed :: TripleRef -> MonadPerspectives Unit
-addToRecomputed i = do
-  r <- getRecomputed
-  setRecomputed (cons i r)

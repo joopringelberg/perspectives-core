@@ -29,7 +29,6 @@ import Perspectives.Representation.Class.Role (functional) as R
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.RunMonadPerspectivesQuery ((##), (##>))
 import Perspectives.Sync.Transactie (Transactie(..), createTransactie)
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)

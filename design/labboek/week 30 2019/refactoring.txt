@@ -1,0 +1,8 @@
+REFACTORING
+
+1. Perspectives.ObjectGetterLookup. Dit is waar gecompileerde queries opgeslagen worden.
+	Probleem: TrackingObjectsGetter is een type alias met twee parameters.
+	De oude Perspectives.QueryCache was een cache van StringTypedTripleGetters.
+	Hij wordt nu niet gebruikt.
+	Naar Quarantaine overgeplaatst.
+2. 

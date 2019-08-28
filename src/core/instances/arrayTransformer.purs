@@ -61,6 +61,9 @@ instance monadTransArrayT :: MonadTrans ArrayT where
   lift :: forall m a. Monad m => m a -> ArrayT m a
   lift = ArrayT <<< map singleton
 
+lift' :: forall m a. Monad m => m (Array a) -> ArrayT m a
+lift' = ArrayT
+
 -- | Use `liftArray` to lift a function of type `Array a -> Array b` to a function
 -- | with type `ArrayT m a -> ArrayT m b`.
 liftArrayFunction :: forall m a b. Monad m => (Array a -> Array b) -> ArrayT m a -> ArrayT m b

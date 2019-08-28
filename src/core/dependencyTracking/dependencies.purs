@@ -15,10 +15,9 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, ResponseRecord(..))
-import Perspectives.CoreTypes (Assumption, AssumptionRegister, MP, MPQ)
+import Perspectives.CoreTypes (Assumption, AssumptionRegister, MP, MPQ, (##=), type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, peek, poke, new)
 import Perspectives.PerspectivesState (assumptionRegister, assumptionRegisterModify)
-import Perspectives.RunMonadPerspectivesQuery (runMonadPerspectivesQuery)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
@@ -43,7 +42,7 @@ activeSupportedEffects = new unit
 registerSupportedEffect :: forall a b.
   CorrelationIdentifier ->
   ApiEffect ->
-  (a -> MPQ (Array b)) ->
+  (a ~~> b) ->
   a ->
   MP Unit
 registerSupportedEffect corrId ef q arg = do
