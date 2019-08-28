@@ -34,7 +34,6 @@ import Perspectives.Representation.Context (Context, actions)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType)
 import Perspectives.RunMonadPerspectivesQuery (runTypedTripleGetterToMaybeObject, (##))
-import Perspectives.TripleAdministration (unRegisterTriple)
 import Perspectives.TypesForDeltas (BindingDelta(..), ContextDelta(..), Delta(..), DeltaType(..), InverseBindingDelta(..), PropertyDelta(..))
 
 {-

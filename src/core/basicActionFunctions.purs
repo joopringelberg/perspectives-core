@@ -4,7 +4,6 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Perspectives.ComputedTripleGetters (parserMessagesM, syntacticStateM)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (retrieveDomeinFileFromCache, storeDomeinFileInCouchdb)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, Value(..))

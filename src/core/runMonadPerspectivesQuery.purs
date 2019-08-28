@@ -10,7 +10,6 @@ import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (type (**>), MonadPerspectives, MonadPerspectivesQuery, Triple(..), TripleGetter, TripleRef(..), TypedTripleGetter(..), Assumption, tripleObjects)
-import Perspectives.TripleAdministration (addToTripleIndex)
 import Prelude (flip, bind, ($), (>>=), (<<<), pure, (<>))
 import Unsafe.Coerce (unsafeCoerce)
 

@@ -33,7 +33,6 @@ import Perspectives.CoreTypes (Transactie, createTransactie)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)
-import Perspectives.TheoryChange (propagate)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
 main :: Effect Unit

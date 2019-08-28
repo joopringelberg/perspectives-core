@@ -23,7 +23,6 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (context)
 import Perspectives.PerspectivesState (setTransactie, transactie)
-import Perspectives.QueryCombinators (containedIn, filter, intersect, notEmpty)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (functional) as P
 import Perspectives.Representation.Class.Role (functional) as R
@@ -32,8 +31,6 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>))
 import Perspectives.Sync.Transactie (Transactie(..), createTransactie)
-import Perspectives.TheoryChange (addTripleToQueue, modifyTriple)
-import Perspectives.TripleGetterComposition ((>->))
 import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
@@ -114,7 +111,7 @@ addDomeinFileToTransactie dfId = do
 -- 	Indien gevonden: verwijder de oude.
 -- 	Anders: voeg de nieuwe toe.
 
--- | Add a Delta to the Transaction. Tries to keep the Transaction as small as possible, by eliminating and integrating 
+-- | Add a Delta to the Transaction. Tries to keep the Transaction as small as possible, by eliminating and integrating
 -- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.
 -- | Add that Triple to the TripleQueue.

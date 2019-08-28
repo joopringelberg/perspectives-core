@@ -27,15 +27,12 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances (saveEntiteit)
-import Perspectives.Instances.TripleGetters (binding, context, roleType, contextType)
 import Perspectives.Instances.ObjectGetters (contextType) as DTO
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.Representation.Context (lookForUnqualifiedRoleType)
 import Perspectives.RunMonadPerspectivesQuery ((##), (##>)) as RP
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
-import Perspectives.TripleAdministration (unRegisterTriple)
-import Perspectives.TripleGetterComposition ((>->))
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
 
 -----------------------------------------------------------

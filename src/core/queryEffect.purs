@@ -5,7 +5,6 @@ import Effect.Class (liftEffect)
 import Perspectives.ApiTypes (CorrelationIdentifier, Response(..))
 import Perspectives.ApiTypes (convertResponse, ApiEffect) as Api
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, NamedFunction(..), StringTriple, StringTypedTripleGetter, Triple(..), TypedTripleGetter(..), StringTripleGetter)
-import Perspectives.TripleAdministration (getRef, registerTriple)
 import Prelude (Unit, bind, pure, ($))
 import Unsafe.Coerce (unsafeCoerce)
 

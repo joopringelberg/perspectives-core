@@ -20,8 +20,6 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, removeEntiteit)
 import Perspectives.Instances (saveEntiteitPreservingVersion)
 import Perspectives.Instances.ObjectGetters (iedereRolInContext)
-import Perspectives.TheoryChange (addToQueue, addTripleToQueue, tripleRefToTripleQueueElement, tripleToTripleQueueElement)
-import Perspectives.TripleAdministration (unRegisterBasicTriple, unRegisterSubject)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (>>=), (>>>), (<<<))
 
 type UserDataState = Array ID

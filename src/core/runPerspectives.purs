@@ -8,7 +8,6 @@ import Effect.Aff.AVar (AVar, new, read)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.Sync.Transactie (Transactie, createTransactie)
-import Perspectives.TheoryChange (propagate)
 import Prelude (bind, discard, pure, ($))
 
 -- | Run an action in MonadPerspectives, given a username and password.
