@@ -211,6 +211,7 @@ closureOfPrototype = closure getPrototype
 -- | Get the ContextRol instances with the given rol name (RolDef) directly from the Context definition (not searching prototypes or Aspects).
 -- | E.g. getRol "model:Perspectives$View$rolProperty" will return all rol instances that bind a PropertyDef on an instance of psp:View.
 -- Test.Perspectives.ObjectGetterConstructors via getRolinContext
+-- NOTE: equals Perspectives.Instances.ObjectGetters.getRole
 getRol :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getRol rn = getContextMember \context -> maybe [] identity (lookup (unwrap rn) (context_iedereRolInContext context))
 
@@ -310,18 +311,3 @@ searchExternalProperty pn = searchPropertyOnContext buitenRol pn
 -- Test.Perspectives.ObjectGetterConstructors
 searchExternalUnqualifiedProperty :: LocalName -> (ContextInstance ~~> Value)
 searchExternalUnqualifiedProperty ln = searchUnqualifiedPropertyOnContext buitenRol ln
-
--- | From the instance of a Rol of any kind, find the instances of the Rol of the given type that bind it (that have
--- | it as their binding). The type of rname (RolDef) can be a BuitenRol.
--- Test.Perspectives.ObjectGetterConstructors
-getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
-getRoleBinders rname = getRolMember \(PerspectRol{gevuldeRollen}) -> maybe [] identity (lookup (unwrap rname) gevuldeRollen)
-
--- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
--- | that bind it (that have it as their binding). The type of ln can be 'buitenRolBeschrijving'.
--- Test.Perspectives.ObjectGetterConstructors
-getUnqualifiedRoleBinders :: LocalName -> (RoleInstance ~~> RoleInstance)
-getUnqualifiedRoleBinders ln = getRolMember \(PerspectRol{gevuldeRollen}) ->
-    case Arr.findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys gevuldeRollen) of
-      Nothing -> []
-      (Just i) -> maybe [] identity (lookup (unsafePartial $ fromJust (Arr.index (keys gevuldeRollen) i)) gevuldeRollen)

@@ -5,7 +5,7 @@ import Control.Monad.Reader (ReaderT)
 import Control.Monad.Writer (WriterT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar)
 import Effect.Exception (error)
@@ -76,6 +76,9 @@ type PerspectivesState = CouchdbState
 -- | However, in the assumption administration we omit these newtypes.
 type Assumption = Tuple String String
 
+assumption :: String -> String -> Assumption
+assumption = Tuple
+
 -- | The AssumptionRegister is indexed by the two elements of an Assumption, in order.
 -- | An instance of the AssumptionRegister is stored in PerspectivesState, so all functions operating on it
 -- | must be run in MonadPerspectives.
@@ -103,6 +106,10 @@ type MPQ = MonadPerspectivesQuery
 type MonadPerspectivesObjects = MonadPerspectives (Array Alias.ID)
 
 type VariableName = String
+
+type TrackingObjectsGetter s o = s -> MonadPerspectivesQuery (Array o)
+
+infixl 5 type TrackingObjectsGetter as ~~~>
 
 -----------------------------------------------------------
 -- OBJECT(S)GETTER
