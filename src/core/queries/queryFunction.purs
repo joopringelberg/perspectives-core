@@ -21,6 +21,7 @@ data QueryFunction
   | ComputedPropertyGetter FunctionName
   | UnaryCombinator FunctionName QueryFunction
   | NaryCombinator FunctionName (Array QueryFunction)
+  | BinaryCombinator FunctionName QueryFunction QueryFunction
   | Filter QueryFunction QueryFunction
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
@@ -41,6 +42,7 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (ComputedPropertyGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedPropertyGetter", dat: f}
   writeImpl (UnaryCombinator f q) = unsafeToForeign $ writeJSON {tag: "UnaryCombinator", dat: [f, writeJSON q]}
   writeImpl (NaryCombinator f q) = unsafeToForeign $ writeJSON {tag: "NaryCombinator", dat: [f, writeJSON q]}
+  writeImpl (BinaryCombinator f op1 op2) = unsafeToForeign $ writeJSON {tag: "BinaryCombinator", dat: [f, writeJSON op1, writeJSON op2]}
   writeImpl (Filter c q) = unsafeToForeign $ writeJSON {tag: "Filter", dat: [writeJSON c, writeJSON q]}
 
 

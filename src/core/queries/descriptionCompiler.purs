@@ -14,7 +14,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..))
 import Prelude (($), pure, bind, (>>=), (<<<))
 
--- From an AST data constructor, create a QueryFunction data element after
+-- From an AST data constructor, create a QueryFunctionDescription data element after
 -- checking that the required path can indeed be followed.
 
 compileElementaryStep :: Domain -> ElementaryQueryStep -> MonadPerspectives FD
@@ -27,15 +27,21 @@ compileElementaryStep currentDomain s@(QualifiedRol qn) = do
       mb <- getPerspectType c >>= pure <<< lookForRoleType qn
       case mb of
         Nothing -> pure $ Left $ ContextHasNoRole c qn
-        (Just et) -> pure $ Right $ QD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType
+        (Just et) -> pure $ Right $ EQD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType
          qn)
     otherwise -> pure $ Left $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.
 compileElementaryStep _ _ = pure $ Left $ UnknownElementaryQueryStep
 
-compileQueryStep :: QueryStep -> MonadPerspectives FD
-compileQueryStep _ = pure $ Left $ UnknownElementaryQueryStep
+compileQueryStep :: Domain -> QueryStep -> MonadPerspectives FD
+compileQueryStep currentDomain s@(BinaryCombinator functionName op1 op2) =
+  case functionName of
+    "compose" -> do
+      f1 <- compileQueryStep currentDomain op1
+    _ ->  pure $ Left $ UnknownElementaryQueryStep
+compileQueryStep currentDomain (Terminal e) = compileElementaryStep currentDomain e
+compileQueryStep _ _ = pure $ Left $ UnknownElementaryQueryStep
 
 type FD = Either CompilerMessage QueryFunctionDescription
 

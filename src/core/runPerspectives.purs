@@ -46,7 +46,7 @@ runPerspectivesWithPropagation userName password mp duration = do
   computation <- forkAff $ runPerspectivesWithState mp rf
   propagation <- forkAff $ forever do
     delay (Milliseconds 50.0)
-    runPerspectivesWithState propagate rf
+    -- runPerspectivesWithState propagate rf
   delay (Milliseconds duration)
   do
     killFiber (error "Error on killing the computation") computation
