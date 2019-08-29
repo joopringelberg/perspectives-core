@@ -38,6 +38,9 @@ saveUserContext id = do
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.buitenRol id)
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.binnenRol id)
   pure unit
+  where
+    iedereRolInContext :: (ContextInstance ##> RoleInstance)
+    iedereRolInContext = getContextMember \ctxt -> nub $ join $ values (context_iedereRolInContext ctxt)
 
 -- * remove tripleAdministration.
 removeUserContext :: ID -> MonadPerspectives Unit
