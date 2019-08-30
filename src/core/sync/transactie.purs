@@ -3,16 +3,18 @@ module Perspectives.Sync.Transactie where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
+import Control.Monad.AvarMonadAsk (modify)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Newtype (class Newtype)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
-import Perspectives.TypesForDeltas (ContextDelta, Delta, BindingDelta, PropertyDelta)
+import Perspectives.TypesForDeltas (RoleDelta, BindingDelta, PropertyDelta)
 import Prelude (class Show, bind, ($), (<>), show, pure)
 import Simple.JSON (class WriteForeign)
 
@@ -22,8 +24,7 @@ import Simple.JSON (class WriteForeign)
 newtype Transactie = Transactie
   { author :: String
   , timeStamp :: SerializableDateTime
-  , deltas :: Array Delta
-  , contextDeltas :: Array ContextDelta
+  , roleDeltas :: Array RoleDelta
   , bindingDeltas :: Array BindingDelta
   , propertyDeltas :: Array PropertyDelta
   , createdContexts :: Array PerspectContext
@@ -34,6 +35,8 @@ newtype Transactie = Transactie
   }
 
 derive instance genericRepTransactie :: Generic Transactie _
+
+derive instance newtypeTransactie :: Newtype Transactie _
 
 instance showTransactie :: Show Transactie where
   show = genericShow
@@ -47,8 +50,7 @@ createTransactie author =
     pure $ Transactie
       { author: author
       , timeStamp: SerializableDateTime (toDateTime n)
-      , deltas: []
-      , contextDeltas: []
+      , roleDeltas: []
       , bindingDeltas: []
       , propertyDeltas: []
       , createdContexts: []

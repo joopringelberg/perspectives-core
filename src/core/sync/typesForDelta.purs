@@ -10,61 +10,36 @@ import Data.Maybe (Maybe)
 import Foreign (Foreign, unsafeToForeign)
 import Foreign.Generic (defaultOptions, genericEncode)
 import Foreign.Generic.Class (class GenericEncode)
-import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (class Show, ($))
 import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
--- DELTA
+-- ROLEDELTA
 -----------------------------------------------------------
-newtype Delta = Delta
-  { id :: ID
-  , memberName :: String
-  , value :: Maybe String
-  , deltaType :: DeltaType
-  , isContext :: Boolean
-  }
-
-derive instance genericDelta :: Generic Delta _
-
-instance showDelta :: Show Delta where
-  show = genericShow
-
-derive instance eqDelta :: Eq Delta
-
-derive newtype instance writeForeignDelta :: WriteForeign Delta
-
-data Delta' = CD ContextDelta | BD BindingDelta | PD PropertyDelta
-
------------------------------------------------------------
--- CONTEXTDELTA
------------------------------------------------------------
--- TODO: hernoem naar RoleDelta
--- ContextDelta's betreffen aanmaken en verwijderen van een Context.
-newtype ContextDelta = ContextDelta
+newtype RoleDelta = RoleDelta
   { id :: ContextInstance
   , role :: EnumeratedRoleType
   , instance :: RoleInstance
   , deltaType :: DeltaType
   }
 
-derive instance genericContextDelta :: Generic ContextDelta _
+derive instance genericRoleDelta :: Generic RoleDelta _
 
-instance showContextDelta :: Show ContextDelta where
+instance showRoleDelta :: Show RoleDelta where
   show = genericShow
 
-derive instance eqContextDelta :: Eq ContextDelta
+derive instance eqRoleDelta :: Eq RoleDelta
 
-derive newtype instance writeForeignContextDelta :: WriteForeign ContextDelta
+derive newtype instance writeForeignRoleDelta :: WriteForeign RoleDelta
 
 -----------------------------------------------------------
 -- BINDINGDELTA
 -----------------------------------------------------------
 newtype BindingDelta = BindingDelta
   { id :: RoleInstance
-  , binding :: RoleInstance
+  , binding :: Maybe RoleInstance
   , deltaType :: DeltaType
   }
 
@@ -76,25 +51,6 @@ instance showBindingDelta :: Show BindingDelta where
 derive instance eqBindingDelta :: Eq BindingDelta
 
 derive newtype instance writeForeignBindingDelta :: WriteForeign BindingDelta
-
------------------------------------------------------------
--- INVERSEBINDINGDELTA
------------------------------------------------------------
-newtype InverseBindingDelta = InverseBindingDelta
-  { id :: RoleInstance
-  , binding :: RoleInstance
-  , role :: EnumeratedRoleType
-  , deltaType :: DeltaType
-  }
-
-derive instance genericInverseBindingDelta :: Generic InverseBindingDelta _
-
-instance showInverseBindingDelta :: Show InverseBindingDelta where
-  show = genericShow
-
-derive instance eqInverseBindingDelta :: Eq InverseBindingDelta
-
-derive newtype instance writeForeignInverseBindingDelta :: WriteForeign InverseBindingDelta
 
 -----------------------------------------------------------
 -- PROPERTYDELTA

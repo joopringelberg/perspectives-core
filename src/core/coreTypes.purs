@@ -23,7 +23,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.View (View)
 import Perspectives.Sync.Transactie (Transactie)
-import Prelude (bind, pure, (>>=), (<<<), ($), (<>))
+import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -93,9 +93,9 @@ type MP = MonadPerspectives
 -----------------------------------------------------------
 -- OBJECTSGETTER
 -----------------------------------------------------------
-type Objectsgetter s o = s -> MP (Array o)
+type ObjectsGetter s o = s -> MP (Array o)
 
-infixl 0 type Objectsgetter as ##>
+infixl 0 type ObjectsGetter as ##>
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERY
@@ -155,3 +155,17 @@ runTypedTripleGetterToObject id tog = evalMonadPerspectivesQuery id tog >>= \obj
   (Just obj) -> pure obj
 
 infix 0 runTypedTripleGetterToObject as ##>>
+
+-----------------------------------------------------------
+-- MONADPERSPECTIVESTRANSACTION
+-----------------------------------------------------------
+-- | The Transaction accumulates Deltas.
+
+type MonadPerspectivesTransaction =  ArrayT (ReaderT (AVar Transactie) MonadPerspectives)
+
+type MPT = MonadPerspectivesTransaction
+
+-----------------------------------------------------------
+-- UPDATER
+-----------------------------------------------------------
+type Updater s = s -> MonadPerspectivesTransaction Unit

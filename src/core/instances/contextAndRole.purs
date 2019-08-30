@@ -11,12 +11,11 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, insert, lookup, pop)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.EntiteitAndRDFAliases (PropertyName, RolName)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.Class.Revision (Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType)
 import Prelude (identity, ($), (/), (<>), show, (+))
 
 -- CONTEXT
@@ -63,33 +62,33 @@ context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 context_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance
 context_rolInContext (PerspectContext{rolInContext}) rn = maybe [] identity (lookup (unwrap rn) rolInContext)
 
-addContext_rolInContext :: PerspectContext -> RolName -> RoleInstance -> PerspectContext
+addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
-  case lookup rolName rolInContext of
-    Nothing -> PerspectContext cr {rolInContext = insert rolName [rolID] rolInContext}
+  case lookup (unwrap rolName) rolInContext of
+    Nothing -> PerspectContext cr {rolInContext = insert (unwrap rolName) [rolID] rolInContext}
     (Just roles) -> do
       case Arr.elemIndex rolID roles of
-        Nothing -> PerspectContext cr {rolInContext = insert rolName (Arr.snoc roles rolID) rolInContext}
+        Nothing -> PerspectContext cr {rolInContext = insert (unwrap rolName) (Arr.snoc roles rolID) rolInContext}
         otherwise -> ct
 
-removeContext_rolInContext :: PerspectContext -> RolName -> RoleInstance -> PerspectContext
+removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 removeContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
-  case lookup rolName rolInContext of
+  case lookup (unwrap rolName) rolInContext of
     Nothing -> ct
     (Just (roles :: Array RoleInstance)) -> do
       case Arr.elemIndex rolID roles of
         Nothing -> ct
-        otherwise -> PerspectContext cr {rolInContext = insert rolName (Arr.delete rolID roles) rolInContext}
+        otherwise -> PerspectContext cr {rolInContext = insert (unwrap rolName) (Arr.delete rolID roles) rolInContext}
 
 setContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 setContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
   PerspectContext cr {rolInContext = insert (unwrap rolName) [rolID] rolInContext}
 
-context_changeRolIdentifier :: PerspectContext -> RolName -> RolName -> PerspectContext
+context_changeRolIdentifier :: PerspectContext -> EnumeratedRoleType -> EnumeratedRoleType -> PerspectContext
 context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
-  case pop oldName rolInContext of
+  case pop (unwrap oldName) rolInContext of
     Nothing -> ct
-    (Just (Tuple vs cr')) -> PerspectContext cr {rolInContext = insert newName vs cr'}
+    (Just (Tuple vs cr')) -> PerspectContext cr {rolInContext = insert (unwrap newName) vs cr'}
 
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
@@ -157,72 +156,72 @@ changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 rol_properties :: PerspectRol -> Object (Array Value)
 rol_properties (PerspectRol{properties}) = properties
 
-rol_property :: PerspectRol -> PropertyName -> Array Value
-rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup pn properties)
+rol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value
+rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (unwrap pn) properties)
 
-addRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
+addRol_property :: PerspectRol -> EnumeratedPropertyType -> Value -> PerspectRol
 addRol_property rl@(PerspectRol rp@{properties}) propertyName value =
-  case lookup propertyName properties of
+  case lookup (unwrap propertyName) properties of
     Nothing -> PerspectRol rp {properties = insert
-      propertyName
+      (unwrap propertyName)
       [value]
       properties}
     (Just values) -> do
       case Arr.elemIndex value values of
         Nothing -> PerspectRol rp {properties = insert
-          propertyName
+          (unwrap propertyName)
           (Arr.cons value values)
           properties}
         otherwise -> rl
 
-removeRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
+removeRol_property :: PerspectRol -> EnumeratedPropertyType -> Value -> PerspectRol
 removeRol_property rl@(PerspectRol rp@{properties}) propertyName value =
-  case lookup propertyName properties of
+  case lookup (unwrap propertyName) properties of
     Nothing -> rl
     (Just values) -> do
       case Arr.elemIndex value values of
         Nothing -> rl
         otherwise -> PerspectRol rp {properties = insert
-          propertyName
+          (unwrap propertyName)
           (Arr.delete value values)
           properties}
 
-setRol_property :: PerspectRol -> PropertyName -> Value -> PerspectRol
+setRol_property :: PerspectRol -> EnumeratedPropertyType -> Value -> PerspectRol
 setRol_property rl@(PerspectRol rp@{properties}) propertyName value =
-  case lookup propertyName properties of
+  case lookup (unwrap propertyName) properties of
     Nothing -> PerspectRol rp {properties = insert
-      propertyName
+      (unwrap propertyName)
       [value]
       properties}
     (Just pvc) -> do
       PerspectRol rp {properties = insert
-          propertyName
+          (unwrap propertyName)
           [value]
           properties}
 
 rol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
 
-rol_gevuldeRol :: PerspectRol -> RolName -> Array RoleInstance
-rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup rn gevuldeRollen)
+rol_gevuldeRol :: PerspectRol -> EnumeratedRoleType -> Array RoleInstance
+rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup (unwrap rn) gevuldeRollen)
 
-addRol_gevuldeRollen :: PerspectRol -> RolName -> RoleInstance -> PerspectRol
+addRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
 addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
-  case lookup rolName gevuldeRollen of
-    Nothing -> PerspectRol cr {gevuldeRollen = insert rolName [rolID] gevuldeRollen}
+  case lookup (unwrap rolName) gevuldeRollen of
+    Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) [rolID] gevuldeRollen}
     (Just roles) -> do
       case Arr.elemIndex rolID roles of
-        Nothing -> PerspectRol cr {gevuldeRollen = insert rolName (Arr.snoc roles rolID) gevuldeRollen}
+        Nothing -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) (Arr.snoc roles rolID) gevuldeRollen}
         otherwise -> ct
 
-removeRol_gevuldeRollen :: PerspectRol -> RolName -> RoleInstance -> PerspectRol
+removeRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
 removeRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
-  case lookup rolName gevuldeRollen of
+  case lookup (unwrap rolName) gevuldeRollen of
     Nothing -> ct
     (Just (roles :: Array RoleInstance)) -> do
       case Arr.elemIndex rolID roles of
         Nothing -> ct
-        otherwise -> PerspectRol cr {gevuldeRollen = insert rolName (Arr.delete rolID roles) gevuldeRollen}
+        otherwise -> PerspectRol cr {gevuldeRollen = insert (unwrap rolName) (Arr.delete rolID roles) gevuldeRollen}
 
 compareOccurrences :: PerspectRol -> PerspectRol -> Ordering
 compareOccurrences a b = compare (rol_occurrence a) (rol_occurrence b)

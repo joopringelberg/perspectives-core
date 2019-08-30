@@ -5,11 +5,12 @@ import Affjax (put) as AJ
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
+import Control.Monad.AvarMonadAsk (modify, get) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff (error, throwError)
@@ -17,7 +18,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, Triple(..), (%%>>), type (**>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -30,7 +31,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.Transactie (Transactie(..), createTransactie)
-import Perspectives.TypesForDeltas (Delta(..), DeltaType(..))
+import Perspectives.TypesForDeltas (BindingDelta(..), DeltaType(..), PropertyDelta(..), RoleDelta(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
@@ -38,19 +39,20 @@ import Simple.JSON (writeJSON)
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
 -- TODO: gebruik runTransactie!
-runTransactie :: MonadPerspectives Unit
+runTransactie :: MonadPerspectivesTransaction Unit
 runTransactie = do
-  user <- getUser
-  t@(Transactie{deltas, changedDomeinFiles}) <- transactie
+  user <- lift $ lift getUser
+  t@(Transactie{deltas, changedDomeinFiles}) <- lift AA.get
   -- register a triple for each delta, add it to the queue, run the queue.
   -- maybeTriples <- traverse (lift <<< modifyTriple) deltas
   -- modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
   -- Propagate the triple changes.
   -- _ <- updateFromSeeds modifiedTriples
-  for_ changedDomeinFiles saveCachedDomeinFile
+  -- for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
-  distributeTransactie t
-  (lift $ createTransactie user) >>= setTransactie
+  -- distributeTransactie t
+  -- (lift $ createTransactie user) >>= setTransactie
+  pure unit
 
 distributeTransactie :: Transactie -> MonadPerspectives Unit
 distributeTransactie t = do
@@ -110,70 +112,81 @@ addDomeinFileToTransactie dfId = do
 -- 	Indien gevonden: verwijder de oude.
 -- 	Anders: voeg de nieuwe toe.
 
+addBindingDelta :: BindingDelta -> MonadPerspectivesTransaction Unit
+addBindingDelta d = lift $ AA.modify (over Transactie \t@{bindingDeltas} -> t {bindingDeltas = cons d bindingDeltas})
+
+addRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
+addRoleDelta d = lift $ AA.modify (over Transactie \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
+
+addPropertyDelta :: PropertyDelta -> MonadPerspectivesTransaction Unit
+addPropertyDelta d = lift $ AA.modify (over Transactie \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
+
 -- | Add a Delta to the Transaction. Tries to keep the Transaction as small as possible, by eliminating and integrating
 -- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.
 -- | Add that Triple to the TripleQueue.
--- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke ContextDelta, BindingDelta, enz.
-addDelta :: Delta -> MonadPerspectives Unit
-addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
-  t@(Transactie tf@{deltas}) <- transactie
-  case elemIndex newCD deltas of
-    (Just _) -> pure unit
-    Nothing -> do
-      maybeM (pure unit) addTripleToQueue (lift $ liftEffect $ modifyTriple newCD)
-      (isfunc :: Boolean) <- case isContext of
-        true -> getPerspectType (EnumeratedRoleType memberName) >>= \(r :: EnumeratedRole) -> R.functional r
-        false -> getPerspectType (EnumeratedPropertyType memberName) >>= \(p :: EnumeratedProperty) -> P.functional p
-      -- isfunc <- isFunctionalComputer memberName -- hier komt ie niet uit.
-      -- (isfunc :: Boolean) <- evalMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
-      if (isfunc)
-        then do
-          x <- pure $ findIndex equalExceptRolID deltas
-          case x of
-            (Just oldCD) -> setTransactie (replace oldCD newCD t)
-            Nothing -> do
-              mCdelta <- pure $ find equalIdRolName deltas
-              case mCdelta of
-                Nothing -> setTransactie (add newCD t)
-                (Just oldCD@(Delta oldF@{deltaType: d})) -> do
-                  indexOld <- pure (unsafePartial (fromJust (elemIndex oldCD deltas)))
-                  case d of
-                    Add | (deltaType == Remove) -> setTransactie (remove oldCD t)
-                    Remove | (deltaType == Add) -> setTransactie (remove oldCD t)
-                    Change | (deltaType == Remove) -> setTransactie (replace indexOld newCD t)
-                    Add | (deltaType == Change) -> setTransactie (replace indexOld (Delta oldF {value = value}) t)
-                    otherwise -> setTransactie (add newCD t)
-        else do
-          x <- pure $ findIndex equalExceptDeltaType deltas
-          case x of
-            Nothing -> setTransactie (add newCD t)
-            (Just i) -> setTransactie (replace i newCD t)
-  pure unit
-  where
-    equalExceptDeltaType :: Delta  -> Boolean
-    equalExceptDeltaType
-      (Delta{id: i, memberName: r, deltaType: d, value: ri}) =
-        id' == i &&
-        memberName == r &&
-        value == ri &&
-        ((deltaType == Add && d == Remove) || (deltaType == Remove && d == Add))
-    equalExceptRolID :: Delta -> Boolean
-    equalExceptRolID
-      (Delta{id: i, memberName: r, deltaType: d}) =
-        id' == i &&
-        memberName == r &&
-        deltaType == d
-    equalIdRolName :: Delta -> Boolean
-    equalIdRolName (Delta{id: i, memberName: r}) =
-      id' == i &&
-      memberName == r
-    add :: Delta -> Transactie -> Transactie
-    add delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons delta deltas}
-    replace :: Int -> Delta -> Transactie -> Transactie
-    replace i delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons newCD (maybe deltas identity (deleteAt i deltas))}
-    remove :: Delta -> Transactie -> Transactie
-    remove i (Transactie tf@{deltas}) = Transactie tf {deltas = (delete i deltas)}
+-- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke RoleDelta, BindingDelta, enz.
+-- addDelta :: Delta -> MonadPerspectives Unit
+-- addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
+--   t@(Transactie tf@{deltas}) <- transactie
+--   case elemIndex newCD deltas of
+--     (Just _) -> pure unit
+--     Nothing -> do
+--       -- TODO. Maak de DeltaMonad en push hier een delta? Of in de functies die addDelta-functies aanroepen?
+--       -- Ergens moet de veranderde assumptie geregistreerd worden.
+--       maybeM (pure unit) addTripleToQueue (lift $ liftEffect $ modifyTriple newCD)
+--       (isfunc :: Boolean) <- case isContext of
+--         true -> getPerspectType (EnumeratedRoleType memberName) >>= \(r :: EnumeratedRole) -> R.functional r
+--         false -> getPerspectType (EnumeratedPropertyType memberName) >>= \(p :: EnumeratedProperty) -> P.functional p
+--       -- isfunc <- isFunctionalComputer memberName -- hier komt ie niet uit.
+--       -- (isfunc :: Boolean) <- evalMonadPerspectivesQuery memberName (toBoolean (if isContext then rolIsFunctioneelM else propertyIsFunctioneelM ))
+--       if (isfunc)
+--         then do
+--           x <- pure $ findIndex equalExceptRolID deltas
+--           case x of
+--             (Just oldCD) -> setTransactie (replace oldCD newCD t)
+--             Nothing -> do
+--               mCdelta <- pure $ find equalIdRolName deltas
+--               case mCdelta of
+--                 Nothing -> setTransactie (add newCD t)
+--                 (Just oldCD@(Delta oldF@{deltaType: d})) -> do
+--                   indexOld <- pure (unsafePartial (fromJust (elemIndex oldCD deltas)))
+--                   case d of
+--                     Add | (deltaType == Remove) -> setTransactie (remove oldCD t)
+--                     Remove | (deltaType == Add) -> setTransactie (remove oldCD t)
+--                     Change | (deltaType == Remove) -> setTransactie (replace indexOld newCD t)
+--                     Add | (deltaType == Change) -> setTransactie (replace indexOld (Delta oldF {value = value}) t)
+--                     otherwise -> setTransactie (add newCD t)
+--         else do
+--           x <- pure $ findIndex equalExceptDeltaType deltas
+--           case x of
+--             Nothing -> setTransactie (add newCD t)
+--             (Just i) -> setTransactie (replace i newCD t)
+--   pure unit
+--   where
+--     equalExceptDeltaType :: Delta  -> Boolean
+--     equalExceptDeltaType
+--       (Delta{id: i, memberName: r, deltaType: d, value: ri}) =
+--         id' == i &&
+--         memberName == r &&
+--         value == ri &&
+--         ((deltaType == Add && d == Remove) || (deltaType == Remove && d == Add))
+--     equalExceptRolID :: Delta -> Boolean
+--     equalExceptRolID
+--       (Delta{id: i, memberName: r, deltaType: d}) =
+--         id' == i &&
+--         memberName == r &&
+--         deltaType == d
+--     equalIdRolName :: Delta -> Boolean
+--     equalIdRolName (Delta{id: i, memberName: r}) =
+--       id' == i &&
+--       memberName == r
+--     add :: Delta -> Transactie -> Transactie
+--     add delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons delta deltas}
+--     replace :: Int -> Delta -> Transactie -> Transactie
+--     replace i delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons newCD (maybe deltas identity (deleteAt i deltas))}
+--     remove :: Delta -> Transactie -> Transactie
+--     remove i (Transactie tf@{deltas}) = Transactie tf {deltas = (delete i deltas)}
 
 
 {-

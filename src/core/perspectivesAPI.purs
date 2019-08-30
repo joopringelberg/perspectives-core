@@ -22,6 +22,7 @@ import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationId
 import Perspectives.ApiTypes (RequestType(..)) as Api
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>), StringTypedTripleGetter)
+import Perspectives.DependencyTracking.Dependency (registerSupportedEffect)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
@@ -29,8 +30,8 @@ import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances (saveEntiteit)
 import Perspectives.Instances.ObjectGetters (contextType) as DTO
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
-import Perspectives.QueryEffect (QueryEffect, sendResult, (~>), sendResponse)
 import Perspectives.Representation.Context (lookForUnqualifiedRoleType)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
 
@@ -112,7 +113,8 @@ dispatchOnRequest :: RequestRecord -> MonadPerspectives Unit
 dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corrId, contextDescription, rolDescription} =
   case request of
     -- Given the qualified name of the RolType.
-    Api.GetRolBinding -> getRolBinding subject predicate setter corrId
+    Api.GetRolBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
+    -- Api.GetRolBinding -> getRolBinding subject predicate setter corrId
     -- Given the rolinstance;
     Api.GetBinding -> subscribeToObjects subject binding setter corrId
     Api.GetBindingType -> subscribeToObjects subject (binding >-> roleType) setter corrId
@@ -213,12 +215,6 @@ type ReactStateSetter = Array String -> Effect Unit
 
 type QueryUnsubscriber e = Effect Unit
 
--- | Runs a the query and adds the ApiEffect to the result.
-subscribeToObjects :: Subject -> StringTypedTripleGetter -> ApiEffect -> CorrelationIdentifier -> MonadPerspectives Unit
-subscribeToObjects subject query setter corrId = do
-  (effectInReact :: QueryEffect String) <- pure $ NamedFunction (show corrId) (sendResult corrId setter)
-  void $ (subject RP.## query ~> effectInReact)
-
 unsubscribeFromObjects :: Subject -> CorrelationIdentifier -> MonadPerspectives Unit
 unsubscribeFromObjects subject corrId = lift $ liftEffect $ unRegisterTriple $ TripleRef {subject, predicate: show corrId}
 
@@ -254,3 +250,7 @@ getProperty rid pn setter corrId = do
 --   case m of
 --     (Left message) -> throwError $ error (show message)
 --     (Right id) -> constructQueryFunction id
+
+-- | Apply an ApiEffect to a Response, in effect sending it through the API to the caller.
+sendResponse :: Response -> Api.ApiEffect -> MonadPerspectives Unit
+sendResponse r ae = liftEffect $ (unsafeCoerce ae) (Api.convertResponse r)
