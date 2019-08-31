@@ -11,7 +11,7 @@ import Perspectives.EntiteitAndRDFAliases (ContextID)
 data QueryStep
   = Filter QueryStep QueryStep
   | Concat (Array QueryStep)
-  | Compose (Array QueryStep)
+  | Compose QueryStep QueryStep
   | NotEmpty QueryStep
   | Closure QueryStep
   | Closure' QueryStep

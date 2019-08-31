@@ -38,11 +38,10 @@ import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<
 import Simple.JSON (writeJSON)
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
--- TODO: gebruik runTransactie!
 runTransactie :: MonadPerspectivesTransaction Unit
 runTransactie = do
   user <- lift $ lift getUser
-  t@(Transactie{deltas, changedDomeinFiles}) <- lift AA.get
+  t@(Transactie{changedDomeinFiles}) <- lift AA.get
   -- register a triple for each delta, add it to the queue, run the queue.
   -- maybeTriples <- traverse (lift <<< modifyTriple) deltas
   -- modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)

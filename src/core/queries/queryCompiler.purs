@@ -12,7 +12,8 @@ import Perspectives.ContextAndRole (context_rolInContext)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
 import Perspectives.InstanceRepresentation (PerspectContext(..))
 import Perspectives.Instances (getPerspectEntiteit)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
+import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -25,55 +26,60 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Unsafe.Coerce (unsafeCoerce)
 
-compileQuery :: QueryFunctionDescription -> MonadPerspectives (TypedTripleGetter Subject Objects)
+context2role :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
+context2role (QD _ (RolGetter (ENR r)) _) = pure $ getRole r
 
--- ROLGETTER
--- TODO: extend for prototypes.
-compileQuery (QD _ (RolGetter (ENR r)) _) = pure (f `trackedAs` (unwrap r))
-  where
-    f :: forall r.
-      Variant (context :: ContextInstance | r)
-      -> MP (Variant (roles :: Array RoleInstance))
-    f v = do
-      (mc :: Maybe ContextInstance) <- pure $ (on _context Just \_ -> Nothing) v
-      case mc of
-        Nothing -> throwError (error "Runtime error: Not a context instance")
-        (Just c) -> do
-          (ct :: PerspectContext) <- getPerspectEntiteit c
-          pure (inj _roles (context_rolInContext ct r))
-
-compileQuery (QD _ (RolGetter (CR cr)) _) = do
+context2role (QD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
-  compileQuery (RC.calculation ct)
+  context2role (RC.calculation ct)
 
+context2role (QD _ (BinaryCombinator "compose" f1@(QD _ _ r1) f2) range) = do
+  case r1 of
+    -- f1 :: ContextInstance ~~> RoleInstance
+    (RDOM er) -> do
+      f1' <- context2role f1
+      f2' <- role2role f2
+      pure (f1' >>> f2')
+    -- f1 :: ContextInstance ~~> ContextInstance
+    (CDOM ct) -> do
+      f1' <- context2context f1
+      f2' <- context2role f2
+      pure f1' >>> f2'
 
 -- The last case
-compileQuery _ = throwError (error "Unknown QueryFunction expression")
+context2role _ = throwError (error "Unknown QueryFunction expression")
+
+role2role :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> RoleInstance)
+-- The last case
+role2role _ = throwError (error "Unknown QueryFunction expression")
+
+context2context :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> ContextInstance)
+-- The last case
+context2context _ = throwError (error "Unknown QueryFunction expression")
 
 -- From a string that maybe identifies a Property, construct a function to get that property from
 -- a Role instance. Notice that this function may fail.
-getPropertyFunction ::
-  String ->
-  MonadPerspectives StringTypedTripleGetter
-getPropertyFunction id =
-  do
-    (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType id)
-    compileQuery $ PC.calculation p
-  <|>
-  do
-    (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
-    compileQuery $ PC.calculation p
+-- getPropertyFunction ::
+--   String ->
+--   MonadPerspectives StringTypedTripleGetter
+-- getPropertyFunction id =
+--   do
+--     (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType id)
+--     compileQuery $ PC.calculation p
+--   <|>
+--   do
+--     (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
+--     compileQuery $ PC.calculation p
 
 -- From a string that maybe identifies a Role, construct a function to get that role from
 -- a Context instance. Notice that this function may fail.
 getRoleFunction ::
-  String ->
-  MonadPerspectives StringTypedTripleGetter
+  String -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 getRoleFunction id =
   do
     (p :: EnumeratedRole) <- getPerspectType (EnumeratedRoleType id)
-    compileQuery $ RC.calculation p
+    context2role $ RC.calculation p
   <|>
   do
     (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType id)
-    compileQuery $ RC.calculation p
+    context2role $ RC.calculation p

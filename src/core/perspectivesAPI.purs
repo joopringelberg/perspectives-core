@@ -17,22 +17,20 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (addRol, removeBinding, setBinding, setProperty, setupBotActions)
 import Perspectives.ApiTypes (ApiEffect, ContextSerialization(..), CorrelationIdentifier, Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (RequestType(..)) as Api
-import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), TripleRef(..), (##>>), (##>), StringTypedTripleGetter)
+import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
+import Perspectives.CoreTypes (MonadPerspectives, (##>>), (##>))
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect)
 import Perspectives.EntiteitAndRDFAliases (ContextID, PropertyName, RolID, RolName, Subject)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (LocalName, buitenRol)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances (saveEntiteit)
+import Perspectives.Instances.ObjectGetters (binding)
 import Perspectives.Instances.ObjectGetters (contextType) as DTO
-import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.Context (lookForUnqualifiedRoleType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
 
 -----------------------------------------------------------
@@ -114,9 +112,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
   case request of
     -- Given the qualified name of the RolType.
     Api.GetRolBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
+    -- getRolBinding (contextID, rolName, receiveValues)
     -- Api.GetRolBinding -> getRolBinding subject predicate setter corrId
     -- Given the rolinstance;
-    Api.GetBinding -> subscribeToObjects subject binding setter corrId
+    Api.GetBinding -> registerSupportedEffect corrId setter binding (RoleInstance subject)
+    -- getBinding (rolID, receiveValues)
+    -- Api.GetBinding -> subscribeToObjects subject binding setter corrId
     Api.GetBindingType -> subscribeToObjects subject (binding >-> roleType) setter corrId
     Api.GetRol -> getRol subject predicate setter corrId
     Api.GetUnqualifiedRol -> getRolFromLocalName subject predicate setter corrId

@@ -3,9 +3,10 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.Reader (lift, runReaderT)
 import Effect.Aff.AVar (new)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
+import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Sync.Transactie (createTransactie)
-import Prelude (Unit, ($), (<<<), (>>=), void)
+import Prelude (Unit, ($), (<<<), (>>=), void, discard)
 -----------------------------------------------------------
 -- RUN IN A TRANSACTION
 -----------------------------------------------------------
@@ -29,6 +30,6 @@ runMonadPerspectivesTransaction a f = lift (createTransactie "") >>= lift <<< ne
       -- When all actions are done, retrieve the Transaction.
 
       -- 3. Send deltas to other participants
-      -- runTransactie
+      runTransactie
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
