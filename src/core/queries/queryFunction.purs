@@ -19,10 +19,11 @@ data QueryFunction
   | RolGetter RoleType
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
-  | UnaryCombinator FunctionName QueryFunction
-  | NaryCombinator FunctionName (Array QueryFunction)
-  | BinaryCombinator FunctionName QueryFunction QueryFunction
-  | Filter QueryFunction QueryFunction
+
+  | UnaryCombinator FunctionName
+  -- | NaryCombinator FunctionName (Array QueryFunction)
+  | BinaryCombinator FunctionName
+  -- | Filter QueryFunction QueryFunction
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 
@@ -40,10 +41,10 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (RolGetter p) = unsafeToForeign $ writeJSON {tag: "RolGetter", dat: writeJSON p}
   writeImpl (ComputedRoleGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedRoleGetter", dat: f}
   writeImpl (ComputedPropertyGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedPropertyGetter", dat: f}
-  writeImpl (UnaryCombinator f q) = unsafeToForeign $ writeJSON {tag: "UnaryCombinator", dat: [f, writeJSON q]}
-  writeImpl (NaryCombinator f q) = unsafeToForeign $ writeJSON {tag: "NaryCombinator", dat: [f, writeJSON q]}
-  writeImpl (BinaryCombinator f op1 op2) = unsafeToForeign $ writeJSON {tag: "BinaryCombinator", dat: [f, writeJSON op1, writeJSON op2]}
-  writeImpl (Filter c q) = unsafeToForeign $ writeJSON {tag: "Filter", dat: [writeJSON c, writeJSON q]}
+  writeImpl (UnaryCombinator f) = unsafeToForeign $ writeJSON {tag: "UnaryCombinator", dat: [f]}
+  -- writeImpl (NaryCombinator f q) = unsafeToForeign $ writeJSON {tag: "NaryCombinator", dat: [f, writeJSON q]}
+  writeImpl (BinaryCombinator f) = unsafeToForeign $ writeJSON {tag: "BinaryCombinator", dat: [f]}
+  -- writeImpl (Filter c q) = unsafeToForeign $ writeJSON {tag: "Filter", dat: [writeJSON c, writeJSON q]}
 
 
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
@@ -59,15 +60,6 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction where
         (Right r) -> pure $ unsafePartial $ RolGetter r
       "ComputedRoleGetter" -> pure $ unsafePartial $ ComputedRoleGetter $ head dat
       "ComputedPropertyGetter" -> pure $ unsafePartial $ ComputedPropertyGetter $ head dat
-      "UnaryCombinator" -> case (readJSON (unsafePartial (head $ tail dat))) of
-        (Left e) -> fail $ ForeignError $ show e
-        (Right sq) -> pure $ unsafePartial $ UnaryCombinator (head dat) sq
-      "NaryCombinator" -> case (readJSON (unsafePartial (head $ tail dat))) of
-        (Left e) -> fail $ ForeignError $ show e
-        (Right sq) -> pure $ unsafePartial $ NaryCombinator (head dat) sq
-      "Filter" -> case (readJSON (unsafePartial (head dat))) of
-        (Left e) -> fail $ ForeignError $ show e
-        (Right c) -> case (readJSON (unsafePartial (head $ tail dat))) of
-          (Left e) -> fail $ ForeignError $ show e
-          (Right sq) -> pure $ unsafePartial $ Filter c sq
+      "UnaryCombinator" -> pure $ unsafePartial $ UnaryCombinator (head dat)
+      "BinaryCombinator" -> pure $ unsafePartial $ BinaryCombinator (head dat)
       x -> fail $ ForeignError ("Unknown case in ReadForeign QueryFunction: " <> show x)

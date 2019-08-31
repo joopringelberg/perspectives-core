@@ -8,7 +8,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Context (lookForRoleType)
@@ -29,7 +29,7 @@ compileElementaryStep currentDomain s@(QualifiedRol qn) = do
       mb <- lift $ getPerspectType c >>= pure <<< lookForRoleType qn
       case mb of
         Nothing -> throwError $ ContextHasNoRole c qn
-        (Just et) -> pure $ QD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType
+        (Just et) -> pure $ SQD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType
          qn)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
@@ -38,9 +38,9 @@ compileElementaryStep _ _ = throwError $ UnknownElementaryQueryStep
 
 compileQueryStep :: Domain -> QueryStep -> FD
 compileQueryStep currentDomain s@(Compose op1 op2) = do
-  (QD _ f1 range1) <- compileQueryStep currentDomain op1
-  (QD _ f2 range2) <- compileQueryStep range1 op2
-  pure $ QD currentDomain (BinaryCombinator "compose" f1 f2) range2
+  f1 <- compileQueryStep currentDomain op1
+  f2 <- compileQueryStep (range f1) op2
+  pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
 
 -- Elementary steps:
 compileQueryStep currentDomain (Terminal e) = compileElementaryStep currentDomain e

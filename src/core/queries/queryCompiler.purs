@@ -13,7 +13,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
 import Perspectives.InstanceRepresentation (PerspectContext(..))
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -27,24 +27,25 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Unsafe.Coerce (unsafeCoerce)
 
 context2role :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
-context2role (QD _ (RolGetter (ENR r)) _) = pure $ getRole r
+context2role (SQD _ (RolGetter (ENR r)) _) = pure $ getRole r
 
-context2role (QD _ (RolGetter (CR cr)) _) = do
+context2role (SQD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
   context2role (RC.calculation ct)
 
-context2role (QD _ (BinaryCombinator "compose" f1@(QD _ _ r1) f2) range) = do
-  case r1 of
+context2role (BQD _ (BinaryCombinator "compose") f1 f2 r) = do
+  case range f1 of
     -- f1 :: ContextInstance ~~> RoleInstance
     (RDOM er) -> do
       f1' <- context2role f1
       f2' <- role2role f2
-      pure (f1' >>> f2')
+      pure (f1' >=> f2')
     -- f1 :: ContextInstance ~~> ContextInstance
     (CDOM ct) -> do
       f1' <- context2context f1
       f2' <- context2role f2
-      pure f1' >>> f2'
+      pure (f1' >=> f2')
+    (PDOM _) -> throwError (error "First function in compose cannot return property value")
 
 -- The last case
 context2role _ = throwError (error "Unknown QueryFunction expression")

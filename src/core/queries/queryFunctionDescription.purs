@@ -12,12 +12,23 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPrope
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | A description of a calculation with its domain and range.
-data QueryFunctionDescription = QD Domain QueryFunction Range
+data QueryFunctionDescription =
+  SQD Domain QueryFunction Range |
+  UQD Domain QueryFunction QueryFunctionDescription Range |
+  BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range
+
+range :: QueryFunctionDescription -> Range
+range (SQD _ _ r) = r
+range (UQD _ _ _ r) = r
+range (BQD _ _ _ _ r) = r
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 
 instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
-  eq = genericEq
+  eq d1@(SQD _ _ _) d2@(SQD _ _ _ ) = eq d1 d2
+  eq d1@(UQD _ _ _ _) d2@(UQD _ _ _ _) = eq d1 d2
+  eq d1@(BQD _ _ _ _ _) d2@(BQD _ _ _ _ _) = eq d1 d2
+  eq _ _ = false
 
 instance writeForeignQueryFunctionDescription :: WriteForeign QueryFunctionDescription where
   writeImpl q = unsafeToForeign (writeJSON q)
@@ -26,7 +37,9 @@ instance readForeignQueryFunctionDescription :: ReadForeign QueryFunctionDescrip
   readImpl q = readJSON' (unsafeFromForeign q)
 
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
-  show = genericShow
+  show q@(SQD _ _ _)= show q
+  show q@(UQD _ _ _ _)= show q
+  show q@(BQD _ _ _ _ _)= show q
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
