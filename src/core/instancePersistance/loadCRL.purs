@@ -11,7 +11,8 @@ import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
 import Perspectives.ContextRoleParser (parseAndCache)
-import Perspectives.CoreTypes (MonadPerspectives, UserMessage)
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Checking.PerspectivesTypeChecker.Messages (UserMessage)
 import Perspectives.SaveUserData (saveDomeinFileAsUserData)
 
 modelDirectory :: String

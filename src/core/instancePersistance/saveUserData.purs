@@ -9,6 +9,7 @@ import Data.Array (cons, nub)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (over)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Foreign.Object (values)
 import Perspectives.Assignment.Update (saveEntiteit)
@@ -29,9 +30,9 @@ type UserDataState = Array ID
 
 type MonadSaveUserData = StateT UserDataState MonadPerspectives
 
-saveDomeinFileAsUserData :: Array String -> MonadPerspectives Unit
+saveDomeinFileAsUserData :: Array RoleInstance -> MonadPerspectives Unit
 saveDomeinFileAsUserData ids = do
-  for_ ids (deconstructBuitenRol >>> ContextInstance >>> saveEntiteitPreservingVersion :: ContextInstance -> MP PerspectContext)
+  for_ ids (unwrap >>> deconstructBuitenRol >>> ContextInstance >>> saveEntiteitPreservingVersion :: ContextInstance -> MP PerspectContext)
 
 -- This function saves a previously cached ContextInstance and adds it to the Transactie
 saveUserContext :: Updater ContextInstance
