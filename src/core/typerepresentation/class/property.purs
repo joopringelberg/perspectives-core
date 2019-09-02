@@ -32,7 +32,9 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty whe
 
 rangeOfCalculation :: CalculatedProperty -> MonadPerspectives EnumeratedProperty
 rangeOfCalculation cp = case calculation cp of
-  QD _ _ (PDOM p) -> getPerspectType p
+  SQD _ _ (PDOM p) -> getPerspectType p
+  UQD _ _ _ (PDOM p) -> getPerspectType p
+  BQD _ _ _ _ (PDOM p) -> getPerspectType p
   otherwise -> throwError (error ("range of calculation of " <> show (identifier cp :: CalculatedPropertyType) <> " is not an enumerated property."))
 
 instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty where
@@ -40,4 +42,4 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty whe
   range r = pure (unwrap r).range
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = QD (RDOM (role r)) (PropertyGetter "FunctionName" (ENP (identifier r))) (PDOM (identifier r))
+  calculation r = SQD (RDOM (role r)) (PropertyGetter "FunctionName" (ENP (identifier r))) (PDOM (identifier r))

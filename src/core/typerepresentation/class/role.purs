@@ -38,7 +38,9 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole where
 
 rangeOfCalculation :: CalculatedRole -> MonadPerspectives EnumeratedRole
 rangeOfCalculation cp = case calculation cp of
-  QD _ _ (RDOM p) -> getPerspectType p
+  SQD _ _ (RDOM p) -> getPerspectType p
+  UQD _ _ _ (RDOM p) -> getPerspectType p
+  BQD _ _ _ _ (RDOM p) -> getPerspectType p
   otherwise -> throwError (error ("range of calculation of " <> show (identifier cp :: CalculatedRoleType) <> " is not an enumerated role."))
 
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
@@ -48,7 +50,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = QD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (identifier r))
+  calculation r = SQD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (identifier r))
   properties r = pure (unwrap r).properties
 
 data Role = E EnumeratedRole | C CalculatedRole
