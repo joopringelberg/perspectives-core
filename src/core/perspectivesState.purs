@@ -30,7 +30,7 @@ newPerspectivesState uinfo tr av =
   -- For debugging purposes only:
   -- , recomputed: []
   -- , queryCache: new unit
-  , assumptionRegister: empty
+  , queryAssumptionRegister: empty
   }
 
 -----------------------------------------------------------
@@ -75,11 +75,11 @@ domeinCacheInsert = insert domeinCache
 domeinCacheRemove :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheRemove = remove domeinCache
 
-assumptionRegister :: MonadPerspectives AssumptionRegister
-assumptionRegister = gets _.assumptionRegister
+queryAssumptionRegister :: MonadPerspectives AssumptionRegister
+queryAssumptionRegister = gets _.queryAssumptionRegister
 
-assumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
-assumptionRegisterModify f = modify \(s@{assumptionRegister}) -> s {assumptionRegister = f assumptionRegister}
+queryAssumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
+queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister}) -> s {queryAssumptionRegister = f queryAssumptionRegister}
 -----------------------------------------------------------
 -- FUNCTIONS TO MODIFY GLOBAL UNSAFE STRMAPS IN PERSPECTIVESSTATE
 -----------------------------------------------------------

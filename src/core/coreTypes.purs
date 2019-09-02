@@ -21,7 +21,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.View (View)
 import Perspectives.Sync.Transactie (Transactie)
 import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
@@ -52,7 +52,7 @@ type PerspectivesState = CouchdbState
 
   , memorizeQueryResults :: Boolean -- obsolete
   , transactie :: Transactie
-  , assumptionRegister :: AssumptionRegister
+  , queryAssumptionRegister :: AssumptionRegister
   )
 
 -----------------------------------------------------------

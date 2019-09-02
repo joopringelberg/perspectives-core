@@ -38,8 +38,8 @@ saveUserContext id = do
   rollen <- iedereRolInContext id
   for_ rollen \(rol :: String) -> saveEntiteitPreservingVersion rol :: MonadPerspectives PerspectRol
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.buitenRol id)
-  (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.binnenRol id)
   pure unit
+
 iedereRolInContext :: (ContextInstance ##> RoleInstance)
 iedereRolInContext = getContextMember \ctxt -> nub $ join $ values (context_iedereRolInContext ctxt)
 
@@ -51,10 +51,11 @@ removeUserContext id = do
   rollen <- iedereRolInContext id
   for_ rollen \(rol :: String) -> removeUserRol_ rol
   void $ removeUserRol_ (ID.buitenRol id)
-  (_ :: PerspectRol) <- removeEntiteit (ID.binnenRol id)
   (_ :: PerspectContext) <- removeEntiteit id
-  -- For this subject, for all predicates, unregister the BasicTriples and enter them
-  -- into the TripleQueue to further propagate the consequences.
+
+  -- Update the queryAssumptionRegister in PerspectivesState.
+  -- All assumptions that have this context as a resource, should be removed.
+  -- Also, all queries that depend on at least one of these assumptions, should be recomputed.
   void $ liftEffect $ unRegisterSubject id >>=
         map tripleRefToTripleQueueElement >>> addToQueue >>> pure
 

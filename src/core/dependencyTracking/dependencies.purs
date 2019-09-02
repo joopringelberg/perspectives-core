@@ -17,7 +17,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, ResponseRecord(..))
 import Perspectives.CoreTypes (Assumption, AssumptionRegister, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, peek, poke, new)
-import Perspectives.PerspectivesState (assumptionRegister, assumptionRegisterModify)
+import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
@@ -39,6 +39,12 @@ type ActiveSupportedEffects = GLStrMap SupportedEffect
 activeSupportedEffects :: ActiveSupportedEffects
 activeSupportedEffects = new unit
 
+-- | Register the ApiEffect and the TrackedObjectsGetter with the CorrelationIdentifier and run it once.
+-- | Running means: compute the result of the TrackedObjectsGetter, add the computed Assumptions to
+-- | the SupportedEffect and push the resulting values into the ApiEffect.
+-- | As a result:
+-- |  1. we have cached a new SupportedEffect in the ActiveSupportedEffects.
+-- |  2. we have registered the dependency of this SupportedEffect in the AssumptionRegister in the PerspectivesState.
 registerSupportedEffect :: forall a b.
   CorrelationIdentifier ->
   ApiEffect ->
@@ -47,19 +53,19 @@ registerSupportedEffect :: forall a b.
   MP Unit
 registerSupportedEffect corrId ef q arg = do
   -- Add a new supported effect, for now with zero assumptions.
-  liftEffect $ void $ poke activeSupportedEffects (show corrId) {runner: supportedEffect, assumptions: []}
+  liftEffect $ void $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
   -- then execute the SupportedEffect once
-  supportedEffect unit
+  apiEffectRunner unit
   pure unit
   where
-    supportedEffect :: Unit -> MP Unit
-    supportedEffect _ = do
+    apiEffectRunner :: Unit -> MP Unit
+    apiEffectRunner _ = do
       (Tuple result (assumptions :: Array Assumption)) <- runMonadPerspectivesQuery arg q
       -- destructively set the assumptions in the ActiveSupportedEffects
       (moldSupports :: Maybe SupportedEffect) <- liftEffect $ peek activeSupportedEffects (show corrId)
       -- We have ensured a registration above, hence we can use unsafePartial.
       (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
-      liftEffect $ void $ poke activeSupportedEffects (show corrId) {runner: supportedEffect, assumptions: assumptions}
+      liftEffect $ void $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
       -- destructively register the correlationIdentifier with new assumptions
       {no: new} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
       for_ new (registerDependency corrId)
@@ -74,14 +80,14 @@ _assumptionDependencies :: Assumption -> Traversal' AssumptionRegister (Array Co
 _assumptionDependencies (Tuple rid pid) = at rid <<< traversed <<< at pid <<< _Just
 
 findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
-findDependencies a = assumptionRegister >>= pure <<< firstOf (_assumptionDependencies a)
+findDependencies a = queryAssumptionRegister >>= pure <<< firstOf (_assumptionDependencies a)
 
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<
   (maybe false (maybe false (const true) <<< (elemIndex corrId)) )
 
 registerDependency :: CorrelationIdentifier -> Assumption -> MP Unit
-registerDependency corrId a = assumptionRegisterModify (over (_assumptionDependencies a) (cons corrId))
+registerDependency corrId a = queryAssumptionRegisterModify (over (_assumptionDependencies a) (cons corrId))
 
 deregisterDependency :: CorrelationIdentifier -> Assumption -> MP Unit
-deregisterDependency corrId a = assumptionRegisterModify (over (_assumptionDependencies a) (delete corrId))
+deregisterDependency corrId a = queryAssumptionRegisterModify (over (_assumptionDependencies a) (delete corrId))
