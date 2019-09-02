@@ -4,13 +4,11 @@ module Perspectives.Representation.Class.PersistentType
   , module Perspectives.Representation.Class.Revision
   , module Perspectives.Representation.TypeIdentifiers) where
 
-import Prelude(Unit, bind, ($), pure, (<>), unit)
+import Perspectives.Representation.Class.Revision
 
 import Control.Monad.Except (throwError)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Effect.Aff.AVar (AVar, read)
-import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Object (insert, lookup) as FO
 import Perspectives.CoreTypes (MonadPerspectives, MP)
@@ -20,36 +18,29 @@ import Perspectives.Identifiers (deconstructModelName, deconstructNamespace)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.Persistent (class Persistent, retrieveInternally)
 import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.Class.Revision
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, ViewType)
 import Perspectives.Representation.View (View)
+import Prelude (Unit, bind, ($), pure, (<>), unit)
 
 type Namespace = String
 
-class (Persistent v i) <= PersistentType v i where
+class (Identifiable v i, Revision v, Newtype i String) <= PersistentType v i where
   retrieveFromDomein :: i -> Namespace -> MonadPerspectives v
   cacheInDomeinFile :: i -> v -> MonadPerspectives Unit
 
 -- | Get any type representation for Perspectives, either from cache or from a model file in
 -- | couchdb.
 getPerspectType :: forall v i. PersistentType v i => i -> MonadPerspectives v
-getPerspectType id =
-  do
-    (av :: Maybe (AVar v)) <- retrieveInternally id
-    case av of
-      (Just avar) -> do
-        pe <- liftAff $ read avar
-        pure pe
-      Nothing -> do
-        mns <- pure (deconstructNamespace (unwrap id))
-        case mns of
-          Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> unwrap id <> "'.")
-          (Just ns) -> retrieveFromDomein id ns
+getPerspectType id = do
+  mns <- pure (deconstructNamespace (unwrap id))
+  case mns of
+    Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> unwrap id <> "'.")
+    (Just ns) -> retrieveFromDomein id ns
 
 -----------------------------------------------------------
 -- ADD TO A DOMEINFILE
@@ -66,13 +57,13 @@ addEnumeratedRoleToDomeinFile c (DomeinFile dff@{enumeratedRoles}) = DomeinFile 
 ifNamespace :: forall i. Newtype i String => i -> (DomeinFile -> DomeinFile) -> MP Unit
 ifNamespace i modifier = maybe (pure unit) (modifyDomeinFileInCache modifier) (deconstructModelName (unwrap i))
 
-retrieveFromDomein_ :: forall v i. Persistent v i =>
+retrieveFromDomein_ :: forall v i. PersistentType v i =>
   i
   -> (DomeinFile -> Maybe v)
   -> Namespace
   -> (MonadPerspectives v)
 retrieveFromDomein_ id lookupFunction ns = do
-  df <- retrieveDomeinFile ns 
+  df <- retrieveDomeinFile ns
   case lookupFunction df of
     Nothing -> throwError $ error ("retrieveFromDomein': cannot find definition of " <> (unwrap id) <> " for " <> ns)
     (Just v) -> pure v

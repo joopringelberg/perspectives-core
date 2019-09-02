@@ -18,17 +18,10 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.PerspectivesState (insert, lookup, remove)
-import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
-import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_, changeRevision, rev)
-import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
-import Perspectives.Representation.View (View)
 
 -- | Members of Persistent trade identifiers for a representation.
 
@@ -114,70 +107,6 @@ readEntiteitFromCache id = do
 -----------------------------------------------------------
 -- INSTANCES
 -----------------------------------------------------------
-instance persistentContext :: Persistent Context ContextType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.contexts
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (ContextType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (ContextType "")) (unwrap i)
-  removeInternally i = remove (cache (ContextType "")) (unwrap i)
-
-instance persistentEnumeratedRole :: Persistent EnumeratedRole EnumeratedRoleType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.enumeratedRoles
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (EnumeratedRoleType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (EnumeratedRoleType "")) (unwrap i)
-  removeInternally i = remove (cache (EnumeratedRoleType "")) (unwrap i)
-
-instance persistentCalculatedRole :: Persistent CalculatedRole CalculatedRoleType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.calculatedRoles
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (CalculatedRoleType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (CalculatedRoleType "")) (unwrap i)
-  removeInternally i = remove (cache (CalculatedRoleType "")) (unwrap i)
-
-instance persistentEnumeratedProperty :: Persistent EnumeratedProperty EnumeratedPropertyType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.enumeratedProperties
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (EnumeratedPropertyType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (EnumeratedPropertyType "")) (unwrap i)
-  removeInternally i = remove (cache (EnumeratedPropertyType "")) (unwrap i)
-
-instance persistentCalculatedProperty :: Persistent CalculatedProperty CalculatedPropertyType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.calculatedProperties
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (CalculatedPropertyType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (CalculatedPropertyType "")) (unwrap i)
-  removeInternally i = remove (cache (CalculatedPropertyType "")) (unwrap i)
-
-instance persistentView :: Persistent View ViewType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.views
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (ViewType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (ViewType "")) (unwrap i)
-  removeInternally i = remove (cache (ViewType "")) (unwrap i)
-
-instance persistentAction :: Persistent Action ActionType where
-  -- identifier = _._id <<< unwrap
-  cache _ = gets _.actions
-  representInternally c = do
-    av <- liftAff empty
-    insert (cache (ActionType "")) (unwrap c) av
-  retrieveInternally i = lookup (cache (ActionType "")) (unwrap i)
-  removeInternally i = remove (cache (ActionType "")) (unwrap i)
-
--- NOTE: THESE ARE INSTANCES, NOT TYPES!
 instance persistentPerspectContext :: Persistent PerspectContext ContextInstance where
   -- identifier = _._id <<< unwrap
   cache _ = gets _.contextInstances

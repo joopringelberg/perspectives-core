@@ -20,14 +20,6 @@ newPerspectivesState uinfo tr av =
   rolInstances: new unit
   , contextInstances: new unit
 
-  , contexts: new unit
-  , enumeratedRoles: new unit
-  , calculatedRoles: new unit
-  , enumeratedProperties: new unit
-  , calculatedProperties: new unit
-  , views: new unit
-  , actions: new unit
-
   , domeinCache: new unit
   , userInfo: uinfo
   , couchdbSessionStarted: false

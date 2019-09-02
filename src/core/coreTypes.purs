@@ -21,6 +21,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.View (View)
 import Perspectives.Sync.Transactie (Transactie)
 import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
@@ -45,15 +46,6 @@ type PerspectivesState = CouchdbState
   -- Caching instances
   ( rolInstances :: RolInstances
   , contextInstances :: ContextInstances
-
-  -- Caching type definitions
-  , contexts :: Contexts
-  , enumeratedRoles :: EnumeratedRoles
-  , calculatedRoles :: CalculatedRoles
-  , enumeratedProperties :: EnumeratedProperties
-  , calculatedProperties :: CalculatedProperties
-  , views :: Views
-  , actions :: Actions
 
   -- Caching Domein files
   , domeinCache :: DomeinCache
@@ -113,6 +105,9 @@ type TrackingObjectsGetter s o = s -> MPQ o
 
 infixl 5 type TrackingObjectsGetter as ~~>
 
+type RoleGetter = ContextInstance ~~> RoleInstance
+
+type PropertyValueGetter = RoleInstance ~~> Value
 -----------------------------------------------------------
 -- RUN TO GET ASSUMPTIONS AND AN ARRAY OF RESULTS
 -----------------------------------------------------------

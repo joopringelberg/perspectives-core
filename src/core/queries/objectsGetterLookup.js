@@ -7,11 +7,3 @@ exports.addToArray = function (a) {
     return arr;
   };
 };
-
-exports.objectsGettersEqual = function(g1)
-{
-  return function(g2)
-  {
-    return g1 == g2;
-  }
-}
