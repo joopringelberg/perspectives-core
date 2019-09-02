@@ -6,21 +6,20 @@ import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty)
-import Perspectives.CoreTypes (ContextDefinitions, DomeinCache, MonadPerspectives, PerspectivesState, RolDefinitions, AssumptionRegister)
+import Perspectives.CoreTypes (DomeinCache, MonadPerspectives, PerspectivesState, AssumptionRegister)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Sync.Transactie (Transactie)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
 newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
 newPerspectivesState uinfo tr av =
   {
-  -- weghalen:
-  rolDefinitions: new unit
-  , contextDefinitions: new unit
-  -- Aanvullen met Perspectives types
+
+  rolInstances: new unit
+  , contextInstances: new unit
+
   , contexts: new unit
   , enumeratedRoles: new unit
   , calculatedRoles: new unit
@@ -71,30 +70,6 @@ transactie = gets _.transactie
 
 setTransactie :: Transactie -> MonadPerspectives Unit
 setTransactie t = modify \s -> s { transactie = t }
-
-contextDefinitions :: MonadPerspectives ContextDefinitions
-contextDefinitions = gets _.contextDefinitions
-
-contextDefinitionsLookup :: String -> MonadPerspectives (Maybe (AVar PerspectContext))
-contextDefinitionsLookup = lookup contextDefinitions
-
-contextDefinitionsInsert :: String -> AVar PerspectContext -> MonadPerspectives (AVar PerspectContext)
-contextDefinitionsInsert = insert contextDefinitions
-
-contextDefinitionsRemove :: String -> MonadPerspectives (Maybe (AVar PerspectContext))
-contextDefinitionsRemove = remove contextDefinitions
-
-rolDefinitions :: MonadPerspectives RolDefinitions
-rolDefinitions = gets _.rolDefinitions
-
-rolDefinitionsLookup :: String -> MonadPerspectives (Maybe (AVar PerspectRol))
-rolDefinitionsLookup = lookup rolDefinitions
-
-rolDefinitionsInsert :: String -> AVar PerspectRol -> MonadPerspectives (AVar PerspectRol)
-rolDefinitionsInsert = insert rolDefinitions
-
-rolDefinitionsRemove :: String -> MonadPerspectives (Maybe (AVar PerspectRol))
-rolDefinitionsRemove = remove rolDefinitions
 
 domeinCache :: MonadPerspectives DomeinCache
 domeinCache = gets _.domeinCache

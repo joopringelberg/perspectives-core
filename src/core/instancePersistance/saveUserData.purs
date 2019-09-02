@@ -4,14 +4,16 @@
 module Perspectives.SaveUserData where
 
 import Control.Monad.State (StateT)
+import Data.Array (nub)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Effect.Class (liftEffect)
--- import Perspectives.Actions (tearDownBotActions, updatePerspectEntiteitMember', updatePerspectEntiteit', removeRol)
-import Perspectives.ContextAndRole (context_id, removeRol_binding, removeRol_gevuldeRollen, rol_id)
-import Perspectives.CoreTypes (MP, MonadPerspectives)
+import Foreign.Object (values)
+import Perspectives.ContextAndRole (context_id, context_iedereRolInContext, removeRol_binding, removeRol_gevuldeRollen, rol_id)
+import Perspectives.ContextRolAccessors (getContextMember)
+import Perspectives.CoreTypes (MP, MonadPerspectives, type (##>))
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (binnenRol, buitenRol) as ID
@@ -19,7 +21,8 @@ import Perspectives.Identifiers (deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, removeEntiteit)
 import Perspectives.Instances (saveEntiteitPreservingVersion)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (>>=), (>>>), (<<<))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Prelude (Unit, bind, discard, join, map, pure, unit, void, ($), (<<<), (>>=), (>>>))
 
 type UserDataState = Array ID
 
@@ -37,14 +40,13 @@ saveUserContext id = do
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.buitenRol id)
   (_ :: PerspectRol) <- saveEntiteitPreservingVersion (ID.binnenRol id)
   pure unit
-  where
-    iedereRolInContext :: (ContextInstance ##> RoleInstance)
-    iedereRolInContext = getContextMember \ctxt -> nub $ join $ values (context_iedereRolInContext ctxt)
+iedereRolInContext :: (ContextInstance ##> RoleInstance)
+iedereRolInContext = getContextMember \ctxt -> nub $ join $ values (context_iedereRolInContext ctxt)
 
 -- * remove tripleAdministration.
 removeUserContext :: ID -> MonadPerspectives Unit
 removeUserContext id = do
-  tearDownBotActions id
+  -- tearDownBotActions id
   (_ :: PerspectContext) <- getPerspectEntiteit id
   rollen <- iedereRolInContext id
   for_ rollen \(rol :: String) -> removeUserRol_ rol

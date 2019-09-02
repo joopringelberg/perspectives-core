@@ -71,9 +71,9 @@ retrieveFromDomein_ :: forall v i. Persistent v i =>
   -> (DomeinFile -> Maybe v)
   -> Namespace
   -> (MonadPerspectives v)
-retrieveFromDomein_ id lookup ns = do
-  df <- retrieveDomeinFile ns
-  case lookup df of
+retrieveFromDomein_ id lookupFunction ns = do
+  df <- retrieveDomeinFile ns 
+  case lookupFunction df of
     Nothing -> throwError $ error ("retrieveFromDomein': cannot find definition of " <> (unwrap id) <> " for " <> ns)
     (Just v) -> pure v
 

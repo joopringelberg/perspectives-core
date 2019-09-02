@@ -29,8 +29,8 @@ import Unsafe.Coerce (unsafeCoerce)
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
 -----------------------------------------------------------
-type ContextDefinitions = GLStrMap (AVar PerspectContext)
-type RolDefinitions = GLStrMap (AVar PerspectRol)
+type ContextInstances = GLStrMap (AVar PerspectContext)
+type RolInstances = GLStrMap (AVar PerspectRol)
 type Contexts = GLStrMap (AVar Context)
 type EnumeratedRoles = GLStrMap (AVar EnumeratedRole)
 type CalculatedRoles = GLStrMap (AVar CalculatedRole)
@@ -43,8 +43,8 @@ type DomeinCache = GLStrMap (AVar DomeinFile)
 
 type PerspectivesState = CouchdbState
   -- Caching instances
-  ( rolDefinitions :: RolDefinitions
-  , contextDefinitions :: ContextDefinitions
+  ( rolInstances :: RolInstances
+  , contextInstances :: ContextInstances
 
   -- Caching type definitions
   , contexts :: Contexts

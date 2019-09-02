@@ -177,9 +177,10 @@ instance persistentAction :: Persistent Action ActionType where
   retrieveInternally i = lookup (cache (ActionType "")) (unwrap i)
   removeInternally i = remove (cache (ActionType "")) (unwrap i)
 
+-- NOTE: THESE ARE INSTANCES, NOT TYPES!
 instance persistentPerspectContext :: Persistent PerspectContext ContextInstance where
   -- identifier = _._id <<< unwrap
-  cache _ = gets _.contextDefinitions
+  cache _ = gets _.contextInstances
   representInternally c = do
     av <- liftAff empty
     insert (cache (ContextInstance "")) (unwrap c) av
@@ -187,7 +188,7 @@ instance persistentPerspectContext :: Persistent PerspectContext ContextInstance
   removeInternally i = remove (cache (ContextInstance "")) (unwrap i)
 
 instance persistentPerspectRol :: Persistent PerspectRol RoleInstance where
-  cache _ = gets _.rolDefinitions
+  cache _ = gets _.rolInstances
   representInternally c = do
     av <- liftAff empty
     insert (cache (RoleInstance "")) (unwrap c) av
