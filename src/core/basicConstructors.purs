@@ -3,32 +3,34 @@ module Perspectives.BasicConstructors where
 import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Data.Array (concat, length)
 import Data.Either (Either(..), either)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.AVar (AVar)
 import Effect.Aff (error, throwError)
 import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRol, removeRol)
 import Perspectives.Checking.PerspectivesTypeChecker.Messages (UserMessage(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
-import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, RolID, RolName)
-import Perspectives.Identifiers (LocalName, binnenRol, buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.Identifiers (buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.Representation.Class.Persistent (cacheUncachedEntiteit, removeInternally)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
-import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>))
+import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>), (<$>))
 
 -- | Construct contexts and roles from the serialisation.
 constructContexts :: ContextsSerialisation -> MonadPerspectives (Array UserMessage)
 constructContexts (ContextsSerialisation contexts) = (traverse (constructContext >=> (pure <<< (either identity (const [])))) >=> (pure <<< concat)) contexts
 
-constructContext' :: ContextSerialization -> MonadPerspectives ID
+constructContext' :: ContextSerialization -> MonadPerspectives ContextInstance
 constructContext' c = do
       r <- constructContext c
       case r of
@@ -38,97 +40,98 @@ constructContext' c = do
 -- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
 -- | Type checks the context and returns any semantic problems as UserMessages. If there are no problems, returns the ID.
 -- | Caches the result but does not save it to Couchdb.
-constructContext :: ContextSerialization -> MonadPerspectives (Either (Array UserMessage) ID)
+constructContext :: ContextSerialization -> MonadPerspectives (Either (Array UserMessage) ContextInstance)
 constructContext c@(ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
-  ident <- pure $ expandDefaultNamespaces id
-  (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit ident
+  contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
+  (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit contextInstanceId
   case mc of
     Nothing -> do
       candidate <- runExceptT $ constructContext_
       case candidate of
         (Left messages) -> do
-          removeFromCache ident
+          removeFromCache contextInstanceId
           pure $ Left messages
         (Right _) -> do
-          -- (m :: Array UserMessage) <- checkAContext $ Context ident
+          -- (m :: Array UserMessage) <- checkAContext $ Context contextInstanceId
           m <- pure []
           case length m of
-            0 -> pure $ Right ident
+            0 -> pure $ Right contextInstanceId
             otherwise -> do
-              removeFromCache ident
+              removeFromCache contextInstanceId
               pure $ Left m
-          -- pure $ Right ident
-    otherwise -> pure $ Left $ [ContextExists ident]
+          -- pure $ Right contextInstanceId
+    otherwise -> pure $ Left $ [ContextExists $ unwrap contextInstanceId]
 
   where
-    constructContext_ :: ExceptT (Array UserMessage) (MonadPerspectives) ID
+    constructContext_ :: ExceptT (Array UserMessage) (MonadPerspectives) ContextInstance
     constructContext_ = do
-      ident <- pure $ expandDefaultNamespaces id
-      localName <- maybe (throwError [(NotAValidIdentifier ident)]) pure (deconstructLocalNameFromDomeinURI ident)
+      contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
+      localName <- maybe (throwError [(NotAValidIdentifier $ unwrap contextInstanceId)]) pure (deconstructLocalNameFromDomeinURI $ unwrap contextInstanceId)
       -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
-      (rolIds :: FO.Object (Array RolID)) <-constructRollen
-      lift $ cacheUncachedEntiteit ident
+      (rolIds :: FO.Object (Array RoleInstance)) <-constructRollen
+      externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
+      lift $ cacheUncachedEntiteit contextInstanceId
         (PerspectContext defaultContextRecord
-          { _id = ident
+          { _id = contextInstanceId
           , displayName  = localName
           , pspType = ContextType $ expandDefaultNamespaces ctype
-          , buitenRol = buitenRol ident
+          , buitenRol = externalRole
           , rolInContext = rolIds
         })
-      (b :: Maybe String) <- case prototype of
+      (b :: Maybe RoleInstance) <- case prototype of
         Nothing -> pure Nothing
-        (Just p) -> pure (Just (buitenRol (expandDefaultNamespaces p)))
-      lift $ cacheUncachedEntiteit (buitenRol ident)
+        (Just p) -> pure (Just $ RoleInstance (buitenRol (expandDefaultNamespaces p)))
+      lift $ cacheUncachedEntiteit externalRole
         (PerspectRol defaultRolRecord
-          { _id = buitenRol ident
+          { _id = externalRole
           , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"
-          , context = ident
+          , context = contextInstanceId
           , binding = b
           , properties = constructProperties externeProperties
           })
-      pure ident
+      pure contextInstanceId
 
-    removeFromCache :: ContextID -> MP Unit
+    removeFromCache :: ContextInstance -> MP Unit
     removeFromCache id' = do
       -- Here we know for sure that id is in the cache, as it has been just created (but did fail the tests).
       (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectEntiteit id'
       (_ :: Maybe (AVar PerspectContext)) <- removeInternally id'
-      (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ buitenRol id'
+      (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ RoleInstance $ buitenRol $ unwrap id'
       (_ :: FO.Object (Array (Maybe (AVar PerspectRol)))) <- traverse (traverse removeInternally) rolInContext
       pure unit
 
-    constructRollen :: ExceptT (Array UserMessage) (MonadPerspectives) (FO.Object (Array ID))
+    constructRollen :: ExceptT (Array UserMessage) (MonadPerspectives) (FO.Object (Array RoleInstance))
     constructRollen = do
       (ts :: Array (Tuple String (Array RolSerialization))) <- pure $ FO.toUnfoldable rollen
-      (x :: Array (Tuple String (Array ID))) <- traverse keyRolInstances ts
+      (x :: Array (Tuple String (Array RoleInstance))) <- traverse keyRolInstances ts
       pure $ FO.fromFoldable x
 
       where
-        keyRolInstances :: Tuple String (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives) (Tuple String (Array ID))
+        keyRolInstances :: Tuple String (Array RolSerialization) -> ExceptT (Array UserMessage) (MonadPerspectives) (Tuple String (Array RoleInstance))
         keyRolInstances (Tuple rol rolSerialisations) = do
           expandedRol <- pure $ expandDefaultNamespaces rol
-          instances <- constructRolInstances expandedRol rolSerialisations
+          instances <- constructRolInstances (EnumeratedRoleType expandedRol) rolSerialisations
           pure $ Tuple expandedRol instances
 
-        constructRolInstances :: String -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) (Array RolID)
+        constructRolInstances :: EnumeratedRoleType -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) (Array RoleInstance)
         constructRolInstances rolType rollen' = do
-            contextId <- pure $ expandDefaultNamespaces id
-            localName <- maybe (throwError [(NotAValidIdentifier rolType)]) pure (deconstructLocalNameFromDomeinURI rolType)
+            contextInstanceId <- pure $ expandDefaultNamespaces id
+            localName <- maybe (throwError [(NotAValidIdentifier $ unwrap rolType)]) pure (deconstructLocalNameFromDomeinURI $ unwrap rolType)
             -- The id without the numeric index.
-            rolId <- pure (contextId  <> "$" <> localName <> "_")
-            rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen'
+            rolId <- pure (contextInstanceId  <> "$" <> localName)
+            rolIds <- traverseWithIndex (constructRol rolType (ContextInstance contextInstanceId) rolId) rollen'
             pure rolIds
 
 -- | Caches the result but does not save it to Couchdb.
-constructRol :: RolName -> ContextID -> LocalName -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RolID
+constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RoleInstance
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
-  rolInstanceId <- pure (expandDefaultNamespaces localName <> "_" <> (rol_padOccurrence i))
+  rolInstanceId <- pure $ RoleInstance (localName <> "_" <> (rol_padOccurrence i))
   lift$ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
-      , pspType = EnumeratedRoleType rolType
+      , pspType = rolType
       , context = contextId
-      , binding = maybe Nothing (Just <<< expandDefaultNamespaces) bnd
+      , binding = maybe Nothing (Just <<< RoleInstance <<< expandDefaultNamespaces) bnd
       , properties = constructProperties properties
       , occurrence = i
       })
@@ -137,26 +140,28 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
 -- | Construct and add a Rol instance to the Context instance, provided the construction process doesn't yield
 -- | exceptions and that the resulting context instance is semantically correct.
 -- | Saves the new Rol instance.
-constructAnotherRol :: RolName -> ContextID -> RolSerialization -> MonadPerspectives (Either (Array UserMessage) ID)
+constructAnotherRol :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction (Either (Array UserMessage) RoleInstance)
 constructAnotherRol rolType id rolSerialisation = do
-  ident <- pure $ expandDefaultNamespaces id
-  rolInstances <- getRole (EnumeratedRoleType rolType) ident
-  candidate <- runExceptT $ constructRol rolType ident (ident  <> "$" <> (ident <> maybe "" (\x -> x) (deconstructLocalNameFromDomeinURI rolType))) (getNextRolIndex rolInstances) rolSerialisation
+  contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
+  (candidate :: Either (Array UserMessage) RoleInstance) <- lift $ lift $ do
+    rolInstances <- contextInstanceId ##= getRole rolType
+    runExceptT $ constructRol rolType contextInstanceId (unwrap contextInstanceId  <> "$" <> (unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI $ unwrap rolType))) (getNextRolIndex rolInstances) rolSerialisation
+
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
-      void $ addRol rolType rolId ident
-      -- (m :: Array UserMessage) <- checkAContext $ Context ident
+      void $ addRol contextInstanceId rolType rolId
+      -- (m :: Array UserMessage) <- checkAContext $ Context contextInstanceId
       m <- pure []
       case length m of
         0 -> do
           pure $ Right rolId
         otherwise -> do
-          void $ removeRol rolType rolId ident
+          void $ removeRol contextInstanceId rolType rolId
           pure $ Left m
 
-constructProperties :: PropertySerialization -> FO.Object (Array String)
+constructProperties :: PropertySerialization -> FO.Object (Array Value)
 constructProperties (PropertySerialization props) = ((FO.toUnfoldable :: FO.Object (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> FO.fromFoldable) props
   where
-    keyValuePair :: Tuple String (Array String) -> (Tuple String (Array String))
-    keyValuePair (Tuple key values) = Tuple (expandDefaultNamespaces key) values
+    keyValuePair :: Tuple String (Array String) -> (Tuple String (Array Value))
+    keyValuePair (Tuple key values) = Tuple (expandDefaultNamespaces key) (Value <$> values)
