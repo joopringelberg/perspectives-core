@@ -36,6 +36,7 @@ constructContext' c = do
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
 -- | Type checks the context and returns any semantic problems as UserMessages. If there are no problems, returns the ID.
+-- | Caches the result but does not save it to Couchdb.
 constructContext :: ContextSerialization -> MonadPerspectives (Either (Array UserMessage) ID)
 constructContext c@(ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
   ident <- pure $ expandDefaultNamespaces id
@@ -73,14 +74,6 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
           , buitenRol = buitenRol ident
           , rolInContext = rolIds
         })
-      lift $ cacheUncachedEntiteit (binnenRol ident)
-        (PerspectRol defaultRolRecord
-          { _id = binnenRol ident
-          , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$binnenRolBeschrijving"
-          , binding = Just $ buitenRol ident
-          , context = ident
-          , properties = constructProperties interneProperties
-          })
       (b :: Maybe String) <- case prototype of
         Nothing -> pure Nothing
         (Just p) -> pure (Just (buitenRol (expandDefaultNamespaces p)))
@@ -125,6 +118,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
             rolIds <- traverseWithIndex (constructRol rolType contextId rolId) rollen'
             pure rolIds
 
+-- | Caches the result but does not save it to Couchdb.
 constructRol :: RolName -> ContextID -> LocalName -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RolID
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
   rolInstanceId <- pure (expandDefaultNamespaces localName <> "_" <> (rol_padOccurrence i))

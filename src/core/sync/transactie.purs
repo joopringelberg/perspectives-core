@@ -7,7 +7,11 @@ import Control.Monad.AvarMonadAsk (modify)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Lens (Lens')
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
+import Data.Symbol (SProxy(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
@@ -15,7 +19,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (RoleDelta, BindingDelta, PropertyDelta)
-import Prelude (class Show, bind, ($), (<>), show, pure)
+import Prelude (class Show, bind, ($), (<>), show, pure, (<<<))
 import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
@@ -61,3 +65,15 @@ createTransactie author =
 
 transactieID :: Transactie -> String
 transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
+
+_createdContexts :: Lens' Transactie (Array PerspectContext)
+_createdContexts = _Newtype <<< (prop (SProxy :: SProxy "createdContexts"))
+
+_createdRoles :: Lens' Transactie (Array PerspectRol)
+_createdRoles = _Newtype <<< (prop (SProxy :: SProxy "createdRoles"))
+
+_deletedContexts :: Lens' Transactie (Array ContextInstance)
+_deletedContexts = _Newtype <<< (prop (SProxy :: SProxy "deletedContexts"))
+
+_deletedRoles :: Lens' Transactie (Array RoleInstance)
+_deletedRoles = _Newtype <<< (prop (SProxy :: SProxy "deletedRoles"))
