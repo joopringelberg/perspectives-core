@@ -31,7 +31,7 @@ import Perspectives.Instances.ObjectGetters (binding)
 import Perspectives.Instances.ObjectGetters (contextType) as DTO
 import Perspectives.Representation.Context (lookForUnqualifiedRoleType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==))
+import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, (*>), negate, (==)) 
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL

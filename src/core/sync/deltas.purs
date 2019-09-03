@@ -7,7 +7,7 @@ import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.AvarMonadAsk (modify, get) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head)
+import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head, union)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (over, unwrap)
@@ -23,7 +23,6 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (context)
-import Perspectives.PerspectivesState (setTransactie, transactie)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (functional) as P
 import Perspectives.Representation.Class.Role (functional) as R
@@ -47,7 +46,7 @@ runTransactie = do
   -- modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
   -- Propagate the triple changes.
   -- _ <- updateFromSeeds modifiedTriples
-  -- for_ changedDomeinFiles saveCachedDomeinFile
+  lift $ lift $ for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
   -- distributeTransactie t
   -- (lift $ createTransactie user) >>= setTransactie
@@ -61,41 +60,39 @@ distributeTransactie t = do
   -- _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
--- TODO wordt nog niet gebruikt.
 addContextToTransactie :: PerspectContext ->
-  MonadPerspectives Unit
-addContextToTransactie c = do
-  (Transactie tf@{createdContexts}) <- transactie
-  setTransactie $ Transactie tf {createdContexts = cons c createdContexts}
-  -- put $ Transactie tf {createdContexts = cons c createdContexts}
+  MonadPerspectivesTransaction Unit
+addContextToTransactie c = lift $ AA.modify (over Transactie \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
 
--- TODO wordt nog niet gebruikt.
-addRolToTransactie :: PerspectRol -> MonadPerspectives Unit
-addRolToTransactie c = do
-  (Transactie tf@{createdRoles}) <- transactie
-  setTransactie $ Transactie tf {createdRoles = cons c createdRoles}
+addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
+addRolToTransactie c = lift $ AA.modify (over Transactie \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})
 
-deleteContextFromTransactie :: PerspectContext -> MonadPerspectives Unit
-deleteContextFromTransactie c@(PerspectContext{_id}) = do
-  (Transactie tf@{createdContexts, deletedContexts}) <- transactie
+deleteContextFromTransactie :: PerspectContext -> MonadPerspectivesTransaction Unit
+deleteContextFromTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transactie \(t@{createdContexts, deletedContexts}) ->
   case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
-    Nothing -> setTransactie (Transactie tf{deletedContexts = cons _id deletedContexts})
-    (Just i) -> setTransactie (Transactie tf{createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
+    Nothing -> t {deletedContexts = cons _id deletedContexts}
+    (Just i) -> t {createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
-deleteRolFromTransactie :: PerspectRol -> MonadPerspectives Unit
-deleteRolFromTransactie c@(PerspectRol{_id}) = do
-  (Transactie tf@{createdRoles, deletedRoles}) <- transactie
+deleteRolFromTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
+deleteRolFromTransactie c@(PerspectRol{_id}) = lift $ AA.modify (over Transactie \(t@{createdRoles, deletedRoles}) ->
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
-    Nothing -> setTransactie (Transactie tf{deletedRoles = cons _id deletedRoles})
-    (Just i) -> setTransactie (Transactie tf{createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
+    Nothing -> t {deletedRoles = cons _id deletedRoles}
+    (Just i) -> t {createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
-addDomeinFileToTransactie :: ID -> MonadPerspectives Unit
-addDomeinFileToTransactie dfId = do
-  (Transactie tf@{changedDomeinFiles}) <- transactie
-  case elemIndex dfId changedDomeinFiles of
-    Nothing -> setTransactie $ Transactie tf {changedDomeinFiles = cons dfId changedDomeinFiles}
-    otherwise -> pure unit
+addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
+addDomeinFileToTransactie dfId = lift $ AA.modify (over Transactie \(t@{changedDomeinFiles}) ->
+  t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
+addBindingDelta :: BindingDelta -> MonadPerspectivesTransaction Unit
+addBindingDelta d = lift $ AA.modify (over Transactie \t@{bindingDeltas} -> t {bindingDeltas = cons d bindingDeltas})
+
+addRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
+addRoleDelta d = lift $ AA.modify (over Transactie \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
+
+addPropertyDelta :: PropertyDelta -> MonadPerspectivesTransaction Unit
+addPropertyDelta d = lift $ AA.modify (over Transactie \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
+
+-- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.
 -- ZO JA:
 -- 3. Zoek een delta waarvan de id, rolName en DeltaType gelijk zijn aan die van de nieuwe.
@@ -110,16 +107,6 @@ addDomeinFileToTransactie dfId = do
 -- 4. zoek een delta waarvan id, rolName en rolID gelijk zijn aan die van de nieuwe en het ene DeltaType Add is en het andere Remove.
 -- 	Indien gevonden: verwijder de oude.
 -- 	Anders: voeg de nieuwe toe.
-
-addBindingDelta :: BindingDelta -> MonadPerspectivesTransaction Unit
-addBindingDelta d = lift $ AA.modify (over Transactie \t@{bindingDeltas} -> t {bindingDeltas = cons d bindingDeltas})
-
-addRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
-addRoleDelta d = lift $ AA.modify (over Transactie \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
-
-addPropertyDelta :: PropertyDelta -> MonadPerspectivesTransaction Unit
-addPropertyDelta d = lift $ AA.modify (over Transactie \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
-
 -- | Add a Delta to the Transaction. Tries to keep the Transaction as small as possible, by eliminating and integrating
 -- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.

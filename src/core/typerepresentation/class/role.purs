@@ -53,12 +53,12 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
   calculation r = SQD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (identifier r))
   properties r = pure (unwrap r).properties
 
--- data Role = E EnumeratedRole | C CalculatedRole
---
--- getRole :: RoleType -> MonadPerspectives Role
--- getRole (ENR e) = getPerspectType e >>= pure <<< E
--- getRole (CR c) = getPerspectType c >>= pure <<< C
---
--- getCalculation :: Role -> QueryFunctionDescription
--- getCalculation (E r) = calculation r
--- getCalculation (C r) = calculation r
+data Role = E EnumeratedRole | C CalculatedRole
+
+getRole :: RoleType -> MonadPerspectives Role
+getRole (ENR e) = getPerspectType e >>= pure <<< E
+getRole (CR c) = getPerspectType c >>= pure <<< C
+
+getCalculation :: Role -> QueryFunctionDescription
+getCalculation (E r) = calculation r
+getCalculation (C r) = calculation r

@@ -3,6 +3,7 @@ module Perspectives.Assignment.Update where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (Updater, MonadPerspectivesTransaction)
@@ -115,16 +116,17 @@ removeRol contextId rolName rolInstance = do
               , deltaType: Remove
               , instance: rolInstance
               }
-setRol :: ContextInstance -> EnumeratedRoleType -> (Updater RoleInstance)
-setRol contextId rolName rolInstance = do
+setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+setRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
-  saveEntiteit contextId (setContext_rolInContext pe rolName (rolInstance :: RoleInstance))
-  addRoleDelta $ RoleDelta
-              { id : contextId
-              , role: rolName
-              , deltaType: Change
-              , instance: rolInstance
-              }
+  saveEntiteit contextId (setContext_rolInContext pe rolName (rolInstances :: Array RoleInstance))
+  for_ rolInstances \rolInstance ->
+    addRoleDelta $ RoleDelta
+                { id : contextId
+                , role: rolName
+                , deltaType: Change
+                , instance: rolInstance
+                }
 
 -----------------------------------------------------------
 -- UPDATE A PROPERTY

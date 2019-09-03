@@ -5,67 +5,108 @@ module Perspectives.Actions where
 import Prelude
 
 import Control.Monad.Error.Class (throwError)
-import Data.Array (head)
+import Control.Monad.Trans.Class (lift)
+import Data.Array (foldMap)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
-import Effect.Class (liftEffect)
-import Effect.Exception (Error, error)
-import Perspectives.ApiTypes (Value)
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_pspType, setContext_rolInContext, setRol_property)
-import Perspectives.ContextRolAccessors (getRolMember)
-import Perspectives.CoreTypes (MonadPerspectives, NamedFunction(..), ObjectsGetter, TripleRef(..), TypedTripleGetter(..), (##>>), StringTypedTripleGetter, type (~~>))
-import Perspectives.Deltas (addDelta)
-import Perspectives.EntiteitAndRDFAliases (ContextID, ID, MemberName, PropertyName, RolID, RolName)
-import Perspectives.Identifiers (psp)
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol)
-import Perspectives.Instances (class PersistentInstance)
-import Perspectives.Instances (getPerspectEntiteit, saveVersionedEntiteit)
-import Perspectives.Instances.Aliases (AnyContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType)
-import Perspectives.Query.Compiler (compileQuery)
+import Data.Monoid.Conj (Conj(..))
+import Data.Newtype (alaF)
+import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
+import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.Assignment.Update (setRol)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, runMonadPerspectivesQuery, (##>>))
+import Perspectives.EntiteitAndRDFAliases (ContextID)
+import Perspectives.Instances.ObjectGetters (contextType)
+import Perspectives.Query.Compiler (context2propertyValue, context2role)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
-import Perspectives.Representation.Class.Persistent (EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheCachedEntiteit)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
 import Perspectives.Representation.Context (Context, actions)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType)
-import Perspectives.TypesForDeltas (BindingDelta(..), RoleDelta(..), DeltaType(..), InverseBindingDelta(..), PropertyDelta(..))
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
 -----------------------------------------------------------
--- type Action = (PBool ~~> Value)
+type RHS = WithAssumptions Value -> MonadPerspectivesTransaction Unit
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
 -- | As this function is used exclusively in setting up bot actions, we do not set up bot actions in this function
 -- | itself!
-constructActionFunction :: AssignmentStatement -> StringTypedTripleGetter -> MonadPerspectives (ContextID -> PerspectivesEffect String)
-constructActionFunction a objectGetter = case a of
-  (SetRol rt query) -> do
-    valueComputer <- compileQuery query
-    pure \contextId bools -> case head bools of
-      (Just "true") -> do
-        (value :: Maybe Value) <- runTypedTripleGetterToMaybeObject contextId valueComputer
-        (object :: Maybe RoleInstance) <- runTypedTripleGetterToMaybeObject contextId objectGetter
-        void $ pure $ setRol <$> Just (unwrap rt) <*> object <*> value
-      _ -> pure unit
+constructRHS :: AssignmentStatement -> RoleGetter -> CorrelationIdentifier -> MonadPerspectives (ContextInstance -> RHS)
+constructRHS a objectGetter corrId = case a of
+  (SetRol rt (query :: QueryFunctionDescription)) -> do
+    (valueComputer :: RoleGetter) <- context2role query
+    pure ((\contextId (Tuple bools a0 :: WithAssumptions Value) -> if (alaF Conj foldMap (eq (Value "true")) bools)
+        then do
+          (Tuple value a1 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId valueComputer
+          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
+          -- TODO. Register the CorrelationIdentifier with each of new the assumptions in a0, a1, a2. Deregister any
+          -- removed assumptions.
+          void $ pure $ setRol contextId rt value
+        else pure unit) :: ContextInstance -> RHS)
 
-  otherwise -> throwError (error ("Unknown AssignmentStatement in constructActionFunction: " <> show a))
+  otherwise -> throwError (error ("Unknown AssignmentStatement in constructRHS: " <> show a))
 
-  -- where
-  --   actionFunction :: StringTypedTripleGetter -> StringTypedTripleGetter -> AnyContext -> PerspectivesEffect String
-  --   actionFunction valueComputer' objectGetter' contextId bools = case head bools of
-  --     Nothing -> pure unit
-  --     (Just "true") -> do
-  --       (value :: Maybe Value) <- runTypedTripleGetterToMaybeObject contextId valueComputer'
-  --       (object :: Maybe RoleInstance) <- runTypedTripleGetterToMaybeObject contextId objectGetter'
-  --       void $ pure $ setRol' <$> Just (unwrap rt) <*> object <*> value
+-- | From the description of an Action, compile a Updater of ContextInstance.
+compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
+compileBotAction actionType contextId = do
+  (action :: Action) <- getPerspectType actionType
+  -- objectOfAction is a type of Role.
+  (objectOfAction :: Role) <- getRole (object action)
+  -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
+  -- The result of this function is dependent on any number of Assumptions.
+  (objectGetter :: RoleGetter) <- context2role $ getCalculation objectOfAction
+  -- Get the next CorrelationIdentifier here.
+  (corrId :: CorrelationIdentifier) <- pure 0
+  -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
+  (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (effect action) objectGetter corrId
+  -- The Left Hand Side of the Action is a query that computes boolean values.
+  -- These values depend on a number of Assumptions.
+  (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ condition action
+  -- Now construct the updater by combining the lhs with the rhs.
+  (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
+  -- TODO Register the updater with the CorrelationIdentifier.
+  pure updater
+
+-- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
+-- | on Assumptions in the actionAssumptionRegister in PerspectivesState.
+setupBotActions :: ContextInstance -> MonadPerspectives Unit
+setupBotActions cid = do
+  -- TODO: filter, keeping just those actions with a subject that has RoleKind BotRole.
+  (ct :: ContextType) <- cid ##>> contextType
+  (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
+  -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
+  -- actionAssumptionRegister in PerspectivesState.
+  for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
+
+-- | Remove all actions associated with this context. To do so, we recompute the actions, to get at their names.
+-- | This might be computationally expensive. Some form of caching will speed it up greatly.
+-- | A sneaky way would be to find triples on cid whose predicate match with the pattern "~>".
+tearDownBotActions :: ContextID -> MonadPerspectives Unit
+tearDownBotActions cid = do
+  -- TODO: filter, keeping just those actions with a subject that has RoleKind BotRole.
+  -- (ct :: ContextType) <- contextType cid
+  -- (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
+  -- for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(TypedTripleGetter name _) -> liftEffect $ unRegisterTriple (TripleRef {subject: cid, predicate: name})
+  pure unit
 
 {-
+  where
+    errorMessage :: String -> String -> Error
+    errorMessage s t = error ("constructRHS: " <> s <> " for: " <> t <> " " <> unwrap actionType)
+
+    actionFunction :: StringTypedTripleGetter -> StringTypedTripleGetter -> AnyContext -> PerspectivesEffect String
+    actionFunction valueComputer' objectGetter' contextId bools = case head bools of
+      Nothing -> pure unit
+      (Just "true") -> do
+        (value :: Maybe Value) <- runTypedTripleGetterToMaybeObject contextId valueComputer'
+        (object :: Maybe RoleInstance) <- runTypedTripleGetterToMaybeObject contextId objectGetter'
+        void $ pure $ setRol' <$> Just (unwrap rt) <*> object <*> value
+
   do
   actionType <- onNothing (errorMessage "no type found" "")
     (actionInstanceID ##> contextType)
@@ -101,7 +142,7 @@ constructActionFunction a objectGetter = case a of
         "add" -> pure $ action addRol'
         "remove" -> pure $ action removeRol'
         "set" -> pure $ action setRol'
-        _ -> throwError (error $ "constructActionFunction: unknown operation for assignToRol: '" <> unwrap operation <> "'")
+        _ -> throwError (error $ "constructRHS: unknown operation for assignToRol: '" <> unwrap operation <> "'")
 
     "model:Perspectives$assignToProperty" -> do
       -- The assignment operation to be executed. Possible values are: "add", "remove", "set"
@@ -124,7 +165,6 @@ constructActionFunction a objectGetter = case a of
           case val of
             Nothing -> pure unit
             (Just v) -> do
-              -- TODO. Voer de actie uit voor elk (indirect) object!
               object <- (runTypedTripleGetterToMaybeObject contextId objectGetter)
               case object of
                 Nothing -> pure unit
@@ -135,7 +175,7 @@ constructActionFunction a objectGetter = case a of
         "add" -> pure $ action addProperty'
         "remove" -> pure $ action removeProperty'
         "set" -> pure $ action setProperty'
-        _ -> throwError (error $ "constructActionFunction: unknown operation for assignToProperty: '" <> (unwrap operation) <> "'")
+        _ -> throwError (error $ "constructRHS: unknown operation for assignToProperty: '" <> (unwrap operation) <> "'")
 
     "model:Perspectives$effectFullFunction" -> do
       functionName <- onNothing (errorMessage "no function name provided" actionType) (actionInstanceID ##> (searchExternalProperty $ (PropertyDef $ psp "effectFullFunction$buitenRolBeschrijving$functionName")))
@@ -149,45 +189,10 @@ constructActionFunction a objectGetter = case a of
         --   Just "true" -> void $ storeDomeinFile contextId
         --   _ -> pure unit
 
-        _ -> throwError (error $ "constructActionFunction: unknown functionName for effectFullFunction: '" <> (unwrap functionName) <> "'")
+        _ -> throwError (error $ "constructRHS: unknown functionName for effectFullFunction: '" <> (unwrap functionName) <> "'")
 
-    _ -> throwError (error $ "constructActionFunction: unknown type description: '" <> actionType <> "'")
+    _ -> throwError (error $ "constructRHS: unknown type description: '" <> actionType <> "'")
   where
     errorMessage :: String -> String -> Error
-    errorMessage s t = error ("constructActionFunction: " <> s <> " for: " <> t <> " " <> actionInstanceID)
+    errorMessage s t = error ("constructRHS: " <> s <> " for: " <> t <> " " <> actionInstanceID)
 -}
-type ActionID = String
-
--- | From the description of an Action, compile a StringTypedTripleGetter that should be applied to an instance of
--- | the Context holding the Action, to conditionally execute it.
-compileBotAction :: ActionType -> ContextID -> MonadPerspectives StringTypedTripleGetter
-compileBotAction actionType contextId = do
-  (action :: Action) <- getPerspectType actionType
-  (obj :: Role) <- getRole (object action)
-  (objectGetter :: StringTypedTripleGetter) <- compileQuery $ getCalculation obj
-  (conditionalEffect :: (ContextID -> PerspectivesEffect String)) <- constructActionFunction (effect action) objectGetter
-  (conditionQuery :: StringTypedTripleGetter) <- compileQuery $ condition action
-  -- We can use the id of the Action to name the function. In the dependency network, the triple will
-  -- be identified by the combination of the StringTypedTripleGetter and this Action name. That gives an unique name.
-  pure $ (conditionQuery ~> (NamedFunction (unwrap actionType) (conditionalEffect contextId)))
-
-  where
-    errorMessage :: String -> String -> Error
-    errorMessage s t = error ("constructActionFunction: " <> s <> " for: " <> t <> " " <> unwrap actionType)
-
-setupBotActions :: AnyContext -> MonadPerspectives Unit
-setupBotActions cid = do
-  -- TODO: filter, keeping just those actions with a subject that has RoleKind BotRole.
-  (ct :: ContextType) <- contextType cid
-  (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
-  for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \tg -> cid ## tg
-
--- | Remove all actions associated with this context. To do so, we recompute the actions, to get at their names.
--- | This might be computationally expensive. Some form of caching will speed it up greatly.
--- | A sneaky way would be to find triples on cid whose predicate match with the pattern "~>".
-tearDownBotActions :: ContextID -> MonadPerspectives Unit
-tearDownBotActions cid = do
-  -- TODO: filter, keeping just those actions with a subject that has RoleKind BotRole.
-  (ct :: ContextType) <- contextType cid
-  (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
-  for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(TypedTripleGetter name _) -> liftEffect $ unRegisterTriple (TripleRef {subject: cid, predicate: name})

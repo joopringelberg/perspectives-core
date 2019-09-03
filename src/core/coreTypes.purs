@@ -15,14 +15,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT, runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
-import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Context (Context)
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.View (View)
 import Perspectives.Sync.Transactie (Transactie)
 import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -32,15 +25,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -----------------------------------------------------------
 type ContextInstances = GLStrMap (AVar PerspectContext)
 type RolInstances = GLStrMap (AVar PerspectRol)
-type Contexts = GLStrMap (AVar Context)
-type EnumeratedRoles = GLStrMap (AVar EnumeratedRole)
-type CalculatedRoles = GLStrMap (AVar CalculatedRole)
-type EnumeratedProperties = GLStrMap (AVar EnumeratedProperty)
-type CalculatedProperties = GLStrMap (AVar CalculatedProperty)
-type Views = GLStrMap (AVar View)
-type Actions = GLStrMap (AVar Action)
 type DomeinCache = GLStrMap (AVar DomeinFile)
--- type QueryCache = GLStrMap (TypedTripleGetter String String)
 
 type PerspectivesState = CouchdbState
   -- Caching instances
@@ -50,9 +35,8 @@ type PerspectivesState = CouchdbState
   -- Caching Domein files
   , domeinCache :: DomeinCache
 
-  , memorizeQueryResults :: Boolean -- obsolete
-  , transactie :: Transactie
   , queryAssumptionRegister :: AssumptionRegister
+  , actionAssumptionRegister :: AssumptionRegister
   )
 
 -----------------------------------------------------------
@@ -115,9 +99,10 @@ type PropertyValueGetter = RoleInstance ~~> Value
 runMonadPerspectivesQuery :: forall s o.
   s
   -> (s -> MonadPerspectivesQuery o)
-  -> (MonadPerspectives (Tuple (Array o) (Array Assumption)))
+  -> (MonadPerspectives (WithAssumptions o))
 runMonadPerspectivesQuery a f = runWriterT (runArrayT (f a))
 
+type WithAssumptions o = Tuple (Array o) (Array Assumption)
 -----------------------------------------------------------
 -- EVAL TO GET AN ARRAY OF RESULTS
 -----------------------------------------------------------

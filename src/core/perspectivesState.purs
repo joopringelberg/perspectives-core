@@ -15,22 +15,15 @@ import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
 newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
 newPerspectivesState uinfo tr av =
-  {
-
-  rolInstances: new unit
+  { rolInstances: new unit
   , contextInstances: new unit
-
   , domeinCache: new unit
+  , queryAssumptionRegister: empty
+  , actionAssumptionRegister: empty
+  -- CouchdbState
   , userInfo: uinfo
   , couchdbSessionStarted: false
   , sessionCookie: av
-  , memorizeQueryResults: true
-  , transactie: tr
-  -- , tripleQueue: []
-  -- For debugging purposes only:
-  -- , recomputed: []
-  -- , queryCache: new unit
-  , queryAssumptionRegister: empty
   }
 
 -----------------------------------------------------------
@@ -56,12 +49,6 @@ tryReadSessionCookieValue = gets _.sessionCookie >>= lift <<< tryRead
 
 setSessionCookie :: String -> MonadPerspectives Unit
 setSessionCookie c = sessionCookie >>= (lift <<< put c)
-
-transactie :: MonadPerspectives Transactie
-transactie = gets _.transactie
-
-setTransactie :: Transactie -> MonadPerspectives Unit
-setTransactie t = modify \s -> s { transactie = t }
 
 domeinCache :: MonadPerspectives DomeinCache
 domeinCache = gets _.domeinCache

@@ -15,7 +15,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 
@@ -50,6 +50,10 @@ role2role _ = throwError (error "Unknown QueryFunction expression")
 context2context :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> ContextInstance)
 -- The last case
 context2context _ = throwError (error "Unknown QueryFunction expression")
+
+context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> Value)
+-- The last case
+context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 
 -- From a string that maybe identifies a Property, construct a function to get that property from
 -- a Role instance. Notice that this function may fail.

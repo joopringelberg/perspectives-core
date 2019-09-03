@@ -80,9 +80,9 @@ removeContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID 
         Nothing -> ct
         otherwise -> PerspectContext cr {rolInContext = insert (unwrap rolName) (Arr.delete rolID roles) rolInContext}
 
-setContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
+setContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance -> PerspectContext
 setContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
-  PerspectContext cr {rolInContext = insert (unwrap rolName) [rolID] rolInContext}
+  PerspectContext cr {rolInContext = insert (unwrap rolName) rolID rolInContext}
 
 context_changeRolIdentifier :: PerspectContext -> EnumeratedRoleType -> EnumeratedRoleType -> PerspectContext
 context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
