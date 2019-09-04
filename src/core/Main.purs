@@ -1,38 +1,15 @@
---
--- module Main where
---
--- import Test.TypeDefChecker (test)
--- import Test.TestEffects as TE
--- import Effect.Aff (Aff, Fiber, runAff, runAff_)
--- import Effect.Aff.Console (CONSOLE, log) as AC
--- import Effect (Effect)
--- import Perspectives.PerspectivesState (runPerspectives)
--- import Prelude (class Show, Unit, pure, unit, (>>=), show)
---
--- -- import Test.BoundContexts
---
--- main :: forall e. Effect (TE.CancelerEffects e) (Fiber (TE.CancelerEffects e) Unit)
--- main = runAff TE.handleError (runPerspectives "cor" "geheim" test)
-
-
-
-
-
-
 module Main where
-import Effect.Aff (Error, Milliseconds(..), delay, forkAff, runAff)
+import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
 import Effect (Effect)
 import Effect.Console (log)
-import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
 import Perspectives.Api (setupApi, setupTcpApi)
 -- import Perspectives.ComputedTripleGetters (addComputedTripleGetters)
-import Perspectives.CoreTypes (Transactie, createTransactie)
-
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)
+import Perspectives.Sync.Transactie (Transactie, createTransactie)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
 main :: Effect Unit
@@ -46,10 +23,6 @@ main = void $ runAff handleError do
   state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} tr av
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
-  void $ forkAff $ forever do
-    delay (Milliseconds 500.0)
-    -- liftEffect $ log "propagating"
-    runPerspectivesWithState propagate state
   where
     f = do
       void $ setupUser
