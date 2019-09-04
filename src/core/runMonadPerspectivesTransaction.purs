@@ -6,22 +6,21 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
 import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Sync.Transactie (createTransactie)
-import Prelude (Unit, ($), (<<<), (>>=), void, discard)
+import Prelude ((<<<), (>>=), discard, bind, pure)
 -----------------------------------------------------------
 -- RUN IN A TRANSACTION
 -----------------------------------------------------------
 -- | Runs an update function (a function in MonadPerspectivesTransaction that produces deltas),
 -- | runs actions as long as they are triggered, sends deltas to other participants and re-runs active queries
-runMonadPerspectivesTransaction :: forall s o.
-  s
-  -> (s -> MonadPerspectivesTransaction o)
-  -> (MonadPerspectives (Array Unit))
-runMonadPerspectivesTransaction a f = lift (createTransactie "") >>= lift <<< new >>= runReaderT (runArrayT run)
+runMonadPerspectivesTransaction :: forall o. 
+  MonadPerspectivesTransaction o
+  -> (MonadPerspectives (Array o))
+runMonadPerspectivesTransaction a = lift (createTransactie "") >>= lift <<< new >>= runReaderT (runArrayT run)
   where
-    run :: MonadPerspectivesTransaction Unit
+    run :: MonadPerspectivesTransaction o
     run = do
       -- 1. Execute the update functions: this will accumulate deltas in the Transaction.
-      void $ f a
+      r <- a
       -- 2. Now run actions.
       -- Derive changed assumptions from the Transaction and use the dependency administration set up for the LHS
       -- of actions to find the actions that should be run.
@@ -33,3 +32,4 @@ runMonadPerspectivesTransaction a f = lift (createTransactie "") >>= lift <<< ne
       runTransactie
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
+      pure r

@@ -76,6 +76,9 @@ registerSupportedEffect corrId ef q arg = do
       liftEffect $ ef (ResponseRecord {corrId: corrId, result: Just (unsafeCoerce result), error: Nothing})
       pure unit
 
+unregisterSupportedEffect :: CorrelationIdentifier -> MP Unit
+unregisterSupportedEffect corrId = pure unit
+
 _assumptionDependencies :: Assumption -> Traversal' AssumptionRegister (Array CorrelationIdentifier)
 _assumptionDependencies (Tuple rid pid) = at rid <<< traversed <<< at pid <<< _Just
 

@@ -55,6 +55,10 @@ instance eqRoleType :: Eq RoleType where
   eq (CR r1) (CR r2) = r1 == r2
   eq (ENR r1) (ENR r2) = r1 == r2
 
+roletype2string :: RoleType -> String
+roletype2string (ENR s) = unwrap s
+roletype2string (CR s) = unwrap s
+
 data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
 derive instance genericRepRoleKind :: Generic RoleKind _
 instance writeForeignRoleKind :: WriteForeign RoleKind where

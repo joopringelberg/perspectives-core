@@ -9,15 +9,18 @@ import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives)
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.ObjectGetterLookup (lookupRoleGetterByName)
+import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
+import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Role (calculation) as RC
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 
 context2role :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 context2role (SQD _ (RolGetter (ENR r)) _) = pure $ getRole r
@@ -55,6 +58,10 @@ context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextI
 -- The last case
 context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 
+role2propertyValue :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> Value)
+-- The last case
+role2propertyValue _ = throwError (error "Unknown QueryFunction expression")
+
 -- From a string that maybe identifies a Property, construct a function to get that property from
 -- a Role instance. Notice that this function may fail.
 -- getPropertyFunction ::
@@ -85,3 +92,20 @@ getRoleFunction id =
   do
     (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType id)
     context2role $ RC.calculation p
+
+-- From a string that maybe identifies a Role, retrieve or construct a function to get that role from
+-- a Context instance. Notice that this function may fail.
+getPropertyFunction ::
+  String -> MonadPerspectives (RoleInstance ~~> Value)
+getPropertyFunction id =
+  case lookupPropertyValueGetterByName id of
+    Nothing -> empty
+    (Just g) -> pure g
+  <|>
+  do
+    (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType id)
+    role2propertyValue $ PC.calculation p
+  <|>
+  do
+    (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
+    role2propertyValue $ PC.calculation p

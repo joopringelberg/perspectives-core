@@ -1,17 +1,18 @@
 module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
+import Control.Plus (empty, (<|>))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), Domain(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (CalculatedRoleType, ContextType, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (ContextType, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleKind, RoleType(..))
-import Prelude (class Show, pure, show, (<<<), (<>), (>=>), (>>=))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..))
+import Prelude (class Show, pure, show, (<<<), (<>), (>=>), (>>=), ($))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -62,3 +63,13 @@ getRole (CR c) = getPerspectType c >>= pure <<< C
 getCalculation :: Role -> QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
+
+effectiveRoleType :: String -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType r = effectiveRoleType_ (ENR $ EnumeratedRoleType r) <|> effectiveRoleType_ (CR $ CalculatedRoleType r)
+  where
+    effectiveRoleType_ :: RoleType -> MonadPerspectives EnumeratedRoleType
+    effectiveRoleType_ = getRole >=> pure <<< getCalculation >=> case _ of
+        SQD _ _ (RDOM p) -> pure p
+        UQD _ _ _ (RDOM p) -> pure p
+        BQD _ _ _ _ (RDOM p) -> pure p
+        otherwise -> empty
