@@ -3,7 +3,7 @@ module Perspectives.Sync.Transactie where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-import Control.Monad.AvarMonadAsk (modify)
+import Data.Array (union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -19,7 +19,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (RoleDelta, BindingDelta, PropertyDelta)
-import Prelude (class Show, bind, ($), (<>), show, pure, (<<<))
+import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<))
 import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
@@ -46,6 +46,21 @@ instance showTransactie :: Show Transactie where
   show = genericShow
 
 derive newtype instance writeForeignTransactie :: WriteForeign Transactie
+
+instance semiGroupTransactie :: Semigroup Transactie where
+  append t1@(Transactie {author, timeStamp, roleDeltas, bindingDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
+    t2@(Transactie {author: a, timeStamp: t, roleDeltas: r, bindingDeltas: b, propertyDeltas: p, createdContexts: cc, createdRoles: cr, deletedContexts: dc, deletedRoles: dr, changedDomeinFiles: cd}) = Transactie
+      { author: author
+      , timeStamp: timeStamp
+      , roleDeltas: union roleDeltas r
+      , bindingDeltas: union bindingDeltas b
+      , propertyDeltas: union propertyDeltas p
+      , createdContexts: union createdContexts cc
+      , createdRoles: union createdRoles cr
+      , deletedContexts: union deletedContexts dc
+      , deletedRoles: union deletedRoles dr
+      , changedDomeinFiles: union changedDomeinFiles cd
+    }
 
 createTransactie :: String -> Aff Transactie
 createTransactie author =

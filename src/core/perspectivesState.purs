@@ -10,11 +10,10 @@ import Perspectives.CoreTypes (DomeinCache, MonadPerspectives, PerspectivesState
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
-import Perspectives.Sync.Transactie (Transactie)
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
 
-newPerspectivesState :: UserInfo -> Transactie -> AVar String -> PerspectivesState
-newPerspectivesState uinfo tr av =
+newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
+newPerspectivesState uinfo av =
   { rolInstances: new unit
   , contextInstances: new unit
   , domeinCache: new unit

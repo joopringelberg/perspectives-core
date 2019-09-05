@@ -11,7 +11,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Show, class Eq, (==), (>>>), (<<<))
+import Prelude (class Show, class Eq, (==), (>>>), (<<<), eq)
 import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON')
 
 -----------------------------------------------------------
@@ -91,6 +91,9 @@ derive instance genericRepPerspectRol :: Generic PerspectRol _
 
 instance showPerspectRol :: Show PerspectRol where
   show = genericShow
+
+instance eqPerspectRol :: Eq PerspectRol where
+  eq (PerspectRol{_id: id1}) (PerspectRol{_id: id2}) = eq id1 id2
 
 derive instance newtypePerspectRol :: Newtype PerspectRol _
 

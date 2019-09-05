@@ -9,7 +9,6 @@ import Perspectives.Api (setupApi, setupTcpApi)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)
-import Perspectives.Sync.Transactie (Transactie, createTransactie)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
 main :: Effect Unit
@@ -19,8 +18,7 @@ main = void $ runAff handleError do
   pwd <- pure "geheim"
   url <- pure "http://127.0.0.1:5984/"
   (av :: AVar String) <- new "This value will be removed on first authentication!"
-  (tr :: Transactie) <- createTransactie usr
-  state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} tr av
+  state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
   where

@@ -29,7 +29,7 @@ import Perspectives.Representation.Class.Role (functional) as R
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.Sync.Transactie (Transactie(..), createTransactie)
+import Perspectives.Sync.Transactie (Transactie(..))
 import Perspectives.TypesForDeltas (BindingDelta(..), DeltaType(..), PropertyDelta(..), RoleDelta(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
@@ -49,7 +49,6 @@ runTransactie = do
   lift $ lift $ for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
   -- distributeTransactie t
-  -- (lift $ createTransactie user) >>= setTransactie
   pure unit
 
 distributeTransactie :: Transactie -> MonadPerspectives Unit
