@@ -1,4 +1,4 @@
-module Perspectives.Sync.Transactie where
+module Perspectives.Sync.Transaction where
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -25,7 +25,7 @@ import Simple.JSON (class WriteForeign)
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-newtype Transactie = Transactie
+newtype Transaction = Transaction
   { author :: String
   , timeStamp :: SerializableDateTime
   , roleDeltas :: Array RoleDelta
@@ -38,18 +38,18 @@ newtype Transactie = Transactie
   , changedDomeinFiles :: Array String
   }
 
-derive instance genericRepTransactie :: Generic Transactie _
+derive instance genericRepTransactie :: Generic Transaction _
 
-derive instance newtypeTransactie :: Newtype Transactie _
+derive instance newtypeTransactie :: Newtype Transaction _
 
-instance showTransactie :: Show Transactie where
+instance showTransactie :: Show Transaction where
   show = genericShow
 
-derive newtype instance writeForeignTransactie :: WriteForeign Transactie
+derive newtype instance writeForeignTransactie :: WriteForeign Transaction
 
-instance semiGroupTransactie :: Semigroup Transactie where
-  append t1@(Transactie {author, timeStamp, roleDeltas, bindingDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
-    t2@(Transactie {author: a, timeStamp: t, roleDeltas: r, bindingDeltas: b, propertyDeltas: p, createdContexts: cc, createdRoles: cr, deletedContexts: dc, deletedRoles: dr, changedDomeinFiles: cd}) = Transactie
+instance semiGroupTransactie :: Semigroup Transaction where
+  append t1@(Transaction {author, timeStamp, roleDeltas, bindingDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
+    t2@(Transaction {author: a, timeStamp: t, roleDeltas: r, bindingDeltas: b, propertyDeltas: p, createdContexts: cc, createdRoles: cr, deletedContexts: dc, deletedRoles: dr, changedDomeinFiles: cd}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , roleDeltas: union roleDeltas r
@@ -62,11 +62,11 @@ instance semiGroupTransactie :: Semigroup Transactie where
       , changedDomeinFiles: union changedDomeinFiles cd
     }
 
-createTransactie :: String -> Aff Transactie
+createTransactie :: String -> Aff Transaction
 createTransactie author =
   do
     n <- liftEffect $ now
-    pure $ Transactie
+    pure $ Transaction
       { author: author
       , timeStamp: SerializableDateTime (toDateTime n)
       , roleDeltas: []
@@ -78,17 +78,30 @@ createTransactie author =
       , deletedRoles: []
       , changedDomeinFiles: []}
 
-transactieID :: Transactie -> String
-transactieID (Transactie{author, timeStamp}) = author <> "_" <> show timeStamp
+cloneEmptyTransaction :: Transaction -> Transaction
+cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
+  { author: author
+  , timeStamp: timeStamp
+  , roleDeltas: []
+  , bindingDeltas: []
+  , propertyDeltas: []
+  , createdContexts: []
+  , createdRoles: []
+  , deletedContexts: []
+  , deletedRoles: []
+  , changedDomeinFiles: []}
 
-_createdContexts :: Lens' Transactie (Array PerspectContext)
+transactieID :: Transaction -> String
+transactieID (Transaction{author, timeStamp}) = author <> "_" <> show timeStamp
+
+_createdContexts :: Lens' Transaction (Array PerspectContext)
 _createdContexts = _Newtype <<< (prop (SProxy :: SProxy "createdContexts"))
 
-_createdRoles :: Lens' Transactie (Array PerspectRol)
+_createdRoles :: Lens' Transaction (Array PerspectRol)
 _createdRoles = _Newtype <<< (prop (SProxy :: SProxy "createdRoles"))
 
-_deletedContexts :: Lens' Transactie (Array ContextInstance)
+_deletedContexts :: Lens' Transaction (Array ContextInstance)
 _deletedContexts = _Newtype <<< (prop (SProxy :: SProxy "deletedContexts"))
 
-_deletedRoles :: Lens' Transactie (Array RoleInstance)
+_deletedRoles :: Lens' Transaction (Array RoleInstance)
 _deletedRoles = _Newtype <<< (prop (SProxy :: SProxy "deletedRoles"))

@@ -18,7 +18,6 @@ newPerspectivesState uinfo av =
   , contextInstances: new unit
   , domeinCache: new unit
   , queryAssumptionRegister: empty
-  , actionAssumptionRegister: empty
   -- CouchdbState
   , userInfo: uinfo
   , couchdbSessionStarted: false

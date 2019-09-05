@@ -2,7 +2,7 @@ module Perspectives.CoreTypes where
 
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.Writer (WriterT, runWriterT)
-import Data.Array (head)
+import Data.Array (head, union)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
@@ -16,8 +16,8 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Sync.Transactie (Transactie)
-import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
+import Perspectives.Sync.Transaction (Transaction)
+import Prelude (class Monoid, class Semigroup, Unit, bind, pure, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -36,7 +36,6 @@ type PerspectivesState = CouchdbState
   , domeinCache :: DomeinCache
 
   , queryAssumptionRegister :: AssumptionRegister
-  , actionAssumptionRegister :: AssumptionRegister
   )
 
 -----------------------------------------------------------
@@ -141,7 +140,7 @@ infix 0 runTypedTripleGetterToObject as ##>>
 -----------------------------------------------------------
 -- | The Transaction accumulates Deltas.
 
-type MonadPerspectivesTransaction =  ArrayT (ReaderT (AVar Transactie) MonadPerspectives)
+type MonadPerspectivesTransaction =  ArrayT (ReaderT (AVar Transaction) MonadPerspectives)
 
 type MPT = MonadPerspectivesTransaction
 

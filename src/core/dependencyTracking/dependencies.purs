@@ -12,6 +12,7 @@ import Data.Lens.At (at)
 import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Tuple (Tuple(..))
+import Effect (Effect)
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, ResponseRecord(..))
@@ -33,6 +34,9 @@ type SupportedEffect = {runner :: ApiEffectRunner, assumptions:: Array Assumptio
 -- | rely on it, are re-executed.
 -- | A SupportedEffect is stored under the CorrelationIdentifier that identifies the ApiEffect.
 type ActiveSupportedEffects = GLStrMap SupportedEffect
+
+lookupActiveSupportedEffect :: CorrelationIdentifier -> Effect (Maybe SupportedEffect)
+lookupActiveSupportedEffect = show >>> peek activeSupportedEffects
 
 -- | A global store of SupportedEffect-s
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.

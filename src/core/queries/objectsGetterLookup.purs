@@ -6,6 +6,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.CoreTypes (RoleGetter, PropertyValueGetter)
 import Prelude (Unit, unit)
 
+-- TODO: vervang dit door GLStrMap.
 -- | A tuple of two arrays. By construction, the items with the same indices belong to each other as name and RoleGetter.
 type RoleGetterCache = (Tuple (Array RoleGetter) (Array String))
 

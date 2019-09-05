@@ -6,13 +6,16 @@ import Prelude
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldMap)
+import Data.Array (foldMap, union)
 import Data.Foldable (for_)
+import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF)
 import Data.Tuple (Tuple(..))
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
+import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies)
 import Perspectives.Assignment.Update (setRol)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, runMonadPerspectivesQuery, (##>>))
 import Perspectives.EntiteitAndRDFAliases (ContextID)
@@ -33,44 +36,46 @@ import Perspectives.Representation.TypeIdentifiers (ContextType)
 type RHS = WithAssumptions Value -> MonadPerspectivesTransaction Unit
 
 -- | From the description of an assignment or effectful function, construct a function
--- | that actually assigns a value or sorts an effect for a Context, conditional on a given boolean value.
--- | As this function is used exclusively in setting up bot actions, we do not set up bot actions in this function
--- | itself!
-constructRHS :: AssignmentStatement -> RoleGetter -> CorrelationIdentifier -> MonadPerspectives (ContextInstance -> RHS)
-constructRHS a objectGetter corrId = case a of
+-- | that actually assigns a value or sorts an effect for a Context, conditional on a set of given boolean values.
+constructRHS :: AssignmentStatement -> RoleGetter -> ActionType -> MonadPerspectives (ContextInstance -> RHS)
+constructRHS a objectGetter actionType = case a of
   (SetRol rt (query :: QueryFunctionDescription)) -> do
     (valueComputer :: RoleGetter) <- context2role query
     pure ((\contextId (Tuple bools a0 :: WithAssumptions Value) -> if (alaF Conj foldMap (eq (Value "true")) bools)
         then do
           (Tuple value a1 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId valueComputer
           (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
-          -- TODO. Register the CorrelationIdentifier with each of new the assumptions in a0, a1, a2. Deregister any
-          -- removed assumptions.
+          -- Cache the association between the assumptions found for this ActionInstance.
+          lift $ liftEffect $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
           void $ pure $ setRol contextId rt value
         else pure unit) :: ContextInstance -> RHS)
 
   otherwise -> throwError (error ("Unknown AssignmentStatement in constructRHS: " <> show a))
 
 -- | From the description of an Action, compile a Updater of ContextInstance.
+-- | The results of these rather expensive computations are cached.
 compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
 compileBotAction actionType contextId = do
-  (action :: Action) <- getPerspectType actionType
-  -- objectOfAction is a type of Role.
-  (objectOfAction :: Role) <- getRole (object action)
-  -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
-  -- The result of this function is dependent on any number of Assumptions.
-  (objectGetter :: RoleGetter) <- context2role $ getCalculation objectOfAction
-  -- Get the next CorrelationIdentifier here.
-  (corrId :: CorrelationIdentifier) <- pure 0
-  -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
-  (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (effect action) objectGetter corrId
-  -- The Left Hand Side of the Action is a query that computes boolean values.
-  -- These values depend on a number of Assumptions.
-  (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ condition action
-  -- Now construct the updater by combining the lhs with the rhs.
-  (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
-  -- TODO Register the updater with the CorrelationIdentifier.
-  pure updater
+  ma <- liftEffect $ retrieveAction actionType
+  case ma of
+    (Just a) -> pure a
+    Nothing -> do
+      (action :: Action) <- getPerspectType actionType
+      -- objectOfAction is a type of Role.
+      (objectOfAction :: Role) <- getRole (object action)
+      -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
+      -- The result of this function is dependent on any number of Assumptions.
+      (objectGetter :: RoleGetter) <- context2role $ getCalculation objectOfAction
+      -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
+      (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (effect action) objectGetter actionType
+      -- The Left Hand Side of the Action is a query that computes boolean values.
+      -- These values depend on a number of Assumptions.
+      (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ condition action
+      -- Now construct the updater by combining the lhs with the rhs.
+      (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
+      -- Cache the result.
+      liftEffect $ void $ cacheAction actionType updater
+      pure updater
 
 -- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
 -- | on Assumptions in the actionAssumptionRegister in PerspectivesState.

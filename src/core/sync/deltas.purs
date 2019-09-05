@@ -29,7 +29,7 @@ import Perspectives.Representation.Class.Role (functional) as R
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.Sync.Transactie (Transactie(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (BindingDelta(..), DeltaType(..), PropertyDelta(..), RoleDelta(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
@@ -37,59 +37,52 @@ import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<
 import Simple.JSON (writeJSON)
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
-runTransactie :: MonadPerspectivesTransaction Unit
-runTransactie = do
-  user <- lift $ lift getUser
-  t@(Transactie{changedDomeinFiles}) <- lift AA.get
-  -- register a triple for each delta, add it to the queue, run the queue.
-  -- maybeTriples <- traverse (lift <<< modifyTriple) deltas
-  -- modifiedTriples <- pure (foldr (\mt a -> maybe a (flip cons a) mt) [] maybeTriples)
-  -- Propagate the triple changes.
-  -- _ <- updateFromSeeds modifiedTriples
+runTransactie :: Transaction -> MonadPerspectivesTransaction Unit
+runTransactie t@(Transaction{changedDomeinFiles}) = do
   lift $ lift $ for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
   -- distributeTransactie t
   pure unit
 
-distributeTransactie :: Transactie -> MonadPerspectives Unit
+distributeTransactie :: Transaction -> MonadPerspectives Unit
 distributeTransactie t = do
   -- TODO: SLUIT DIT AAN NA REFACTOREN VAN transactieForEachUser
-  -- (customizedTransacties :: FO.Object Transactie) <- transactieForEachUser t
-  -- (customizedTransacties :: FO.Object Transactie) <- pure []
+  -- (customizedTransacties :: FO.Object Transaction) <- transactieForEachUser t
+  -- (customizedTransacties :: FO.Object Transaction) <- pure []
   -- _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
 addContextToTransactie :: PerspectContext ->
   MonadPerspectivesTransaction Unit
-addContextToTransactie c = lift $ AA.modify (over Transactie \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
+addContextToTransactie c = lift $ AA.modify (over Transaction \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
 
 addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
-addRolToTransactie c = lift $ AA.modify (over Transactie \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})
+addRolToTransactie c = lift $ AA.modify (over Transaction \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})
 
 deleteContextFromTransactie :: PerspectContext -> MonadPerspectivesTransaction Unit
-deleteContextFromTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transactie \(t@{createdContexts, deletedContexts}) ->
+deleteContextFromTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transaction \(t@{createdContexts, deletedContexts}) ->
   case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
     Nothing -> t {deletedContexts = cons _id deletedContexts}
     (Just i) -> t {createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
 deleteRolFromTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
-deleteRolFromTransactie c@(PerspectRol{_id}) = lift $ AA.modify (over Transactie \(t@{createdRoles, deletedRoles}) ->
+deleteRolFromTransactie c@(PerspectRol{_id}) = lift $ AA.modify (over Transaction \(t@{createdRoles, deletedRoles}) ->
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
     Nothing -> t {deletedRoles = cons _id deletedRoles}
     (Just i) -> t {createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
-addDomeinFileToTransactie dfId = lift $ AA.modify (over Transactie \(t@{changedDomeinFiles}) ->
+addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
 addBindingDelta :: BindingDelta -> MonadPerspectivesTransaction Unit
-addBindingDelta d = lift $ AA.modify (over Transactie \t@{bindingDeltas} -> t {bindingDeltas = cons d bindingDeltas})
+addBindingDelta d = lift $ AA.modify (over Transaction \t@{bindingDeltas} -> t {bindingDeltas = cons d bindingDeltas})
 
 addRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
-addRoleDelta d = lift $ AA.modify (over Transactie \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
+addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
 
 addPropertyDelta :: PropertyDelta -> MonadPerspectivesTransaction Unit
-addPropertyDelta d = lift $ AA.modify (over Transactie \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
+addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
 
 -- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.
@@ -113,7 +106,7 @@ addPropertyDelta d = lift $ AA.modify (over Transactie \t@{propertyDeltas} -> t 
 -- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke RoleDelta, BindingDelta, enz.
 -- addDelta :: Delta -> MonadPerspectives Unit
 -- addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
---   t@(Transactie tf@{deltas}) <- transactie
+--   t@(Transaction tf@{deltas}) <- transactie
 --   case elemIndex newCD deltas of
 --     (Just _) -> pure unit
 --     Nothing -> do
@@ -166,16 +159,16 @@ addPropertyDelta d = lift $ AA.modify (over Transactie \t@{propertyDeltas} -> t 
 --     equalIdRolName (Delta{id: i, memberName: r}) =
 --       id' == i &&
 --       memberName == r
---     add :: Delta -> Transactie -> Transactie
---     add delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons delta deltas}
---     replace :: Int -> Delta -> Transactie -> Transactie
---     replace i delta (Transactie tf@{deltas}) = Transactie tf {deltas = cons newCD (maybe deltas identity (deleteAt i deltas))}
---     remove :: Delta -> Transactie -> Transactie
---     remove i (Transactie tf@{deltas}) = Transactie tf {deltas = (delete i deltas)}
+--     add :: Delta -> Transaction -> Transaction
+--     add delta (Transaction tf@{deltas}) = Transaction tf {deltas = cons delta deltas}
+--     replace :: Int -> Delta -> Transaction -> Transaction
+--     replace i delta (Transaction tf@{deltas}) = Transaction tf {deltas = cons newCD (maybe deltas identity (deleteAt i deltas))}
+--     remove :: Delta -> Transaction -> Transaction
+--     remove i (Transaction tf@{deltas}) = Transaction tf {deltas = (delete i deltas)}
 
 
 {-
-sendTransactieToUser :: ID -> Transactie -> MonadPerspectives Unit
+sendTransactieToUser :: ID -> Transaction -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
   (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
@@ -242,20 +235,20 @@ usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInC
 -- Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
 -- Doorloop de verzameling deltas en bepaal per delta welke gebruikers betrokken zijn.
 -- Bouw al doende een FO.Object van userId en gespecialiseerde transacties op, waarbij je een transactie toevoegt voor een gebruiker die nog niet in de FO.Object voorkomt.
-transactieForEachUser :: Transactie -> MonadPerspectives(FO.Object Transactie)
-transactieForEachUser t@(Transactie{deltas}) = do
+transactieForEachUser :: Transaction -> MonadPerspectives(FO.Object Transaction)
+transactieForEachUser t@(Transaction{deltas}) = do
   execStateT
     (for_ deltas (\d -> (lift $ usersInvolvedInDelta d) >>= (\(users :: Array RolInContext) -> transactieForEachUser' d users)))
     FO.empty
   where
-    transactieForEachUser' :: Delta -> (Array RolInContext) -> StateT (FO.Object Transactie) (MonadPerspectives) Unit
+    transactieForEachUser' :: Delta -> (Array RolInContext) -> StateT (FO.Object Transaction) (MonadPerspectives) Unit
     transactieForEachUser' d users = do
       trs <- get
       for_
         users
         (\(user :: RolInContext) -> case FO.lookup (unwrap user) trs of
           Nothing -> put $ FO.insert (unwrap user) (transactieCloneWithJustDelta t d) trs
-          (Just (Transactie tr@{deltas: ds})) -> put $ FO.insert (unwrap user) (Transactie tr {deltas = cons d ds}) trs)
-    transactieCloneWithJustDelta :: Transactie -> Delta -> Transactie
-    transactieCloneWithJustDelta (Transactie tr) d = Transactie tr {deltas = [d]}
+          (Just (Transaction tr@{deltas: ds})) -> put $ FO.insert (unwrap user) (Transaction tr {deltas = cons d ds}) trs)
+    transactieCloneWithJustDelta :: Transaction -> Delta -> Transaction
+    transactieCloneWithJustDelta (Transaction tr) d = Transaction tr {deltas = [d]}
 -}
