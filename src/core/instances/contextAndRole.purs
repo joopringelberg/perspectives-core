@@ -1,12 +1,16 @@
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, delete, elemIndex, snoc) as Arr
-import Data.Array (last)
+import Data.Array (cons, delete, elemIndex, snoc, last) as Arr
 import Data.Int (floor, fromString, toNumber)
+import Data.Lens (Lens', Traversal', _Just, over, set)
+import Data.Lens.At (at)
+import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
+import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, insert, lookup, pop)
 import Math (ln10, log)
@@ -16,7 +20,7 @@ import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), 
 import Perspectives.Representation.Class.Revision (Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType)
-import Prelude (identity, ($), (/), (<>), show, (+))
+import Prelude (flip, identity, show, ($), (+), (/), (<<<), (<>))
 
 -- CONTEXT
 
@@ -62,27 +66,28 @@ context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 context_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance
 context_rolInContext (PerspectContext{rolInContext}) rn = maybe [] identity (lookup (unwrap rn) rolInContext)
 
+_roleInstances :: EnumeratedRoleType -> Traversal' PerspectContext (Array RoleInstance)
+_roleInstances (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t <<< _Just
+  where
+    _rolInContext :: forall a r. Lens' { rolInContext :: a | r } a
+    _rolInContext = prop (SProxy :: SProxy "rolInContext")
+
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
-addContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
-  case lookup (unwrap rolName) rolInContext of
-    Nothing -> PerspectContext cr {rolInContext = insert (unwrap rolName) [rolID] rolInContext}
-    (Just roles) -> do
-      case Arr.elemIndex rolID roles of
-        Nothing -> PerspectContext cr {rolInContext = insert (unwrap rolName) (Arr.snoc roles rolID) rolInContext}
-        otherwise -> ct
+addContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (flip Arr.snoc rolId) ct
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
-removeContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
-  case lookup (unwrap rolName) rolInContext of
-    Nothing -> ct
-    (Just (roles :: Array RoleInstance)) -> do
-      case Arr.elemIndex rolID roles of
-        Nothing -> ct
-        otherwise -> PerspectContext cr {rolInContext = insert (unwrap rolName) (Arr.delete rolID roles) rolInContext}
+removeContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (Arr.delete rolId) ct
 
 setContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance -> PerspectContext
-setContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName rolID =
-  PerspectContext cr {rolInContext = insert (unwrap rolName) rolID rolInContext}
+setContext_rolInContext ct rolName rolIDs = set (_roleInstances rolName) rolIDs ct
+
+type Modifier = Array RoleInstance -> Array RoleInstance
+
+modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> PerspectContext
+modifyContext_rolInContext ct rolName f = over (_roleInstances rolName) f ct
+
+-- modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName f =
+--   PerspectContext cr {rolInContext = maybe [] identity (map f (lookup (unwrap rolName) rolInContext))}
 
 context_changeRolIdentifier :: PerspectContext -> EnumeratedRoleType -> EnumeratedRoleType -> PerspectContext
 context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
@@ -236,7 +241,7 @@ rol_padOccurrence n =  case floor( log( toNumber n) / ln10 ) of
 
 -- Assume the Array is sorted alphabetically. Role index numbers follow the (last) underscore ("_") and are left padded with zeroes.
 getNextRolIndex :: Array RoleInstance -> Int
-getNextRolIndex rolIds = case last rolIds of
+getNextRolIndex rolIds = case Arr.last rolIds of
   Nothing -> 0
   (Just id) -> case lastIndexOf (Pattern "_") (unwrap id) of
     Nothing -> 0
