@@ -4,7 +4,6 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
-import Effect.Class (liftEffect)
 import Foreign.Object (empty)
 import Perspectives.CoreTypes (DomeinCache, MonadPerspectives, PerspectivesState, AssumptionRegister)
 import Perspectives.CouchdbState (UserInfo)
@@ -75,7 +74,7 @@ insert :: forall a.
   MonadPerspectives a
 insert g ns av = do
   (dc :: (GLStrMap a)) <- g
-  _ <- liftEffect $ (poke dc ns av)
+  _ <- pure $ (poke dc ns av)
   pure av
 
 lookup :: forall a.
@@ -84,7 +83,7 @@ lookup :: forall a.
   MonadPerspectives (Maybe a)
 lookup g k = do
   dc <- g
-  liftEffect $ peek dc k
+  pure $ peek dc k
 
 remove :: forall a.
   MonadPerspectives (GLStrMap a) ->
@@ -92,6 +91,6 @@ remove :: forall a.
   MonadPerspectives (Maybe a)
 remove g k = do
   (dc :: (GLStrMap a)) <- g
-  ma <- liftEffect $ peek dc k
-  _ <- liftEffect $ (delete dc k)
+  ma <- pure $ peek dc k
+  _ <- pure $ (delete dc k)
   pure ma

@@ -2,11 +2,10 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (foldM, null, union)
+import Data.Array (foldM, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (new)
-import Effect.Class (liftEffect)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), actionInstancesDependingOn)
@@ -46,7 +45,7 @@ runMonadPerspectivesTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< c
         []
         (assumptionsInTransaction ft)
       lift $ lift $ for_ corrIds \corrId -> do
-        me <- liftEffect $ lookupActiveSupportedEffect corrId
+        me <- pure $ lookupActiveSupportedEffect corrId
         case me of
           Nothing -> pure unit
           (Just {runner}) -> runner unit
@@ -59,16 +58,13 @@ assumptionsInTransaction (Transaction{roleDeltas, bindingDeltas, propertyDeltas}
 -- | Execute every ActionInstance that is triggered by changes in the Transaction.
 -- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
 runActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runActions t = do
-  (as :: Array ActionInstance) <- lift $ liftEffect $ actionInstancesDependingOn $ assumptionsInTransaction t
-  if (null as)
-    then pure t
-    else do
-      lift $ void $ AA.modify cloneEmptyTransaction
-      for_ as \(ActionInstance ctxt atype) ->
-        (lift $ liftEffect $ retrieveAction atype) >>= \ma ->
-          case ma of
-            Nothing -> pure unit
-            (Just a) -> a ctxt
-      nt <- lift AA.get
-      pure <<< (<>) t =<< runActions nt
+runActions t = case actionInstancesDependingOn $ assumptionsInTransaction t of
+  Nothing -> pure t
+  (Just as) -> do
+    lift $ void $ AA.modify cloneEmptyTransaction
+    for_ as \(ActionInstance ctxt atype) ->
+        case retrieveAction atype of
+          Nothing -> pure unit
+          (Just a) -> a ctxt
+    nt <- lift AA.get
+    pure <<< (<>) t =<< runActions nt

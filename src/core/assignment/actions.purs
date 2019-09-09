@@ -12,7 +12,6 @@ import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF)
 import Data.Tuple (Tuple(..))
-import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies)
@@ -46,7 +45,7 @@ constructRHS a objectGetter actionType = case a of
           (Tuple value a1 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId valueComputer
           (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
           -- Cache the association between the assumptions found for this ActionInstance.
-          lift $ liftEffect $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
+          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
           void $ pure $ setRol contextId rt value
         else pure unit) :: ContextInstance -> RHS)
 
@@ -55,9 +54,8 @@ constructRHS a objectGetter actionType = case a of
 -- | From the description of an Action, compile a Updater of ContextInstance.
 -- | The results of these rather expensive computations are cached.
 compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
-compileBotAction actionType contextId = do
-  ma <- liftEffect $ retrieveAction actionType
-  case ma of
+compileBotAction actionType contextId =
+  case retrieveAction actionType of
     (Just a) -> pure a
     Nothing -> do
       (action :: Action) <- getPerspectType actionType
@@ -74,7 +72,7 @@ compileBotAction actionType contextId = do
       -- Now construct the updater by combining the lhs with the rhs.
       (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
       -- Cache the result.
-      liftEffect $ void $ cacheAction actionType updater
+      _ <- pure $ cacheAction actionType updater
       pure updater
 
 -- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency

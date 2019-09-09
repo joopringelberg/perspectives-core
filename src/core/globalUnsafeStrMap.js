@@ -6,30 +6,24 @@ exports["new"] = function () {
 
 exports.peekImpl = function (m) {
   return function (k) {
-    return function()
-      {
-        return m[k];
-      };
+    return m[k];
   };
 };
 
 exports.poke = function (m) {
   return function (k) {
     return function (v) {
-      return function () {
-        m[k] = v;
-        return m;
-      };
+      m[k] = v;
+      return m;
     };
   };
 };
 
-exports["delete"] = function (m) {
+exports["delete_"] = function (m) {
   return function (k) {
-    return function () {
-      delete m[k];
-      return m;
-    };
+    var r = m[k];
+    delete m[k];
+    return r;
   };
 };
 
@@ -43,4 +37,8 @@ exports["clear"] = function(m) {
       }
     );
   }
+}
+
+exports["keys"] = function(m) {
+  return Object.keys(m);
 }

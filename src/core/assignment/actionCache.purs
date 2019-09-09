@@ -2,7 +2,6 @@ module Perspectives.Assignment.ActionCache where
 
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
-import Effect (Effect)
 import Perspectives.CoreTypes (Updater)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
@@ -16,8 +15,8 @@ type ActionCache = GLStrMap (Updater ContextInstance)
 actionCache :: ActionCache
 actionCache = new unit
 
-cacheAction :: ActionType -> (Updater ContextInstance) -> Effect ActionCache
+cacheAction :: ActionType -> (Updater ContextInstance) -> ActionCache
 cacheAction a u = poke actionCache (unwrap a) u
 
-retrieveAction :: ActionType -> Effect (Maybe (Updater ContextInstance))
+retrieveAction :: ActionType -> (Maybe (Updater ContextInstance))
 retrieveAction a = peek actionCache (unwrap a)

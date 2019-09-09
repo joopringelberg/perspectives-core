@@ -12,7 +12,6 @@ import Data.Lens.At (at)
 import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Tuple (Tuple(..))
-import Effect (Effect)
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, ResponseRecord(..))
@@ -35,7 +34,7 @@ type SupportedEffect = {runner :: ApiEffectRunner, assumptions:: Array Assumptio
 -- | A SupportedEffect is stored under the CorrelationIdentifier that identifies the ApiEffect.
 type ActiveSupportedEffects = GLStrMap SupportedEffect
 
-lookupActiveSupportedEffect :: CorrelationIdentifier -> Effect (Maybe SupportedEffect)
+lookupActiveSupportedEffect :: CorrelationIdentifier -> Maybe SupportedEffect
 lookupActiveSupportedEffect = show >>> peek activeSupportedEffects
 
 -- | A global store of SupportedEffect-s
@@ -57,7 +56,7 @@ registerSupportedEffect :: forall a b.
   MP Unit
 registerSupportedEffect corrId ef q arg = do
   -- Add a new supported effect, for now with zero assumptions.
-  liftEffect $ void $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
+  _ <- pure $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
   -- then execute the SupportedEffect once
   apiEffectRunner unit
   pure unit
@@ -66,10 +65,10 @@ registerSupportedEffect corrId ef q arg = do
     apiEffectRunner _ = do
       (Tuple result (assumptions :: Array Assumption)) <- runMonadPerspectivesQuery arg q
       -- destructively set the assumptions in the ActiveSupportedEffects
-      (moldSupports :: Maybe SupportedEffect) <- liftEffect $ peek activeSupportedEffects (show corrId)
+      (moldSupports :: Maybe SupportedEffect) <- pure $ peek activeSupportedEffects (show corrId)
       -- We have ensured a registration above, hence we can use unsafePartial.
       (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
-      liftEffect $ void $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
+      _ <- pure $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
       -- destructively register the correlationIdentifier with new assumptions
       {no: new} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
       for_ new (registerDependency corrId)
