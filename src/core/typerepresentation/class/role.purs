@@ -7,8 +7,8 @@ import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), Domain(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (ContextType, getPerspectType)
+import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
+import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..))
@@ -17,7 +17,7 @@ import Prelude (class Show, pure, show, (<<<), (<>), (>=>), (>>=), ($))
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
 -----------------------------------------------------------
-class Show r <= RoleClass r where
+class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, i -> r where
   kindOfRole :: r -> RoleKind
   roleAspects :: r -> Array EnumeratedRoleType
   context :: r -> ContextType
@@ -27,7 +27,7 @@ class Show r <= RoleClass r where
   calculation :: r -> QueryFunctionDescription
   properties :: r -> MonadPerspectives (Array PropertyType)
 
-instance calculatedRoleRoleClass :: RoleClass CalculatedRole where
+instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects r = []
   context r = (unwrap r).context
@@ -44,7 +44,7 @@ rangeOfCalculation cp = case calculation cp of
   BQD _ _ _ _ (RDOM p) -> getPerspectType p
   otherwise -> throwError (error ("range of calculation of " <> show (identifier cp :: CalculatedRoleType) <> " is not an enumerated role."))
 
-instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
+instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects r = (unwrap r).roleAspects
   context r = (unwrap r).context
@@ -55,6 +55,9 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole where
   properties r = pure (unwrap r).properties
 
 data Role = E EnumeratedRole | C CalculatedRole
+
+id :: forall r i. RoleClass r i => r -> i
+id = identifier
 
 getRole :: RoleType -> MonadPerspectives Role
 getRole (ENR e) = getPerspectType e >>= pure <<< E
@@ -69,6 +72,24 @@ effectiveRoleType r = effectiveRoleType_ (ENR $ EnumeratedRoleType r) <|> effect
   where
     effectiveRoleType_ :: RoleType -> MonadPerspectives EnumeratedRoleType
     effectiveRoleType_ = getRole >=> pure <<< getCalculation >=> case _ of
+        SQD _ _ (RDOM p) -> pure p
+        UQD _ _ _ (RDOM p) -> pure p
+        BQD _ _ _ _ (RDOM p) -> pure p
+        otherwise -> empty
+
+-- Here are alternative functions, using functional dependencies in RoleClass,
+-- omitting Role.
+getRole' :: forall r i. RoleClass r i => i -> MonadPerspectives r
+getRole' i = getPerspectType i
+
+getCalculation' :: forall r i. RoleClass r i => r -> QueryFunctionDescription
+getCalculation' r = calculation r
+
+effectiveRoleType' :: String -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType' r = effectiveRoleType_ (EnumeratedRoleType r) <|> effectiveRoleType_ (CalculatedRoleType r)
+  where
+    effectiveRoleType_ :: forall r i. RoleClass r i => i -> MonadPerspectives EnumeratedRoleType
+    effectiveRoleType_ i = getRole' i >>= pure <<< getCalculation' >>= case _ of
         SQD _ _ (RDOM p) -> pure p
         UQD _ _ _ (RDOM p) -> pure p
         BQD _ _ _ _ (RDOM p) -> pure p

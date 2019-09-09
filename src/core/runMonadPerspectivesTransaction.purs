@@ -16,7 +16,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie)
-import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=), (<>), (=<<))
+import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION

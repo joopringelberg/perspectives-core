@@ -28,7 +28,7 @@ import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPr
 type Identifier = String
 type Namespace = String
 
-class (Identifiable v i, Revision v, Newtype i String) <= Persistent v i where
+class (Identifiable v i, Revision v, Newtype i String) <= Persistent v i | v -> i, i -> v where
   cache :: i -> MonadPerspectives (GLStrMap (AVar v))
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: i -> MonadPerspectives (AVar v)

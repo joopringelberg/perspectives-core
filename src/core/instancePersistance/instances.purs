@@ -35,7 +35,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.User (entitiesDatabase)
 import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON)
 
-class (Persistent v i, WriteForeign v, ReadForeign v, Decode v) <= PersistentInstance v i
+class (Persistent v i, WriteForeign v, ReadForeign v, Decode v) <= PersistentInstance v i | i -> v,  v -> i
 
 instance persistentInstancePerspectContext :: PersistentInstance PerspectContext ContextInstance
 
