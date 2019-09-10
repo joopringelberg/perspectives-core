@@ -137,37 +137,40 @@ setRol contextId rolName rolInstances = do
 -----------------------------------------------------------
 -- UPDATE A PROPERTY
 -----------------------------------------------------------
-type PropertyUpdater = RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
+type PropertyUpdater = Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 
-addProperty :: RoleInstance -> EnumeratedPropertyType -> (Updater Value)
-addProperty rid propertyName val = do
+addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
+addProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
-  saveEntiteit rid (addRol_property pe propertyName val)
-  addPropertyDelta $ PropertyDelta
-              { id : rid
-              , property: propertyName
-              , deltaType: Add
-              , value: val
-              }
+  saveEntiteit rid (addRol_property pe propertyName values)
+  for_ values \val ->
+    addPropertyDelta $ PropertyDelta
+                { id : rid
+                , property: propertyName
+                , deltaType: Add
+                , value: val
+                }
 
-removeProperty :: RoleInstance -> EnumeratedPropertyType -> (Updater Value)
-removeProperty rid propertyName val = do
+removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
+removeProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
-  saveEntiteit rid (removeRol_property pe propertyName val)
-  addPropertyDelta $ PropertyDelta
-              { id : rid
-              , property: propertyName
-              , deltaType: Remove
-              , value: val
-              }
+  saveEntiteit rid (removeRol_property pe propertyName values)
+  for_ values \val ->
+    addPropertyDelta $ PropertyDelta
+                { id : rid
+                , property: propertyName
+                , deltaType: Remove
+                , value: val
+                }
 
-setProperty :: RoleInstance -> EnumeratedPropertyType -> (Updater Value)
-setProperty rid propertyName val = do
+setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
+setProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
-  saveEntiteit rid (setRol_property pe propertyName val)
-  addPropertyDelta $ PropertyDelta
-              { id : rid
-              , property: propertyName
-              , deltaType: Change
-              , value: val
-              }
+  saveEntiteit rid (setRol_property pe propertyName values)
+  for_ values \value ->
+    addPropertyDelta $ PropertyDelta
+                { id : rid
+                , property: propertyName
+                , deltaType: Change
+                , value: value
+                }

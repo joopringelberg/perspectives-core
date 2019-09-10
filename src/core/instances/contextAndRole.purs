@@ -1,6 +1,6 @@
 module Perspectives.ContextAndRole where
 
-import Data.Array (cons, delete, elemIndex, snoc, last) as Arr
+import Data.Array (delete, difference, elemIndex, last, snoc, union) as Arr
 import Data.Int (floor, fromString, toNumber)
 import Data.Lens (Lens', Traversal', _Just, over, set)
 import Data.Lens.At (at)
@@ -19,7 +19,7 @@ import Perspectives.Identifiers (Namespace, deconstructNamespace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.Representation.Class.Revision (Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType(..))
 import Prelude (flip, identity, show, ($), (+), (/), (<<<), (<>))
 
 -- CONTEXT
@@ -158,48 +158,23 @@ changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
 rol_properties :: PerspectRol -> Object (Array Value)
 rol_properties (PerspectRol{properties}) = properties
 
+_propertyValues :: EnumeratedPropertyType -> Traversal' PerspectRol (Array Value)
+_propertyValues (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t <<< _Just
+  where
+    _properties :: forall a r. Lens' { properties :: a | r } a
+    _properties = prop (SProxy :: SProxy "properties")
+
 rol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value
 rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (unwrap pn) properties)
 
-addRol_property :: PerspectRol -> EnumeratedPropertyType -> Value -> PerspectRol
-addRol_property rl@(PerspectRol rp@{properties}) propertyName value =
-  case lookup (unwrap propertyName) properties of
-    Nothing -> PerspectRol rp {properties = insert
-      (unwrap propertyName)
-      [value]
-      properties}
-    (Just values) -> do
-      case Arr.elemIndex value values of
-        Nothing -> PerspectRol rp {properties = insert
-          (unwrap propertyName)
-          (Arr.cons value values)
-          properties}
-        otherwise -> rl
+addRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
+addRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.union values) rl
 
-removeRol_property :: PerspectRol -> EnumeratedPropertyType -> Value -> PerspectRol
-removeRol_property rl@(PerspectRol rp@{properties}) propertyName value =
-  case lookup (unwrap propertyName) properties of
-    Nothing -> rl
-    (Just values) -> do
-      case Arr.elemIndex value values of
-        Nothing -> rl
-        otherwise -> PerspectRol rp {properties = insert
-          (unwrap propertyName)
-          (Arr.delete value values)
-          properties}
+removeRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
+removeRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.difference values) rl
 
-setRol_property :: PerspectRol -> EnumeratedPropertyType -> Value -> PerspectRol
-setRol_property rl@(PerspectRol rp@{properties}) propertyName value =
-  case lookup (unwrap propertyName) properties of
-    Nothing -> PerspectRol rp {properties = insert
-      (unwrap propertyName)
-      [value]
-      properties}
-    (Just pvc) -> do
-      PerspectRol rp {properties = insert
-          (unwrap propertyName)
-          [value]
-          properties}
+setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
+setRol_property rl propertyName values = set (_propertyValues propertyName) values rl
 
 rol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen

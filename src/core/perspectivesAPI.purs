@@ -202,12 +202,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 sendResponse (Result corrId [unwrap id]) setter
     Api.AddRol -> catchError
       do
-        void $ runMonadPerspectivesTransaction $ addRol (ContextInstance subject) (EnumeratedRoleType predicate) (RoleInstance object)
+        void $ runMonadPerspectivesTransaction $ addRol (ContextInstance subject) (EnumeratedRoleType predicate) [(RoleInstance object)]
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     Api.SetProperty -> catchError
       (do
-        void $ runMonadPerspectivesTransaction (setProperty (RoleInstance subject) (EnumeratedPropertyType predicate) (Value object))
+        void $ runMonadPerspectivesTransaction (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
         sendResponse (Result corrId ["ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "SetBinding", subject: rolID, object: bindingID},

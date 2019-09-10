@@ -150,14 +150,14 @@ constructAnotherRol rolType id rolSerialisation = do
   case candidate of
     (Left messages) -> pure $ Left messages
     (Right rolId) -> do
-      void $ addRol contextInstanceId rolType rolId
+      void $ addRol contextInstanceId rolType [rolId]
       -- (m :: Array UserMessage) <- checkAContext $ Context contextInstanceId
       m <- pure []
       case length m of
         0 -> do
           pure $ Right rolId
         otherwise -> do
-          void $ removeRol contextInstanceId rolType rolId
+          void $ removeRol contextInstanceId rolType [rolId]
           pure $ Left m
 
 constructProperties :: PropertySerialization -> FO.Object (Array Value)

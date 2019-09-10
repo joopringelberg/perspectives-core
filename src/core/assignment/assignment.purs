@@ -1,6 +1,7 @@
 module Perspectives.Representation.Assignment where
 
 import Data.Array.Partial (head, tail)
+import Data.Array (cons)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -21,7 +22,7 @@ data AssignmentStatement
   | SetProperty EnumeratedPropertyType QueryFunctionDescription
   | AddToProperty EnumeratedPropertyType QueryFunctionDescription
   | RemoveFromProperty EnumeratedPropertyType QueryFunctionDescription
-  | EffectFullFunction FunctionName
+  | EffectFullFunction FunctionName (Array String)
 
 derive instance genericRepAssignmentStatement :: Generic AssignmentStatement _
 
@@ -40,7 +41,7 @@ instance writeForeignAssignmentStatement :: WriteForeign AssignmentStatement whe
   writeImpl (SetProperty r v) = unsafeToForeign $ writeJSON {tag: "SetProperty", dat: [writeJSON r, writeJSON v]}
   writeImpl (AddToProperty r v) = unsafeToForeign $ writeJSON {tag: "AddToProperty", dat: [writeJSON r, writeJSON v]}
   writeImpl (RemoveFromProperty r v) = unsafeToForeign $ writeJSON {tag: "RemoveFromProperty", dat: [writeJSON r, writeJSON v]}
-  writeImpl (EffectFullFunction f) = unsafeToForeign $ writeJSON {tag: "EffectFullFunction", dat: [f]}
+  writeImpl (EffectFullFunction f as) = unsafeToForeign $ writeJSON {tag: "EffectFullFunction", dat: cons f as}
 
 
 instance readForeignAssignmentStatement :: ReadForeign AssignmentStatement where
@@ -53,7 +54,7 @@ instance readForeignAssignmentStatement :: ReadForeign AssignmentStatement where
       "SetProperty" -> unsafePartial (SetProperty <$> getProperty dat <*> getValueQuery dat)
       "AddToProperty" -> unsafePartial (AddToProperty <$> getProperty dat <*> getValueQuery dat)
       "RemoveFromProperty" -> unsafePartial (RemoveFromProperty <$> getProperty dat <*> getValueQuery dat)
-      "EffectFullFunction" -> pure $ unsafePartial $ EffectFullFunction $ head dat
+      "EffectFullFunction" -> pure $ unsafePartial $ EffectFullFunction (head dat) (tail dat)
       x -> fail $ ForeignError ("Unknown case in ReadForeign QueryFunction: " <> show x)
 
 getValueQuery :: Array String -> F QueryFunctionDescription

@@ -91,6 +91,8 @@ infixl 5 type TrackingObjectsGetter as ~~>
 type RoleGetter = ContextInstance ~~> RoleInstance
 
 type PropertyValueGetter = RoleInstance ~~> Value
+
+type ContextPropertyValueGetter = ContextInstance ~~> Value
 -----------------------------------------------------------
 -- RUN TO GET ASSUMPTIONS AND AN ARRAY OF RESULTS
 -----------------------------------------------------------
