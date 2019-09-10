@@ -14,12 +14,11 @@ import Data.Newtype (alaF)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
-import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies)
-import Perspectives.Assignment.Update (setRol)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, runMonadPerspectivesQuery, (##>>))
-import Perspectives.EntiteitAndRDFAliases (ContextID)
+import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
+import Perspectives.Assignment.Update (RoleUpdater, PropertyUpdater, addRol, removeRol, setRol)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, PropertyValueGetter, runMonadPerspectivesQuery, (##>>))
 import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Query.Compiler (context2propertyValue, context2role)
+import Perspectives.Query.Compiler (context2propertyValue, context2role, role2propertyValue)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
@@ -27,7 +26,8 @@ import Perspectives.Representation.Class.PersistentType (ActionType, getPerspect
 import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
 import Perspectives.Representation.Context (Context, actions)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType)
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..))
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -40,18 +40,41 @@ constructRHS :: AssignmentStatement -> RoleGetter -> ActionType -> MonadPerspect
 constructRHS a objectGetter actionType = case a of
   (SetRol rt (query :: QueryFunctionDescription)) -> do
     (valueComputer :: RoleGetter) <- context2role query
-    pure ((\contextId (Tuple bools a0 :: WithAssumptions Value) -> if (alaF Conj foldMap (eq (Value "true")) bools)
-        then do
-          (Tuple value a1 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId valueComputer
-          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
-          -- Cache the association between the assumptions found for this ActionInstance.
-          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
-          void $ pure $ setRol contextId rt value
-        else pure unit) :: ContextInstance -> RHS)
+    pure $ f rt valueComputer setRol
+  (AddToRol rt (query :: QueryFunctionDescription)) -> do
+    valueComputer <- context2role query
+    pure $ f rt valueComputer addRol
+  (RemoveFromRol rt (query :: QueryFunctionDescription)) -> do
+    valueComputer <- context2role query
+    pure $ f rt valueComputer removeRol
+  (SetProperty pt (query :: QueryFunctionDescription)) -> do
+    (valueComputer :: RoleGetter) <- role2propertyValue query
+    pure $ f pt valueComputer setRol
 
   otherwise -> throwError (error ("Unknown AssignmentStatement in constructRHS: " <> show a))
 
--- | From the description of an Action, compile a Updater of ContextInstance.
+  where
+    f :: EnumeratedRoleType -> RoleGetter -> RoleUpdater -> (ContextInstance -> RHS)
+    f rt roleGetter roleUpdater contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
+        then do
+          (Tuple value a1 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId roleGetter
+          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
+          -- Cache the association between the assumptions found for this ActionInstance.
+          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
+          void $ pure $ roleUpdater contextId rt value
+        else pure unit
+
+    g :: EnumeratedPropertyType -> PropertyValueGetter -> PropertyUpdater -> (RoleInstance -> RHS)
+    g rt propertyGetter roleUpdater contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
+        then do
+          (Tuple value a1 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId propertyGetter
+          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
+          -- Cache the association between the assumptions found for this ActionInstance.
+          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
+          void $ pure $ removeRol contextId rt value
+        else pure unit
+
+-- | From the description of an Action, compile an Updater of ContextInstance.
 -- | The results of these rather expensive computations are cached.
 compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
 compileBotAction actionType contextId =
@@ -86,16 +109,9 @@ setupBotActions cid = do
   -- actionAssumptionRegister in PerspectivesState.
   for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
 
--- | Remove all actions associated with this context. To do so, we recompute the actions, to get at their names.
--- | This might be computationally expensive. Some form of caching will speed it up greatly.
--- | A sneaky way would be to find triples on cid whose predicate match with the pattern "~>".
-tearDownBotActions :: ContextID -> MonadPerspectives Unit
-tearDownBotActions cid = do
-  -- TODO: filter, keeping just those actions with a subject that has RoleKind BotRole.
-  -- (ct :: ContextType) <- contextType cid
-  -- (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
-  -- for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(TypedTripleGetter name _) -> liftEffect $ unRegisterTriple (TripleRef {subject: cid, predicate: name})
-  pure unit
+-- | Remove all actions associated with this context.
+tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
+tearDownBotActions = pure <<< removeContextInstanceDependencies
 
 {-
   where

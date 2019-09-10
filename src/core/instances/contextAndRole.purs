@@ -86,9 +86,6 @@ type Modifier = Array RoleInstance -> Array RoleInstance
 modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> PerspectContext
 modifyContext_rolInContext ct rolName f = over (_roleInstances rolName) f ct
 
--- modifyContext_rolInContext ct@(PerspectContext cr@{rolInContext}) rolName f =
---   PerspectContext cr {rolInContext = maybe [] identity (map f (lookup (unwrap rolName) rolInContext))}
-
 context_changeRolIdentifier :: PerspectContext -> EnumeratedRoleType -> EnumeratedRoleType -> PerspectContext
 context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
   case pop (unwrap oldName) rolInContext of

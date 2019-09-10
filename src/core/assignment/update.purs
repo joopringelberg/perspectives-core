@@ -3,9 +3,10 @@ module Perspectives.Assignment.Update where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
+import Data.Array (difference, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
-import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeRol_binding, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (Updater, MonadPerspectivesTransaction)
 import Perspectives.Deltas (addBindingDelta, addRoleDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -95,27 +96,32 @@ removeBinding roleId = do
 -----------------------------------------------------------
 -- UPDATE A ROLE
 -----------------------------------------------------------
-addRol :: ContextInstance -> EnumeratedRoleType -> (Updater RoleInstance)
-addRol contextId rolName rolInstance = do
-  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
-  saveEntiteit contextId (addContext_rolInContext pe rolName rolInstance)
-  addRoleDelta $ RoleDelta
-              { id : contextId
-              , role: rolName
-              , deltaType: Add
-              , instance: rolInstance
-              }
+type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 
-removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater RoleInstance)
-removeRol contextId rolName rolInstance = do
+addRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+addRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
-  saveEntiteit contextId (removeContext_rolInContext pe rolName rolInstance)
-  addRoleDelta $ RoleDelta
-              { id : contextId
-              , role: rolName
-              , deltaType: Remove
-              , instance: rolInstance
-              }
+  saveEntiteit contextId (modifyContext_rolInContext pe rolName (flip union rolInstances))
+  for_ rolInstances \rolInstance ->
+    addRoleDelta $ RoleDelta
+                { id : contextId
+                , role: rolName
+                , deltaType: Add
+                , instance: rolInstance
+                }
+
+removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+removeRol contextId rolName rolInstances = do
+  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
+  saveEntiteit contextId (modifyContext_rolInContext pe rolName (flip difference rolInstances))
+  for_ rolInstances \rolInstance ->
+    addRoleDelta $ RoleDelta
+                { id : contextId
+                , role: rolName
+                , deltaType: Remove
+                , instance: rolInstance
+                }
+
 setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 setRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
@@ -131,6 +137,8 @@ setRol contextId rolName rolInstances = do
 -----------------------------------------------------------
 -- UPDATE A PROPERTY
 -----------------------------------------------------------
+type PropertyUpdater = RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
+
 addProperty :: RoleInstance -> EnumeratedPropertyType -> (Updater Value)
 addProperty rid propertyName val = do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
