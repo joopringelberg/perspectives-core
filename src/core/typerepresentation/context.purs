@@ -25,6 +25,7 @@ class ContextClass c where
   userRole :: c -> Array EnumeratedRoleType
   botRole :: c -> Array EnumeratedRoleType
   actions :: c -> Array ActionType
+  aspects :: c -> Array ContextType
 
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
@@ -35,6 +36,7 @@ instance contextContextClass :: ContextClass Context where
   userRole = _.gebruikerRol <<< unwrap
   botRole = _.botRol <<< unwrap
   actions = _.actions <<< unwrap
+  aspects = _.contextAspects <<< unwrap
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> Context -> Maybe RoleType
@@ -60,6 +62,7 @@ lookForRole_ criterium rn c = some (roleInContext c) (roleTypeIdentifier >>> (cr
     some candidates test = case uncons candidates of
       Nothing -> Nothing
       (Just {head, tail}) -> if (test head) then (Just head) else some tail test
+
 -----------------------------------------------------------
 -- CONTEXT
 -----------------------------------------------------------

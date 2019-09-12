@@ -32,6 +32,15 @@ filter source criterium a = do
   guard passes
   pure r
 
+filter' :: forall m a o. Monad m =>
+  (a -> ArrayT m o) ->
+  (o -> Boolean) ->
+  (a -> ArrayT m o)
+filter' source criterium a = do
+  (r :: o) <- source a
+  guard (criterium r)
+  pure r
+
 cond :: forall m s o. Monad m =>
   (s -> ArrayT m Boolean) ->
   (s -> ArrayT m o) ->

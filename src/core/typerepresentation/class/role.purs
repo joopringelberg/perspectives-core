@@ -19,7 +19,7 @@ import Prelude (class Show, pure, show, (<<<), (<>), (>=>), (>>=), ($))
 -----------------------------------------------------------
 class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, i -> r where
   kindOfRole :: r -> RoleKind
-  roleAspects :: r -> Array EnumeratedRoleType
+  roleAspects :: r -> MonadPerspectives (Array EnumeratedRoleType)
   context :: r -> ContextType
   binding :: r -> MonadPerspectives RoleType
   functional :: r -> MonadPerspectives Boolean
@@ -29,7 +29,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
 
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
-  roleAspects r = []
+  roleAspects = rangeOfCalculation >=> roleAspects
   context r = (unwrap r).context
   binding = rangeOfCalculation >=> binding
   functional = rangeOfCalculation >=> functional
@@ -46,7 +46,7 @@ rangeOfCalculation cp = case calculation cp of
 
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
-  roleAspects r = (unwrap r).roleAspects
+  roleAspects r = pure (unwrap r).roleAspects
   context r = (unwrap r).context
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
@@ -67,15 +67,15 @@ getCalculation :: Role -> QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
 
-effectiveRoleType :: String -> MonadPerspectives EnumeratedRoleType
-effectiveRoleType r = effectiveRoleType_ (ENR $ EnumeratedRoleType r) <|> effectiveRoleType_ (CR $ CalculatedRoleType r)
-  where
-    effectiveRoleType_ :: RoleType -> MonadPerspectives EnumeratedRoleType
-    effectiveRoleType_ = getRole >=> pure <<< getCalculation >=> case _ of
-        SQD _ _ (RDOM p) -> pure p
-        UQD _ _ _ (RDOM p) -> pure p
-        BQD _ _ _ _ (RDOM p) -> pure p
-        otherwise -> empty
+effectiveRoleType_ :: String -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType_ r = effectiveRoleType (ENR $ EnumeratedRoleType r) <|> effectiveRoleType (CR $ CalculatedRoleType r)
+
+effectiveRoleType :: RoleType -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType = getRole >=> pure <<< getCalculation >=> case _ of
+    SQD _ _ (RDOM p) -> pure p
+    UQD _ _ _ (RDOM p) -> pure p
+    BQD _ _ _ _ (RDOM p) -> pure p
+    otherwise -> empty
 
 -- Here are alternative functions, using functional dependencies in RoleClass,
 -- omitting Role.
@@ -86,10 +86,10 @@ getCalculation' :: forall r i. RoleClass r i => r -> QueryFunctionDescription
 getCalculation' r = calculation r
 
 effectiveRoleType' :: String -> MonadPerspectives EnumeratedRoleType
-effectiveRoleType' r = effectiveRoleType_ (EnumeratedRoleType r) <|> effectiveRoleType_ (CalculatedRoleType r)
+effectiveRoleType' r = effectiveRoleType'_ (EnumeratedRoleType r) <|> effectiveRoleType'_ (CalculatedRoleType r)
   where
-    effectiveRoleType_ :: forall r i. RoleClass r i => i -> MonadPerspectives EnumeratedRoleType
-    effectiveRoleType_ i = getRole' i >>= pure <<< getCalculation' >>= case _ of
+    effectiveRoleType'_ :: forall r i. RoleClass r i => i -> MonadPerspectives EnumeratedRoleType
+    effectiveRoleType'_ i = getRole' i >>= pure <<< getCalculation' >>= case _ of
         SQD _ _ (RDOM p) -> pure p
         UQD _ _ _ (RDOM p) -> pure p
         BQD _ _ _ _ (RDOM p) -> pure p

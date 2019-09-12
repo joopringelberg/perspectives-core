@@ -92,6 +92,10 @@ instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
 
 data PropertyType = ENP EnumeratedPropertyType | CP CalculatedPropertyType
 
+propertytype2string :: PropertyType -> String
+propertytype2string (ENP s) = unwrap s
+propertytype2string (CP s) = unwrap s
+
 derive instance genericRepPropertyType :: Generic PropertyType _
 instance writeForeignPropertyType :: WriteForeign PropertyType where
   writeImpl (ENP r) = writeImpl r

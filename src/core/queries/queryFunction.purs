@@ -1,6 +1,6 @@
 module Perspectives.Representation.QueryFunction where
 
-import Data.Array.Partial (head, tail)
+import Data.Array.Partial (head)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -15,7 +15,7 @@ type FunctionName = String
 
 data QueryFunction
   = DataTypeGetter FunctionName
-  | PropertyGetter FunctionName PropertyType
+  | PropertyGetter PropertyType
   | RolGetter RoleType
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
@@ -37,7 +37,7 @@ type ConstructorRep = {tag :: String, dat :: Array String}
 
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (DataTypeGetter f) = unsafeToForeign $ writeJSON {tag: "DataTypeGetter", dat: f}
-  writeImpl (PropertyGetter f p) = unsafeToForeign $ writeJSON {tag: "PropertyGetter", dat: [f, writeJSON p]}
+  writeImpl (PropertyGetter p) = unsafeToForeign $ writeJSON {tag: "PropertyGetter", dat: writeJSON p}
   writeImpl (RolGetter p) = unsafeToForeign $ writeJSON {tag: "RolGetter", dat: writeJSON p}
   writeImpl (ComputedRoleGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedRoleGetter", dat: f}
   writeImpl (ComputedPropertyGetter f) = unsafeToForeign $ writeJSON {tag: "ComputedPropertyGetter", dat: f}
@@ -52,9 +52,9 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction where
     (Left e) -> fail (ForeignError "Could not parse QueryFunction data")
     (Right ({tag, dat} :: ConstructorRep)) -> case tag of
       "DataTypeGetter" -> pure $ unsafePartial $ DataTypeGetter $ head dat
-      "PropertyGetter" -> case (readJSON (unsafePartial $ head $ tail dat)) of
+      "PropertyGetter" -> case (readJSON (unsafePartial $ head dat)) of
         (Left e) -> fail $ ForeignError (show e)
-        (Right r) -> pure $ unsafePartial $ PropertyGetter (head dat) r
+        (Right r) -> pure $ unsafePartial $ PropertyGetter r
       "RolGetter" -> case (readJSON (unsafePartial $ head dat)) of
         (Left e) -> fail $ ForeignError (show e)
         (Right r) -> pure $ unsafePartial $ RolGetter r

@@ -19,11 +19,12 @@ import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Actions (setupBotActions)
-import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Api
+import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>))
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
@@ -31,13 +32,12 @@ import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances (saveEntiteit)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Context (lookForUnqualifiedRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), roletype2string)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
-import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (>>=))
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
+import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -132,8 +132,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case mctype of
         Nothing -> sendResponse (Error corrId ("No contexttype found for '" <> subject <> "'")) setter
         (Just (ctype :: ContextType)) -> do
-          mrtype <- getPerspectType ctype >>= pure <<< (lookForUnqualifiedRoleType predicate)
-          case mrtype of
+          rtypes <- runArrayT $ lookForUnqualifiedRoleType predicate ctype
+          case head rtypes of
             Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
             (Just (rtype :: RoleType)) -> do
               (f :: RoleGetter) <- (getRoleFunction (roletype2string rtype))
@@ -146,8 +146,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case mctype of
         Nothing -> sendResponse (Error corrId ("No contexttype found for '" <> subject <> "'")) setter
         (Just (ctype :: ContextType)) -> do
-          mrtype <- getPerspectType ctype >>= pure <<< (lookForUnqualifiedRoleType predicate)
-          case mrtype of
+          rtypes <- runArrayT $ lookForUnqualifiedRoleType predicate ctype
+          case head rtypes of
             Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
             (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
     Api.GetProperty -> do
@@ -186,8 +186,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- Check whether a role exists for ContextDef with the localRolName and then create a new instance of it according to the rolDescription.
     -- subject :: Context, predicate :: localRolName, object :: ContextDef. rolDescription must be present!
     Api.CreateRolWithLocalName -> do
-      mqrolname <- (getPerspectType $ ContextType object) >>= pure <<< (lookForUnqualifiedRoleType predicate)
-      case mqrolname of
+      qrolnames <- runArrayT $ lookForUnqualifiedRoleType predicate (ContextType object)
+      case head qrolnames of
         Nothing -> sendResponse (Error corrId ("Cannot find Rol with local name '" <> predicate <> "' on context type '" <> object <> "'!")) setter
         (Just (qrolname :: RoleType)) -> case qrolname of
           -- (CR ctype) -> pure unit
@@ -240,8 +240,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- subject :: ContextDef, predicate :: localRolName, object :: RolID
     -- TODO: maak checkBinding
     -- Api.CheckBinding -> do
-    --   mtypeOfRolToBindTo <- (getPerspectType $ ContextType subject) >>= (lookForUnqualifiedRoleType predicate)
-    --   case mtypeOfRolToBindTo of
+    --   typeOfRolesToBindTo <- runArrayT $ lookForUnqualifiedRoleType predicate (ContextType subject)
+    --   case head typeOfRolesToBindTo of
     --     Nothing -> sendResponse (Error corrId ("No roltype found for '" <> predicate <> "'.")) setter
     --     (Just typeOfRolToBindTo) -> do
     --       ok <- checkBinding (RolDef typeOfRolToBindTo) object

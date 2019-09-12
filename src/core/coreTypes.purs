@@ -73,6 +73,13 @@ type ObjectsGetter s o = s -> MP (Array o)
 infixl 0 type ObjectsGetter as ##>
 
 -----------------------------------------------------------
+-- TYPELEVELGETTER
+-----------------------------------------------------------
+type TypeLevelGetter s o = s -> ArrayT MP o
+
+infixl 0 type TypeLevelGetter as ~~~>
+
+-----------------------------------------------------------
 -- MONADPERSPECTIVESQUERY
 -----------------------------------------------------------
 -- | The QueryEnvironment accumulates Assumptions.

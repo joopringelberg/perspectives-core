@@ -4,17 +4,20 @@ module Perspectives.Query.DescriptionCompiler where
 -- checking that the required path can indeed be followed.
 
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Data.Array (head)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Context (lookForRoleType)
+import Perspectives.Representation.Class.Property (effectivePropertyType)
+import Perspectives.Representation.Class.Role (effectiveRoleType)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..))
-import Prelude (class Show, bind, pure, ($), (<<<), (>>=), (<>), show)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
+import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleType, lookForUnqualifiedRoleType)
+import Prelude (class Show, bind, pure, ($), (<>), show)
 
 -- From an AST data constructor, create a QueryFunctionDescription data element after
 -- checking that the required path can indeed be followed.
@@ -22,15 +25,37 @@ import Prelude (class Show, bind, pure, ($), (<<<), (>>=), (<>), show)
 compileElementaryStep :: Domain -> ElementaryQueryStep -> FD
 -- Check whether the domain is a ContextType. Then check whether this type has a role with
 -- the given qualified name. We know it is not an external role (that would be asked for directly), but it may be a user-, bot-, context- or rolInContext role.
--- We also don't know whether it is enumerated or calculated.
 compileElementaryStep currentDomain s@(QualifiedRol qn) = do
   case currentDomain of
     (CDOM c) -> do
-      mb <- lift $ getPerspectType c >>= pure <<< lookForRoleType qn
-      case mb of
+      (at :: Array RoleType) <- lift $ runArrayT $ lookForRoleType qn c
+      case head at of
         Nothing -> throwError $ ContextHasNoRole c qn
-        (Just et) -> pure $ SQD currentDomain (RolGetter et) (RDOM $ EnumeratedRoleType
-         qn)
+        (Just (et :: RoleType)) -> do
+          (effectiveType :: EnumeratedRoleType) <- lift $ effectiveRoleType et
+          pure $ SQD currentDomain (RolGetter et) (RDOM $ effectiveType)
+    otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
+
+compileElementaryStep currentDomain s@(UnqualifiedRol ln) = do
+  case currentDomain of
+    (CDOM c) -> do
+      (at :: Array RoleType) <- lift $ runArrayT $ lookForUnqualifiedRoleType ln c
+      case head at of
+        Nothing -> throwError $ ContextHasNoRole c ln
+        (Just (et :: RoleType)) -> do
+          (effectiveType :: EnumeratedRoleType) <- lift $ effectiveRoleType et
+          pure $ SQD currentDomain (RolGetter et) (RDOM $ effectiveType)
+    otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
+
+compileElementaryStep currentDomain s@(QualifiedProperty qn) = do
+  case currentDomain of
+    (RDOM r) -> do
+      (at :: Array PropertyType) <- lift $ runArrayT $ lookForPropertyType qn r
+      case head at of
+        Nothing -> throwError $ RoleHasNoProperty r qn
+        (Just (et :: PropertyType)) -> do
+          (effectiveType :: EnumeratedPropertyType) <- lift $ effectivePropertyType et
+          pure $ SQD currentDomain (PropertyGetter et) (PDOM $ effectiveType)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.
@@ -56,11 +81,13 @@ data CompilerMessage =
   UnknownElementaryQueryStep
   | IncompatibleQueryArgument Domain ElementaryQueryStep
   | ContextHasNoRole ContextType String
+  | RoleHasNoProperty EnumeratedRoleType String
 
 instance showCompilerMessage :: Show CompilerMessage where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no role with the name '" <> qn <> "'."
+  show (RoleHasNoProperty rtype qn) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "'."
 
 compileRoleDescription :: ContextType -> QueryStep -> MonadPerspectives QueryFunctionDescription
 compileRoleDescription ct s = do
