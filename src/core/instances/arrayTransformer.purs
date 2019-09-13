@@ -12,7 +12,9 @@ import Prelude
 import Control.Monad.Trans.Class (class MonadTrans)
 import Control.MonadZero (class Alternative, class MonadZero)
 import Control.Plus (class Alt, class Plus)
-import Data.Array (concat, singleton)
+import Data.Array (catMaybes) as Arr
+import Data.Array (concat, foldl, singleton, union)
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 
@@ -34,6 +36,12 @@ derive instance newtypeArrayT :: Newtype (ArrayT m a) _
 instance functorArrayT :: Functor m => Functor (ArrayT m) where
   map f (ArrayT ma) = ArrayT (map f <$> ma)
 
+-- | Remove elements from an array which do not contain a value.
+catMaybes :: forall f a. Monad f => ArrayT f (Maybe a) -> ArrayT f a
+catMaybes (ArrayT ma) = ArrayT $ do
+  (as :: Array (Maybe a)) <- ma
+  pure (Arr.catMaybes as)
+
 instance applyArrayT :: Monad m => Apply (ArrayT m) where
   apply = applyArrayT_
 
@@ -48,9 +56,16 @@ instance applicativeArrayT :: Monad m => Applicative (ArrayT m) where
 
 -- NOTE that the result may contain double entries. We cannot assume Ord for the elements of the arrays, however, nor restrict Bind to such elements.
 instance bindArrayT :: Monad m => Bind (ArrayT m) where
+  -- bind :: forall a b. ArrayT m a -> (a -> ArrayT m b) -> ArrayT m b
   bind (ArrayT x) f = ArrayT (x >>= g)
     where
+      -- g :: Array a -> m (Array b)
       g as = map concat (traverse unwrap (map f as))
+      -- g as = map concat (unwrap (traverse f as))
+
+-- h :: forall a b m. Eq b => Monad m => (a -> ArrayT m b) -> Array a -> m (Array b)
+-- h f as = map concat (unwrap (traverse f as))
+-- h f as = map (foldl union []) (unwrap (traverse f as))
 
 -- x :: forall a m. Applicative m => Array (m (Array a)) -> m (Array a)
 -- x = traverse identity >>> map concat

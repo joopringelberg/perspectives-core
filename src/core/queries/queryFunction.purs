@@ -17,6 +17,7 @@ data QueryFunction
   = DataTypeGetter FunctionName
   | PropertyGetter PropertyType
   | RolGetter RoleType
+  -- 'Computed' is not 'calculated': call a Purescript function here.
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
 

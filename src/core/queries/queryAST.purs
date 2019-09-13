@@ -23,18 +23,18 @@ data QueryStep
   | Terminal ElementaryQueryStep
 
 data ElementaryQueryStep
-  = UnqualifiedRol String
-  | QualifiedRol String
-  | UnqualifiedProperty String
+  = QualifiedRol String
+  | UnqualifiedRol String
   | QualifiedProperty String
-  | UnqualifiedExternalProperty String
+  | UnqualifiedProperty String
   | QualifiedExternalProperty String
-  | UnqualifiedInternalProperty String
-  | QualifiedInternalProperty String
+  | UnqualifiedExternalProperty String
+
+  | Binding
+
   | Constant ContextID String -- ContextID identifies the type of the constant.
   | RolesOf String
   | Variable String
-  | Binding
   | Context
   | Identity
   | Type

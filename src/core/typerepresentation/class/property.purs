@@ -5,6 +5,8 @@ import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (range) as QT
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -30,28 +32,26 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty whe
   mandatory = rangeOfCalculatedProperty >=> mandatory
   calculation r = (unwrap r).calculation
 
+propertyCalculationRange :: QueryFunctionDescription -> MonadPerspectives EnumeratedPropertyType
+propertyCalculationRange qfd = case QT.range qfd of
+  (PDOM p) -> pure p
+  otherwise -> throwError (error ("range of calculation of a property is not an enumerated property."))
+
 rangeOfCalculatedProperty :: CalculatedProperty -> MonadPerspectives EnumeratedProperty
 rangeOfCalculatedProperty cp = propertyCalculationRange (calculation cp) >>= getPerspectType
-
-rangeOfCalculation :: forall r. PropertyClass r => r -> MonadPerspectives EnumeratedPropertyType
-rangeOfCalculation cp = propertyCalculationRange (calculation cp)
 
 rangeOfCalculation_ :: forall r. PropertyClass r => r -> MonadPerspectives EnumeratedProperty
 rangeOfCalculation_ cp = propertyCalculationRange (calculation cp) >>= getPerspectType
 
-propertyCalculationRange :: QueryFunctionDescription -> MonadPerspectives EnumeratedPropertyType
-propertyCalculationRange cd = case cd of
-  SQD _ _ (PDOM p) -> pure p
-  UQD _ _ _ (PDOM p) -> pure p
-  BQD _ _ _ _ (PDOM p) -> pure p
-  otherwise -> throwError (error ("range of calculation of a property is not an enumerated property."))
+rangeOfCalculation :: forall r. PropertyClass r => r -> MonadPerspectives EnumeratedPropertyType
+rangeOfCalculation cp = propertyCalculationRange (calculation cp)
 
 instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty where
   role r = (unwrap r).role
   range r = pure (unwrap r).range
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = SQD (RDOM (role r)) (PropertyGetter "FunctionName" (ENP (identifier r))) (PDOM (identifier r))
+  calculation r = SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (PDOM (identifier r))
 
 effectivePropertyType :: PropertyType -> MonadPerspectives EnumeratedPropertyType
 effectivePropertyType (ENP s) = ((getPerspectType s) :: MP EnumeratedProperty) >>= rangeOfCalculation

@@ -1,18 +1,24 @@
 module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.List.Trans (catMaybes)
 import Control.Plus (empty, (<|>))
+import Data.Array (intersect, foldl)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Effect.Exception (error)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), Domain(..))
+import Perspectives.Query.QueryTypes (range) as QT
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
-import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType, getPerspectTypes)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..))
-import Prelude (class Show, pure, show, (<<<), (<>), (>=>), (>>=), ($))
+import Prelude (class Show, pure, (<<<), (>=>), (>>=), ($), map, join, bind)
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -21,28 +27,65 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   kindOfRole :: r -> RoleKind
   roleAspects :: r -> MonadPerspectives (Array EnumeratedRoleType)
   context :: r -> ContextType
-  binding :: r -> MonadPerspectives RoleType
+  binding :: r -> MonadPerspectives (Maybe (ADT EnumeratedRoleType))
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
   calculation :: r -> QueryFunctionDescription
   properties :: r -> MonadPerspectives (Array PropertyType)
+  fullType :: r -> MonadPerspectives (ADT EnumeratedRoleType)
 
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
-  roleAspects = rangeOfCalculation >=> roleAspects
+  roleAspects = rangeOfCalculatedRole >=> roleAspects'
   context r = (unwrap r).context
-  binding = rangeOfCalculation >=> binding
-  functional = rangeOfCalculation >=> functional
-  mandatory = rangeOfCalculation >=> mandatory
+  binding = rangeOfCalculatedRole >=> binding'
+  functional = rangeOfCalculatedRole >=> functional'
+  mandatory = rangeOfCalculatedRole >=> mandatory'
   calculation r = (unwrap r).calculation
-  properties = rangeOfCalculation >=> properties
+  properties = rangeOfCalculatedRole >=> properties'
+  fullType r = rangeOfCalculatedRole >=> fullADTType
 
-rangeOfCalculation :: CalculatedRole -> MonadPerspectives EnumeratedRole
-rangeOfCalculation cp = case calculation cp of
-  SQD _ _ (RDOM p) -> getPerspectType p
-  UQD _ _ _ (RDOM p) -> getPerspectType p
-  BQD _ _ _ _ (RDOM p) -> getPerspectType p
-  otherwise -> throwError (error ("range of calculation of " <> show (identifier cp :: CalculatedRoleType) <> " is not an enumerated role."))
+roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
+roleCalculationRange qfd = case QT.range qfd of
+  (RDOM p) -> pure p
+  otherwise -> throwError (error ("range of calculation of a calculated role is not an enumerated role."))
+
+rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
+rangeOfCalculatedRole cr = roleCalculationRange (calculation cr)
+
+rangeOfCalculation_ :: CalculatedRole -> MonadPerspectives (Array EnumeratedRole)
+rangeOfCalculation_ = rangeOfCalculatedRole >=> getPerspectTypes
+
+roleAspects' :: ADT EnumeratedRoleType -> MP (Array EnumeratedRoleType)
+roleAspects' (ST et) = getPerspectType et >>= (roleAspects :: EnumeratedRole -> MP (Array EnumeratedRoleType))
+roleAspects' s@(SUM ts) = getPerspectTypes s >>= g
+  where
+    g :: Array EnumeratedRole -> MP (Array EnumeratedRoleType)
+    g = (traverse roleAspects) >=> pure <<< foldl intersect []
+roleAspects' s@(PROD ts) = getPerspectTypes s >>= g
+  where
+    g :: Array EnumeratedRole -> MP (Array EnumeratedRoleType)
+    g = map join <<< (traverse roleAspects)
+
+binding' :: ADT EnumeratedRoleType -> MP (Maybe (ADT EnumeratedRoleType))
+binding' s@(ST et) = ((getPerspectType et) :: MP EnumeratedRole) >>= binding
+binding' s@(SUM _) = getPerspectTypes s >>= g
+  where
+    g :: Array EnumeratedRole -> MP (ADT EnumeratedRoleType)
+    g rs = map SUM ((traverse binding) rs) 
+binding' p@(PROD _) = getPerspectTypes p >>= g
+  where
+    g :: Array EnumeratedRole -> MP (ADT EnumeratedRoleType)
+    g rs = map PROD ((traverse binding) rs)
+
+functional' :: ADT EnumeratedRoleType -> MP Boolean
+functional' _ = pure true
+
+mandatory' :: ADT EnumeratedRoleType -> MP Boolean
+mandatory' _ = pure true
+
+properties' :: ADT EnumeratedRoleType -> MP (Array PropertyType)
+properties' _ = pure []
 
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
@@ -51,8 +94,18 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = SQD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (identifier r))
+  calculation r = SQD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
   properties r = pure (unwrap r).properties
+  fullType r = case (unwrap r).binding of
+    Nothing -> pure $ ST $ identifier r
+    (Just b) -> do
+      bt <- fullADTType b
+      pure $ SUM [ST (identifier r), b]
+
+fullADTType :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+fullADTType (ST et) = ((getPerspectType et) :: MP EnumeratedRole) >>= fullType
+fullADTType (SUM adts) = map SUM (traverse fullADTType adts)
+fullADTType (PROD adts) = map PROD (traverse fullADTType adts)
 
 data Role = E EnumeratedRole | C CalculatedRole
 
@@ -67,15 +120,15 @@ getCalculation :: Role -> QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
 
-effectiveRoleType_ :: String -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType_ :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 effectiveRoleType_ r = effectiveRoleType (ENR $ EnumeratedRoleType r) <|> effectiveRoleType (CR $ CalculatedRoleType r)
 
-effectiveRoleType :: RoleType -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 effectiveRoleType = getRole >=> pure <<< getCalculation >=> case _ of
     SQD _ _ (RDOM p) -> pure p
     UQD _ _ _ (RDOM p) -> pure p
     BQD _ _ _ _ (RDOM p) -> pure p
-    otherwise -> empty
+    otherwise -> empty -- NB: The Alt instance of Aff throws an error on empty!
 
 -- Here are alternative functions, using functional dependencies in RoleClass,
 -- omitting Role.
@@ -85,10 +138,10 @@ getRole' i = getPerspectType i
 getCalculation' :: forall r i. RoleClass r i => r -> QueryFunctionDescription
 getCalculation' r = calculation r
 
-effectiveRoleType' :: String -> MonadPerspectives EnumeratedRoleType
+effectiveRoleType' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 effectiveRoleType' r = effectiveRoleType'_ (EnumeratedRoleType r) <|> effectiveRoleType'_ (CalculatedRoleType r)
   where
-    effectiveRoleType'_ :: forall r i. RoleClass r i => i -> MonadPerspectives EnumeratedRoleType
+    effectiveRoleType'_ :: forall r i. RoleClass r i => i -> MonadPerspectives (ADT EnumeratedRoleType)
     effectiveRoleType'_ i = getRole' i >>= pure <<< getCalculation' >>= case _ of
         SQD _ _ (RDOM p) -> pure p
         UQD _ _ _ (RDOM p) -> pure p

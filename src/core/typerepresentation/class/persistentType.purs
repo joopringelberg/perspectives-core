@@ -7,14 +7,18 @@ module Perspectives.Representation.Class.PersistentType
 import Perspectives.Representation.Class.Revision
 
 import Control.Monad.Except (throwError)
+import Data.Array (foldl, intersect, singleton, union)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
+import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Foreign.Object (insert, lookup) as FO
 import Perspectives.CoreTypes (MonadPerspectives, MP)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (deconstructModelName, deconstructNamespace)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -25,11 +29,11 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, ViewType)
 import Perspectives.Representation.View (View)
-import Prelude (Unit, bind, ($), pure, (<>), unit)
+import Prelude (Unit, bind, ($), pure, (<>), unit, (>>=), (<<<), class Eq)
 
 type Namespace = String
 
-class (Identifiable v i, Revision v, Newtype i String) <= PersistentType v i where
+class (Identifiable v i, Revision v, Newtype i String, Eq v) <= PersistentType v i where
   retrieveFromDomein :: i -> Namespace -> MonadPerspectives v
   cacheInDomeinFile :: i -> v -> MonadPerspectives Unit
 
@@ -41,6 +45,14 @@ getPerspectType id = do
   case mns of
     Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> unwrap id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
+
+getPerspectTypes :: forall r i. PersistentType r i => ADT i -> MP (Array r)
+getPerspectTypes (ST i) = getPerspectType i >>= pure <<< singleton
+getPerspectTypes (SUM adts) = traverse getPerspectTypes adts >>= pure <<< foldl intersect []
+getPerspectTypes (PROD adts) = traverse getPerspectTypes adts >>= pure <<< foldl union []
+
+getPerspectTypes' :: forall r i. PersistentType r i => ADT i -> ArrayT MP r
+getPerspectTypes' = ArrayT <<< getPerspectTypes
 
 -----------------------------------------------------------
 -- ADD TO A DOMEINFILE

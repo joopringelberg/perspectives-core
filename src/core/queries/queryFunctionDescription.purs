@@ -7,6 +7,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Foreign (unsafeFromForeign, unsafeToForeign)
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
@@ -43,7 +44,7 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM EnumeratedRoleType | PDOM EnumeratedPropertyType | CDOM ContextType
+data Domain = RDOM (ADT EnumeratedRoleType) | PDOM EnumeratedPropertyType | CDOM ContextType
 
 type Range = Domain
 

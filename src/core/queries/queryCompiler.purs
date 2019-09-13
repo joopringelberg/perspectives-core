@@ -22,9 +22,11 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 
+-- Handles Enumerated RoleTypes
 context2role :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 context2role (SQD _ (RolGetter (ENR r)) _) = pure $ getRole r
 
+-- Handles Calculated RoleTypes
 context2role (SQD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
   context2role (RC.calculation ct)

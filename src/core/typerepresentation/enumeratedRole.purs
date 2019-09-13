@@ -2,10 +2,12 @@ module Perspectives.Representation.EnumeratedRole where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleKind, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -24,7 +26,7 @@ type EnumeratedRoleRecord =
   , properties :: Array PropertyType
 
   , context :: ContextType
-  , binding :: RoleType
+  , binding :: Maybe (ADT EnumeratedRoleType)
 
   , functional :: Boolean
   , mandatory :: Boolean

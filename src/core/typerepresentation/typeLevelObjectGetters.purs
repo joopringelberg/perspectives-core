@@ -1,16 +1,18 @@
 module Perspectives.Types.ObjectGetters where
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
-import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
+import Data.Array (singleton)
+import Perspectives.CoreTypes (MonadPerspectives, MP, type (~~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, filter')
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Role (class RoleClass, properties, roleAspects)
+import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.PersistentType (getPerspectType, getPerspectTypes')
+import Perspectives.Representation.Class.Role (class RoleClass, binding, properties, roleAspects)
 import Perspectives.Representation.Context (Context, aspects, roleInContext) as Context
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, propertytype2string, roletype2string)
-import Prelude (pure, (==), (>>>), (<<<), (>=>))
+import Prelude (pure, (==), (>>>), (<<<), (>=>), map)
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
@@ -31,23 +33,36 @@ contextAspectsClosure = closure_ f where
   f :: ContextType -> ArrayT MonadPerspectives ContextType
   f = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.aspects)
 
-lookForPropertyType :: forall r i. RoleClass r i => String -> (i ~~~> PropertyType)
+lookForPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
+lookForPropertyType_ s i = lookForProperty (propertytype2string >>> ((==) s)) (ST i)
+
+-- | We simply require the Pattern to match the end of the string.
+lookForUnqualifiedPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
+lookForUnqualifiedPropertyType_ s i = lookForProperty (propertytype2string >>> isContainingNamespace s) (ST i)
+
+lookForPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForPropertyType s = lookForProperty (propertytype2string >>> ((==) s))
 
 -- | We simply require the Pattern to match the end of the string.
-lookForUnqualifiedPropertyType :: forall r i. RoleClass r i => String -> (i ~~~> PropertyType)
+lookForUnqualifiedPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> isContainingNamespace s)
 
-lookForProperty :: forall r i. RoleClass r i => (PropertyType -> Boolean) -> i ~~~> PropertyType
+lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
 lookForProperty criterium = filter' (roleAspectsClosure >=> propertyOfRole) criterium
 
 propertyOfRole :: forall r i. RoleClass r i => i ~~~> PropertyType
 propertyOfRole = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> properties)
 
-roleAspectsClosure :: forall r i. RoleClass r i => i ~~~> EnumeratedRoleType
+roleAspectsClosure :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
 roleAspectsClosure = g >=> closure_ f where
   f :: EnumeratedRoleType -> ArrayT MonadPerspectives EnumeratedRoleType
   f = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPerspectives EnumeratedRole) >=> roleAspects)
 
-  g :: i ~~~> EnumeratedRoleType
-  g = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> roleAspects)
+  g :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
+  g = ((getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< roleAspects)
+
+typeOfBinding :: ADT EnumeratedRoleType ~~~> ADT EnumeratedRoleType
+typeOfBinding = (getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< map singleton <<< binding
+
+typeOfBinding_ :: EnumeratedRoleType ~~~> (ADT EnumeratedRoleType)
+typeOfBinding_ = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MP EnumeratedRole) >=> binding >=> pure <<< singleton)
