@@ -2,6 +2,7 @@ module Perspectives.Types.ObjectGetters where
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 import Data.Array (singleton)
+import Data.Maybe (Maybe)
 import Perspectives.CoreTypes (MonadPerspectives, MP, type (~~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (isContainingNamespace)
@@ -61,8 +62,10 @@ roleAspectsClosure = g >=> closure_ f where
   g :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
   g = ((getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< roleAspects)
 
-typeOfBinding :: ADT EnumeratedRoleType ~~~> ADT EnumeratedRoleType
+-- alleen gebruikt in DescriptionCompiler. Probeer te vervangen door fullType.
+typeOfBinding :: ADT EnumeratedRoleType ~~~> Maybe (ADT EnumeratedRoleType)
 typeOfBinding = (getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< map singleton <<< binding
 
-typeOfBinding_ :: EnumeratedRoleType ~~~> (ADT EnumeratedRoleType)
-typeOfBinding_ = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MP EnumeratedRole) >=> binding >=> pure <<< singleton)
+-- wordt niet gebruikt.
+-- typeOfBinding_ :: EnumeratedRoleType ~~~> (ADT EnumeratedRoleType)
+-- typeOfBinding_ = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MP EnumeratedRole) >=> binding >=> pure <<< singleton)

@@ -4,7 +4,7 @@ module Perspectives.Query.DescriptionCompiler where
 -- checking that the required path can indeed be followed.
 
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Data.Array (head)
+import Data.Array (catMaybes, head)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
@@ -83,8 +83,10 @@ compileElementaryStep currentDomain s@(Binding) = do
   case currentDomain of
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       -- The binding of a role is always an ADT EnumeratedRoleType.
-      (typeOfBinding' :: (Array (ADT EnumeratedRoleType))) <- runArrayT $ typeOfBinding r
-      pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM typeOfBinding')
+      (typeOfBinding' :: (Array (Maybe (ADT EnumeratedRoleType)))) <- lift $ runArrayT $ typeOfBinding r
+      case head $ catMaybes typeOfBinding' of
+        Nothing -> throwError $ RoleHasNoBinding r
+        (Just adt) -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.
@@ -111,12 +113,14 @@ data CompilerMessage =
   | IncompatibleQueryArgument Domain ElementaryQueryStep
   | ContextHasNoRole ContextType String
   | RoleHasNoProperty (ADT EnumeratedRoleType) String
+  | RoleHasNoBinding (ADT EnumeratedRoleType)
 
 instance showCompilerMessage :: Show CompilerMessage where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no role with the name '" <> qn <> "'."
   show (RoleHasNoProperty rtype qn) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "'."
+  show (RoleHasNoBinding rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding."
 
 compileRoleDescription :: ContextType -> QueryStep -> MonadPerspectives QueryFunctionDescription
 compileRoleDescription ct s = do
