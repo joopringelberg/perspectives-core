@@ -42,7 +42,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   functional = rangeOfCalculatedRole >=> functional'
   mandatory = rangeOfCalculatedRole >=> mandatory'
   calculation r = (unwrap r).calculation
-  properties = rangeOfCalculatedRole >=> properties'
+  properties = rangeOfCalculatedRole >=> propertiesOfADT
   fullType = rangeOfCalculatedRole >=> fullADTType
 
 fullADTType :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
@@ -87,8 +87,8 @@ mandatory' = reduce g
     g :: EnumeratedRoleType -> MP Boolean
     g = (getPerspectType :: EnumeratedRoleType -> MP EnumeratedRole) >=> mandatory
 
-properties' :: ADT EnumeratedRoleType -> MP (Array PropertyType)
-properties' = reduce g
+propertiesOfADT :: ADT EnumeratedRoleType -> MP (Array PropertyType)
+propertiesOfADT = reduce g
   where
     g :: EnumeratedRoleType -> MP (Array PropertyType)
     g = (getPerspectType :: EnumeratedRoleType -> MP EnumeratedRole) >=> properties

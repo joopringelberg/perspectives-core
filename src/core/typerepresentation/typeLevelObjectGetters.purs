@@ -1,19 +1,15 @@
 module Perspectives.Types.ObjectGetters where
 
--- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
-import Data.Array (singleton)
-import Data.Maybe (Maybe)
-import Perspectives.CoreTypes (MonadPerspectives, MP, type (~~~>))
+import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, filter')
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.PersistentType (getPerspectType, getPerspectTypes')
-import Perspectives.Representation.Class.Role (class RoleClass, binding, properties, roleAspects)
+import Perspectives.Representation.Class.PersistentType (getPerspectType)
+import Perspectives.Representation.Class.Role (class RoleClass, properties, propertiesOfADT)
 import Perspectives.Representation.Context (Context, aspects, roleInContext) as Context
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, propertytype2string, roletype2string)
-import Prelude (pure, (==), (>>>), (<<<), (>=>), map)
+import Prelude (pure, (==), (>>>), (<<<), (>=>))
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
@@ -49,18 +45,7 @@ lookForUnqualifiedPropertyType :: String -> (ADT EnumeratedRoleType ~~~> Propert
 lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> isContainingNamespace s)
 
 lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
-lookForProperty criterium = filter' (roleAspectsClosure >=> propertyOfRole) criterium
+lookForProperty criterium = filter' (ArrayT <<< propertiesOfADT) criterium
 
 propertyOfRole :: forall r i. RoleClass r i => i ~~~> PropertyType
 propertyOfRole = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> properties)
-
--- TODO ik heb het vermoeden dat hier teveel wordt gedaan.
--- is er overlap met getPerspectTypes'?
--- wordt alleen in deze module gebruikt.
-roleAspectsClosure :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
-roleAspectsClosure = g >=> closure_ f where
-  f :: EnumeratedRoleType -> ArrayT MonadPerspectives EnumeratedRoleType
-  f = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MonadPerspectives EnumeratedRole) >=> roleAspects)
-
-  g :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
-  g = ((getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< roleAspects)
