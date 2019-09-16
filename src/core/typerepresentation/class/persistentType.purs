@@ -42,6 +42,13 @@ getPerspectType id = do
     Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> unwrap id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
 
+getEnumeratedRole :: EnumeratedRoleType -> MP EnumeratedRole
+getEnumeratedRole = getPerspectType
+
+getEnumeratedProperty :: EnumeratedPropertyType -> MP EnumeratedProperty
+getEnumeratedProperty = getPerspectType
+
+
 -----------------------------------------------------------
 -- ADD TO A DOMEINFILE
 -----------------------------------------------------------
