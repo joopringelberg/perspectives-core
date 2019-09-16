@@ -2,7 +2,7 @@ module Perspectives.CoreTypes where
 
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.Writer (WriterT, runWriterT)
-import Data.Array (head, union)
+import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
@@ -17,7 +17,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (class Monoid, class Semigroup, Unit, bind, pure, ($), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------

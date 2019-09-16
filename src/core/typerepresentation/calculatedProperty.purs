@@ -2,13 +2,11 @@ module Perspectives.Representation.CalculatedProperty where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.InstanceIdentifiers (Value(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedRoleType, RoleKind(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedRoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 

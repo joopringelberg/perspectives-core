@@ -1,6 +1,6 @@
 module Perspectives.Representation.ADT where
 
-import Data.Array (elemIndex, filter, intersect, union)
+import Data.Array (elemIndex, filter, head, intersect, uncons, union)
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
@@ -69,5 +69,12 @@ instance reducibletoADT :: Reducible EnumeratedRoleType (ADT EnumeratedRoleType)
   reduce f (PROD adts) = do
     (x :: Array (ADT EnumeratedRoleType)) <- traverse (reduce f) adts
     -- Simplify: remove all NOTYPE's.
-    pure $ PROD $ filter (notEq NOTYPE) x
+    r <- pure $ filter (notEq NOTYPE) x
+    case uncons r of
+      -- SUM [] == NOTYPE
+      Nothing -> pure NOTYPE
+      (Just {head : hd, tail}) -> case head tail of
+        -- SUM [a] = a
+        Nothing -> pure hd
+        otherwise -> pure $ PROD r
   reduce f NOTYPE = pure NOTYPE
