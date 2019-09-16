@@ -54,6 +54,9 @@ lookForProperty criterium = filter' (roleAspectsClosure >=> propertyOfRole) crit
 propertyOfRole :: forall r i. RoleClass r i => i ~~~> PropertyType
 propertyOfRole = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> properties)
 
+-- TODO ik heb het vermoeden dat hier teveel wordt gedaan.
+-- is er overlap met getPerspectTypes'?
+-- wordt alleen in deze module gebruikt.
 roleAspectsClosure :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
 roleAspectsClosure = g >=> closure_ f where
   f :: EnumeratedRoleType -> ArrayT MonadPerspectives EnumeratedRoleType
@@ -61,11 +64,3 @@ roleAspectsClosure = g >=> closure_ f where
 
   g :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
   g = ((getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< roleAspects)
-
--- alleen gebruikt in DescriptionCompiler. Probeer te vervangen door fullType.
-typeOfBinding :: ADT EnumeratedRoleType ~~~> Maybe (ADT EnumeratedRoleType)
-typeOfBinding = (getPerspectTypes' :: ADT EnumeratedRoleType ~~~> EnumeratedRole) >=> ArrayT <<< map singleton <<< binding
-
--- wordt niet gebruikt.
--- typeOfBinding_ :: EnumeratedRoleType ~~~> (ADT EnumeratedRoleType)
--- typeOfBinding_ = ArrayT <<< ((getPerspectType :: EnumeratedRoleType -> MP EnumeratedRole) >=> binding >=> pure <<< singleton)

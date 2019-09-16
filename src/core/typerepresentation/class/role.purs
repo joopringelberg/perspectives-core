@@ -2,7 +2,7 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, (<|>))
-import Data.Array (catMaybes)
+import Data.Array (elemIndex, filter)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -13,11 +13,11 @@ import Perspectives.Query.QueryTypes (range) as QT
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
-import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType, getPerspectTypes)
+import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..))
-import Prelude (class Show, bind, identity, map, pure, ($), (<<<), (>=>), (>>=))
+import Prelude (class Show, bind, map, notEq, pure, ($), (<<<), (>=>), (>>=))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -26,7 +26,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   kindOfRole :: r -> RoleKind
   roleAspects :: r -> MonadPerspectives (Array EnumeratedRoleType)
   context :: r -> ContextType
-  binding :: r -> MonadPerspectives (Maybe (ADT EnumeratedRoleType))
+  binding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
   calculation :: r -> QueryFunctionDescription
@@ -38,7 +38,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects = rangeOfCalculatedRole >=> roleAspects'
   context r = (unwrap r).context
-  binding = rangeOfCalculatedRole >=> binding'
+  binding = rangeOfCalculatedRole >=> bindingOfADT
   functional = rangeOfCalculatedRole >=> functional'
   mandatory = rangeOfCalculatedRole >=> mandatory'
   calculation r = (unwrap r).calculation
@@ -49,6 +49,7 @@ fullADTType :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
 fullADTType (ST et) = ((getPerspectType et) :: MP EnumeratedRole) >>= fullType
 fullADTType (SUM adts) = map SUM (traverse fullADTType adts)
 fullADTType (PROD adts) = map PROD (traverse fullADTType adts)
+fullADTType NOTYPE = pure NOTYPE
 
 roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
 roleCalculationRange qfd = case QT.range qfd of
@@ -58,24 +59,21 @@ roleCalculationRange qfd = case QT.range qfd of
 rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfCalculatedRole cr = roleCalculationRange (calculation cr)
 
-rangeOfCalculation_ :: CalculatedRole -> MonadPerspectives (Array EnumeratedRole)
-rangeOfCalculation_ = rangeOfCalculatedRole >=> getPerspectTypes
-
-binding' :: ADT EnumeratedRoleType -> MP (Maybe (ADT EnumeratedRoleType))
-binding' s@(ST et) = ((getPerspectType et) :: MP EnumeratedRole) >>= binding
-binding' s@(SUM _) = getPerspectTypes s >>= g
-  where
-    g :: Array EnumeratedRole -> MP (Maybe (ADT EnumeratedRoleType))
-    g rs = do
-      (x :: (Array (Maybe (ADT EnumeratedRoleType)))) <- traverse binding rs
-      (y :: (Maybe (Array (ADT EnumeratedRoleType)))) <- pure $ traverse identity x
-      pure (map SUM y)
-binding' p@(PROD _) = getPerspectTypes p >>= g
-  where
-    g :: Array EnumeratedRole -> MP (Maybe (ADT EnumeratedRoleType))
-    g rs = do
-      (x :: (Array (Maybe (ADT EnumeratedRoleType)))) <- traverse binding rs
-      pure $ Just $ PROD $ catMaybes x
+-- what is the binding of a calculated role? It is the binding of the range of its calculation (an ADT).
+-- what is the binding of an ADT?
+bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+bindingOfADT (ST et) = ((getPerspectType et) :: MP EnumeratedRole) >>= binding
+bindingOfADT (SUM adts) = do
+  (x :: Array (ADT EnumeratedRoleType)) <- traverse bindingOfADT adts
+  -- Simplify: all members of the SUM must have a binding, otherwise the binding of the SUM is NOTYPE.
+  case elemIndex NOTYPE x of
+    Nothing -> pure NOTYPE
+    otherwise -> pure $ SUM x
+bindingOfADT (PROD adts) = do
+  (x :: Array (ADT EnumeratedRoleType)) <- traverse bindingOfADT adts
+  -- Simplify: remove all NOTYPE's.
+  pure $ PROD $ filter (notEq NOTYPE) x
+bindingOfADT NOTYPE = pure NOTYPE
 
 functional' :: ADT EnumeratedRoleType -> MP Boolean
 functional' = reduce g
@@ -110,11 +108,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   mandatory r = pure (unwrap r).mandatory
   calculation r = SQD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
   properties r = pure (unwrap r).properties
-  fullType r = case (unwrap r).binding of
-    Nothing -> pure $ ST $ identifier r
-    (Just b) -> do
-      bt <- fullADTType b
-      pure $ SUM [ST (identifier r), b]
+  fullType r = pure $ PROD [(ST $ identifier r), (unwrap r).binding]
 
 data Role = E EnumeratedRole | C CalculatedRole
 

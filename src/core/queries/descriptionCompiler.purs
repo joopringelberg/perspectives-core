@@ -4,7 +4,7 @@ module Perspectives.Query.DescriptionCompiler where
 -- checking that the required path can indeed be followed.
 
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Data.Array (catMaybes, head)
+import Data.Array (head)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
@@ -12,12 +12,12 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Property (effectivePropertyType)
-import Perspectives.Representation.Class.Role (effectiveRoleType)
+import Perspectives.Representation.Class.Role (effectiveRoleType, bindingOfADT)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleType, typeOfBinding)
+import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleType)
 import Prelude (class Show, bind, pure, ($), (<>), show)
 
 -- From an AST data constructor, create a QueryFunctionDescription data element after
@@ -83,10 +83,10 @@ compileElementaryStep currentDomain s@(Binding) = do
   case currentDomain of
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       -- The binding of a role is always an ADT EnumeratedRoleType.
-      (typeOfBinding' :: (Array (Maybe (ADT EnumeratedRoleType)))) <- lift $ runArrayT $ typeOfBinding r
-      case head $ catMaybes typeOfBinding' of
-        Nothing -> throwError $ RoleHasNoBinding r
-        (Just adt) -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
+      (typeOfBinding' :: (ADT EnumeratedRoleType)) <- lift $ bindingOfADT r
+      case typeOfBinding' of
+        NOTYPE -> throwError $ RoleHasNoBinding r
+        adt -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.

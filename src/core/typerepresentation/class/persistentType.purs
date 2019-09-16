@@ -46,10 +46,17 @@ getPerspectType id = do
     Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> unwrap id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
 
+-- TODO Ik vraag me af of dit een zinnige definitie is.
+-- wordt gebruikt in TypeLevelObjectGetters
+-- | First recursively computes for each member of a Sum or Product ADT the underlying type representations.
+-- | Then returns the intersection of those for a Sum, and the union for a Product.
+-- NOTICE that for a Sum of ST ADT types, this returns an empty type. Presumably we at least need the intersection of
+-- the fullType.
 getPerspectTypes :: forall r i. PersistentType r i => ADT i -> MP (Array r)
 getPerspectTypes (ST i) = getPerspectType i >>= pure <<< singleton
 getPerspectTypes (SUM adts) = traverse getPerspectTypes adts >>= pure <<< foldl intersect []
 getPerspectTypes (PROD adts) = traverse getPerspectTypes adts >>= pure <<< foldl union []
+getPerspectTypes NOTYPE = pure []
 
 getPerspectTypes' :: forall r i. PersistentType r i => ADT i -> ArrayT MP r
 getPerspectTypes' = ArrayT <<< getPerspectTypes

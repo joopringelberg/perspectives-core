@@ -14,7 +14,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 import Prelude (class Eq, class Monad, class Show, ($), bind, pure)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
-data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a))
+data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | NOTYPE
 -- data CompoundRoleType
 
 derive instance genericRepBinding :: Generic (ADT a) _
@@ -42,6 +42,7 @@ instance reducableToBool :: Reducable EnumeratedRoleType Boolean where
   reduce f (PROD adts) = do
     (bools :: Array Boolean) <- traverse (reduce f) adts
     pure $ unwrap $ foldMap Disj bools
+  reduce f NOTYPE = pure false
 
 instance reducableToArray :: Eq b => Reducable EnumeratedRoleType (Array b) where
   reduce f (ST a) = f a
@@ -51,3 +52,4 @@ instance reducableToArray :: Eq b => Reducable EnumeratedRoleType (Array b) wher
   reduce f (PROD adts) = do
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
     pure $ foldl union [] arrays
+  reduce f NOTYPE = pure []

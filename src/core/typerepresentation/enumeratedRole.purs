@@ -2,7 +2,6 @@ module Perspectives.Representation.EnumeratedRole where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -26,7 +25,7 @@ type EnumeratedRoleRecord =
   , properties :: Array PropertyType
 
   , context :: ContextType
-  , binding :: Maybe (ADT EnumeratedRoleType)
+  , binding :: ADT EnumeratedRoleType
 
   , functional :: Boolean
   , mandatory :: Boolean
