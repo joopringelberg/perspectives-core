@@ -23,7 +23,8 @@ import Prelude (class Show, map, pure, ($), (<<<), (>=>), (>>=))
 class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, i -> r where
   kindOfRole :: r -> RoleKind
   roleAspects :: r -> MonadPerspectives (Array EnumeratedRoleType)
-  context :: r -> ContextType
+  context :: r -> MP (ADT ContextType)
+  contextOfRepresentation :: r -> ContextType
   binding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
@@ -35,7 +36,9 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects = rangeOfCalculatedRole >=> roleAspects'
-  context r = (unwrap r).context
+  -- TODO. Klopt dit? Nemen we de context van de berekening, of de context van het berekende resultaat?
+  context = rangeOfCalculatedRole >=> contextOfADT
+  contextOfRepresentation r = (unwrap r).context
   binding = rangeOfCalculatedRole >=> bindingOfADT
   functional = rangeOfCalculatedRole >=> functional'
   mandatory = rangeOfCalculatedRole >=> mandatory'
@@ -56,6 +59,13 @@ roleCalculationRange qfd = case QT.range qfd of
 
 rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfCalculatedRole cr = roleCalculationRange (calculation cr)
+
+-- | The context of an ADT
+contextOfADT :: ADT EnumeratedRoleType -> MP (ADT ContextType)
+contextOfADT (ST et) = (getEnumeratedRole >=> context) et
+contextOfADT (SUM adts) = map SUM (traverse contextOfADT adts)
+contextOfADT (PROD adts) = map PROD (traverse contextOfADT adts)
+contextOfADT NOTYPE = pure NOTYPE
 
 -- | The binding of an ADT.
 bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
@@ -88,11 +98,12 @@ roleAspects' = reduce g
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects r = pure (unwrap r).roleAspects
-  context r = (unwrap r).context
+  context r = pure $ ST $ contextOfRepresentation r
+  contextOfRepresentation r = (unwrap r).context
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = SQD (CDOM (context r)) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
+  calculation r = SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
   properties r = pure (unwrap r).properties
   fullType r = pure $ PROD [(ST $ identifier r), (unwrap r).binding]
 

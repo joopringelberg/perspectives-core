@@ -29,16 +29,15 @@ data ElementaryQueryStep
   | UnqualifiedProperty String
   | QualifiedExternalProperty String
   | UnqualifiedExternalProperty String
-
   | Binding
 
+  | Context
+  | BuitenRol
   | Constant ContextID String -- ContextID identifies the type of the constant.
   | RolesOf String
   | Variable String
-  | Context
   | Identity
   | Type
-  | BuitenRol
   | IedereRolInContext
   | RolTypen
   | Label

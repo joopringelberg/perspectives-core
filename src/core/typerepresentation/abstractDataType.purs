@@ -46,8 +46,8 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
     pure $ unwrap $ foldMap Disj bools
   reduce f NOTYPE = pure false
 
--- | Reduce an `ADT EnumeratedRoleType` with `f :: EnumeratedRoleType -> MP (Array b)`
-instance reducibleToArray :: Eq b => Reducible EnumeratedRoleType (Array b) where
+-- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
+instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
@@ -58,6 +58,7 @@ instance reducibleToArray :: Eq b => Reducible EnumeratedRoleType (Array b) wher
   reduce f NOTYPE = pure []
 
 -- | Reduce an `ADT EnumeratedRoleType` with `f :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)`
+-- | `reduce f` then has type `ADT EnumeratedRoleType` -> MP (ADT EnumeratedRoleType)`.
 instance reducibletoADT :: Reducible EnumeratedRoleType (ADT EnumeratedRoleType) where
   reduce f (ST et) = f et
   reduce f (SUM adts) = do

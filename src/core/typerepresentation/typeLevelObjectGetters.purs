@@ -1,10 +1,11 @@
 module Perspectives.Types.ObjectGetters where
 
+import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, filter')
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, properties, propertiesOfADT)
 import Perspectives.Representation.Context (Context, aspects, roleInContext) as Context
@@ -21,6 +22,19 @@ lookForUnqualifiedRoleType s = lookForRole (roletype2string >>> isContainingName
 
 lookForRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
 lookForRole criterium = filter' (contextAspectsClosure >=> roleInContext) criterium
+
+lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
+lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s))
+
+-- | We simply require the Pattern to match the end of the string.
+lookForUnqualifiedRoleTypeOfADT :: String -> ADT ContextType ~~~> RoleType
+lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> isContainingNamespace s)
+
+lookForRoleOfADT :: (RoleType -> Boolean) -> ADT ContextType ~~~> RoleType
+lookForRoleOfADT criterium = ArrayT <<< reduce f
+  where
+    f :: ContextType -> MonadPerspectives (Array RoleType)
+    f = unwrap <<< lookForRole criterium
 
 roleInContext :: ContextType ~~~> RoleType
 roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.roleInContext)

@@ -14,10 +14,10 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Property (effectivePropertyType)
-import Perspectives.Representation.Class.Role (effectiveRoleType, bindingOfADT)
+import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, effectiveRoleType)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleType, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleType)
+import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (class Show, bind, pure, ($), (<>), show)
 
 -- From an AST data constructor, create a QueryFunctionDescription data element after
@@ -29,7 +29,7 @@ compileElementaryStep :: Domain -> ElementaryQueryStep -> FD
 compileElementaryStep currentDomain s@(QualifiedRol qn) = do
   case currentDomain of
     (CDOM c) -> do
-      (rts :: Array RoleType) <- lift $ runArrayT $ lookForRoleType qn c
+      (rts :: Array RoleType) <- lift $ runArrayT $ lookForRoleTypeOfADT qn c
       case head rts of
         Nothing -> throwError $ ContextHasNoRole c qn
         -- rt can be Enumerated or Calculated!
@@ -41,7 +41,7 @@ compileElementaryStep currentDomain s@(QualifiedRol qn) = do
 compileElementaryStep currentDomain s@(UnqualifiedRol ln) = do
   case currentDomain of
     (CDOM c) -> do
-      (at :: Array RoleType) <- lift $ runArrayT $ lookForUnqualifiedRoleType ln c
+      (at :: Array RoleType) <- lift $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ln c
       case head at of
         Nothing -> throwError $ ContextHasNoRole c ln
         (Just (et :: RoleType)) -> do
@@ -83,10 +83,17 @@ compileElementaryStep currentDomain s@(Binding) = do
   case currentDomain of
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       -- The binding of a role is always an ADT EnumeratedRoleType.
-      (typeOfBinding' :: (ADT EnumeratedRoleType)) <- lift $ bindingOfADT r
-      case typeOfBinding' of
+      (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift $ bindingOfADT r
+      case typeOfBinding of
         NOTYPE -> throwError $ RoleHasNoBinding r
         adt -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
+    otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
+
+compileElementaryStep currentDomain s@(Context) = do
+  case currentDomain of
+    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+      (typeOfContext :: ADT ContextType) <- lift $ contextOfADT r
+      pure $ SQD currentDomain (DataTypeGetter "context") (CDOM typeOfContext)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.
@@ -111,7 +118,7 @@ type FD = ExceptT CompilerMessage MonadPerspectives QueryFunctionDescription
 data CompilerMessage =
   UnknownElementaryQueryStep
   | IncompatibleQueryArgument Domain ElementaryQueryStep
-  | ContextHasNoRole ContextType String
+  | ContextHasNoRole (ADT ContextType) String
   | RoleHasNoProperty (ADT EnumeratedRoleType) String
   | RoleHasNoBinding (ADT EnumeratedRoleType)
 
@@ -124,7 +131,7 @@ instance showCompilerMessage :: Show CompilerMessage where
 
 compileRoleDescription :: ContextType -> QueryStep -> MonadPerspectives QueryFunctionDescription
 compileRoleDescription ct s = do
-  r <- runExceptT (compileQueryStep (CDOM ct) s)
+  r <- runExceptT (compileQueryStep (CDOM $ ST ct) s)
   case r of
     (Left m) -> throwError (error (show m))
     (Right d) -> pure d

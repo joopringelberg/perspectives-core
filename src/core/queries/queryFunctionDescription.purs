@@ -44,7 +44,7 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM (ADT EnumeratedRoleType) | PDOM EnumeratedPropertyType | CDOM ContextType
+data Domain = RDOM (ADT EnumeratedRoleType) | PDOM EnumeratedPropertyType | CDOM (ADT ContextType)
 
 type Range = Domain
 
