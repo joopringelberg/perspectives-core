@@ -9,9 +9,11 @@ import Perspectives.EntiteitAndRDFAliases (ContextID)
 -- TODO: positie in de oorspronkelijke tekst toevoegen.
 
 data QueryStep
-  = Filter QueryStep QueryStep
+  = Compose QueryStep QueryStep
+  | Terminal ElementaryQueryStep
+  | Filter QueryStep QueryStep
+
   | Concat (Array QueryStep)
-  | Compose QueryStep QueryStep
   | NotEmpty QueryStep
   | Closure QueryStep
   | Closure' QueryStep
@@ -20,7 +22,6 @@ data QueryStep
   | IgnoreCache QueryStep
   | Contains QueryStep QueryStep
   | SetVariable String QueryStep
-  | Terminal ElementaryQueryStep
 
 data ElementaryQueryStep
   = QualifiedRole String

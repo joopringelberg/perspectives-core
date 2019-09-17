@@ -115,6 +115,11 @@ compileQueryStep currentDomain s@(Compose op1 op2) = do
 -- Elementary steps:
 compileQueryStep currentDomain (Terminal e) = compileElementaryStep currentDomain e
 
+compileQueryStep currentDomain s@(Filter criterium source) = do
+  criterium' <- compileQueryStep currentDomain criterium
+  source' <- compileQueryStep currentDomain source
+  pure $ BQD currentDomain (BinaryCombinator "filter") criterium' source' currentDomain
+
 -- the last case
 compileQueryStep _ _ = throwError $ UnknownElementaryQueryStep
 
