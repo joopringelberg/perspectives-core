@@ -13,7 +13,6 @@ data QueryStep
   | Terminal ElementaryQueryStep
   | Filter QueryStep QueryStep
   | Disjunction QueryStep QueryStep
-
   | Conjunction QueryStep QueryStep
 
   | NotEmpty QueryStep

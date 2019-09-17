@@ -53,6 +53,12 @@ sumOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
 sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
 sumOfDomains _ _ = Nothing
 
+productOfDomains :: Domain -> Domain -> Maybe Domain
+productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
+productOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
+productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
+productOfDomains _ _ = Nothing
+
 type Range = Domain
 
 derive instance genericDomain :: Generic Domain _
