@@ -1,16 +1,14 @@
 module Perspectives.Representation.Context where
 
-import Data.Array (null, uncons)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
-import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), RoleType(..))
-import Prelude (class Eq, class Show, (<<<), (==), (>>>))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedRoleType, RoleType)
+import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
@@ -37,32 +35,6 @@ instance contextContextClass :: ContextClass Context where
   botRole = _.botRol <<< unwrap
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
-
--- TODO: DIT IS WAARSCHIJNLIJK VEROUDERD.
--- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
-lookForRoleType :: String -> Context -> Maybe RoleType
--- TODO: breid uit voor andere roltypen.
--- TODO: breid uit voor Aspecten.
-lookForRoleType = lookForRole_ (==)
-
--- | We simply require the Pattern to match the end of the string.
-lookForUnqualifiedRoleType :: String -> Context -> Maybe RoleType
-lookForUnqualifiedRoleType = lookForRole_ isContainingNamespace
-
-type RoleTypeIdentifier = String
-lookForRole_ :: (RoleTypeIdentifier -> String -> Boolean) -> RoleTypeIdentifier -> Context -> (Maybe RoleType)
-lookForRole_ criterium rn c = some (roleInContext c) (roleTypeIdentifier >>> (criterium rn))
-  where
-
-    roleTypeIdentifier :: RoleType -> String
-    roleTypeIdentifier (ENR (EnumeratedRoleType i)) = i
-    roleTypeIdentifier (CR (CalculatedRoleType i)) = i
-
-    some :: forall a. Array a -> (a -> Boolean) -> Maybe a
-    some candidates test | null candidates = Nothing
-    some candidates test = case uncons candidates of
-      Nothing -> Nothing
-      (Just {head, tail}) -> if (test head) then (Just head) else some tail test
 
 -----------------------------------------------------------
 -- CONTEXT

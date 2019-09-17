@@ -118,8 +118,6 @@ compileQueryStep currentDomain (Terminal e) = compileElementaryStep currentDomai
 -- the last case
 compileQueryStep _ _ = throwError $ UnknownElementaryQueryStep
 
--- type FD = Either CompilerMessage QueryFunctionDescription
-
 type FD = ExceptT CompilerMessage MonadPerspectives QueryFunctionDescription
 
 data CompilerMessage =
