@@ -8,7 +8,7 @@ import Control.Plus (empty)
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives)
-import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.Instances.ObjectGetters (getProperty, getRole, externalRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -20,7 +20,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 
 -- Handles Enumerated RoleTypes
 context2role :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
@@ -30,6 +30,8 @@ context2role (SQD _ (RolGetter (ENR r)) _) = pure $ getRole r
 context2role (SQD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
   context2role (RC.calculation ct)
+
+context2role (SQD _ (DataTypeGetter "externalRole") _) = pure externalRole
 
 context2role (BQD _ (BinaryCombinator "compose") f1 f2 r) = do
   case range f1 of
@@ -61,6 +63,11 @@ context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextI
 context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 
 role2propertyValue :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> Value)
+role2propertyValue (SQD _ (PropertyGetter (ENP pt)) _) = pure $ getProperty pt
+role2propertyValue (SQD _ (PropertyGetter (CP pt)) _) = do
+  (cp :: CalculatedProperty) <- getPerspectType pt
+  role2propertyValue (PC.calculation cp)
+
 -- The last case
 role2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 

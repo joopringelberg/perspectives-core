@@ -5,6 +5,7 @@ module Perspectives.Instances
 , fetchEntiteit
 , removeEntiteit
 , getPerspectEntiteit
+, getPerspectContext
 , tryGetPerspectEntiteit
 , getAVarRepresentingPerspectEntiteit
 , class PersistentInstance
@@ -50,6 +51,9 @@ getPerspectEntiteit id =
         pe <- liftAff $ read avar
         pure pe
       Nothing -> fetchEntiteit id
+
+getPerspectContext :: ContextInstance -> MP PerspectContext
+getPerspectContext = getPerspectEntiteit
 
 tryGetPerspectEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))

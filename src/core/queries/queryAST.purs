@@ -15,6 +15,7 @@ data QueryStep
   | Disjunction QueryStep QueryStep
   | Conjunction QueryStep QueryStep
 
+  -- To be implemented.
   | NotEmpty QueryStep
   | Closure QueryStep
   | Closure' QueryStep
@@ -35,6 +36,7 @@ data ElementaryQueryStep
   | Context
   | ExternalRole
 
+  -- To be implemented.
   | Constant ContextID String -- ContextID identifies the type of the constant.
   | RolesOf String
   | Variable String
