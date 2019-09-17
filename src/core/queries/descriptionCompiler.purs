@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range, sumOfDomains)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Property (effectivePropertyType)
@@ -120,6 +120,13 @@ compileQueryStep currentDomain s@(Filter criterium source) = do
   source' <- compileQueryStep currentDomain source
   pure $ BQD currentDomain (BinaryCombinator "filter") criterium' source' currentDomain
 
+compileQueryStep currentDomain s@(Disjunction op1 op2) = do
+  op1' <- compileQueryStep currentDomain op1
+  op2' <- compileQueryStep currentDomain op2
+  case sumOfDomains (range op1') (range op2') of
+    (Just dom) -> pure $ BQD currentDomain (BinaryCombinator "disjunction") op1' op2' dom
+    _ -> throwError $ IncompatibleDomainsForDisjunction (range op1') (range op2')
+
 -- the last case
 compileQueryStep _ _ = throwError $ UnknownElementaryQueryStep
 
@@ -131,6 +138,7 @@ data CompilerMessage =
   | ContextHasNoRole (ADT ContextType) String
   | RoleHasNoProperty (ADT EnumeratedRoleType) String
   | RoleHasNoBinding (ADT EnumeratedRoleType)
+  | IncompatibleDomainsForDisjunction Domain Domain
 
 instance showCompilerMessage :: Show CompilerMessage where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
@@ -138,6 +146,7 @@ instance showCompilerMessage :: Show CompilerMessage where
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no role with the name '" <> qn <> "'."
   show (RoleHasNoProperty rtype qn) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "'."
   show (RoleHasNoBinding rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding."
+  show (IncompatibleDomainsForDisjunction dom1 dom2) = "(IncompatibleDomainsForDisjunction) These two domains cannot be joined in a disjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
 
 compileRoleDescription :: ContextType -> QueryStep -> MonadPerspectives QueryFunctionDescription
 compileRoleDescription ct s = do

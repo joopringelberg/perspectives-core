@@ -12,8 +12,10 @@ data QueryStep
   = Compose QueryStep QueryStep
   | Terminal ElementaryQueryStep
   | Filter QueryStep QueryStep
+  | Disjunction QueryStep QueryStep
 
-  | Concat (Array QueryStep)
+  | Conjunction QueryStep QueryStep
+
   | NotEmpty QueryStep
   | Closure QueryStep
   | Closure' QueryStep

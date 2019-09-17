@@ -6,8 +6,9 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign, unsafeToForeign)
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
@@ -45,6 +46,12 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
 data Domain = RDOM (ADT EnumeratedRoleType) | PDOM EnumeratedPropertyType | CDOM (ADT ContextType)
+
+sumOfDomains :: Domain -> Domain -> Maybe Domain
+sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
+sumOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
+sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
+sumOfDomains _ _ = Nothing
 
 type Range = Domain
 
