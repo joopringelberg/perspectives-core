@@ -8,7 +8,7 @@ import Control.Plus (empty)
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives)
-import Perspectives.Instances.ObjectGetters (getProperty, getRole, externalRole)
+import Perspectives.Instances.ObjectGetters (binding, externalRole, getProperty, getRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -51,6 +51,8 @@ context2role (BQD _ (BinaryCombinator "compose") f1 f2 r) = do
 context2role _ = throwError (error "Unknown QueryFunction expression")
 
 role2role :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> RoleInstance)
+role2role (SQD _ (DataTypeGetter "binding") _) = pure binding
+
 -- The last case
 role2role _ = throwError (error "Unknown QueryFunction expression")
 
