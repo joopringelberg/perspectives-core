@@ -57,18 +57,18 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
     pure $ foldl union [] arrays
   reduce f NOTYPE = pure []
 
--- | Reduce an `ADT EnumeratedRoleType` with `f :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)`
--- | `reduce f` then has type `ADT EnumeratedRoleType` -> MP (ADT EnumeratedRoleType)`.
-instance reducibletoADT :: Reducible EnumeratedRoleType (ADT EnumeratedRoleType) where
+-- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`
+-- | `reduce f` then has type `ADT a` -> MP (ADT b)`.
+instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f (ST et) = f et
   reduce f (SUM adts) = do
-    (x :: Array (ADT EnumeratedRoleType)) <- traverse (reduce f) adts
+    (x :: Array (ADT b)) <- traverse (reduce f) adts
     -- Simplify: all members of the SUM must have a binding, otherwise the binding of the SUM is NOTYPE.
     case elemIndex NOTYPE x of
       Nothing -> pure NOTYPE
       otherwise -> pure $ SUM x
   reduce f (PROD adts) = do
-    (x :: Array (ADT EnumeratedRoleType)) <- traverse (reduce f) adts
+    (x :: Array (ADT b)) <- traverse (reduce f) adts
     -- Simplify: remove all NOTYPE's.
     r <- pure $ filter (notEq NOTYPE) x
     case uncons r of

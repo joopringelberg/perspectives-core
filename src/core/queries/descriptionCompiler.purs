@@ -17,7 +17,7 @@ import Perspectives.Representation.Class.Property (effectivePropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, effectiveRoleType)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (class Show, bind, pure, ($), (<>), show)
 
 -- From an AST data constructor, create a QueryFunctionDescription data element after
@@ -26,7 +26,7 @@ import Prelude (class Show, bind, pure, ($), (<>), show)
 compileElementaryStep :: Domain -> ElementaryQueryStep -> FD
 -- Check whether the domain is a ContextType. Then check whether this type has a role with
 -- the given qualified name. We know it is not an external role (that would be asked for directly), but it may be a user-, bot-, context- or rolInContext role.
-compileElementaryStep currentDomain s@(QualifiedRol qn) = do
+compileElementaryStep currentDomain s@(QualifiedRole qn) = do
   case currentDomain of
     (CDOM c) -> do
       (rts :: Array RoleType) <- lift $ runArrayT $ lookForRoleTypeOfADT qn c
@@ -38,7 +38,7 @@ compileElementaryStep currentDomain s@(QualifiedRol qn) = do
           pure $ SQD currentDomain (RolGetter rt) (RDOM $ effectiveType)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
-compileElementaryStep currentDomain s@(UnqualifiedRol ln) = do
+compileElementaryStep currentDomain s@(UnqualifiedRole ln) = do
   case currentDomain of
     (CDOM c) -> do
       (at :: Array RoleType) <- lift $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ln c
@@ -74,10 +74,10 @@ compileElementaryStep currentDomain s@(UnqualifiedProperty qn) = do
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 compileElementaryStep currentDomain s@(QualifiedExternalProperty qn) = do
-  compileQueryStep currentDomain (Compose (Terminal BuitenRol) (Terminal (QualifiedRol qn)))
+  compileQueryStep currentDomain (Compose (Terminal ExternalRole) (Terminal (QualifiedRole qn)))
 
 compileElementaryStep currentDomain s@(UnqualifiedExternalProperty qn) = do
-  compileQueryStep currentDomain (Compose (Terminal BuitenRol) (Terminal (UnqualifiedRol qn)))
+  compileQueryStep currentDomain (Compose (Terminal ExternalRole) (Terminal (UnqualifiedRole qn)))
 
 compileElementaryStep currentDomain s@(Binding) = do
   case currentDomain of
@@ -94,6 +94,13 @@ compileElementaryStep currentDomain s@(Context) = do
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       (typeOfContext :: ADT ContextType) <- lift $ contextOfADT r
       pure $ SQD currentDomain (DataTypeGetter "context") (CDOM typeOfContext)
+    otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
+
+compileElementaryStep currentDomain s@(ExternalRole) = do
+  case currentDomain of
+    (CDOM c) -> do
+      (rts :: ADT EnumeratedRoleType) <- lift $ externalRoleOfADT c
+      pure $ SQD currentDomain (DataTypeGetter "externalRole") (RDOM $ rts)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 -- The last case.

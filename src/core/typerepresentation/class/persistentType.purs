@@ -48,7 +48,8 @@ getEnumeratedRole = getPerspectType
 getEnumeratedProperty :: EnumeratedPropertyType -> MP EnumeratedProperty
 getEnumeratedProperty = getPerspectType
 
-
+getContext :: ContextType -> MP Context
+getContext = getPerspectType
 -----------------------------------------------------------
 -- ADD TO A DOMEINFILE
 -----------------------------------------------------------

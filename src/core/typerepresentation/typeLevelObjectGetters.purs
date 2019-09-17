@@ -1,16 +1,27 @@
 module Perspectives.Types.ObjectGetters where
 
+import Data.Array (singleton)
 import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
+import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
+import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
 import Perspectives.Representation.Class.Role (class RoleClass, properties, propertiesOfADT)
-import Perspectives.Representation.Context (Context, aspects, roleInContext) as Context
+import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole) as Context
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, propertytype2string, roletype2string)
 import Prelude (pure, (==), (>>>), (<<<), (>=>))
+
+externalRoleOfADT_ :: ADT ContextType ~~~> EnumeratedRoleType
+externalRoleOfADT_ = ArrayT <<< reduce eRole where
+  eRole :: ContextType -> MP (Array EnumeratedRoleType)
+  eRole = getContext >=> pure <<< singleton <<< Context.externalRole
+
+externalRoleOfADT :: ADT ContextType -> MP (ADT EnumeratedRoleType)
+externalRoleOfADT = reduce eRole where
+  eRole :: ContextType -> MP (ADT EnumeratedRoleType)
+  eRole = getContext >=> pure <<< ST <<< Context.externalRole
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)

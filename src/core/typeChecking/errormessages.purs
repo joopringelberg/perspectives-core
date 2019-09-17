@@ -51,7 +51,7 @@ data UserMessage =
   | VariableAlreadyDeclaredAs VariableName TypeID
   | MissingUnqualifiedProperty LocalName Alias.RolName
   | MissingQualifiedProperty Alias.PropertyName Alias.RolName
-  | MissingQualifiedRol Alias.RolName Alias.ContextID
+  | MissingQualifiedRole Alias.RolName Alias.ContextID
   | MissingUnqualifiedRol Alias.RolName Alias.ContextID
   | ContextExists Alias.ID
   | NotAValidIdentifier String
@@ -66,7 +66,7 @@ instance showUserMessage :: Show UserMessage where
   show (MultipleDefinitions ln aspectArray) = "(MultipleDefinitions) Elk van de volgende Aspecten heeft een definitie voor '" <> ln <> "': " <> show aspectArray
   show (MissingUnqualifiedProperty ln rn) = "(MissingUnqualifiedProperty) Er is geen definitie voor de property '" <> ln <> "' voor de rol '" <> rn <> "'."
   show (MissingQualifiedProperty pn rn) = "(MissingQualifiedProperty) Er is geen definitie voor de property '" <> pn <> "' voor de rol '" <> rn <> "'."
-  show (MissingQualifiedRol rn cid) = "(MissingQualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
+  show (MissingQualifiedRole rn cid) = "(MissingQualifiedRole) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
   show (MissingUnqualifiedRol rn cid) = "(MissingUnqualifiedRol) Er is geen definitie voor de rol '" <> rn <> "' in de context '" <> cid <> "'."
   show (NoType cid) = "(NoType) De context '" <> cid <> "' heeft geen type."
   show (MissingRolInstance rn cid) = "(MissingRolInstance) De verplichte Rol '" <> rn <> "' komt niet voor in de context '" <> cid <> "'."

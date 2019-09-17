@@ -38,6 +38,7 @@ instance contextContextClass :: ContextClass Context where
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
 
+-- TODO: DIT IS WAARSCHIJNLIJK VEROUDERD.
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> Context -> Maybe RoleType
 -- TODO: breid uit voor andere roltypen.
