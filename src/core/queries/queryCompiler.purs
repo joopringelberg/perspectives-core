@@ -8,7 +8,7 @@ import Control.Plus (empty)
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives)
-import Perspectives.Instances.ObjectGetters (binding, externalRole, getProperty, getRole)
+import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -22,6 +22,16 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 
+---------------------------------------------------------------------------------------------------
+-- CONTEXT TO CONTEXT
+---------------------------------------------------------------------------------------------------
+context2context :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> ContextInstance)
+-- The last case
+context2context _ = throwError (error "Unknown QueryFunction expression")
+
+---------------------------------------------------------------------------------------------------
+-- CONTEXT TO ROLE
+---------------------------------------------------------------------------------------------------
 -- Handles Enumerated RoleTypes
 context2role :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 context2role (SQD _ (RolGetter (ENR r)) _) = pure $ getRole r
@@ -50,20 +60,34 @@ context2role (BQD _ (BinaryCombinator "compose") f1 f2 r) = do
 -- The last case
 context2role _ = throwError (error "Unknown QueryFunction expression")
 
+---------------------------------------------------------------------------------------------------
+-- CONTEXT TO PROPERTYVALUE
+---------------------------------------------------------------------------------------------------
+context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> Value)
+-- The last case
+context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
+
+---------------------------------------------------------------------------------------------------
+-- ROLE TO CONTEXT
+---------------------------------------------------------------------------------------------------
+role2context :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> ContextInstance)
+role2context (SQD _ (DataTypeGetter "context") _) = pure context
+
+-- The last case
+role2context _ = throwError (error "Unknown QueryFunction expression")
+
+---------------------------------------------------------------------------------------------------
+-- ROLE TO ROLE
+---------------------------------------------------------------------------------------------------
 role2role :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> RoleInstance)
 role2role (SQD _ (DataTypeGetter "binding") _) = pure binding
 
 -- The last case
 role2role _ = throwError (error "Unknown QueryFunction expression")
 
-context2context :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> ContextInstance)
--- The last case
-context2context _ = throwError (error "Unknown QueryFunction expression")
-
-context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> Value)
--- The last case
-context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
-
+---------------------------------------------------------------------------------------------------
+-- ROLE TO PROPERTYVALUE
+---------------------------------------------------------------------------------------------------
 role2propertyValue :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> Value)
 role2propertyValue (SQD _ (PropertyGetter (ENP pt)) _) = pure $ getProperty pt
 role2propertyValue (SQD _ (PropertyGetter (CP pt)) _) = do
