@@ -62,6 +62,11 @@ context2role qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range f1 of
     -- However, Purescript requires we handle all Range cases.
     (PDOM _) -> throwError (error "First function in compose cannot return property value")
 
+context2role (BQD _ (BinaryCombinator "filter") criterium source _) = do
+  (criterium' :: RoleInstance ~~> Value) <- role2propertyValue criterium
+  source' <- context2role source
+  pure $ filter source' (makeBoolean criterium')
+
 -- The last case
 context2role _ = throwError (error "Unknown QueryFunction expression")
 
@@ -84,6 +89,11 @@ role2context qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range f1 of
   (CDOM _) -> compose qd role2context context2context
   (RDOM _) -> compose qd role2role role2context
   otherwise -> throwError (error "First function in compose cannot return property value")
+
+role2context (BQD _ (BinaryCombinator "filter") criterium source _) = do
+  (criterium' :: ContextInstance ~~> Value) <- context2propertyValue criterium
+  source' <- role2context source
+  pure $ filter source' (makeBoolean criterium')
 
 -- The last case
 role2context _ = throwError (error "Unknown QueryFunction expression")
