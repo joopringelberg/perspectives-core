@@ -36,7 +36,6 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
   roleAspects = rangeOfCalculatedRole >=> roleAspects'
-  -- TODO. Klopt dit? Nemen we de context van de berekening, of de context van het berekende resultaat?
   context = rangeOfCalculatedRole >=> contextOfADT
   contextOfRepresentation r = (unwrap r).context
   binding = rangeOfCalculatedRole >=> bindingOfADT

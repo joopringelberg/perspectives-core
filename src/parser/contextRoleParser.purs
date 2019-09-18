@@ -454,7 +454,6 @@ roleBinding cname =
   <|> contextBindingByReference cname
   <|> emptyBinding cname
   <|> roleBindingByReference cname
--- TODO: query
 
 withRoleCounting :: forall a. IP a -> IP a
 withRoleCounting p = do

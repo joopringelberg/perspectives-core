@@ -1,6 +1,3 @@
-{-
-  TODO. Restore the functionality to remove data once Actions is back on line.
--}
 module Perspectives.SaveUserData where
 
 import Control.Monad.AvarMonadAsk (modify)
