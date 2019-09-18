@@ -1,14 +1,12 @@
 module Perspectives.Query.Compiler where
 
-import Prelude (bind, ($), pure, (>=>))
-
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty)
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
-import Perspectives.Instances.Combinators (filter)
+import Perspectives.Instances.Combinators (filter, preferLeft)
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
@@ -22,6 +20,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Prelude (bind, ($), pure, (>=>))
 
 ---------------------------------------------------------------------------------------------------
 -- CONTEXT TO CONTEXT
@@ -37,6 +36,8 @@ context2context (BQD _ (BinaryCombinator "filter") criterium source _) = do
   (criterium' :: ContextInstance ~~> Value) <- context2propertyValue criterium
   source' <- context2context source
   pure $ filter source' (makeBoolean criterium')
+
+context2context qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) = disjunction qd context2context
 
 -- The last case
 context2context _ = throwError (error "Unknown QueryFunction expression")
@@ -67,6 +68,8 @@ context2role (BQD _ (BinaryCombinator "filter") criterium source _) = do
   source' <- context2role source
   pure $ filter source' (makeBoolean criterium')
 
+context2role qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) = disjunction qd context2role
+
 -- The last case
 context2role _ = throwError (error "Unknown QueryFunction expression")
 
@@ -75,6 +78,8 @@ context2role _ = throwError (error "Unknown QueryFunction expression")
 ---------------------------------------------------------------------------------------------------
 context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> Value)
 context2propertyValue qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = compose qd context2role role2propertyValue
+
+context2propertyValue qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) = disjunction qd context2propertyValue
 
 -- The last case
 context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
@@ -95,6 +100,8 @@ role2context (BQD _ (BinaryCombinator "filter") criterium source _) = do
   source' <- role2context source
   pure $ filter source' (makeBoolean criterium')
 
+role2context qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) = disjunction qd role2context
+
 -- The last case
 role2context _ = throwError (error "Unknown QueryFunction expression")
 
@@ -108,6 +115,8 @@ role2role (BQD _ (BinaryCombinator "filter") criterium source _) = do
   (criterium' :: RoleInstance ~~> Value) <- role2propertyValue criterium
   source' <- role2role source
   pure $ filter source' (makeBoolean criterium')
+
+role2role qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) = disjunction qd role2role
 
 -- The last case
 role2role _ = throwError (error "Unknown QueryFunction expression")
@@ -127,6 +136,8 @@ role2propertyValue qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range 
   (RDOM _) -> compose qd role2role role2propertyValue
   otherwise -> throwError (error "First function in compose cannot return property value")
 
+role2propertyValue qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) = disjunction qd role2propertyValue
+
 -- The last case
 role2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 
@@ -144,6 +155,18 @@ compose (BQD _ (BinaryCombinator "compose") f1 f2 _) p1 p2 = do
   pure (f1' >=> f2')
 compose _ _ _ = throwError (error "Perspectives.Query.Compiler.compose just handles BinaryCombinator 'compose'.")
 
+---------------------------------------------------------------------------------------------------
+-- THE DISJUNCTION PATTERN
+---------------------------------------------------------------------------------------------------
+disjunction :: forall a b.
+  QueryFunctionDescription ->
+  (QueryFunctionDescription -> MP (a ~~> b)) ->
+  MP (a ~~> b)
+disjunction qd@(BQD _ (BinaryCombinator "disjunction") f1 f2 _) p = do
+  f1' <- p f1
+  f2' <- p f2
+  pure (preferLeft f1' f2')
+disjunction _ _ = throwError (error "Perspectives.Query.Compiler.disjunction just handles BinaryCombinator 'disjunction'.")
 
 ---------------------------------------------------------------------------------------------------
 -- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS

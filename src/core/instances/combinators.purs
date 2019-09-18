@@ -1,7 +1,7 @@
 module Perspectives.Instances.Combinators where
 
 import Control.MonadZero (guard)
-import Data.Array (cons, elemIndex)
+import Data.Array (cons, elemIndex, null)
 import Data.Maybe (maybe)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Prelude (class Monad, class Eq, bind, const, discard, pure, ($), (>=>))
@@ -49,3 +49,13 @@ cond :: forall m s o. Monad m =>
 cond condition thenPart elsePart id = do
   passes <- condition id
   if passes then thenPart id else elsePart id
+
+preferLeft :: forall m s o. Monad m =>
+  (s -> ArrayT m o) ->
+  (s -> ArrayT m o) ->
+  (s -> ArrayT m o)
+preferLeft left right id = ArrayT do
+  r <- runArrayT $ left id
+  if null r
+    then runArrayT $ right id
+    else pure r
