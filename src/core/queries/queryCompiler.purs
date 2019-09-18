@@ -1,14 +1,15 @@
 module Perspectives.Query.Compiler where
 
-import Prelude
+import Prelude (bind, ($), pure, (>=>))
 
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty)
 import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives)
-import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
+import Perspectives.Instances.Combinators (filter)
+import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
@@ -26,6 +27,17 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 -- CONTEXT TO CONTEXT
 ---------------------------------------------------------------------------------------------------
 context2context :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> ContextInstance)
+
+context2context qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range f1 of
+  (RDOM er) -> compose qd context2role role2context
+  (CDOM ct) -> compose qd context2context context2context
+  (PDOM _) -> throwError (error "First function in compose cannot return property value")
+
+context2context (BQD _ (BinaryCombinator "filter") criterium source _) = do
+  (criterium' :: ContextInstance ~~> Value) <- context2propertyValue criterium
+  source' <- context2context source
+  pure $ filter source' (makeBoolean criterium')
+
 -- The last case
 context2context _ = throwError (error "Unknown QueryFunction expression")
 
@@ -43,18 +55,11 @@ context2role (SQD _ (RolGetter (CR cr)) _) = do
 
 context2role (SQD _ (DataTypeGetter "externalRole") _) = pure externalRole
 
-context2role (BQD _ (BinaryCombinator "compose") f1 f2 r) = do
-  case range f1 of
-    -- f1 :: ContextInstance ~~> RoleInstance
-    (RDOM er) -> do
-      f1' <- context2role f1
-      f2' <- role2role f2
-      pure (f1' >=> f2')
-    -- f1 :: ContextInstance ~~> ContextInstance
-    (CDOM ct) -> do
-      f1' <- context2context f1
-      f2' <- context2role f2
-      pure (f1' >=> f2')
+context2role qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range f1 of
+    (RDOM _) -> compose qd context2role role2role
+    (CDOM _) -> compose qd context2context context2role
+    -- Note: this case will not happen as the DescriptionCompiler has checked on the types.
+    -- However, Purescript requires we handle all Range cases.
     (PDOM _) -> throwError (error "First function in compose cannot return property value")
 
 -- The last case
@@ -64,6 +69,8 @@ context2role _ = throwError (error "Unknown QueryFunction expression")
 -- CONTEXT TO PROPERTYVALUE
 ---------------------------------------------------------------------------------------------------
 context2propertyValue :: QueryFunctionDescription -> MonadPerspectives (ContextInstance ~~> Value)
+context2propertyValue qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = compose qd context2role role2propertyValue
+
 -- The last case
 context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 
@@ -72,6 +79,11 @@ context2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 ---------------------------------------------------------------------------------------------------
 role2context :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> ContextInstance)
 role2context (SQD _ (DataTypeGetter "context") _) = pure context
+
+role2context qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range f1 of
+  (CDOM _) -> compose qd role2context context2context
+  (RDOM _) -> compose qd role2role role2context
+  otherwise -> throwError (error "First function in compose cannot return property value")
 
 -- The last case
 role2context _ = throwError (error "Unknown QueryFunction expression")
@@ -82,6 +94,11 @@ role2context _ = throwError (error "Unknown QueryFunction expression")
 role2role :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> RoleInstance)
 role2role (SQD _ (DataTypeGetter "binding") _) = pure binding
 
+role2role (BQD _ (BinaryCombinator "filter") criterium source _) = do
+  (criterium' :: RoleInstance ~~> Value) <- role2propertyValue criterium
+  source' <- role2role source
+  pure $ filter source' (makeBoolean criterium')
+
 -- The last case
 role2role _ = throwError (error "Unknown QueryFunction expression")
 
@@ -90,27 +107,37 @@ role2role _ = throwError (error "Unknown QueryFunction expression")
 ---------------------------------------------------------------------------------------------------
 role2propertyValue :: QueryFunctionDescription -> MonadPerspectives (RoleInstance ~~> Value)
 role2propertyValue (SQD _ (PropertyGetter (ENP pt)) _) = pure $ getProperty pt
+
 role2propertyValue (SQD _ (PropertyGetter (CP pt)) _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
   role2propertyValue (PC.calculation cp)
 
+role2propertyValue qd@(BQD _ (BinaryCombinator "compose") f1 f2 _) = case range f1 of
+  (CDOM _) -> compose qd role2context context2propertyValue
+  (RDOM _) -> compose qd role2role role2propertyValue
+  otherwise -> throwError (error "First function in compose cannot return property value")
+
 -- The last case
 role2propertyValue _ = throwError (error "Unknown QueryFunction expression")
 
--- From a string that maybe identifies a Property, construct a function to get that property from
--- a Role instance. Notice that this function may fail.
--- getPropertyFunction ::
---   String ->
---   MonadPerspectives StringTypedTripleGetter
--- getPropertyFunction id =
---   do
---     (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType id)
---     compileQuery $ PC.calculation p
---   <|>
---   do
---     (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
---     compileQuery $ PC.calculation p
+---------------------------------------------------------------------------------------------------
+-- THE COMPOSITION PATTERN
+---------------------------------------------------------------------------------------------------
+compose :: forall a b c.
+  QueryFunctionDescription ->
+  (QueryFunctionDescription -> MP (a ~~> b)) ->
+  (QueryFunctionDescription -> MP (b ~~> c)) ->
+  MP (a ~~> c)
+compose (BQD _ (BinaryCombinator "compose") f1 f2 _) p1 p2 = do
+  (f1' :: (a ~~> b)) <- p1 f1
+  (f2' :: (b ~~> c)) <- p2 f2
+  pure (f1' >=> f2')
+compose _ _ _ = throwError (error "Perspectives.Query.Compiler.compose just handles BinaryCombinator 'compose'.")
 
+
+---------------------------------------------------------------------------------------------------
+-- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS
+---------------------------------------------------------------------------------------------------
 -- From a string that maybe identifies a Role, retrieve or construct a function to get that role from
 -- a Context instance. Notice that this function may fail.
 getRoleFunction ::

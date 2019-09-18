@@ -18,7 +18,7 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Instances (getPerspectContext, getPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (($), (<>), (<<<), pure, (*>), bind, discard, (>=>))
+import Prelude (($), (<>), (<<<), pure, (*>), bind, discard, (>=>), (>>>), map, (==))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -77,6 +77,10 @@ getProperty pn r = ArrayT do
     (Just p) -> do
       tell [assumption (unwrap r)(unwrap pn)]
       pure p
+
+-- | Turn a function that returns strings into one that returns Booleans.
+makeBoolean :: forall a. (a ~~> Value) -> (a ~~> Boolean)
+makeBoolean f = f >>> map (((==) "true") <<< unwrap)
 
 -- | Get the values for the property with the local name that are directly represented on the instance of a rol of type r, including AspectProperties.
 -- | E.g. getUnqualifiedProperty "voornaam"

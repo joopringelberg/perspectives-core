@@ -47,6 +47,8 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 -- | an array of variables that have been declared.
 data Domain = RDOM (ADT EnumeratedRoleType) | PDOM EnumeratedPropertyType | CDOM (ADT ContextType)
 
+type Range = Domain
+
 sumOfDomains :: Domain -> Domain -> Maybe Domain
 sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
 sumOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
@@ -58,8 +60,6 @@ productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
 productOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
 productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
 productOfDomains _ _ = Nothing
-
-type Range = Domain
 
 derive instance genericDomain :: Generic Domain _
 
