@@ -9,6 +9,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Foreign.Object (values)
+import Perspectives.Actions (tearDownBotActions)
 import Perspectives.Assignment.Update (saveEntiteit)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeContext_rolInContext, removeRol_gevuldeRollen, rol_pspType)
 import Perspectives.CoreTypes (MP, MonadPerspectives, Updater, MonadPerspectivesTransaction)
@@ -47,7 +48,7 @@ iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 removeUserContext :: Updater ContextInstance
 removeUserContext id = do
   lift $ modify (over _deletedContexts (cons id))
-  -- TODO: tearDownBotActions id
+  lift $ lift $ tearDownBotActions id
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectEntiteit id
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> removeUserRol_ rol
   void $ removeUserRol_ (context_buitenRol ctxt)

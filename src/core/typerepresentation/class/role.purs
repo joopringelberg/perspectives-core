@@ -101,12 +101,6 @@ propertiesOfADT = reduce g
     g :: EnumeratedRoleType -> MP (Array PropertyType)
     g = getEnumeratedRole >=> properties
 
--- TODO. Er is een probleem hier met de rolbinding. Het reduce patroon
--- bereikt de bodem met (ST et), maar we willen ook de views van de binding daarvan.
--- Om die binding mee te nemen moeten we het volledige
--- type nemen: (PROD (ST et) binding). Maar dat leidt tot eindeloze recursie.
--- We zouden dat kunnen stoppen met een andere terminal dan ST, bijvoorbeeld T(erminal).
--- (ST et) expandeert dan naar (PROD (T et) binding).
 -- Views of the binding of a role count as views of the role itself.
 viewsOfADT :: ADT EnumeratedRoleType -> MP (Array ViewType)
 viewsOfADT = reduce g
