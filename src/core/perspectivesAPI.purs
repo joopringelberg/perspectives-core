@@ -23,6 +23,7 @@ import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Ap
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
+import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
@@ -254,14 +255,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Check whether a role exists for ContextDef with the localRolName and whether it allows RolID as binding.
     -- subject :: ContextDef, predicate :: localRolName, object :: RolID
-    -- TODO: maak checkBinding
-    -- Api.CheckBinding -> do
-    --   typeOfRolesToBindTo <- runArrayT $ lookForUnqualifiedRoleType predicate (ContextType subject)
-    --   case head typeOfRolesToBindTo of
-    --     Nothing -> sendResponse (Error corrId ("No roltype found for '" <> predicate <> "'.")) setter
-    --     (Just typeOfRolToBindTo) -> do
-    --       ok <- checkBinding (RolDef typeOfRolToBindTo) object
-    --       sendResponse (Result corrId [(show ok)]) setter
+    Api.CheckBinding -> do
+      typeOfRolesToBindTo <- runArrayT $ lookForUnqualifiedRoleType predicate (ContextType subject)
+      case head typeOfRolesToBindTo of
+        Nothing -> sendResponse (Error corrId ("No roltype found for '" <> predicate <> "'.")) setter
+        (Just typeOfRolToBindTo) -> do
+          ok <- checkBinding typeOfRolToBindTo (RoleInstance object)
+          sendResponse (Result corrId [(show ok)]) setter
     Api.Unsubscribe -> unregisterSupportedEffect corrId
     Api.WrongRequest -> sendResponse (Error corrId subject) setter
     otherwise -> sendResponse (Error corrId ("Perspectives could not handle this request: '" <> (showRequestRecord r) <> "'")) (mkApiEffect reactStateSetter)

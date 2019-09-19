@@ -12,12 +12,15 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Representation.ADT (lessThenOrEqualTo)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, EnumeratedRoleType, getPerspectType)
-import Perspectives.Representation.Class.Role (kindOfRole)
+import Perspectives.Representation.Class.Role (effectiveRoleType, kindOfRole)
 import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
 import Prelude (class Eq, class Show, Unit, bind, discard, pure, show, unit, ($), (<<<), (<>), (==), (>=>), (>>=))
 
@@ -78,6 +81,16 @@ checkContext c = do
     rolekind :: RoleType -> MP RoleKind
     rolekind (ENR r) = (getPerspectType r :: MP EnumeratedRole) >>= pure <<< kindOfRole
     rolekind (CR r) = (getPerspectType r :: MP CalculatedRole) >>= pure <<< kindOfRole
+
+-----------------------------------------------------------
+-- CHECKBINDING
+-----------------------------------------------------------
+checkBinding :: RoleType -> RoleInstance -> MP Boolean
+checkBinding roletype instanceToBind = do
+  (instanceType :: EnumeratedRoleType) <- roleType_ instanceToBind
+  eit <- effectiveRoleType (ENR instanceType)
+  ert <- effectiveRoleType roletype
+  pure $ lessThenOrEqualTo ert eit
 
 -----------------------------------------------------------
 -- COLLECTING ERRORS DURING TYPE CHECKING

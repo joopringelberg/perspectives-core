@@ -11,7 +11,7 @@ import Foreign.Object (keys, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_buitenRol, context_pspType, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), assumption, type (##>))
+import Perspectives.CoreTypes (type (~~>), assumption, type (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
@@ -101,6 +101,9 @@ getUnqualifiedProperty ln r = ArrayT do
 -- | to track it as a dependency.
 roleType :: RoleInstance ~~> EnumeratedRoleType
 roleType = ArrayT <<< lift <<< (getRolMember \r -> [rol_pspType r])
+
+roleType_ :: RoleInstance -> MP EnumeratedRoleType
+roleType_ = (getRolMember \r -> rol_pspType r)
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given
 -- | type that bind it (that have it as their binding). The type of rname (RolDef) may
