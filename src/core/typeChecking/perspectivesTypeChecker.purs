@@ -17,7 +17,7 @@ import Perspectives.Representation.ADT (lessThenOrEqualTo)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, EnumeratedRoleType, getPerspectType)
-import Perspectives.Representation.Class.Role (effectiveRoleType, kindOfRole)
+import Perspectives.Representation.Class.Role (effectiveRoleType, fullADTType, kindOfRole)
 import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -87,9 +87,8 @@ checkContext c = do
 -----------------------------------------------------------
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
-  (instanceType :: EnumeratedRoleType) <- roleType_ instanceToBind
-  eit <- effectiveRoleType (ENR instanceType)
-  ert <- effectiveRoleType roletype
+  eit <- (roleType_ >=> effectiveRoleType <<< ENR >=> fullADTType) instanceToBind
+  ert <- (effectiveRoleType >=> fullADTType) roletype
   pure $ lessThenOrEqualTo ert eit
 
 -----------------------------------------------------------

@@ -125,7 +125,9 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   mandatory r = pure (unwrap r).mandatory
   calculation r = SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
   properties r = includeBinding (\r' -> (unwrap r').properties) propertiesOfADT r
-  fullType r = pure $ PROD [(ST $ identifier r), (unwrap r).binding]
+  fullType r = do
+    bindingType <- fullADTType (unwrap r).binding
+    pure $ PROD [(ST $ identifier r), bindingType]
   views r = includeBinding (\r' -> values (unwrap r).views) viewsOfADT r
 
 -- | A pattern of computation shared in the recursive computation of roleAspects, properties and views of a role.

@@ -88,6 +88,7 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f NOTYPE = pure NOTYPE
 
 -- | `p lessThenOrEqualTo q` means: p is less specific than q.
+-- | This function is semantically correct only on a fully expanded type: use `Perspectives.Representation.Class.Role.fullType`.
 lessThenOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
 lessThenOrEqualTo (ST x) (ST y) = x == y
 lessThenOrEqualTo (SUM adts) q = let
