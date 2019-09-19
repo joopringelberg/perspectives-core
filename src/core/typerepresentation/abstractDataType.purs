@@ -15,8 +15,10 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 import Prelude (class Eq, class Monad, class Show, bind, notEq, pure, ($))
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
+-- | An Algebraic Data Type to represent the type of roles with more than one type of binding.
+-- | `a` invariably is a newtype representing entities on the type level of Perspectives.
+-- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`.
 data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | NOTYPE
--- data CompoundRoleType
 
 derive instance genericRepBinding :: Generic (ADT a) _
 
@@ -36,6 +38,7 @@ class Reducible a b where
   reduce :: forall m. Monad m => (a -> m b) -> ADT a -> m b
 
 -- | Reduce an `ADT EnumeratedRoleType` with `f :: EnumeratedRoleType -> MP Boolean`
+-- | Does **not** take the binding of a role into account.
 instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
@@ -47,6 +50,8 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
   reduce f NOTYPE = pure false
 
 -- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
+-- | Includes the binding of a role: this means that the computation recurses on the binding.
+-- | This is expected behaviour for functions like propertiesOfADT, viewsOfADT and roleAspectsOfADT.
 instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do

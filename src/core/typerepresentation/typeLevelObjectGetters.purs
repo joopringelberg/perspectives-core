@@ -1,5 +1,6 @@
 module Perspectives.Types.ObjectGetters where
 
+import Control.Plus ((<|>))
 import Data.Array (singleton)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
@@ -8,9 +9,9 @@ import Perspectives.Identifiers (isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
-import Perspectives.Representation.Class.Role (class RoleClass, properties, propertiesOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, getRole', properties, propertiesOfADT, views, viewsOfADT)
 import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole) as Context
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType, ViewType(..), propertytype2string, roletype2string)
 import Prelude (pure, (==), (>>>), (<<<), (>=>))
 
 externalRoleOfADT_ :: ADT ContextType ~~~> EnumeratedRoleType
@@ -72,5 +73,19 @@ lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> isCo
 lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
 lookForProperty criterium = filter' (ArrayT <<< propertiesOfADT) criterium
 
-propertyOfRole :: forall r i. RoleClass r i => i ~~~> PropertyType
-propertyOfRole = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> properties)
+propertiesOfRole :: String ~~~> PropertyType
+propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRole_ (CalculatedRoleType s)
+  where
+    propertiesOfRole_ :: forall r i. RoleClass r i => i ~~~> PropertyType
+    propertiesOfRole_ = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> properties)
+
+viewsOfRole :: String ~~~> ViewType
+viewsOfRole s = f (EnumeratedRoleType s) <|> f (CalculatedRoleType s) where
+  f :: forall i r. RoleClass r i => i ~~~> ViewType
+  f = ArrayT <<< (getRole' >=> views)
+
+lookForUnqualifiedViewType :: String -> (ADT EnumeratedRoleType ~~~> ViewType)
+lookForUnqualifiedViewType s = lookForView (unwrap >>> isContainingNamespace s)
+
+lookForView :: (ViewType -> Boolean) -> ADT EnumeratedRoleType ~~~> ViewType
+lookForView criterium = filter' (ArrayT <<< viewsOfADT) criterium

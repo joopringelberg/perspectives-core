@@ -23,7 +23,7 @@ import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Ap
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
-import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>))
+import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
@@ -32,12 +32,15 @@ import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances (saveEntiteit)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
+import Perspectives.Representation.Class.PersistentType (getPerspectType)
+import Perspectives.Representation.Class.Role (effectiveRoleType')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
-import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>))
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -153,11 +156,24 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetProperty -> do
       (f :: PropertyValueGetter) <- (getPropertyFunction predicate)
       registerSupportedEffect corrId setter f (RoleInstance subject)
-    -- TODO. Maak propertiesDef, searchView en propertyReferenties.
-    -- Api.GetViewProperties -> -- subject is the roltype.
-    --   if (predicate == "allProperties")
-    --     then registerSupportedEffect corrId setter (effectiveRoleType >=> propertiesDef) subject
-    --     else registerSupportedEffect corrId setter (effectiveRolType >=> searchView predicate >=> propertyReferenties >=> binding) subject
+      -- For a Role and a View, return the properties in that View.
+      -- If View equals "allProperties", return all properties of the Role.
+    -- {request: "GetViewProperties", subject: RoleType, predicate: unqualifiedViewName}
+    -- Note that RoleType actually is the qualified name of either an EnumeratedRoleType or a CalculatedRoleType,
+    -- not the Newtype.
+    Api.GetViewProperties -> if (predicate == "allProperties")
+      then do
+        props <- runArrayT $ propertiesOfRole subject
+        sendResponse (Result corrId (propertytype2string <$> props)) setter
+      else do
+        adt <- effectiveRoleType' subject
+        views <- runArrayT $ lookForUnqualifiedViewType predicate adt
+        case head views of
+          Nothing -> sendResponse (Error corrId ("View '" <> predicate <> "' is available for role '" <> subject <> "'.")) setter
+          -- NOTE: we arbitrarily take the first matching View.
+          (Just (v :: ViewType)) -> do
+            props <- ((getPerspectType v) :: MP View) >>= pure <<< propertyReferences
+            sendResponse (Result corrId []) setter
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
