@@ -24,6 +24,7 @@ class ContextClass c where
   botRole :: c -> Array EnumeratedRoleType
   actions :: c -> Array ActionType
   aspects :: c -> Array ContextType
+  nestedContexts :: c -> Array ContextType
 
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
@@ -35,6 +36,7 @@ instance contextContextClass :: ContextClass Context where
   botRole = _.botRol <<< unwrap
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
+  nestedContexts = _.nestedContexts <<< unwrap
 
 -----------------------------------------------------------
 -- CONTEXT
@@ -55,6 +57,7 @@ type ContextRecord =
   , gebruikerRol :: Array EnumeratedRoleType
   , botRol :: Array EnumeratedRoleType
 
+  , nestedContexts :: Array ContextType
   , actions :: Array ActionType
   }
 

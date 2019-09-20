@@ -1,7 +1,7 @@
 -- | The QueryCompiler constructs functions to calculate an instance of a Role for a Context or a Value for a Property,
 -- | from a `QueryFunctionDescription`. It operates on a Variant `CompiledFunction` that covers all combinations of
 -- | Domain and Range that can be computed.
--- |
+-- | Instances of `QueryFunctionDescription` are computed by the function [compileQueryStep](Perspectives.Query.DescriptionCompiler.html#t:compileQueryStep).
 
 module Perspectives.Query.Compiler where
 
@@ -38,6 +38,10 @@ data CompiledFunction =
   | R2V (RoleInstance ~~> Value)
 
 -- | Construct a function wrapped in CompiledFunction that actually computes the described function.
+-- | A note on kind of roles ([RoleKind](Perspectives.Representation.TypeIdentifiers.html#t:RoleKind)).
+-- | In the type representation, we keep UserRoles, BotRoles, etc. in seperate members of Context.
+-- | But in the instance representation, there is no need for that. All (Enumerated) 
+-- | roles have the same runtime representation and their names are unique.
 compileFunction :: QueryFunctionDescription -> MP CompiledFunction
 compileFunction (SQD _ (RolGetter (ENR r)) _) = pure $ C2R $ getRole r
 
