@@ -18,7 +18,7 @@ import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActi
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>))
 import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Query.Compiler (context2propertyValue, context2role)
+import Perspectives.Query.Compiler (context2propertyValue, context2role) 
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))

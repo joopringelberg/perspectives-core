@@ -1,3 +1,11 @@
+-- | An Algebraic Data Type to represent the type of roles with more than one type of binding.
+-- | `a` invariably is a newtype representing entities on the type level of Perspectives.
+-- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`.
+-- |
+-- | ### Equivalences
+-- | `SUM x NOTYPE` equals `NOTYPE`
+-- | `PROD x NOTYPE` equals `x`
+
 module Perspectives.Representation.ADT where
 
 import Data.Array (elemIndex, filter, head, intersect, uncons, union)
@@ -15,11 +23,6 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, ($), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
--- | An Algebraic Data Type to represent the type of roles with more than one type of binding.
--- | `a` invariably is a newtype representing entities on the type level of Perspectives.
--- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`.
--- | SUM x NOTYPE = NOTYPE.
--- | PROD x NOTYPE = x
 data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | NOTYPE
 
 derive instance genericRepBinding :: Generic (ADT a) _
@@ -36,6 +39,7 @@ instance writeForeignBinding :: (WriteForeign a) => WriteForeign (ADT a) where
 instance readForeignBinding :: (ReadForeign a) => ReadForeign (ADT a) where
   readImpl b = readJSON' (unsafeFromForeign b)
 
+-- | The `Reducible` class implements a pattern to recursively process an ADT.
 class Reducible a b where
   reduce :: forall m. Monad m => (a -> m b) -> ADT a -> m b
 
@@ -53,7 +57,7 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
 
 -- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
 -- | Includes the binding of a role: this means that the computation recurses on the binding.
--- | This is expected behaviour for functions like propertiesOfADT, viewsOfADT and roleAspectsOfADT.
+-- | This is expected behaviour for functions like `propertiesOfADT`, `viewsOfADT` and `roleAspectsOfADT`.
 instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
@@ -64,7 +68,7 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
     pure $ foldl union [] arrays
   reduce f NOTYPE = pure []
 
--- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`
+-- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.
 -- | `reduce f` then has type `ADT a` -> MP (ADT b)`.
 instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f (ST et) = f et
