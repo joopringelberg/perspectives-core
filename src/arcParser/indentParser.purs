@@ -81,6 +81,12 @@ runIndentParser s p = evalStateT (runIndent (runParserT s p)) initialContextRole
 runIndentParser' :: forall a. String -> IP a -> MonadPerspectives (Tuple (Either ParseError a) ArcParserState)
 runIndentParser' s p = runStateT (runIndent (runParserT s p)) initialContextRoleParserMonadState
 
+-- | Apply a parser, return the DomeinFile (possibly just the default DomeinFile if the parser fails).
+parseToDomeinFile :: String -> IP Unit -> MonadPerspectives DomeinFile
+parseToDomeinFile s p = do
+  (Tuple _ {domeinFile}) <- runIndentParser' s p
+  pure domeinFile
+
 -- | As convienience, to lift functions on Aff all the way up:
 liftAffToIP :: forall a. MonadPerspectives a -> IP a
 liftAffToIP = lift <<< lift <<< lift
@@ -150,38 +156,6 @@ withNamespace ns p = do
   _ <- setNamespace ns
   result <- p
   _ <- setNamespace namespace
-  pure result
-
------------------------------------------------------------
--- TypeNamespace
------------------------------------------------------------
-getTypeNamespace :: IP String
-getTypeNamespace = lift (lift get) >>= pure <<< (_.typeNamespace)
-
-setTypeNamespace :: String -> IP Unit
-setTypeNamespace ns = do
-  s <- lift (lift get)
-  lift (lift (put s {typeNamespace = ns}))
-
--- Note that the namespace in state is not terminated by a $.
-withExtendedTypeNamespace :: forall a. String -> IP a -> IP a
-withExtendedTypeNamespace extension p = do
-  namespace <- getTypeNamespace
-  case null extension of
-    false -> setTypeNamespace (namespace <> "$" <> extension)
-    otherwise -> pure unit
-  -- _ <- setNamespace (namespace <> "$" <> extension)
-  result <- p
-  _ <- setTypeNamespace namespace
-  pure result
-
--- Note that the namespace in state is not terminated by a $.
-withTypeNamespace :: forall a. String -> IP a -> IP a
-withTypeNamespace ns p = do
-  namespace <- getTypeNamespace
-  _ <- setTypeNamespace ns
-  result <- p
-  _ <- setTypeNamespace namespace
   pure result
 
 -----------------------------------------------------------
