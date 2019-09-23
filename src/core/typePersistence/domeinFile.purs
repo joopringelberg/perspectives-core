@@ -2,6 +2,7 @@ module Perspectives.DomeinFile where
 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object, empty)
@@ -19,7 +20,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 newtype DomeinFile = DomeinFile
   { _rev :: Revision_
   , _id :: String
-  , contexts :: DomeinFileContexts
+  , contexts :: Object Context
   , enumeratedRoles :: Object EnumeratedRole
   , calculatedRoles :: Object CalculatedRole
   , enumeratedProperties :: Object EnumeratedProperty
@@ -29,6 +30,8 @@ newtype DomeinFile = DomeinFile
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
+
+derive instance newtypeDomeinFile :: Newtype DomeinFile _
 
 instance encodeDomeinFile :: Encode DomeinFile where
   -- encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
@@ -43,9 +46,6 @@ derive newtype instance readForeignDomeinFile :: ReadForeign DomeinFile
 
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}
-
--- | DomeinFileContexts is an immutable map of resource type names to PerspectContexts.
-type DomeinFileContexts = Object Context
 
 type DomeinFileEnumeratedRoles = Object EnumeratedRole
 

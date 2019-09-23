@@ -1,0 +1,35 @@
+CONTEXTEN ALS WEBPAGINA'S
+
+Het equivalent van een webpagina kan in Perspectives een context zijn met twee agentrollen:
+	* auteur
+	* bezoeker
+Naar keuze kan de auteur een perspectief hebben op de bezoeker, of niet. 
+Als de auteur geen perspectief heeft, kan hij niet de pagina naar de bezoeker sturen. Het voor Perspectives gewone push-model van informatie verspreiden kan dan niet gebruikt worden. In plaats daarvan moet de gebruiker de context ophalen. 
+
+EEN PAGINA ANONIEM OPHALEN
+Dit kunnen we laten werken als een klassieke hyperlink. De server is de couchdb van de auteur. Maar de context (pagina) moet in een aparte database worden opgenomen om hem bereikbaar te maken voor de bezoeker. Immers, de normale instanties-database van de auteur is alléén voor hem toegankelijk.
+De client van de bezoeker haalt de pagina op, geeft de bezoeker daar een rol in, en slaat hem op in de database met instanties van de bezoeker. 
+Vervolgens kan de bezoeker hem als context gebruiken. Bijvoorbeeld door hem (althans zijn buitenrol) op te nemen in een lijst met interessante links (bookmarks).
+
+EEN PAGINA VOOR DE AUTEUR ZICHTBAAR OPHALEN
+Hier wil de bezoeker een rol nemen in de pagina en dat kenbaar laten zijn aan de auteur. 
+De auteur kan voorwaarden aan deze rol stellen.
+De bezoeker doet dus in effect het verzoek aan de auteur om hem de rol van bezoeker in de pagina te geven. 
+De auteur - hoogstwaarschijnlijk gerepresenteerd door een bot in de context - beslist daarover en bindt de bezoeker al dan niet aan de rol.
+
+De Representerende Rol van de pagina-context **moet** beschikbaar zijn voor de bezoeker - anders kan hij niet eens weten dat de pagina er is. Die rol draagt ook informatie waaraan de bezoeker kan aflezen dat hij, als hij de pagina opent, zichtbaar wordt voor de auteur.
+
+Eveneens **moet** de auteur in een perspectief van de Bezoeker zitten, anders kan de Bezoeker hem geen verzoek sturen. Ik neem daarom aan dat de context/pagina van waaruit de Bezoeker de pagina kan zien waarin hij wil participeren, een rol heeft met de auteur van die pagina.
+
+Dus hoe doet de bezoeker het verzoek aan de auteur?
+
+Bijvoorbeeld zo:
+	* de context Verzoek heeft de rollen Verzoeker, Ontvanger, ToegangTot (een ContextRol).
+	* Ontvanger heeft in Verzoek een Bot.
+	* deze bot probeert de Ontvanger te binden aan de (gestandaardiseerde) rol Bezoeker in de context die gebonden is aan ToegangTot.
+
+De runtime van de bezoeker maakt een verzoek (een context) met de Representerende Rol van de pagina-context waar hij toegang toe wil. De auteur van die pagina krijgt de rol van Ontvanger. De runtime stuurt dat Verzoek volgens standaard sync naar de auteur. Daar bindt de bot al dan niet de Verzoeker aan de Bezoeker rol van de pagina-context.
+
+We kunnen er ook een apart mechanisme voor maken. 
+
+Een alternatief mechanisme is dat Verzoek en Pagina één geheel vormen. De Bezoeker heeft eerst de ene rol in die Pagina (waarmee hij de pagina anoniem heeft opgehaald) en vraagt dan om de andere rol.
