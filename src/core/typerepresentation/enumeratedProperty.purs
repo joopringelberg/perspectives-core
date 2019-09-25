@@ -1,6 +1,7 @@
 module Perspectives.Representation.EnumeratedProperty where
 
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
@@ -54,6 +55,8 @@ instance identifiableEnumeratedProperty :: Identifiable EnumeratedProperty Enume
 data Range = PString | PBool | PNumber | PDate
 
 derive instance genericRange :: Generic Range _
+
+instance eqRange :: Eq Range where eq = genericEq
 
 instance writeForeignRange :: WriteForeign Range where
   writeImpl = writeImpl <<< genericSumToVariant

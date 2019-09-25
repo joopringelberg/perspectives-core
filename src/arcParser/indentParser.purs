@@ -31,7 +31,6 @@ import Text.Parsing.Parser.Pos (Position)
 type ArcParserState =
   { rolOccurrences :: F.Object Int
   , namespace :: String
-  , typeNamespace :: String
   , prefixes :: F.Object String
   , domeinFile :: DomeinFile
   , context :: Maybe Context
@@ -48,8 +47,7 @@ defaultPrefixes = F.fromFoldable [Tuple "arc:" "model:Arc"]
 initialContextRoleParserMonadState :: ArcParserState
 initialContextRoleParserMonadState =
   { rolOccurrences: F.empty
-  , namespace: "model:Arc"
-  , typeNamespace: "model:Arc"
+  , namespace: ""
   , prefixes: defaultPrefixes
   , domeinFile: defaultDomeinFile
   , context: Nothing
@@ -92,7 +90,10 @@ liftAffToIP :: forall a. MonadPerspectives a -> IP a
 liftAffToIP = lift <<< lift <<< lift
 
 modifyArcParserState :: (ArcParserState -> ArcParserState) -> IP Unit
-modifyArcParserState = lift <<< lift <<< modify_
+-- modifyArcParserState = lift <<< lift <<< modify_
+modifyArcParserState f = do
+  (s :: ArcParserState) <- lift (lift get)
+  lift (lift (put (f s)))
 
 getArcParserState :: IP ArcParserState
 getArcParserState = lift $ lift get
@@ -141,9 +142,11 @@ setNamespace ns = do
 withExtendedNamespace :: forall a. String -> IP a -> IP a
 withExtendedNamespace extension p = do
   namespace <- getNamespace
-  case null extension of
-    false -> setNamespace (namespace <> "$" <> extension)
-    otherwise -> pure unit
+  case null namespace of
+    false -> case null extension of
+      false -> setNamespace (namespace <> "$" <> extension)
+      otherwise -> pure unit
+    otherwise -> setNamespace ("model:" <> extension)
   -- _ <- setNamespace (namespace <> "$" <> extension)
   result <- p
   _ <- setNamespace namespace

@@ -2,12 +2,13 @@ module Perspectives.Representation.EnumeratedRole where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Object (Object)
-import Perspectives.Representation.ADT (ADT)
+import Foreign.Object (Object, empty)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleKind, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -32,6 +33,25 @@ type EnumeratedRoleRecord =
 
   , functional :: Boolean
   , mandatory :: Boolean
+  }
+
+defaultEnumeratedRole :: String -> String -> EnumeratedRole
+defaultEnumeratedRole qname dname = EnumeratedRole
+  { _id: EnumeratedRoleType qname
+  , _rev: Nothing
+  , displayName: dname
+  , kindOfRole: RoleInContext
+
+  , roleAspects: []
+  , properties: []
+
+  , context: ContextType ""
+  , binding: NOTYPE
+
+  , views: empty
+
+  , functional: true
+  , mandatory: false
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

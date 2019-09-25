@@ -53,6 +53,7 @@ perspectDef = LanguageDef
                   , "BooleanProperty"
                   , "NumberProperty"
                   , "StringProperty"
+                  , "DateTimeProperty"
                   , "LocalPerspective"
                   , "ScreenLocationX"
                   , "ScreenLocationY"
@@ -68,6 +69,8 @@ perspectDef = LanguageDef
                   , "Object"
                   , "Subject"
                   , "FilledBy"
+                  , "False"
+                  , "True"
                   ]
                 , caseSensitive:   true
                 }

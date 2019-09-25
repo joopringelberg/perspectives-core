@@ -23,7 +23,7 @@ import Perspectives.LoadCRL (loadCRLFile, unLoadCRLFile, withSemanticChecks, wit
 import Perspectives.PerspectivesTypes (AnyContext)
 import Perspectives.RunPerspectives (runPerspectives, runPerspectivesWithPropagation)
 import Perspectives.SaveUserData (removeUserContext, saveUserContext)
-import Test.Unit.Assert as Assert 
+import Test.Unit.Assert as Assert
 
 
 runP :: forall a.

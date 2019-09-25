@@ -2,12 +2,12 @@ module Perspectives.Representation.Context where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedRoleType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -59,6 +59,24 @@ type ContextRecord =
 
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType
+  }
+
+defaultContext :: String -> String -> Context
+defaultContext id dname = Context { _id: (ContextType id)
+  , _rev: Nothing
+  , displayName: dname
+
+  , contextAspects: []
+  , defaultPrototype: Nothing
+
+  , rolInContext: []
+  , contextRol: []
+  , externeRol: EnumeratedRoleType ""
+  , gebruikerRol: []
+  , botRol: []
+
+  , nestedContexts: []
+  , actions: []
   }
 
 derive instance genericRepContext :: Generic Context _

@@ -60,3 +60,6 @@ uncapitalizedString = f <$> lower <*> AR.many identLetter where
 
 colon :: IP Unit
 colon = reservedOp ":"
+
+arcIdentifier :: IP String
+arcIdentifier = lexeme capitalizedString
