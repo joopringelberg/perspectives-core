@@ -4,12 +4,13 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Kishimen (genericSumToVariant)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
 import Prelude (class Eq, class Show, (<<<), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 -----------------------------------------------------------
 -- CONTEXT TYPE CLASS
@@ -47,6 +48,7 @@ type ContextRecord =
   { _id :: ContextType
   , _rev :: Revision_
   , displayName :: String
+  , kindOfContext :: ContextKind
 
   , contextAspects :: Array ContextType
   , defaultPrototype :: Maybe ContextInstance
@@ -61,11 +63,13 @@ type ContextRecord =
   , actions :: Array ActionType
   }
 
-defaultContext :: String -> String -> Context
-defaultContext id dname = Context { _id: (ContextType id)
+data ContextKind = Domain | Case | Party | Activity | State
+
+defaultContext :: String -> String -> ContextKind -> Context
+defaultContext id dname kind = Context { _id: (ContextType id)
   , _rev: Nothing
   , displayName: dname
-
+  , kindOfContext: kind
   , contextAspects: []
   , defaultPrototype: Nothing
 
@@ -99,3 +103,11 @@ instance revisionContext :: Revision Context where
 
 instance identifiableContext :: Identifiable Context ContextType where
   identifier (Context{_id}) = _id
+
+derive instance genericContextKind :: Generic ContextKind _
+instance showContextKind :: Show ContextKind where show = genericShow
+derive instance eqContextKind :: Eq ContextKind
+instance writeForeignContextKind :: WriteForeign ContextKind where
+  writeImpl = writeImpl <<< genericSumToVariant
+instance readForeignContextKind :: ReadForeign ContextKind where
+  readImpl f = readImpl f

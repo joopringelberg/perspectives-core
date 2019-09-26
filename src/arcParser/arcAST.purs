@@ -5,6 +5,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
+import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.TypeIdentifiers (RoleKind)
 
@@ -12,8 +13,6 @@ newtype ContextE = ContextE
   { id :: String
   , kindOfContext :: ContextKind
   , contextParts :: List ContextPart}
-
-data ContextKind = Domain | Case | Party | Activity | State
 
 data ContextPart = RE RoleE | CE ContextE
 
@@ -52,10 +51,6 @@ newtype ViewE = ViewE
 
 derive instance genericContextE :: Generic ContextE _
 instance showContextE :: Show ContextE where show = genericShow
-
-derive instance genericContextKind :: Generic ContextKind _
-instance showContextKind :: Show ContextKind where show = genericShow
-derive instance eqContextKind :: Eq ContextKind
 
 derive instance genericContextElement :: Generic ContextPart _
 instance showContextElement :: Show ContextPart where show x = genericShow x
