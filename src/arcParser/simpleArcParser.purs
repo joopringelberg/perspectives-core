@@ -13,13 +13,6 @@ import Text.Parsing.Indent (withBlock)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (try)
 
-domain :: IP ContextE
-domain = do
-  r <- contextE
-  case r of
-    (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
-    otherwise -> fail "Domain cannot be a role"
-
 contextE :: IP ContextPart
 contextE = withBlock
   (\(Tuple uname knd) elements -> CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements})
@@ -42,6 +35,13 @@ contextE = withBlock
     contextPart :: IP ContextPart
     contextPart = defer (\_ -> contextE) <|> roleE
 
+domain :: IP ContextE
+domain = do
+  r <- contextE
+  case r of
+    (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
+    otherwise -> fail "Domain cannot be a role"
+
 roleE :: IP ContextPart
 roleE = withBlock
   (\(Tuple uname knd) elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements})
@@ -49,13 +49,13 @@ roleE = withBlock
   rolePart
   where
     role_ :: IP (Tuple String RoleKind)
-    role_ = reserved "Role" *> colon *> do
+    role_ = (reserved "Role" <|> reserved "Agent") *> colon *> do
       knd <- roleKind
       uname <- colon *> arcIdentifier
       pure (Tuple uname knd)
 
     roleKind :: IP RoleKind
-    roleKind = (reserved "Role" *> pure RoleInContext)
+    roleKind = (reserved "RoleInContext" *> pure RoleInContext)
       <|> reserved "ContextRole" *> pure ContextRole
       <|> reserved "ExternalRole" *> pure ExternalRole
       <|> reserved "UserRole" *> pure UserRole
@@ -66,11 +66,13 @@ roleE = withBlock
     rolePart = propertyE <|> perspectiveE <|> viewE <|> functionalAttribute <|> mandatoryAttribute <|> filledByAttribute
 
     functionalAttribute :: IP RolePart
-    functionalAttribute = reserved "NonFunctional" *> colon *> boolean >>= pure <<< FunctionalAttribute
+    functionalAttribute = reserved "Functional" *> colon *> boolean >>= pure <<< FunctionalAttribute
 
     mandatoryAttribute :: IP RolePart
     mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MandatoryAttribute
 
+    filledByAttribute :: IP RolePart
+    filledByAttribute = reserved "FilledBy" *> colon *> arcIdentifier >>= pure <<< FilledByAttribute
 
 propertyE :: IP RolePart
 propertyE = withBlock
@@ -88,7 +90,7 @@ propertyE = withBlock
     propertyPart = functionalAttribute <|> mandatoryAttribute
 
     functionalAttribute :: IP PropertyPart
-    functionalAttribute = reserved "NonFunctional" *> colon *> boolean >>= pure <<< FunctionalAttribute'
+    functionalAttribute = reserved "Functional" *> colon *> boolean >>= pure <<< FunctionalAttribute'
 
     mandatoryAttribute :: IP PropertyPart
     mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MandatoryAttribute'
@@ -109,10 +111,10 @@ perspectiveE = withBlock
     perspective_ = reserved "Perspective" *> colon *> reserved "Perspective" *> colon *> arcIdentifier
 
     object :: IP PerspectivePart
-    object = reserved "Object" *> colon *> arcIdentifier >>= pure <<< Object
+    object = try (reserved "ObjectRef" *> colon *> arcIdentifier >>= pure <<< Object)
 
     defaultView :: IP PerspectivePart
-    defaultView = reserved "View" *> colon *> reserved "DefaultObjectViewRef" *> colon *> arcIdentifier >>= pure <<< DefaultView
+    defaultView = try (reserved "View" *> colon *> reserved "DefaultObjectViewRef" *> colon *> arcIdentifier >>= pure <<< DefaultView)
 
 viewE :: IP RolePart
 viewE = withBlock
@@ -149,6 +151,3 @@ actionE = withBlock
 
 boolean :: IP Boolean
 boolean = (reserved "True" *> pure true) <|> (reserved "False" *> pure false)
-
-filledByAttribute :: IP RolePart
-filledByAttribute = reserved "FilledBy" *> colon *> arcIdentifier >>= pure <<< FilledByAttribute

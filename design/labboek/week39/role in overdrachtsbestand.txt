@@ -3,7 +3,7 @@ Dit zou de nieuwe vorm zijn die een user role krijgt:
 Agent : UserRole : <naam>
 	Mandatory : False
 	Perspective : Perspective : <naam>
-		Object : <ref>
+		ObjectRef : <ref>
 		View : DefaultObjectViewRef : <ref>
 		Action : Consults : <naam>
 			IndirectObjectRef : <ref>						/// optioneel
