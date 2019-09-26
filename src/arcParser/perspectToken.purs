@@ -71,6 +71,11 @@ perspectDef = LanguageDef
                   , "FilledBy"
                   , "False"
                   , "True"
+                  , "DefaultObjectViewRef"
+                  , "IndirectObjectRef"
+                  , "SubjectViewRef"
+                  , "ObjectViewRef"
+                  , "IndirectObjectViewRef"
                   ]
                 , caseSensitive:   true
                 }

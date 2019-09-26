@@ -19,8 +19,8 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (<>), (>>=))
-import Text.Parsing.Indent (runIndent)
+import Prelude (class Monad, Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (<>), (>>=), (<*))
+import Text.Parsing.Indent (IndentParser, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
 import Text.Parsing.Parser.Pos (Position)
 
@@ -171,3 +171,6 @@ setPrefix pre exp = do
 
 getPrefix :: Prefix -> IP (Maybe String)
 getPrefix pre = lift (lift (gets (\{prefixes} -> F.lookup pre prefixes)))
+
+onSameLine :: forall m s a. Monad m => IndentParser m s a -> IndentParser m s a
+onSameLine p = withPos (p <* sameLine)

@@ -1,0 +1,29 @@
+Dit zou de nieuwe vorm zijn die een user role krijgt:
+
+Agent : UserRole : <naam>
+	Mandatory : False
+	Perspective : Perspective : <naam>
+		Object : <ref>
+		View : DefaultObjectViewRef : <ref>
+		Action : Consults : <naam>
+			IndirectObjectRef : <ref>						/// optioneel
+			View : ObjectViewRef : <ref>				/// optioneel
+			View : SubjectViewRef : <ref>				/// optioneel
+			View : IndirectObjectViewRef : <ref>		/// optioneel
+	Property : StringProperty : <naam>
+		Mandatory : False
+		Functional : False
+		Calculated : False
+	View : View : <naam>
+		Property : PropertyRef : <ref>
+		Property : PropertyRef : <ref>
+	ContextScreen : ContextScreen : <naam>
+		Perspective : PerspectiveRef : <ref>
+			ScreenLocationX : 100
+			ScreenLocationY : 100
+			ScreenWidth : 600
+			ScreenHeight : 400
+
+
+Ik heb overal waar de waarde een referentie naar een ander object is, de suffix "Ref" toegevoegd aan het stereotype.
+Dat is niet heel belangrijk, maar levert wel extra helderheid.

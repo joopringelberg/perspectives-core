@@ -1,17 +1,17 @@
 module Perspectives.Parsing.Arc.Simple where
 
-import Control.Alt (void, (<|>))
+import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Tuple (Tuple(..))
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextKind(..), ContextPart(..), FilledByAttribute(..), FunctionalAttribute(..), MandatoryAttribute(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextKind(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, colon, reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (pure, (*>), bind, ($), (==), discard, (>>=), (<<<))
-import Text.Parsing.Indent (sameLine, withBlock)
+import Prelude (pure, (*>), bind, ($), (==), (>>=), (<<<))
+import Text.Parsing.Indent (withBlock)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.String (whiteSpace)
+import Text.Parsing.Parser.Combinators (try)
 
 domain :: IP ContextE
 domain = do
@@ -27,10 +27,9 @@ contextE = withBlock
   (defer (\_ -> contextPart))
   where
     context_ :: IP (Tuple String ContextKind)
-    context_ = sameLine *> reserved "Context" *> colon *> do
+    context_ = reserved "Context" *> colon *> do
       knd <- contextKind
       uname <- colon *> arcIdentifier
-      void whiteSpace
       pure (Tuple uname knd)
 
     contextKind :: IP ContextKind
@@ -50,7 +49,7 @@ roleE = withBlock
   rolePart
   where
     role_ :: IP (Tuple String RoleKind)
-    role_ = sameLine *> reserved "Role" *> colon *> do
+    role_ = reserved "Role" *> colon *> do
       knd <- roleKind
       uname <- colon *> arcIdentifier
       pure (Tuple uname knd)
@@ -67,10 +66,10 @@ roleE = withBlock
     rolePart = propertyE <|> perspectiveE <|> viewE <|> functionalAttribute <|> mandatoryAttribute <|> filledByAttribute
 
     functionalAttribute :: IP RolePart
-    functionalAttribute = reserved "NonFunctional" *> colon *> boolean >>= pure <<< FA <<< FunctionalAttribute
+    functionalAttribute = reserved "NonFunctional" *> colon *> boolean >>= pure <<< FunctionalAttribute
 
     mandatoryAttribute :: IP RolePart
-    mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MA <<< MandatoryAttribute
+    mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MandatoryAttribute
 
 
 propertyE :: IP RolePart
@@ -80,7 +79,7 @@ propertyE = withBlock
   propertyPart
   where
     property_ :: IP (Tuple String Range)
-    property_ = sameLine *> reserved "Property" *> colon *> do
+    property_ = reserved "Property" *> colon *> do
       ran <- range
       uname <- colon *> arcIdentifier
       pure (Tuple uname ran)
@@ -89,10 +88,10 @@ propertyE = withBlock
     propertyPart = functionalAttribute <|> mandatoryAttribute
 
     functionalAttribute :: IP PropertyPart
-    functionalAttribute = reserved "NonFunctional" *> colon *> boolean >>= pure <<< FA' <<< FunctionalAttribute
+    functionalAttribute = reserved "NonFunctional" *> colon *> boolean >>= pure <<< FunctionalAttribute'
 
     mandatoryAttribute :: IP PropertyPart
-    mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MA' <<< MandatoryAttribute
+    mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MandatoryAttribute'
 
     range :: IP Range
     range = reserved "BooleanProperty" *> pure PBool
@@ -101,16 +100,55 @@ propertyE = withBlock
       <|> reserved "DateTimeProperty" *> pure PDate
 
 perspectiveE :: IP RolePart
-perspectiveE = fail "perspectiveE is not yet implemented."
+perspectiveE = withBlock
+  (\uname parts -> PRE $ PerspectiveE {id: uname, perspectiveParts: parts})
+  perspective_
+  (object <|> defaultView <|> actionE)
+  where
+    perspective_ :: IP String
+    perspective_ = reserved "Perspective" *> colon *> reserved "Perspective" *> colon *> arcIdentifier
+
+    object :: IP PerspectivePart
+    object = reserved "Object" *> colon *> arcIdentifier >>= pure <<< Object
+
+    defaultView :: IP PerspectivePart
+    defaultView = reserved "View" *> colon *> reserved "DefaultObjectViewRef" *> colon *> arcIdentifier >>= pure <<< DefaultView
 
 viewE :: IP RolePart
 viewE = withBlock
   (\uname refs -> VE $ ViewE {id: uname, viewParts: refs})
-  (sameLine *> reserved "View" *> colon *> reserved "View" *> colon *> arcIdentifier)
-  (reserved "Property" *> colon *> arcIdentifier)
+  (reserved "View" *> colon *> reserved "View" *> colon *> arcIdentifier)
+  (reserved "Property" *> colon *> reserved "PropertyRef" *> colon *> arcIdentifier)
+
+actionE :: IP PerspectivePart
+actionE = withBlock
+  (\(Tuple uname verb) parts -> Act $ ActionE {id: uname, verb: verb, actionParts: parts})
+  actionE_
+  (indirectObjectView <|> indirectObject <|> objectView <|> subjectView)
+  where
+    actionE_ :: IP (Tuple String String)
+    actionE_ = do
+      verb <- reserved "Action" *> colon *> arcIdentifier
+      uname <- colon *> arcIdentifier
+      pure $ Tuple uname verb
+
+    indirectObject :: IP ActionPart
+    indirectObject = reserved "IndirectObjectRef" *> colon *> arcIdentifier >>= pure <<< IndirectObject
+
+    -- If not a subjectView, the parser backtracks to objectView, indirectObjectView or indirectObject. The latter
+    -- obviously fails, but the others do so too because "View" has already been consumed.
+    -- Hence we need to wrap the parser in `try`, to make it backtrack over "View".
+    subjectView :: IP ActionPart
+    subjectView = try (reserved "View" *> colon *> reserved "SubjectViewRef" *> colon *> arcIdentifier >>= pure <<< SubjectView)
+
+    objectView :: IP ActionPart
+    objectView = try (reserved "View" *> colon *> reserved "ObjectViewRef" *> colon *> arcIdentifier >>= pure <<< ObjectView)
+
+    indirectObjectView :: IP ActionPart
+    indirectObjectView = try (reserved "View" *> colon *> reserved "IndirectObjectViewRef" *> colon *> arcIdentifier >>= pure <<< IndirectObjectView)
 
 boolean :: IP Boolean
-boolean = (reserved "True" *> pure true) <|> (reserved "False" *> pure true)
+boolean = (reserved "True" *> pure true) <|> (reserved "False" *> pure false)
 
 filledByAttribute :: IP RolePart
-filledByAttribute = reserved "FilledBy" *> colon *> arcIdentifier >>= pure <<< FBA <<< FilledByAttribute
+filledByAttribute = reserved "FilledBy" *> colon *> arcIdentifier >>= pure <<< FilledByAttribute

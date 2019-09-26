@@ -22,13 +22,7 @@ newtype RoleE = RoleE
   , kindOfRole :: RoleKind
   , roleParts :: List RolePart}
 
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FA FunctionalAttribute | MA MandatoryAttribute | FBA FilledByAttribute
-
-newtype FunctionalAttribute = FunctionalAttribute Boolean
-
-newtype MandatoryAttribute = MandatoryAttribute Boolean
-
-newtype FilledByAttribute = FilledByAttribute String
+data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String
 
 newtype PropertyE = PropertyE
   { id :: String
@@ -36,18 +30,21 @@ newtype PropertyE = PropertyE
   , propertyParts :: List PropertyPart
   }
 
-data PropertyPart = FA' FunctionalAttribute | MA' MandatoryAttribute
+data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean
 
 newtype PerspectiveE = PerspectiveE
-  { object :: String
-  , perspectiveParts :: List ActionE}
+  { id :: String
+  , perspectiveParts :: List PerspectivePart}
+
+data PerspectivePart = Object String | DefaultView String | Act ActionE
 
 newtype ActionE = ActionE
   { id :: String
-  , subject :: String
   , verb :: String
-  , object :: String
-  , indirectObject :: String}
+  , actionParts :: List ActionPart
+  }
+
+data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String
 
 newtype ViewE = ViewE
   { id :: String
@@ -69,15 +66,6 @@ instance showRoleE :: Show RoleE where show = genericShow
 derive instance genericRoleElement :: Generic RolePart _
 instance showRoleElement :: Show RolePart where show = genericShow
 
-derive instance genericFunctionalAttribute :: Generic FunctionalAttribute _
-instance showFunctionalAttribute :: Show FunctionalAttribute where show = genericShow
-
-derive instance genericMandatoryAttribute :: Generic MandatoryAttribute _
-instance showMandatoryAttribute :: Show MandatoryAttribute where show = genericShow
-
-derive instance genericeFilledByAttribute :: Generic FilledByAttribute _
-instance showFilledByAttribute :: Show FilledByAttribute where show = genericShow
-
 derive instance genericPropertyE :: Generic PropertyE _
 instance showPropertyE :: Show PropertyE where show = genericShow
 
@@ -87,8 +75,14 @@ instance showPropertyElement :: Show PropertyPart where show = genericShow
 derive instance genericPerspectiveElement :: Generic PerspectiveE _
 instance showPerspectiveElement :: Show PerspectiveE where show = genericShow
 
+derive instance genericPerspectivePart :: Generic PerspectivePart _
+instance showPerspectivePart :: Show PerspectivePart where show = genericShow
+
 derive instance genericActionElement :: Generic ActionE _
 instance showActionElement :: Show ActionE where show = genericShow
+
+derive instance genericActionPart :: Generic ActionPart _
+instance showActionPart :: Show ActionPart where show = genericShow
 
 derive instance genericViewElement :: Generic ViewE _
 instance showViewElement :: Show ViewE where show = genericShow
