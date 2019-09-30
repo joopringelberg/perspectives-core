@@ -4,7 +4,7 @@ import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, colon, reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, colon, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -64,7 +64,7 @@ roleE = withBlock
       <|> fail "Unknown kind of role"
 
     rolePart :: IP RolePart
-    rolePart = propertyE <|> perspectiveE <|> viewE <|> functionalAttribute <|> mandatoryAttribute <|> filledByAttribute
+    rolePart = propertyE <|> perspectiveE <|> viewE <|> functionalAttribute <|> mandatoryAttribute <|> filledByAttribute <|> calculation
 
     functionalAttribute :: IP RolePart
     functionalAttribute = reserved "Functional" *> colon *> boolean >>= pure <<< FunctionalAttribute
@@ -74,6 +74,9 @@ roleE = withBlock
 
     filledByAttribute :: IP RolePart
     filledByAttribute = reserved "FilledBy" *> colon *> arcIdentifier >>= pure <<< FilledByAttribute
+
+    calculation :: IP RolePart
+    calculation = reserved "Calculation" *> colon *> stringUntilNewline >>= pure <<< Calculation
 
 propertyE :: IP RolePart
 propertyE = withBlock
@@ -88,13 +91,16 @@ propertyE = withBlock
       pure (Tuple uname ran)
 
     propertyPart :: IP PropertyPart
-    propertyPart = functionalAttribute <|> mandatoryAttribute
+    propertyPart = functionalAttribute <|> mandatoryAttribute <|> calculation
 
     functionalAttribute :: IP PropertyPart
     functionalAttribute = reserved "Functional" *> colon *> boolean >>= pure <<< FunctionalAttribute'
 
     mandatoryAttribute :: IP PropertyPart
     mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MandatoryAttribute'
+
+    calculation :: IP PropertyPart
+    calculation = reserved "Calculation" *> colon *> stringUntilNewline >>= pure <<< Calculation'
 
     range :: IP Range
     range = reserved "BooleanProperty" *> pure PBool

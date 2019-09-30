@@ -39,9 +39,7 @@ instance readForeignQueryFunctionDescription :: ReadForeign QueryFunctionDescrip
   readImpl q = readJSON' (unsafeFromForeign q)
 
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
-  show q@(SQD _ _ _)= show q
-  show q@(UQD _ _ _ _)= show q
-  show q@(BQD _ _ _ _ _)= show q
+  show q = genericShow q
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.

@@ -3,12 +3,13 @@ module Perspectives.Representation.EnumeratedProperty where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, writeImpl)
 
@@ -27,6 +28,16 @@ type EnumeratedPropertyRecord =
   , functional :: Boolean
   , mandatory :: Boolean
   }
+
+defaultEnumeratedProperty :: String -> String -> String -> Range -> EnumeratedProperty
+defaultEnumeratedProperty id dn role range = EnumeratedProperty
+  { _id: EnumeratedPropertyType id
+  , _rev: Nothing
+  , displayName: dn
+  , role: EnumeratedRoleType role
+  , range: range
+  , functional: true
+  , mandatory: true}
 
 derive instance genericRepEnumeratedProperty :: Generic EnumeratedProperty _
 

@@ -4,11 +4,10 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Object (Object, empty)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), ViewType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -29,26 +28,26 @@ type EnumeratedRoleRecord =
   , context :: ContextType
   , binding :: ADT EnumeratedRoleType
 
-  , views :: Object ViewType
+  , views :: Array ViewType
 
   , functional :: Boolean
   , mandatory :: Boolean
   }
 
-defaultEnumeratedRole :: String -> String -> EnumeratedRole
-defaultEnumeratedRole qname dname = EnumeratedRole
+defaultEnumeratedRole :: String -> String -> RoleKind -> String -> EnumeratedRole
+defaultEnumeratedRole qname dname kindOfRole context = EnumeratedRole
   { _id: EnumeratedRoleType qname
   , _rev: Nothing
   , displayName: dname
-  , kindOfRole: RoleInContext
+  , kindOfRole: kindOfRole
 
   , roleAspects: []
   , properties: []
 
-  , context: ContextType ""
+  , context: ContextType context
   , binding: NOTYPE
 
-  , views: empty
+  , views: []
 
   , functional: true
   , mandatory: false

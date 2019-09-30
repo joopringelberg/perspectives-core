@@ -1,15 +1,16 @@
 module Perspectives.Parsing.Arc.Identifiers where
 
 import Control.Alt ((<|>))
+import Data.Array (foldl, intercalate)
 import Data.Array (many, cons) as AR
 import Data.Char.Unicode (isLower)
 import Data.String.CodeUnits (fromCharArray)
 import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
-import Prelude (Unit, show, (<$>), ($>), ($), (<*>))
-import Text.Parsing.Parser.Combinators ((<?>))
-import Text.Parsing.Parser.String (satisfy)
-import Text.Parsing.Parser.String (oneOf) as STRING
+import Prelude (Unit, bind, pure, show, ($), ($>), (/=), (<$>), (<*>), (<>), (*>))
+import Text.Parsing.Parser.Combinators (try, (<?>))
+import Text.Parsing.Parser.String (char, satisfy, whiteSpace)
+import Text.Parsing.Parser.String (oneOf, string) as STRING
 import Text.Parsing.Parser.Token (alphaNum, upper)
 
 reservedOp ::  String -> IP Unit
@@ -61,5 +62,20 @@ uncapitalizedString = f <$> lower <*> AR.many identLetter where
 colon :: IP Unit
 colon = reservedOp ":"
 
+qualifiedName ::  IP String
+qualifiedName = do
+  _ <- STRING.string "model:"
+  domein <- AR.many (dollar <|> capitalizedString)
+  pure $ "model:" <> foldl (<>) "" domein
+
+dollar :: IP String
+dollar = reservedOp "$" *> pure "$"
+
 arcIdentifier :: IP String
-arcIdentifier = lexeme capitalizedString
+arcIdentifier = lexeme (try capitalizedString <|> try qualifiedName)
+
+stringUntilNewline :: IP String
+stringUntilNewline = do
+  (chars :: Array Char) <- AR.many (satisfy (_ /= '\n'))
+  _ <- whiteSpace
+  pure $ fromCharArray chars

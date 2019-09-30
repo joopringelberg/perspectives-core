@@ -2,12 +2,15 @@ module Perspectives.Representation.CalculatedProperty where
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedRoleType)
-import Prelude (class Eq, class Show, (<<<), (==))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Prelude (class Eq, class Show, (<<<), (==), ($))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
@@ -24,6 +27,14 @@ type CalculatedPropertyRecord =
   -- , computation :: Maybe (RoleInContext ~~> Value)
   , role :: EnumeratedRoleType
   }
+
+defaultCalculatedProperty :: String -> String -> String -> CalculatedProperty
+defaultCalculatedProperty id dn role = CalculatedProperty
+  { _id: CalculatedPropertyType id
+  , _rev: Nothing
+  , displayName: dn
+  , calculation: SQD (RDOM $ ST $ (EnumeratedRoleType "")) (DataTypeGetter "") (PDOM (EnumeratedPropertyType ""))
+  , role: EnumeratedRoleType role}
 
 derive instance genericRepCalculatedProperty :: Generic CalculatedProperty _
 

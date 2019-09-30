@@ -9,7 +9,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
-import Prelude (class Eq, class Show, (<<<), (==))
+import Prelude (class Eq, class Show, map, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 -----------------------------------------------------------
@@ -53,6 +53,7 @@ type ContextRecord =
   , contextAspects :: Array ContextType
   , defaultPrototype :: Maybe ContextInstance
 
+  -- TODO: heroverweeg of dit niet samengevoegd kan worden.
   , rolInContext :: Array RoleType
   , contextRol :: Array RoleType
   , externeRol :: EnumeratedRoleType
@@ -61,12 +62,13 @@ type ContextRecord =
 
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType
+  , context :: Maybe ContextType
   }
 
 data ContextKind = Domain | Case | Party | Activity | State
 
-defaultContext :: String -> String -> ContextKind -> Context
-defaultContext id dname kind = Context { _id: (ContextType id)
+defaultContext :: String -> String -> ContextKind -> Maybe String -> Context
+defaultContext id dname kind context = Context { _id: (ContextType id)
   , _rev: Nothing
   , displayName: dname
   , kindOfContext: kind
@@ -81,6 +83,7 @@ defaultContext id dname kind = Context { _id: (ContextType id)
 
   , nestedContexts: []
   , actions: []
+  , context: map ContextType context
   }
 
 derive instance genericRepContext :: Generic Context _

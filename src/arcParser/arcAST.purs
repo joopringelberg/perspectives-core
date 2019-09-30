@@ -21,7 +21,8 @@ newtype RoleE = RoleE
   , kindOfRole :: RoleKind
   , roleParts :: List RolePart}
 
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String
+-- TODO: het verschil tussen conjunctie en disjunctie bij binding.
+data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String
 
 newtype PropertyE = PropertyE
   { id :: String
@@ -29,7 +30,7 @@ newtype PropertyE = PropertyE
   , propertyParts :: List PropertyPart
   }
 
-data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean
+data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' String
 
 newtype PerspectiveE = PerspectiveE
   { id :: String

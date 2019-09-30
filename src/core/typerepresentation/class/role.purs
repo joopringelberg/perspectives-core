@@ -6,7 +6,6 @@ import Data.Array (union)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
-import Foreign.Object (values)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), Domain(..))
 import Perspectives.Query.QueryTypes (range) as QT
@@ -128,7 +127,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   fullType r = do
     bindingType <- fullADTType (unwrap r).binding
     pure $ PROD [(ST $ identifier r), bindingType]
-  views r = includeBinding (\r' -> values (unwrap r).views) viewsOfADT r
+  views r = includeBinding (\r' -> (unwrap r).views) viewsOfADT r
 
 -- | A pattern of computation shared in the recursive computation of roleAspects, properties and views of a role.
 -- | It computes the local value for an EnumeratedRole and then the value of the binding of the role, returning

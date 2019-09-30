@@ -20,23 +20,27 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, ($), (==))
+import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, ($), (==), (<>), show)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | NOTYPE
 
 derive instance genericRepBinding :: Generic (ADT a) _
 
-instance showBinding :: (Show a) => Show (ADT a) where
-  show b = genericShow b
+-- TODO. This implementation causes an endless loop.
+instance showADT :: (Show a) => Show (ADT a) where
+  show (ST a) = "(" <> "ST" <> " " <> show a <> ")"
+  show NOTYPE = "NOTYPE"
+  show (SUM adts) = "(" <> "SUM" <> show adts <> ")"
+  show (PROD adts) = "(" <> "PROD" <> show adts <> ")"
 
-instance eqBinding :: (Eq a) => Eq (ADT a) where
+instance eqADT :: (Eq a) => Eq (ADT a) where
   eq b1 b2 = genericEq b1 b2
 
-instance writeForeignBinding :: (WriteForeign a) => WriteForeign (ADT a) where
+instance writeForeignADT :: (WriteForeign a) => WriteForeign (ADT a) where
   writeImpl b = unsafeToForeign (writeJSON b)
 
-instance readForeignBinding :: (ReadForeign a) => ReadForeign (ADT a) where
+instance readForeignADT :: (ReadForeign a) => ReadForeign (ADT a) where
   readImpl b = readJSON' (unsafeFromForeign b)
 
 -- | The `Reducible` class implements a pattern to recursively process an ADT.

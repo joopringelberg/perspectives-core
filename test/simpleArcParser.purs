@@ -11,9 +11,10 @@ import Effect.Class.Console (logShow)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
-import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextKind(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Simple (actionE, domain, perspectiveE, propertyE, roleE, viewE)
+import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Test.Perspectives.Utils (runP)
@@ -25,7 +26,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.Simple" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- runP $ runIndentParser "Context : Domain : MyTestDomain\n" domain
     case r of
@@ -75,6 +76,17 @@ theSuite = suite "Perspectives.Parsing.Arc.Simple" do
         (assert "Role should have a Functional attribute"
           (isJust (findIndex (case _ of
             (FunctionalAttribute false) -> true
+            otherwise -> false) roleParts)))
+      otherwise -> assert "Role should have parts" false
+
+  test "Role with a calculation" do
+    (r :: Either ParseError ContextPart) <- runP $ runIndentParser "Role : RoleInContext : MyRole\n  Calculation : some calculation\n  Mandatory : True" roleE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right rl@(RE (RoleE{roleParts}))) -> do
+        (assert "Role should have a Calculation"
+          (isJust (findIndex (case _ of
+            (Calculation _) -> true
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
@@ -129,7 +141,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Simple" do
             otherwise -> false) viewParts)))
       otherwise -> assert "Property should have parts" false
 
-  testOnly "Perspective with ObjectRef, DefaultObjectView and an Action" do
+  test "Perspective with ObjectRef, DefaultObjectView and an Action" do
     (r :: Either ParseError RolePart) <- runP $ runIndentParser "Perspective : Perspective : MyPerspective\n  ObjectRef : MyObject\n  View : DefaultObjectViewRef : MyView\n  Action : Consults : MyAction" perspectiveE
     case r of
       (Left e) -> assert (show e) false
