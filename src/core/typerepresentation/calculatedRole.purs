@@ -4,6 +4,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -26,10 +27,12 @@ type CalculatedRoleRecord =
 
   , calculation :: QueryFunctionDescription
   , context :: ContextType
+
+  , pos :: ArcPosition
   }
 
-defaultCalculatedRole :: String -> String -> RoleKind -> String -> CalculatedRole
-defaultCalculatedRole qname dname kindOfRole context = CalculatedRole
+defaultCalculatedRole :: String -> String -> RoleKind -> String -> ArcPosition -> CalculatedRole
+defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
   { _id: CalculatedRoleType qname
   , _rev: Nothing
   , displayName: dname
@@ -37,6 +40,8 @@ defaultCalculatedRole qname dname kindOfRole context = CalculatedRole
 
   , calculation: SQD (CDOM $ ST $ (ContextType "")) (RolGetter (ENR (EnumeratedRoleType ""))) (RDOM (ST (EnumeratedRoleType "")))
   , context: ContextType context
+
+  , pos: pos
   }
 
 derive instance genericRepCalculatedRole :: Generic CalculatedRole _

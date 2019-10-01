@@ -5,6 +5,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Object (Object, empty)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
@@ -35,10 +36,12 @@ type EnumeratedRoleRecord =
 
   , functional :: Boolean
   , mandatory :: Boolean
+
+  , pos :: ArcPosition
   }
 
-defaultEnumeratedRole :: String -> String -> RoleKind -> String -> EnumeratedRole
-defaultEnumeratedRole qname dname kindOfRole context = EnumeratedRole
+defaultEnumeratedRole :: String -> String -> RoleKind -> String -> ArcPosition -> EnumeratedRole
+defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   { _id: EnumeratedRoleType qname
   , _rev: Nothing
   , displayName: dname
@@ -56,6 +59,8 @@ defaultEnumeratedRole qname dname kindOfRole context = EnumeratedRole
 
   , functional: true
   , mandatory: false
+
+  , pos: pos
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

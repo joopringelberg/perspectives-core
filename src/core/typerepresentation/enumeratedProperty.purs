@@ -6,6 +6,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
@@ -27,17 +28,20 @@ type EnumeratedPropertyRecord =
   , range :: Range
   , functional :: Boolean
   , mandatory :: Boolean
+
+  , pos :: ArcPosition
   }
 
-defaultEnumeratedProperty :: String -> String -> String -> Range -> EnumeratedProperty
-defaultEnumeratedProperty id dn role range = EnumeratedProperty
+defaultEnumeratedProperty :: String -> String -> String -> Range -> ArcPosition -> EnumeratedProperty
+defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
   { _id: EnumeratedPropertyType id
   , _rev: Nothing
   , displayName: dn
   , role: EnumeratedRoleType role
   , range: range
   , functional: true
-  , mandatory: true}
+  , mandatory: true
+  , pos: pos}
 
 derive instance genericRepEnumeratedProperty :: Generic EnumeratedProperty _
 

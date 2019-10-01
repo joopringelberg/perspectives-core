@@ -5,6 +5,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
@@ -60,12 +61,14 @@ type ContextRecord =
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType
   , context :: Maybe ContextType
+
+  , pos :: ArcPosition
   }
 
 data ContextKind = Domain | Case | Party | Activity | State
 
-defaultContext :: String -> String -> ContextKind -> Maybe String -> Context
-defaultContext id dname kind context = Context { _id: (ContextType id)
+defaultContext :: String -> String -> ContextKind -> Maybe String -> ArcPosition -> Context
+defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , _rev: Nothing
   , displayName: dname
   , kindOfContext: kind
@@ -80,6 +83,7 @@ defaultContext id dname kind context = Context { _id: (ContextType id)
   , nestedContexts: []
   , actions: []
   , context: map ContextType context
+  , pos: pos
   }
 
 derive instance genericRepContext :: Generic Context _

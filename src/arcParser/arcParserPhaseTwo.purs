@@ -35,15 +35,15 @@ import Prelude (map, pure, ($), (<>), (==), bind)
 -- (4) We might want a way to indicate that the system should be able to find a qualified name.
 
 traverseDomain :: ContextE -> DomeinFileRecord -> String -> Except String DomeinFile
-traverseDomain c@(ContextE {id, kindOfContext, contextParts}) df ns = do
+traverseDomain c@(ContextE {id, kindOfContext, contextParts, pos}) df ns = do
   (Tuple domeinFileRecord domain) <- traverseContextE c df ns
   pure $ DomeinFile domeinFileRecord
 
 -- | Traverse the members of the ContextE AST type to construct a new Context type
 -- | and insert it into a DomeinFileRecord.
 traverseContextE :: ContextE -> DomeinFileRecord -> String -> Except String (Tuple DomeinFileRecord Context)
-traverseContextE (ContextE {id, kindOfContext, contextParts}) df ns = do
-  context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns))
+traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) df ns = do
+  context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   (Tuple domeinFile context') <- foldM handleParts (Tuple df context) contextParts
   pure $ Tuple (addContextToDomeinFile context' domeinFile) context'
 
@@ -109,7 +109,7 @@ traverseRoleE r df ns = if isCalculatedRole r
 
 -- | Traverse a RoleE that results in an EnumeratedRole.
 traverseEnumeratedRoleE :: RoleE -> DomeinFileRecord -> String -> Except String (Tuple DomeinFileRecord Role)
-traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts}) df@{enumeratedRoles} ns = do
+traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedRoles} ns = do
   -- If we have a BotRole, we add its parts (perspectives with actions) to the UserRole
   -- that it serves.
   role@(EnumeratedRole{_id:roleName}) <-
@@ -119,15 +119,15 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts}) df@{enumeratedRoles}
         servedUserId <- pure (ns <> "$" <> servedUserLocalName)
         case lookup servedUserId enumeratedRoles of
           (Just user) -> pure user
-          Nothing -> pure (defaultEnumeratedRole servedUserId servedUserLocalName UserRole ns)
+          Nothing -> pure (defaultEnumeratedRole servedUserId servedUserLocalName UserRole ns pos)
       UserRole -> do
         userId <- pure (ns <> "$" <> id)
         case lookup userId enumeratedRoles of
           (Just user) -> pure user
-          Nothing -> pure (defaultEnumeratedRole userId id kindOfRole ns)
+          Nothing -> pure (defaultEnumeratedRole userId id kindOfRole ns pos)
       otherwise -> do
         roleName <- pure (ns <> "$" <> id)
-        pure (defaultEnumeratedRole roleName id kindOfRole ns)
+        pure (defaultEnumeratedRole roleName id kindOfRole ns pos)
   (Tuple domeinFile role') <- foldM (unsafePartial $ handleParts (unwrap roleName)) (Tuple df role) roleParts
   pure $ Tuple (addRoleToDomeinFile (E role') domeinFile) (E role')
 
@@ -193,14 +193,15 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts}) df@{enumeratedRoles}
 -- Traverse the members of ViewE to construct a new View type and insert it into the
 -- DomeinFileRecord.
 traverseViewE :: ViewE -> DomeinFileRecord -> String -> Except String (Tuple DomeinFileRecord ViewType)
-traverseViewE (ViewE {id, viewParts}) df@({views}) ns = let
+traverseViewE (ViewE {id, viewParts, pos}) df@({views}) ns = let
   viewName = ns <> "$" <> id
   view = View
     { _id: ViewType viewName
     , _rev: Nothing
     , displayName: id
     , propertyReferences: map (qualifyProperty ns) (fromFoldable viewParts)
-    , role: EnumeratedRoleType ns }
+    , role: EnumeratedRoleType ns
+    , pos: pos}
   in pure $ Tuple (df {views = insert viewName view views}) (ViewType viewName)
   where
     -- TODO. Is het een calculated of een enumerated property?
@@ -224,8 +225,8 @@ addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = over
 
 -- | Traverse a RoleE that results in an CalculatedRole.
 traverseCalculatedRoleE :: RoleE -> DomeinFileRecord -> String -> Except String (Tuple DomeinFileRecord Role)
-traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts}) df ns = do
-  role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns)
+traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df ns = do
+  role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
   (Tuple domeinFile role') <- foldM (unsafePartial $ handleParts) (Tuple df role) roleParts
   pure $ Tuple (addRoleToDomeinFile (C role') domeinFile) (C role')
   -- in Tuple df (C role')
@@ -253,8 +254,8 @@ traversePropertyE r df ns = if isCalculatedProperty r
         otherwise -> false) propertyParts))
 
 traverseEnumeratedPropertyE :: PropertyE -> DomeinFileRecord -> String -> Except String (Tuple DomeinFileRecord Property.Property)
-traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts}) df ns = do
-  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns range
+traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) df ns = do
+  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns range pos
   (Tuple domeinFile property') <- foldM (unsafePartial handleParts) (Tuple df property) propertyParts
   pure $ Tuple (addPropertyToDomeinFile (Property.E property') domeinFile) (Property.E property')
 
@@ -273,8 +274,8 @@ traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts}) df ns = do
 
 -- | Traverse a PropertyE that results in an CalculatedProperty.
 traverseCalculatedPropertyE :: PropertyE -> DomeinFileRecord -> String -> Except String (Tuple DomeinFileRecord Property.Property)
-traverseCalculatedPropertyE (PropertyE {id, range, propertyParts}) df ns = do
-  (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns
+traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) df ns = do
+  (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns pos
   calculation' <- case head propertyParts of
     -- TODO: actually call the parser, here.
     (Just (Calculation' c)) -> pure calculation

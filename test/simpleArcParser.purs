@@ -26,7 +26,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.Simple" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n" domain
     case r of

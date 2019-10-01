@@ -4,6 +4,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -26,15 +27,18 @@ type CalculatedPropertyRecord =
   , calculation :: QueryFunctionDescription
   -- , computation :: Maybe (RoleInContext ~~> Value)
   , role :: EnumeratedRoleType
+
+  , pos :: ArcPosition
   }
 
-defaultCalculatedProperty :: String -> String -> String -> CalculatedProperty
-defaultCalculatedProperty id dn role = CalculatedProperty
+defaultCalculatedProperty :: String -> String -> String -> ArcPosition -> CalculatedProperty
+defaultCalculatedProperty id dn role pos = CalculatedProperty
   { _id: CalculatedPropertyType id
   , _rev: Nothing
   , displayName: dn
   , calculation: SQD (RDOM $ ST $ (EnumeratedRoleType "")) (DataTypeGetter "") (PDOM (EnumeratedPropertyType ""))
-  , role: EnumeratedRoleType role}
+  , role: EnumeratedRoleType role
+  , pos: pos}
 
 derive instance genericRepCalculatedProperty :: Generic CalculatedProperty _
 

@@ -23,15 +23,17 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.DomeinFile (DomeinFile(..), defaultDomeinFile)
 import Perspectives.Parsing.Arc.AST (ContextE(..))
-import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseContextE)
 import Perspectives.Parsing.Arc.Simple (domain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
+import Perspectives.Representation.View (View(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
@@ -40,7 +42,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -51,6 +53,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
           (Left e) -> assert e false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
+            -- logShow context
             assert "The DomeinFile should have context 'model:MyTestDomain'."
               (isJust (lookup "model:MyTestDomain" dr'.contexts))
             assert "The DomeinFile should have context 'model:MyTestDomain$MyCase'."
@@ -61,21 +64,21 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               ((Just $ ContextType "model:MyTestDomain$MyCase") == (preview (prop (SProxy :: SProxy "contexts") <<< at "model:MyTestDomain" <<< traversed <<< _Newtype <<< (prop (SProxy :: SProxy "nestedContexts")) <<< ix 0) dr'))
             assert "'MyCase' should have 'MyRoleInContext' as a role in context"
               ((Just $ ENR $ EnumeratedRoleType "model:MyTestDomain$MyCase$MyRoleInContext") == (preview (prop (SProxy :: SProxy "contexts") <<< at "model:MyTestDomain$MyCase" <<< traversed <<< _Newtype <<< (prop (SProxy :: SProxy "rolInContext")) <<< ix 0) dr'))
-
             assert "The Domain should have the id 'MyTestDomain'" (id == "MyTestDomain")
 
-  test "A Context with a CalculatedRole." do
+  test "A Context with a CalculatedRole and a position." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      Calculation : some calculation" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
-        -- logShow ctxt
+        logShow ctxt
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
           (Left e) -> assert e false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
-            assert "bla bla" true
+            assert "The role MyRoleInContext should be a calculated role."
+              (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext" dr'.calculatedRoles))
 
   test "A role with a view" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      View : View : MyView\n        PropertyRef : MyProp" domain
@@ -86,7 +89,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
         case runExcept (traverseContextE ctxt dr "model:") of
           (Left e) -> assert e false
           (Right (Tuple dr' context)) -> do
-            -- logShow dr'
+            logShow dr'
             assert "The DomeinFile should have the view 'MyView'" (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext$MyView" dr'.views))
             assert "MyRoleInContext should have the view MyView"
               case (lookup "model:MyTestDomain$MyCase$MyRoleInContext" dr'.enumeratedRoles) of
@@ -273,3 +276,37 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               case lookup "model:MyTestDomain$MySelf" dr'.enumeratedRoles of
                 Nothing -> false
                 (Just (EnumeratedRole{properties})) -> length properties == 2
+
+  testOnly "Types should have positions in their definining texts." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n    Property : BooleanProperty : Happy\n      Calculation : prop1\n    View : View : MyView\n  Role : RoleInContext : MyRoleInContext\n    Calculation : prop1 prop2" domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        (DomeinFile dr) <- pure defaultDomeinFile
+        case runExcept (traverseContextE ctxt dr "model:") of
+          (Left e) -> assert e true
+          (Right (Tuple dr' context)) -> do
+            logShow dr'
+            assert "The Domain should be on position (1, 20)"
+              (case context of (Context{pos}) -> pos == ArcPosition {line: 1, column: 20})
+            assert "The role MySelf should have position (2, 21)"
+              case (lookup "model:MyTestDomain$MySelf" dr'.enumeratedRoles) of
+                Nothing -> false
+                (Just (EnumeratedRole{pos})) -> pos == ArcPosition({line: 2, column: 21})
+            assert "The role MyRoleInContext should have position (8,26)"
+              case (lookup "model:MyTestDomain$MyRoleInContext" dr'.calculatedRoles) of
+                Nothing -> false
+                (Just (CalculatedRole{pos})) -> pos == ArcPosition({line: 8, column: 26})
+            assert "'MyView' should have position (7, 19)"
+              case (lookup "model:MyTestDomain$MySelf$MyView" dr'.views) of
+                Nothing -> false
+                (Just (View{pos})) -> pos == ArcPosition{line: 7, column: 19}
+            assert "Property 'Nickname' should have position (4, 33)"
+              case (lookup "model:MyTestDomain$MySelf$NickName" dr'.enumeratedProperties) of
+                Nothing -> false
+                (Just (EnumeratedProperty{pos})) -> pos == ArcPosition{line: 4, column: 33}
+            assert "Property 'Happy' should have position (5, 34)"
+              case (lookup "model:MyTestDomain$MySelf$Happy" dr'.calculatedProperties) of
+                Nothing -> false
+                (Just (CalculatedProperty{pos})) -> pos == ArcPosition{line: 5, column: 34}

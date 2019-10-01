@@ -2,31 +2,30 @@ module Perspectives.Parsing.Arc.Simple where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Data.Either (Either)
-import Data.Identity (Identity(..))
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, colon, reserved, stringUntilNewline)
-import Perspectives.Parsing.Arc.IndentParser (IP)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (class Monad, bind, pure, ($), (*>), (<<<), (==), (>>=), (<*))
-import Text.Parsing.Indent (IndentParser, runIndent, sameLine, withBlock, withPos)
-import Text.Parsing.Parser (ParseError(..), fail, runParserT)
+import Prelude (bind, pure, ($), (*>), (<<<), (==), (>>=), (<*))
+import Text.Parsing.Indent (withBlock)
+import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (try)
 
 contextE :: IP ContextPart
 contextE = withBlock
-  (\(Tuple uname knd) elements -> CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements})
+  (\{uname, knd, pos} elements -> CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos})
   context_
   (defer (\_ -> contextPart))
   where
-    context_ :: IP (Tuple String ContextKind)
+    context_ :: IP (Record (uname :: String, knd :: ContextKind, pos :: ArcPosition))
     context_ = reserved "Context" *> colon *> do
-      knd <- contextKind
-      uname <- colon *> arcIdentifier
-      pure (Tuple uname knd)
+      knd <- contextKind <* colon
+      pos <- getPosition
+      uname <- arcIdentifier
+      pure {uname, knd, pos}
 
     contextKind :: IP ContextKind
     contextKind = (reserved "Domain" *> pure Domain)
@@ -47,15 +46,16 @@ domain = do
 
 roleE :: IP ContextPart
 roleE = withBlock
-  (\(Tuple uname knd) elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements})
+  (\{uname, knd, pos} elements -> RE $ RoleE {id: uname, kindOfRole: knd, roleParts: elements, pos: pos})
   role_
   rolePart
   where
-    role_ :: IP (Tuple String RoleKind)
+    role_ :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition))
     role_ = (reserved "Role" <|> reserved "Agent") *> colon *> do
-      knd <- roleKind
-      uname <- colon *> arcIdentifier
-      pure (Tuple uname knd)
+      knd <- roleKind <* colon
+      pos <- getPosition
+      uname <- arcIdentifier
+      pure {uname, knd, pos}
 
     roleKind :: IP RoleKind
     roleKind = (reserved "RoleInContext" *> pure RoleInContext)
@@ -85,15 +85,16 @@ roleE = withBlock
 
 propertyE :: IP RolePart
 propertyE = withBlock
-  (\(Tuple uname ran) parts -> PE $ PropertyE {id: uname, range: ran, propertyParts: parts})
+  (\{uname, ran, pos} parts -> PE $ PropertyE {id: uname, range: ran, propertyParts: parts, pos: pos})
   property_
   propertyPart
   where
-    property_ :: IP (Tuple String Range)
+    property_ :: IP (Record (uname :: String, ran :: Range, pos :: ArcPosition))
     property_ = reserved "Property" *> colon *> do
-      ran <- range
-      uname <- colon *> arcIdentifier
-      pure (Tuple uname ran)
+      ran <- range <* colon
+      pos <- getPosition
+      uname <- arcIdentifier
+      pure {uname, ran, pos}
 
     propertyPart :: IP PropertyPart
     propertyPart = functionalAttribute <|> mandatoryAttribute <|> calculation
@@ -115,12 +116,16 @@ propertyE = withBlock
 
 perspectiveE :: IP RolePart
 perspectiveE = withBlock
-  (\uname parts -> PRE $ PerspectiveE {id: uname, perspectiveParts: parts})
+  (\(Tuple uname pos) parts -> PRE $ PerspectiveE {id: uname, perspectiveParts: parts, pos: pos})
   perspective_
   (object <|> defaultView <|> actionE)
   where
-    perspective_ :: IP String
-    perspective_ = reserved "Perspective" *> colon *> reserved "Perspective" *> colon *> arcIdentifier
+    perspective_ :: IP (Tuple String ArcPosition)
+    perspective_ = reserved "Perspective" *> colon *> reserved "Perspective" *> colon *>
+      do
+        pos <- getPosition
+        uname <- arcIdentifier
+        pure (Tuple uname pos)
 
     object :: IP PerspectivePart
     object = try (reserved "ObjectRef" *> colon *> arcIdentifier >>= pure <<< Object)
@@ -130,21 +135,26 @@ perspectiveE = withBlock
 
 viewE :: IP RolePart
 viewE = withBlock
-  (\uname refs -> VE $ ViewE {id: uname, viewParts: refs})
-  (reserved "View" *> colon *> reserved "View" *> colon *> arcIdentifier)
+  (\(Tuple uname pos) refs -> VE $ ViewE {id: uname, viewParts: refs, pos: pos})
+  (reserved "View" *> colon *> reserved "View" *> colon *> do
+    pos <- getPosition
+    uname <- arcIdentifier
+    pure (Tuple uname pos))
+  -- TODO: leg positie per property vast.
   (reserved "Property" *> colon *> reserved "PropertyRef" *> colon *> arcIdentifier)
 
 actionE :: IP PerspectivePart
 actionE = withBlock
-  (\(Tuple uname verb) parts -> Act $ ActionE {id: uname, verb: verb, actionParts: parts})
+  (\{uname, verb, pos} parts -> Act $ ActionE {id: uname, verb: verb, actionParts: parts, pos: pos})
   actionE_
   (indirectObjectView <|> indirectObject <|> objectView <|> subjectView)
   where
-    actionE_ :: IP (Tuple String String)
+    actionE_ :: IP (Record (uname :: String, verb :: String, pos :: ArcPosition))
     actionE_ = do
       verb <- reserved "Action" *> colon *> arcIdentifier
-      uname <- colon *> arcIdentifier
-      pure $ Tuple uname verb
+      pos <- getPosition <* colon
+      uname <- arcIdentifier
+      pure {uname, verb, pos}
 
     indirectObject :: IP ActionPart
     indirectObject = reserved "IndirectObjectRef" *> colon *> arcIdentifier >>= pure <<< IndirectObject

@@ -3,6 +3,7 @@ module Perspectives.Representation.View where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, ViewType)
@@ -32,6 +33,8 @@ type ViewRecord =
 
   , propertyReferences :: Array PropertyType
   , role :: EnumeratedRoleType
+
+  , pos :: ArcPosition
   }
 
 derive instance genericRepView :: Generic View _

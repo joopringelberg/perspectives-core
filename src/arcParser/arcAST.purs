@@ -5,6 +5,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.TypeIdentifiers (RoleKind)
@@ -12,14 +13,16 @@ import Perspectives.Representation.TypeIdentifiers (RoleKind)
 newtype ContextE = ContextE
   { id :: String
   , kindOfContext :: ContextKind
-  , contextParts :: List ContextPart}
+  , contextParts :: List ContextPart
+  , pos :: ArcPosition}
 
 data ContextPart = RE RoleE | CE ContextE
 
 newtype RoleE = RoleE
   { id :: String
   , kindOfRole :: RoleKind
-  , roleParts :: List RolePart}
+  , roleParts :: List RolePart
+  , pos :: ArcPosition}
 
 -- TODO: het verschil tussen conjunctie en disjunctie bij binding.
 data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String
@@ -28,13 +31,15 @@ newtype PropertyE = PropertyE
   { id :: String
   , range :: Range
   , propertyParts :: List PropertyPart
+  , pos :: ArcPosition
   }
 
 data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' String
 
 newtype PerspectiveE = PerspectiveE
   { id :: String
-  , perspectiveParts :: List PerspectivePart}
+  , perspectiveParts :: List PerspectivePart
+  , pos :: ArcPosition}
 
 data PerspectivePart = Object String | DefaultView String | Act ActionE
 
@@ -42,13 +47,15 @@ newtype ActionE = ActionE
   { id :: String
   , verb :: String
   , actionParts :: List ActionPart
+  , pos :: ArcPosition
   }
 
 data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String
 
 newtype ViewE = ViewE
   { id :: String
-  , viewParts :: List String}
+  , viewParts :: List String
+  , pos :: ArcPosition}
 
 derive instance genericContextE :: Generic ContextE _
 instance showContextE :: Show ContextE where show = genericShow
