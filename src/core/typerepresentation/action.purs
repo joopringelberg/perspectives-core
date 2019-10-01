@@ -51,6 +51,7 @@ type ActionRecord =
   , indirectObject :: RoleType
   , condition :: QueryFunctionDescription
   , effect :: AssignmentStatement
+  , executedByBot :: Boolean
   }
 
 derive instance genericRepAction :: Generic Action _

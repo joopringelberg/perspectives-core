@@ -22,7 +22,7 @@ newtype RoleE = RoleE
   , roleParts :: List RolePart}
 
 -- TODO: het verschil tussen conjunctie en disjunctie bij binding.
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String
+data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String
 
 newtype PropertyE = PropertyE
   { id :: String

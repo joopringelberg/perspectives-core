@@ -4,10 +4,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Object (Object, empty)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -30,6 +31,8 @@ type EnumeratedRoleRecord =
 
   , views :: Array ViewType
 
+  , perspectives :: Object ActionType
+
   , functional :: Boolean
   , mandatory :: Boolean
   }
@@ -48,6 +51,8 @@ defaultEnumeratedRole qname dname kindOfRole context = EnumeratedRole
   , binding: NOTYPE
 
   , views: []
+
+  , perspectives: empty
 
   , functional: true
   , mandatory: false

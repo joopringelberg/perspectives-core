@@ -6,6 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.List (findIndex, head, filter, length)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (logShow)
 import Node.Encoding (Encoding(..))
@@ -17,7 +18,6 @@ import Perspectives.Parsing.Arc.Simple (actionE, domain, perspectiveE, propertyE
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
@@ -26,16 +26,16 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
+theSuite = suite "Perspectives.Parsing.Arc.Simple" do
   test "Representing the Domain" do
-    (r :: Either ParseError ContextE) <- runP $ runIndentParser "Context : Domain : MyTestDomain\n" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         assert "The Domain should have the id 'MyTestDomain'" (id == "MyTestDomain")
 
   test "Role without parts" do
-    (r :: Either ParseError ContextPart) <- runP $ runIndentParser "Role : RoleInContext : MyRole\n" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "Role : RoleInContext : MyRole\n" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(RE (RoleE{id}))) -> do
@@ -43,7 +43,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Domain with a role" do
-    (r :: Either ParseError ContextE) <- runP $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRole\n" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRole\n" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{contextParts})) -> do
@@ -55,7 +55,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
           otherwise -> assert "Parsed an unexpected type" false
 
   test "Role that is mandatory" do
-    (r :: Either ParseError ContextPart) <- runP $ runIndentParser "Role : RoleInContext : MyRole\n  Mandatory : True" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "Role : RoleInContext : MyRole\n  Mandatory : True" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(RE (RoleE{roleParts}))) -> case head roleParts of
@@ -65,7 +65,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Role that has a mandatory and a functional attribute" do
-    (r :: Either ParseError ContextPart) <- runP $ runIndentParser "Role : RoleInContext : MyRole\n  Mandatory : True\n  Functional : False" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "Role : RoleInContext : MyRole\n  Mandatory : True\n  Functional : False" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> do
@@ -80,7 +80,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Role should have parts" false
 
   test "Role with a calculation" do
-    (r :: Either ParseError ContextPart) <- runP $ runIndentParser "Role : RoleInContext : MyRole\n  Calculation : some calculation\n  Mandatory : True" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "Role : RoleInContext : MyRole\n  Calculation : some calculation\n  Mandatory : True" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> do
@@ -91,7 +91,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Role should have parts" false
 
   test "Role that has two FilledBy attributes" do
-    (r :: Either ParseError ContextPart) <- runP $ runIndentParser "Role : RoleInContext : MyRole\n  Mandatory : True\n  Functional : False\n  FilledBy : Host\n  FilledBy : Guest" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "Role : RoleInContext : MyRole\n  Mandatory : True\n  Functional : False\n  FilledBy : Host\n  FilledBy : Guest" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> do
@@ -101,8 +101,20 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
+  test "BotRole" do
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "Role : BotRole : MyBot\n  ForUser : MySelf" roleE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
+            (ForUser _) -> true
+            otherwise -> false) roleParts)) of
+          Nothing -> assert "BotRole should have a ForUser part." false
+          Just (ForUser u) -> assert "BotRole should have ForUser part with value 'MySelf'" (u == "MySelf")
+          otherwise -> assert "BotRole should have ForUser part" false
+      otherwise -> assert "BotRole should have a ForUser part." false
+
   test "Property without parts" do
-    (r :: Either ParseError RolePart) <- runP $ runIndentParser "Property : NumberProperty : MyProperty\n" propertyE
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "Property : NumberProperty : MyProperty\n" propertyE
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(PE (PropertyE{id, range}))) -> do
@@ -111,7 +123,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Property with functional and mandatory properties" do
-    (r :: Either ParseError RolePart) <- runP $ runIndentParser "Property : NumberProperty : MyProperty\n  Mandatory : True\n  Functional : False" propertyE
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "Property : NumberProperty : MyProperty\n  Mandatory : True\n  Functional : False" propertyE
     case r of
       (Left e) -> assert (show e) false
       (Right pr@(PE (PropertyE{propertyParts}))) -> do
@@ -126,7 +138,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Property should have parts" false
 
   test "View with property references" do
-    (r :: Either ParseError RolePart) <- runP $ runIndentParser "View : View : MyView\n  Property : PropertyRef : P1\n  Property : PropertyRef : P2" viewE
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "View : View : MyView\n  Property : PropertyRef : P1\n  Property : PropertyRef : P2" viewE
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(VE (ViewE{id, viewParts}))) -> do
@@ -142,11 +154,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Property should have parts" false
 
   test "Perspective with ObjectRef, DefaultObjectView and an Action" do
-    (r :: Either ParseError RolePart) <- runP $ runIndentParser "Perspective : Perspective : MyPerspective\n  ObjectRef : MyObject\n  View : DefaultObjectViewRef : MyView\n  Action : Consults : MyAction" perspectiveE
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "Perspective : Perspective : MyPerspective\n  ObjectRef : MyObject\n  View : DefaultObjectViewRef : MyView\n  Action : Consults : MyAction" perspectiveE
     case r of
       (Left e) -> assert (show e) false
       (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        logShow pre
+        -- logShow pre
         assert "The Perspective should have the id 'MyPerspective'" (id == "MyPerspective")
         (assert "The Perspective should have the object 'MyObject'"
           (isJust (findIndex (case _ of
@@ -163,7 +175,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Action without parts" do
-    (r :: Either ParseError PerspectivePart) <- runP $ runIndentParser "Action : Consults : MyAction\n" actionE
+    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Action : Consults : MyAction\n" actionE
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(Act (ActionE{id, verb}))) -> do
@@ -172,7 +184,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Action with indirect object and objectview" do
-    (r :: Either ParseError PerspectivePart) <- runP $ runIndentParser "Action : Consults : MyAction\n  IndirectObjectRef : SomeObjectRef\n  View : ObjectViewRef : SomeObjectViewRef" actionE
+    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Action : Consults : MyAction\n  IndirectObjectRef : SomeObjectRef\n  View : ObjectViewRef : SomeObjectViewRef" actionE
     case r of
       (Left e) -> assert (show e) false
       (Right act@(Act (ActionE{id, actionParts}))) -> do
@@ -189,15 +201,15 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
   test "Parse a file" do
     fileName <- pure "parsetest1.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
-    (r :: Either ParseError ContextE) <- runP $ runIndentParser text domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
     case r of
       (Left e) -> assert (show e) false
       (Right dom) -> do
-        logShow dom
+        -- logShow dom
         assert ("The file '" <> fileName <> "' does not parse") true
 
   test "Domain with a role and subcontext" do
-    (r :: Either ParseError ContextE) <- runP $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRole\n  Context : Case : MySubContext" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRole\n  Context : Case : MySubContext" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{contextParts})) -> do

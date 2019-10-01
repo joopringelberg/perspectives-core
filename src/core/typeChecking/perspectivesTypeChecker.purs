@@ -18,7 +18,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, EnumeratedRoleType, getPerspectType)
 import Perspectives.Representation.Class.Role (effectiveRoleType, fullADTType, kindOfRole)
-import Perspectives.Representation.Context (Context, botRole, contextAspects, contextRole, defaultPrototype, roleInContext, userRole, externalRole)
+import Perspectives.Representation.Context (Context, contextAspects, contextRole, defaultPrototype, externalRole, roleInContext, userRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
@@ -53,7 +53,6 @@ checkContext c = do
   for_ (roleInContext c) (checkRoleKind RoleInContext)
   for_ (contextRole c) (checkRoleKind ContextRole)
   for_ (userRole c) (checkEnumeratedRole UserRole)
-  for_ (botRole c) (checkEnumeratedRole BotRole)
   checkEnumeratedRole ExternalRole (externalRole c)
 
   where

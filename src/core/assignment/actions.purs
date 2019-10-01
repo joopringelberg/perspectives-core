@@ -18,7 +18,7 @@ import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActi
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>))
 import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Query.Compiler (context2propertyValue, context2role) 
+import Perspectives.Query.Compiler (context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action, condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
@@ -112,7 +112,7 @@ compileBotAction actionType contextId =
 -- | on Assumptions in the actionAssumptionRegister in PerspectivesState.
 setupBotActions :: ContextInstance -> MonadPerspectives Unit
 setupBotActions cid = do
-  -- TODO: filter, keeping just those actions with a subject that has RoleKind BotRole.
+  -- TODO: filter, keeping just those actions that are to be executed by a Bot.
   (ct :: ContextType) <- cid ##>> contextType
   (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
   -- Run the updater once. It will collect the Assumptions it depends on and register itself in the

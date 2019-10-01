@@ -2,6 +2,8 @@ module Perspectives.Parsing.Arc.Simple where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
+import Data.Either (Either)
+import Data.Identity (Identity(..))
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, colon, reserved, stringUntilNewline)
@@ -9,9 +11,9 @@ import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (pure, (*>), bind, ($), (==), (>>=), (<<<))
-import Text.Parsing.Indent (withBlock)
-import Text.Parsing.Parser (fail)
+import Prelude (class Monad, bind, pure, ($), (*>), (<<<), (==), (>>=), (<*))
+import Text.Parsing.Indent (IndentParser, runIndent, sameLine, withBlock, withPos)
+import Text.Parsing.Parser (ParseError(..), fail, runParserT)
 import Text.Parsing.Parser.Combinators (try)
 
 contextE :: IP ContextPart
@@ -64,7 +66,7 @@ roleE = withBlock
       <|> fail "Unknown kind of role"
 
     rolePart :: IP RolePart
-    rolePart = propertyE <|> perspectiveE <|> viewE <|> functionalAttribute <|> mandatoryAttribute <|> filledByAttribute <|> calculation
+    rolePart = propertyE <|> perspectiveE <|> viewE <|> functionalAttribute <|> mandatoryAttribute <|> filledByAttribute <|> calculation <|> forUser
 
     functionalAttribute :: IP RolePart
     functionalAttribute = reserved "Functional" *> colon *> boolean >>= pure <<< FunctionalAttribute
@@ -77,6 +79,9 @@ roleE = withBlock
 
     calculation :: IP RolePart
     calculation = reserved "Calculation" *> colon *> stringUntilNewline >>= pure <<< Calculation
+
+    forUser :: IP RolePart
+    forUser = reserved "ForUser" *> colon *> arcIdentifier >>= pure <<< ForUser
 
 propertyE :: IP RolePart
 propertyE = withBlock

@@ -22,7 +22,6 @@ class ContextClass c where
   contextRole :: c -> Array RoleType
   externalRole :: c -> EnumeratedRoleType
   userRole :: c -> Array EnumeratedRoleType
-  botRole :: c -> Array EnumeratedRoleType
   actions :: c -> Array ActionType
   aspects :: c -> Array ContextType
   nestedContexts :: c -> Array ContextType
@@ -34,7 +33,6 @@ instance contextContextClass :: ContextClass Context where
   contextRole = _.contextRol <<< unwrap
   externalRole = _.externeRol <<< unwrap
   userRole = _.gebruikerRol <<< unwrap
-  botRole = _.botRol <<< unwrap
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
@@ -58,7 +56,6 @@ type ContextRecord =
   , contextRol :: Array RoleType
   , externeRol :: EnumeratedRoleType
   , gebruikerRol :: Array EnumeratedRoleType
-  , botRol :: Array EnumeratedRoleType
 
   , nestedContexts :: Array ContextType
   , actions :: Array ActionType
@@ -79,7 +76,6 @@ defaultContext id dname kind context = Context { _id: (ContextType id)
   , contextRol: []
   , externeRol: EnumeratedRoleType ""
   , gebruikerRol: []
-  , botRol: []
 
   , nestedContexts: []
   , actions: []
