@@ -1,8 +1,9 @@
 module Perspectives.Parsing.Arc.PhaseTwo where
 
-import Control.Monad.Except (ExceptT, lift, throwError)
-import Control.Monad.State (State, get, put)
+import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.State (State, evalState, gets, modify, runState)
 import Data.Array (cons, elemIndex, fromFoldable)
+import Data.Either (Either)
 import Data.Foldable (foldl)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
@@ -13,7 +14,7 @@ import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -30,7 +31,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), d
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (Unit, bind, map, pure, ($), (<>), (==), discard)
+import Prelude (Unit, bind, discard, map, pure, void, ($), (<>), (==))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -40,47 +41,65 @@ import Prelude (Unit, bind, map, pure, ($), (<>), (==), discard)
 -- (4) We might want a way to indicate that the system should be able to find a qualified name.
 -- (5) For more clarity, put the DomeinFileRecord into State instead of passing it around.
 
+type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord}
+
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot, and allows exceptions.
-type PhaseTwo a = ExceptT PerspectivesError (State Boolean) a
+type PhaseTwo a = ExceptT PerspectivesError (State PhaseTwoState) a
+
+-- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
+runPhaseTwo :: forall a. PhaseTwo a -> (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo computation =  runState (runExceptT computation) {bot: false, dfr: defaultDomeinFileRecord}
+
+-- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
+evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
+evalPhaseTwo computation = evalState (runExceptT computation) {bot: false, dfr: defaultDomeinFileRecord}
 
 subjectIsBot :: PhaseTwo Unit
-subjectIsBot = lift $ put true
+subjectIsBot = lift $ void $ modify (\s -> s {bot = true})
 
 subjectIsNotABot :: PhaseTwo Unit
-subjectIsNotABot = lift $ put false
+subjectIsNotABot = lift $ void $ modify (\s -> s {bot = false})
 
 isSubjectBot :: PhaseTwo Boolean
-isSubjectBot = lift $ get
+isSubjectBot = lift $ gets _.bot
 
-traverseDomain :: ContextE -> DomeinFileRecord -> Namespace -> PhaseTwo DomeinFile
-traverseDomain c@(ContextE {id, kindOfContext, contextParts, pos}) df ns = do
-  (Tuple domeinFileRecord domain) <- traverseContextE c df ns
+modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseTwo Unit
+modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
+
+getDF :: PhaseTwo DomeinFileRecord
+getDF = lift $ gets _.dfr
+
+traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
+traverseDomain c@(ContextE {id, kindOfContext, contextParts, pos}) ns = do
+  _ <- traverseContextE c ns
   -- TODO: We might correct the type of references to Properties in Views here.
+  domeinFileRecord <- getDF
   pure $ DomeinFile domeinFileRecord
 
 -- | Traverse the members of the ContextE AST type to construct a new Context type
 -- | and insert it into a DomeinFileRecord.
-traverseContextE :: ContextE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Context)
-traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) df ns = do
+traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
+traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
-  (Tuple domeinFile context') <- foldM handleParts (Tuple df context) contextParts
+  context' <- foldM handleParts context contextParts
   -- TODO: We might correct the type of the Object and IndirectObject of the Actions in this Context now.
-  pure $ Tuple (addContextToDomeinFile context' domeinFile) context'
+  modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
+  pure context'
 
   where
 
     -- Construct members for the new Context type according to the type of
     -- parts found in the ContextE AST type. Insert these members into the new Context.
-    handleParts :: Tuple DomeinFileRecord Context -> ContextPart -> PhaseTwo (Tuple DomeinFileRecord Context)
+    handleParts :: Context -> ContextPart -> PhaseTwo Context
     -- Construct a nested Context.
-    handleParts (Tuple domeinFile contextUnderConstruction) (CE c) = do
-      (Tuple domeinFile' subContext) <- traverseContextE c domeinFile (addNamespace ns id)
-      pure $ Tuple domeinFile' (subContext `insertInto` contextUnderConstruction)
+    handleParts contextUnderConstruction (CE c) = do
+      subContext <- traverseContextE c (addNamespace ns id)
+      pure (subContext `insertInto` contextUnderConstruction)
 
     -- Construct a Role
-    handleParts (Tuple domeinFile contextUnderConstruction) (RE r) = do
-      (Tuple domeinFile' role) <- traverseRoleE r domeinFile (addNamespace ns id)
-      pure $ Tuple domeinFile' (unsafePartial (role `insertRoleInto` contextUnderConstruction))
+    handleParts contextUnderConstruction (RE r) = do
+      role <- traverseRoleE r (addNamespace ns id)
+      pure (unsafePartial (role `insertRoleInto` contextUnderConstruction))
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = over
@@ -116,10 +135,10 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) df ns = do
 
 -- | Traverse the members of the RoleE AST type to construct a new Role type
 -- | and insert it into a DomeinFileRecord.
-traverseRoleE :: RoleE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Role)
-traverseRoleE r df ns = if isCalculatedRole r
-  then traverseCalculatedRoleE r df ns
-  else traverseEnumeratedRoleE r df ns
+traverseRoleE :: RoleE -> Namespace -> PhaseTwo Role
+traverseRoleE r ns = if isCalculatedRole r
+  then traverseCalculatedRoleE r ns
+  else traverseEnumeratedRoleE r ns
   where
     isCalculatedRole :: RoleE -> Boolean
     -- isCalculatedRole _ = true
@@ -128,10 +147,11 @@ traverseRoleE r df ns = if isCalculatedRole r
       otherwise -> false) roleParts))
 
 -- | Traverse a RoleE that results in an EnumeratedRole.
-traverseEnumeratedRoleE :: RoleE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Role)
-traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedRoles} ns = do
+traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
+traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   -- If we have a BotRole, we add its parts (perspectives with actions) to the UserRole
   -- that it serves.
+  df@{enumeratedRoles} <- getDF
   role@(EnumeratedRole{_id:roleName}) <-
     case kindOfRole of
       BotRole -> do
@@ -149,45 +169,44 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedR
       otherwise -> do
         roleName <- pure (ns <> "$" <> id)
         pure (defaultEnumeratedRole roleName id kindOfRole ns pos)
-  (Tuple domeinFile role') <- foldM (unsafePartial $ handleParts (unwrap roleName)) (Tuple df role) roleParts
+  role' <- foldM (unsafePartial $ handleParts (unwrap roleName)) role roleParts
   subjectIsNotABot
-  pure $ Tuple (addRoleToDomeinFile (E role') domeinFile) (E role')
+  modifyDF (\domeinFile -> addRoleToDomeinFile (E role') domeinFile)
+  pure (E role')
 
   where
 
     -- Construct members for the new Role type according to the type of
     -- parts found in the RoleE AST type. Insert these members into the new Role.
     -- The Calculation case is not handled for an EnumeratedRole, hence the Partial constraint.
-    handleParts :: Partial => Namespace -> Tuple DomeinFileRecord EnumeratedRole -> RolePart -> PhaseTwo (Tuple DomeinFileRecord EnumeratedRole)
+    handleParts :: Partial => Namespace -> EnumeratedRole -> RolePart -> PhaseTwo EnumeratedRole
 
     -- PROPERTY
-    handleParts roleName (Tuple domeinFile roleUnderConstruction) (PE pe) = do
-      (Tuple domeinFile' property) <- traversePropertyE pe domeinFile roleName
-      pure $ Tuple domeinFile' (property `insertPropertyInto` roleUnderConstruction)
+    handleParts roleName roleUnderConstruction (PE pe) = do
+      property <- traversePropertyE pe roleName
+      pure (property `insertPropertyInto` roleUnderConstruction)
 
     -- PERSPECTIVE
-    handleParts roleName (Tuple domeinFile (EnumeratedRole roleUnderConstruction@{perspectives})) (PRE pe) = do
-      (Tuple domeinFile' (Tuple roleIdentifier actions)) <- traversePerspectiveE pe domeinFile roleName
-      pure $ Tuple domeinFile' (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{perspectives}) (PRE pe) = do
+      (Tuple roleIdentifier actions) <- traversePerspectiveE pe roleName
+      pure (EnumeratedRole roleUnderConstruction {perspectives = (insert roleIdentifier actions perspectives)})
 
     -- VIEW
-    handleParts roleName (Tuple domeinFile (EnumeratedRole roleUnderConstruction@{views})) (VE pe) = do
-      (Tuple domeinFile' viewType) <- traverseViewE pe domeinFile roleName
-      pure $ Tuple domeinFile' (EnumeratedRole $ roleUnderConstruction {views = cons viewType views})
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{views}) (VE pe) = do
+      viewType <- traverseViewE pe roleName
+      pure (EnumeratedRole $ roleUnderConstruction {views = cons viewType views})
 
     -- FUNCTIONALATTRIBUTE
-    handleParts roleName (Tuple domeinFile (EnumeratedRole roleUnderConstruction)) (FunctionalAttribute bool) = pure $
-      Tuple domeinFile (EnumeratedRole $ roleUnderConstruction {functional = bool})
+    handleParts roleName (EnumeratedRole roleUnderConstruction) (FunctionalAttribute bool) = pure (EnumeratedRole $ roleUnderConstruction {functional = bool})
 
     -- MANDATORYATTRIBUTE
-    handleParts roleName (Tuple domeinFile (EnumeratedRole roleUnderConstruction)) (MandatoryAttribute bool) = pure $
-      Tuple domeinFile (EnumeratedRole $ roleUnderConstruction {mandatory = bool})
+    handleParts roleName (EnumeratedRole roleUnderConstruction) (MandatoryAttribute bool) = pure (EnumeratedRole $ roleUnderConstruction {mandatory = bool})
 
     -- FILLEDBYATTRIBUTE
-    handleParts roleName (Tuple domeinFile (EnumeratedRole roleUnderConstruction@{binding})) (FilledByAttribute bnd) = pure $ Tuple domeinFile (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding bnd})
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd) = pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding bnd})
 
     -- FORUSER
-    handleParts roleName (Tuple domeinFile (EnumeratedRole roleUnderConstruction)) (ForUser _) = pure $ Tuple domeinFile (EnumeratedRole $ roleUnderConstruction)
+    handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)
 
     userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
     userServedByBot pos' localBotName parts = let
@@ -215,17 +234,19 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedR
 
 -- Traverse the members of ViewE to construct a new View type and insert it into the
 -- DomeinFileRecord.
-traverseViewE :: ViewE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord ViewType)
-traverseViewE (ViewE {id, viewParts, pos}) df@({views}) ns = let
-  viewName = ns <> "$" <> id
-  view = View
+traverseViewE :: ViewE -> Namespace -> PhaseTwo ViewType
+traverseViewE (ViewE {id, viewParts, pos}) ns = do
+  viewName <- pure (ns <> "$" <> id)
+  view <- pure $ View
     { _id: ViewType viewName
     , _rev: Nothing
     , displayName: id
     , propertyReferences: map (qualifyProperty ns) (fromFoldable viewParts)
     , role: EnumeratedRoleType ns
     , pos: pos}
-  in pure $ Tuple (df {views = insert viewName view views}) (ViewType viewName)
+  modifyDF (\(df@{views}) -> df {views = insert viewName view views})
+  pure (ViewType viewName)
+
   where
     -- TODO. Is het een calculated of een enumerated property?
     -- | If the second argument is a fully qualified name, return it as a PropertyType;
@@ -247,63 +268,64 @@ addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = over
 --   (C r@(CalculatedRole{_id})) -> df {calculatedRoles = insert (unwrap _id) r calculatedRoles}
 
 -- | Traverse a RoleE that results in an CalculatedRole.
-traverseCalculatedRoleE :: RoleE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Role)
-traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df ns = do
+traverseCalculatedRoleE :: RoleE -> Namespace -> PhaseTwo Role
+traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
-  (Tuple domeinFile role') <- foldM (unsafePartial $ handleParts) (Tuple df role) roleParts
-  pure $ Tuple (addRoleToDomeinFile (C role') domeinFile) (C role')
+  role' <- foldM (unsafePartial $ handleParts) role roleParts
+  modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
+  pure (C role')
 
   where
-    handleParts :: Partial => Tuple DomeinFileRecord CalculatedRole -> RolePart -> PhaseTwo (Tuple DomeinFileRecord CalculatedRole)
+    handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     -- Parse the query expression.
-    handleParts (Tuple domeinFile roleUnderConstruction) (Calculation calc) =
+    handleParts roleUnderConstruction (Calculation calc) =
       -- let
       -- TODO: actually call the parser.
       -- calculation = parseQuery calc
       -- in Tuple domeinFile' (roleUnderConstruction {calculation = calculation})
-      pure $ Tuple domeinFile roleUnderConstruction
+      pure roleUnderConstruction
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.
-traversePropertyE :: PropertyE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Property.Property)
-traversePropertyE r df ns = if isCalculatedProperty r
-  then traverseCalculatedPropertyE r df ns
-  else traverseEnumeratedPropertyE r df ns
+traversePropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
+traversePropertyE r ns = if isCalculatedProperty r
+  then traverseCalculatedPropertyE r ns
+  else traverseEnumeratedPropertyE r ns
   where
     isCalculatedProperty :: PropertyE -> Boolean
     isCalculatedProperty (PropertyE {propertyParts}) = (isJust (findIndex (case _ of
         (Calculation' _) -> true
         otherwise -> false) propertyParts))
 
-traverseEnumeratedPropertyE :: PropertyE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Property.Property)
-traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) df ns = do
+traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
+traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
   property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns range pos
-  (Tuple domeinFile property') <- foldM (unsafePartial handleParts) (Tuple df property) propertyParts
-  pure $ Tuple (addPropertyToDomeinFile (Property.E property') domeinFile) (Property.E property')
+  property' <- foldM (unsafePartial handleParts) property propertyParts
+  modifyDF (\df -> addPropertyToDomeinFile (Property.E property') df)
+  pure (Property.E property')
 
   where
     -- Construct members for the new Property type according to the type of
     -- parts found in the PropertyE AST type. Insert these members into the new Property.
     -- The Calculation case is not handled for an EnumeratedRole, hence the Partial constraint.
-    handleParts :: Partial => Tuple DomeinFileRecord EnumeratedProperty -> PropertyPart -> PhaseTwo (Tuple DomeinFileRecord EnumeratedProperty)
+    handleParts :: Partial => EnumeratedProperty -> PropertyPart -> PhaseTwo EnumeratedProperty
     -- FUNCTIONALATTRIBUTE
-    handleParts (Tuple domeinFile (EnumeratedProperty propertyUnderConstruction)) (FunctionalAttribute' bool) = pure $
-      Tuple domeinFile (EnumeratedProperty $ propertyUnderConstruction {functional = bool})
+    handleParts (EnumeratedProperty propertyUnderConstruction) (FunctionalAttribute' bool) = pure (EnumeratedProperty $ propertyUnderConstruction {functional = bool})
 
     -- MANDATORYATTRIBUTE
-    handleParts (Tuple domeinFile (EnumeratedProperty propertyUnderConstruction)) (MandatoryAttribute' bool) = pure $
-      Tuple domeinFile (EnumeratedProperty $ propertyUnderConstruction {mandatory = bool})
+    handleParts (EnumeratedProperty propertyUnderConstruction) (MandatoryAttribute' bool) = pure (EnumeratedProperty $ propertyUnderConstruction {mandatory = bool})
 
 -- | Traverse a PropertyE that results in an CalculatedProperty.
-traverseCalculatedPropertyE :: PropertyE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord Property.Property)
-traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) df ns = do
+traverseCalculatedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
+traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
   (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns pos
   calculation' <- case head propertyParts of
     -- TODO: actually call the parser, here.
     (Just (Calculation' c)) -> pure calculation
     otherwise -> pure calculation
   property' <- pure $ Property.C $ CalculatedProperty (property {calculation = calculation'})
-  pure $ Tuple (addPropertyToDomeinFile property' df) property'
+  modifyDF (\df -> addPropertyToDomeinFile property' df)
+  pure property'
 
 addPropertyToDomeinFile :: Property.Property -> DomeinFileRecord -> DomeinFileRecord
 addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties} = case property of
@@ -314,8 +336,8 @@ addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties}
 -- | Returns the fully qualified string that identifies the Object of the Action and the qualified identifiers of the Actions
 -- | (we need not know what kind of Role that Object is, to be able to store the
 -- | Perspective in the Role itself).
-traversePerspectiveE :: PerspectiveE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord (Tuple String (Array ActionType)))
-traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) df rolename = do
+traversePerspectiveE :: PerspectiveE -> Namespace -> PhaseTwo (Tuple String (Array ActionType))
+traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
 
   -- First identify the Object of the Perspective. We need to hand it down to treatment
   -- of each separate Action.
@@ -338,9 +360,11 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) df rolename = do
       otherwise -> false) perspectiveParts)
 
   -- Now construct all Actions.
-  (Tuple domeinFile actions) <- foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) (Tuple df []) perspectiveParts
+  actions <- foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) [] (filter (case _ of
+      (Act _) -> true
+      otherwise -> false) perspectiveParts)
 
-  pure $ Tuple domeinFile (Tuple object actions)
+  pure (Tuple object actions)
 
 -- | Constructs an Action, using the provided Object and maybe the View on that Object,
 -- | from the ActionE. Returns the fully qualified name of the Action in the ActionType.
@@ -349,10 +373,10 @@ traverseActionE :: Partial =>                     -- The function is partial bec
   String ->                                       -- The qualified identifier of the Object.
   Maybe ViewType ->                               -- The unqualified identifier of the Default View on the Object.
   Namespace ->                                    -- The namespace, i.e. the qualified identifier of the Role.
-  Tuple DomeinFileRecord (Array ActionType) ->    -- Accumulators: the DomeinFileRecord and an array of Actions.
+  (Array ActionType) ->                           -- Accumulator: an array of Actions.
   PerspectivePart ->                              -- The ActionE element.
-  PhaseTwo (Tuple DomeinFileRecord (Array ActionType))
-traverseActionE object defaultObjectView rolename (Tuple df actions) (Act (ActionE{id, verb, actionParts, pos})) = do
+  PhaseTwo (Array ActionType)
+traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
   actionId <- pure (rolename <> "$" <> id)
   executedByBot <- isSubjectBot
   action <- pure $ Action
@@ -371,7 +395,8 @@ traverseActionE object defaultObjectView rolename (Tuple df actions) (Act (Actio
     , executedByBot: executedByBot
   }
   action' <- foldM (handleParts $ deconstructNamespace_ rolename) action actionParts
-  pure $ Tuple (df {actions = (insert actionId action' df.actions)}) (cons (identifier action') actions)
+  modifyDF (\df -> df {actions = (insert actionId action' df.actions)})
+  pure (cons (identifier action') actions)
 
   where
 

@@ -50,8 +50,11 @@ derive newtype instance readForeignDomeinFile :: ReadForeign DomeinFile
 instance showDomeinFile :: Show DomeinFile where
   show = genericShow
 
+defaultDomeinFileRecord :: DomeinFileRecord
+defaultDomeinFileRecord = { _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}
+
 defaultDomeinFile :: DomeinFile
-defaultDomeinFile = DomeinFile{ _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}
+defaultDomeinFile = DomeinFile defaultDomeinFileRecord
 
 type DomeinFileEnumeratedRoles = Object EnumeratedRole
 
