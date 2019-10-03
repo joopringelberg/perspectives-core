@@ -26,6 +26,7 @@ class ContextClass c where
   actions :: c -> Array ActionType
   aspects :: c -> Array ContextType
   nestedContexts :: c -> Array ContextType
+  position :: c -> ArcPosition
 
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
@@ -37,6 +38,7 @@ instance contextContextClass :: ContextClass Context where
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
+  position = _.pos <<< unwrap
 
 -----------------------------------------------------------
 -- CONTEXT

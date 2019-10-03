@@ -6,6 +6,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.TypeIdentifiers (RoleKind)
@@ -45,7 +46,7 @@ data PerspectivePart = Object String | DefaultView String | Act ActionE
 
 newtype ActionE = ActionE
   { id :: String
-  , verb :: String
+  , verb :: Verb
   , actionParts :: List ActionPart
   , pos :: ArcPosition
   }

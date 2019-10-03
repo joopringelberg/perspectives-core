@@ -26,6 +26,7 @@ import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseContextE)
 import Perspectives.Parsing.Arc.Simple (domain)
+import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -50,7 +51,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             -- logShow context
@@ -74,7 +75,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         logShow ctxt
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The role MyRoleInContext should be a calculated role."
@@ -87,7 +88,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             logShow dr'
             assert "The DomeinFile should have the view 'MyView'" (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext$MyView" dr'.views))
@@ -105,7 +106,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The DomeinFile should have the role 'model:MyTestDomain$MyRoleInContext' with\
@@ -121,7 +122,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The DomeinFile should have the role 'model:MyTestDomain$MyRoleInContext' that is\
@@ -137,7 +138,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The role 'model:MyTestDomain$MyRoleInContext' should have context 'model:MyTestDomain'"
@@ -152,7 +153,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The domain 'model:MyTestDomain' should have no context."
@@ -171,7 +172,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The DomeinFile should have the property 'MyProp'" (isJust (lookup "model:MyTestDomain$MyRoleInContext$MyProp" dr'.enumeratedProperties))
@@ -199,7 +200,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         -- logShow ctxt
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The DomeinFile should have the property 'MyProp'" (isJust (lookup "model:MyTestDomain$MyRoleInContext$MyProp" dr'.calculatedProperties))
@@ -226,21 +227,21 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         -- logShow dom
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE dom dr "model:") of
-          (Left e) -> assert e false
+          (Left e) -> assert (show e) false
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert ("The file '" <> fileName <> "' does not parse") true
 
-  test "An Agent role for a Bot without a ForUser clause" do
+  testOnly "An Agent role for a Bot without a ForUser clause" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> do
-            log e
-            assert e true
+          (Left (e :: PerspectivesError)) -> do
+            logShow e
+            assert (show e) true
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "A BotRole should specify the user it represents with a 'ForUser' clause." false
@@ -253,7 +254,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         -- logShow ctxt
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e true
+          (Left e) -> assert (show e) true
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The BotRole for user 'MySelf' should give rise to an enumeratedRole 'model:MyTestDomain$MySelf'"
@@ -269,7 +270,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         -- logShow ctxt
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e true
+          (Left e) -> assert (show e) true
           (Right (Tuple dr' context)) -> do
             -- logShow dr'
             assert "The enumeratedRole 'model:MyTestDomain$MySelf' should have the properties 'NickName' and 'Happy'"
@@ -277,7 +278,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 Nothing -> false
                 (Just (EnumeratedRole{properties})) -> length properties == 2
 
-  testOnly "Types should have positions in their definining texts." do
+  test "Types should have positions in their definining texts." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n    Property : BooleanProperty : Happy\n      Calculation : prop1\n    View : View : MyView\n  Role : RoleInContext : MyRoleInContext\n    Calculation : prop1 prop2" domain
     case r of
       (Left e) -> assert (show e) false
@@ -285,7 +286,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
         -- logShow ctxt
         (DomeinFile dr) <- pure defaultDomeinFile
         case runExcept (traverseContextE ctxt dr "model:") of
-          (Left e) -> assert e true
+          (Left e) -> assert (show e) true
           (Right (Tuple dr' context)) -> do
             logShow dr'
             assert "The Domain should be on position (1, 20)"

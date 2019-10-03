@@ -6,6 +6,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, colon, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition)
+import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
@@ -145,7 +146,7 @@ viewE = withBlock
 
 actionE :: IP PerspectivePart
 actionE = withBlock
-  (\{uname, verb, pos} parts -> Act $ ActionE {id: uname, verb: verb, actionParts: parts, pos: pos})
+  (\{uname, verb, pos} parts -> Act $ ActionE {id: uname, verb: constructVerb verb, actionParts: parts, pos: pos})
   actionE_
   (indirectObjectView <|> indirectObject <|> objectView <|> subjectView)
   where
@@ -170,6 +171,14 @@ actionE = withBlock
 
     indirectObjectView :: IP ActionPart
     indirectObjectView = try (reserved "View" *> colon *> reserved "IndirectObjectViewRef" *> colon *> arcIdentifier >>= pure <<< IndirectObjectView)
+
+    constructVerb :: String -> Verb
+    constructVerb v = case v of
+      "Consult" -> Consult
+      "Create" -> Create
+      "Change" -> Change
+      "Delete" -> Delete
+      s -> Custom s
 
 boolean :: IP Boolean
 boolean = (reserved "True" *> pure true) <|> (reserved "False" *> pure false)

@@ -32,7 +32,8 @@ type EnumeratedRoleRecord =
 
   , views :: Array ViewType
 
-  , perspectives :: Object ActionType
+  -- An array of ActionTypes, indexed by their object-types.
+  , perspectives :: Object (Array ActionType)
 
   , functional :: Boolean
   , mandatory :: Boolean

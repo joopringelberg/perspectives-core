@@ -3,13 +3,15 @@ module Perspectives.Representation.Action where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Assignment (AssignmentStatement)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedRoleType, RoleType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
@@ -20,10 +22,12 @@ class ActionClass c where
   subject :: c -> Array EnumeratedRoleType
   verb :: c -> Verb
   object :: c -> RoleType
-  indirectObject :: c -> RoleType
-  requiredObjectProperties :: c -> Array PropertyType
-  condition :: c -> QueryFunctionDescription
-  effect :: c -> AssignmentStatement
+  indirectObject :: c -> Maybe RoleType
+  requiredObjectProperties :: c -> Maybe ViewType
+  requiredSubjectProperties :: c -> Maybe ViewType
+  requiredIndirectObjectProperties :: c -> Maybe ViewType
+  condition :: c -> Maybe QueryFunctionDescription
+  effect :: c -> Maybe AssignmentStatement
 
 instance contextActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
@@ -31,6 +35,8 @@ instance contextActionClass :: ActionClass Action where
   object = _.object <<< unwrap
   indirectObject = _.indirectObject <<< unwrap
   requiredObjectProperties = _.requiredObjectProperties <<< unwrap
+  requiredSubjectProperties = _.requiredSubjectProperties <<< unwrap
+  requiredIndirectObjectProperties = _.requiredIndirectObjectProperties <<< unwrap
   condition = _.condition <<< unwrap
   effect = _.effect <<< unwrap
 
@@ -47,11 +53,30 @@ type ActionRecord =
   , subject :: Array EnumeratedRoleType
   , verb :: Verb
   , object :: RoleType
-  , requiredObjectProperties :: Array PropertyType
-  , indirectObject :: RoleType
-  , condition :: QueryFunctionDescription
-  , effect :: AssignmentStatement
+  , requiredObjectProperties :: Maybe ViewType
+  , requiredSubjectProperties :: Maybe ViewType
+  , requiredIndirectObjectProperties :: Maybe ViewType
+  , indirectObject :: Maybe RoleType
+  , condition :: Maybe QueryFunctionDescription
+  , effect :: Maybe AssignmentStatement
   , executedByBot :: Boolean
+  }
+
+defaultAction :: String -> String -> Verb -> RoleType -> Maybe ViewType -> ArcPosition -> Action
+defaultAction id displayName verb object objectView pos = Action
+  { _id: ActionType id
+  , _rev: Nothing
+  , displayName: displayName
+  , subject: []
+  , verb: verb
+  , object: object
+  , requiredObjectProperties: objectView
+  , requiredSubjectProperties: Nothing
+  , requiredIndirectObjectProperties: Nothing
+  , indirectObject: Nothing
+  , condition: Nothing
+  , effect: Nothing
+  , executedByBot: false
   }
 
 derive instance genericRepAction :: Generic Action _

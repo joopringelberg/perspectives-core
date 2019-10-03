@@ -147,6 +147,10 @@ data Role = E EnumeratedRole | C CalculatedRole
 id :: forall r i. RoleClass r i => r -> i
 id = identifier
 
+stringId :: RoleType -> String
+stringId (ENR (EnumeratedRoleType ident)) = ident
+stringId (CR (CalculatedRoleType ident)) = ident
+
 getRole :: RoleType -> MonadPerspectives Role
 getRole (ENR e) = getPerspectType e >>= pure <<< E
 getRole (CR c) = getPerspectType c >>= pure <<< C
