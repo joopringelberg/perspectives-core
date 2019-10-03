@@ -1,0 +1,41 @@
+Things to fix after Phase two
+
+NAMESPACING
+We do not know the qualification of various local names.
+De Guids lossen dit op voor overdrachtsbestanden.
+Maar voor Arc moet worden gezocht, of beter gekwalificeerd.
+
+IN ENUMERATEDROLE:
+* the binding
+	Zoeken kan in de context namespace hiërarchie, maar dat levert niet altijd een sluitende oplossing.
+	Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is.
+	Indien dat niet lukt, meldt het aan de modelleur: hij moet de binding beter kwalificeren.
+
+IN VIEW: 
+* Property(referentie).
+	Moet komen uit de 'roltelescoop' (denk ook aan aspecten).
+	Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is (want de binding kan uit andere contexten komen)
+	Als dezelfde lokale naam kan meermaals voorkomt: meldt het aan de modelleur, hij moet dan beter kwalificeren.
+
+IN ACTION:
+Moet komen uit de 'roltelescoop'.
+Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is (want de binding kan uit andere contexten komen)
+Als dezelfde lokale naam kan meermaals voorkomt: meldt het aan de modelleur, hij moet dan beter kwalificeren.
+
+* The DefaultObjectView.	
+* The SubjectView.
+* The IndirectObjectView.
+
+
+ENUMERATED OR CALCULATED
+
+ACTION:
+* The type of the Object of a Perspective: Enumerated or Calculated.
+* The type of the IndirectObject of a Perspective: Enumerated or Calculated.
+Kan nagekeken worden in de DomeinFile zodra de Context van de Rol met het Perspectief met de Actie compleet is.
+
+VIEW: 
+* The type of the Properties in a View: Enumerated or Calculated.
+Kan nagekeken worden in de DomeinFile zodra de namespace van de Property bekend is en de Rol compleet is.
+Omdat de Rol gevuld kan worden door andere rollen, moet het hele Domein volledig zijn.
+

@@ -1,6 +1,7 @@
 module Perspectives.Parsing.Arc.PhaseTwo where
 
-import Control.Monad.Except (Except, throwError)
+import Control.Monad.Except (ExceptT, lift, throwError)
+import Control.Monad.State (State, get, put)
 import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Foldable (foldl)
 import Data.Lens (over)
@@ -13,23 +14,23 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..), defaultAction)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
-import Perspectives.Representation.Class.Role (Role(..), stringId)
+import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (map, pure, ($), (<>), (==), bind, discard)
+import Prelude (Unit, bind, map, pure, ($), (<>), (==), discard)
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -37,15 +38,24 @@ import Prelude (map, pure, ($), (<>), (==), bind, discard)
 -- (2) We need a way to indicate PRODUCT types for bindings.
 -- (3) We might want a way to generate some names (like for Perspectives).
 -- (4) We might want a way to indicate that the system should be able to find a qualified name.
+-- (5) For more clarity, put the DomeinFileRecord into State instead of passing it around.
 
-type PhaseTwo a = Except PerspectivesError a
+-- | A Monad with state that indicates whether the Subject of an Action is a Bot, and allows exceptions.
+type PhaseTwo a = ExceptT PerspectivesError (State Boolean) a
 
--- | The qualified name of an element that functions as a namespace (Context or Role).
-type Namespace = String
+subjectIsBot :: PhaseTwo Unit
+subjectIsBot = lift $ put true
+
+subjectIsNotABot :: PhaseTwo Unit
+subjectIsNotABot = lift $ put false
+
+isSubjectBot :: PhaseTwo Boolean
+isSubjectBot = lift $ get
 
 traverseDomain :: ContextE -> DomeinFileRecord -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c@(ContextE {id, kindOfContext, contextParts, pos}) df ns = do
   (Tuple domeinFileRecord domain) <- traverseContextE c df ns
+  -- TODO: We might correct the type of references to Properties in Views here.
   pure $ DomeinFile domeinFileRecord
 
 -- | Traverse the members of the ContextE AST type to construct a new Context type
@@ -54,6 +64,7 @@ traverseContextE :: ContextE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) df ns = do
   context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   (Tuple domeinFile context') <- foldM handleParts (Tuple df context) contextParts
+  -- TODO: We might correct the type of the Object and IndirectObject of the Actions in this Context now.
   pure $ Tuple (addContextToDomeinFile context' domeinFile) context'
 
   where
@@ -124,6 +135,7 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedR
   role@(EnumeratedRole{_id:roleName}) <-
     case kindOfRole of
       BotRole -> do
+        subjectIsBot
         servedUserLocalName <- userServedByBot pos id roleParts
         servedUserId <- pure (ns <> "$" <> servedUserLocalName)
         case lookup servedUserId enumeratedRoles of
@@ -138,6 +150,7 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedR
         roleName <- pure (ns <> "$" <> id)
         pure (defaultEnumeratedRole roleName id kindOfRole ns pos)
   (Tuple domeinFile role') <- foldM (unsafePartial $ handleParts (unwrap roleName)) (Tuple df role) roleParts
+  subjectIsNotABot
   pure $ Tuple (addRoleToDomeinFile (E role') domeinFile) (E role')
 
   where
@@ -188,7 +201,8 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df@{enumeratedR
         (Just user) -> pure user
         otherwise -> throwError (MissingForUser pos' localBotName)
 
-    -- TODO. We assume a sum type and we assume a qualified name. Handle PROD types.
+    -- TODO (augmentADT) We assume a sum type and we assume a qualified name. Handle PROD types.
+    -- TODO (augmentADT). We do not know the namespace of the roleName that we augment the ADT with.
     augmentADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     augmentADT adt roleName = case adt of
       NOTYPE -> ST $ EnumeratedRoleType roleName
@@ -238,7 +252,6 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) df ns = do
   role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
   (Tuple domeinFile role') <- foldM (unsafePartial $ handleParts) (Tuple df role) roleParts
   pure $ Tuple (addRoleToDomeinFile (C role') domeinFile) (C role')
-  -- in Tuple df (C role')
 
   where
     handleParts :: Partial => Tuple DomeinFileRecord CalculatedRole -> RolePart -> PhaseTwo (Tuple DomeinFileRecord CalculatedRole)
@@ -302,14 +315,14 @@ addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties}
 -- | (we need not know what kind of Role that Object is, to be able to store the
 -- | Perspective in the Role itself).
 traversePerspectiveE :: PerspectiveE -> DomeinFileRecord -> Namespace -> PhaseTwo (Tuple DomeinFileRecord (Tuple String (Array ActionType)))
-traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) df ns = do
+traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) df rolename = do
 
   -- First identify the Object of the Perspective. We need to hand it down to treatment
   -- of each separate Action.
   (object :: String) <- case head $ filter (case _ of
     (Object _) -> true
     otherwise -> false) perspectiveParts of
-      (Just (Object o)) -> pure o
+      (Just (Object o)) -> pure (deconstructNamespace_ rolename <> "$" <> o)
       otherwise -> throwError (MissingObject pos id)
 
   -- Similarly, find and use the DefaultObjectView, if any. Notice that if no
@@ -325,9 +338,9 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) df ns = do
       otherwise -> false) perspectiveParts)
 
   -- Now construct all Actions.
-  (Tuple domeinFile actions) <- foldM (unsafePartial $ traverseActionE object defaultObjectView ns) (Tuple df []) perspectiveParts
+  (Tuple domeinFile actions) <- foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) (Tuple df []) perspectiveParts
 
-  pure $ Tuple domeinFile (Tuple (ns <> "$" <> object) actions)
+  pure $ Tuple domeinFile (Tuple object actions)
 
 -- | Constructs an Action, using the provided Object and maybe the View on that Object,
 -- | from the ActionE. Returns the fully qualified name of the Action in the ActionType.
@@ -335,32 +348,43 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) df ns = do
 traverseActionE :: Partial =>                     -- The function is partial because we just handle ActionE.
   String ->                                       -- The qualified identifier of the Object.
   Maybe ViewType ->                               -- The unqualified identifier of the Default View on the Object.
-  String ->                                       -- The namespace, i.e. the qualified identifier of the Role.
+  Namespace ->                                    -- The namespace, i.e. the qualified identifier of the Role.
   Tuple DomeinFileRecord (Array ActionType) ->    -- Accumulators: the DomeinFileRecord and an array of Actions.
   PerspectivePart ->                              -- The ActionE element.
   PhaseTwo (Tuple DomeinFileRecord (Array ActionType))
-traverseActionE object defaultObjectView ns (Tuple df actions) (Act (ActionE{id, verb, actionParts, pos})) = do
-  actionId <- pure (ns <> "$" <> id)
-  -- TODO. We cannot know the type of the Object here. Is it an Enumerated or a Calculated Role? Construct an EnumeratedRoleType, correct later.
-  -- The same holds for the IndirectObject.
-  -- Similarly, we do not know whether this Action should be executed by a Bot.
-  -- We do not know the subject at all.
-  action <- pure $ defaultAction actionId id verb (ENR $ EnumeratedRoleType object) defaultObjectView pos
-  action' <- foldM handleParts action actionParts
+traverseActionE object defaultObjectView rolename (Tuple df actions) (Act (ActionE{id, verb, actionParts, pos})) = do
+  actionId <- pure (rolename <> "$" <> id)
+  executedByBot <- isSubjectBot
+  action <- pure $ Action
+    { _id: ActionType actionId
+    , _rev: Nothing
+    , displayName: id
+    , subject: [EnumeratedRoleType rolename]
+    , verb: verb
+    , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
+    , requiredObjectProperties: defaultObjectView
+    , requiredSubjectProperties: Nothing
+    , requiredIndirectObjectProperties: Nothing
+    , indirectObject: Nothing
+    , condition: Nothing
+    , effect: Nothing
+    , executedByBot: executedByBot
+  }
+  action' <- foldM (handleParts $ deconstructNamespace_ rolename) action actionParts
   pure $ Tuple (df {actions = (insert actionId action' df.actions)}) (cons (identifier action') actions)
 
   where
 
-    handleParts :: Action -> ActionPart -> PhaseTwo Action
+    handleParts :: Namespace -> Action -> ActionPart -> PhaseTwo Action
 
     -- INDIRECTOBJECT
-    handleParts (Action ar) (IndirectObject ido) = pure $ Action ar {indirectObject = Just (ENR $ EnumeratedRoleType ido)}
+    handleParts contextName (Action ar) (IndirectObject ido) = pure $ Action ar {indirectObject = Just (ENR $ EnumeratedRoleType (contextName <> "$" <> ido))}
 
     -- SUBJECTVIEW
-    handleParts (Action ar) (SubjectView sv) = pure $ Action (ar {requiredSubjectProperties = Just $ ViewType sv})
+    handleParts _ (Action ar) (SubjectView sv) = pure $ Action (ar {requiredSubjectProperties = Just $ ViewType sv})
 
     -- OBJECTVIEW
-    handleParts (Action ar) (ObjectView ov) = pure $ Action (ar {requiredObjectProperties = Just $ ViewType ov})
+    handleParts _ (Action ar) (ObjectView ov) = pure $ Action (ar {requiredObjectProperties = Just $ ViewType ov})
 
     -- INDIRECTOBJECTVIEW
-    handleParts (Action ar) (IndirectObjectView iov) = pure $ Action (ar {requiredIndirectObjectProperties = Just $ ViewType iov})
+    handleParts _ (Action ar) (IndirectObjectView iov) = pure $ Action (ar {requiredIndirectObjectProperties = Just $ ViewType iov})

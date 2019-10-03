@@ -15,6 +15,7 @@ import Node.Path as Path
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Simple (actionE, domain, perspectiveE, propertyE, roleE, viewE)
+import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
@@ -180,7 +181,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
       (Left e) -> assert (show e) false
       (Right ctxt@(Act (ActionE{id, verb}))) -> do
         assert "The Action should have the id 'MyAction'" (id == "MyAction")
-        assert "The Action should have the verb 'Consults''" (verb == "Consults")
+        assert "The Action should have the verb 'Consults''" (verb == Consult)
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Action with indirect object and objectview" do

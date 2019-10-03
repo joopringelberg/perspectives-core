@@ -8,11 +8,12 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, union)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
@@ -98,10 +99,10 @@ compileBotAction actionType contextId =
       -- The result of this function is dependent on any number of Assumptions.
       (objectGetter :: RoleGetter) <- context2role $ getCalculation objectOfAction
       -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
-      (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (effect action) objectGetter actionType
+      (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (unsafePartial $ fromJust $ effect action) objectGetter actionType
       -- The Left Hand Side of the Action is a query that computes boolean values.
       -- These values depend on a number of Assumptions.
-      (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ condition action
+      (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ unsafePartial $ fromJust $ condition action
       -- Now construct the updater by combining the lhs with the rhs.
       (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
       -- Cache the result.

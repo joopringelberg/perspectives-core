@@ -50,6 +50,7 @@ type ActionRecord =
   , _rev :: Revision_
   , displayName :: String
 
+  -- TODO: For synchronization, we might need to allow CalculatedRoles as subject of an action.
   , subject :: Array EnumeratedRoleType
   , verb :: Verb
   , object :: RoleType

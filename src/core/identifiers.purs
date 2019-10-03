@@ -6,6 +6,7 @@ module Perspectives.Identifiers
 , hasLocalName
 , deconstructModelName
 , deconstructNamespace
+, deconstructNamespace_
 , guardWellFormedNess
 , getFirstMatch
 , getSecondMatch
@@ -48,7 +49,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, identity, ($), (<>), (==), (||), (>>>))
+import Prelude (class Show, identity, ($), (<>), (==), (||), (>>>), (<<<))
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -145,6 +146,9 @@ domeinURIRegex = unsafeRegex "^(model:\\w*.*)\\$(\\w*)" noFlags
 -- | Returns the Namespace part of an identifier or Nothing.
 deconstructNamespace :: String -> Maybe Namespace
 deconstructNamespace = getFirstMatch domeinURIRegex
+
+deconstructNamespace_ :: String -> Namespace
+deconstructNamespace_ = unsafePartial $ fromJust <<< deconstructNamespace
 
 -- | Returns "localName" from "model:ModelName$localName" or Nothing
 deconstructLocalNameFromDomeinURI :: String -> Maybe String
