@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Array (head, length)
 import Data.Either (Either(..))
-import Data.Lens (preview, traversed)
+import Data.Lens (_Just, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso.Newtype (_Newtype)
@@ -27,12 +27,13 @@ import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo, traverseDomain)
 import Perspectives.Parsing.Arc.Simple (domain)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -310,3 +311,67 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               case (lookup "model:MyTestDomain$MySelf$Happy" dr'.calculatedProperties) of
                 Nothing -> false
                 (Just (CalculatedProperty{pos})) -> pos == ArcPosition{line: 5, column: 34}
+
+  testOnly "Actions" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultsAnotherRole\n      View : DefaultObjectViewRef : ViewOpWens\n      Action : Change : ChangeAnotherRole\n        View : ObjectViewRef : AnotherView" domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) true
+          (Right (DomeinFile dr')) -> do
+            logShow dr'
+            assert "An Action in a Perspective should end up in the DomeinFile."
+              (isJust (lookup "model:MyTestDomain$MySelf$ConsultsAnotherRole" dr'.actions))
+            assert "The Role MySelf should have a Perspective on 'model:MyTestDomain$AnotherRole' that includes the Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole'."
+              (let
+                -- _p :: Traversal' DomeinFileRecord ActionType)
+                -- NOTE: the index at the end of the Traversal' is very dependent on the order of the Actions!
+                _p = prop (SProxy :: (SProxy "enumeratedRoles")) <<< at "model:MyTestDomain$MySelf" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "perspectives")) <<< at "model:MyTestDomain$AnotherRole" <<< traversed <<< ix 1
+                in case (preview _p dr') of
+                  (Just (ActionType "model:MyTestDomain$MySelf$ConsultsAnotherRole")) -> true
+                  otherwise -> false)
+            assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should have 'model:MyTestDomain$AnotherRole' as Object"
+              (let
+                _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
+                in case (preview _o dr') of
+                  (Just (ENR (EnumeratedRoleType "model:MyTestDomain$AnotherRole"))) -> true
+                  otherwise -> false
+                )
+            assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should be executed by the bot."
+              (let
+                _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "executedByBot"))
+                in case (preview _o dr') of
+                  (Just true) -> true
+                  otherwise -> false
+                )
+            assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should have as Subject 'model:MyTestDomain$MySelf'."
+              (let
+                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "subject")) <<< ix 0
+                in case (preview _s dr') of
+                  (Just (EnumeratedRoleType "model:MyTestDomain$MySelf")) -> true
+                  otherwise -> false
+                )
+            assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should have as Verb 'Consult'."
+              (let
+                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "verb"))
+                in case (preview _s dr') of
+                  (Just Consult) -> true
+                  otherwise -> false
+                )
+            assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should have as requiredObjectProperties 'ViewOpWens'."
+              (let
+                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "requiredObjectProperties")) <<< _Just
+                in case (preview _s dr') of
+                  (Just (ViewType "ViewOpWens")) -> true
+                  otherwise -> false
+                )
+            assert "The Action 'model:MyTestDomain$MySelf$ChangeAnotherRole' should have as requiredObjectProperties the custom (non-default) View 'AnotherView'."
+              (let
+                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ChangeAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "requiredObjectProperties")) <<< _Just
+                in case (preview _s dr') of
+                  (Just (ViewType "AnotherView")) -> true
+                  otherwise -> false
+                )

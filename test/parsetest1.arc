@@ -11,6 +11,7 @@ Context : Domain : Feest
     View : View : ViewOpWens
       Property : PropertyRef : Naam
       Property : PropertyRef : Bedrag
+    View : View : AnotherView
   Agent : UserRole : Gast
     Mandatory : False
     Functional : False
@@ -23,3 +24,4 @@ Context : Domain : Feest
       View : DefaultObjectViewRef : ViewOpWens
       Action : Consults : ConsultsWens
       Action : Changes : ChangesWens
+        View : ObjectViewRef : AnotherView
