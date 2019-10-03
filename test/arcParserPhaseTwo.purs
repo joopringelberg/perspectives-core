@@ -276,7 +276,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 Nothing -> false
                 (Just (EnumeratedRole{properties})) -> length properties == 2
 
-  testOnly "Types should have positions in their definining texts." do
+  test "Types should have positions in their definining texts." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n    Property : BooleanProperty : Happy\n      Calculation : prop1\n    View : View : MyView\n  Role : RoleInContext : MyRoleInContext\n    Calculation : prop1 prop2" domain
     case r of
       (Left e) -> assert (show e) false
