@@ -3,27 +3,24 @@ module Perspectives.Parsing.Arc.PhaseTwo where
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Control.Monad.State (State, evalState, gets, modify, runState)
 import Data.Array (cons, elemIndex, fromFoldable)
-import Data.Array (filter) as Arr
 import Data.Either (Either)
-import Data.Foldable (foldl, for_)
-import Data.Lens (Traversal', over, set, traversed)
-import Data.Lens.At (at)
-import Data.Lens.Iso.Newtype (_Newtype)
+import Data.Foldable (foldl)
+import Data.Lens (over, set, traversed)
 import Data.Lens.Record (prop)
 import Data.List (List, filter, findIndex, foldM, head)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, lookup, values)
+import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isInNamespace, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..), indirectObject)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
@@ -32,9 +29,9 @@ import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<>), (==), (>>=), (<<<))
+import Prelude (Unit, bind, discard, map, pure, void, ($), (<>), (==))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -50,11 +47,17 @@ type PhaseTwo a = ExceptT PerspectivesError (State PhaseTwoState) a
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
 runPhaseTwo :: forall a. PhaseTwo a -> (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo computation =  runState (runExceptT computation) {bot: false, dfr: defaultDomeinFileRecord}
+runPhaseTwo computation = runPhaseTwo_ computation defaultDomeinFileRecord
+
+runPhaseTwo_ :: forall a. PhaseTwo a -> DomeinFileRecord -> (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo_ computation dfr = runState (runExceptT computation) {bot: false, dfr: dfr}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
-evalPhaseTwo computation = evalState (runExceptT computation) {bot: false, dfr: defaultDomeinFileRecord}
+evalPhaseTwo computation = evalPhaseTwo_ computation defaultDomeinFileRecord
+
+evalPhaseTwo_ :: forall a. PhaseTwo a -> DomeinFileRecord -> (Either PerspectivesError a)
+evalPhaseTwo_ computation drf = evalState (runExceptT computation) {bot: false, dfr: drf}
 
 subjectIsBot :: PhaseTwo Unit
 subjectIsBot = lift $ void $ modify (\s -> s {bot = true})
@@ -85,7 +88,6 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
   context' <- foldM handleParts context contextParts
   modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
-  getDF >>= correctTypes (addNamespace ns id)
   pure context'
 
   where
@@ -134,39 +136,6 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 
     addNamespace :: String -> String -> String
     addNamespace ns' ln = if ns == "model:" then (ns' <> ln) else (ns' <> "$" <> ln)
-
-  -- The Object and IndirectObject of the Actions in this Context are by default represented as EnumeratedRoleTypes.
-  -- Here we correct that if necessary.
-    correctTypes :: String -> DomeinFileRecord -> PhaseTwo Unit
-    correctTypes contextId {actions} = do
-      contextActions <- pure $ Arr.filter (\(Action {_id: (ActionType cid)}) -> cid `isInNamespace` contextId) (values actions)
-      for_ contextActions (unsafePartial correctObject)
-      for_ contextActions (unsafePartial correctIndirectObject)
-      pure unit
-
-      where
-        correctObject :: Partial => Action -> PhaseTwo Unit
-        correctObject (Action ar@{_id: (ActionType objId), object: (ENR (EnumeratedRoleType obj))}) = do
-          {calculatedRoles} <- getDF
-          case lookup obj calculatedRoles of
-            (Just _) -> modifyDF (set (_object objId) (CR (CalculatedRoleType obj)))
-            otherwise -> pure unit
-          pure unit
-
-        _object :: String -> Traversal' DomeinFileRecord RoleType
-        _object objId = prop (SProxy :: SProxy "actions") <<< at objId <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "object")
-
-        correctIndirectObject :: Partial => Action -> PhaseTwo Unit
-        correctIndirectObject (Action ar@{_id: (ActionType objId), indirectObject: (Just (ENR (EnumeratedRoleType obj)))}) = do
-          {calculatedRoles} <- getDF
-          case lookup obj calculatedRoles of
-            (Just _) -> modifyDF (set (_indirectObject objId) (Just (CR (CalculatedRoleType obj))))
-            otherwise -> pure unit
-          pure unit
-        correctIndirectObject _ = pure unit
-
-        _indirectObject :: String -> Traversal' DomeinFileRecord (Maybe RoleType)
-        _indirectObject objId = prop (SProxy :: SProxy "actions") <<< at objId <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "indirectObject")
 
 -- | Traverse the members of the RoleE AST type to construct a new Role type
 -- | and insert it into a DomeinFileRecord.
