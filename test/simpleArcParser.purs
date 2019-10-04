@@ -14,7 +14,7 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
-import Perspectives.Parsing.Arc.Simple (actionE, domain, perspectiveE, propertyE, roleE, viewE)
+import Perspectives.Parsing.TransferFile (actionE, domain, perspectiveE, propertyE, roleE, viewE)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -27,7 +27,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.Simple" do
+theSuite = suiteSkip "Perspectives.Parsing.TransferFile" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n" domain
     case r of

@@ -25,3 +25,4 @@ Context : Domain : Feest
       Action : Consults : ConsultsWens
       Action : Changes : ChangesWens
         View : ObjectViewRef : AnotherView
+        IndirectObjectRef : Wens

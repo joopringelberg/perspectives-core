@@ -1,6 +1,11 @@
 module Perspectives.Parsing.Arc.PhaseThree where
 
-import Control.Monad.Error.Class (throwError)
+-- | Phase Three of the parser solves problems that arise due to forward reference.
+-- | In a View, for example, the modeller can reference a property of a Role that
+-- | has not yet been parsed in phase two (this may happen if that Role is filled with
+-- | a role that is 'later' in the source text).
+-- | 
+
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.Lens (Traversal', set, traversed)
@@ -13,7 +18,7 @@ import Foreign.Object (lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFileRecord)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo, evalPhaseTwo_, getDF, modifyDF)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Prelude (Unit, bind, discard, pure, unit, void, (<<<), ($))

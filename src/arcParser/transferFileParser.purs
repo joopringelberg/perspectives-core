@@ -1,4 +1,4 @@
-module Perspectives.Parsing.Arc.Simple where
+module Perspectives.Parsing.TransferFile where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)

@@ -13,7 +13,7 @@ import Text.Parsing.Indent (IndentParser, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), runParserT)
 import Unsafe.Coerce (unsafeCoerce)
 
--- | This is the type that is produced by Perspectives.Parsing.Arc.Simple.
+-- | This is the type that is produced by Perspectives.Parsing.TransferFile.
 -- type IndentParser m s a = ParserT s (StateT Position m) a
 type IP a = IndentParser Identity String a
 
