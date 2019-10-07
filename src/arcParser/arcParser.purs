@@ -2,17 +2,18 @@ module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, (<|>))
 import Control.Lazy (defer)
-import Data.List (List(..))
+import Data.List (List(..), singleton)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PerspectiveE(..), PropertyE(..), RoleE(..), RolePart(..), ViewE(..), PropertyPart(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
+import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (bind, pure, ($), (*>), (<<<), (==), (>>=), (<*), discard, (<>))
+import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (withBlock)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (option, optionMaybe, try, (<?>))
@@ -117,7 +118,6 @@ roleE = try $ withBlock
     rolePart :: IP RolePart
     rolePart = propertyE <|> perspectiveE <|> viewE
 
--- TODO: implement propertyE
 propertyE :: IP RolePart
 propertyE = calculatedProperty <|> enumeratedProperty
   where
@@ -174,10 +174,80 @@ propertyE = calculatedProperty <|> enumeratedProperty
             <|> reserved "String" *> pure PString
             <|> reserved "DateTime" *> pure PDate
 
--- TODO: implement viewE
 viewE :: IP RolePart
-viewE = fail "viewE is not yet implemented"
+viewE = try do
+  pos <- getPosition
+  uname <- reserved "view" *> colon *> arcIdentifier
+  refs <- token.parens (token.commaSep arcIdentifier)
+  pure $ VE $ ViewE {id: uname, viewParts: refs, pos: pos}
 
--- TODO: implement perspectiveE
+-- | Parses four forms, because both the default view on the Object and the actions involved are optional:
+-- |  `perspective on: Guest`
+-- |  `perspective on: Guest (ViewOnGuest)`
+-- |  `perspective on: Guest: Consult, Change`
+-- |  `perspective on: Guest (ViewOnGuest): Consult, Change`
+-- | Each of the forms above can be combined with specialised actions:
+-- |      Consult with ViewOnGuest
+-- |      Change with AnotherView`
 perspectiveE :: IP RolePart
-perspectiveE = fail "perspectiveE is not yet implemented"
+perspectiveE = try do
+  pos <- getPosition
+  withBlock
+    (\parts otherActions -> PRE $ PerspectiveE {id: "", perspectiveParts: parts <> otherActions, pos: pos})
+    perspective_
+    actionE
+  where
+    perspective_ :: IP (List PerspectivePart)
+    perspective_ = do
+      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> arcIdentifier >>= pure <<< Object
+      (maybeDefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
+      (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')
+      case maybeDefaultView of
+        Nothing -> pure $ Cons object actions
+        Just v -> pure $ Cons v (Cons object actions)
+
+    minimalAction' :: IP PerspectivePart
+    minimalAction' = do
+      pos <- getPosition
+      verbName <- arcIdentifier
+      pure $ Act $ ActionE {id: "", verb: constructVerb verbName, actionParts: Nil, pos}
+
+constructVerb :: String -> Verb
+constructVerb v = case v of
+  "Consult" -> Consult
+  "Create" -> Create
+  "Change" -> Change
+  "Delete" -> Delete
+  s -> Custom s
+
+-- | Parses the following forms:
+-- |  Consult with ViewOnGuest
+-- |  Consult with ViewOnGuest
+-- |    subjectView: AnotherView
+-- |  Bind with AnotherView
+-- |    indirectObject: AnotherRole (ViewOnAnotherRole)
+actionE :: IP PerspectivePart
+actionE = try $ withBlock
+  (\{pos, verb, view} parts -> Act $ ActionE {id: "", verb, actionParts: Cons view (join parts), pos})
+  actionE_
+  (subjectView <|> indirectObject)
+  where
+    actionE_ :: IP {pos :: ArcPosition, verb :: Verb, view :: ActionPart}
+    actionE_ = try do
+      pos <- getPosition
+      verb <- arcIdentifier >>= pure <<< constructVerb
+      view <- reserved "with" *> arcIdentifier >>= pure <<< ObjectView
+      pure {pos, verb, view}
+
+    subjectView :: IP (List ActionPart)
+    subjectView = do
+      pos <- getPosition
+      viewName <- reserved "subjectView" *> colon *> arcIdentifier
+      pure $ Cons (SubjectView viewName) Nil
+
+    indirectObject :: IP (List ActionPart)
+    indirectObject = do
+      pos <- getPosition
+      indirectObjectName <- reserved "indirectObject" *> colon *> arcIdentifier
+      indirectObjectView <- option Nil (token.parens (arcIdentifier >>= pure <<< singleton <<< IndirectObjectView))
+      pure $ Cons (IndirectObject indirectObjectName) indirectObjectView
