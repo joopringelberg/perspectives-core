@@ -101,3 +101,15 @@ theSuite = suite "Perspectives.Parsing.Arc" do
             (FilledByAttribute _) -> true
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
+
+  testOnly "BotRole" do
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "bot : for MySelf" roleE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
+            (ForUser _) -> true
+            otherwise -> false) roleParts)) of
+          Nothing -> assert "BotRole should have a ForUser part." false
+          Just (ForUser u) -> assert "BotRole should have ForUser part with value 'MySelf'" (u == "MySelf")
+          otherwise -> assert "BotRole should have ForUser part" false
+      otherwise -> assert "BotRole should have a ForUser part." false

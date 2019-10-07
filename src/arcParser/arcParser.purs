@@ -68,7 +68,7 @@ roleE = try $ withBlock
     botRole_ :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     botRole_ = try do
       pos <- getPosition
-      reserved "bot"
+      reserved "bot" <* colon
       forUser <- reserved "for" *> arcIdentifier
       pure {uname: "", knd: BotRole, pos, parts: Cons (ForUser forUser) Nil}
 
@@ -104,7 +104,6 @@ roleE = try $ withBlock
 
     filledBy :: IP (List RolePart)
     filledBy = option Nil (reserved "filledBy" *> colon *> token.commaSep arcIdentifier >>= pure <<< map FilledByAttribute)
-    -- filledBy = option Nil (reserved "filledBy" *> colon *> arcIdentifier >>= pure <<< FilledByAttribute >>= pure <<< singleton)
 
     roleKind :: IP RoleKind
     roleKind = (reserved "thing" *> pure RoleInContext)
@@ -117,17 +116,14 @@ roleE = try $ withBlock
     rolePart :: IP RolePart
     rolePart = propertyE <|> perspectiveE <|> viewE
 
+-- TODO: implement propertyE
 propertyE :: IP RolePart
-propertyE = do
-  pos <- getPosition
-  pure $ PE $ PropertyE {id: "", range: PNumber, propertyParts: Nil, pos}
+propertyE = fail "propertyY is not yet implemented"
 
+-- TODO: implement perspectiveE
 perspectiveE :: IP RolePart
-perspectiveE = do
-  pos <- getPosition
-  pure $ PRE $ PerspectiveE {id: "", perspectiveParts: Nil, pos}
+perspectiveE = fail "perspectiveE is not yet implemented"
 
+-- TODO: implement viewE
 viewE :: IP RolePart
-viewE = do
-  pos <- getPosition
-  pure $ VE $ ViewE {id: "", viewParts: Nil, pos}
+viewE = fail "viewE is not yet implemented" 
