@@ -2,6 +2,7 @@ module Perspectives.Parsing.TransferFile where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon)
@@ -86,7 +87,7 @@ roleE = withBlock
 
 propertyE :: IP RolePart
 propertyE = withBlock
-  (\{uname, ran, pos} parts -> PE $ PropertyE {id: uname, range: ran, propertyParts: parts, pos: pos})
+  (\{uname, ran, pos} parts -> PE $ PropertyE {id: uname, range: Just ran, propertyParts: parts, pos: pos})
   property_
   propertyPart
   where

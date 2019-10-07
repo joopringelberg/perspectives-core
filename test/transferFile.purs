@@ -120,7 +120,7 @@ theSuite = suiteSkip "Perspectives.Parsing.TransferFile" do
       (Left e) -> assert (show e) false
       (Right ctxt@(PE (PropertyE{id, range}))) -> do
         assert "The Property should have the id 'MyProperty'" (id == "MyProperty")
-        assert "The Property should have the range PNumber'" (range == PNumber)
+        assert "The Property should have the range PNumber'" (range == Just PNumber)
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Property with functional and mandatory properties" do

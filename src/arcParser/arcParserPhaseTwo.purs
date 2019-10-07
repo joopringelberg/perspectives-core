@@ -8,7 +8,7 @@ import Data.Foldable (foldl)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
 import Data.List (List, filter, findIndex, foldM, head)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
@@ -303,7 +303,7 @@ traversePropertyE r ns = if isCalculatedProperty r
 
 traverseEnumeratedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
 traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
-  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns range pos
+  property <- pure $ defaultEnumeratedProperty (ns <> "$" <> id) id ns (unsafePartial $ fromJust range) pos
   property' <- foldM (unsafePartial handleParts) property propertyParts
   modifyDF (\df -> addPropertyToDomeinFile (Property.E property') df)
   pure (Property.E property')

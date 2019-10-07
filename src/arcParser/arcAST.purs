@@ -5,6 +5,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
+import Data.Maybe (Maybe)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
@@ -30,7 +31,7 @@ data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute
 
 newtype PropertyE = PropertyE
   { id :: String
-  , range :: Range
+  , range :: Maybe Range
   , propertyParts :: List PropertyPart
   , pos :: ArcPosition
   }

@@ -102,7 +102,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
-  testOnly "BotRole" do
+  test "BotRole" do
     (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "bot : for MySelf" roleE
     case r of
       (Left e) -> assert (show e) false
@@ -113,3 +113,18 @@ theSuite = suite "Perspectives.Parsing.Arc" do
           Just (ForUser u) -> assert "BotRole should have ForUser part with value 'MySelf'" (u == "MySelf")
           otherwise -> assert "BotRole should have ForUser part" false
       otherwise -> assert "BotRole should have a ForUser part." false
+
+  testOnly "Property with functional and mandatory properties" do
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty (mandatory, not functional, Number)" propertyE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pr@(PE (PropertyE{propertyParts}))) -> do
+        (assert "Property should have a Mandatory attribute"
+          (isJust (findIndex (case _ of
+            (MandatoryAttribute' true) -> true
+            otherwise -> false) propertyParts)))
+        (assert "Property should have a Functional attribute"
+          (isJust (findIndex (case _ of
+            (FunctionalAttribute' false) -> true
+            otherwise -> false) propertyParts)))
+      otherwise -> assert "Property should have parts" false
