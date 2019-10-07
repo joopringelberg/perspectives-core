@@ -1,4 +1,4 @@
-module Test.Parsing.Arc.Simple where
+module Test.Parsing.Arc.TransferFile where
 
 import Prelude
 

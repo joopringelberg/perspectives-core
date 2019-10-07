@@ -1,4 +1,4 @@
-module Perspectives.Parsing.Arc.Token where
+module Perspectives.Parsing.TransferFile.Token where
 
 import Control.Alt ((<|>))
 import Control.Monad (class Monad)
@@ -21,6 +21,7 @@ perspectDef :: IndentLanguageDef
 --                 { reservedOpNames = ["=", "=>"]
 --                 , reservedNames   = [ "intern","extern"]
 --                 }
+-- TODO: VERANDER DE BEHANDELING VAN COMMENTAAR.
 -- | Even though we have comments, we make the Tokenizer none the wizer. This way it won't skip comments.
 -- | We detect comments ourselves and collect them!
 perspectDef = LanguageDef
@@ -48,7 +49,9 @@ perspectDef = LanguageDef
                   , "UserRole"
                   , "BotRole"
                   , "Mandatory"
+                  , "mandatory"
                   , "Functional"
+                  , "functional"
                   , "Calculated"
                   , "BooleanProperty"
                   , "NumberProperty"

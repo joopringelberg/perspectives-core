@@ -24,7 +24,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Testing the correction of the types of the Object and IndirectObject of an Action." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultsAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
     case r of
