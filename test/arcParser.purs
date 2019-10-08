@@ -44,7 +44,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Domain with a role" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole (not mandatory, not functional)\n" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole (not mandatory, not functional)" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{contextParts})) -> do

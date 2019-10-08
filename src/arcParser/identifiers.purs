@@ -17,7 +17,7 @@ colon :: IP String
 colon = token.colon
 
 arcIdentifier :: IP String
-arcIdentifier = qualifiedName <|> prefixedName <|> token.identifier
+arcIdentifier = (qualifiedName <|> prefixedName <|> token.identifier) <?> "a capitalized name, a prefixed name, or a fully qualified name"
   where
     qualifiedName :: IP String
     qualifiedName = try do

@@ -2,14 +2,16 @@ domain: Feest
   --properties: AantalGasten (mandatory, functional) Number
   thing: Wens (mandatory, functional)
     property: Naam (mandatory, not functional, String)
-    property: Bedrag (mandatory, not functional, Number)
+    -- Correct errors
+    property : Bedrag (mandatory, not functional, Number)
+    -- Correct errors
     view: ViewOpWens (Naam, Bedrag)
-  user: gast (not mandatory, not functional) filledBy: sys:User
+  user: Gast (not mandatory, not functional) filledBy: sys:User
     property: Naam (mandatory, functional, String)
     view: ViewOpGast (Naam)
     perspective on: Wens (ViewOpWens): Consult, Change
     property: WellBehaved = Wens > Bedrag
-    perspective on: Gast
+    perspective on : Gast
       Consult with ViewOpGast
       Change with AnotherView
       Bind with AnotherView
