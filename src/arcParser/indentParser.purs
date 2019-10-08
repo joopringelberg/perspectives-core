@@ -106,9 +106,9 @@ sourceLine (ArcPosition {line: l, column: _}) = l
 setSourceLine :: ArcPosition -> Int -> ArcPosition
 setSourceLine (ArcPosition {line: _, column: c}) l = ArcPosition {line: l, column: c}
 
--- | Parses only on lines that are lower than the reference
+-- | Parses only on lines that are lower than the reference (unless the end of the input stream has been reached).
 nextLine :: IP Unit
 nextLine = do
     pos <- getPosition
     s   <- get'
-    if sourceLine pos > sourceLine s then pure unit else fail "not on the next line"
+    if sourceLine pos > sourceLine s then pure unit else (eof <|> fail "not on the next line")

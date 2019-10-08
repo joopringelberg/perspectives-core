@@ -43,7 +43,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
         assert "The Role should have the id 'MyRole'" (id == "MyRole")
       otherwise -> assert "Parsed an unexpected type" false
 
-  test "Domain with a role" do
+  testOnly "Domain with a role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole (not mandatory, not functional)" domain
     case r of
       (Left e) -> assert (show e) false
@@ -373,7 +373,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
-  testOnly "Parse a file" do
+  test "Parse a file" do
     fileName <- pure "arcsyntax.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
