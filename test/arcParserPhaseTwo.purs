@@ -10,6 +10,7 @@ import Data.Lens.At (at)
 import Data.Lens.Index (ix)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
+import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -21,11 +22,12 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Parsing.Arc.AST (ContextE(..))
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
+import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
-import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo, traverseDomain)
-import Perspectives.Parsing.TransferFile (domain)
+import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo, expandNamespace, traverseDomain, withNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError)
+import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -43,7 +45,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -216,10 +218,10 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 -- TODO: check the actual calculation.
                 (Just (CalculatedProperty {calculation})) -> true
 
-  test "Parse a file and pass phase two over it" do
-    fileName <- pure "parsetest1.arc"
+  testOnly "Parse a file and pass phase two over it" do
+    fileName <- pure "arcsyntax.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right dom) -> do
@@ -228,7 +230,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
         case evalPhaseTwo (traverseDomain dom "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
-            -- logShow dr'
+            logShow dr'
             assert ("The file '" <> fileName <> "' does not parse") true
 
   test "An Agent role for a Bot without a ForUser clause" do
@@ -375,3 +377,8 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                   (Just (ViewType "AnotherView")) -> true
                   otherwise -> false
                 )
+  test "withNamespaces" do
+    case evalPhaseTwo (unsafePartial $ withNamespaces (Cons (PREFIX "sys" "model:System$System") Nil)
+        (expandNamespace "sys:User")) of
+      (Right eu) -> assert "The expansion of 'sys:User' should be 'model:System$System$User'" (eu == "model:System$System$User")
+      (Left e) -> assert (show e) false

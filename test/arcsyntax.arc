@@ -6,7 +6,7 @@ Syntax colour groups:
   * property ranges: String, Number, Boolean, DateTime
 -}
 domain: Feest
-  use: sys for model:System
+  use: sys for model:System$System
   external:
     property: AantalGasten (mandatory, functional, Number)
   thing: Wens (mandatory, functional)

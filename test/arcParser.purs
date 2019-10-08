@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
-import Data.List (List, filter, findIndex, head, length)
+import Data.List (filter, findIndex, head, length)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
@@ -17,7 +17,6 @@ import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), 
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
-import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -27,7 +26,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n" domain
     case r of
@@ -373,7 +372,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
-  testOnly "Parse a file" do
+  test "Parse a file" do
     fileName <- pure "arcsyntax.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain

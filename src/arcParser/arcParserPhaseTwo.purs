@@ -11,11 +11,13 @@ import Data.List (List, filter, findIndex, foldM, head)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, lookup)
+import Foreign.Object (Object, empty, insert, lookup)
+import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -40,7 +42,7 @@ import Prelude (Unit, bind, discard, map, pure, void, ($), (<>), (==))
 -- (3) We might want a way to generate some names (like for Perspectives).
 -- (4) We might want a way to indicate that the system should be able to find a qualified name.
 
-type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord}
+type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String}
 
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot, and allows exceptions.
 type PhaseTwo a = ExceptT PerspectivesError (State PhaseTwoState) a
@@ -50,14 +52,14 @@ runPhaseTwo :: forall a. PhaseTwo a -> (Tuple (Either PerspectivesError a) Phase
 runPhaseTwo computation = runPhaseTwo_ computation defaultDomeinFileRecord
 
 runPhaseTwo_ :: forall a. PhaseTwo a -> DomeinFileRecord -> (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_ computation dfr = runState (runExceptT computation) {bot: false, dfr: dfr}
+runPhaseTwo_ computation dfr = runState (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
 evalPhaseTwo computation = evalPhaseTwo_ computation defaultDomeinFileRecord
 
 evalPhaseTwo_ :: forall a. PhaseTwo a -> DomeinFileRecord -> (Either PerspectivesError a)
-evalPhaseTwo_ computation drf = evalState (runExceptT computation) {bot: false, dfr: drf}
+evalPhaseTwo_ computation drf = evalState (runExceptT computation) {bot: false, dfr: drf, namespaces: empty}
 
 subjectIsBot :: PhaseTwo Unit
 subjectIsBot = lift $ void $ modify (\s -> s {bot = true})
@@ -74,8 +76,33 @@ modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 getDF :: PhaseTwo DomeinFileRecord
 getDF = lift $ gets _.dfr
 
+-- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
+withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a
+withNamespaces pairs pt = do
+  x <- pure $ OBJ.fromFoldable $ map (\(PREFIX pre mod) -> Tuple pre mod) pairs
+  ns <- lift $ gets _.namespaces
+  -- TODO: gebruik een andere vorm van samenvoegen, zodat namen worden geschaduwd.
+  void $ modify \s -> s {namespaces = x <> ns}
+  ctxt <- pt
+  void $ modify \s -> s {namespaces = ns}
+  pure ctxt
+
+-- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
+-- | Useful for expanding local names used in bindings, property- and view references.
+expandNamespace :: String -> PhaseTwo String
+expandNamespace s = if isQualifiedWithDomein s then pure s else
+  case deconstructPrefix s of
+    (Just pre) -> do
+      namespaces <- lift $ gets _.namespaces
+      case lookup pre namespaces of
+        (Just modelName) -> case deconstructLocalNameFromCurie s of
+          (Just ln) -> pure (modelName <> "$" <> ln )
+          Nothing -> pure s
+        Nothing -> pure s
+    Nothing -> pure s
+
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
-traverseDomain c@(ContextE {id, kindOfContext, contextParts, pos}) ns = do
+traverseDomain c ns = do
   _ <- traverseContextE c ns
   -- TODO: We might correct the type of references to Properties in Views here.
   domeinFileRecord <- getDF
@@ -86,9 +113,14 @@ traverseDomain c@(ContextE {id, kindOfContext, contextParts, pos}) ns = do
 traverseContextE :: ContextE -> Namespace -> PhaseTwo Context
 traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
   context <- pure $ defaultContext (addNamespace ns id) id kindOfContext (if ns == "model:" then Nothing else (Just ns)) pos
-  context' <- foldM handleParts context contextParts
-  modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
-  pure context'
+  unsafePartial $ withNamespaces
+    (filter (case _ of
+      (PREFIX _ _) -> true
+      otherwise -> false) contextParts)
+    do
+      context' <- foldM handleParts context contextParts
+      modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
+      pure context'
 
   where
 
@@ -136,7 +168,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
       -- A catchall case that just returns the context. Calculated roles for ExternalRole,
       -- UserRole and BotRole should be ignored.
-      -- _, _ -> c
+      _, _ -> c
 
     addNamespace :: String -> String -> String
     addNamespace ns' ln = if ns == "model:" then (ns' <> ln) else (ns' <> "$" <> ln)
@@ -211,7 +243,9 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
     handleParts roleName (EnumeratedRole roleUnderConstruction) (MandatoryAttribute bool) = pure (EnumeratedRole $ roleUnderConstruction {mandatory = bool})
 
     -- FILLEDBYATTRIBUTE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd) = pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding bnd})
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd) = do
+      expandedBnd <- expandNamespace bnd
+      pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding expandedBnd})
 
     -- FORUSER
     handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)
@@ -245,11 +279,12 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 traverseViewE :: ViewE -> Namespace -> PhaseTwo ViewType
 traverseViewE (ViewE {id, viewParts, pos}) ns = do
   viewName <- pure (ns <> "$" <> id)
+  (expandedPropertyReferences :: Array PropertyType) <- traverse qualifyProperty (fromFoldable viewParts)
   view <- pure $ View
     { _id: ViewType viewName
     , _rev: Nothing
     , displayName: id
-    , propertyReferences: map (qualifyProperty ns) (fromFoldable viewParts)
+    , propertyReferences: expandedPropertyReferences
     , role: EnumeratedRoleType ns
     , pos: pos}
   modifyDF (\(df@{views}) -> df {views = insert viewName view views})
@@ -257,10 +292,11 @@ traverseViewE (ViewE {id, viewParts, pos}) ns = do
 
   where
     -- TODO. Is het een calculated of een enumerated property?
-    -- | If the second argument is a fully qualified name, return it as a PropertyType;
-    -- | otherwise, assume it is just a local name and prefix it with the namespace first.
-    qualifyProperty :: Namespace -> String -> PropertyType
-    qualifyProperty roleName pname = if isQualifiedWithDomein pname then (ENP $ EnumeratedPropertyType pname) else (ENP $ EnumeratedPropertyType (roleName <> "$" <> pname))
+    -- | Expand prefixed names.
+    qualifyProperty :: String -> PhaseTwo PropertyType
+    qualifyProperty pname = do
+      expandedPname <- expandNamespace pname
+      pure $ ENP $ EnumeratedPropertyType expandedPname
 
 addRoleToDomeinFile :: Role -> DomeinFileRecord -> DomeinFileRecord
 addRoleToDomeinFile (E r@(EnumeratedRole{_id})) domeinFile = over
