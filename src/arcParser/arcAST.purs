@@ -18,7 +18,10 @@ newtype ContextE = ContextE
   , contextParts :: List ContextPart
   , pos :: ArcPosition}
 
-data ContextPart = RE RoleE | CE ContextE
+type Prefix = String
+type ModelName = String
+
+data ContextPart = RE RoleE | CE ContextE | PREFIX Prefix ModelName
 
 newtype RoleE = RoleE
   { id :: String

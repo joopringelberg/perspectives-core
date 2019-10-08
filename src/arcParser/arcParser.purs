@@ -5,7 +5,7 @@ import Data.List (List(..), singleton)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon, prefix)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..))
@@ -15,7 +15,6 @@ import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
-import Text.Parsing.Parser.String (whiteSpace)
 
 contextE :: IP ContextPart
 contextE = try $ withEntireBlock
@@ -41,8 +40,12 @@ contextE = try $ withEntireBlock
     contextPart = do
       ck <- lookAhead $ optionMaybe contextKind
       case ck of
-        Nothing -> roleE
-        otherwise -> contextE
+        (Just _) -> contextE
+        Nothing -> do
+          useClause <- lookAhead $ optionMaybe (reserved "use")
+          case useClause of
+            Nothing -> roleE
+            otherwise -> useClause_
 
 domain :: IP ContextE
 domain = do
@@ -50,6 +53,12 @@ domain = do
   case r of
     (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
     otherwise -> fail "Domain cannot be a role"
+
+useClause_ :: IP ContextPart
+useClause_ = do
+  prefix <- reserved "use" *> colon *> prefix
+  modelName <- reserved "for" *> arcIdentifier
+  pure $ PREFIX prefix modelName
 
 roleE :: IP ContextPart
 roleE = try $ withEntireBlock

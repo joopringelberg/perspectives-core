@@ -38,6 +38,7 @@ perspectDef = LanguageDef
                   , "party"
                   , "state"
                   , "activity"
+                  , "use"
 
                   -- Roles
                   , "thing"
