@@ -69,12 +69,10 @@ withEntireBlock f a p = withPos $ do
     r2 <- if isIndented' then entireBlock p else pure Nil
     pure (f r1 r2)
 
-    where
-
-    -- | Parses a block of lines at the same indentation level.
-    -- | If not every line has been parsed, fails by applying p to the next line
-    entireBlock :: forall x. IP x -> IP (List x)
-    entireBlock pr = (withPos (many $ checkIndent *> pr) >>= unlessOutdented (pr >>= pure <<< singleton))
+-- | Parses a block of lines at the same indentation level.
+-- | If not every line has been parsed, fails by applying p to the next line
+entireBlock :: forall x. IP x -> IP (List x)
+entireBlock pr = (withPos (many $ checkIndent *> pr) >>= unlessOutdented (pr >>= pure <<< singleton))
 
 -- | Applies parser `p` iff the current location of the parser is not outdented with respect
 -- | to the reference position stored previously by the IndentParser (and the end of the input

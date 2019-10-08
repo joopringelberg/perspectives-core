@@ -15,6 +15,7 @@ import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.String (whiteSpace)
 
 contextE :: IP ContextPart
 contextE = try $ withEntireBlock
@@ -45,7 +46,7 @@ contextE = try $ withEntireBlock
 
 domain :: IP ContextE
 domain = do
-  r <- contextE
+  r <- token.whiteSpace *> contextE
   case r of
     (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
     otherwise -> fail "Domain cannot be a role"
@@ -59,9 +60,10 @@ roleE = try $ withEntireBlock
     role_ :: IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     role_ = do
       pos <- getPosition
-      knd <- (roleKind <* colon) <?> "'thing', 'properties', 'context', 'user' or 'bot'"
+      knd <- (roleKind <* colon) <?> "'thing', 'external', 'context', 'user' or 'bot'"
       case knd of
         BotRole -> botRole_ pos
+        ExternalRole -> externalRole_ pos
         otherwise -> do
           uname <- arcIdentifier
           isCalculated <- lookAhead $ optionMaybe (reserved "=")
@@ -88,6 +90,9 @@ roleE = try $ withEntireBlock
     botRole_ pos = try do
       forUser <- reserved "for" *> arcIdentifier
       pure {uname: "", knd: BotRole, pos, parts: Cons (ForUser forUser) Nil}
+
+    externalRole_ :: ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
+    externalRole_ pos = pure {uname: "external", knd: ExternalRole, pos, parts: Nil}
 
     calculatedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     calculatedRole_ pos knd uname = try do
@@ -121,7 +126,7 @@ roleE = try $ withEntireBlock
 
     roleKind :: IP RoleKind
     roleKind = (reserved "thing" *> pure RoleInContext)
-      <|> reserved "properties" *> pure ExternalRole
+      <|> reserved "external" *> pure ExternalRole
       <|> reserved "context" *> pure ContextRole
       <|> reserved "user" *> pure UserRole
       <|> reserved "bot" *> pure BotRole
