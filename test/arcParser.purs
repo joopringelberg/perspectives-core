@@ -26,7 +26,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc" do
+theSuite = suite "Perspectives.Parsing.Arc" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n" domain
     case r of
@@ -381,3 +381,13 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
       (Right dom) -> do
         logShow dom
         assert ("The file '" <> fileName <> "' does not parse") true
+
+  testOnly "Context with an aspect" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  aspect : pre:MyAspectRole" domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{contextParts})) -> do
+        case head contextParts of
+          Nothing -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
+          (Just (ContextAspect "pre:MyAspectRole")) -> pure unit
+          otherwise -> assert "The Context should have an aspect 'pre:MyAspectRole'." false

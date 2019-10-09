@@ -27,7 +27,7 @@ arcIdentifier = (qualifiedName <|> prefixedName <|> token.identifier) <?> "a cap
 
     prefixedName :: IP String
     prefixedName = try do
-      pre <- prefix
+      pre <- lowerCaseName
       void token.colon
       i <- token.identifier
       pure (pre <> ":" <> i)
@@ -38,8 +38,8 @@ stringUntilNewline = do
   _ <- whiteSpace
   pure $ fromCharArray chars
 
-prefix :: IP String
-prefix = many lower <* token.whiteSpace >>= pure <<< fromCharArray
+lowerCaseName :: IP String
+lowerCaseName = many lower <* token.whiteSpace >>= pure <<< fromCharArray
 
 lower ::  IP Char
 lower = satisfy isLower <?> "lowercase letter"

@@ -45,7 +45,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -218,7 +218,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 -- TODO: check the actual calculation.
                 (Just (CalculatedProperty {calculation})) -> true
 
-  testOnly "Parse a file and pass phase two over it" do
+  test "Parse a file and pass phase two over it" do
     fileName <- pure "arcsyntax.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text ARC.domain

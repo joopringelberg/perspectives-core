@@ -137,9 +137,11 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       role <- traverseRoleE r (addNamespace ns id)
       pure (unsafePartial (role `insertRoleInto` contextUnderConstruction))
 
-    -- Use prefixes
-    -- TODO: implement traverseContextE handleParts for PREFIX!
+    -- Prefixes are handled earlier, so this can be a no-op
     handleParts contextUnderConstruction (PREFIX pre model) = pure contextUnderConstruction
+
+    -- TODO: handle aspects!
+    handleParts contextUnderConstruction (ContextAspect contextName) = pure contextUnderConstruction
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = over

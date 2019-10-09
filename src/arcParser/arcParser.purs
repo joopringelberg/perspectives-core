@@ -1,11 +1,12 @@
 module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, (<|>))
+import Data.Array (elemIndex)
 import Data.List (List(..), singleton)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon, prefix)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..))
@@ -36,16 +37,18 @@ contextE = try $ withEntireBlock
       <|> reserved "activity" *> pure Activity
       <|> reserved "state" *> pure State
 
+    isContextKind :: String -> Boolean
+    isContextKind s = isJust (elemIndex s ["domain", "case", "party", "activity", "state"])
+
     contextPart :: IP ContextPart
     contextPart = do
-      ck <- lookAhead $ optionMaybe contextKind
-      case ck of
-        (Just _) -> contextE
-        Nothing -> do
-          useClause <- lookAhead $ optionMaybe (reserved "use")
-          case useClause of
-            Nothing -> roleE
-            otherwise -> useClause_
+      keyword <- lookAhead $ lowerCaseName <* colon
+      case keyword of
+        "use" -> useClause_
+        "aspect" -> aspectClause_
+        ctxt | isContextKind ctxt -> contextE
+        role | isRoleKind role -> roleE
+        otherwise -> fail "unknown keyword for a context."
 
 domain :: IP ContextE
 domain = do
@@ -56,9 +59,12 @@ domain = do
 
 useClause_ :: IP ContextPart
 useClause_ = do
-  prefix <- reserved "use" *> colon *> prefix
+  prefix <- reserved "use" *> colon *> lowerCaseName
   modelName <- reserved "for" *> arcIdentifier
   pure $ PREFIX prefix modelName
+
+aspectClause_ :: IP ContextPart
+aspectClause_ = reserved "aspect" *> colon *> arcIdentifier >>= pure <<< ContextAspect
 
 roleE :: IP ContextPart
 roleE = try $ withEntireBlock
@@ -140,6 +146,9 @@ roleE = try $ withEntireBlock
       <|> reserved "user" *> pure UserRole
       <|> reserved "bot" *> pure BotRole
       <|> fail "Unknown kind of role"
+
+isRoleKind :: String -> Boolean
+isRoleKind s = isJust (elemIndex s ["thing", "external", "context", "user", "bot"])
 
 propertyE :: IP RolePart
 propertyE = try do
