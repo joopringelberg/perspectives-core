@@ -1,10 +1,11 @@
 module Perspectives.Parsing.Arc where
 
-import Control.Alt (map, (<|>))
+import Control.Alt (map, void, (<|>))
 import Data.Array (elemIndex)
 import Data.List (List(..), singleton)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
+import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
@@ -14,8 +15,9 @@ import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=))
-import Text.Parsing.Parser (fail)
+import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
+import Unsafe.Coerce (unsafeCoerce)
 
 contextE :: IP ContextPart
 contextE = try $ withEntireBlock
@@ -51,7 +53,11 @@ contextE = try $ withEntireBlock
         otherwise -> fail "unknown keyword for a context."
 
     aspectE :: IP ContextPart
-    aspectE = reserved "aspect" *> colon *> arcIdentifier >>= pure <<< ContextAspect
+    aspectE = do
+      void $ reserved "aspect" *> colon
+      pos <-getPosition
+      aspect <- arcIdentifier
+      pure $ ContextAspect aspect pos
 
 domain :: IP ContextE
 domain = do
@@ -63,8 +69,12 @@ domain = do
 useE :: IP ContextPart
 useE = do
   prefix <- reserved "use" *> colon *> lowerCaseName
-  modelName <- reserved "for" *> arcIdentifier
-  pure $ PREFIX prefix modelName
+  void $ reserved "for"
+  pos <- getPosition
+  modelName <- arcIdentifier
+  if isQualifiedWithDomein modelName
+    then pure $ PREFIX prefix modelName
+    else failWithPosition ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)") (unsafeCoerce pos)
 
 roleE :: IP ContextPart
 roleE = try $ withEntireBlock
@@ -96,7 +106,11 @@ roleE = try $ withEntireBlock
         _ -> viewE
 
     aspectE :: IP RolePart
-    aspectE = reserved "aspect" *> colon *> arcIdentifier >>= pure <<< RoleAspect
+    aspectE = do
+      void $ reserved "aspect" *> colon
+      pos <- getPosition
+      aspect <- arcIdentifier
+      pure $ RoleAspect aspect pos
 
     otherRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     otherRole_ pos knd uname = try do

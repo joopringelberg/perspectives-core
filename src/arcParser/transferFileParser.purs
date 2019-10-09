@@ -16,6 +16,8 @@ import Text.Parsing.Indent (withBlock)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (try)
 
+-- TODO: handle Aspects
+
 contextE :: IP ContextPart
 contextE = withBlock
   (\{uname, knd, pos} elements -> CE $ ContextE { id: uname, kindOfContext: knd, contextParts: elements, pos: pos})
@@ -142,7 +144,6 @@ viewE = withBlock
     pos <- getPosition
     uname <- arcIdentifier
     pure (Tuple uname pos))
-  -- TODO: leg positie per property vast.
   (reserved "Property" *> colon *> reserved "PropertyRef" *> colon *> arcIdentifier)
 
 actionE :: IP PerspectivePart

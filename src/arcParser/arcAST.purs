@@ -21,7 +21,7 @@ newtype ContextE = ContextE
 type Prefix = String
 type ModelName = String
 
-data ContextPart = RE RoleE | CE ContextE | PREFIX Prefix ModelName | ContextAspect String
+data ContextPart = RE RoleE | CE ContextE | PREFIX Prefix ModelName | ContextAspect String ArcPosition
 
 newtype RoleE = RoleE
   { id :: String
@@ -29,8 +29,8 @@ newtype RoleE = RoleE
   , roleParts :: List RolePart
   , pos :: ArcPosition}
 
--- TODO: het verschil tussen conjunctie en disjunctie bij binding.
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String | RoleAspect String
+-- TODO: het verschil tussen conjunctie en disjunctie bij FilledByAttribute.
+data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String | RoleAspect String ArcPosition
 
 newtype PropertyE = PropertyE
   { id :: String

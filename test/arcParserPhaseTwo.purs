@@ -26,13 +26,13 @@ import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo, expandNamespace, traverseDomain, withNamespaces)
-import Perspectives.Parsing.Messages (PerspectivesError)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Context (Context(..), contextAspects)
+import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
@@ -45,7 +45,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -400,7 +400,17 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (Just (Context{contextAspects})) -> assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
                 (isJust (elemIndex (ContextType "model:MyAspectModel$MyAspect") contextAspects))
 
-  testOnly "Role with Aspect" do
+  test "Test well-formedness of a ContextAspect name" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Feest\n  aspect: MyAspectModel$MyAspect" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left (NotWellFormedName pos _)) -> assert "The position in the error message should be" (pos == ArcPosition {line: 2, column: 11})
+          otherwise -> assert "The name of the aspect is not well-formed and that should be detected." false
+
+  test "Role with Aspect" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Feest\n  thing: Wens (mandatory, functional)\n    aspect: model:MyAspectModel$MyAspect$MyAspectRole" ARC.domain
     case r of
       (Left e) -> assert (show e) false

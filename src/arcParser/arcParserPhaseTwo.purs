@@ -140,11 +140,11 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     -- Prefixes are handled earlier, so this can be a no-op
     handleParts contextUnderConstruction (PREFIX pre model) = pure contextUnderConstruction
 
-    handleParts (Context contextUnderConstruction@{contextAspects}) (ContextAspect contextName) = do
+    handleParts (Context contextUnderConstruction@{contextAspects}) (ContextAspect contextName pos') = do
       expandedAspect <- expandNamespace contextName
       if isQualifiedWithDomein expandedAspect
         then pure (Context $ contextUnderConstruction {contextAspects = cons (ContextType expandedAspect) contextAspects})
-        else throwError $ NotWellFormedName pos contextName
+        else throwError $ NotWellFormedName pos' contextName
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = over
@@ -256,11 +256,11 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
     handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)
 
     -- ROLEASPECT
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{roleAspects}) (RoleAspect a) = do
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{roleAspects}) (RoleAspect a pos') = do
       expandedAspect <- expandNamespace a
       if isQualifiedWithDomein expandedAspect
         then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons (EnumeratedRoleType expandedAspect) roleAspects})
-        else throwError $ NotWellFormedName pos a
+        else throwError $ NotWellFormedName pos' a
 
     userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
     userServedByBot pos' localBotName parts = let
@@ -275,7 +275,6 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
         otherwise -> throwError (MissingForUser pos' localBotName)
 
     -- TODO (augmentADT) We assume a sum type and we assume a qualified name. Handle PROD types.
-    -- TODO (augmentADT). We do not know the namespace of the roleName that we augment the ADT with.
     augmentADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     augmentADT adt roleName = case adt of
       NOTYPE -> ST $ EnumeratedRoleType roleName

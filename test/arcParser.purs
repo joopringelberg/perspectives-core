@@ -14,19 +14,20 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, viewE)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Text.Parsing.Parser (ParseError(..))
+import Unsafe.Coerce (unsafeCoerce)
 
 testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc" do
+theSuite = suite "Perspectives.Parsing.Arc" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n" domain
     case r of
@@ -389,7 +390,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
       (Right ctxt@(ContextE{contextParts})) -> do
         case head contextParts of
           Nothing -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
-          (Just (ContextAspect "pre:MyAspectRole")) -> pure unit
+          (Just (ContextAspect "pre:MyAspectRole" _)) -> pure unit
           otherwise -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
 
   test "Role with an aspect" do
@@ -397,9 +398,25 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
-            (RoleAspect _) -> true
+            (RoleAspect _ _) -> true
             otherwise -> false) roleParts)) of
           Nothing -> assert "Role should have a RoleAspect part." false
-          Just (RoleAspect u) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
+          Just (RoleAspect u _) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
           otherwise -> assert "Role should have a RoleAspect part" false
       otherwise -> assert "Role should have a RoleAspect part" false
+
+  test "Context with a use clause" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:System$System" domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{contextParts})) -> do
+        case head contextParts of
+          Nothing -> assert "The Context should have a user clause." false
+          (Just (PREFIX "sys" "model:System$System")) -> pure unit
+          otherwise -> assert "The Context should have a use clause: 'use: sys model:System$System'." false
+
+  test "Well-formedness of a use clause" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for System$System" domain
+    case r of
+      (Left (ParseError _ pos)) -> assert "The error should be situated at (2, 16)" (unsafeCoerce pos == ArcPosition {line: 2, column: 16})
+      otherwise -> assert "The modelname is not well-formed and that should be detected" false

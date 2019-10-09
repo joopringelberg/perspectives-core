@@ -54,7 +54,6 @@ type ContextRecord =
   , contextAspects :: Array ContextType
   , defaultPrototype :: Maybe ContextInstance
 
-  -- TODO: heroverweeg of dit niet samengevoegd kan worden.
   , rolInContext :: Array RoleType
   , contextRol :: Array RoleType
   , externeRol :: EnumeratedRoleType
