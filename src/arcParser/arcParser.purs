@@ -44,11 +44,14 @@ contextE = try $ withEntireBlock
     contextPart = do
       keyword <- lookAhead $ lowerCaseName <* colon
       case keyword of
-        "use" -> useClause_
-        "aspect" -> aspectClause_
+        "use" -> useE
+        "aspect" -> aspectE
         ctxt | isContextKind ctxt -> contextE
         role | isRoleKind role -> roleE
         otherwise -> fail "unknown keyword for a context."
+
+    aspectE :: IP ContextPart
+    aspectE = reserved "aspect" *> colon *> arcIdentifier >>= pure <<< ContextAspect
 
 domain :: IP ContextE
 domain = do
@@ -57,14 +60,11 @@ domain = do
     (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain'"
     otherwise -> fail "Domain cannot be a role"
 
-useClause_ :: IP ContextPart
-useClause_ = do
+useE :: IP ContextPart
+useE = do
   prefix <- reserved "use" *> colon *> lowerCaseName
   modelName <- reserved "for" *> arcIdentifier
   pure $ PREFIX prefix modelName
-
-aspectClause_ :: IP ContextPart
-aspectClause_ = reserved "aspect" *> colon *> arcIdentifier >>= pure <<< ContextAspect
 
 roleE :: IP ContextPart
 roleE = try $ withEntireBlock
@@ -88,11 +88,15 @@ roleE = try $ withEntireBlock
 
     rolePart :: IP RolePart
     rolePart = do
-      typeOfPart <- lookAhead ((reserved' "property" <|> reserved' "perspective" <|> reserved' "view") <?> "property, perspectives or view")
+      typeOfPart <- lookAhead ((reserved' "property" <|> reserved' "perspective" <|> reserved' "view" <|> reserved' "aspect") <?> "property, perspectives, aspect or view")
       case typeOfPart of
         "property" -> propertyE
         "perspective" -> perspectiveE
+        "aspect" -> aspectE
         _ -> viewE
+
+    aspectE :: IP RolePart
+    aspectE = reserved "aspect" *> colon *> arcIdentifier >>= pure <<< RoleAspect
 
     otherRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     otherRole_ pos knd uname = try do

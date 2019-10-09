@@ -382,7 +382,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
         logShow dom
         assert ("The file '" <> fileName <> "' does not parse") true
 
-  testOnly "Context with an aspect" do
+  test "Context with an aspect" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  aspect : pre:MyAspectRole" domain
     case r of
       (Left e) -> assert (show e) false
@@ -391,3 +391,15 @@ theSuite = suite "Perspectives.Parsing.Arc" do
           Nothing -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
           (Just (ContextAspect "pre:MyAspectRole")) -> pure unit
           otherwise -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
+
+  testOnly "Role with an aspect" do
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing : MyRole (mandatory, functional)\n  aspect: pre:MyAspectRole" roleE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right rl@(RE (RoleE{roleParts}))) -> case (head (filter (case _ of
+            (RoleAspect _) -> true
+            otherwise -> false) roleParts)) of
+          Nothing -> assert "Role should have a RoleAspect part." false
+          Just (RoleAspect u) -> assert "Role should have a RoleAspect part with value 'pre:MyAspectRole'" (u == "pre:MyAspectRole")
+          otherwise -> assert "Role should have a RoleAspect part" false
+      otherwise -> assert "Role should have a RoleAspect part" false

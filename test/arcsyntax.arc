@@ -14,7 +14,7 @@ domain: Feest
   thing: Wens (mandatory, functional)
     property: Naam (mandatory, not functional, String)
     property : Bedrag (mandatory, not functional, Number)
-    --aspect: pre:MyAspect$MyAspectRole
+    aspect: pre:MyAspect$MyAspectRole
     view: ViewOpWens (Naam, Bedrag)
   user: Gast (not mandatory, not functional) filledBy: sys:User
     property: Naam (mandatory, functional, String)
