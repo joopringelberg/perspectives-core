@@ -140,8 +140,11 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     -- Prefixes are handled earlier, so this can be a no-op
     handleParts contextUnderConstruction (PREFIX pre model) = pure contextUnderConstruction
 
-    -- TODO: handle aspects!
-    handleParts contextUnderConstruction (ContextAspect contextName) = pure contextUnderConstruction
+    handleParts (Context contextUnderConstruction@{contextAspects}) (ContextAspect contextName) = do
+      expandedAspect <- expandNamespace contextName
+      if isQualifiedWithDomein expandedAspect
+        then pure (Context $ contextUnderConstruction {contextAspects = cons (ContextType expandedAspect) contextAspects})
+        else throwError $ NotWellFormedName pos contextName
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = over
@@ -251,6 +254,13 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
     -- FORUSER
     handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)
+
+    -- ROLEASPECT
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{roleAspects}) (RoleAspect a) = do
+      expandedAspect <- expandNamespace a
+      if isQualifiedWithDomein expandedAspect
+        then pure (EnumeratedRole $ roleUnderConstruction {roleAspects = cons (EnumeratedRoleType expandedAspect) roleAspects})
+        else throwError $ NotWellFormedName pos a
 
     userServedByBot :: ArcPosition -> String -> List RolePart -> PhaseTwo String
     userServedByBot pos' localBotName parts = let

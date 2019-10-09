@@ -3,7 +3,7 @@ module Test.Parsing.Arc.PhaseTwo where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (head, length)
+import Data.Array (elemIndex, head, length)
 import Data.Either (Either(..))
 import Data.Lens (_Just, preview, traversed)
 import Data.Lens.At (at)
@@ -22,8 +22,8 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc (domain) as ARC
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo, expandNamespace, traverseDomain, withNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError)
@@ -32,7 +32,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Context (Context(..))
+import Perspectives.Representation.Context (Context(..), contextAspects)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
@@ -45,7 +45,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -382,3 +382,35 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
         (expandNamespace "sys:User")) of
       (Right eu) -> assert "The expansion of 'sys:User' should be 'model:System$System$User'" (eu == "model:System$System$User")
       (Left e) -> assert (show e) false
+
+  test "Context with Aspect" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Feest\n  aspect: model:MyAspectModel$MyAspect" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
+              (isJust (lookup "model:Feest" dr'.contexts))
+            case (lookup "model:Feest" dr'.contexts) of
+              Nothing -> assert "Cannot find the domain" false
+              (Just (Context{contextAspects})) -> assert "The domain 'model:Feest' should have an aspect 'model:MyAspectModel$MyAspect'."
+                (isJust (elemIndex (ContextType "model:MyAspectModel$MyAspect") contextAspects))
+
+  testOnly "Role with Aspect" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Feest\n  thing: Wens (mandatory, functional)\n    aspect: model:MyAspectModel$MyAspect$MyAspectRole" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            case lookup "model:Feest$Wens" dr'.enumeratedRoles of
+              Nothing -> assert "Cannot find the role 'model:Feest$Wens'" false
+              (Just (EnumeratedRole{roleAspects})) -> assert "The role 'model:Feest$Wens' should have an aspect 'model:MyAspectModel$MyAspect$MyAspectRole'."
+                (isJust (elemIndex (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole") roleAspects))

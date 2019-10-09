@@ -30,6 +30,7 @@ data PerspectivesError
     | WrongRoleKind RoleType RoleKind RoleKind
     | MissingForUser ArcPosition String
     | MissingObject ArcPosition String
+    | NotWellFormedName ArcPosition String
     | Custom String
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
@@ -40,6 +41,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (WrongRoleKind roletype expected found) = "Role '" <> show roletype <> "' has kind '" <> show found <> "' but should have kind '" <> show expected<> "'."
   show (MissingForUser pos localBotName) = "(MissingForUser) The BotRole '" <> localBotName <> "' should have a 'ForUser' clause: " <> show pos
   show (MissingObject pos localPerspectiveName) = "(MissingObject) The perspective '" <> localPerspectiveName <> "' should have an 'ObjectRef' clause: " <> show pos
+  show (NotWellFormedName pos name) = "(NotWellFormedName) The name '" <> name <> "' is not well-formed (it cannot be expanded to a fully qualified name): " <> show pos
   show (Custom s) = s
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

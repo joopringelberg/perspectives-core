@@ -8,6 +8,7 @@ Syntax colour groups:
 -}
 domain: Feest
   use: sys for model:System$System
+  use: pre for model:MyAspectModel
   aspect: pre:MyAspect
   external:
     property: AantalGasten (mandatory, functional, Number)

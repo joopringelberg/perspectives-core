@@ -26,7 +26,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n" domain
     case r of
@@ -392,7 +392,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
           (Just (ContextAspect "pre:MyAspectRole")) -> pure unit
           otherwise -> assert "The Context should have an aspect 'pre:MyAspectRole'." false
 
-  testOnly "Role with an aspect" do
+  test "Role with an aspect" do
     (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing : MyRole (mandatory, functional)\n  aspect: pre:MyAspectRole" roleE
     case r of
       (Left e) -> assert (show e) false
