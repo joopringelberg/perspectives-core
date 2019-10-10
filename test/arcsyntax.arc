@@ -1,10 +1,10 @@
 {-
-Syntax colour groups:
-  * context kinds
-  * role kinds
-  * keywords: mandatory, functional, not, filledBy, on, with, for, use
-  * property ranges: String, Number, Boolean, DateTime
-  * aspect
+TODO:
+  * map properties from AspectRoles to local names?
+  * map properties from AspectRoles to properties from the Binding of the role.
+  * expression parser.
+  * PRODUCT for binding
+  * partial qualification: pre:..MyRole
 -}
 domain: Feest
   use: sys for model:System$System

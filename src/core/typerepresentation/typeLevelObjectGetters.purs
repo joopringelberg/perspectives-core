@@ -6,12 +6,12 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (isContainingNamespace)
-import Perspectives.Instances.Combinators (closure_, filter')
+import Perspectives.Instances.Combinators (closure_, disjunction, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
 import Perspectives.Representation.Class.Role (class RoleClass, getRole', properties, propertiesOfADT, views, viewsOfADT)
-import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole) as Context
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType, ViewType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole, contextRole) as Context
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType, ViewType, propertytype2string, roletype2string)
 import Prelude (pure, (==), (>>>), (<<<), (>=>))
 
 externalRoleOfADT_ :: ADT ContextType ~~~> EnumeratedRoleType
@@ -26,14 +26,19 @@ externalRoleOfADT = reduce eRole where
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
-lookForRoleType s = lookForRole (roletype2string >>> ((==) s))
+lookForRoleType s = disjunction
+  (lookForRoleInContext (roletype2string >>> ((==) s)))
+  (lookForContextRole (roletype2string >>> ((==) s)))
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s = lookForRole (roletype2string >>> isContainingNamespace s)
+lookForUnqualifiedRoleType s = lookForRoleInContext (roletype2string >>> isContainingNamespace s)
 
-lookForRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
-lookForRole criterium = filter' (contextAspectsClosure >=> roleInContext) criterium
+lookForRoleInContext :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
+lookForRoleInContext criterium = filter' (contextAspectsClosure >=> roleInContext) criterium
+
+lookForContextRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
+lookForContextRole criterium = filter' (contextAspectsClosure >=> contextRole) criterium
 
 lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
 lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s))
@@ -46,10 +51,13 @@ lookForRoleOfADT :: (RoleType -> Boolean) -> ADT ContextType ~~~> RoleType
 lookForRoleOfADT criterium = ArrayT <<< reduce f
   where
     f :: ContextType -> MonadPerspectives (Array RoleType)
-    f = unwrap <<< lookForRole criterium
+    f = unwrap <<< lookForRoleInContext criterium
 
 roleInContext :: ContextType ~~~> RoleType
 roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.roleInContext)
+
+contextRole :: ContextType ~~~> RoleType
+contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.contextRole)
 
 contextAspectsClosure :: ContextType ~~~> ContextType
 contextAspectsClosure = closure_ f where

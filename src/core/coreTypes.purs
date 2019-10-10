@@ -75,9 +75,42 @@ infixl 0 type ObjectsGetter as ##>
 -----------------------------------------------------------
 -- TYPELEVELGETTER
 -----------------------------------------------------------
-type TypeLevelGetter s o = s -> ArrayT MP o
+type TypeLevelResults o = ArrayT MP o
+
+type TypeLevelGetter s o = s -> TypeLevelResults o
 
 infixl 0 type TypeLevelGetter as ~~~>
+
+-----------------------------------------------------------
+-- RUN TYPELEVELGETTER TO GET AN ARRAY OF RESULTS
+-----------------------------------------------------------
+-- | Run a TypeLevelGetter on its argument to obtain the Array of results in MonadPerspectives.
+runTypeLevelToArray :: forall s o.
+  s
+  -> (s ~~~> o)
+  -> MonadPerspectives (Array o)
+runTypeLevelToArray a f = runArrayT (f a)
+
+infixl 1 runTypeLevelToArray as ###=
+
+-----------------------------------------------------------
+-- OBTAIN JUST A SINGLE RESULT OR NOTHING (###>) FROM A TYPELEVELGETTER
+-----------------------------------------------------------
+runTypeLevelToMaybeObject :: forall s o. s -> (s ~~~> o) -> (MonadPerspectives) (Maybe o)
+runTypeLevelToMaybeObject id tog = runTypeLevelToArray id tog >>= pure <<< head
+
+infix 1 runTypeLevelToMaybeObject as ###>
+
+-----------------------------------------------------------
+-- OBTAIN A SINGLE RESULT OR AN ERROR (###>>) FROM A TYPELEVELGETTER
+-----------------------------------------------------------
+runTypeLevelToObject :: forall s o. s -> (s ~~~> o) -> (MonadPerspectives) o
+runTypeLevelToObject id tog = runTypeLevelToArray id tog >>= \objects ->
+  case head objects of
+  Nothing -> throwError $ error $ "TypeLevelGetter returns no values for '" <> (unsafeCoerce id) <> "'."
+  (Just obj) -> pure obj
+
+infix 1 runTypeLevelToObject as ###>>
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVESQUERY
@@ -101,18 +134,18 @@ type PropertyValueGetter = RoleInstance ~~> Value
 
 type ContextPropertyValueGetter = ContextInstance ~~> Value
 -----------------------------------------------------------
--- RUN TO GET ASSUMPTIONS AND AN ARRAY OF RESULTS
+-- RUN TRACKINGOBJECTSGETTER TO GET ASSUMPTIONS AND AN ARRAY OF RESULTS
 -----------------------------------------------------------
 -- | Run a TrackingObjectsGetter on its argument to obtain both the underlying assumptions and the Array of results in MonadPerspectives.
 runMonadPerspectivesQuery :: forall s o.
   s
-  -> (s -> MonadPerspectivesQuery o)
+  -> (s ~~> o)
   -> (MonadPerspectives (WithAssumptions o))
 runMonadPerspectivesQuery a f = runWriterT (runArrayT (f a))
 
 type WithAssumptions o = Tuple (Array o) (Array Assumption)
 -----------------------------------------------------------
--- EVAL TO GET AN ARRAY OF RESULTS
+-- EVAL TRACKINGOBJECTSGETTER TO GET AN ARRAY OF RESULTS
 -----------------------------------------------------------
 -- | Apply a TrackingObjectsGetter to an argument to obtain an Array of results in MonadPerspectives.
 evalMonadPerspectivesQuery :: forall s o.
@@ -126,7 +159,7 @@ evalMonadPerspectivesQuery a f = do
 infix 0 evalMonadPerspectivesQuery as ##=
 
 ------------------------------------------------------------------------------------------------------------------------
--- OBTAIN JUST A SINGLE RESULT OR NOTHING (##>)
+-- OBTAIN JUST A SINGLE RESULT OR NOTHING (##>) FROM TRACKINGOBJECTSGETTER
 ------------------------------------------------------------------------------------------------------------------------
 evalMonadPerspectivesQueryToMaybeObject :: forall s o. s -> (s ~~> o) -> (MonadPerspectives) (Maybe o)
 evalMonadPerspectivesQueryToMaybeObject id tog = evalMonadPerspectivesQuery id tog >>= pure <<< head
@@ -134,15 +167,15 @@ evalMonadPerspectivesQueryToMaybeObject id tog = evalMonadPerspectivesQuery id t
 infix 0 evalMonadPerspectivesQueryToMaybeObject as ##>
 
 ------------------------------------------------------------------------------------------------------------------------
--- OBTAIN A SINGLE RESULT OR AN ERROR (##>>)
+-- OBTAIN A SINGLE RESULT OR AN ERROR (##>>) FROM TRACKINGOBJECTSGETTER
 ------------------------------------------------------------------------------------------------------------------------
-runTypedTripleGetterToObject :: forall s o. s -> (s ~~> o) -> (MonadPerspectives) o
-runTypedTripleGetterToObject id tog = evalMonadPerspectivesQuery id tog >>= \objects ->
+runMonadPerspectivesQueryToObject :: forall s o. s -> (s ~~> o) -> (MonadPerspectives) o
+runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>= \objects ->
   case head objects of
   Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unsafeCoerce id) <> "'."
   (Just obj) -> pure obj
 
-infix 0 runTypedTripleGetterToObject as ##>>
+infix 0 runMonadPerspectivesQueryToObject as ##>>
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVESTRANSACTION

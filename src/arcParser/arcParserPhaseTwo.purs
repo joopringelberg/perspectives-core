@@ -39,8 +39,6 @@ import Prelude (Unit, bind, discard, map, pure, void, ($), (<>), (==))
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
 -- However, we don't know when traversing the Arc AST.
 -- (2) We need a way to indicate PRODUCT types for bindings.
--- (3) We might want a way to generate some names (like for Perspectives).
--- (4) We might want a way to indicate that the system should be able to find a qualified name.
 
 type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String}
 
@@ -448,6 +446,7 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , condition: Nothing
     , effect: Nothing
     , executedByBot: executedByBot
+    , pos
   }
   action' <- foldM (handleParts $ deconstructNamespace_ rolename) action actionParts
   modifyDF (\df -> df {actions = (insert actionId action' df.actions)})

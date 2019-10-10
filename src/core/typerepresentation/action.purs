@@ -61,6 +61,7 @@ type ActionRecord =
   , condition :: Maybe QueryFunctionDescription
   , effect :: Maybe AssignmentStatement
   , executedByBot :: Boolean
+  , pos :: ArcPosition
   }
 
 defaultAction :: String -> String -> Verb -> RoleType -> Maybe ViewType -> ArcPosition -> Action
@@ -78,6 +79,7 @@ defaultAction id displayName verb object objectView pos = Action
   , condition: Nothing
   , effect: Nothing
   , executedByBot: false
+  , pos: pos
   }
 
 derive instance genericRepAction :: Generic Action _
