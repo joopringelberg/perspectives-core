@@ -1,55 +1,17 @@
 module Perspectives.Identifiers
-( deconstructPrefix
-, deconstructLocalNameFromCurie
-, deconstructLocalNameFromDomeinURI
-, deconstructLocalNameFromDomeinURI_
-, hasLocalName
-, deconstructModelName
-, deconstructNamespace
-, deconstructNamespace_
-, guardWellFormedNess
-, getFirstMatch
-, getSecondMatch
-, Namespace
-, LocalName
-, roleIndexNr
-, escapeCouchdbDocumentName
-, isInNamespace
-, isContainingNamespace
-, isQualifiedWithDomein
-, ModelName(..)
-, QualifiedName(..)
-, class PerspectEntiteitIdentifier
-, pe_namespace
-, pe_localName
-, binnenRol
-, deconstructBinnenRol
-, buitenRol
-, deconstructBuitenRol
-, PEIdentifier
-, Prefix
-, isUserURI
-, isUserEntiteitID
-, isBinnenRol
-, isModelName
-, expandDefaultNamespaces
-, q
-, psp
-, buitenToBinnenRol
-  )
 
 where
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array.NonEmpty (NonEmptyArray, index)
-import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.String (Pattern(..), Replacement(..), contains, indexOf, replace, replaceAll)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.String (Pattern(..), Replacement(..), contains, indexOf, replace, replaceAll, stripPrefix, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, identity, ($), (<>), (==), (||), (>>>), (<<<))
+import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (>>>), (||))
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -126,6 +88,14 @@ guardWellFormedNess f a = onNothing' (error $ "This identifier is not well forme
 -----------------------------------------------------------
 -- DECONSTRUCTING NAMESPACES
 -----------------------------------------------------------
+-- | A qualified name has the form `model:ModelName$First$Second`.
+-- | In other words, it consists of
+-- |  * a modelName: `model:ModelName`, followed by any number of
+-- |  * segments: `$segment` (a '$' followed by word characters).
+-- | Alternatively, we can split a qualifiedName in
+-- |  * a namespace: everything but the last segment, and
+-- |  * the localName: the last segment.
+
 domeinURIQualifiedRegex :: Regex
 domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)(.*)$" noFlags
 
@@ -133,36 +103,65 @@ domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)(.*)$" noFlags
 isQualifiedWithDomein :: String -> Boolean
 isQualifiedWithDomein s = test domeinURIQualifiedRegex s
 
-namespaceRegex :: Regex
-namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
+-- | Matches the entire namespace part of a qualified name (everything but the last segment).
+namespaceRegEx :: Regex
+namespaceRegEx = unsafeRegex "^(model:.*)\\$\\w*" noFlags
 
--- | Returns the "model:ModelName" part of an identifier or Nothing.
-deconstructModelName :: String -> Maybe Namespace
-deconstructModelName = getFirstMatch namespaceRegex
-
-domeinURIRegex :: Regex
-domeinURIRegex = unsafeRegex "^(model:\\w*.*)\\$(\\w*)" noFlags
-
--- | Returns the Namespace part of an identifier or Nothing.
+-- | Returns the entire name but for the last segment. This is the namespace of the local name.
+-- | deconstructNamespace "model:Model$First$Second" == Just "model:Model$First"
+-- | deconstructNamespace "model:Model" == Just "model:Model"
 deconstructNamespace :: String -> Maybe Namespace
-deconstructNamespace = getFirstMatch domeinURIRegex
+deconstructNamespace s = case deconstructLocalName s of
+  Nothing -> Just s
+  (Just ln) -> stripSuffix (Pattern ln) s
 
+-- | As deconstructNamespace, but will throw a runtime error if it fails.
 deconstructNamespace_ :: String -> Namespace
 deconstructNamespace_ = unsafePartial $ fromJust <<< deconstructNamespace
 
--- | Returns "localName" from "model:ModelName$localName" or Nothing
-deconstructLocalNameFromDomeinURI :: String -> Maybe String
-deconstructLocalNameFromDomeinURI = getSecondMatch domeinURIRegex
+namespaceRegex :: Regex
+namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
 
-deconstructLocalNameFromDomeinURI_ :: String -> String
-deconstructLocalNameFromDomeinURI_ s = unsafePartial (fromJust (deconstructLocalNameFromDomeinURI s))
+-- | Returns the "model:ModelName" part of an identifier or Nothing if it does not start with model:ModelName.
+-- | deconstructModelName "model:Model$First$Second" == Just "model:Model"
+-- | deconstructModelName "model:Model" == Just "model:Model"
+deconstructModelName :: String -> Maybe Namespace
+deconstructModelName = getFirstMatch namespaceRegex
+
+-- | Matches the last segment of the name (the word after the last "$")
+localPartsRegEx :: Regex
+localPartsRegEx = unsafeRegex "^model:\\w*(.*)$" noFlags
+
+-- | Returns "Context$localName" from "model:ModelName$Context$localName" or Nothing if it does
+-- | not start with model:ModelName
+-- | So this function returns ALL SEGMENTS of the name, omitting just the model:ModelName part.
+-- | deconstructSegments "model:ModelName$Context$localName" == Just "Context$localName"
+-- | deconstructSegments "model:Model" == Just ""
+deconstructSegments :: String -> Maybe String
+deconstructSegments = getFirstMatch localPartsRegEx
+
+lastPartRegEx :: Regex
+lastPartRegEx = unsafeRegex ".*\\$(\\w+)" noFlags
+
+-- | Returns "localName" from "model:ModelName$Context$localName" or Nothing
+-- | So this function returns THE LAST SEGMENT of the name.
+-- | deconstructLocalName "model:Model$First$Second" == Just "Second"
+-- | deconstructLocalName "model:Model" == Nothing
+deconstructLocalName :: String -> Maybe String
+deconstructLocalName = getFirstMatch lastPartRegEx
+
+deconstructLocalName_ :: String -> String
+deconstructLocalName_ s = unsafePartial (fromJust (deconstructLocalName s))
 
 -- | "model:Perspectives$Context" `hasLocalName` "Context"
 hasLocalName :: String -> String -> Boolean
-hasLocalName qn ln = case deconstructLocalNameFromDomeinURI qn of
+hasLocalName qn ln = case deconstructLocalName qn of
   Nothing -> false
   (Just ln') -> ln == ln'
 
+-- | "Context" `isLocalNameOf` "model:Perspectives$Context"
+isLocalNameOf :: String -> String -> Boolean
+isLocalNameOf = flip hasLocalName
 -----------------------------------------------------------
 -- CURIES
 -----------------------------------------------------------
@@ -228,17 +227,21 @@ roleIndexNr s = case match roleIndexNrRegex s of
 escapeCouchdbDocumentName :: String -> String
 escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
 
+-- | To be used for qualified names only!
 -- | True iff the first argument contains the second (as its first part). E.g.:
 -- | "model:Perspectives$Aangifte$Aangever" `isInNamespace` "model:Perspectives$Aangifte".
 -- | "a" `isInNamespace` "a" is true, too.
 isInNamespace :: String -> String -> Boolean
-isInNamespace a b = a == b || (isContainingNamespace b a)
+isInNamespace a b = a == b || (b `isContainingNamespace` a)
 
+-- | To be used for qualified names only!
 -- | True iff the first argument is the first part of the second. E.g.:
 -- | "model:Perspectives$Aangifte" `isContainingNamespace` "model:Perspectives$Aangifte$Aangever".
 -- | Hence, a SubNamespace is more specialized, thus longer.
 isContainingNamespace :: String -> String -> Boolean
-isContainingNamespace ns ident = contains (Pattern ns) ident
+isContainingNamespace ns ident = case indexOf (Pattern ns) ident of
+  (Just n) | n == 0 -> true
+  otherwise -> false
 
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS

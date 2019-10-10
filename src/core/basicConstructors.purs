@@ -17,7 +17,7 @@ import Perspectives.Assignment.Update (addRol, removeRol)
 import Perspectives.Checking.PerspectivesTypeChecker.Messages (UserMessage(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
-import Perspectives.Identifiers (buitenRol, deconstructLocalNameFromDomeinURI, expandDefaultNamespaces)
+import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (getRole)
@@ -66,7 +66,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
     constructContext_ :: ExceptT (Array UserMessage) (MonadPerspectives) ContextInstance
     constructContext_ = do
       contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
-      localName <- maybe (throwError [(NotAValidIdentifier $ unwrap contextInstanceId)]) pure (deconstructLocalNameFromDomeinURI $ unwrap contextInstanceId)
+      localName <- maybe (throwError [(NotAValidIdentifier $ unwrap contextInstanceId)]) pure (deconstructLocalName $ unwrap contextInstanceId)
       -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
       (rolIds :: FO.Object (Array RoleInstance)) <-constructRollen
       externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
@@ -116,7 +116,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
         constructRolInstances :: EnumeratedRoleType -> Array RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) (Array RoleInstance)
         constructRolInstances rolType rollen' = do
             contextInstanceId <- pure $ expandDefaultNamespaces id
-            localName <- maybe (throwError [(NotAValidIdentifier $ unwrap rolType)]) pure (deconstructLocalNameFromDomeinURI $ unwrap rolType)
+            localName <- maybe (throwError [(NotAValidIdentifier $ unwrap rolType)]) pure (deconstructLocalName $ unwrap rolType)
             -- The id without the numeric index.
             rolId <- pure (contextInstanceId  <> "$" <> localName)
             rolIds <- traverseWithIndex (constructRol rolType (ContextInstance contextInstanceId) rolId) rollen'
@@ -145,7 +145,7 @@ constructAnotherRol rolType id rolSerialisation = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
   (candidate :: Either (Array UserMessage) RoleInstance) <- lift $ lift $ do
     rolInstances <- contextInstanceId ##= getRole rolType
-    runExceptT $ constructRol rolType contextInstanceId (unwrap contextInstanceId  <> "$" <> (unsafePartial $ fromJust (deconstructLocalNameFromDomeinURI $ unwrap rolType))) (getNextRolIndex rolInstances) rolSerialisation
+    runExceptT $ constructRol rolType contextInstanceId (unwrap contextInstanceId  <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap rolType))) (getNextRolIndex rolInstances) rolSerialisation
 
   case candidate of
     (Left messages) -> pure $ Left messages
