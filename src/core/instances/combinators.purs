@@ -12,7 +12,7 @@ import Prelude (class Monad, class Eq, bind, const, discard, pure, ($), (>=>))
 closure :: forall a m. Eq a => Monad m => (a -> ArrayT m a) -> (a -> ArrayT m a)
 closure f = f >=> \a -> ArrayT do
   a' <- runArrayT $ closure f a
-  pure $ maybe a' (const (cons a a')) (elemIndex a a')
+  pure $ maybe (cons a a') (const a') (elemIndex a a')
 
 -- | The closure of f, including the root argument.
 -- | The closure of f contains no double entries iff the result of
@@ -20,7 +20,7 @@ closure f = f >=> \a -> ArrayT do
 closure_ :: forall a m. Eq a => Monad m => (a -> ArrayT m a) -> (a -> ArrayT m a)
 closure_ f a = ArrayT $ do
   r <- runArrayT $ closure f a
-  pure $ maybe r (const (cons a r)) (elemIndex a r)
+  pure $ maybe (cons a r) (const r) (elemIndex a r)
 
 filter :: forall m a o. Monad m =>
   (a -> ArrayT m o) ->

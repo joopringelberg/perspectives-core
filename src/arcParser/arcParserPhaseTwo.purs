@@ -1,10 +1,11 @@
 module Perspectives.Parsing.Arc.PhaseTwo where
 
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Control.Monad.State (State, evalState, gets, modify, runState)
+import Control.Monad.State (StateT, evalStateT, gets, modify, runStateT)
 import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Either (Either)
 import Data.Foldable (foldl)
+import Data.Identity (Identity)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
 import Data.List (List, filter, findIndex, foldM, head)
@@ -33,7 +34,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), d
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (Unit, bind, discard, map, pure, void, ($), (<>), (==))
+import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<>), (==))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -42,22 +43,26 @@ import Prelude (Unit, bind, discard, map, pure, void, ($), (<>), (==))
 
 type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String}
 
--- | A Monad with state that indicates whether the Subject of an Action is a Bot, and allows exceptions.
-type PhaseTwo a = ExceptT PerspectivesError (State PhaseTwoState) a
+-- | A Monad with state that indicates whether the Subject of an Action is a Bot,
+-- | and allows exceptions.
+-- | It allows for a variable bottom of the monadic stack.
+type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
-runPhaseTwo :: forall a. PhaseTwo a -> (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo computation = runPhaseTwo_ computation defaultDomeinFileRecord
+runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord
 
-runPhaseTwo_ :: forall a. PhaseTwo a -> DomeinFileRecord -> (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_ computation dfr = runState (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty}
+runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
-evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
-evalPhaseTwo computation = evalPhaseTwo_ computation defaultDomeinFileRecord
+evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
+evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord
 
-evalPhaseTwo_ :: forall a. PhaseTwo a -> DomeinFileRecord -> (Either PerspectivesError a)
-evalPhaseTwo_ computation drf = evalState (runExceptT computation) {bot: false, dfr: drf, namespaces: empty}
+evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> m (Either PerspectivesError a)
+evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty}
+
+type PhaseTwo a = PhaseTwo' a Identity
 
 subjectIsBot :: PhaseTwo Unit
 subjectIsBot = lift $ void $ modify (\s -> s {bot = true})
@@ -101,10 +106,10 @@ expandNamespace s = if isQualifiedWithDomein s then pure s else
 
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
-  _ <- traverseContextE c ns
+  (Context {_id}) <- traverseContextE c ns
   -- TODO: We might correct the type of references to Properties in Views here.
   domeinFileRecord <- getDF
-  pure $ DomeinFile domeinFileRecord
+  pure $ DomeinFile (domeinFileRecord {_id = unwrap _id})
 
 -- | Traverse the members of the ContextE AST type to construct a new Context type
 -- | and insert it into a DomeinFileRecord.
@@ -397,7 +402,11 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
   (object :: String) <- case head $ filter (case _ of
     (Object _) -> true
     otherwise -> false) perspectiveParts of
-      (Just (Object o)) -> pure (deconstructNamespace_ rolename <> "$" <> o)
+      -- (Just (Object o)) -> pure (deconstructNamespace_ rolename <> "$" <> o)
+      -- Even though the object should be a role in the context,
+      -- we cannot be sure at this point that it will actually be so.
+      -- We pass the unqualified name and have PhaseThree look it up.
+      (Just (Object o)) -> pure o
       otherwise -> throwError (MissingObject pos id)
 
   -- Similarly, find and use the DefaultObjectView, if any. Notice that if no
@@ -457,6 +466,8 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     handleParts :: Namespace -> Action -> ActionPart -> PhaseTwo Action
 
     -- INDIRECTOBJECT
+    -- TODO: weliswaar hoort het object in de namespace van de context te zitten,
+    -- maar we weten natuurlijk niet of het er ook werkelijk is!
     handleParts contextName (Action ar) (IndirectObject ido) = pure $ Action ar {indirectObject = Just (ENR $ EnumeratedRoleType (contextName <> "$" <> ido))}
 
     -- SUBJECTVIEW

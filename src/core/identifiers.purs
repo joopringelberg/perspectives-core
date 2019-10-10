@@ -4,7 +4,7 @@ where
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), contains, indexOf, replace, replaceAll, stripPrefix, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), indexOf, replace, replaceAll, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -113,7 +113,7 @@ namespaceRegEx = unsafeRegex "^(model:.*)\\$\\w*" noFlags
 deconstructNamespace :: String -> Maybe Namespace
 deconstructNamespace s = case deconstructLocalName s of
   Nothing -> Just s
-  (Just ln) -> stripSuffix (Pattern ln) s
+  (Just ln) -> stripSuffix (Pattern $ "$" <> ln) s
 
 -- | As deconstructNamespace, but will throw a runtime error if it fails.
 deconstructNamespace_ :: String -> Namespace
@@ -243,6 +243,18 @@ isContainingNamespace ns ident = case indexOf (Pattern ns) ident of
   (Just n) | n == 0 -> true
   otherwise -> false
 
+-- | True iff the second argument is a suffix of the first argument.
+-- | Does not check whether names are well-formed qualified names.
+-- | whole `endsWithSegments` part
+-- | "model:Model$First$Second$Third" `endsWithSegments` "Second$Third" == true
+-- | "model:Model$First$Second$Third" `endsWithSegments` "Second" == false
+endsWithSegments :: String -> String -> Boolean
+endsWithSegments whole part = isJust $ stripSuffix (Pattern part) whole
+
+-- | "Second$Third" `areLastSegmentsOf` "model:Model$First$Second$Third" == true
+-- | "Second" `areLastSegmentsOf` "model:Model$First$Second$Third" == false
+areLastSegmentsOf :: String -> String -> Boolean
+areLastSegmentsOf = flip endsWithSegments
 -----------------------------------------------------------
 -- REGEX MATCHING HELPER FUNCTIONS
 -----------------------------------------------------------

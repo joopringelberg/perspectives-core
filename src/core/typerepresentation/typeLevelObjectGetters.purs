@@ -5,7 +5,7 @@ import Data.Array (singleton)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.Identifiers (isContainingNamespace)
+import Perspectives.Identifiers (areLastSegmentsOf, isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, disjunction, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
@@ -32,7 +32,9 @@ lookForRoleType s = disjunction
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s = lookForRoleInContext (roletype2string >>> isContainingNamespace s)
+lookForUnqualifiedRoleType s = disjunction
+  (lookForRoleInContext (roletype2string >>> areLastSegmentsOf s))
+  (lookForContextRole (roletype2string >>> areLastSegmentsOf s))
 
 lookForRoleInContext :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
 lookForRoleInContext criterium = filter' (contextAspectsClosure >=> roleInContext) criterium

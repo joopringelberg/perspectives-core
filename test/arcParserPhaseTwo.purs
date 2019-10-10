@@ -25,7 +25,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
-import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo, expandNamespace, traverseDomain, withNamespaces)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo, evalPhaseTwo', expandNamespace, traverseDomain, withNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Representation.ADT (ADT(..))
@@ -43,6 +43,9 @@ import Text.Parsing.Parser (ParseError)
 
 testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
+
+evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
+evalPhaseTwo = unwrap <<< evalPhaseTwo'
 
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
