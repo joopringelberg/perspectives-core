@@ -277,6 +277,8 @@ constructVerb v = case v of
 -- |    subjectView: AnotherView
 -- |  Bind with AnotherView
 -- |    indirectObject: AnotherRole (ViewOnAnotherRole)
+-- |  Consult
+-- |    indirectObject: AnotherRole
 actionE :: IP PerspectivePart
 actionE = try $ withEntireBlock
   (\{pos, verb, view} parts -> Act $ ActionE {id: "", verb, actionParts: Cons view (join parts), pos})
@@ -287,7 +289,7 @@ actionE = try $ withEntireBlock
     actionE_ = try do
       pos <- getPosition
       verb <- (arcIdentifier <?> "Consult, Change, Create, Delete or a valid identifier") >>= pure <<< constructVerb
-      view <- reserved "with" *> arcIdentifier >>= pure <<< ObjectView
+      view <- option (ObjectView "AllProperties") (reserved "with" *> arcIdentifier >>= pure <<< ObjectView)
       pure {pos, verb, view}
 
     actionParts :: IP (List ActionPart)

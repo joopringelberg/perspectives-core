@@ -15,7 +15,7 @@ import Node.Path as Path
 import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, viewE)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
-import Perspectives.Representation.Action (Verb(..))
+import Perspectives.Representation.Action (Verb(..), indirectObject)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -27,7 +27,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc" do
+theSuite = suite "Perspectives.Parsing.Arc" do
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n" domain
     case r of
@@ -328,6 +328,18 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
         (assert "The Action should have an IndirectObjectView with name 'ViewOnAnotherRole'"
           (isJust (findIndex (case _ of
             (IndirectObjectView v) -> v == "ViewOnAnotherRole"
+            otherwise -> false) actionParts)))
+      otherwise -> assert "Parsed an unexpected type" false
+
+  test "Action without a view and an indirectObject" do
+    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult\n  indirectObject: AnotherRole" actionE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+        assert "The Action should have the Verb 'Consult'" (verb == Consult)
+        (assert "The Action should have an indirectObject with name 'AnotherRole'"
+          (isJust (findIndex (case _ of
+            (IndirectObject v) -> v == "AnotherRole"
             otherwise -> false) actionParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
