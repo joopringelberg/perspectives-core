@@ -32,7 +32,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultsAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
     case r of
@@ -83,7 +83,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             assert "lookForUnqualifiedRoleType should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
               (isJust (head roles))
 
-  testOnly "Testing qualifyActionRoles." do
+  test "Testing qualifyActionRoles." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultsAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
     case r of
       (Left e) -> assert (show e) false
@@ -105,7 +105,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       (Just _) -> true
                       otherwise -> false
                   )
-                assert "The Object of the action 'ConsultsAnotherRole' should be a CalculatedRole type."
+                assert "The Object of the action 'ConsultsAnotherRole' should be a qualified CalculatedRole type."
                   (let
                     _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
                     in case (preview _o correctedDFR) of
@@ -113,7 +113,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       -- (Just (CR _)) -> true
                       otherwise -> false
                     )
-                assert "The IndirectObject of the action 'ConsultsAnotherRole' should be a CalculatedRole type."
+                assert "The IndirectObject of the action 'ConsultsAnotherRole' should be a qualified CalculatedRole type."
                   (let
                     _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "indirectObject")) <<< _Just
                     in case (preview _o correctedDFR) of

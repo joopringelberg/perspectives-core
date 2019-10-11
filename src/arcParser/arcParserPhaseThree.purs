@@ -9,25 +9,29 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (modify)
 import Control.Monad.Trans.Class (lift)
+import Data.Array (head, length)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup, values)
-import Perspectives.CoreTypes (MonadPerspectives, (###>), MP)
+import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MonadPerspectives, (###=), MP)
 import Perspectives.DomeinCache (withDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo', runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Class.PersistentType (typeExists)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedRoleType(..), RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedRoleType(..), RoleType(..), roletype2string)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
-import Prelude (Unit, bind, pure, unit, void, (<<<), ($), (<>), (==))
+import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==))
 
 -- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
 -- | an Action is a Bot, and allows exceptions.
@@ -58,30 +62,36 @@ qualifyActionRoles {contexts, enumeratedRoles, actions, calculatedRoles} = for_ 
           \(ActionType a) -> case lookup a actions of
             Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
             (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
-              ar' <- if isQualifiedWithDomein (roletype2string object)
-                then case lookup (roletype2string object) calculatedRoles of
-                  Nothing -> pure ar
-                  (Just (CalculatedRole{_id:id'})) -> pure $ ar {object = CR id'}
-                else do
-                  mtype <- lift2 $ ctxtId ###> lookForUnqualifiedRoleType (roletype2string object)
-                  case mtype of
-                    Nothing -> throwError $ RoleMissingInContext pos (roletype2string object) (unwrap ctxtId)
-                    (Just t) -> pure $ ar {object = t}
+              -- TODO. Refactor een functie String -> MP (Array RoleType)
+              ar' <- do
+                qname <- qualifiedRoleType ctxtId pos (roletype2string object)
+                pure $ ar {object = qname}
               ar'' <- case mindirectObject of
-                (Just indirectObject) -> if isQualifiedWithDomein (roletype2string indirectObject)
-                  then case lookup (roletype2string indirectObject) calculatedRoles of
-                    Nothing -> pure ar'
-                    (Just (CalculatedRole{_id:id'})) -> pure $ ar' {indirectObject = Just $ CR id'}
-                  else do
-                    mtype <- lift2 $ ctxtId ###> lookForUnqualifiedRoleType (roletype2string indirectObject)
-                    case mtype of
-                      Nothing -> throwError $ RoleMissingInContext pos (roletype2string indirectObject) (unwrap ctxtId)
-                      (Just t) -> pure $ ar' {indirectObject = Just t}
+                (Just indirectObject) -> do
+                  qname <- qualifiedRoleType ctxtId pos (roletype2string indirectObject)
+                  pure $ ar' {indirectObject = Just qname}
                 otherwise -> pure ar'
               if ar'' == ar
                 then pure unit
                 -- A change, so modify the DomeinFileRecord
                 else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
   where
+    qualifiedRoleType :: ContextType -> ArcPosition -> String -> PhaseThree RoleType
+    qualifiedRoleType ctxtId pos ident = if isQualifiedWithDomein ident
+      then case lookup ident calculatedRoles of
+        Nothing -> do
+          -- Does the role exist at all (in some other model)?
+          exists <- lift2 $ typeExists (EnumeratedRoleType ident)
+          if exists
+            then pure $ ENR $ EnumeratedRoleType ident
+            else throwError $ UnknownRole pos ident
+        (Just (CalculatedRole{_id:id'})) -> pure $ CR id'
+      else do
+        types <- lift2 $ ctxtId ###= lookForUnqualifiedRoleType ident
+        case length types of
+          0 -> throwError $ RoleMissingInContext pos ident (unwrap ctxtId)
+          1 -> pure $ unsafePartial $ fromJust $ head types
+          otherwise -> throwError $ NotUniquelyIdentifying pos ident (map roletype2string types)
+
     modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
     modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}

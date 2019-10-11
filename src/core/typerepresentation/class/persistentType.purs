@@ -6,7 +6,7 @@ module Perspectives.Representation.Class.PersistentType
 
 import Perspectives.Representation.Class.Revision
 
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (catchError, throwError)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Effect.Exception (error)
@@ -25,11 +25,11 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, ViewType)
 import Perspectives.Representation.View (View)
-import Prelude (Unit, bind, ($), pure, (<>), unit, class Eq)
+import Prelude (Unit, bind, ($), pure, (<>), unit, class Eq, (>>=), (<<<), const)
 
 type Namespace = String
 
-class (Identifiable v i, Revision v, Newtype i String, Eq v) <= PersistentType v i where
+class (Identifiable v i, Revision v, Newtype i String, Eq v) <= PersistentType v i | v -> i, i -> v where
   retrieveFromDomein :: i -> Namespace -> MonadPerspectives v
   cacheInDomeinFile :: i -> v -> MonadPerspectives Unit
 
@@ -50,6 +50,10 @@ getEnumeratedProperty = getPerspectType
 
 getContext :: ContextType -> MP Context
 getContext = getPerspectType
+
+typeExists :: forall v i. PersistentType v i => i -> MP Boolean
+typeExists id = catchError (((getPerspectType id) :: MP v) >>= pure <<< const true) \e -> pure false
+
 -----------------------------------------------------------
 -- ADD TO A DOMEINFILE
 -----------------------------------------------------------

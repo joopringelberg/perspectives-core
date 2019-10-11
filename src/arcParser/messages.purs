@@ -32,6 +32,8 @@ data PerspectivesError
     | MissingObject ArcPosition String
     | NotWellFormedName ArcPosition String
     | RoleMissingInContext ArcPosition String String
+    | UnknownRole ArcPosition String
+    | NotUniquelyIdentifying ArcPosition String (Array String)
     | Custom String
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
@@ -44,6 +46,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (MissingObject pos localPerspectiveName) = "(MissingObject) The perspective '" <> localPerspectiveName <> "' should have an 'ObjectRef' clause: " <> show pos
   show (NotWellFormedName pos name) = "(NotWellFormedName) The name '" <> name <> "' is not well-formed (it cannot be expanded to a fully qualified name): " <> show pos
   show (RoleMissingInContext pos localRoleName ctxt) = "(RoleMissingInContext) The local role name '" <> localRoleName <> "' cannot be found in the context: '" <> ctxt <> "', at: " <> show pos
+  show (UnknownRole pos qname) = "(UnknownRole) The role '" <> qname <> "' is not defined, at: " <> show pos
+  show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
   show (Custom s) = s
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
