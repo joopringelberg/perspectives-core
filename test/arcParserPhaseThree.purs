@@ -13,6 +13,7 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Effect.Class.Console (logShow, log)
+import Foreign.Object (lookup)
 import Perspectives.CoreTypes ((###=))
 import Perspectives.DomeinCache (withDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -23,10 +24,12 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleType(..))
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedRoleType, roleInContext)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -157,7 +160,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (Left (RoleMissingInContext _ _ _)) -> assert "" true
               otherwise -> assert "Expected the 'RoleMissingInContext' error" false
 
-  testOnly "Testing qualifyActionRoles: NotUniquelyIdentifying." do
+  test "Testing qualifyActionRoles: NotUniquelyIdentifying." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  user: Gast (mandatory, functional)\n    perspective on: DoubleRole: Consult\n  thing: DoubleRole (mandatory, functional)\n  case: NestedCase\n    thing: DoubleRole (mandatory, functional)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -169,5 +172,102 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             -- logShow dr'
             x <- runP $ phaseThree dr'
             case x of
-              (Left (NotUniquelyIdentifying _ _ _)) -> assert "" true
-              otherwise -> assert "" true
+              (Left (NotUniquelyIdentifying _ _ _)) -> assert "" false
+              otherwise -> assert "" false
+
+  test "Testing qualifyBindings: correct reference." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Binder (mandatory, functional) filledBy: Bound\n  thing: Bound (mandatory, functional)" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{enumeratedRoles}) -> do
+                -- logShow correctedDFR
+                case lookup "model:MyTestDomain$Binder" enumeratedRoles of
+                  Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
+                  (Just (EnumeratedRole{binding})) -> assert
+                    "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
+                    (binding == ST (EnumeratedRoleType "model:MyTestDomain$Bound"))
+
+  test "Testing qualifyBindings: qualified reference." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Binder (mandatory, functional) filledBy: model:MyTestDomain$Bound\n  thing: Bound (mandatory, functional)" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{enumeratedRoles}) -> do
+                -- logShow correctedDFR
+                case lookup "model:MyTestDomain$Binder" enumeratedRoles of
+                  Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
+                  (Just (EnumeratedRole{binding})) -> assert
+                    "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
+                    (binding == ST (EnumeratedRoleType "model:MyTestDomain$Bound"))
+
+  testOnly "Testing qualifyBindings: prefixed reference." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  use: my for model:MyTestDomain\n  thing: Binder (mandatory, functional) filledBy: my:Bound\n  thing: Bound (mandatory, functional)" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{enumeratedRoles}) -> do
+                -- logShow correctedDFR
+                case lookup "model:MyTestDomain$Binder" enumeratedRoles of
+                  Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
+                  (Just (EnumeratedRole{binding})) -> assert
+                    "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
+                    (binding == ST (EnumeratedRoleType "model:MyTestDomain$Bound"))
+
+  test "Testing qualifyBindings: missing reference." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Binder (mandatory, functional) filledBy: Bount\n  thing: Bound (mandatory, functional)" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left (UnknownRole _ _)) -> assert "" true
+              otherwise -> do
+                assert "The binding of 'Binder' is not defined and that should have been detected." false
+
+  test "Testing qualifyBindings: two candidates for binding." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Binder (mandatory, functional) filledBy: Bound\n  thing: Bound (mandatory, functional)\n  case: Nested\n    thing: Bound (mandatory, functional)" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e@(NotUniquelyIdentifying _ _ _)) -> do
+                logShow e
+                assert "" true
+              otherwise -> do
+                assert "The binding of 'Binder' is not defined and that should have been detected." false

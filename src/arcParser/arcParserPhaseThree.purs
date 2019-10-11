@@ -7,23 +7,24 @@ module Perspectives.Parsing.Arc.PhaseThree where
 -- |
 
 import Control.Monad.Except (throwError)
-import Control.Monad.State (modify)
+import Control.Monad.State (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (head, length)
+import Data.Array (filter, head, length)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, lookup, values)
+import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (###=), MP)
 import Perspectives.DomeinCache (withDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (isQualifiedWithDomein)
+import Perspectives.Identifiers (endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo', runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (typeExists)
@@ -31,7 +32,7 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedRoleType(..), RoleType(..), roletype2string)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
-import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==))
+import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==), (>=>))
 
 -- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
 -- | an Action is a Bot, and allows exceptions.
@@ -43,10 +44,13 @@ lift2 = lift <<< lift
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = withDomeinFile _id (DomeinFile df)
   do
-    (Tuple ei {dfr}) <- runPhaseTwo_' (qualifyActionRoles df) df
+    (Tuple ei {dfr}) <- runPhaseTwo_' ((qualifyActionRoles >=> getDF >=> qualifyBindings) df) df
     case ei of
       (Left e) -> pure $ Left e
       otherwise -> pure $ Right dfr
+  where
+    getDF :: Unit -> PhaseThree DomeinFileRecord
+    getDF _ = lift $ gets _.dfr
 
 -- | Qualifies the identifiers used in the object- and indirectObject field of an Action.
 -- | All Objects are by default constructed as enumerated; this function corrects that if
@@ -93,5 +97,30 @@ qualifyActionRoles {contexts, enumeratedRoles, actions, calculatedRoles} = for_ 
           -- This will not happen: a context does not allow two roles with the same local name.
           otherwise -> throwError $ NotUniquelyIdentifying pos ident (map roletype2string types)
 
-    modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
-    modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
+modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
+modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
+
+-- | Qualifies the identifiers used in the filledBy part of an EnumeratedRole declaration.
+-- | A binding is represented as an ADT. We transform all elements of the form `ST segmentedName` in the tree
+-- | to `ST qualifiedName`, using the `Reducible a (ADT b)` instance.
+-- | We qualify a name only by searching the roles of the domain. Role names that have the segmentedName as a suffix
+-- | are candidates to qualify it. Only one such Role may exist in the domain!
+-- | Note that this function requires the DomeinFile to be available in the cache!
+qualifyBindings :: DomeinFileRecord -> PhaseThree Unit
+qualifyBindings {enumeratedRoles:roles} = for_ roles
+  (\(EnumeratedRole rr@{_id, binding, pos}) -> do
+    qbinding <- reduce (qualifyBinding pos) binding
+    if binding == qbinding
+      then pure unit
+      else -- change the role in the domain
+        modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
+  where
+    qualifyBinding :: ArcPosition -> EnumeratedRoleType -> PhaseThree (ADT EnumeratedRoleType)
+    qualifyBinding pos i@(EnumeratedRoleType ident) = if isQualifiedWithDomein ident
+      then pure $ ST i
+      else do
+        (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) (keys roles)
+        case head candidates of
+          Nothing -> throwError $ UnknownRole pos ident
+          (Just qname) | length candidates == 1 -> pure $ ST $ EnumeratedRoleType $ qname
+          otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates

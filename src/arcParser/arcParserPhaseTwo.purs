@@ -277,11 +277,15 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
         (Just user) -> pure user
         otherwise -> throwError (MissingForUser pos' localBotName)
 
-    -- TODO (augmentADT) We assume a sum type and we assume a qualified name. Handle PROD types.
+    -- We assume we add roleName as another disjunct of a sum type.
+    -- `roleName` should be qualified.
+    -- TODO (augmentADT) Handle PROD types.
     augmentADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     augmentADT adt roleName = case adt of
       NOTYPE -> ST $ EnumeratedRoleType roleName
-      x -> SUM [ST $ EnumeratedRoleType roleName, x]
+      SUM terms -> SUM $ cons (ST $ EnumeratedRoleType roleName) terms
+      p@(PROD _) -> SUM [p, ST $ EnumeratedRoleType roleName]
+      s@(ST _) -> SUM [s, ST $ EnumeratedRoleType roleName]
 
     -- Insert a Property type into a Role type.
     insertPropertyInto :: Property.Property -> EnumeratedRole -> EnumeratedRole
