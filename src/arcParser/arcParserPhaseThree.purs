@@ -62,7 +62,6 @@ qualifyActionRoles {contexts, enumeratedRoles, actions, calculatedRoles} = for_ 
           \(ActionType a) -> case lookup a actions of
             Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
             (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
-              -- TODO. Refactor een functie String -> MP (Array RoleType)
               ar' <- do
                 qname <- qualifiedRoleType ctxtId pos (roletype2string object)
                 pure $ ar {object = qname}
@@ -91,6 +90,7 @@ qualifyActionRoles {contexts, enumeratedRoles, actions, calculatedRoles} = for_ 
         case length types of
           0 -> throwError $ RoleMissingInContext pos ident (unwrap ctxtId)
           1 -> pure $ unsafePartial $ fromJust $ head types
+          -- This will not happen: a context does not allow two roles with the same local name.
           otherwise -> throwError $ NotUniquelyIdentifying pos ident (map roletype2string types)
 
     modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
