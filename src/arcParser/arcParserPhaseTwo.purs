@@ -34,7 +34,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), d
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<>), (==))
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -439,7 +439,10 @@ traverseActionE :: Partial =>                     -- The function is partial bec
   PerspectivePart ->                              -- The ActionE element.
   PhaseTwo (Array ActionType)
 traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
-  actionId <- pure (rolename <> "$" <> id)
+  -- If there is no id, create one by concatenating the Object and the Verb.
+  actionId <- if id == ""
+    then pure (rolename <> "$" <> show verb <> object)
+    else pure (rolename <> "$" <> id)
   executedByBot <- isSubjectBot
   action <- pure $ Action
     { _id: ActionType actionId
