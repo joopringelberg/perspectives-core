@@ -14,7 +14,9 @@ import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, viewE)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
+import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..), indirectObject)
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
@@ -27,7 +29,52 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc" do
+  test "arcIdentifier on simple name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "MyTestDomain" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        assert "'MyTestDomain' should be parsed as a valid identifier" (id == "MyTestDomain")
+
+  test "arcIdentifier on uncapitalised name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "myTestDomain" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) true
+      (Right id) -> do
+        assert "'MyTestDomain' should be parsed as a valid identifier" (id == "MyTestDomain")
+
+  test "arcIdentifier on segmented name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "MyTestDomain$Context" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) true
+      (Right id) -> do
+        logShow id
+        assert "'MyTestDomain$Context' should be parsed as a valid identifier" (id == "MyTestDomain$Context")
+
+  test "arcIdentifier on prefixed name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "pre:MyTestDomain" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) true
+      (Right id) -> do
+        assert "'pre:MyTestDomain' should be parsed as a valid identifier" (id == "pre:MyTestDomain")
+
+  test "arcIdentifier on prefixed segmented name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "pre:MyTestDomain$Context" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) true
+      (Right id) -> do
+        logShow id
+        assert "'pre:MyTestDomain$Context' should be parsed as a valid identifier" (id == "pre:MyTestDomain$Context")
+
+  test "arcIdentifier on fully qualified name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "model:MyTestDomain$Context" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) true
+      (Right id) -> do
+        logShow id
+        assert "'model:MyTestDomain$Context' should be parsed as a valid identifier" (id == "model:MyTestDomain$Context")
+
   test "Representing the Domain" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n" domain
     case r of

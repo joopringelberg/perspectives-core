@@ -27,7 +27,7 @@ perspectDef = LanguageDef
                 , commentLine     : "--"
                 , nestedComments:  false
                 , identStart      : upper
-                , identLetter:     alphaNum <|> oneOf ['_', '$']
+                , identLetter:     alphaNum <|> oneOf ['_']
                 , opStart:         op'
                 , opLetter:        op'
                 , reservedOpNames : ["="]

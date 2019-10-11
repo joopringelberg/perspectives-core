@@ -260,7 +260,7 @@ perspectiveE = try do
     minimalAction' :: IP PerspectivePart
     minimalAction' = do
       pos <- getPosition
-      verbName <- arcIdentifier
+      verbName <- token.identifier
       pure $ Act $ ActionE {id: "", verb: constructVerb verbName, actionParts: Nil, pos}
 
 constructVerb :: String -> Verb
