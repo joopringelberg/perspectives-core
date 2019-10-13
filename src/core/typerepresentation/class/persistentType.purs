@@ -25,11 +25,11 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedPropertyType, EnumeratedRoleType, ViewType)
 import Perspectives.Representation.View (View)
-import Prelude (Unit, bind, ($), pure, (<>), unit, class Eq, (>>=), (<<<), const)
+import Prelude (class Eq, class Show, Unit, bind, const, pure, show, unit, ($), (<<<), (<>), (>>=))
 
 type Namespace = String
 
-class (Identifiable v i, Revision v, Newtype i String, Eq v) <= PersistentType v i | v -> i, i -> v where
+class (Show i, Identifiable v i, Revision v, Newtype i String, Eq v) <= PersistentType v i | v -> i, i -> v where
   retrieveFromDomein :: i -> Namespace -> MonadPerspectives v
   cacheInDomeinFile :: i -> v -> MonadPerspectives Unit
 
@@ -37,9 +37,9 @@ class (Identifiable v i, Revision v, Newtype i String, Eq v) <= PersistentType v
 -- | couchdb.
 getPerspectType :: forall v i. PersistentType v i => i -> MonadPerspectives v
 getPerspectType id = do
-  mns <- pure (deconstructNamespace (unwrap id))
+  mns <- pure (deconstructModelName (unwrap id))
   case mns of
-    Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> unwrap id <> "'.")
+    Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> show id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
 
 getEnumeratedRole :: EnumeratedRoleType -> MP EnumeratedRole
@@ -77,7 +77,7 @@ retrieveFromDomein_ :: forall v i. PersistentType v i =>
 retrieveFromDomein_ id lookupFunction ns = do
   df <- retrieveDomeinFile ns
   case lookupFunction df of
-    Nothing -> throwError $ error ("retrieveFromDomein': cannot find definition of " <> (unwrap id) <> " for " <> ns)
+    Nothing -> throwError $ error ("retrieveFromDomein': cannot find definition of " <> (show id) <> " for " <> ns)
     (Just v) -> pure v
 
 -----------------------------------------------------------

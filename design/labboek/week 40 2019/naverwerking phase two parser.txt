@@ -6,7 +6,7 @@ De Guids lossen dit op voor overdrachtsbestanden.
 Maar voor Arc moet worden gezocht, of beter gekwalificeerd.
 
 IN ENUMERATEDROLE:
-* the binding
+* the binding																			KLAAR
 	Zoeken kan in de context namespace hiërarchie, maar dat levert niet altijd een sluitende oplossing.
 	Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is.
 	Indien dat niet lukt, meldt het aan de modelleur: hij moet de binding beter kwalificeren.
@@ -31,18 +31,21 @@ Als dezelfde lokale naam kan meermaals voorkomt: meldt het aan de modelleur, hij
 * The SubjectView: idem, Subject.
 * The IndirectObjectView: idem IndirectObject.
 
-Rol-referenties. Object en IndirectObject moeten rollen uit de context zijn. Dat moet gedetermineerd zijn (er kunnen niet twee rollen met dezelfde naam zijn).
+Rol-referenties. 																		KLAAR
+Object en IndirectObject moeten rollen uit de context zijn. Dat moet gedetermineerd zijn (er kunnen niet twee rollen met dezelfde naam zijn).
 
-BOTROLE
+BOTROLE																					KLAAR
 De identifier in de for: clause moet ook gekwalificeerd worden.
+NEEN. Dat is een vergissing. Het perspectief van de Bot wordt bij de gebruiker ingetrokken. 
+Die gebruiker moet er wel zijn, maar als dat zo is wordt een volledig gekwalificeerde naam voor hem opgesteld.
 
 ENUMERATED OR CALCULATED
 
-ACTION:
+ACTION:																					KLAAR
 * The type of the Object of a Perspective: Enumerated or Calculated.
 * The type of the IndirectObject of a Perspective: Enumerated or Calculated.
 Kan nagekeken worden in de DomeinFile zodra de Context van de Rol met het Perspectief met de Actie compleet is.
-KLAAR
+
 
 VIEW: 
 * The type of the Properties in a View: Enumerated or Calculated.

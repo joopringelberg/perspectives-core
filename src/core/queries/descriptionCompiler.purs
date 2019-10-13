@@ -1,8 +1,5 @@
 module Perspectives.Query.DescriptionCompiler where
 
--- From an AST data constructor, create a QueryFunction data element after
--- checking that the required path can indeed be followed.
-
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.Array (head)
 import Data.Either (Either(..))
@@ -14,7 +11,7 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Property (effectivePropertyType)
-import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, effectiveRoleType)
+import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
@@ -34,8 +31,8 @@ compileElementaryStep currentDomain s@(QualifiedRole qn) = do
         Nothing -> throwError $ ContextHasNoRole c qn
         -- rt can be Enumerated or Calculated!
         (Just (rt :: RoleType)) -> do
-          (effectiveType :: ADT EnumeratedRoleType) <- lift $ effectiveRoleType rt
-          pure $ SQD currentDomain (RolGetter rt) (RDOM $ effectiveType)
+          (expandedType :: ADT EnumeratedRoleType) <- lift $ expandedADT_ rt
+          pure $ SQD currentDomain (RolGetter rt) (RDOM $ expandedType)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 compileElementaryStep currentDomain s@(UnqualifiedRole ln) = do
@@ -45,8 +42,8 @@ compileElementaryStep currentDomain s@(UnqualifiedRole ln) = do
       case head at of
         Nothing -> throwError $ ContextHasNoRole c ln
         (Just (et :: RoleType)) -> do
-          (effectiveType :: ADT EnumeratedRoleType) <- lift $ effectiveRoleType et
-          pure $ SQD currentDomain (RolGetter et) (RDOM $ effectiveType)
+          (expandedType :: ADT EnumeratedRoleType) <- lift $ expandedADT_ et
+          pure $ SQD currentDomain (RolGetter et) (RDOM $ expandedType)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
 compileElementaryStep currentDomain s@(QualifiedProperty qn) = do
@@ -57,6 +54,7 @@ compileElementaryStep currentDomain s@(QualifiedProperty qn) = do
         Nothing -> throwError $ RoleHasNoProperty r qn
         -- pt can be Enumerated or Calculated!
         (Just (pt :: PropertyType)) -> do
+          -- TODO: controleer of hier niet een 'expandedADT_' voor PropertyClass gebruikt moet worden.
           (effectiveType :: EnumeratedPropertyType) <- lift $ effectivePropertyType pt
           pure $ SQD currentDomain (PropertyGetter pt) (PDOM $ effectiveType)
     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s

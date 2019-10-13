@@ -71,7 +71,7 @@ lookForPropertyType_ s i = lookForProperty (propertytype2string >>> ((==) s)) (S
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
-lookForUnqualifiedPropertyType_ s i = lookForProperty (propertytype2string >>> isContainingNamespace s) (ST i)
+lookForUnqualifiedPropertyType_ s i = lookForProperty (propertytype2string >>> areLastSegmentsOf s) (ST i)
 
 lookForPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForPropertyType s = lookForProperty (propertytype2string >>> ((==) s))

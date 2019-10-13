@@ -14,8 +14,10 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
+import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, keys, lookup, values)
+import Foreign.Object (Object, insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (###=), MP)
 import Perspectives.DomeinCache (withDomeinFile)
@@ -30,9 +32,10 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (typeExists)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedRoleType(..), RoleType(..), roletype2string)
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType)
-import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==), (>=>))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.View (View(..))
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType)
+import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==), (>=>), discard)
 
 -- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
 -- | an Action is a Bot, and allows exceptions.
@@ -44,7 +47,9 @@ lift2 = lift <<< lift
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = withDomeinFile _id (DomeinFile df)
   do
-    (Tuple ei {dfr}) <- runPhaseTwo_' ((qualifyActionRoles >=> getDF >=> qualifyBindings) df) df
+    -- TODO. Put the DomeinFileRecord that results from qualifyBindings in cache
+    -- before calling qualifyPropertyReferences!
+    (Tuple ei {dfr}) <- runPhaseTwo_' ((qualifyActionRoles >=> getDF >=> qualifyBindings >=> getDF >=> qualifyPropertyReferences) df) df
     case ei of
       (Left e) -> pure $ Left e
       otherwise -> pure $ Right dfr
@@ -67,11 +72,11 @@ qualifyActionRoles {contexts, enumeratedRoles, actions, calculatedRoles} = for_ 
             Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
             (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
               ar' <- do
-                qname <- qualifiedRoleType ctxtId pos (roletype2string object)
+                qname <- qualifiedRoleType calculatedRoles ctxtId pos (roletype2string object)
                 pure $ ar {object = qname}
               ar'' <- case mindirectObject of
                 (Just indirectObject) -> do
-                  qname <- qualifiedRoleType ctxtId pos (roletype2string indirectObject)
+                  qname <- qualifiedRoleType calculatedRoles ctxtId pos (roletype2string indirectObject)
                   pure $ ar' {indirectObject = Just qname}
                 otherwise -> pure ar'
               if ar'' == ar
@@ -79,8 +84,8 @@ qualifyActionRoles {contexts, enumeratedRoles, actions, calculatedRoles} = for_ 
                 -- A change, so modify the DomeinFileRecord
                 else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
   where
-    qualifiedRoleType :: ContextType -> ArcPosition -> String -> PhaseThree RoleType
-    qualifiedRoleType ctxtId pos ident = if isQualifiedWithDomein ident
+    qualifiedRoleType :: Object CalculatedRole -> ContextType -> ArcPosition -> String -> PhaseThree RoleType
+    qualifiedRoleType calculatedRoles ctxtId pos ident = if isQualifiedWithDomein ident
       then case lookup ident calculatedRoles of
         Nothing -> do
           -- Does the role exist at all (in some other model)?
@@ -106,6 +111,7 @@ modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 -- | We qualify a name only by searching the roles of the domain. Role names that have the segmentedName as a suffix
 -- | are candidates to qualify it. Only one such Role may exist in the domain!
 -- | Note that this function requires the DomeinFile to be available in the cache!
+-- | This function just uses the DomeinFileRecord that is passed in as an argument.
 qualifyBindings :: DomeinFileRecord -> PhaseThree Unit
 qualifyBindings {enumeratedRoles:roles} = for_ roles
   (\(EnumeratedRole rr@{_id, binding, pos}) -> do
@@ -124,3 +130,25 @@ qualifyBindings {enumeratedRoles:roles} = for_ roles
           Nothing -> throwError $ UnknownRole pos ident
           (Just qname) | length candidates == 1 -> pure $ ST $ EnumeratedRoleType $ qname
           otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+
+-- | Qualify the references to Properties in each View.
+-- | Note that we need the DomeinFile with qualified bindings in the cache for this
+-- | function to work correctly!
+qualifyPropertyReferences :: DomeinFileRecord -> PhaseThree Unit
+qualifyPropertyReferences {views} = do
+  qviews <- traverseWithIndex qualifyView views
+  modifyDF \dfr -> dfr {views = qviews}
+
+  where
+    qualifyView :: String -> View -> PhaseThree View
+    qualifyView viewName (View vr@{propertyReferences, role, pos}) = do
+      qprops <- traverse (qualifyProperty role pos) propertyReferences
+      pure $ View $ vr {propertyReferences = qprops}
+
+    qualifyProperty :: EnumeratedRoleType -> ArcPosition -> PropertyType -> PhaseThree PropertyType
+    qualifyProperty erole pos propType = do
+      (candidates :: Array PropertyType) <- lift2 $ erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType)
+      case head candidates of
+        Nothing -> throwError $ UnknownProperty pos (propertytype2string propType)
+        (Just t) | length candidates == 1 -> pure t
+        otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)

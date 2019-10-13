@@ -15,7 +15,7 @@ derive instance genericRepContextType :: Generic ContextType _
 derive newtype instance writeForeignContextType :: WriteForeign ContextType
 derive newtype instance readForeignContextType :: ReadForeign ContextType
 instance showContextType :: Show ContextType where
-  show = show <<< unwrap
+  show i = "ContextType " <> (unwrap i)
 instance eqContextType :: Eq ContextType where
   eq (ContextType id1) (ContextType id2) = id1 == id2
 
@@ -25,7 +25,7 @@ derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
 derive newtype instance writeForeignEnumeratedRolType :: WriteForeign EnumeratedRoleType
 derive newtype instance readForeignEnumeratedRolType :: ReadForeign EnumeratedRoleType
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
-  show = show <<< unwrap
+  show i = "EnumeratedRoleType " <> (unwrap i)
 instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
   eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
 
@@ -35,7 +35,7 @@ derive instance genericRepComputedRolType :: Generic CalculatedRoleType _
 derive newtype instance writeForeignComputedRolType :: WriteForeign CalculatedRoleType
 derive newtype instance readForeignComputedRolType :: ReadForeign CalculatedRoleType
 instance showComputedRolType :: Show CalculatedRoleType where
-  show = show <<< unwrap
+  show i = "CalculatedRoleType " <> (unwrap i)
 instance eqComputedRolType :: Eq CalculatedRoleType where
   eq (CalculatedRoleType id1) (CalculatedRoleType id2) = id1 == id2
 
@@ -76,7 +76,7 @@ derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyTy
 derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
 derive newtype instance readForeignEnumeratedPropertyType :: ReadForeign EnumeratedPropertyType
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
-  show = show <<< unwrap
+  show i = "EnumeratedPropertyType " <> (unwrap i)
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
   eq (EnumeratedPropertyType id1) (EnumeratedPropertyType id2) = id1 == id2
 
@@ -86,7 +86,7 @@ derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyTy
 derive newtype instance writeForeignCalculatedPropertyType :: WriteForeign CalculatedPropertyType
 derive newtype instance readForeignCalculatedPropertyType :: ReadForeign CalculatedPropertyType
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
-  show = show <<< unwrap
+  show i = "CalculatedPropertyType " <> (unwrap i)
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
   eq (CalculatedPropertyType id1) (CalculatedPropertyType id2) = id1 == id2
 
@@ -117,7 +117,7 @@ derive instance genericRepViewType :: Generic ViewType _
 derive newtype instance writeForeignViewType :: WriteForeign ViewType
 derive newtype instance readForeignViewType :: ReadForeign ViewType
 instance showViewType :: Show ViewType where
-  show = show <<< unwrap
+  show i = "ViewType " <> (unwrap i)
 instance eqViewType :: Eq ViewType where
   eq (ViewType id1) (ViewType id2) = id1 == id2
 
@@ -127,6 +127,6 @@ derive instance genericRepActionType :: Generic ActionType _
 derive newtype instance writeForeignActionType :: WriteForeign ActionType
 derive newtype instance readForeignActionType :: ReadForeign ActionType
 instance showActionType :: Show ActionType where
-  show = show <<< unwrap
+  show i = "ActionType " <> (unwrap i)
 instance eqActionType :: Eq ActionType where
   eq (ActionType id1) (ActionType id2) = id1 == id2

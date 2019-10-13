@@ -34,7 +34,7 @@ import Perspectives.Instances (saveEntiteit)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Role (effectiveRoleType')
+import Perspectives.Representation.Class.Role (rangeOfRoleCalculation')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View, propertyReferences)
@@ -167,7 +167,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         props <- runArrayT $ propertiesOfRole subject
         sendResponse (Result corrId (propertytype2string <$> props)) setter
       else do
-        adt <- effectiveRoleType' subject
+        adt <- rangeOfRoleCalculation' subject
         views <- runArrayT $ lookForUnqualifiedViewType predicate adt
         case head views of
           Nothing -> sendResponse (Error corrId ("View '" <> predicate <> "' is available for role '" <> subject <> "'.")) setter

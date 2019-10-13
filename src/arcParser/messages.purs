@@ -33,6 +33,7 @@ data PerspectivesError
     | NotWellFormedName ArcPosition String
     | RoleMissingInContext ArcPosition String String
     | UnknownRole ArcPosition String
+    | UnknownProperty ArcPosition String
     | NotUniquelyIdentifying ArcPosition String (Array String)
     | Custom String
 
@@ -47,6 +48,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotWellFormedName pos name) = "(NotWellFormedName) The name '" <> name <> "' is not well-formed (it cannot be expanded to a fully qualified name): " <> show pos
   show (RoleMissingInContext pos localRoleName ctxt) = "(RoleMissingInContext) The local role name '" <> localRoleName <> "' cannot be found in the context: '" <> ctxt <> "', at: " <> show pos
   show (UnknownRole pos qname) = "(UnknownRole) The role '" <> qname <> "' is not defined, at: " <> show pos
+  show (UnknownProperty pos qname) = "(UnknownProperty) The property '" <> qname <> "' is not defined, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
   show (Custom s) = s
 

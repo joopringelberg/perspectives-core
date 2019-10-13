@@ -15,6 +15,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..))
 import Prelude (pure, (>=>), (>>=))
 
+-- TODO. Controleer of de opzet van RoleClass.expandedADT hier van toepassing is.
 -----------------------------------------------------------
 -- PROPERTY TYPE CLASS
 -----------------------------------------------------------
