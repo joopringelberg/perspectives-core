@@ -22,7 +22,7 @@ IN VIEW: 																				KLAAR
 	Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is (want de binding kan uit andere contexten komen)
 	Als dezelfde lokale naam kan meermaals voorkomt: meldt het aan de modelleur, hij moet dan beter kwalificeren.
 
-IN ACTION:
+IN ACTION:																				KLAAR
 View-referenties. Moeten komen uit de 'roltelescoop'.
 Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is (want de binding kan uit andere contexten komen)
 Als dezelfde lokale naam kan meermaals voorkomt: meldt het aan de modelleur, hij moet dan beter kwalificeren.

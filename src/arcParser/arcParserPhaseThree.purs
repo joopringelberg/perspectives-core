@@ -12,7 +12,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, head, length)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
@@ -33,7 +33,7 @@ import Perspectives.Representation.Class.PersistentType (typeExists)
 import Perspectives.Representation.Class.Role (expandedADT_)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
 import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==), discard, (>>=))
@@ -165,7 +165,7 @@ qualifyPropertyReferences = do
     (qualifyPropertyReferences' df)
   where
     qualifyPropertyReferences' :: DomeinFileRecord -> PhaseThree Unit
-    qualifyPropertyReferences' df@{_id, views} = do
+    qualifyPropertyReferences' df@{_id, views, calculatedProperties} = do
       qviews <- traverseWithIndex qualifyView views
       modifyDF \dfr -> dfr {views = qviews}
 
@@ -179,11 +179,18 @@ qualifyPropertyReferences = do
         qualifyProperty erole pos propType = do
           -- Note that we need the DomeinFile with qualified bindings in the cache
           -- for this function to work correctly!
-          (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
-          case head candidates of
-            Nothing -> throwError $ UnknownProperty pos (propertytype2string propType)
-            (Just t) | length candidates == 1 -> pure t
-            otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
+          if isQualifiedWithDomein (propertytype2string propType)
+            -- The modeller has provided a qualified property. He cannot say whether it is Calculated, or Enumerated,
+            -- however. If it is Calculated, change now.
+            then if isJust (lookup (propertytype2string propType) calculatedProperties)
+              then pure $ CP $ CalculatedPropertyType (propertytype2string propType)
+              else pure propType
+            else do
+              (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
+              case head candidates of
+                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType)
+                (Just t) | length candidates == 1 -> pure t
+                otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
 
 -- | The views on the subject, object and indirectObject of an Action can be specified
 -- | with a local name. It should be possible to qualify such a name by comparing it with
