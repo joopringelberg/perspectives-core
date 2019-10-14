@@ -39,13 +39,6 @@ storeDomeinFileInCache ns df= do
 removeDomeinFileFromCache :: Namespace -> MonadPerspectives Unit
 removeDomeinFileFromCache = void <<< domeinCacheRemove
 
-withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
-withDomeinFile ns df mpa = do
-  void $ storeDomeinFileInCache ns df
-  r <- mpa
-  removeDomeinFileFromCache ns
-  pure r
-
 -- | Change the domeinfile in cache. NOTA BENE: does not store the modified file in Couchdb!
 modifyDomeinFileInCache :: (DomeinFile -> DomeinFile) -> Namespace -> MonadPerspectives Unit
 modifyDomeinFileInCache modifier ns = do

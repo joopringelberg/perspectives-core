@@ -412,8 +412,7 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
       (Just (Object o)) -> pure o
       otherwise -> throwError (MissingObject pos id)
 
-  -- Similarly, find and use the DefaultObjectView. The parser injected "AllProperties" if no
-  -- DefaultObjectView is found. However, each Action can provide its own View.
+  -- Similarly, find and use the DefaultObjectView, if the Action has not provided its own View.
   -- We do not (yet) allow a View with a CalculatedRole, so the View is taken from the EnumeratedRole's that
   -- underly the calculation of such a role. However, that still allows the View to be defined in another
   -- namespace than the Role itself.
@@ -450,7 +449,7 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     { _id: ActionType actionId
     , _rev: Nothing
     , displayName: id
-    , subject: [EnumeratedRoleType rolename]
+    , subject: EnumeratedRoleType rolename
     , verb: verb
     , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
     , requiredObjectProperties: case head (filter (case _ of

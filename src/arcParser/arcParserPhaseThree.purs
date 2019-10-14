@@ -17,12 +17,12 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, insert, keys, lookup, values)
+import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (###=), MP)
-import Perspectives.DomeinCache (withDomeinFile)
+import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo', runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -30,11 +30,12 @@ import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (typeExists)
+import Perspectives.Representation.Class.Role (expandedADT_)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType)
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
 import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==), discard, (>>=))
 
 -- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
@@ -46,13 +47,13 @@ lift2 = lift <<< lift
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
-    -- TODO. Put the DomeinFileRecord that results from qualifyBindings in cache
-    -- before calling qualifyPropertyReferences!
     (Tuple ei {dfr}) <- runPhaseTwo_'
       (do
         qualifyActionRoles
         qualifyBindings
-        qualifyPropertyReferences)
+        qualifyPropertyReferences
+        qualifyViewReferences
+        )
       df
     case ei of
       (Left e) -> pure $ Left e
@@ -61,12 +62,24 @@ phaseThree df@{_id} = do
 getDF :: Unit -> PhaseThree DomeinFileRecord
 getDF _ = lift $ gets _.dfr
 
+withDomeinFile :: forall a. Namespace -> DomeinFile -> PhaseThree a -> PhaseThree a
+withDomeinFile ns df mpa = do
+  void $ lift2 $ storeDomeinFileInCache ns df
+  r <- mpa
+  lift2 $ removeDomeinFileFromCache ns
+  pure r
+
 -- | Qualifies the identifiers used in the object- and indirectObject field of an Action.
 -- | All Objects are by default constructed as enumerated; this function corrects that if
 -- | applicable.
 -- | Note that this function requires the DomeinFile to be available in the cache!
 qualifyActionRoles :: PhaseThree Unit
-qualifyActionRoles = (lift $ gets _.dfr) >>= qualifyActionRoles'
+qualifyActionRoles = do
+  df@{_id} <- lift $ gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (qualifyActionRoles' df)
   where
   qualifyActionRoles' :: DomeinFileRecord -> PhaseThree Unit
   qualifyActionRoles' {contexts, enumeratedRoles, actions, calculatedRoles} = for_ contexts
@@ -79,11 +92,11 @@ qualifyActionRoles = (lift $ gets _.dfr) >>= qualifyActionRoles'
               Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
               (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
                 ar' <- do
-                  qname <- qualifiedRoleType calculatedRoles ctxtId pos (roletype2string object)
+                  qname <- qualifiedRoleType ctxtId pos (roletype2string object)
                   pure $ ar {object = qname}
                 ar'' <- case mindirectObject of
                   (Just indirectObject) -> do
-                    qname <- qualifiedRoleType calculatedRoles ctxtId pos (roletype2string indirectObject)
+                    qname <- qualifiedRoleType ctxtId pos (roletype2string indirectObject)
                     pure $ ar' {indirectObject = Just qname}
                   otherwise -> pure ar'
                 if ar'' == ar
@@ -91,8 +104,8 @@ qualifyActionRoles = (lift $ gets _.dfr) >>= qualifyActionRoles'
                   -- A change, so modify the DomeinFileRecord
                   else modifyDF (\df@{actions: actions'} -> df {actions = insert (unwrap actId) (Action ar'') actions'})
     where
-      qualifiedRoleType :: Object CalculatedRole -> ContextType -> ArcPosition -> String -> PhaseThree RoleType
-      qualifiedRoleType calculatedRoles ctxtId pos ident = if isQualifiedWithDomein ident
+      qualifiedRoleType :: ContextType -> ArcPosition -> String -> PhaseThree RoleType
+      qualifiedRoleType ctxtId pos ident = if isQualifiedWithDomein ident
         then case lookup ident calculatedRoles of
           Nothing -> do
             -- Does the role exist at all (in some other model)?
@@ -143,10 +156,13 @@ qualifyBindings = (lift $ gets _.dfr) >>= qualifyBindings'
 
 
 -- | Qualify the references to Properties in each View.
--- | Note that we need the DomeinFile with qualified bindings in the cache for this
--- | function to work correctly!
 qualifyPropertyReferences :: PhaseThree Unit
-qualifyPropertyReferences = (lift $ gets _.dfr) >>= qualifyPropertyReferences'
+qualifyPropertyReferences = do
+  df@{_id} <- lift $ gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (qualifyPropertyReferences' df)
   where
     qualifyPropertyReferences' :: DomeinFileRecord -> PhaseThree Unit
     qualifyPropertyReferences' df@{_id, views} = do
@@ -161,11 +177,54 @@ qualifyPropertyReferences = (lift $ gets _.dfr) >>= qualifyPropertyReferences'
 
         qualifyProperty :: EnumeratedRoleType -> ArcPosition -> PropertyType -> PhaseThree PropertyType
         qualifyProperty erole pos propType = do
-          (candidates :: Array PropertyType) <- lift2 $ withDomeinFile
-            _id
-            (DomeinFile df)
-            (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
+          -- Note that we need the DomeinFile with qualified bindings in the cache
+          -- for this function to work correctly!
+          (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
           case head candidates of
             Nothing -> throwError $ UnknownProperty pos (propertytype2string propType)
             (Just t) | length candidates == 1 -> pure t
             otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
+
+-- | The views on the subject, object and indirectObject of an Action can be specified
+-- | with a local name. It should be possible to qualify such a name by comparing it with
+-- | the views that are available on the roles bound to the subject, object and
+-- | indirectObject, respectively.
+qualifyViewReferences :: PhaseThree Unit
+qualifyViewReferences = do
+  df@{_id} <- lift $ gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (qualifyViewReferences' df)
+  where
+    qualifyViewReferences' :: DomeinFileRecord -> PhaseThree Unit
+    qualifyViewReferences' df@{_id, actions} = do
+      qactions <- traverseWithIndex qualifyAction actions
+      modifyDF \dfr -> dfr {actions = qactions}
+
+      where
+        qualifyAction :: String -> Action -> PhaseThree Action
+        qualifyAction actionName (Action ar@{subject, requiredSubjectProperties, object, requiredObjectProperties, indirectObject, requiredIndirectObjectProperties, pos}) = do
+          (subjectView :: Maybe ViewType) <- qualifyViewForRole requiredSubjectProperties (ENR subject)
+          (objectView :: Maybe ViewType) <- qualifyViewForRole requiredObjectProperties object
+          (indirectObjectView :: Maybe ViewType) <- case indirectObject of
+            (Just indirectObject') -> qualifyViewForRole requiredIndirectObjectProperties indirectObject'
+            Nothing -> pure Nothing
+          pure $ Action ar
+            { requiredSubjectProperties = subjectView
+            , requiredObjectProperties = objectView
+            , requiredIndirectObjectProperties = indirectObjectView}
+
+          where
+            qualifyViewForRole :: Maybe ViewType -> RoleType -> PhaseThree (Maybe ViewType)
+            qualifyViewForRole requiredProperties role =
+              case requiredProperties of
+                Nothing -> pure Nothing
+                (Just rqp) -> do
+                  viewCandidates <- lift2 do
+                    adt <- expandedADT_ role
+                    (adt ###= lookForUnqualifiedViewType (unwrap rqp))
+                  case head viewCandidates of
+                    Nothing -> throwError $ UnknownView pos (unwrap rqp)
+                    (Just v) | length viewCandidates == 1 -> pure $ Just v
+                    otherwise -> throwError $ NotUniquelyIdentifying pos (unwrap rqp) (map unwrap viewCandidates)

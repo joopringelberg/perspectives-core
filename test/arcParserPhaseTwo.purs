@@ -354,7 +354,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 )
             assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should have as Subject 'model:MyTestDomain$MySelf'."
               (let
-                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "subject")) <<< ix 0
+                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "subject")) 
                 in case (preview _s dr') of
                   (Just (EnumeratedRoleType "model:MyTestDomain$MySelf")) -> true
                   otherwise -> false

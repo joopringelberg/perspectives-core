@@ -16,7 +16,7 @@ IN ENUMERATEDROLE:
 		* zo nee, genereer een melding
 		* binding-elementen zijn ST, ST in SUM en in PRODUCT
 
-IN VIEW: 
+IN VIEW: 																				KLAAR
 * Property(referentie).
 	Moet komen uit de 'roltelescoop' (denk ook aan aspecten).
 	Kan pas als die hiërarchie volledig is, dus als het model volledig verwerkt is (want de binding kan uit andere contexten komen)

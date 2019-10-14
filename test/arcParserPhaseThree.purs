@@ -14,9 +14,10 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Effect.Class.Console (logShow, log)
 import Foreign.Object (lookup)
-import Perspectives.CoreTypes ((###=))
-import Perspectives.DomeinCache (withDomeinFile)
+import Perspectives.CoreTypes (MonadPerspectives, (###=))
+import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
@@ -25,18 +26,26 @@ import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (Action(..), requiredObjectProperties)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..), propertyReferences)
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, roleInContext)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
+
+withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
+withDomeinFile ns df mpa = do
+  void $ storeDomeinFileInCache ns df
+  r <- mpa
+  removeDomeinFileFromCache ns
+  pure r
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
@@ -310,7 +319,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (Left (UnknownProperty _ _)) -> assert "" true
               otherwise -> assert "The view refers to a non-existing property 'Datu' and that should be detected." false
 
-  testOnly "Testing qualifyPropertyReferences: reference to property on binding." do
+  test "Testing qualifyPropertyReferences: reference to property on binding." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    view: ViewOpFeest (Datum)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -347,3 +356,25 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$FeestVoorbereiding$Datum") propertyReferences) of
                     (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))) -> assert "" true
                     otherwise -> assert "There should be a Property 'model:MyTestDomain$FeestVoorbereiding$Datum' in ViewOpFeest" false
+
+  testOnly "Testing qualifyViewReferences: reference to View on Action." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    view: ViewOpFeest (Datum)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                logShow correctedDFR
+                -- get the action
+                case lookup "model:MyTestDomain$Guest$ConsultFeest" actions of
+                  Nothing -> assert "There should be an Action 'model:MyTestDomain$Guest$ConsultFeest'." false
+                  (Just (Action{requiredObjectProperties})) -> case requiredObjectProperties of
+                    (Just (ViewType "model:MyTestDomain$Feest$ViewOpFeest")) -> assert "bla" true
+                    otherwise -> assert "There should be an Object View" false

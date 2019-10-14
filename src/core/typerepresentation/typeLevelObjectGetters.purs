@@ -94,8 +94,11 @@ viewsOfRole s = f (EnumeratedRoleType s) <|> f (CalculatedRoleType s) where
   f :: forall i r. RoleClass r i => i ~~~> ViewType
   f = ArrayT <<< (getRole' >=> views)
 
+lookForUnqualifiedViewType_ :: String -> (EnumeratedRoleType ~~~> ViewType)
+lookForUnqualifiedViewType_ s i = lookForView (unwrap >>> areLastSegmentsOf s) (ST i)
+
 lookForUnqualifiedViewType :: String -> (ADT EnumeratedRoleType ~~~> ViewType)
-lookForUnqualifiedViewType s = lookForView (unwrap >>> isContainingNamespace s)
+lookForUnqualifiedViewType s = lookForView (unwrap >>> areLastSegmentsOf s)
 
 lookForView :: (ViewType -> Boolean) -> ADT EnumeratedRoleType ~~~> ViewType
 lookForView criterium = filter' (ArrayT <<< viewsOfADT) criterium

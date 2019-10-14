@@ -19,7 +19,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 -- ACTION TYPE CLASS
 -----------------------------------------------------------
 class ActionClass c where
-  subject :: c -> Array EnumeratedRoleType
+  subject :: c -> EnumeratedRoleType
   verb :: c -> Verb
   object :: c -> RoleType
   indirectObject :: c -> Maybe RoleType
@@ -29,7 +29,7 @@ class ActionClass c where
   condition :: c -> Maybe QueryFunctionDescription
   effect :: c -> Maybe AssignmentStatement
 
-instance contextActionClass :: ActionClass Action where
+instance actionActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
   verb = _.verb <<< unwrap
   object = _.object <<< unwrap
@@ -51,7 +51,7 @@ type ActionRecord =
   , displayName :: String
 
   -- TODO: For synchronization, we might need to allow CalculatedRoles as subject of an action.
-  , subject :: Array EnumeratedRoleType
+  , subject :: EnumeratedRoleType
   , verb :: Verb
   , object :: RoleType
   , requiredObjectProperties :: Maybe ViewType
@@ -62,24 +62,6 @@ type ActionRecord =
   , effect :: Maybe AssignmentStatement
   , executedByBot :: Boolean
   , pos :: ArcPosition
-  }
-
-defaultAction :: String -> String -> Verb -> RoleType -> Maybe ViewType -> ArcPosition -> Action
-defaultAction id displayName verb object objectView pos = Action
-  { _id: ActionType id
-  , _rev: Nothing
-  , displayName: displayName
-  , subject: []
-  , verb: verb
-  , object: object
-  , requiredObjectProperties: objectView
-  , requiredSubjectProperties: Nothing
-  , requiredIndirectObjectProperties: Nothing
-  , indirectObject: Nothing
-  , condition: Nothing
-  , effect: Nothing
-  , executedByBot: false
-  , pos: pos
   }
 
 derive instance genericRepAction :: Generic Action _
