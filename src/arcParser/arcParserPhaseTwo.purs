@@ -22,16 +22,18 @@ import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, decon
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
-import Perspectives.Representation.Class.Role (Role(..))
+import Perspectives.Representation.Class.Role (Role(..), kindOfRole)
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==))
@@ -185,12 +187,20 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
 traverseRoleE :: RoleE -> Namespace -> PhaseTwo Role
 traverseRoleE r ns = if isCalculatedRole r
   then traverseCalculatedRoleE r ns
-  else traverseEnumeratedRoleE r ns
+  else if isComputedRole r
+    then traverseComputedRoleE r ns
+    else traverseEnumeratedRoleE r ns
   where
     isCalculatedRole :: RoleE -> Boolean
     -- isCalculatedRole _ = true
     isCalculatedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
       (Calculation _) -> true
+      otherwise -> false) roleParts))
+
+    isComputedRole :: RoleE -> Boolean
+    -- isCalculatedRole _ = true
+    isComputedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
+      (Computation _ _) -> true
       otherwise -> false) roleParts))
 
 -- | Traverse a RoleE that results in an EnumeratedRole.
@@ -251,7 +261,11 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
     -- FILLEDBYATTRIBUTE
     handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd) = do
-      expandedBnd <- expandNamespace bnd
+      -- If the RoleKind is ContextRole, we should construct the name of the External
+      -- Role of the binding (which then is a Context)
+      expandedBnd <- if kindOfRole == ContextRole
+        then expandNamespace (bnd <> "$External")
+        else expandNamespace bnd
       pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding expandedBnd})
 
     -- FORUSER
@@ -345,6 +359,20 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
       -- calculation = parseQuery calc
       -- in Tuple domeinFile' (roleUnderConstruction {calculation = calculation})
       pure roleUnderConstruction
+
+-- | Traverse a RoleE that results in an CalculatedRole with a Calculation that depends on a Computed function.
+traverseComputedRoleE :: RoleE -> Namespace -> PhaseTwo Role
+traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
+  role <- pure (defaultCalculatedRole (ns <> "$" <> id) id kindOfRole ns pos)
+  role' <- foldM (unsafePartial $ handleParts) role roleParts
+  modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
+  pure (C role')
+
+  where
+    handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
+    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName computedType) = let
+      calculation = SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType)))
+      in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.

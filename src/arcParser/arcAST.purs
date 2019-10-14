@@ -29,8 +29,11 @@ newtype RoleE = RoleE
   , roleParts :: List RolePart
   , pos :: ArcPosition}
 
+type FunctionName = String
+type ComputedType = String
+
 -- TODO: het verschil tussen conjunctie en disjunctie bij FilledByAttribute.
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String | RoleAspect String ArcPosition
+data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String | RoleAspect String ArcPosition | Computation FunctionName ComputedType
 
 newtype PropertyE = PropertyE
   { id :: String

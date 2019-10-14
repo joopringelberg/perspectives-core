@@ -19,7 +19,7 @@ domain: System
         property: Voornaam (mandatory, not functional, String)
         view: VolledigeNaam (Voornaam, Achternaam)
       -- Het type van ModellenM bepalen we met de clause 'returns:'
-      thing: Modellen = apicall "ModellenM" returns: Model
+      thing: Modellen = apicall "ModellenM" returns: sys:Model
       thing: IndexedContexts (not mandatory, not functional)
       thing: ModelsInUse (not mandatory, not functional) filledBy Model
 

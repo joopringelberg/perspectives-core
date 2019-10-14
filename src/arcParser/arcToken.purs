@@ -48,6 +48,7 @@ perspectDef = LanguageDef
                   , "properties"
                   , "filledBy"
                   , "for"
+                  , "apicall"
 
                   -- Properties
                   , "property"

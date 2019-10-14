@@ -28,6 +28,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo, evalPhaseTwo', expandNamespace, traverseDomain, withNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -35,6 +36,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -85,7 +87,30 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
             assert "The role MyRoleInContext should be a calculated role."
               (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext" dr'.calculatedRoles))
 
-  testOnly "A Context with an external property and role." do
+  test "A Context with a Computed Role." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = apicall \"ModellenM\" returns : sys:Modellen" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr'@{calculatedRoles})) -> do
+            -- logShow dr'
+            case lookup "model:MyTestDomain$MyRole" calculatedRoles of
+              Nothing -> assert "There should be a role 'MyRole'" false
+              Just (CalculatedRole{calculation}) -> do
+                assert "The calculation should '(RDOM (ST EnumeratedRoleType sys:Modellen))' as its Range"
+                  case calculation of
+                    (SQD _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen")))) -> true
+                    otherwise -> false
+                assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
+                  case calculation of
+                    (SQD _ (ComputedRoleGetter "ModellenM") _) -> true
+                    otherwise -> false
+
+
+  test "A Context with an external property and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  case: MyCase\n    external:\n      property: MyProp (mandatory, functional, String) " ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -351,7 +376,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (let
                 -- _p :: Traversal' DomeinFileRecord ActionType)
                 -- NOTE: the index at the end of the Traversal' is very dependent on the order of the Actions!
-                _p = prop (SProxy :: (SProxy "enumeratedRoles")) <<< at "model:MyTestDomain$MySelf" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "perspectives")) <<< at "model:MyTestDomain$AnotherRole" <<< traversed <<< ix 1
+                _p = prop (SProxy :: (SProxy "enumeratedRoles")) <<< at "model:MyTestDomain$MySelf" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "perspectives")) <<< at "AnotherRole" <<< traversed <<< ix 1
                 in case (preview _p dr') of
                   (Just (ActionType "model:MyTestDomain$MySelf$ConsultsAnotherRole")) -> true
                   otherwise -> false)
@@ -359,7 +384,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (let
                 _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
                 in case (preview _o dr') of
-                  (Just (ENR (EnumeratedRoleType "model:MyTestDomain$AnotherRole"))) -> true
+                  (Just (ENR (EnumeratedRoleType "AnotherRole"))) -> true
                   otherwise -> false
                 )
             assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should be executed by the bot."
@@ -444,3 +469,18 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               Nothing -> assert "Cannot find the role 'model:Feest$Wens'" false
               (Just (EnumeratedRole{roleAspects})) -> assert "The role 'model:Feest$Wens' should have an aspect 'model:MyAspectModel$MyAspect$MyAspectRole'."
                 (isJust (elemIndex (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole") roleAspects))
+
+  testOnly "Role with binding to Context" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Feest\n  context: Uitje (mandatory, functional) filledBy: Speeltuin" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr'@{enumeratedRoles})) -> do
+            -- logShow dr'
+            case lookup "model:Feest$Uitje" enumeratedRoles of
+              (Just (EnumeratedRole{binding})) -> assert "The binding of Uitje should be an External Role"
+                (binding == (ST $ EnumeratedRoleType "Speeltuin$External"))
+              otherwise -> assert "The binding of Uitje should be an External Role" false

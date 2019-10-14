@@ -102,6 +102,25 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
             assert "The role should have kind 'RoleInContext'" (kindOfRole == RoleInContext)
           otherwise -> assert "Parsed an unexpected type" false
 
+  test "Domain with a computed role" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = apicall \"ModellenM\" returns : sys:Modellen" domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{contextParts})) -> do
+        logShow ctxt
+        case head (filter (case _ of
+            (RE _) -> true
+            otherwise -> false) contextParts) of
+          Nothing -> assert "The Domain should have a role." false
+          (Just (RE (RoleE{roleParts}))) -> do
+            case (head (filter (case _ of
+                (Computation "ModellenM" "sys:Modellen") -> true
+                otherwise -> false) roleParts)) of
+              Nothing -> assert "There should be a computation RolePart" false
+              otherwise -> assert "" true
+
+          otherwise -> assert "Parsed an unexpected type" false
+
   test "Domain with a thing role and a user role and a context role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole (not mandatory, not functional)\n  user: Gast (mandatory, functional)\n  context: Celebration (mandatory, functional)" domain
     case r of
@@ -176,7 +195,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
       otherwise -> assert "Role should have parts" false
 
   test "Role with a calculation" do
-    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing: MyRole = bla bla\n" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing: MyRole = bla bla\n  property: Prop (mandatory, functional, String)" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> do
