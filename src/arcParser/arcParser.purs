@@ -251,11 +251,11 @@ perspectiveE = try do
     perspective_ :: IP (List PerspectivePart)
     perspective_ = do
       (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> arcIdentifier >>= pure <<< Object
-      (maybeDefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
+      (mdefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
       (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')
-      case maybeDefaultView of
+      case mdefaultView of
         Nothing -> pure $ Cons object actions
-        Just v -> pure $ Cons v (Cons object actions)
+        (Just defaultView) -> pure $ Cons defaultView (Cons object actions)
 
     minimalAction' :: IP PerspectivePart
     minimalAction' = do
@@ -281,16 +281,18 @@ constructVerb v = case v of
 -- |    indirectObject: AnotherRole
 actionE :: IP PerspectivePart
 actionE = try $ withEntireBlock
-  (\{pos, verb, view} parts -> Act $ ActionE {id: "", verb, actionParts: Cons view (join parts), pos})
+  (\{pos, verb, mview} parts -> Act $ ActionE {id: "", verb, actionParts: case mview of
+    Nothing -> join parts
+    (Just view) ->  Cons view (join parts), pos})
   actionE_
   actionParts
   where
-    actionE_ :: IP {pos :: ArcPosition, verb :: Verb, view :: ActionPart}
+    actionE_ :: IP {pos :: ArcPosition, verb :: Verb, mview :: Maybe ActionPart}
     actionE_ = try do
       pos <- getPosition
       verb <- (arcIdentifier <?> "Consult, Change, Create, Delete or a valid identifier") >>= pure <<< constructVerb
-      view <- option (ObjectView "AllProperties") (reserved "with" *> arcIdentifier >>= pure <<< ObjectView)
-      pure {pos, verb, view}
+      mview <- optionMaybe (reserved "with" *> arcIdentifier >>= pure <<< ObjectView)
+      pure {pos, verb, mview}
 
     actionParts :: IP (List ActionPart)
     actionParts = do

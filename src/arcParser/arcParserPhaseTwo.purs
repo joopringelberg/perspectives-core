@@ -107,7 +107,6 @@ expandNamespace s = if isQualifiedWithDomein s then pure s else
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
   (Context {_id}) <- traverseContextE c ns
-  -- TODO: We might correct the type of references to Properties in Views here.
   domeinFileRecord <- getDF
   pure $ DomeinFile (domeinFileRecord {_id = unwrap _id})
 
@@ -413,9 +412,8 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
       (Just (Object o)) -> pure o
       otherwise -> throwError (MissingObject pos id)
 
-  -- Similarly, find and use the DefaultObjectView, if any. Notice that if no
-  -- DefaultObjectView is found, each Action could provide its own View (or we will use
-  -- the Allproperties View).
+  -- Similarly, find and use the DefaultObjectView. The parser injected "AllProperties" if no
+  -- DefaultObjectView is found. However, each Action can provide its own View.
   -- We do not (yet) allow a View with a CalculatedRole, so the View is taken from the EnumeratedRole's that
   -- underly the calculation of such a role. However, that still allows the View to be defined in another
   -- namespace than the Role itself.
@@ -455,7 +453,11 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , subject: [EnumeratedRoleType rolename]
     , verb: verb
     , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
-    , requiredObjectProperties: defaultObjectView
+    , requiredObjectProperties: case head (filter (case _ of
+          (ObjectView _) -> true
+          otherwise -> false) actionParts) of
+        Nothing -> defaultObjectView
+        (Just (ObjectView v)) -> Just $ ViewType v
     , requiredSubjectProperties: Nothing
     , requiredIndirectObjectProperties: Nothing
     , indirectObject: Nothing
