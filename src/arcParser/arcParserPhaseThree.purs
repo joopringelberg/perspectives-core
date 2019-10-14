@@ -53,6 +53,7 @@ phaseThree df@{_id} = do
         qualifyBindings
         qualifyPropertyReferences
         qualifyViewReferences
+        inverseBindings
         )
       df
     case ei of
@@ -235,3 +236,8 @@ qualifyViewReferences = do
                     Nothing -> throwError $ UnknownView pos (unwrap rqp)
                     (Just v) | length viewCandidates == 1 -> pure $ Just v
                     otherwise -> throwError $ NotUniquelyIdentifying pos (unwrap rqp) (map unwrap viewCandidates)
+
+-- | For each Role with a binding, record that Role as an inverse binding for the value of the binding.
+-- TODO. Implement inverseBindings. Or do we really need it?
+inverseBindings :: PhaseThree Unit
+inverseBindings = pure unit

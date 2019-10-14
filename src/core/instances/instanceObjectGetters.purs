@@ -28,8 +28,8 @@ trackContextDependency roleName f c = (lift $ tell [(assumption (unwrap c) (unwr
 
 -- | Because we never change the ExternalRole of a Context, we have no need
 -- | to track it as a dependency.
-buitenRol :: ContextInstance ~~> RoleInstance
-buitenRol = ArrayT <<< lift <<< (getContextMember \c -> [context_buitenRol c])
+externalRole :: ContextInstance ~~> RoleInstance
+externalRole = lift <<< lift <<< (getPerspectContext >=> pure <<< IP.externalRole)
 
 getRole :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getRole rn c = ArrayT do
@@ -46,9 +46,6 @@ getRole rn c = ArrayT do
 -- | to track it as a dependency.
 contextType :: ContextInstance ~~> ContextType
 contextType = ArrayT <<< lift <<< (getContextMember \c -> [context_pspType c])
-
-externalRole :: ContextInstance ~~> RoleInstance
-externalRole = lift <<< lift <<< (getPerspectContext >=> pure <<< IP.externalRole)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE

@@ -8,7 +8,7 @@ module Perspectives.Query.Compiler where
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
@@ -40,7 +40,7 @@ data CompiledFunction =
 -- | Construct a function wrapped in CompiledFunction that actually computes the described function.
 -- | A note on kind of roles ([RoleKind](Perspectives.Representation.TypeIdentifiers.html#t:RoleKind)).
 -- | In the type representation, we keep UserRoles, BotRoles, etc. in seperate members of Context.
--- | But in the instance representation, there is no need for that. All (Enumerated) 
+-- | But in the instance representation, there is no need for that. All (Enumerated)
 -- | roles have the same runtime representation and their names are unique.
 compileFunction :: QueryFunctionDescription -> MP CompiledFunction
 compileFunction (SQD _ (RolGetter (ENR r)) _) = pure $ C2R $ getRole r
@@ -60,6 +60,8 @@ compileFunction (SQD _ (DataTypeGetter "externalRole") _) = pure $ C2R externalR
 compileFunction (SQD _ (DataTypeGetter "context") _) = pure $ R2C context
 
 compileFunction (SQD _ (DataTypeGetter "binding") _) = pure $ R2R binding
+
+compileFunction (SQD _ (ComputedRoleGetter functionName) _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
 
 compileFunction (BQD _ (BinaryCombinator "compose") f1 f2 _) = do
   f1' <- compileFunction f1
@@ -120,11 +122,7 @@ compileFunction qd = throwError (error $ "Cannot create a function out of '" <> 
 -- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS
 ---------------------------------------------------------------------------------------------------
 -- | From a string that maybe identifies a Role, retrieve or construct a function to get that role from
--- | a Context instance. Notice that this function may fail. Notice, too, the use of `unsafePartial`.
--- | The compiler judges `getRoleFunction` to be Partial, because we handle just one case of the Variants
--- | that `compileFunction` can return.
--- | We safely discard the Partial constraint because the QueryDescriptionCompiler just produces descriptions
--- | of functions of the right type.
+-- | a Context instance. Notice that this function may fail.
 getRoleFunction ::
   String -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 getRoleFunction id = unsafePartial $

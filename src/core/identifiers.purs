@@ -34,8 +34,8 @@ deconstructBinnenRol s = replaceAll (Pattern "_binnenRol") (Replacement "")(repl
 
 buitenRol :: String -> String
 buitenRol s = if isModelName s
-  then s <> "$_buitenRol"
-  else s <> "_buitenRol"
+  then s <> "$_External"
+  else s <> "_External"
 
 -- | Returns the identifier minus the "_buitenRol" or "$_buitenRol" part.
 deconstructBuitenRol :: String -> String

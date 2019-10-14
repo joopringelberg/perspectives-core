@@ -48,7 +48,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
     case r of
@@ -379,7 +379,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                     (Just (ViewType "model:MyTestDomain$Feest$ViewOpFeest")) -> assert "bla" true
                     otherwise -> assert "There should be an Object View" false
 
-  testOnly "Testing qualifyPropertyReferences: reference to a Calculated Property." do
+  test "Testing qualifyPropertyReferences: reference to a Calculated Property." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: BigParty = Guest > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
     case r of
       (Left e) -> assert (show e) false

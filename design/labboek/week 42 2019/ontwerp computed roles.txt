@@ -1,0 +1,56 @@
+ONTWERP COMPUTED ROLES
+
+Een Computed Role wordt gerepresenteerd als een Calculated role met een bijzondere berekening.
+
+De specificatie van een Computed Role, in Arc, is als volgt:
+
+	thing: Modellen = apicall "ModellenM" returns: Model
+
+De parser en nabewerkingen maken hier een CalculatedRole van, met een calculation (=QueryFunctionDescription) met de volgende vorm:
+
+	SQD Domain (ComputedRoleGetter "ModellenM") (RDOM (ST (EnumeratedRoleType Model))
+
+(waarin 'Domain' vervangen is door de context).
+
+De Perspectives.Query.DescriptionCompiler komt hier helemaal niet aan de pas, omdat het zo eenvoudig is.
+
+Uiteraard is het de verantwoordelijkheid van de modelleur om ervoor te zorgen dat "ModellenM" inderdaad het type resultaat oplevert dat hij opschrijft (in de 'returns' clause).
+
+Dat betekent ook, dat we in de QueryAST geen Constructor tegenkomen voor ComputedRole of ComputedProperty.
+
+Daarentegen moet in Perspectives.Query.Compiler wel degelijk een case ComputedRoleGetter (en ComputedPropertyGetter) afgehandeld worden. In deze case moet uiteindelijk de functie die aangeduid is met "ModellenM" opgehaald en ingezet worden.
+
+HET GEVAL MODELLENM
+Deze functie haalt de lijst van modellen uit de database op en representeert hen als de instanties van een rol. Hoe zorgen we ervoor dat de waarde van deze rol opnieuw berekend wordt, als er een nieuw model ge-upload wordt? Ervan uitgaand dat alleen de gebruiker zelf nieuwe modellen kan uploaden, kunnen we de zaak zo optuigen dat hij, en passant als hij een model upload, ook een trigger verzorgt die tot herberekening van de rol leidt. 
+Die trigger is de property 'ModelOphaalTeller' (externe property van de case PerspectivesSystem).
+Maar we moeten dan wel de berekening van de rol afhankelijk maken van die property. D.w.z. dat als de property verandert, de berekening van de rol opnieuw uitgevoerd wordt.
+
+Ik had daarvoor het mechanisme constructTripleGetterWithArbitrarySupport. Bestaat er nog zoiets?
+Het gaat om de herberekening van een query. 
+
+Perspectives.DependencyTracking.Dependency$registerSupportedEffect executeert runMonadPerspectivesQuery op de query en zijn argument. Het resultaat is een Tuple met o.a. een Array van Assumptions. Deze Assumptions worden in de dependency tracking administratie gebruikt om ervoor te zorgen dat als één van hen verandert, de query opnieuw uitgevoerd wordt en het effect (de ApiEffectRunner) opnieuw wordt uitgevoerd. Dat is precies wat we nodig hebben.
+
+Dus nu is de vraag: hoe zorgen we ervoor dat als ModellenM uitgevoerd wordt, de ModelOphaalTeller als assumptie wordt geregistreerd? Een query wordt uitgevoerd in MonadPerspectivesQuery, een WriterT (Array Assumption). 
+An Assumption is a combination of a resource (ContextInstance or RoleInstance) and a type (EnumeratedRoleType, CalculatedRoleType, EnumeratedPropertyType or CalculatedPropertyType). Bijvoorbeeld de combinatie van een ContextInstance en een CalculatedRoleType - het geval dat we hier onderzoeken. 
+De berekening van een waarde wordt afhankelijk gemaakt van onderliggende waarde door een Assumption weg te schrijven met 'tell' naar de WriterT accumulator.
+
+De Assumption die we willen, heeft de volgende vorm:
+
+	Assumption 
+		<de instantie van PerspectivesSystem> 
+		(EnumeratedProperty "model:System$PerspectivesSystem$External$ModelOphaalTeller")
+
+EXTERNE ROL
+1. wordt een externe property goed gerepresenteerd op de externe rol?
+	- Wat doet de parser met properties onder 'external'?
+		* Hij zet ze op de rol External van de Context.
+	
+2. Hebben we uberhaupt een externe rol voor een context?
+	- Ja.
+
+3. Hoe wordt een externe rol opgehaald?
+	- met 'buitenRol', die 'context_buitenRol' gebruikt.
+	- en ook met 'externalRole', die op een andere manier precies hetzelfde resultaat geeft.
+
+4. Hoe wordt een externe property opgehaald?
+	- via externalRole.

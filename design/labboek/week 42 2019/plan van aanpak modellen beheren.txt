@@ -1,0 +1,12 @@
+PLAN VAN AANPAK MODELLEN BEHEREN
+Ik had een opzet waarbij je via een scherm met een upload de waarde van een tekstsproperty van een modelcontext (of rol) verandert. Een bot observeert de toestand en parseert de tekststring. Bij succes wordt het bestand dan opgeslagen als een model in de database.
+
+In grote lijnen moet het volgende gebeuren:
+* een tekstbestand parseren, nabewerken en opslaan. Geeft Either UserMessages Unit als resultaat, want het kan fout gaan.
+* voor bots moet je een actie kunnen beschrijven met zij-effecten. Dit moet aansluiten op de bot-actie-compiler.
+* het model dat ik had, moet ik opnieuw opzetten en uitschrijven in Arc.
+
+ACTIES
+1. Bestudeer het CRL model dat ik voorheen had.
+2. Ik had een opzet voor het beheren van modellen, inclusief een ankerpunt voor de rootcontexten van een model. Bestudeer dat en kijk hoe dat naar Arc overgezet kan worden.
+3. Schrijf een functie die een bestand inleest, parseert en nabewerkt. En bij succes opslaat in de database.

@@ -1,0 +1,130 @@
+NAAMGEVING
+* NonFunctional: ik geef de voorkeur aan Functional (liever geen dubbele ontkenningen).
+
+* is het BotRole?
+
+* Ik kom "MultiRole" tegen:
+		Context : Case : C
+			Role : MultiRole : R2
+Wat is dat?
+
+* Role : Role, maar met die tweede bedoel je RoleInContext. Liever dat aanhouden!
+
+* View : View en ActionObjectView (zie hieronder). Liever dan View : RoleView.
+
+PERSPECTIVE
+Ik mis het object en de view bij Perspective.
+
+	Perspective : Perspective : <naam>
+		Object : <naam>									/// is wat ik verwacht
+		View : ViewRef : <ref>							/// verwijzing naar View van de Role.
+		Action : Changes : <naam>
+			ActionOnScreen : False
+			ActionObjectView : AllProperties
+			Role : ObjectRole : OR of Changes			/// is redundant
+				Object : Feest
+			Role : SubjectRole : SR of Changes
+				Subject : Host
+
+Idem voor view.
+
+ACTION
+Dit is de huidige structuur in de file:
+
+	Action : Consults : Consults
+		ActionOnScreen : False						/// Is dit niet redundant? Het scherm bevat een verwijzing
+		ActionObjectView : AllProperties
+		Role : ObjectRole : OR of Consults
+			Object : Feest
+		Role : SubjectRole : SR of Consults
+			Subject : Host
+
+1. In plaats van Role... zou je gewoon Object kunnen gebruiken (geeft evenveel informatie en het zijn eigenlijk geen rollen):
+
+	Object : Feest
+
+Je kan dan weliswaar geen naam van de Object 'rol' aangeven, maar dat doe je toch niet.
+
+2. Als je dan toch Role... gebruikt, houd dan het stramien aan dat je ook voor rollen van een context gebruikt. Dus:
+
+		Role : ObjectRole : OR of Consults
+			FilledBy : Feest
+3. De view volgt ook een heel ander patroon dan bij rol:
+
+	ActionObjectView : <naam>
+
+in plaats van:
+
+	View : Object : <naam>
+
+Alles bij elkaar zou het dit kunnen worden:
+
+	Action : Consults : <naam>
+		View : Object : <ref>							/// optioneel: indien afwezig de view van het perspective
+		Role : Object : <ref>
+		IndirectObject : <ref>
+		View : IndirectObject : <ref>
+
+of, nog regelmatiger:
+
+	Action : Consults : <naam>							/// hoewel je nooit deze naam gebruikt, als modelleur
+		Role : Subject : <ref>
+			View : ViewRef : <ref>						/// Of de View inbedden? 
+		Role : Object : <ref>
+			View : ViewRef : <ref>
+
+Hoort een view exclusief bij een Action, verwijs je naar een view van de Role?
+
+CONTEXTSCREEN
+ContextScreens schaar je onder 
+
+	Perspective : LocalPerspective. 
+
+Een RolPerspectief schaar je onder 
+
+	Perspective : Perspective. 
+
+Zou het niet logischer zijn om een scherm direct in zijn eigen categorie (ContextScreen) te plaatsen onder UserRole? Ik vind een scherm en een perspectief wel heel verschillende dingen.
+Of anders: gebruik 
+
+	Perspective : RolePerspective 
+
+en 
+
+	Perspective : ContextPerspective 
+
+en stop het scherm dan onder de laatste. 
+
+
+HET IS NU
+		Agent : UserRole : Gast
+
+
+			Mandatory : False
+
+
+			Calculated : False
+
+
+			Perspective : LocalPerspective : ContextScreen of Gast
+
+
+				ScreenLocationX : 100
+
+
+				ScreenLocationY : 100
+
+
+				ScreenWidth : 600
+
+
+				ScreenHeight : 400
+
+
+			Perspective : Perspective : Gast on Cadeauwens
+
+
+==========
+TODO
+1. Hanteer namen met spaties erin.
+2. Genereer namen als een underscore gebruikt wordt.

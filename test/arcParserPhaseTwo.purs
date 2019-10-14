@@ -48,7 +48,7 @@ evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
 evalPhaseTwo = unwrap <<< evalPhaseTwo'
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -84,6 +84,23 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
             -- logShow dr'
             assert "The role MyRoleInContext should be a calculated role."
               (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext" dr'.calculatedRoles))
+
+  testOnly "A Context with an external property and role." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  case: MyCase\n    external:\n      property: MyProp (mandatory, functional, String) " ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            assert "There should be an external role."
+              (isJust (lookup "model:MyTestDomain$MyCase$External" dr'.enumeratedRoles))
+            assert "The External Role of MyCase should have a property MyProp"
+              case (lookup "model:MyTestDomain$MyCase$External" dr'.enumeratedRoles) of
+                Nothing -> false
+                (Just (EnumeratedRole{properties})) -> isJust (elemIndex (ENP $ EnumeratedPropertyType "model:MyTestDomain$MyCase$External$MyProp") properties)
 
   test "A role with a view" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      View : View : MyView\n        PropertyRef : MyProp" domain
@@ -354,7 +371,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 )
             assert "The Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole' should have as Subject 'model:MyTestDomain$MySelf'."
               (let
-                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "subject")) 
+                _s = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultsAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "subject"))
                 in case (preview _s dr') of
                   (Just (EnumeratedRoleType "model:MyTestDomain$MySelf")) -> true
                   otherwise -> false

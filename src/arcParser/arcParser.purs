@@ -125,7 +125,7 @@ roleE = try $ withEntireBlock
       pure {uname: "", knd: BotRole, pos, parts: Cons (ForUser forUser) Nil}
 
     externalRole_ :: ArcPosition -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
-    externalRole_ pos = pure {uname: "external", knd: ExternalRole, pos, parts: Nil}
+    externalRole_ pos = pure {uname: "External", knd: ExternalRole, pos, parts: Nil}
 
     calculatedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     calculatedRole_ pos knd uname = try do
