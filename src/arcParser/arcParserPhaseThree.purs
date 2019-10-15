@@ -12,13 +12,12 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, head, length)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, keys, lookup, values)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (###=), MP)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -26,6 +25,7 @@ import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDom
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo', runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -33,6 +33,7 @@ import Perspectives.Representation.Class.PersistentType (typeExists)
 import Perspectives.Representation.Class.Role (expandedADT_)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
@@ -54,7 +55,7 @@ phaseThree df@{_id} = do
         qualifyPropertyReferences
         qualifyViewReferences
         inverseBindings
-        -- TODO: Maybe qualify the range of the calculation of a CalculatedRole that depends on a Computation.
+        qualifyReturnsClause
         )
       df
     case ei of
@@ -118,11 +119,9 @@ qualifyActionRoles = do
           (Just (CalculatedRole{_id:id'})) -> pure $ CR id'
         else do
           types <- lift2 $ ctxtId ###= lookForUnqualifiedRoleType ident
-          case length types of
-            0 -> throwError $ RoleMissingInContext pos ident (unwrap ctxtId)
-            1 -> pure $ unsafePartial $ fromJust $ head types
-            -- This will not happen: a context does not allow two roles with the same local name.
-            otherwise -> throwError $ NotUniquelyIdentifying pos ident (map roletype2string types)
+          case head types of
+            Nothing -> throwError $ RoleMissingInContext pos ident (unwrap ctxtId)
+            (Just t) -> pure t
 
 modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
 modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
@@ -239,6 +238,34 @@ qualifyViewReferences = do
                     otherwise -> throwError $ NotUniquelyIdentifying pos (unwrap rqp) (map unwrap viewCandidates)
 
 -- | For each Role with a binding, record that Role as an inverse binding for the value of the binding.
--- TODO. Implement inverseBindings. Or do we really need it?
+-- TODO. Implement inverseBindings. Or don't we really need it?
 inverseBindings :: PhaseThree Unit
 inverseBindings = pure unit
+
+-- | A Computed Role has a clause that specifies the type of Role that is computed.
+-- | The modeller can use an unqualfied name, that should be resolved against all Roles in the Domain.
+qualifyReturnsClause :: PhaseThree Unit
+qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
+  where
+    qualifyReturnsClause' :: DomeinFileRecord -> PhaseThree Unit
+    qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
+      (\(CalculatedRole rr@{_id, calculation, pos}) -> do
+        case calculation of
+          SQD dom (ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType))) -> do
+            qComputedType <- qualifyType pos computedType
+            if computedType == unwrap qComputedType
+              then pure unit
+              else -- change the role in the domain
+                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = SQD dom (ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
+          otherwise -> pure unit)
+
+      where
+        qualifyType :: ArcPosition -> String -> PhaseThree EnumeratedRoleType
+        qualifyType pos ident = if isQualifiedWithDomein ident
+          then pure $ EnumeratedRoleType ident
+          else do
+            (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) (keys enumeratedRoles)
+            case head candidates of
+              Nothing -> throwError $ UnknownRole pos ident
+              (Just qname) | length candidates == 1 -> pure $ EnumeratedRoleType qname
+              otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates

@@ -1,0 +1,31 @@
+TODO WEEK 42 EN VERDER
+
+ONTWIKKELING
+1. ComputedRoles afmaken:
+	- kwalificatie van de returns-clause
+
+2. ComputedProperties toevoegen.
+
+3. Syntax maken voor queries en de parser uitbreiden zodat hij de QueryAst oplevert. Deze parser onderdeel van de ArcParser maken.
+
+4. AST verzinnen voor de assignment- en expressie-syntax. Hierbij aansluiting zoeken bij de AST voor assignment die er al is (Perspectives.Representation.Assignment$AssignmentStatement) en bij de Query AST.
+
+5. Parser maken voor de assignment- en expressie-syntax.
+
+6. De DescriptionCompiler uitbreiden voor assignment- en expressie AST (en integreren met Perspectives.Representation.Assignment$AssignmentStatement).
+
+7. Al deze onderdelen (parsers, descriptioncompilers) samen onderbrengen in één geheel dat resulteert in ofwel een opgeslagen DomeinFile, ofwel in foutmeldingen voor de modelleur.
+
+=============== OPLEVERING
+1. Voeg op moduleniveau documentatie toe in de source.
+
+2. Zoek uit hoe ik code kan opleveren. Stel ik de repository open, of maak ik een clone die ik openstel? Ik moet anticiperen op samenwerking met anderen. Zie https://opensource.guide/starting-a-project/.
+
+3. Zoek uit wat ik minimaal moet maken om te voldoen aan de Memorandum of Understanding.
+	- a public status page for the project to keep the wider internet community informed
+	- vermelden op de website
+	- credits section of the software
+
+
+KLAAR
+4. Vul het MoU in.

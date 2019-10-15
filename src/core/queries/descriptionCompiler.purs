@@ -1,5 +1,10 @@
 module Perspectives.Query.DescriptionCompiler where
 
+-- | From the Abstract Syntax Tree that results from a query-path expression (see `Perspectives.QueryAST` for the AST),
+-- | create a QueryFunctionDescription data element.
+-- | The code in this module sees to it that each step in the path is followed by a step that takes as its domain the
+-- | range of its predecessor. Otherwise, an error is thrown that will be presented to the modeller.
+
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Data.Array (head)
 import Data.Either (Either(..))
@@ -16,9 +21,6 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (class Show, bind, pure, ($), (<>), show)
-
--- From an AST data constructor, create a QueryFunctionDescription data element after
--- checking that the required path can indeed be followed.
 
 compileElementaryStep :: Domain -> ElementaryQueryStep -> FD
 -- Check whether the domain is a ContextType. Then check whether this type has a role with

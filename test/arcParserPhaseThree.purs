@@ -25,6 +25,7 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..), requiredObjectProperties)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -32,6 +33,7 @@ import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..), propertyReferences)
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, roleInContext)
@@ -48,7 +50,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
     case r of
@@ -116,7 +118,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 assert "AnotherRole should be a calculatedRole"
                   (let
                     _r = prop (SProxy :: (SProxy "calculatedRoles")) <<< at "model:MyTestDomain$AnotherRole" <<< traversed
@@ -170,21 +172,6 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left (RoleMissingInContext _ _ _)) -> assert "" true
               otherwise -> assert "Expected the 'RoleMissingInContext' error" false
-
-  test "Testing qualifyActionRoles: NotUniquelyIdentifying." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  user: Gast (mandatory, functional)\n    perspective on: DoubleRole: Consult\n  thing: DoubleRole (mandatory, functional)\n  case: NestedCase\n    thing: DoubleRole (mandatory, functional)" ARC.domain
-    case r of
-      (Left e) -> assert (show e) false
-      (Right ctxt@(ContextE{id})) -> do
-        -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
-          (Left e) -> assert (show e) false
-          (Right (DomeinFile dr')) -> do
-            -- logShow dr'
-            x <- runP $ phaseThree dr'
-            case x of
-              (Left (NotUniquelyIdentifying _ _ _)) -> assert "" false
-              otherwise -> assert "" false
 
   test "Testing qualifyBindings: correct reference." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Binder (mandatory, functional) filledBy: Bound\n  thing: Bound (mandatory, functional)" ARC.domain
@@ -258,7 +245,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
         case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
-            logShow dr'
+            -- logShow dr'
             x <- runP $ phaseThree dr'
             case x of
               (Left (UnknownRole _ _)) -> assert "" true
@@ -274,11 +261,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
         case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
-            logShow dr'
+            -- logShow dr'
             x <- runP $ phaseThree dr'
             case x of
               (Left e@(NotUniquelyIdentifying _ _ _)) -> do
-                logShow e
+                -- logShow e
                 assert "" true
               otherwise -> do
                 assert "The binding of 'Binder' is not defined and that should have been detected." false
@@ -297,7 +284,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{views}) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
                   Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
                   (Just (View{propertyReferences})) -> case head (filter (\pref -> propertytype2string pref == "model:MyTestDomain$Feest$Datum") propertyReferences) of
@@ -333,7 +320,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{views}) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 -- Get the references from the view
                 case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
                   Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
@@ -371,7 +358,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 -- get the action
                 case lookup "model:MyTestDomain$Guest$ConsultFeest" actions of
                   Nothing -> assert "There should be an Action 'model:MyTestDomain$Guest$ConsultFeest'." false
@@ -393,10 +380,37 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{views}) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 -- get the action
                 case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
                   Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'." false
                   (Just (View{propertyReferences})) -> case elemIndex (CP (CalculatedPropertyType "model:MyTestDomain$Feest$BigParty")) propertyReferences of
                     Nothing -> assert "There should be a CalculatedProperty 'BigParty' in the View 'ViewOpFeest'" false
                     otherwise -> assert "" true
+
+  testOnly "A Context with a Computed Role." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole = apicall \"ModellenM\" returns : Modellen\n  case: SubContext\n    thing: Modellen (mandatory, functional)\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{calculatedRoles}) -> do
+                -- logShow correctedDFR
+                case lookup "model:MyTestDomain$MyRole" calculatedRoles of
+                  Nothing -> assert "There should be a role 'MyRole'" false
+                  Just (CalculatedRole{calculation}) -> do
+                    assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
+                      case calculation of
+                        (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen")))) -> true
+                        otherwise -> false
+                    assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
+                      case calculation of
+                        (SQD _ (ComputedRoleGetter "ModellenM") _) -> true
+                        otherwise -> false

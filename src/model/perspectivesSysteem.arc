@@ -21,7 +21,7 @@ domain: System
       -- Het type van ModellenM bepalen we met de clause 'returns:'
       thing: Modellen = apicall "ModellenM" returns: sys:Model
       thing: IndexedContexts (not mandatory, not functional)
-      thing: ModelsInUse (not mandatory, not functional) filledBy Model
+      context: ModelsInUse (not mandatory, not functional) filledBy Model
 
   case: Model
     external:

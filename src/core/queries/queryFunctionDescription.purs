@@ -1,6 +1,9 @@
 module Perspectives.Query.QueryTypes where
 
--- | A queryfunction with its domain and range.
+-- | A description of a queryfunction. Such a description
+-- | consists of the origin (Domain) and destination of the querypath, and a description of the function that computes
+-- | the destination from the origin.
+
 import Prelude
 
 import Data.Generic.Rep (class Generic)

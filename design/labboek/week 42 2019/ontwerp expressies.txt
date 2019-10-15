@@ -1,0 +1,40 @@
+ONTWERP EXPRESSIES VOOR ACTIES
+Expressies worden in Acties gebruikt als
+	* conditie
+	* rechterkant van een rule
+
+term = RoleIdentifier | PropertyIdentifier 'van' RoleIdentifier
+
+expressie = UnaryOperator term | term BinaryOperator term | term
+
+UnaryOperator = 'not' | 'exists' | new
+
+BinaryOperator = ArithmeticOperator | StringOperator | DateOperator | BooleanOperator
+
+Assignment = term AssignmentOperator expressie
+
+AssignmentOperator = '=' | '+=' | '-=' 
+
+RoleIdentifier = ArcIdentifier | 'Object' | 'Subject' | 'IndirectObject'
+
+De vraag is: hoeveel semantiek stoppen we in de syntax? Onderscheiden we b.v. rol- en property expressies?
+Onderscheiden we expressies met boolean waarde van andere?
+Ik houdt de syntax simpel maar voeg een semantische controle toe. Daarin zien we erop toe dat bijvoorbeeld een Boolean operator alleen op expressies met een Boolean waarde wordt toegepast.
+
+
+UITBREIDING ONTWERP ACTIES
+Een conditie van een actie voor een user gebruiken we om de gebruiker via de GUI al dan niet in staat te stellen die actie uit te voeren.
+
+	user: MySelf (mandatory, functional)
+		perspective on: SomeRole
+			Consult
+				condition: <expressie>
+
+Een actie voor een bot moet altijd van een conditie voorzien worden. Bovendien is een actie voor een bot zinloos, tenzij hij de toestand kan veranderen. Daarom introduceren we voor een bot een if...then syntax voor acties:
+
+	bot: for MySelf
+		perspective on: SomeRole
+			if <expressie> then <assignment>
+
+STAND VAN ZAKEN EXPRESSIES EN ASSIGNMENT
+In de vorige versie van de runtime lag de assignment syntax in CLR dicht bij de AST voor assignment. Ik had mij toen bedacht dat ik een parser zou toevoegen die zou resulteren in CLR als AST. Die afstand is nu groter. Ik kan niet in Arc eenzelfde uitdrukking geven aan een soort AST. De assignment- en expressieparser is nu echt nodig.

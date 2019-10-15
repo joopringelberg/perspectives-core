@@ -50,7 +50,7 @@ evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
 evalPhaseTwo = unwrap <<< evalPhaseTwo'
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -108,7 +108,6 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                   case calculation of
                     (SQD _ (ComputedRoleGetter "ModellenM") _) -> true
                     otherwise -> false
-
 
   test "A Context with an external property and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  case: MyCase\n    external:\n      property: MyProp (mandatory, functional, String) " ARC.domain
@@ -470,7 +469,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               (Just (EnumeratedRole{roleAspects})) -> assert "The role 'model:Feest$Wens' should have an aspect 'model:MyAspectModel$MyAspect$MyAspectRole'."
                 (isJust (elemIndex (EnumeratedRoleType "model:MyAspectModel$MyAspect$MyAspectRole") roleAspects))
 
-  testOnly "Role with binding to Context" do
+  test "Role with binding to Context" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Feest\n  context: Uitje (mandatory, functional) filledBy: Speeltuin" ARC.domain
     case r of
       (Left e) -> assert (show e) false
