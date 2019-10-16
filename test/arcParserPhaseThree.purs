@@ -50,7 +50,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
     case r of
@@ -388,7 +388,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                     Nothing -> assert "There should be a CalculatedProperty 'BigParty' in the View 'ViewOpFeest'" false
                     otherwise -> assert "" true
 
-  testOnly "A Context with a Computed Role." do
+  test "A Context with a Computed Role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole = apicall \"ModellenM\" returns : Modellen\n  case: SubContext\n    thing: Modellen (mandatory, functional)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false

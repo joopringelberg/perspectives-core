@@ -1,43 +1,46 @@
 module Perspectives.Parsing.Arc.Expression where
 
-import Control.Alt (map, void, (<|>))
+import Control.Alt ((<|>))
 import Control.Lazy (defer)
+import Data.String (length)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Step(..), UnaryStep(..), SimpleStep(..), Operator(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
-import Text.Parsing.Parser (fail, failWithPosition)
-import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
-import Prelude ((<$>), (<*>), ($), pure, (<<<), (*>), bind, discard)
+import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+))
+import Text.Parsing.Parser.Combinators (try, (<?>))
 
 step :: IP Step
-step = simpleStep <|> defer \_ -> unaryStep <|> compoundStep
+step = step_ <|> token.parens step_
+  where
+    step_ :: IP Step
+    step_ = try (defer \_-> compoundStep <|> defer \_ -> unaryStep <|> simpleStep)
 
 simpleStep :: IP Step
-simpleStep =
-  Simple <$> (ArcIdentifier <$> getPosition <*> arcIdentifier)
+simpleStep = try
+  (Simple <$> (ArcIdentifier <$> getPosition <*> arcIdentifier)
   <|>
-  Simple <$> (Binding <$> (reserved "binding" *> getPosition))
+  Simple <$> (Binding <$> (getPosition <* reserved "binding"))
   <|>
-  Simple <$> (Binder <$> (reserved "binder" *> getPosition))
+  Simple <$> (Binder <$> (getPosition <* reserved "binder"))
   <|>
-  Simple <$> (Context <$> (reserved "context" *> getPosition))
+  Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
-  Simple <$> (Extern <$> (reserved "extern" *> getPosition))
+  Simple <$> (Extern <$> (getPosition <* reserved "extern"))) <?> "binding, binder, context, extern or a valid identifier"
 
 unaryStep :: IP Step
-unaryStep =
-  Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
+unaryStep = try
+  (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
   <|>
   Unary <$> (Create <$> getPosition <*> (reserved "create" *> (defer \_ -> arcIdentifier)))
   <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> arcIdentifier)))
+  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> arcIdentifier)))) <?> "not <expr>, create <identifier>, exists <identifier>"
 
 compoundStep :: IP Step
-compoundStep = defer \_->filterStep <|> binaryStep <|> token.parens filterStep <|> token.parens binaryStep
+compoundStep = try (defer \_->binaryStep) <|> (defer \_->filterStep)
 
 filterStep :: IP Step
-filterStep = do
+filterStep = try do
   start <- getPosition
   reserved "filter"
   source <- step
@@ -47,37 +50,104 @@ filterStep = do
   pure $ Binary $ BinaryStep {start, end, operator: Filter start, left: source, right: criterium}
 
 binaryStep :: IP Step
-binaryStep = do
+binaryStep = try do
   start <- getPosition
-  left <- step
+  left <- simpleStep <|> token.parens step
   op <- operator
   right <- step
   end <- getPosition
-  pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
+  case right of
+    (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight})) -> if (operatorPrecedence op) > (operatorPrecedence opOfRight)
+      then pure $ Binary $ BinaryStep
+        { start
+        , end -- equals endOfRight.
+        , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight})
+        , operator: opOfRight
+        , right: rightOfRight
+      }
+      else pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
+    otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
 
 operator :: IP Operator
-operator = (Compose <$> (reserved ">>" *> getPosition))
+operator = ((Compose <$> (getPosition <* reserved ">>"))
   <|>
-  (Equals <$> (reserved "==" *> getPosition))
+  (Equals <$> (getPosition <* reserved "=="))
   <|>
-  (NotEquals <$> (reserved "/=" *> getPosition))
+  (NotEquals <$> (getPosition <* reserved "/="))
   <|>
-  (LessThen <$> (reserved "<" *> getPosition))
+  (LessThen <$> (getPosition <* reserved "<"))
   <|>
-  (LessThenEqual <$> (reserved "<=" *> getPosition))
+  (LessThenEqual <$> (getPosition <* reserved "<="))
   <|>
-  (GreaterThen <$> (reserved ">" *> getPosition))
+  (GreaterThen <$> (getPosition <* reserved ">"))
   <|>
-  (GreaterThenEqual <$> (reserved ">=" *> getPosition))
+  (GreaterThenEqual <$> (getPosition <* reserved ">="))
   <|>
-  (LogicalAnd <$> (reserved "and" *> getPosition))
+  (LogicalAnd <$> (getPosition <* reserved "and"))
   <|>
-  (LogicalOr <$> (reserved "or" *> getPosition))
+  (LogicalOr <$> (getPosition <* reserved "or"))
   <|>
-  (Add <$> (reserved "+" *> getPosition))
+  (Add <$> (getPosition <* reserved "+"))
   <|>
-  (Subtract <$> (reserved "-" *> getPosition))
+  (Subtract <$> (getPosition <* reserved "-"))
   <|>
-  (Divide <$> (reserved "/" *> getPosition))
+  (Divide <$> (getPosition <* reserved "/"))
   <|>
-  (Multiply <$> (reserved "*" *> getPosition))
+  (Multiply <$> (getPosition <* reserved "*"))) <?> ">>, ==, /=, <, <=, >, >=, and, or, +, -, /, *"
+
+operatorPrecedence :: Operator -> Int
+operatorPrecedence (Compose _) = 8
+operatorPrecedence (Equals _) = 0
+operatorPrecedence (NotEquals _) = 0
+operatorPrecedence (LessThen _) = 1
+operatorPrecedence (LessThenEqual _) = 1
+operatorPrecedence (GreaterThen _) = 1
+operatorPrecedence (GreaterThenEqual _) = 1
+operatorPrecedence (LogicalAnd _) = 1
+operatorPrecedence (LogicalOr _) = 2
+operatorPrecedence (Add _) = 3
+operatorPrecedence (Subtract _) = 2
+operatorPrecedence (Divide _) = 4
+operatorPrecedence (Multiply _) = 5
+operatorPrecedence (Filter _) = 9
+
+startOf :: Step -> ArcPosition
+startOf stp = case stp of
+  (Simple s) -> startOfSimple s
+  (Binary (BinaryStep{start})) -> start
+  (Unary us) -> startOfUnary us
+
+  where
+    startOfSimple (ArcIdentifier p _) = p
+    startOfSimple (Binding p) = p
+    startOfSimple (Binder p) = p
+    startOfSimple (Context p) = p
+    startOfSimple (Extern p) = p
+
+    startOfUnary (LogicalNot p _) = p
+    startOfUnary (Create p _) = p
+    startOfUnary (Exists p _) = p
+
+endOf :: Step -> ArcPosition
+endOf stp = case stp of
+  (Simple s) -> endOfSimple s
+  (Binary (BinaryStep{end})) -> end
+  (Unary us) -> endOfUnary us
+
+  where
+    endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
+    endOfSimple (Binding (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
+    endOfSimple (Binder (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
+    endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
+    endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
+
+    -- Note that this assumes a single whitespace between 'not' and the step.
+    endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
+    endOfUnary (Create (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
+    endOfUnary (Exists (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
+
+    col_ :: ArcPosition -> Int
+    col_ (ArcPosition{column}) = column
+
+    line_ :: ArcPosition -> Int
+    line_ (ArcPosition{line}) = line

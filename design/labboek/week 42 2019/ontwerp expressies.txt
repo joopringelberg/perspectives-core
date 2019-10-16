@@ -1,7 +1,7 @@
 ONTWERP EXPRESSIES VOOR ACTIES
 Expressies worden in Acties gebruikt als
 	* conditie
-	* rechterkant van een rule
+	* rechterkant van een rule (assignment)
 
 term = RoleIdentifier | PropertyIdentifier 'van' RoleIdentifier
 

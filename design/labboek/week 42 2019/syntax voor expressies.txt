@@ -18,12 +18,11 @@ GRAMMATICA
 
 step = simpleStep | unaryStep | compoundStep
 
-simpleStep = RoleName
+simpleStep = ArcIdentifier
 	| binding
 	| binder
 	| context
 	| extern
-	| PropertyName
 
 unaryStep = 'not' step | 'create' ArcIdentifier | 'exists' ArcIdentifier
 

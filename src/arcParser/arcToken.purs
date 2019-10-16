@@ -72,6 +72,9 @@ perspectDef = LanguageDef
                   , "objectView"
                   , "indirectObjectView"
                   , "subjectView"
+
+                  -- Queries
+                  , "Filter"
                   ]
                 , caseSensitive:   true
                 }

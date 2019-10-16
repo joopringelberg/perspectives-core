@@ -9,6 +9,7 @@ import Test.Parsing.Arc.TransferFile (theSuite) as TF
 import Test.Parsing.Arc as TPA
 import Test.Parsing.Arc.PhaseTwo (theSuite) as TPA2
 import Test.Parsing.Arc.PhaseThree as TPA3
+import Test.Parsing.Arc.Expression as TPAE
 import Test.Unit.Main (runTest)
 
 main :: Effect Unit
@@ -17,3 +18,4 @@ main = runTest do
   TPA.theSuite
   TPA2.theSuite
   TPA3.theSuite
+  TPAE.theSuite
