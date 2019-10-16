@@ -50,6 +50,7 @@ cond condition thenPart elsePart id = do
   passes <- condition id
   if passes then thenPart id else elsePart id
 
+-- | Prefer the left solution over the right one.
 disjunction :: forall m s o. Monad m =>
   (s -> ArrayT m o) ->
   (s -> ArrayT m o) ->
@@ -60,6 +61,7 @@ disjunction left right id = ArrayT do
     then runArrayT $ right id
     else pure r
 
+-- | Join the results.
 conjunction :: forall m s o. Eq o => Monad m =>
   (s -> ArrayT m o) ->
   (s -> ArrayT m o) ->

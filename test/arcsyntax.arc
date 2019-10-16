@@ -21,7 +21,7 @@ domain: Feest
     property: Naam (mandatory, functional, String)
     view: ViewOpGast (Naam)
     perspective on: Wens (ViewOpWens): Consult, Change
-    property: WellBehaved = Wens > Bedrag
+    property: WellBehaved = context > Gast > Binding > Naam
     perspective on : Gast
       Consult with ViewOpGast
       Change with AnotherView
@@ -30,7 +30,7 @@ domain: Feest
         subjectView: ViewOpGast
   bot: for Gast
     perspective on: Wens (ViewOpWens): Delete
-  user: Eregast = Gast where blabla
+  user: Eregast = Gast > binding
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
   -- A nested context
   activity: EzeltjePrik

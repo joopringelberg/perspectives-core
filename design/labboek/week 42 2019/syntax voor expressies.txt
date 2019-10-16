@@ -1,0 +1,99 @@
+SYNTAX VOOR QUERYPADEN
+
+Voorbeelden van een CalculatedRole
+
+	context >> RoleName >> binding
+	
+	context >> extern >> binder >> context
+	
+	filter context >> RoleName with BooleanPropertyName
+	
+	filter context >> RoleName with NumericPropertyName > 10
+	
+	(RoleName1 or RoleName2) >> binding
+	
+	(RoleName1 and RoleName2) >> context
+
+GRAMMATICA
+
+step = simpleStep | compoundStep
+
+simpleStep = RoleName
+	| binding
+	| binder
+	| context
+	| extern
+	| PropertyName
+
+compoundStep = (filter step 'with' step) | (step operator step) | filter step 'with' step | step operator step
+
+operator = '>>' | 'disjunction' | '=' | '<' | '>' | 'and' | 'or' | '+' etc
+
+assignment = lhs AssignmentOperator step
+
+lhs = RoleName | PropertyName 'of' RoleName
+
+AssignmentOperator = '=' | '=+' | '=-'
+
+SEMANTISCHE CONTROLE
+Lang niet alle syntactisch correcte expressies zijn semantisch correct, natuurlijk. 
+
+	RoleName >> binding >> PropertyName = context
+
+is syntactisch correct maar semantisch onmogelijk.
+
+OPERATOR PRECEDENCE
+Zo werkt operator precedentie:
+
+Stel: precedence( '>>' ) > precedence ('=')
+
+Dan moet deze expressie:
+
+	a >> b = c >> d				(I)
+
+gelijk zijn aan deze expressie:
+
+	(a >> b) = (c >> d)			(II)
+
+Een links-naar-rechts parser zou van (I) dit maken:
+
+	a >> (b = (c >> d)
+
+De uiteindelijke expressie wordt geconstrueerd voor de operator '>>' uit twee delen:
+
+	a							(III)
+
+en
+
+	(b = (c >> d))				(IV)
+
+In die laatste stap moet onderzocht worden of de operator ('>>') hogere precedentie heeft dan de operator van (IV). Dat is hier het geval. Daarom wordt (IV) gesplitst in zijn linker- en rechter term:
+
+	b							(linkerterm)
+	(c >> d)					(rechterterm)
+
+en wordt de uiteindelijke expressie gevormd door de combinatie van een nieuwe term (a << b), geconstrueerd uit (III) en de linkerterm en de operator '>>' (waar we mee bezig waren), de operator van (IV) en dat is '=' en de rechterterm. Dan verkrijgen we:
+
+	(a >> b) = (c >> d)			(II)
+
+Deze overweging moet bij elke compoundStep gemaakt worden. Dus:
+
+1. Is de rechterterm samengesteld?
+2. Zo nee, dan ben je klaar.
+3. Zo ja: is de precedence van de huidige operator groter dan die van de rechterterm?
+4. Zo nee, dan ben je klaar.
+5. Zo ja, dan breek je de rechterterm op zoals boven beschreven.
+
+Precedentie categoriën:
+
+Op een schaal van 0 (lage precedence) tot 9 (hoge precedence):
+
+	>>		9
+	==		0
+	<		1
+	>		1
+	*		5
+	/		4
+	+		3
+	-		2
+>>

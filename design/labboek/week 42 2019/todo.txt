@@ -1,9 +1,6 @@
 TODO WEEK 42 EN VERDER
 
 ONTWIKKELING
-1. ComputedRoles afmaken:
-	- kwalificatie van de returns-clause
-
 2. ComputedProperties toevoegen.
 
 3. Syntax maken voor queries en de parser uitbreiden zodat hij de QueryAst oplevert. Deze parser onderdeel van de ArcParser maken.
@@ -28,4 +25,7 @@ ONTWIKKELING
 
 
 KLAAR
+1. ComputedRoles afmaken:		
+	- kwalificatie van de returns-clause
+
 4. Vul het MoU in.

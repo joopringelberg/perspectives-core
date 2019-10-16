@@ -1,0 +1,99 @@
+module Perspectives.Parsing.Arc.Expression.AST where
+
+-- | An Abstract Syntax Tree data model for Perspectives expressions. The expression grammar is below.
+-- |
+-- | step = simpleStep | compoundStep
+-- |
+-- | simpleStep = RoleName
+-- |
+-- | | binding
+-- |
+-- | | binder
+-- |
+-- | | context
+-- |
+-- | | extern
+-- |
+-- | | PropertyName
+-- |
+-- | compoundStep = (filter step 'with' step) | (step operator step) | filter step 'with' step | step operator step
+-- |
+-- | operator = '>>' | '==' | '<' | '>' | '<=' | '>=' | 'and' | 'or' | '+' | '-' | '*' | '/'
+-- |
+-- | assignment = lhs AssignmentOperator step
+-- |
+-- | lhs = RoleName | PropertyName 'of' RoleName
+-- |
+-- | AssignmentOperator = '=' | '=+' | '=-'
+
+import Prelude
+
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Show (genericShow)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+
+data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep
+
+data SimpleStep =
+  RoleName ArcPosition String
+  | PropertyName ArcPosition String
+  | Binding ArcPosition
+  | Binder ArcPosition
+  | Context ArcPosition
+  | Extern ArcPosition
+
+data UnaryStep =
+  LogicalNot ArcPosition Step
+  | Create ArcPosition String
+  | Exists ArcPosition String
+
+newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
+
+data Operator =
+  Compose ArcPosition
+  | Equals ArcPosition
+  | NotEquals ArcPosition
+  | LessThen ArcPosition
+  | LessThenEqual ArcPosition
+  | GreaterThen ArcPosition
+  | GreaterThenEqual ArcPosition
+  | LogicalAnd ArcPosition
+  | LogicalOr ArcPosition
+  | Add ArcPosition
+  | Subtract ArcPosition
+  | Divide ArcPosition
+  | Multiply ArcPosition
+
+newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: LHS, operator :: AssignmentOperator, value :: Step}
+
+data LHS = Role String | Property String
+
+data AssignmentOperator =
+  Set ArcPosition
+  | AddTo ArcPosition
+  | DeleteFrom ArcPosition
+  | Delete ArcPosition
+
+derive instance genericStep :: Generic Step _
+instance showStep :: Show Step where show s = genericShow s
+
+derive instance genericSimpleStep :: Generic SimpleStep _
+instance showSimpleStep :: Show SimpleStep where show = genericShow
+
+derive instance genericBinaryStep :: Generic BinaryStep _
+instance showBinaryStep :: Show BinaryStep where show = genericShow
+
+derive instance genericUnaryStep :: Generic UnaryStep _
+instance showUnaryStep :: Show UnaryStep where show = genericShow
+
+derive instance genericOperator :: Generic Operator _
+instance showOperator :: Show Operator where show = genericShow
+
+derive instance genericAssignment :: Generic Assignment _
+instance showAssignment :: Show Assignment where show = genericShow
+
+derive instance genericAssignmentOperator :: Generic AssignmentOperator _
+instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
+
+derive instance genericLHS :: Generic LHS _
+instance showLHS :: Show LHS where show = genericShow
