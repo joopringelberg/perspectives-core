@@ -3,20 +3,20 @@ SYNTAX VOOR QUERYPADEN
 Voorbeelden van een CalculatedRole
 
 	context >> RoleName >> binding
-	
+
 	context >> extern >> binder >> context
-	
+
 	filter context >> RoleName with BooleanPropertyName
-	
+
 	filter context >> RoleName with NumericPropertyName > 10
-	
+
 	(RoleName1 or RoleName2) >> binding
-	
+
 	(RoleName1 and RoleName2) >> context
 
 GRAMMATICA
 
-step = simpleStep | compoundStep
+step = simpleStep | unaryStep | compoundStep
 
 simpleStep = RoleName
 	| binding
@@ -24,6 +24,8 @@ simpleStep = RoleName
 	| context
 	| extern
 	| PropertyName
+
+unaryStep = 'not' step | 'create' ArcIdentifier | 'exists' ArcIdentifier
 
 compoundStep = (filter step 'with' step) | (step operator step) | filter step 'with' step | step operator step
 
@@ -33,10 +35,14 @@ assignment = lhs AssignmentOperator step
 
 lhs = RoleName | PropertyName 'of' RoleName
 
+RoleName = ArcIdentifier
+
+PropertyName = ArcIdentifier
+
 AssignmentOperator = '=' | '=+' | '=-'
 
 SEMANTISCHE CONTROLE
-Lang niet alle syntactisch correcte expressies zijn semantisch correct, natuurlijk. 
+Lang niet alle syntactisch correcte expressies zijn semantisch correct, natuurlijk.
 
 	RoleName >> binding >> PropertyName = context
 

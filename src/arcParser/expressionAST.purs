@@ -2,7 +2,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 
 -- | An Abstract Syntax Tree data model for Perspectives expressions. The expression grammar is below.
 -- |
--- | step = simpleStep | compoundStep
+-- | step = simpleStep | unaryStep | compoundStep
 -- |
 -- | simpleStep = RoleName
 -- |
@@ -16,6 +16,8 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | | PropertyName
 -- |
+-- | unaryStep = 'not' step | 'create' ArcIdentifier | 'exists' ArcIdentifier
+-- |
 -- | compoundStep = (filter step 'with' step) | (step operator step) | filter step 'with' step | step operator step
 -- |
 -- | operator = '>>' | '==' | '<' | '>' | '<=' | '>=' | 'and' | 'or' | '+' | '-' | '*' | '/'
@@ -25,6 +27,10 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- | lhs = RoleName | PropertyName 'of' RoleName
 -- |
 -- | AssignmentOperator = '=' | '=+' | '=-'
+-- |
+-- | RoleName = ArcIdentifier
+-- |
+-- | PropertyName = ArcIdentifier
 
 import Prelude
 
@@ -35,8 +41,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep
 
 data SimpleStep =
-  RoleName ArcPosition String
-  | PropertyName ArcPosition String
+  ArcIdentifier ArcPosition String
   | Binding ArcPosition
   | Binder ArcPosition
   | Context ArcPosition
@@ -63,10 +68,9 @@ data Operator =
   | Subtract ArcPosition
   | Divide ArcPosition
   | Multiply ArcPosition
+  | Filter ArcPosition
 
-newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: LHS, operator :: AssignmentOperator, value :: Step}
-
-data LHS = Role String | Property String
+newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Step}
 
 data AssignmentOperator =
   Set ArcPosition
@@ -94,6 +98,3 @@ instance showAssignment :: Show Assignment where show = genericShow
 
 derive instance genericAssignmentOperator :: Generic AssignmentOperator _
 instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
-
-derive instance genericLHS :: Generic LHS _
-instance showLHS :: Show LHS where show = genericShow
