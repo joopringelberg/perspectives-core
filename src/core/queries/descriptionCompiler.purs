@@ -12,6 +12,7 @@ import Data.Maybe (Maybe(..))
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range, sumOfDomains, productOfDomains)
 import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
 import Perspectives.Representation.ADT (ADT(..))
@@ -20,7 +21,7 @@ import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expan
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (class Show, bind, pure, ($), (<>), show)
+import Prelude (bind, pure, ($), show)
 
 compileElementaryStep :: Domain -> ElementaryQueryStep -> FD
 -- Check whether the domain is a ContextType. Then check whether this type has a role with
@@ -137,23 +138,7 @@ compileQueryStep currentDomain s@(Conjunction op1 op2) = do
 -- the last case
 compileQueryStep _ _ = throwError $ UnknownElementaryQueryStep
 
-type FD = ExceptT CompilerMessage MonadPerspectives QueryFunctionDescription
-
-data CompilerMessage =
-  UnknownElementaryQueryStep
-  | IncompatibleQueryArgument Domain ElementaryQueryStep
-  | ContextHasNoRole (ADT ContextType) String
-  | RoleHasNoProperty (ADT EnumeratedRoleType) String
-  | RoleHasNoBinding (ADT EnumeratedRoleType)
-  | IncompatibleDomainsForJunction Domain Domain
-
-instance showCompilerMessage :: Show CompilerMessage where
-  show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
-  show (IncompatibleQueryArgument dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom
-  show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no role with the name '" <> qn <> "'."
-  show (RoleHasNoProperty rtype qn) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "'."
-  show (RoleHasNoBinding rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding."
-  show (IncompatibleDomainsForJunction dom1 dom2) = "(IncompatibleDomainsForJunction) These two domains cannot be joined in a disjunction of conjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
+type FD = ExceptT PerspectivesError MonadPerspectives QueryFunctionDescription
 
 compileRoleDescription :: ContextType -> QueryStep -> MonadPerspectives QueryFunctionDescription
 compileRoleDescription ct s = do

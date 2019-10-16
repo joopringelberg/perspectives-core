@@ -9,6 +9,7 @@ module Perspectives.QueryAST where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Perspectives.EntiteitAndRDFAliases (ContextID)
 
@@ -61,3 +62,9 @@ derive instance genericRepElementaryQueryStep :: Generic ElementaryQueryStep _
 
 instance showElementaryQueryStep :: Show ElementaryQueryStep where
   show = genericShow
+
+instance eqElementaryQueryStep :: Eq ElementaryQueryStep where
+  eq = genericEq
+
+instance eqQueryStep :: Eq QueryStep where
+  eq e1 e2 = genericEq e1 e2

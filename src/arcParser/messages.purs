@@ -11,7 +11,10 @@ import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType)
+import Perspectives.Query.QueryTypes (Domain)
+import Perspectives.QueryAST (ElementaryQueryStep)
+import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
@@ -37,6 +40,12 @@ data PerspectivesError
     | UnknownView ArcPosition String
     | NotUniquelyIdentifying ArcPosition String (Array String)
     | Custom String
+    | UnknownElementaryQueryStep
+    | IncompatibleQueryArgument Domain ElementaryQueryStep
+    | ContextHasNoRole (ADT ContextType) String
+    | RoleHasNoProperty (ADT EnumeratedRoleType) String
+    | RoleHasNoBinding (ADT EnumeratedRoleType)
+    | IncompatibleDomainsForJunction Domain Domain
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
 
@@ -53,6 +62,12 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownView pos qname) = "(UnknownProperty) The view '" <> qname <> "' is not defined, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
   show (Custom s) = s
+  show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
+  show (IncompatibleQueryArgument dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom
+  show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no role with the name '" <> qn <> "'."
+  show (RoleHasNoProperty rtype qn) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "'."
+  show (RoleHasNoBinding rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding."
+  show (IncompatibleDomainsForJunction dom1 dom2) = "(IncompatibleDomainsForJunction) These two domains cannot be joined in a disjunction of conjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError
