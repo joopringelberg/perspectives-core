@@ -22,9 +22,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | operator = '>>' | '==' | '<' | '>' | '<=' | '>=' | 'and' | 'or' | '+' | '-' | '*' | '/'
 -- |
--- | assignment = lhs AssignmentOperator step
--- |
--- | lhs = RoleName | PropertyName 'of' RoleName
+-- | assignment = ArcIdentifier AssignmentOperator step
 -- |
 -- | AssignmentOperator = '=' | '=+' | '=-'
 -- |
@@ -36,6 +34,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 
 data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep
@@ -70,7 +69,7 @@ data Operator =
   | Multiply ArcPosition
   | Filter ArcPosition
 
-newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Step}
+newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
 
 data AssignmentOperator =
   Set ArcPosition

@@ -2,8 +2,9 @@ module Perspectives.Parsing.Arc.Expression where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
+import Data.Maybe (Maybe(..))
 import Data.String (length)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Step(..), UnaryStep(..), SimpleStep(..), Operator(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
@@ -151,3 +152,29 @@ endOf stp = case stp of
 
     line_ :: ArcPosition -> Int
     line_ (ArcPosition{line}) = line
+
+assignment :: IP Assignment
+assignment = deletion <|> try do
+  start <- getPosition
+  lhs <- arcIdentifier
+  op <- assignmentOperator
+  val <- step
+  end <- getPosition
+  pure $ Assignment {start, end, lhs, operator: op, value: Just val}
+
+assignmentOperator :: IP AssignmentOperator
+assignmentOperator = try
+  (DeleteFrom <$> (getPosition <* reserved "=-"))
+  <|>
+  (AddTo <$> (getPosition <* reserved "=+"))
+  <|>
+  ((Set <$> (getPosition <* reserved "="))
+  ) <?> "=, =+, =-"
+
+deletion :: IP Assignment
+deletion = try do
+  start <- getPosition
+  reserved "delete"
+  lhs <- arcIdentifier
+  end <- getPosition
+  pure $ Assignment {start, end, lhs, operator: Delete start, value: Nothing }

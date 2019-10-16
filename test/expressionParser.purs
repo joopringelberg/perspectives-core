@@ -6,8 +6,8 @@ import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
-import Perspectives.Parsing.Arc.Expression (binaryStep, compoundStep, filterStep, simpleStep, step, unaryStep)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression (assignment, assignmentOperator, binaryStep, compoundStep, filterStep, simpleStep, step, unaryStep)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..), AssignmentOperator(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -106,6 +106,20 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
               otherwise -> false
             otherwise -> false
 
+
+  test "BinaryStep with different SimpleSteps" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "AnotherRole >> binding" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        logShow id
+        assert "'AnotherRole >> binding' should be parsed as a a binary step with operator 'Compose'"
+          case id of
+            (Binary (BinaryStep {operator})) -> case operator of
+              (Compose _) -> true
+              otherwise -> false
+            otherwise -> false
+
   test "BinaryStep that fails on operator" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 ? Prop2" binaryStep
     case r of
@@ -175,9 +189,55 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       (Left e) -> assert (show e) false
       (Right id) -> do
         logShow id
-        assert "'(MyRole) >> (MyProp)' should be parsed as a a binary step with operator 'Add'"
+        assert "'MyProp1 + MyProp2 * MyProp3' should be parsed as a a binary step with operator 'Add'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
               (Add _) -> true
               otherwise -> false
+            otherwise -> false
+
+  test "Operator precedence on '(MyProp1 + MyProp2) * MyProp3'" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "(MyProp1 + MyProp2) * MyProp3" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        logShow id
+        assert "'(MyRole) >> (MyProp)' should be parsed as a a binary step with operator 'Multiply'"
+          case id of
+            (Binary (BinaryStep {operator})) -> case operator of
+              (Multiply _) -> true
+              otherwise -> false
+            otherwise -> false
+
+  test "Assignment: MyRole = AnotherRole" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyRole = AnotherRole" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Assignment{operator})) -> do
+        logShow a
+        assert "'MyRole = AnotherRole' should be parsed as a an Assignment with operator Set"
+          case operator of
+            (Set _) -> true
+            otherwise -> false
+
+  test "MyRole =+ AnotherRole >> binding" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyRole =+ AnotherRole >> binding" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Assignment{operator})) -> do
+        logShow a
+        assert "'MyRole =+ AnotherRole >> binding' should be parsed as a an Assignment with operator AddTo"
+          case operator of
+            (AddTo _) -> true
+            otherwise -> false
+
+  test "delete MyProp" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "delete Myprop" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Assignment{operator})) -> do
+        logShow a
+        assert "'delete Myprop' should be parsed as a an Assignment with operator Delete"
+          case operator of
+            (Delete _) -> true
             otherwise -> false
