@@ -26,7 +26,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (bind, ($), pure, (>=>), (<>), show)
+import Prelude (bind, ($), pure, (>=>), (<>), show, (>>=))
 
 -- | A Variant to hold the six types of functions that can be computed.
 data CompiledFunction =
@@ -47,13 +47,13 @@ compileFunction (SQD _ (RolGetter (ENR r)) _) = pure $ C2R $ getRole r
 
 compileFunction (SQD _ (RolGetter (CR cr)) _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
-  compileFunction (RC.calculation ct)
+  RC.calculation ct >>= compileFunction
 
 compileFunction (SQD _ (PropertyGetter (ENP pt)) _) = pure $ R2V $ getProperty pt
 
 compileFunction (SQD _ (PropertyGetter (CP pt)) _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
-  compileFunction (PC.calculation cp)
+  PC.calculation cp >>= compileFunction
 
 compileFunction (SQD _ (DataTypeGetter "externalRole") _) = pure $ C2R externalRole
 
@@ -132,12 +132,12 @@ getRoleFunction id = unsafePartial $
   <|>
   do
     (p :: EnumeratedRole) <- getPerspectType (EnumeratedRoleType id)
-    (C2R f) <- compileFunction $ RC.calculation p
+    (C2R f) <- RC.calculation p >>= compileFunction
     pure f
   <|>
   do
     (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType id)
-    (C2R f) <- compileFunction $ RC.calculation p
+    (C2R f) <- RC.calculation p >>= compileFunction
     pure f
 
 -- | Construct a function to compute instances of a RoleType from an instance of a Context.
@@ -163,10 +163,10 @@ getPropertyFunction id = unsafePartial $
   <|>
   do
     (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType id)
-    (R2V f) <- compileFunction $ PC.calculation p
+    (R2V f) <- PC.calculation p >>= compileFunction
     pure f
   <|>
   do
     (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
-    (R2V f) <- compileFunction $ PC.calculation p
+    (R2V f) <- PC.calculation p >>= compileFunction
     pure f

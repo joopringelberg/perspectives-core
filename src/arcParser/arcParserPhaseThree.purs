@@ -29,6 +29,7 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (typeExists)
 import Perspectives.Representation.Class.Role (expandedADT_)
 import Perspectives.Representation.Context (Context(..))
@@ -251,12 +252,12 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
     qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
-          SQD dom (ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType))) -> do
+          Q (SQD dom (ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType)))) -> do
             qComputedType <- qualifyType pos computedType
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
-                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = SQD dom (ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
+                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
           otherwise -> pure unit)
 
       where

@@ -14,7 +14,7 @@ import Foreign.Object (insert, lookup) as FO
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (deconstructModelName, deconstructNamespace)
+import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)

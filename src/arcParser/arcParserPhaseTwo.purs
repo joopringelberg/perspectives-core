@@ -27,6 +27,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
 import Perspectives.Representation.Class.Role (Role(..))
@@ -371,7 +372,7 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     handleParts (CalculatedRole roleUnderConstruction) (Computation functionName computedType) = let
-      calculation = SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType)))
+      calculation = Q $ SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType)))
       in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type

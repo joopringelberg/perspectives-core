@@ -7,6 +7,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
@@ -25,7 +26,7 @@ type CalculatedRoleRecord =
   , displayName :: String
   , kindOfRole :: RoleKind
 
-  , calculation :: QueryFunctionDescription
+  , calculation :: Calculation
   , context :: ContextType
 
   , pos :: ArcPosition
@@ -38,7 +39,7 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
   , displayName: dname
   , kindOfRole: kindOfRole
 
-  , calculation: SQD (CDOM $ ST $ (ContextType "")) (RolGetter (ENR (EnumeratedRoleType ""))) (RDOM (ST (EnumeratedRoleType "")))
+  , calculation: Q $ SQD (CDOM $ ST $ (ContextType "")) (RolGetter (ENR (EnumeratedRoleType ""))) (RDOM (ST (EnumeratedRoleType "")))
   , context: ContextType context
 
   , pos: pos

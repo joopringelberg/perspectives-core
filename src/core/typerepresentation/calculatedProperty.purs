@@ -7,6 +7,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
@@ -24,7 +25,7 @@ type CalculatedPropertyRecord =
   , _rev :: Revision_
   , displayName :: String
 
-  , calculation :: QueryFunctionDescription
+  , calculation :: Calculation
   -- , computation :: Maybe (RoleInContext ~~> Value)
   , role :: EnumeratedRoleType
 
@@ -36,7 +37,7 @@ defaultCalculatedProperty id dn role pos = CalculatedProperty
   { _id: CalculatedPropertyType id
   , _rev: Nothing
   , displayName: dn
-  , calculation: SQD (RDOM $ ST $ (EnumeratedRoleType "")) (DataTypeGetter "") (PDOM (EnumeratedPropertyType ""))
+  , calculation: Q $ SQD (RDOM $ ST $ (EnumeratedRoleType "")) (DataTypeGetter "") (PDOM (EnumeratedPropertyType ""))
   , role: EnumeratedRoleType role
   , pos: pos}
 

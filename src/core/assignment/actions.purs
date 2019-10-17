@@ -97,7 +97,7 @@ compileBotAction actionType contextId =
       (objectOfAction :: Role) <- getRole (object action)
       -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
       -- The result of this function is dependent on any number of Assumptions.
-      (objectGetter :: RoleGetter) <- context2role $ getCalculation objectOfAction
+      (objectGetter :: RoleGetter) <- getCalculation objectOfAction >>= context2role
       -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
       (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (unsafePartial $ fromJust $ effect action) objectGetter actionType
       -- The Left Hand Side of the Action is a query that computes boolean values.

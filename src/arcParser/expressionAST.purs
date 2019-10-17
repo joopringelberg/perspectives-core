@@ -36,8 +36,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
+import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
+-- | Step represents an Expression conforming to the grammar given above.
 data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep
 
 data SimpleStep =
@@ -81,6 +84,10 @@ data AssignmentOperator =
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq
+instance writeForeignStep :: WriteForeign Step where
+  writeImpl q = unsafeToForeign (writeJSON q)
+instance readForeignStep :: ReadForeign Step where
+  readImpl q = readJSON' (unsafeFromForeign q)
 
 derive instance genericSimpleStep :: Generic SimpleStep _
 instance showSimpleStep :: Show SimpleStep where show = genericShow

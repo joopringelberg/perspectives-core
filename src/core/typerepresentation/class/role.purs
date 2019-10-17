@@ -11,12 +11,13 @@ import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), Domain(..))
 import Perspectives.Query.QueryTypes (range) as QT
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType, getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
-import Prelude (class Show, map, pure, ($), (<<<), (>=>), (>>=), bind, class Eq)
+import Prelude (class Show, map, pure, ($), (<<<), (>=>), (>>=), bind, class Eq, (<>))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -29,7 +30,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   binding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
-  calculation :: r -> QueryFunctionDescription
+  calculation :: r -> MonadPerspectives QueryFunctionDescription
   properties :: r -> MonadPerspectives (Array PropertyType)
   -- | The type of the Role, including its binding. Is expanded just for CalculatedRole.
   typeIncludingBinding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
@@ -40,14 +41,14 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
 getRole' :: forall r i. RoleClass r i => i -> MonadPerspectives r
 getRole' i = getPerspectType i
 
-getCalculation' :: forall r i. RoleClass r i => r -> QueryFunctionDescription
+getCalculation' :: forall r i. RoleClass r i => r -> MonadPerspectives QueryFunctionDescription
 getCalculation' r = calculation r
 
 rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> rangeOfRoleCalculation'_ (CalculatedRoleType r)
   where
     rangeOfRoleCalculation'_ :: forall r i. RoleClass r i => i -> MonadPerspectives (ADT EnumeratedRoleType)
-    rangeOfRoleCalculation'_ i = getRole' i >>= pure <<< getCalculation' >>= case _ of
+    rangeOfRoleCalculation'_ i = getRole' i >>= getCalculation' >>= case _ of
         SQD _ _ (RDOM p) -> pure p
         UQD _ _ _ (RDOM p) -> pure p
         BQD _ _ _ _ (RDOM p) -> pure p
@@ -64,14 +65,16 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   binding = rangeOfCalculatedRole >=> bindingOfADT
   functional = rangeOfCalculatedRole >=> functional'
   mandatory = rangeOfCalculatedRole >=> mandatory'
-  calculation r = (unwrap r).calculation
+  calculation r = case (unwrap r).calculation of
+    Q qd -> pure qd
+    otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   properties = rangeOfCalculatedRole >=> propertiesOfADT
   typeIncludingBinding = rangeOfCalculatedRole
   expandedADT = rangeOfCalculatedRole
   views =  rangeOfCalculatedRole >=> viewsOfADT
 
 rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
-rangeOfCalculatedRole cr = roleCalculationRange (calculation cr)
+rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
   where
     roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
     roleCalculationRange qfd = case QT.range qfd of
@@ -89,7 +92,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
+  calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
   properties r = includeBinding (\r' -> (unwrap r').properties) propertiesOfADT r
   typeIncludingBinding r = do
     pure $ case (unwrap r).binding of
@@ -188,7 +191,7 @@ data Role = E EnumeratedRole | C CalculatedRole
 id :: forall r i. RoleClass r i => r -> i
 id = identifier
 
-getCalculation :: Role -> QueryFunctionDescription
+getCalculation :: Role -> MonadPerspectives QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
 
@@ -202,7 +205,7 @@ getRole (CR c) = getPerspectType c >>= pure <<< C
 -- | The range of the computation of the RoleType.
 -- | Does not include the binding, for (ENR (EnumeratedRoleType e)).
 rangeOfRoleCalculation :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
-rangeOfRoleCalculation = getRole >=> pure <<< getCalculation >=> case _ of
+rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
     SQD _ _ (RDOM p) -> pure p
     UQD _ _ _ (RDOM p) -> pure p
     BQD _ _ _ _ (RDOM p) -> pure p

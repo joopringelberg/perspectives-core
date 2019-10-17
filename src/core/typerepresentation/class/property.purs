@@ -8,12 +8,13 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Query.QueryTypes (range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty, Range)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..))
-import Prelude (pure, (>=>), (>>=))
+import Prelude (pure, (>=>), (>>=), ($), (<>))
 
 -- TODO. Controleer of de opzet van RoleClass.expandedADT hier van toepassing is.
 -----------------------------------------------------------
@@ -24,14 +25,16 @@ class (Identifiable r i) <= PropertyClass r i | r -> i, i -> r where
   range :: r -> MonadPerspectives Range
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
-  calculation :: r -> QueryFunctionDescription
+  calculation :: r -> MonadPerspectives QueryFunctionDescription
 
 instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty CalculatedPropertyType where
   role r = (unwrap r).role
   range = rangeOfCalculatedProperty >=> range
   functional = rangeOfCalculatedProperty >=> functional
   mandatory = rangeOfCalculatedProperty >=> mandatory
-  calculation r = (unwrap r).calculation
+  calculation r = case (unwrap r).calculation of
+    Q calc -> pure calc
+    otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedProperty before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedPropertyType))))
 
 propertyCalculationRange :: QueryFunctionDescription -> MonadPerspectives EnumeratedPropertyType
 propertyCalculationRange qfd = case QT.range qfd of
@@ -39,20 +42,20 @@ propertyCalculationRange qfd = case QT.range qfd of
   otherwise -> throwError (error ("range of calculation of a property is not an enumerated property."))
 
 rangeOfCalculatedProperty :: CalculatedProperty -> MonadPerspectives EnumeratedProperty
-rangeOfCalculatedProperty cp = propertyCalculationRange (calculation cp) >>= getPerspectType
+rangeOfCalculatedProperty cp = calculation cp >>= propertyCalculationRange >>= getPerspectType
 
 rangeOfCalculation_ :: forall r i. PropertyClass r i => r -> MonadPerspectives EnumeratedProperty
-rangeOfCalculation_ cp = propertyCalculationRange (calculation cp) >>= getPerspectType
+rangeOfCalculation_ = calculation >=> propertyCalculationRange >=> getPerspectType
 
 rangeOfCalculation :: forall r i. PropertyClass r i => r -> MonadPerspectives EnumeratedPropertyType
-rangeOfCalculation cp = propertyCalculationRange (calculation cp)
+rangeOfCalculation = calculation >=> propertyCalculationRange
 
 instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty EnumeratedPropertyType where
   role r = (unwrap r).role
   range r = pure (unwrap r).range
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (PDOM (identifier r))
+  calculation r = pure $ SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (PDOM (identifier r))
 
 data Property = E EnumeratedProperty | C CalculatedProperty
 
