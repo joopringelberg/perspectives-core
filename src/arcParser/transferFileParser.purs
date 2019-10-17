@@ -5,7 +5,8 @@ import Control.Lazy (defer)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon)
+import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
@@ -82,7 +83,7 @@ roleE = withBlock
     filledByAttribute = reserved "FilledBy" *> colon *> arcIdentifier >>= pure <<< FilledByAttribute
 
     calculation :: IP RolePart
-    calculation = reserved "Calculation" *> colon *> stringUntilNewline >>= pure <<< Calculation
+    calculation = reserved "Calculation" *> colon *> step >>= pure <<< Calculation
 
     forUser :: IP RolePart
     forUser = reserved "ForUser" *> colon *> arcIdentifier >>= pure <<< ForUser
@@ -110,7 +111,7 @@ propertyE = withBlock
     mandatoryAttribute = reserved "Mandatory" *> colon *> boolean >>= pure <<< MandatoryAttribute'
 
     calculation :: IP PropertyPart
-    calculation = reserved "Calculation" *> colon *> stringUntilNewline >>= pure <<< Calculation'
+    calculation = reserved "Calculation" *> colon *> step >>= pure <<< Calculation'
 
     range :: IP Range
     range = reserved "BooleanProperty" *> pure PBool

@@ -7,7 +7,8 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, stringUntilNewline, reserved, colon, lowerCaseName)
+import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..))
@@ -133,7 +134,8 @@ roleE = try $ withEntireBlock
 
     calculatedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
     calculatedRole_ pos knd uname = try do
-      calculation <- reserved "=" *> stringUntilNewline >>= pure <<< Calculation
+      -- calculation <- reserved "=" *> stringUntilNewline >>= pure <<< Calculation
+      calculation <- reserved "=" *> step >>= pure <<< Calculation
       pure {uname, knd, pos, parts: Cons calculation Nil }
 
     computedRole_ :: ArcPosition -> RoleKind -> String -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart))
@@ -190,7 +192,7 @@ propertyE = try do
     calculatedProperty :: ArcPosition -> String -> IP RolePart
     calculatedProperty pos uname = try do
       token.reservedOp "="
-      calc <- stringUntilNewline
+      calc <- step
       pure $ PE $ PropertyE
         { id: uname
         , range: Nothing

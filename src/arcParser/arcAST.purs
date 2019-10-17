@@ -6,6 +6,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
@@ -33,7 +34,7 @@ type FunctionName = String
 type ComputedType = String
 
 -- TODO: het verschil tussen conjunctie en disjunctie bij FilledByAttribute.
-data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation String | ForUser String | RoleAspect String ArcPosition | Computation FunctionName ComputedType
+data RolePart = PE PropertyE | PRE PerspectiveE | VE ViewE | FunctionalAttribute Boolean | MandatoryAttribute Boolean | FilledByAttribute String | Calculation Step | ForUser String | RoleAspect String ArcPosition | Computation FunctionName ComputedType
 
 newtype PropertyE = PropertyE
   { id :: String
@@ -42,7 +43,7 @@ newtype PropertyE = PropertyE
   , pos :: ArcPosition
   }
 
-data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' String
+data PropertyPart = FunctionalAttribute' Boolean | MandatoryAttribute' Boolean | Calculation' Step
 
 newtype PerspectiveE = PerspectiveE
   { id :: String
