@@ -45,6 +45,9 @@ getPerspectType id = do
 getEnumeratedRole :: EnumeratedRoleType -> MP EnumeratedRole
 getEnumeratedRole = getPerspectType
 
+getCalculatedRole :: CalculatedRoleType -> MP CalculatedRole
+getCalculatedRole = getPerspectType
+
 getEnumeratedProperty :: EnumeratedPropertyType -> MP EnumeratedProperty
 getEnumeratedProperty = getPerspectType
 

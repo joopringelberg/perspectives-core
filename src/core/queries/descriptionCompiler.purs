@@ -6,24 +6,28 @@ module Perspectives.Query.DescriptionCompiler where
 -- | range of its predecessor. Otherwise, an error is thrown that will be presented to the modeller.
 
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Data.Array (head)
+import Control.Monad.State (gets)
+import Data.Array (head, length)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
+import Data.Newtype (unwrap)
 import Effect.Exception (error)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.Identifiers (isQualifiedWithDomein)
+import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), SimpleStep(..), Step(..), UnaryStep)
+import Perspectives.Parsing.Arc.PhaseThree (PhaseThree, lift2)
+import Perspectives.Parsing.Arc.PhaseTwo (getDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range, sumOfDomains, productOfDomains)
-import Perspectives.QueryAST (ElementaryQueryStep(..), QueryStep(..))
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
 import Perspectives.Representation.Class.Property (effectivePropertyType)
-import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_)
+import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT, expandedADT_, getRoleType)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, pure, ($), show)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleType(..), roletype2string)
+import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
+import Prelude (bind, map, pure, show, ($), (==), discard)
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileElementaryStep currentDomain st
@@ -38,24 +42,59 @@ compileElementaryStep currentDomain s@(ArcIdentifier pos ident) =
   case currentDomain of
     (CDOM c) -> do
       (rts :: Array RoleType) <- if isQualifiedWithDomein ident
-        then lift $ runArrayT $ lookForRoleTypeOfADT ident c
-        else lift $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
+        then lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
+        else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
       case head rts of
         Nothing -> throwError $ ContextHasNoRole c ident
         (Just (rt :: RoleType)) -> do
-          (expandedType :: ADT EnumeratedRoleType) <- lift $ expandedADT_ rt
+          (expandedType :: ADT EnumeratedRoleType) <- lift $ lift $ expandedADT_ rt
           pure $ SQD currentDomain (RolGetter rt) (RDOM $ expandedType)
     (RDOM r) -> do
       (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
-        then  lift $ runArrayT $ lookForPropertyType ident r
-        else lift $ runArrayT $ lookForUnqualifiedPropertyType ident r
+        then  lift2 $ runArrayT $ lookForPropertyType ident r
+        else lift2 $ runArrayT $ lookForUnqualifiedPropertyType ident r
       case head pts of
         Nothing -> throwError $ RoleHasNoProperty r ident
         (Just (pt :: PropertyType)) -> do
           -- TODO: controleer of hier niet een 'expandedADT_' voor PropertyClass gebruikt moet worden.
-          (effectiveType :: EnumeratedPropertyType) <- lift $ effectivePropertyType pt
+          (effectiveType :: EnumeratedPropertyType) <- lift2 $ effectivePropertyType pt
           pure $ SQD currentDomain (PropertyGetter pt) (PDOM $ effectiveType)
-    otherwise -> throwError $ IncompatibleQueryArgument currentDomain (Simple s)
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileElementaryStep currentDomain s@(Value pos range stringRepresentation) = pure $
+  SQD currentDomain (Constant range stringRepresentation) (VDOM range)
+
+compileElementaryStep currentDomain s@(Binding pos) = do
+  case currentDomain of
+    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+      -- The binding of a role is always an ADT EnumeratedRoleType.
+      (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
+      case typeOfBinding of
+        NOTYPE -> throwError $ RoleHasNoBinding pos r
+        adt -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileElementaryStep currentDomain s@(Binder pos binderName) = do
+  case currentDomain of
+    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+      (qBinderType :: EnumeratedRoleType) <- if isQualifiedWithDomein binderName
+        then pure $ EnumeratedRoleType binderName
+        -- Try to qualify the name within the Domain.
+        else do
+          {_id:namespace} <- lift $ gets _.dfr
+          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain binderName (unsafePartial $ fromJust $ (deconstructModelName namespace))
+          case head qnames of
+            Nothing -> throwError $ UnknownRole pos binderName
+            (Just qn) | length qnames == 1 -> pure qn
+            otherwise -> throwError $ NotUniquelyIdentifying pos binderName (map unwrap qnames)
+
+      -- Now we have a qualified Rolename for the binder, check if it indeed binds the role that is the currentDomain.
+      -- That is, its binding (an ADT) must be more general than the currentDomain.
+      (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ expandedADT_ (ENR qBinderType)
+      if r `lessThenOrEqualTo` bindingOfBinder
+        then pure $ SQD currentDomain (DataTypeGetterWithParameter "getUnqualifiedRoleBinders" binderName) (RDOM $ ST qBinderType)
+        else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 -- compileElementaryStep currentDomain s@(QualifiedExternalProperty qn) = do
 --   compileQueryStep currentDomain (Compose (Terminal ExternalRole) (Terminal (QualifiedRole qn)))
@@ -67,7 +106,7 @@ compileElementaryStep currentDomain s@(ArcIdentifier pos ident) =
 --   case currentDomain of
 --     (RDOM (r :: ADT EnumeratedRoleType)) -> do
 --       -- The binding of a role is always an ADT EnumeratedRoleType.
---       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift $ bindingOfADT r
+--       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
 --       case typeOfBinding of
 --         NOTYPE -> throwError $ RoleHasNoBinding r
 --         adt -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
@@ -76,14 +115,14 @@ compileElementaryStep currentDomain s@(ArcIdentifier pos ident) =
 -- compileElementaryStep currentDomain s@(Context) = do
 --   case currentDomain of
 --     (RDOM (r :: ADT EnumeratedRoleType)) -> do
---       (typeOfContext :: ADT ContextType) <- lift $ contextOfADT r
+--       (typeOfContext :: ADT ContextType) <- lift2 $ contextOfADT r
 --       pure $ SQD currentDomain (DataTypeGetter "context") (CDOM typeOfContext)
 --     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 --
 -- compileElementaryStep currentDomain s@(ExternalRole) = do
 --   case currentDomain of
 --     (CDOM c) -> do
---       (rts :: ADT EnumeratedRoleType) <- lift $ externalRoleOfADT c
+--       (rts :: ADT EnumeratedRoleType) <- lift2 $ externalRoleOfADT c
 --       pure $ SQD currentDomain (DataTypeGetter "externalRole") (RDOM $ rts)
 --     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
 
@@ -126,11 +165,12 @@ compileQueryStep currentDomain s@(Conjunction op1 op2) = do
 compileQueryStep _ _ = throwError $ UnknownElementaryQueryStep
 -}
 
-type FD = ExceptT PerspectivesError MonadPerspectives QueryFunctionDescription
+-- type FD = ExceptT PerspectivesError MonadPerspectives QueryFunctionDescription
+type FD = PhaseThree QueryFunctionDescription
 
-compileRoleDescription :: ContextType -> Step -> MonadPerspectives QueryFunctionDescription
-compileRoleDescription ct s = do
-  r <- runExceptT (compileStep (CDOM $ ST ct) s)
-  case r of
-    (Left m) -> throwError (error (show m))
-    (Right d) -> pure d
+-- compileRoleDescription :: ContextType -> Step -> MonadPerspectives QueryFunctionDescription
+-- compileRoleDescription ct s = do
+--   r <- runExceptT (compileStep (CDOM $ ST ct) s)
+--   case r of
+--     (Left m) -> throwError (error (show m))
+--     (Right d) -> pure d

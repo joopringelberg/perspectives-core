@@ -4,7 +4,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | step = simpleStep | unaryStep | compoundStep
 -- |
--- | simpleStep = RoleName
+-- | simpleStep = ArcIdentifier
 -- |
 -- | | binding
 -- |
@@ -14,7 +14,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | | extern
 -- |
--- | | PropertyName
+-- | | Value
 -- |
 -- | unaryStep = 'not' step | 'create' ArcIdentifier | 'exists' ArcIdentifier
 -- |
@@ -29,6 +29,8 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- | RoleName = ArcIdentifier
 -- |
 -- | PropertyName = ArcIdentifier
+-- |
+-- | Value = number | boolean | string | date
 
 import Prelude
 
@@ -48,7 +50,7 @@ data SimpleStep =
   ArcIdentifier ArcPosition String
   | Value ArcPosition Range String
   | Binding ArcPosition
-  | Binder ArcPosition
+  | Binder ArcPosition String
   | Context ArcPosition
   | Extern ArcPosition
 

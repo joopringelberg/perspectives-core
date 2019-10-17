@@ -25,12 +25,16 @@ domain: Feest
     perspective on : Gast
       Consult with ViewOpGast
       Change with AnotherView
+        if SomeProp > AnotherProp
       Bind with AnotherView
         indirectObject: AnotherRole (ViewOnAnotherRole)
         subjectView: ViewOpGast
   bot: for Gast
     perspective on: Wens (ViewOpWens): Delete
   user: Eregast = Gast > binding
+  bot: for Eregast
+    perspective on: Wens
+      if Wens >> Bedrag > 10 then SomeProp = false
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
   -- A nested context
   activity: EzeltjePrik

@@ -24,7 +24,7 @@ simpleStep = try
   <|>
   Simple <$> (Binding <$> (getPosition <* reserved "binding"))
   <|>
-  Simple <$> (Binder <$> (getPosition <* reserved "binder"))
+  Simple <$> (Binder <$> (getPosition <* reserved "binder") <*> arcIdentifier)
   <|>
   Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
@@ -131,7 +131,7 @@ startOf stp = case stp of
     startOfSimple (ArcIdentifier p _) = p
     startOfSimple (Value p _ _) = p
     startOfSimple (Binding p) = p
-    startOfSimple (Binder p) = p
+    startOfSimple (Binder p _) = p
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
 
@@ -149,7 +149,7 @@ endOf stp = case stp of
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
     endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
     endOfSimple (Binding (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
-    endOfSimple (Binder (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
+    endOfSimple (Binder (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
 

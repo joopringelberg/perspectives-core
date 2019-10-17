@@ -1,18 +1,21 @@
 module Perspectives.Types.ObjectGetters where
 
-import Control.Plus ((<|>))
-import Data.Array (singleton)
+import Control.Plus (map, (<|>))
+import Data.Array (filter, singleton)
 import Data.Newtype (unwrap)
+import Foreign.Object (keys)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.Identifiers (areLastSegmentsOf, isContainingNamespace)
+import Perspectives.DomeinCache (retrieveDomeinFile)
+import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments, isContainingNamespace)
 import Perspectives.Instances.Combinators (closure_, disjunction, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
 import Perspectives.Representation.Class.Role (class RoleClass, getRole', properties, propertiesOfADT, views, viewsOfADT)
 import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole, contextRole) as Context
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType, ViewType, propertytype2string, roletype2string)
-import Prelude (pure, (==), (>>>), (<<<), (>=>))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
+import Prelude (pure, (==), (>>>), (<<<), (>=>), bind, ($), (<>))
 
 externalRoleOfADT_ :: ADT ContextType ~~~> EnumeratedRoleType
 externalRoleOfADT_ = ArrayT <<< reduce eRole where
@@ -102,3 +105,15 @@ lookForUnqualifiedViewType s = lookForView (unwrap >>> areLastSegmentsOf s)
 
 lookForView :: (ViewType -> Boolean) -> ADT EnumeratedRoleType ~~~> ViewType
 lookForView criterium = filter' (ArrayT <<< viewsOfADT) criterium
+
+qualifyRoleInDomain :: String -> String ~~~> RoleType
+qualifyRoleInDomain localName namespace = ArrayT do
+  DomeinFile {calculatedRoles, enumeratedRoles} <- retrieveDomeinFile namespace
+  eCandidates <- pure $ map (ENR <<< EnumeratedRoleType) (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))
+  cCandidates <- pure $ map (CR <<< CalculatedRoleType) (filter (\_id -> _id `endsWithSegments` localName) (keys calculatedRoles))
+  pure $ eCandidates <> cCandidates
+
+qualifyEnumeratedRoleInDomain :: String -> String ~~~> EnumeratedRoleType
+qualifyEnumeratedRoleInDomain localName namespace = ArrayT do
+  DomeinFile {calculatedRoles, enumeratedRoles} <- retrieveDomeinFile namespace
+  pure $ map EnumeratedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))

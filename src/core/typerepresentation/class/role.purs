@@ -13,7 +13,7 @@ import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
-import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getPerspectType, getEnumeratedRole)
+import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
@@ -217,5 +217,8 @@ expandedADT_ = getRole >=> (case _ of
   C r -> expandedADT r)
 
 -----------------------------------------------------------
--- FUNCTIONS ON ROLECLASS
+-- FUNCTIONS ON STRING
 -----------------------------------------------------------
+getRoleType :: String -> MonadPerspectives RoleType
+getRoleType s = ((getEnumeratedRole $ EnumeratedRoleType s) >>= pure <<< ENR <<< identifier)
+  <|> ((getCalculatedRole $ CalculatedRoleType s) >>= pure <<< CR <<< identifier)
