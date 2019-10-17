@@ -49,3 +49,6 @@ lowerCaseName = many lower <* token.whiteSpace >>= pure <<< fromCharArray
 
 lower ::  IP Char
 lower = satisfy isLower <?> "lowercase letter"
+
+boolean :: IP String
+boolean = token.symbol "true" <|> token.symbol "false"

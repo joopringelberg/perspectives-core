@@ -5,10 +5,11 @@ import Control.Lazy (defer)
 import Data.Maybe (Maybe(..))
 import Data.String (length)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
-import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+))
+import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
 import Text.Parsing.Parser.Combinators (try, (<?>))
 
 step :: IP Step
@@ -27,7 +28,15 @@ simpleStep = try
   <|>
   Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
-  Simple <$> (Extern <$> (getPosition <* reserved "extern"))) <?> "binding, binder, context, extern or a valid identifier"
+  Simple <$> (Extern <$> (getPosition <* reserved "extern"))
+  <|>
+  Simple <$> (Value <$> getPosition <*> pure PString <*> token.stringLiteral)
+  <|>
+  Simple <$> (Value <$> getPosition <*> pure PBool <*> boolean)
+  <|>
+  Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
+  -- TODO: date
+  ) <?> "binding, binder, context, extern or a valid identifier"
 
 unaryStep :: IP Step
 unaryStep = try
@@ -120,6 +129,7 @@ startOf stp = case stp of
 
   where
     startOfSimple (ArcIdentifier p _) = p
+    startOfSimple (Value p _ _) = p
     startOfSimple (Binding p) = p
     startOfSimple (Binder p) = p
     startOfSimple (Context p) = p
@@ -137,6 +147,7 @@ endOf stp = case stp of
 
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
+    endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
     endOfSimple (Binding (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Binder (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}

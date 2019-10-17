@@ -7,14 +7,15 @@ import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
 import Perspectives.Parsing.Arc.Expression (assignment, assignmentOperator, binaryStep, compoundStep, filterStep, simpleStep, step, unaryStep)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..), AssignmentOperator(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
+import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.Expression" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -183,7 +184,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
               otherwise -> false
             otherwise -> false
 
-  testOnly "Operator precedence on 'MyProp1 + MyProp2 * MyProp3'" do
+  test "Operator precedence on 'MyProp1 + MyProp2 * MyProp3'" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp1 + MyProp2 * MyProp3" step
     case r of
       (Left e) -> assert (show e) false
@@ -241,3 +242,37 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           case operator of
             (Delete _) -> true
             otherwise -> false
+
+  test "number in equation" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp > 10" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Binary (BinaryStep{operator, right}))) -> do
+        logShow a
+        assert "'MyProp > 10' should be parsed as a a GreaterThen with left operand the number 10"
+          case operator of
+            (GreaterThen _) -> true
+            otherwise -> false
+        assert "The right term should be '(Simple (Value _ PNumber \"10\"))'"
+          case right of
+            (Simple (Value _ PNumber "10")) -> true
+            otherwise -> false
+      otherwise -> assert "'MyProp > 10' should be parsed as a a GreaterThen" false
+
+  test "boolean" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "false" simpleStep
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Simple (Value _ PBool "false"))) -> do
+        logShow a
+        assert "bla" true
+      otherwise -> assert "'false' should be parsed as a (Value _ PBoolean \"false\")" false
+
+  test "string" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "\"aap\"" simpleStep
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Simple (Value _ PString "aap"))) -> do
+        logShow a
+        assert "bla" true
+      otherwise -> assert "'\"aap\"' should be parsed as a (Value _ PBoolean \"aap\")" false

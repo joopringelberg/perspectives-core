@@ -16,8 +16,7 @@ import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
-import Perspectives.Parsing.Arc.Token (token)
-import Perspectives.Representation.Action (Verb(..), indirectObject)
+import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -195,7 +194,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
       otherwise -> assert "Role should have parts" false
 
   test "Role with a calculation" do
-    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing: MyRole = bla bla\n  property: Prop (mandatory, functional, String)" roleE
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing: MyRole = context >> Role\n  property: Prop (mandatory, functional, String)" roleE
     case r of
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> do
@@ -244,7 +243,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
       otherwise -> assert "Property should have parts" false
 
   test "Calculated property" do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty = bla bla" propertyE
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty = context >> Role >> Prop" propertyE
     case r of
       (Left e) -> assert (show e) false
       (Right pr@(PE (PropertyE{propertyParts}))) -> do

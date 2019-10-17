@@ -33,6 +33,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -75,7 +76,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
             assert "The Domain should have the id 'MyTestDomain'" (id == "MyTestDomain")
 
   test "A Context with a CalculatedRole and a position." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      Calculation : some calculation" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      Calculation : context >> Role" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -102,11 +103,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               Just (CalculatedRole{calculation}) -> do
                 assert "The calculation should '(RDOM (ST EnumeratedRoleType sys:Modellen))' as its Range"
                   case calculation of
-                    (SQD _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen")))) -> true
+                    (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))))) -> true
                     otherwise -> false
                 assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
                   case calculation of
-                    (SQD _ (ComputedRoleGetter "ModellenM") _) -> true
+                    (Q (SQD _ (ComputedRoleGetter "ModellenM") _)) -> true
                     otherwise -> false
 
   test "A Context with an external property and role." do
@@ -238,7 +239,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 (Just (EnumeratedProperty {range})) -> range == PString
 
   test "A role with a CalculatedProperty" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    Property : StringProperty : MyProp\n      Calculation : prop1 prop2" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    Property : StringProperty : MyProp\n      Calculation : Prop1 + Prop2" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -324,7 +325,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 (Just (EnumeratedRole{properties})) -> length properties == 2
 
   test "Types should have positions in their definining texts." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n    Property : BooleanProperty : Happy\n      Calculation : prop1\n    View : View : MyView\n  Role : RoleInContext : MyRoleInContext\n    Calculation : prop1 prop2" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Property : StringProperty : NickName\n    Property : BooleanProperty : Happy\n      Calculation : Prop1 and Prop2\n    View : View : MyView\n  Role : RoleInContext : MyRoleInContext\n    Calculation : context >> Role" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do

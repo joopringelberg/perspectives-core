@@ -3,15 +3,11 @@ TODO WEEK 42 EN VERDER
 ONTWIKKELING
 2. ComputedProperties toevoegen.
 
-3. Syntax maken voor queries en de parser uitbreiden zodat hij de QueryAst oplevert. Deze parser onderdeel van de ArcParser maken.
-
-4. AST verzinnen voor de assignment- en expressie-syntax. Hierbij aansluiting zoeken bij de AST voor assignment die er al is (Perspectives.Representation.Assignment$AssignmentStatement) en bij de Query AST.
-
-5. Parser maken voor de assignment- en expressie-syntax.
-
 6. De DescriptionCompiler uitbreiden voor assignment- en expressie AST (en integreren met Perspectives.Representation.Assignment$AssignmentStatement).
 
 7. Al deze onderdelen (parsers, descriptioncompilers) samen onderbrengen in één geheel dat resulteert in ofwel een opgeslagen DomeinFile, ofwel in foutmeldingen voor de modelleur.
+
+9. Representeer getallen, strings, booleans en datums in SimpleStep.
 
 =============== OPLEVERING
 1. Voeg op moduleniveau documentatie toe in de source.
@@ -28,4 +24,13 @@ KLAAR
 1. ComputedRoles afmaken:		
 	- kwalificatie van de returns-clause
 
+3. Syntax maken voor queries en de parser uitbreiden zodat hij de QueryAst oplevert. 
+
 4. Vul het MoU in.
+
+5. Parser maken voor de assignment- en expressie-syntax.
+
+4. AST verzinnen voor de assignment- en expressie-syntax. Hierbij aansluiting zoeken bij de AST voor assignment die er al is (Perspectives.Representation.Assignment$AssignmentStatement) en bij de Query AST.
+
+8. De expressieparser onderdeel van de ArcParser maken.
+

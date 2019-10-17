@@ -38,6 +38,7 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Representation.EnumeratedProperty (Range)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | Step represents an Expression conforming to the grammar given above.
@@ -45,6 +46,7 @@ data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep
 
 data SimpleStep =
   ArcIdentifier ArcPosition String
+  | Value ArcPosition Range String
   | Binding ArcPosition
   | Binder ArcPosition
   | Context ArcPosition
