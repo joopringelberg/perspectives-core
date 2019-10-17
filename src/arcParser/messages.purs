@@ -10,9 +10,9 @@ import Data.List.Lazy.NonEmpty (singleton)
 import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain)
-import Perspectives.QueryAST (ElementaryQueryStep)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
@@ -41,7 +41,7 @@ data PerspectivesError
     | NotUniquelyIdentifying ArcPosition String (Array String)
     | Custom String
     | UnknownElementaryQueryStep
-    | IncompatibleQueryArgument Domain ElementaryQueryStep
+    | IncompatibleQueryArgument Domain Step
     | ContextHasNoRole (ADT ContextType) String
     | RoleHasNoProperty (ADT EnumeratedRoleType) String
     | RoleHasNoBinding (ADT EnumeratedRoleType)
@@ -62,6 +62,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownView pos qname) = "(UnknownProperty) The view '" <> qname <> "' is not defined, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
   show (Custom s) = s
+  -- TODO: Als extra kunnen we de Constructors hieronder voorzien van ArcPosition.
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom
   show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no role with the name '" <> qn <> "'."

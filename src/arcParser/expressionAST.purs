@@ -33,6 +33,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -79,18 +80,23 @@ data AssignmentOperator =
 
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
+instance eqStep :: Eq Step where eq = genericEq
 
 derive instance genericSimpleStep :: Generic SimpleStep _
 instance showSimpleStep :: Show SimpleStep where show = genericShow
+instance eqSimpleStep :: Eq SimpleStep where eq = genericEq
 
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow
+instance eqBinaryStep :: Eq BinaryStep where eq s1 s2 = genericEq s1 s2
 
 derive instance genericUnaryStep :: Generic UnaryStep _
 instance showUnaryStep :: Show UnaryStep where show = genericShow
+instance eqUnaryStep :: Eq UnaryStep where eq u1 u2 = genericEq u1 u2
 
 derive instance genericOperator :: Generic Operator _
 instance showOperator :: Show Operator where show = genericShow
+instance eqOperator :: Eq Operator where eq = genericEq
 
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
