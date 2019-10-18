@@ -30,15 +30,12 @@ import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType,
 import Prelude (bind, map, pure, show, ($), (==), discard)
 
 compileStep :: Domain -> Step -> FD
-compileStep currentDomain (Simple st) = compileElementaryStep currentDomain st
+compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
 compileStep currentDomain (Binary st) = compileBinaryStep currentDomain st
 
-compileUnaryStep :: Domain -> UnaryStep -> FD
-compileUnaryStep currentDomain _ = throwError $ Custom "Implement compileUnaryStep"
-
-compileElementaryStep :: Domain -> SimpleStep -> FD
-compileElementaryStep currentDomain s@(ArcIdentifier pos ident) =
+compileSimpleStep :: Domain -> SimpleStep -> FD
+compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
   case currentDomain of
     (CDOM c) -> do
       (rts :: Array RoleType) <- if isQualifiedWithDomein ident
@@ -61,10 +58,10 @@ compileElementaryStep currentDomain s@(ArcIdentifier pos ident) =
           pure $ SQD currentDomain (PropertyGetter pt) (PDOM $ effectiveType)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
-compileElementaryStep currentDomain s@(Value pos range stringRepresentation) = pure $
+compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
   SQD currentDomain (Constant range stringRepresentation) (VDOM range)
 
-compileElementaryStep currentDomain s@(Binding pos) = do
+compileSimpleStep currentDomain s@(Binding pos) = do
   case currentDomain of
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       -- The binding of a role is always an ADT EnumeratedRoleType.
@@ -74,7 +71,7 @@ compileElementaryStep currentDomain s@(Binding pos) = do
         adt -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
-compileElementaryStep currentDomain s@(Binder pos binderName) = do
+compileSimpleStep currentDomain s@(Binder pos binderName) = do
   case currentDomain of
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       (qBinderType :: EnumeratedRoleType) <- if isQualifiedWithDomein binderName
@@ -96,38 +93,22 @@ compileElementaryStep currentDomain s@(Binder pos binderName) = do
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
--- compileElementaryStep currentDomain s@(QualifiedExternalProperty qn) = do
---   compileQueryStep currentDomain (Compose (Terminal ExternalRole) (Terminal (QualifiedRole qn)))
---
--- compileElementaryStep currentDomain s@(UnqualifiedExternalProperty qn) = do
---   compileQueryStep currentDomain (Compose (Terminal ExternalRole) (Terminal (UnqualifiedRole qn)))
---
--- compileElementaryStep currentDomain s@(Binding) = do
---   case currentDomain of
---     (RDOM (r :: ADT EnumeratedRoleType)) -> do
---       -- The binding of a role is always an ADT EnumeratedRoleType.
---       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
---       case typeOfBinding of
---         NOTYPE -> throwError $ RoleHasNoBinding r
---         adt -> pure $ SQD currentDomain (DataTypeGetter "binding") (RDOM adt)
---     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
---
--- compileElementaryStep currentDomain s@(Context) = do
---   case currentDomain of
---     (RDOM (r :: ADT EnumeratedRoleType)) -> do
---       (typeOfContext :: ADT ContextType) <- lift2 $ contextOfADT r
---       pure $ SQD currentDomain (DataTypeGetter "context") (CDOM typeOfContext)
---     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
---
--- compileElementaryStep currentDomain s@(ExternalRole) = do
---   case currentDomain of
---     (CDOM c) -> do
---       (rts :: ADT EnumeratedRoleType) <- lift2 $ externalRoleOfADT c
---       pure $ SQD currentDomain (DataTypeGetter "externalRole") (RDOM $ rts)
---     otherwise -> throwError $ IncompatibleQueryArgument currentDomain s
+compileSimpleStep currentDomain s@(Context pos) = do
+  case currentDomain of
+    (RDOM (r :: ADT EnumeratedRoleType)) -> do
+      (typeOfContext :: ADT ContextType) <- lift2 $ contextOfADT r
+      pure $ SQD currentDomain (DataTypeGetter "context") (CDOM typeOfContext)
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
--- The last case.
-compileElementaryStep _ _ = throwError $ UnknownElementaryQueryStep
+compileSimpleStep currentDomain s@(Extern pos) = do
+  case currentDomain of
+    (CDOM c) -> do
+      (rts :: ADT EnumeratedRoleType) <- lift2 $ externalRoleOfADT c
+      pure $ SQD currentDomain (DataTypeGetter "externalRole") (RDOM $ rts)
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+
+compileUnaryStep :: Domain -> UnaryStep -> FD
+compileUnaryStep currentDomain _ = throwError $ Custom "Implement compileUnaryStep"
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain _ = throwError $ Custom "Implement compileBinaryStep"
@@ -140,7 +121,7 @@ compileQueryStep currentDomain s@(Compose op1 op2) = do
   pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
 
 -- Elementary steps:
-compileQueryStep currentDomain (Terminal e) = compileElementaryStep currentDomain e
+compileQueryStep currentDomain (Terminal e) = compileSimpleStep currentDomain e
 
 compileQueryStep currentDomain s@(Filter criterium source) = do
   criterium' <- compileQueryStep currentDomain criterium
