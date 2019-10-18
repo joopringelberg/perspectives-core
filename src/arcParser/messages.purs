@@ -12,7 +12,7 @@ import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Query.QueryTypes (Domain)
+import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
@@ -48,6 +48,7 @@ data PerspectivesError
     | RoleHasNoBinding ArcPosition (ADT EnumeratedRoleType)
     | IncompatibleDomainsForJunction Domain Domain
     | RoleDoesNotBind ArcPosition RoleType (ADT EnumeratedRoleType)
+    | IncompatibleComposition ArcPosition Range Domain
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
 
@@ -73,6 +74,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (RoleHasNoBinding pos rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding, at: " <> show pos
   show (IncompatibleDomainsForJunction dom1 dom2) = "(IncompatibleDomainsForJunction) These two domains cannot be joined in a disjunction of conjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
   show (RoleDoesNotBind pos rtype adt) = "(RoleDoesNotBind) The role '" <> show rtype <> "' does not bind roles of type '" <> show adt <> "'"
+  show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the right operand (" <> show right <> ") are incompatible."
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError

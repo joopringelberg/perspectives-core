@@ -11,6 +11,7 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign, unsafeToForeign)
+-- import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
@@ -27,6 +28,11 @@ range :: QueryFunctionDescription -> Range
 range (SQD _ _ r) = r
 range (UQD _ _ _ r) = r
 range (BQD _ _ _ _ r) = r
+
+domain :: QueryFunctionDescription -> Range
+domain (SQD d _ _) = d
+domain (UQD d _ _ _) = d
+domain (BQD d _ _ _ _) = d
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 

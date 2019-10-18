@@ -95,7 +95,11 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
         otherwise -> pure $ PROD r
   reduce f NOTYPE = pure NOTYPE
 
--- | `p lessThenOrEqualTo q` means: p is less specific than q.
+-- | `q greaterThanOrEqualTo p` means: q is more general than p, or equal to p.
+greaterThanOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
+greaterThanOrEqualTo = flip lessThenOrEqualTo
+
+-- | `p lessThenOrEqualTo q` means: p is less specific than q, or equal to q.
 -- | This function is semantically correct only on a fully expanded type: use `Perspectives.Representation.Class.Role.expandedADT`.
 lessThenOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
 lessThenOrEqualTo (ST x) (ST y) = x == y

@@ -16,19 +16,19 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.PhaseThree (PhaseThree, lift2)
 import Perspectives.Parsing.Arc.PhaseTwo (getDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range, sumOfDomains, productOfDomains)
-import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
-import Perspectives.Representation.Class.Property (effectivePropertyType)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, productOfDomains, range, sumOfDomains)
+import Perspectives.Representation.ADT (ADT(..), greaterThanOrEqualTo, lessThenOrEqualTo)
+import Perspectives.Representation.Class.Property (effectivePropertyType, rangeOfCalculation_)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT, expandedADT_, getRoleType)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
-import Prelude (bind, map, pure, show, ($), (==), discard)
+import Prelude (bind, discard, eq, flip, map, pure, show, ($), (<$>), (<*>), (==))
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
@@ -151,14 +151,21 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
     otherwise -> pure $ UQD currentDomain (UnaryCombinator "exists") descriptionOfs (VDOM PBool)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
-compileBinaryStep currentDomain _ = throwError $ Custom "Implement compileBinaryStep"
+compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) = case operator of
+  (Compose pos) -> do
+    f1 <- compileStep currentDomain left
+    f2 <- compileStep (range f1) right
+    -- The range of f1 must be more general than or equal to the domain of f2
+    -- TODO: greaterThanOrEqualTo werkt op ADT, maar hier hebben we Domain (Range).
+    gt <- lift2 ((range f1) `greaterThanOrEqualTo_` (domain f2))
+    if gt
+      then pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
+      else throwError $ IncompatibleComposition pos (range f1) (domain f2)
+
+  otherwise -> throwError $ Custom "Implement compileBinaryStep"
 
 {-
 compileQueryStep :: Domain -> QueryStep -> FD
-compileQueryStep currentDomain s@(Compose op1 op2) = do
-  f1 <- compileQueryStep currentDomain op1
-  f2 <- compileQueryStep (range f1) op2
-  pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
 
 -- Elementary steps:
 compileQueryStep currentDomain (Terminal e) = compileSimpleStep currentDomain e
@@ -195,3 +202,15 @@ type FD = PhaseThree QueryFunctionDescription
 --   case r of
 --     (Left m) -> throwError (error (show m))
 --     (Right d) -> pure d
+
+greaterThanOrEqualTo_ :: Domain -> Domain -> MonadPerspectives Boolean
+greaterThanOrEqualTo_ = flip lessThenOrEqualTo_
+
+-- | `p lessThenOrEqualTo q` means: p is less specific than q, or equal to q.
+-- | This function is semantically correct only on a fully expanded types: use `Perspectives.Representation.Class.Role.expandedADT`.
+lessThenOrEqualTo_ :: Domain -> Domain -> MonadPerspectives Boolean
+lessThenOrEqualTo_ (RDOM adtL) (RDOM adtR) = pure (adtL `lessThenOrEqualTo` adtR)
+lessThenOrEqualTo_ (CDOM adtL) (CDOM adtR) = pure (adtL `lessThenOrEqualTo` adtR)
+lessThenOrEqualTo_ (PDOM et1) (PDOM et2) = eq <$> effectivePropertyType (ENP et1) <*> effectivePropertyType (ENP et2)
+lessThenOrEqualTo_ (VDOM r1) (VDOM r2) = pure $ r1 `eq` r2
+lessThenOrEqualTo_ _ _ = pure false
