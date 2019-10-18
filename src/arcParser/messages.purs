@@ -40,7 +40,6 @@ data PerspectivesError
     | UnknownProperty ArcPosition String
     | UnknownView ArcPosition String
     | NotUniquelyIdentifying ArcPosition String (Array String)
-    | Custom String
     | UnknownElementaryQueryStep
     | IncompatibleQueryArgument ArcPosition Domain Step
     | ContextHasNoRole (ADT ContextType) String
@@ -49,6 +48,10 @@ data PerspectivesError
     | IncompatibleDomainsForJunction Domain Domain
     | RoleDoesNotBind ArcPosition RoleType (ADT EnumeratedRoleType)
     | IncompatibleComposition ArcPosition Range Domain
+    | TypesCannotBeCompared ArcPosition Range Range
+    | NotABoolean ArcPosition
+
+    | Custom String
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
 
@@ -74,7 +77,10 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (RoleHasNoBinding pos rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding, at: " <> show pos
   show (IncompatibleDomainsForJunction dom1 dom2) = "(IncompatibleDomainsForJunction) These two domains cannot be joined in a disjunction of conjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
   show (RoleDoesNotBind pos rtype adt) = "(RoleDoesNotBind) The role '" <> show rtype <> "' does not bind roles of type '" <> show adt <> "'"
-  show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the right operand (" <> show right <> ") are incompatible."
+  show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the argument of the right operand (" <> show right <> ") are incompatible."
+  show (TypesCannotBeCompared pos left right) = "(TypesCannotBeCompared) The result of the left operand (" <> show left <> ") and of the right operand (" <> show right <> ") are incompatible."
+  show (NotABoolean pos) = "(NotABoolean) The expression starting at " <> show pos <> " does not result in a boolean value."
+
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.
 type MultipleErrors = NonEmptyList PerspectivesError

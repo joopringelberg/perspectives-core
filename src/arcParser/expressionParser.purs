@@ -87,13 +87,13 @@ operator = ((Compose <$> (getPosition <* reserved ">>"))
   <|>
   (NotEquals <$> (getPosition <* reserved "/="))
   <|>
-  (LessThen <$> (getPosition <* reserved "<"))
+  (LessThan <$> (getPosition <* reserved "<"))
   <|>
-  (LessThenEqual <$> (getPosition <* reserved "<="))
+  (LessThanEqual <$> (getPosition <* reserved "<="))
   <|>
-  (GreaterThen <$> (getPosition <* reserved ">"))
+  (GreaterThan <$> (getPosition <* reserved ">"))
   <|>
-  (GreaterThenEqual <$> (getPosition <* reserved ">="))
+  (GreaterThanEqual <$> (getPosition <* reserved ">="))
   <|>
   (LogicalAnd <$> (getPosition <* reserved "and"))
   <|>
@@ -111,10 +111,10 @@ operatorPrecedence :: Operator -> Int
 operatorPrecedence (Compose _) = 8
 operatorPrecedence (Equals _) = 0
 operatorPrecedence (NotEquals _) = 0
-operatorPrecedence (LessThen _) = 1
-operatorPrecedence (LessThenEqual _) = 1
-operatorPrecedence (GreaterThen _) = 1
-operatorPrecedence (GreaterThenEqual _) = 1
+operatorPrecedence (LessThan _) = 1
+operatorPrecedence (LessThanEqual _) = 1
+operatorPrecedence (GreaterThan _) = 1
+operatorPrecedence (GreaterThanEqual _) = 1
 operatorPrecedence (LogicalAnd _) = 1
 operatorPrecedence (LogicalOr _) = 2
 operatorPrecedence (Add _) = 3

@@ -66,10 +66,10 @@ data Operator =
   Compose ArcPosition
   | Equals ArcPosition
   | NotEquals ArcPosition
-  | LessThen ArcPosition
-  | LessThenEqual ArcPosition
-  | GreaterThen ArcPosition
-  | GreaterThenEqual ArcPosition
+  | LessThan ArcPosition
+  | LessThanEqual ArcPosition
+  | GreaterThan ArcPosition
+  | GreaterThanEqual ArcPosition
   | LogicalAnd ArcPosition
   | LogicalOr ArcPosition
   | Add ArcPosition

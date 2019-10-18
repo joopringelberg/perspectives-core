@@ -15,7 +15,7 @@ import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | A description of a calculation with its domain and range.
@@ -53,19 +53,17 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM (ADT EnumeratedRoleType) | PDOM EnumeratedPropertyType | CDOM (ADT ContextType) | VDOM EP.Range
+data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM EP.Range
 
 type Range = Domain
 
 sumOfDomains :: Domain -> Domain -> Maybe Domain
 sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
-sumOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
 sumOfDomains (CDOM a) (CDOM b) = Just (CDOM (SUM [a, b]))
 sumOfDomains _ _ = Nothing
 
 productOfDomains :: Domain -> Domain -> Maybe Domain
 productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
-productOfDomains (PDOM a) (PDOM b) = if (a == b ) then Just (PDOM a) else Nothing
 productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
 productOfDomains _ _ = Nothing
 

@@ -5,30 +5,29 @@ module Perspectives.Query.DescriptionCompiler where
 -- | The code in this module sees to it that each step in the path is followed by a step that takes as its domain the
 -- | range of its predecessor. Otherwise, an error is thrown that will be presented to the modeller.
 
-import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
+import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (head, length)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Array (elemIndex, head, length)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
-import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.Expression (startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree (PhaseThree, lift2)
-import Perspectives.Parsing.Arc.PhaseTwo (getDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, productOfDomains, range, sumOfDomains)
-import Perspectives.Representation.ADT (ADT(..), greaterThanOrEqualTo, lessThenOrEqualTo)
-import Perspectives.Representation.Class.Property (effectivePropertyType, rangeOfCalculation_)
-import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT, expandedADT_, getRoleType)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range)
+import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
+import Perspectives.Representation.Class.Property (rangeOfPropertyType)
+import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
-import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
-import Prelude (bind, discard, eq, flip, map, pure, show, ($), (<$>), (<*>), (==))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
+import Prelude (bind, eq, flip, map, pure, ($), (==), (&&))
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
@@ -55,8 +54,8 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
         Nothing -> throwError $ RoleHasNoProperty r ident
         (Just (pt :: PropertyType)) -> do
           -- TODO: controleer of hier niet een 'expandedADT_' voor PropertyClass gebruikt moet worden.
-          (effectiveType :: EnumeratedPropertyType) <- lift2 $ effectivePropertyType pt
-          pure $ SQD currentDomain (PropertyGetter pt) (PDOM $ effectiveType)
+          (rOfpt :: Range) <- lift2 $ rangeOfPropertyType pt
+          pure $ SQD currentDomain (PropertyGetter pt) (VDOM rOfpt)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
@@ -151,49 +150,54 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
     otherwise -> pure $ UQD currentDomain (UnaryCombinator "exists") descriptionOfs (VDOM PBool)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
-compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) = case operator of
-  (Compose pos) -> do
+compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) = do
     f1 <- compileStep currentDomain left
     f2 <- compileStep (range f1) right
-    -- The range of f1 must be more general than or equal to the domain of f2
-    -- TODO: greaterThanOrEqualTo werkt op ADT, maar hier hebben we Domain (Range).
-    gt <- lift2 ((range f1) `greaterThanOrEqualTo_` (domain f2))
-    if gt
-      then pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
-      else throwError $ IncompatibleComposition pos (range f1) (domain f2)
 
-  otherwise -> throwError $ Custom "Implement compileBinaryStep"
+    case operator of
+      Compose pos -> do
+        -- The range of f1 must be more general than or equal to the domain of f2
+        gt <- lift2 ((range f1) `greaterThanOrEqualTo_` (domain f2))
+        if gt
+          then pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
+          else throwError $ IncompatibleComposition pos (range f1) (domain f2)
 
-{-
-compileQueryStep :: Domain -> QueryStep -> FD
+      Equals pos -> comparison pos f1 f2 "equals"
+      NotEquals pos -> comparison pos f1 f2 "notEquals"
+      LessThan pos -> comparison pos f1 f2 "lessThan"
+      LessThanEqual pos -> comparison pos f1 f2 "lessThanEqual"
+      GreaterThan pos -> comparison pos f1 f2 "greaterThan"
+      GreaterThanEqual pos -> comparison pos f1 f2 "greaterThanEqual"
 
--- Elementary steps:
-compileQueryStep currentDomain (Terminal e) = compileSimpleStep currentDomain e
+      LogicalAnd pos -> binOp pos f1 f2 [PBool] "and"
+      LogicalOr pos -> binOp pos f1 f2 [PBool] "or"
+      Add pos -> binOp pos f1 f2 [PNumber, PString] "add"
+      Subtract pos -> binOp pos f1 f2 [PNumber, PString] "subtract"
+      Divide pos -> binOp pos f1 f2 [PNumber] "divide"
+      Multiply pos -> binOp pos f1 f2 [PNumber] "multiply"
 
-compileQueryStep currentDomain s@(Filter criterium source) = do
-  criterium' <- compileQueryStep currentDomain criterium
-  source' <- compileQueryStep currentDomain source
-  pure $ BQD currentDomain (BinaryCombinator "filter") criterium' source' currentDomain
+      -- f1 is the source to be filtered, f2 is the criterium.
+      Filter pos -> case range f2 of
+        VDOM PBool -> pure $ BQD currentDomain (BinaryCombinator "filter") f1 f2 (range f1)
+        otherwise -> throwError $ NotABoolean (startOf right)
 
-compileQueryStep currentDomain s@(Disjunction op1 op2) = do
-  op1' <- compileQueryStep currentDomain op1
-  op2' <- compileQueryStep currentDomain op2
-  case sumOfDomains (range op1') (range op2') of
-    (Just dom) -> pure $ BQD currentDomain (BinaryCombinator "disjunction") op1' op2' dom
-    _ -> throwError $ IncompatibleDomainsForJunction (range op1') (range op2')
+  where
+    comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> String -> PhaseThree QueryFunctionDescription
+    comparison pos left' right' functionName = do
+      -- Both ranges must be equal
+      gt <- lift2 $ pure ((range left') `eq` (range right'))
+      if gt
+        then pure $ BQD currentDomain (BinaryCombinator functionName) left' right' (range right')
+        else throwError $ TypesCannotBeCompared pos (range left') (domain right')
 
-compileQueryStep currentDomain s@(Conjunction op1 op2) = do
-  op1' <- compileQueryStep currentDomain op1
-  op2' <- compileQueryStep currentDomain op2
-  case productOfDomains (range op1') (range op2') of
-    (Just dom) -> pure $ BQD currentDomain (BinaryCombinator "conjunction") op1' op2' dom
-    _ -> throwError $ IncompatibleDomainsForJunction (range op1') (range op2')
+    binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> String -> PhaseThree QueryFunctionDescription
+    binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
+      (VDOM rc1), (VDOM rc2) | rc1 == rc2 && allowed rc1 && allowed rc2 -> pure $ BQD currentDomain (BinaryCombinator functionName) left' right' (VDOM rc1)
+      l, r -> throwError $ TypesCannotBeCompared pos l r
+      where
+        allowed :: Range -> Boolean
+        allowed r = isJust $ elemIndex r allowedRangeConstructors
 
--- the last case
-compileQueryStep _ _ = throwError $ UnknownElementaryQueryStep
--}
-
--- type FD = ExceptT PerspectivesError MonadPerspectives QueryFunctionDescription
 type FD = PhaseThree QueryFunctionDescription
 
 -- compileRoleDescription :: ContextType -> Step -> MonadPerspectives QueryFunctionDescription
@@ -211,6 +215,5 @@ greaterThanOrEqualTo_ = flip lessThenOrEqualTo_
 lessThenOrEqualTo_ :: Domain -> Domain -> MonadPerspectives Boolean
 lessThenOrEqualTo_ (RDOM adtL) (RDOM adtR) = pure (adtL `lessThenOrEqualTo` adtR)
 lessThenOrEqualTo_ (CDOM adtL) (CDOM adtR) = pure (adtL `lessThenOrEqualTo` adtR)
-lessThenOrEqualTo_ (PDOM et1) (PDOM et2) = eq <$> effectivePropertyType (ENP et1) <*> effectivePropertyType (ENP et2)
 lessThenOrEqualTo_ (VDOM r1) (VDOM r2) = pure $ r1 `eq` r2
 lessThenOrEqualTo_ _ _ = pure false

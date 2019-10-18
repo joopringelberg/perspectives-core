@@ -51,6 +51,9 @@ getCalculatedRole = getPerspectType
 getEnumeratedProperty :: EnumeratedPropertyType -> MP EnumeratedProperty
 getEnumeratedProperty = getPerspectType
 
+getCalculatedProperty :: CalculatedPropertyType -> MP CalculatedProperty
+getCalculatedProperty = getPerspectType
+
 getContext :: ContextType -> MP Context
 getContext = getPerspectType
 
