@@ -36,15 +36,17 @@ simpleStep = try
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
   -- TODO: date
+  <|>
+  Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> (defer \_ -> arcIdentifier)))
+  <|>
+  Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> (defer \_ -> arcIdentifier)))
   ) <?> "binding, binder, context, extern or a valid identifier"
 
 unaryStep :: IP Step
 unaryStep = try
   (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
   <|>
-  Unary <$> (Create <$> getPosition <*> (reserved "create" *> (defer \_ -> arcIdentifier)))
-  <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> arcIdentifier)))) <?> "not <expr>, create <identifier>, exists <identifier>"
+  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr>, createContext  <identifier>, createRole <identifier>, exists <step>"
 
 compoundStep :: IP Step
 compoundStep = try (defer \_->binaryStep) <|> (defer \_->filterStep)
@@ -134,9 +136,10 @@ startOf stp = case stp of
     startOfSimple (Binder p _) = p
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
+    startOfSimple (CreateContext p _) = p
+    startOfSimple (CreateEnumeratedRole p _) = p
 
     startOfUnary (LogicalNot p _) = p
-    startOfUnary (Create p _) = p
     startOfUnary (Exists p _) = p
 
 endOf :: Step -> ArcPosition
@@ -152,11 +155,12 @@ endOf stp = case stp of
     endOfSimple (Binder (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
+    endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
+    endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
-    endOfUnary (Create (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
-    endOfUnary (Exists (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
+    endOfUnary (Exists (ArcPosition{line, column}) step') = endOf step'
 
     col_ :: ArcPosition -> Int
     col_ (ArcPosition{column}) = column

@@ -35,6 +35,7 @@ data PerspectivesError
     | MissingObject ArcPosition String
     | NotWellFormedName ArcPosition String
     | RoleMissingInContext ArcPosition String String
+    | UnknownContext ArcPosition String
     | UnknownRole ArcPosition String
     | UnknownProperty ArcPosition String
     | UnknownView ArcPosition String
@@ -60,7 +61,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (RoleMissingInContext pos localRoleName ctxt) = "(RoleMissingInContext) The local role name '" <> localRoleName <> "' cannot be found in the context: '" <> ctxt <> "', at: " <> show pos
   show (UnknownRole pos qname) = "(UnknownRole) The role '" <> qname <> "' is not defined, at: " <> show pos
   show (UnknownProperty pos qname) = "(UnknownProperty) The property '" <> qname <> "' is not defined, at: " <> show pos
-  show (UnknownView pos qname) = "(UnknownProperty) The view '" <> qname <> "' is not defined, at: " <> show pos
+  show (UnknownContext pos qname) = "(UnknownContext) The context '" <> qname <> "' is not defined, at: " <> show pos
+  show (UnknownView pos qname) = "(UnknownView) The view '" <> qname <> "' is not defined, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
   show (Custom s) = s
   -- TODO: Als extra kunnen we de Constructors hieronder voorzien van ArcPosition.

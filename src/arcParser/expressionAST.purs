@@ -49,6 +49,8 @@ data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep
 data SimpleStep =
   ArcIdentifier ArcPosition String
   | Value ArcPosition Range String
+  | CreateContext ArcPosition String
+  | CreateEnumeratedRole ArcPosition String
   | Binding ArcPosition
   | Binder ArcPosition String
   | Context ArcPosition
@@ -56,8 +58,7 @@ data SimpleStep =
 
 data UnaryStep =
   LogicalNot ArcPosition Step
-  | Create ArcPosition String
-  | Exists ArcPosition String
+  | Exists ArcPosition Step
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 

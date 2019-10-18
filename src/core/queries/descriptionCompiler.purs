@@ -16,7 +16,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), SimpleStep(..), Step(..), UnaryStep)
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.PhaseThree (PhaseThree, lift2)
 import Perspectives.Parsing.Arc.PhaseTwo (getDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -24,9 +24,10 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
 import Perspectives.Representation.Class.Property (effectivePropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT, expandedADT_, getRoleType)
+import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleType(..), roletype2string)
-import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleType(..), roletype2string)
+import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
 import Prelude (bind, map, pure, show, ($), (==), discard)
 
 compileStep :: Domain -> Step -> FD
@@ -107,8 +108,47 @@ compileSimpleStep currentDomain s@(Extern pos) = do
       pure $ SQD currentDomain (DataTypeGetter "externalRole") (RDOM $ rts)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
+compileSimpleStep currentDomain (CreateContext pos ident) = do
+  -- If `ident` is not qualified, try to qualify it in the Domain.
+  (qcontextType :: ContextType) <- if isQualifiedWithDomein ident
+    then pure $ ContextType ident
+    -- Try to qualify the name within the Domain.
+    else do
+      {_id:namespace} <- lift $ gets _.dfr
+      (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain ident (unsafePartial $ fromJust $ (deconstructModelName namespace))
+      case head qnames of
+        Nothing -> throwError $ UnknownContext pos ident
+        (Just qn) | length qnames == 1 -> pure qn
+        otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
+  pure $ SQD currentDomain (DataTypeGetterWithParameter "createContext" (unwrap qcontextType)) (CDOM (ST qcontextType))
+
+compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
+  -- If `ident` is not qualified, try to qualify it in the Domain.
+  (qroleType :: EnumeratedRoleType) <- if isQualifiedWithDomein ident
+    then pure $ EnumeratedRoleType ident
+    -- Try to qualify the name within the Domain.
+    else do
+      {_id:namespace} <- lift $ gets _.dfr
+      (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain ident (unsafePartial $ fromJust $ (deconstructModelName namespace))
+      case head qnames of
+        Nothing -> throwError $ UnknownRole pos ident
+        (Just qn) | length qnames == 1 -> pure qn
+        otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
+  pure $ SQD currentDomain (DataTypeGetterWithParameter "createRole" (unwrap qroleType)) (RDOM (ST qroleType))
+
 compileUnaryStep :: Domain -> UnaryStep -> FD
-compileUnaryStep currentDomain _ = throwError $ Custom "Implement compileUnaryStep"
+compileUnaryStep currentDomain (LogicalNot pos s) = do
+  -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool) range value.
+  descriptionOfs <- compileStep currentDomain s
+  case range descriptionOfs of
+    VDOM PBool -> pure $ UQD currentDomain (UnaryCombinator "not") descriptionOfs (VDOM PBool)
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain s
+
+compileUnaryStep currentDomain st@(Exists pos s) = do
+  descriptionOfs <- compileStep currentDomain s
+  case range descriptionOfs of
+    VDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    otherwise -> pure $ UQD currentDomain (UnaryCombinator "exists") descriptionOfs (VDOM PBool)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain _ = throwError $ Custom "Implement compileBinaryStep"

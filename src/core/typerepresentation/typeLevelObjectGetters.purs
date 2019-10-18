@@ -14,7 +14,7 @@ import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
 import Perspectives.Representation.Class.Role (class RoleClass, getRole', properties, propertiesOfADT, views, viewsOfADT)
 import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole, contextRole) as Context
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType, EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Prelude (pure, (==), (>>>), (<<<), (>=>), bind, ($), (<>))
 
 externalRoleOfADT_ :: ADT ContextType ~~~> EnumeratedRoleType
@@ -115,5 +115,15 @@ qualifyRoleInDomain localName namespace = ArrayT do
 
 qualifyEnumeratedRoleInDomain :: String -> String ~~~> EnumeratedRoleType
 qualifyEnumeratedRoleInDomain localName namespace = ArrayT do
-  DomeinFile {calculatedRoles, enumeratedRoles} <- retrieveDomeinFile namespace
+  DomeinFile {enumeratedRoles} <- retrieveDomeinFile namespace
   pure $ map EnumeratedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys enumeratedRoles))
+
+qualifyCalculatedRoleInDomain :: String -> String ~~~> CalculatedRoleType
+qualifyCalculatedRoleInDomain localName namespace = ArrayT do
+  DomeinFile {calculatedRoles} <- retrieveDomeinFile namespace
+  pure $ map CalculatedRoleType (filter (\_id -> _id `endsWithSegments` localName) (keys calculatedRoles))
+
+qualifyContextInDomain :: String -> String ~~~> ContextType
+qualifyContextInDomain localName namespace = ArrayT do
+  DomeinFile {contexts} <- retrieveDomeinFile namespace
+  pure $ map ContextType (filter (\_id -> _id `endsWithSegments` localName) (keys contexts))
