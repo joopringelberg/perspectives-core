@@ -17,6 +17,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, insert, lookup)
 import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
@@ -37,7 +38,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==))
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
@@ -66,6 +67,13 @@ evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> m 
 evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty}
 
 type PhaseTwo a = PhaseTwo' a Identity
+
+-- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
+-- | an Action is a Bot, and allows exceptions.
+type PhaseThree a = PhaseTwo' a MonadPerspectives
+
+lift2 :: forall a. MonadPerspectives a -> PhaseThree a
+lift2 = lift <<< lift
 
 subjectIsBot :: PhaseTwo Unit
 subjectIsBot = lift $ void $ modify (\s -> s {bot = true})
@@ -354,12 +362,8 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     -- Parse the query expression.
-    handleParts roleUnderConstruction (Calculation calc) =
-      -- let
-      -- TODO: actually call the parser.
-      -- calculation = parseQuery calc
-      -- in Tuple domeinFile' (roleUnderConstruction {calculation = calculation})
-      pure roleUnderConstruction
+    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) =
+      pure $ CalculatedRole (roleUnderConstruction {calculation = S calc})
 
 -- | Traverse a RoleE that results in an CalculatedRole with a Calculation that depends on a Computed function.
 traverseComputedRoleE :: RoleE -> Namespace -> PhaseTwo Role
@@ -410,8 +414,8 @@ traverseCalculatedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Prope
 traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
   (CalculatedProperty property@{calculation}) <- pure $ defaultCalculatedProperty (ns <> "$" <> id) id ns pos
   calculation' <- case head propertyParts of
-    -- TODO: actually call the parser, here.
-    (Just (Calculation' c)) -> pure calculation
+    -- TODO: fish out the actually parsed calculation and use that!
+    (Just (Calculation' c)) -> pure $ S c
     otherwise -> pure calculation
   property' <- pure $ Property.C $ CalculatedProperty (property {calculation = calculation'})
   modifyDF (\df -> addPropertyToDomeinFile property' df)

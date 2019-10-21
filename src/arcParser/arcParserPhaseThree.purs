@@ -18,16 +18,18 @@ import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, keys, lookup, values)
-import Perspectives.CoreTypes (MonadPerspectives, (###=), MP)
+import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo', runPhaseTwo_')
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.DescriptionCompiler (compileStep)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (typeExists)
@@ -38,14 +40,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, map, pure, unit, void, ($), (<<<), (<>), (==), discard, (>>=))
-
--- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
--- | an Action is a Bot, and allows exceptions.
-type PhaseThree a = PhaseTwo' a MonadPerspectives
-
-lift2 :: forall a. MonadPerspectives a -> PhaseThree a
-lift2 = lift <<< lift
+import Prelude (Unit, bind, map, pure, unit, void, ($), (<>), (==), discard, (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -57,6 +52,7 @@ phaseThree df@{_id} = do
         qualifyViewReferences
         inverseBindings
         qualifyReturnsClause
+        compileExpressions
         )
       df
     case ei of
@@ -270,3 +266,33 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
               Nothing -> throwError $ UnknownRole pos ident
               (Just qname) | length candidates == 1 -> pure $ EnumeratedRoleType qname
               otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+
+-- TODO: compile the expressions in conditions for actions.
+compileExpressions :: PhaseThree Unit
+compileExpressions = do
+  df@{_id} <- lift $ gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (compileExpressions' df)
+-- compileExpressions = (lift $ gets _.dfr) >>= compileExpressions'
+  where
+    compileExpressions' :: DomeinFileRecord -> PhaseThree Unit
+    compileExpressions' {calculatedRoles, calculatedProperties} = do
+      compRoles <- traverseWithIndex compileRolExpr calculatedRoles
+      compProps <- traverseWithIndex compilePropertyExpr calculatedProperties
+      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps}
+
+    compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
+    compileRolExpr roleName (CalculatedRole cr@{calculation, context}) = case calculation of
+      Q _ -> pure $ CalculatedRole cr
+      S stp -> do
+        descr <- compileStep (CDOM $ ST context) stp
+        pure $ CalculatedRole (cr {calculation = Q descr})
+
+    compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
+    compilePropertyExpr propertyName (CalculatedProperty cr@{calculation, role}) = case calculation of
+      Q _ -> pure $ CalculatedProperty cr
+      S stp -> do
+        descr <- compileStep (RDOM $ ST role) stp
+        pure $ CalculatedProperty (cr {calculation = Q descr})

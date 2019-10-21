@@ -55,6 +55,7 @@ data SimpleStep =
   | Binder ArcPosition String
   | Context ArcPosition
   | Extern ArcPosition
+  | NoOp ArcPosition
 
 data UnaryStep =
   LogicalNot ArcPosition Step

@@ -138,6 +138,7 @@ startOf stp = case stp of
     startOfSimple (Extern p) = p
     startOfSimple (CreateContext p _) = p
     startOfSimple (CreateEnumeratedRole p _) = p
+    startOfSimple (NoOp p) = p
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
@@ -157,6 +158,7 @@ endOf stp = case stp of
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
+    endOfSimple (NoOp pos) = pos
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}

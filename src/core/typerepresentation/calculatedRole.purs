@@ -4,14 +4,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -39,7 +37,7 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
   , displayName: dname
   , kindOfRole: kindOfRole
 
-  , calculation: Q $ SQD (CDOM $ ST $ (ContextType "")) (RolGetter (ENR (EnumeratedRoleType ""))) (RDOM (ST (EnumeratedRoleType "")))
+  , calculation: S $ Simple $ NoOp $ ArcPosition{column: 0, line: 0}
   , context: ContextType context
 
   , pos: pos

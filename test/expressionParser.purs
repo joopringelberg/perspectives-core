@@ -59,7 +59,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
       (Right id) -> do
         logShow id
         assert "'create MyRole' should be parsed as a the unary step Create" case id of
-          (Unary (Create (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
+          (Simple (CreateEnumeratedRole (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
           otherwise -> false
 
   test "FilterStep" do
@@ -251,7 +251,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
         logShow a
         assert "'MyProp > 10' should be parsed as a a GreaterThen with left operand the number 10"
           case operator of
-            (GreaterThen _) -> true
+            (GreaterThan _) -> true
             otherwise -> false
         assert "The right term should be '(Simple (Value _ PNumber \"10\"))'"
           case right of

@@ -4,14 +4,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -37,7 +35,7 @@ defaultCalculatedProperty id dn role pos = CalculatedProperty
   { _id: CalculatedPropertyType id
   , _rev: Nothing
   , displayName: dn
-  , calculation: Q $ SQD (RDOM $ ST $ (EnumeratedRoleType "")) (DataTypeGetter "") (PDOM (EnumeratedPropertyType ""))
+  , calculation: S $ Simple $ NoOp $ ArcPosition{column: 0, line: 0}
   , role: EnumeratedRoleType role
   , pos: pos}
 

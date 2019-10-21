@@ -3,22 +3,13 @@ TODO WEEK 42 EN VERDER
 ONTWIKKELING
 2. ComputedProperties toevoegen.
 
-6. De DescriptionCompiler uitbreiden voor assignment- en expressie AST (en integreren met Perspectives.Representation.Assignment$AssignmentStatement).
-
 7. Al deze onderdelen (parsers, descriptioncompilers) samen onderbrengen in één geheel dat resulteert in ofwel een opgeslagen DomeinFile, ofwel in foutmeldingen voor de modelleur.
 
-9. Representeer getallen, strings, booleans en datums in SimpleStep.
+8. Tests maken voor de voltooide parser met expressies.
 
-=============== OPLEVERING
-1. Voeg op moduleniveau documentatie toe in de source.
+9. Condities en rules voor bots toevoegen.
 
-2. Zoek uit hoe ik code kan opleveren. Stel ik de repository open, of maak ik een clone die ik openstel? Ik moet anticiperen op samenwerking met anderen. Zie https://opensource.guide/starting-a-project/.
-
-3. Zoek uit wat ik minimaal moet maken om te voldoen aan de Memorandum of Understanding.
-	- a public status page for the project to keep the wider internet community informed
-	- vermelden op de website
-	- credits section of the software
-
+10. Functies voor collecties (sum etc) toevoegen.
 
 KLAAR
 1. ComputedRoles afmaken:		
@@ -33,4 +24,8 @@ KLAAR
 4. AST verzinnen voor de assignment- en expressie-syntax. Hierbij aansluiting zoeken bij de AST voor assignment die er al is (Perspectives.Representation.Assignment$AssignmentStatement) en bij de Query AST.
 
 8. De expressieparser onderdeel van de ArcParser maken.
+
+6. De DescriptionCompiler uitbreiden voor assignment- en expressie AST (en integreren met Perspectives.Representation.Assignment$AssignmentStatement).
+
+9. Representeer getallen, strings, booleans en datums in SimpleStep.
 

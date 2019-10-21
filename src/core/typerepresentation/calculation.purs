@@ -17,8 +17,8 @@ import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Prelude (class Eq, class Show, (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
-
 data Calculation = S Step | Q QueryFunctionDescription
+
 derive instance genericRepVerb :: Generic Calculation _
 instance writeForeignVerb :: WriteForeign Calculation where
   writeImpl = writeImpl <<< genericSumToVariant

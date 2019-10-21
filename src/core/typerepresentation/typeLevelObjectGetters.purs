@@ -8,7 +8,7 @@ import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments, isContainingNamespace)
+import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
 import Perspectives.Instances.Combinators (closure_, disjunction, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
@@ -39,6 +39,7 @@ lookForUnqualifiedRoleType s = disjunction
   (lookForRoleInContext (roletype2string >>> areLastSegmentsOf s))
   (lookForContextRole (roletype2string >>> areLastSegmentsOf s))
 
+-- TODO. sluit Aspecten in via ADT. Kunnen we Context een ADT geven?
 lookForRoleInContext :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
 lookForRoleInContext criterium = filter' (contextAspectsClosure >=> roleInContext) criterium
 
@@ -50,7 +51,7 @@ lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s))
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleTypeOfADT :: String -> ADT ContextType ~~~> RoleType
-lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> isContainingNamespace s)
+lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLastSegmentsOf s)
 
 lookForRoleOfADT :: (RoleType -> Boolean) -> ADT ContextType ~~~> RoleType
 lookForRoleOfADT criterium = ArrayT <<< reduce f
@@ -81,7 +82,7 @@ lookForPropertyType s = lookForProperty (propertytype2string >>> ((==) s))
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
-lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> isContainingNamespace s)
+lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> areLastSegmentsOf s)
 
 lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
 lookForProperty criterium = filter' (ArrayT <<< propertiesOfADT) criterium

@@ -2,7 +2,8 @@ module Perspectives.Query.DescriptionCompiler where
 
 -- | From the Abstract Syntax Tree that results from a query-path expression (see `Perspectives.QueryAST` for the AST),
 -- | create a QueryFunctionDescription data element.
--- | The code in this module sees to it that each step in the path is followed by a step that takes as its domain the
+-- | The code in this module sees to it that each function is applied to the right type of arguments.
+-- | For example, each step in a path must be followed by a step that takes as its domain the
 -- | range of its predecessor. Otherwise, an error is thrown that will be presented to the modeller.
 
 import Control.Monad.Except (lift, throwError)
@@ -17,7 +18,7 @@ import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseThree (PhaseThree, lift2)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
@@ -134,6 +135,8 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
         (Just qn) | length qnames == 1 -> pure qn
         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
   pure $ SQD currentDomain (DataTypeGetterWithParameter "createRole" (unwrap qroleType)) (RDOM (ST qroleType))
+
+compileSimpleStep currentDomain (NoOp _) = pure $ SQD currentDomain (DataTypeGetter "identity") currentDomain
 
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
