@@ -37,5 +37,8 @@ domain: Feest
     perspective on: Wens
       --if Wens >> Bedrag > 10 then SomeProp = false
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
+    property: VoorBigBrother = Datum > '1995-12-17'
+    -- comment
+    property: Datum (mandatory, functional, DateTime)
   -- A nested context
   activity: EzeltjePrik

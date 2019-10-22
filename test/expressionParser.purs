@@ -15,7 +15,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.Expression" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -39,8 +39,8 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: when it fails" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "notmatched" simpleStep
     case r of
-      (Left (ParseError m _)) -> assert "Should fail with: 'Expected binding, binder, context, extern or a valid identifier'" (m == "Expected binding, binder, context, extern or a valid identifier")
-      (Right id) -> assert "Should fail with: 'Expected binding, binder, context, extern or a valid identifier'" false
+      (Left (ParseError m _)) -> assert "Should fail with: 'Expected binding, binder, context, extern or a valid identifier'" (m == "Expected binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)")
+      (Right id) -> assert "Should fail with: 'Expected binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)'" false
 
   test "UnaryStep: LogicalNot" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "not MyProperty" unaryStep
@@ -278,20 +278,36 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       otherwise -> assert "'\"aap\"' should be parsed as a (Value _ PBoolean \"aap\")" false
 
   test "date" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "1995-12-17T03:24:00" simpleStep
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "'1995-12-17T03:24:00'" simpleStep
     -- logShow r -- (Right (Simple (Value (ArcPosition { column: 1, line: 1 }) PNumber "1995")))
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PDate _))) -> do
         logShow a
         assert "bla" true
-      otherwise -> assert "'1995-12-17T03:24:00' should be parsed as a (Date _ PDate ...)" false
+      otherwise -> assert "\"1995-12-17T03:24:00\" should be parsed as a (Date _ PDate ...)" false
 
-  testOnly "date" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "1995-12-17" simpleStep
+  test "date" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "'1995-12-17'" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PDate _))) -> do
         logShow a
         assert "bla" true
       otherwise -> assert "'1995-12-17' should be parsed as a (Date _ PDate ...)" false
+
+  test "date in comparison" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp > '1995-12-17'" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Binary (BinaryStep{operator, right}))) -> do
+        logShow a
+        assert "'MyProp > 10' should be parsed as a a GreaterThan with right operand the DateTime '1995-12-17'"
+          case operator of
+            (GreaterThan _) -> true
+            otherwise -> false
+        assert "The right term should be '(Simple (Value _ PDate \"1995-12-17\"))'"
+          case right of
+            (Simple (Value _ PDate _)) -> true
+            otherwise -> false
+      otherwise -> assert "'MyProp > '1995-12-17'' should be parsed as a a GreaterThan" false

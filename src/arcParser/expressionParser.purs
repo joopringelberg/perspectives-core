@@ -2,21 +2,23 @@ module Perspectives.Parsing.Arc.Expression where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Control.Monad.Trans.Class (lift)
-import Data.DateTime (DateTime(..))
-import Data.JSDate (JSDate, parse, readDate, toDateTime)
+import Data.Array (many)
+import Data.DateTime (DateTime)
+import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
-import Data.String (length, trim)
-import Effect.Class (liftEffect)
+import Data.String (length)
+import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved, stringUntilNewline)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (try, (<?>))
+import Text.Parsing.Parser.Combinators (between, try, (<?>))
+import Text.Parsing.Parser.String (char)
+import Text.Parsing.Parser.Token (alphaNum)
 
 step :: IP Step
 step = step_ <|> token.parens step_
@@ -36,11 +38,11 @@ simpleStep = try
   <|>
   Simple <$> (Extern <$> (getPosition <* reserved "extern"))
   <|>
+  Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
+  <|>
   Simple <$> (Value <$> getPosition <*> pure PString <*> token.stringLiteral)
   <|>
   Simple <$> (Value <$> getPosition <*> pure PBool <*> boolean)
-  <|>
-  Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
   -- TODO: date
@@ -48,13 +50,13 @@ simpleStep = try
   Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> (defer \_ -> arcIdentifier)))
   <|>
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> (defer \_ -> arcIdentifier)))
-  ) <?> "binding, binder, context, extern or a valid identifier"
+  ) <?> "binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)"
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 parseDate :: IP DateTime
 parseDate = try do
-  s <- stringUntilNewline
-  (d :: JSDate) <- pure $ unsafePerformEffect $ parse $ trim s
+  s <- dateTimeLiteral
+  (d :: JSDate) <- pure $ unsafePerformEffect $ parse s
   case toDateTime d of
     Nothing -> fail "Not a date"
     (Just (dt :: DateTime)) -> pure dt
@@ -212,3 +214,15 @@ deletion = try do
   lhs <- arcIdentifier
   end <- getPosition
   pure $ Assignment {start, end, lhs, operator: Delete start, value: Nothing }
+
+-- | Parse between single quotes.
+dateTimeLiteral :: IP String
+dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
+  where
+    go :: IP String
+    go = do
+        chars <- between (char '\'') (char '\'' <?> "end of string") (many dateChar)
+        pure $ SCU.fromCharArray chars
+
+    dateChar :: IP Char
+    dateChar = alphaNum <|> char ':' <|> char '+' <|> char '-' <|> char ' ' <|> char '.'

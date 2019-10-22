@@ -254,6 +254,17 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
             otherwise -> false) propertyParts)))
       otherwise -> assert "Property should have parts" false
 
+  test "Calculated property with DateTime" do
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty = Datum > '1995-12-17'\n-- commentaar" propertyE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pr@(PE (PropertyE{propertyParts}))) -> do
+        (assert "Property should have a calculation"
+          (isJust (findIndex (case _ of
+            (Calculation' _) -> true
+            otherwise -> false) propertyParts)))
+      otherwise -> assert "Property should have parts" false
+
   test "View with property references" do
     (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "view : MyView(P1, P2)" viewE
     case r of

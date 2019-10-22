@@ -504,3 +504,22 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                     otherwise -> false
                   otherwise -> false)
               otherwise -> assert "There should be an action Consult Party" false
+
+  test "Action with a DateTime Condition" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if MyProp > '1995-12-17'" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr'@{actions})) -> do
+            -- logShow dr'
+            case lookup "model:Test$Gast$ConsultParty" actions of
+              (Just (Action{condition})) -> assert "The condition should have operator '>'"
+                (case condition of
+                  S (Binary (BinaryStep{operator})) -> case operator of
+                    (GreaterThan _) -> true
+                    otherwise -> false
+                  otherwise -> false)
+              otherwise -> assert "There should be an action Consult Party" false
