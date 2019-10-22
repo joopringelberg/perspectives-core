@@ -9,11 +9,12 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (logShow)
-import Node.Encoding (Encoding(..))
+import Node.Encoding (Encoding(..)) as ENC
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (actionE, domain, perspectiveE, propertyE, roleE, viewE)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.Action (Verb(..))
@@ -371,6 +372,29 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
             otherwise -> false) actionParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
+  test "Action with a condition" do
+    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView\n  if Prop1 > 10" actionE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pre@(Act (ActionE{verb, actionParts}))) -> do
+        logShow pre
+        assert "The Action should have the Verb 'Consult'" (verb == Consult)
+        (assert "The Action should have a view with name 'ViewOnGuest'"
+          (isJust (findIndex (case _ of
+            (ObjectView v) -> v == "ViewOnGuest"
+            otherwise -> false) actionParts)))
+        (assert "The Action should have a subjectView with name 'AnotherView'"
+          (isJust (findIndex (case _ of
+            (SubjectView v) -> v == "AnotherView"
+            otherwise -> false) actionParts)))
+        (assert "The Action should have a Condition"
+          (isJust (findIndex (case _ of
+            (Condition (Binary (BinaryStep {operator}))) -> case operator of
+              GreaterThan _ -> true
+              otherwise -> false
+            otherwise -> false) actionParts)))
+      otherwise -> assert "Parsed an unexpected type" false
+
   test "Action with its own View, with a subjectView and an indirectObject with a view." do
     (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Consult with ViewOnGuest\n  subjectView: AnotherView\n  indirectObject: AnotherRole (ViewOnAnotherRole)" actionE
     case r of
@@ -452,7 +476,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
 
   test "Parse a file" do
     fileName <- pure "arcsyntax.arc"
-    text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
+    text <- liftEffect (readTextFile ENC.UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
     case r of
       (Left e) -> assert (show e) false

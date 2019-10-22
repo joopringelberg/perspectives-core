@@ -308,8 +308,8 @@ actionE = try $ withEntireBlock
 
     actionParts :: IP (List ActionPart)
     actionParts = do
-      lookAhead (reserved "subjectView" <|> reserved "indirectObject") <?> "subjectView or indirectObject"
-      subjectView <|> indirectObject
+      lookAhead (reserved "subjectView" <|> reserved "indirectObject" <|> reserved "if") <?> "if, subjectView or indirectObject"
+      subjectView <|> indirectObject <|> condition
 
     subjectView :: IP (List ActionPart)
     subjectView = do
@@ -323,6 +323,12 @@ actionE = try $ withEntireBlock
       indirectObjectName <- reserved "indirectObject" *> colon *> arcIdentifier
       indirectObjectView <- option Nil (token.parens (arcIdentifier >>= pure <<< singleton <<< IndirectObjectView))
       pure $ Cons (IndirectObject indirectObjectName) indirectObjectView
+
+    condition :: IP (List ActionPart)
+    condition = do
+      pos <- getPosition
+      expr <- reserved "if" *> step
+      pure $ Cons (Condition expr) Nil
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

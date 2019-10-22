@@ -59,7 +59,7 @@ newtype ActionE = ActionE
   , pos :: ArcPosition
   }
 
-data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String
+data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String | Condition Step
 
 newtype ViewE = ViewE
   { id :: String

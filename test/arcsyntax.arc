@@ -35,7 +35,7 @@ domain: Feest
   user: Eregast = Gast > binding
   bot: for Eregast
     perspective on: Wens
-      if Wens >> Bedrag > 10 then SomeProp = false
+      --if Wens >> Bedrag > 10 then SomeProp = false
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
   -- A nested context
   activity: EzeltjePrik
