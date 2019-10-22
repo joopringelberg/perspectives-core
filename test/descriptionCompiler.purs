@@ -1,0 +1,361 @@
+module Test.Query.DescriptionCompiler where
+
+import Prelude
+
+import Control.Monad.Free (Free)
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
+import Effect.Aff (Aff)
+import Effect.Class.Console (logShow)
+import Foreign.Object (lookup)
+import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.Identifiers (Namespace)
+import Perspectives.Parsing.Arc (domain) as ARC
+import Perspectives.Parsing.Arc.AST (ContextE(..))
+import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
+import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
+import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Calculation (Calculation(..))
+import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Test.Perspectives.Utils (runP)
+import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit.Assert (assert)
+import Text.Parsing.Parser (ParseError)
+
+withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
+withDomeinFile ns df mpa = do
+  void $ storeDomeinFileInCache ns df
+  r <- mpa
+  removeDomeinFileFromCache ns
+  pure r
+
+makeTest_ :: (String -> Aff Unit -> Free TestF Unit) ->
+  String ->
+  String ->
+  (PerspectivesError -> Aff Unit) ->
+  (DomeinFileRecord -> Aff Unit) ->
+  Free TestF Unit
+makeTest_ test title source errorHandler theTest = test title do
+  (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser source ARC.domain
+  case r of
+    (Left e) -> assert (show e) false
+    (Right ctxt@(ContextE{id})) -> do
+      -- logShow ctxt
+      case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+        (Left e) -> assert (show e) false
+        (Right (DomeinFile dr')) -> do
+          -- logShow dr'
+          x <- runP $ phaseThree dr'
+          case x of
+            (Left e) -> errorHandler e
+            (Right correctedDFR) -> theTest correctedDFR
+
+makeTest :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFileRecord -> Aff Unit) -> Free TestF Unit
+makeTest = makeTest_ test
+
+makeTestOnly :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFileRecord -> Aff Unit) -> Free TestF Unit
+makeTestOnly = makeTest_ testOnly
+
+theSuite :: Free TestF Unit
+theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
+
+  makeTest "compileSimpleStep: ArcIdentifier, Role."
+    "domain: Test\n  thing: Role = AnotherRole\n  thing: AnotherRole (mandatory, functional)"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role" calculatedRoles of
+        Nothing -> assert "There should be a role 'Role'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:Test$AnotherRole))' as its Range"
+            case calculation of
+              (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:Test$AnotherRole"))))) -> true
+              otherwise -> false
+          assert "The queryfunction of the calculation should be '(RolGetter \"model:Test$AnotherRole\")'"
+            case calculation of
+              (Q (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$AnotherRole"))) _)) -> true
+              otherwise -> false)
+
+  makeTest "compileSimpleStep: ArcIdentifier, missing Role."
+    "domain: Test\n  thing: Role = AnotherRole"
+    (\e -> case e of
+      (ContextHasNoRole _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no role AnotherRole" false)
+
+  makeTest "compileSimpleStep: ArcIdentifier, Property."
+    "domain: Test\n  thing: Role (mandatory, functional)\n    property: Prop1 = Prop2\n    property: Prop2 (mandatory, functional, Boolean)\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role$Prop1" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop1'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should have '(VDOM PBool)' as its Range"
+            case calculation of
+              (Q (SQD _ _ (VDOM PBool))) -> true
+              otherwise -> false
+          assert "The queryfunction of the calculation should be '(PropertyGetter \"model:Test$AnotherRole\")'"
+            case calculation of
+              (Q (SQD _ (PropertyGetter (ENP (EnumeratedPropertyType "model:Test$Role$Prop2"))) _)) -> true
+              otherwise -> false)
+
+  makeTest "compileSimpleStep: ArcIdentifier, missing Property."
+    "domain: Test\n  thing: Role (mandatory, functional)\n    property: Prop1 = Prop2"
+    (\e -> case e of
+      (RoleHasNoProperty _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no property Prop2" false)
+
+  makeTest "compileSimpleStep: Value."
+    "domain: Test\n  thing: Role (mandatory, functional)\n    property: Prop1 = 1"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role$Prop1" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop1'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should have '(VDOM PNumber)' as its Range"
+            case calculation of
+              (Q (SQD _ _ (VDOM PNumber))) -> true
+              otherwise -> false
+          assert "The queryfunction of the calculation should be '(Constant PNumber \"1\")'"
+            case calculation of
+              (Q (SQD _ (Constant PNumber "1") _)) -> true
+              otherwise -> false)
+
+  makeTest "compileSimpleStep: Binding."
+    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: Role2\n    property: Prop1 = binding >> Prop2\n  thing: Role2 (mandatory, functional)\n    property: Prop2 (mandatory, functional, Boolean)"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1$Prop1" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop1'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be a composition, the first step of which is 'binding'"
+            case calculation of
+              (Q (BQD _ _ (SQD _ (DataTypeGetter "binding") _) _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileSimpleStep: Binding, missing binding."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 = binding >> Prop2\n"
+    (\e -> case e of
+      (RoleHasNoBinding _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no binding for Role1" false)
+
+  makeTest "compileSimpleStep: Binder."
+    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: Role2\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role3" calculatedRoles of
+        Nothing -> assert "There should be a role 'Role3'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should be a composition, the second step of which is 'getRoleBinders'"
+            case calculation of
+              (Q (BQD _ _ _ (SQD _ (DataTypeGetterWithParameter "getRoleBinders" "model:Test$Role1") _) _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileSimpleStep: Binder, missing binding."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
+    (\e -> case e of
+      (RoleDoesNotBind _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no binding for Role1" false)
+
+  makeTest "compileSimpleStep: Context."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n  thing: Role2 = Role1 >> context >> Role1\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role2" calculatedRoles of
+        Nothing -> assert "There should be a role 'Role2'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should be a composition, the second step of which is a composition the first of which 'context'"
+            case calculation of
+              (Q (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter "context") _) _ _) _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileSimpleStep: Context, wrong argument type."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = binder Role1\n"
+    (\e -> case e of
+      (IncompatibleQueryArgument _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that context cannot be applied to a Context" false)
+
+  makeTest "compileSimpleStep: Extern."
+    "domain: Test\n  thing: Role1 = extern\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1" calculatedRoles of
+        Nothing -> assert "There should be a role 'Role1'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should be a simple calculation,of which the queryfunction is '(DataTypeGetter \"externalRole\")'"
+            case calculation of
+              (Q (SQD _ (DataTypeGetter "externalRole") _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileSimpleStep: Extern, wrong argument type."
+    "domain: Test\n  thing: Role1 = Role2 >> extern\n  thing: Role2 (mandatory, functional)\n"
+    (\e -> case e of
+      (IncompatibleQueryArgument _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that extern cannot be applied to a Role" false)
+
+  makeTest "compileSimpleStep: CreateContext."
+    "domain: Test\n  case: Case1\n    thing: Role1 (mandatory, functional)\n    thing: Role2 = createContext Case1 >> Role1\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Case1$Role2" calculatedRoles of
+        Nothing -> assert "There should be a role 'Role2'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should be a composition,of which the first operand is a simple function the queryfunction is '(CreateContext \"model:Test$Case1\")'"
+            case calculation of
+              (Q (BQD _ _ (SQD _ (DataTypeGetterWithParameter "createContext" "model:Test$Case1") _) _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileSimpleStep: CreateContext, context type not defined."
+    "domain: Test\n  case: Case1\n    thing: Role1 (mandatory, functional)\n    thing: Role2 = createContext Case2 >> Role1\n"
+    (\e -> case e of
+      (UnknownContext _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the context type that is being created is not defined" false)
+
+  -- Skipping createRole because it is an exact copy of createContext
+
+  makeTest "compileUnaryStep: LogicalNot."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 = not Prop1\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1$Prop2" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop2'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be a Unary combination, the queryFunction of which should be '(UnaryCombinator \"not\")'"
+            case calculation of
+              (Q (UQD _ (UnaryCombinator "not") _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileUnaryStep: LogicalNot, wrong argument type"
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = not Prop1\n"
+    (\e -> case e of
+      (IncompatibleQueryArgument _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that 'not' must be applied to a Boolean value" false)
+
+  makeTest "compileUnaryStep: exists."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 = exists Prop1\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1$Prop2" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop2'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be a Unary combination, the queryFunction of which should be '(UnaryCombinator \"exists\")'"
+            case calculation of
+              (Q (UQD _ (UnaryCombinator "exists") _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileUnaryStep: exists, wrong argument type"
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = not Prop1\n"
+    (\e -> case e of
+      (IncompatibleQueryArgument _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that extern cannot be applied to a Role" false)
+
+  makeTest "compileBinaryStep: compose."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role3 (mandatory, functional)\n    property: Prop2 = context >> Role1 >> Prop1\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role3$Prop2" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop2'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be a composition"
+            case calculation of
+              (Q (BQD _ (BinaryCombinator "compose") _ _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileBinaryStep: compose with incompatible types"
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role3 (mandatory, functional)\n    property: Prop2 = context >> binding >> Prop1\n"
+    (\e -> case e of
+      (IncompatibleQueryArgument _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
+
+  makeTest "compileBinaryStep: make a comparison."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 (mandatory, functional, Boolean)\n    property: Prop3 = Prop1 == Prop2\n    \n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1$Prop3" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop3'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be (BinaryCombinator \"equals\")"
+            case calculation of
+              (Q (BQD _ (BinaryCombinator "equals") _ _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileBinaryStep: make a comparison, terms have different result types."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 (mandatory, functional, String)\n    property: Prop3 = Prop1 == Prop2\n    \n"
+    (\e -> case e of
+      (TypesCannotBeCompared _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
+
+  makeTest "compileBinaryStep: make a binary operation with 'and'."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 (mandatory, functional, Boolean)\n    property: Prop3 = Prop1 and Prop2\n    \n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1$Prop3" calculatedProperties of
+        Nothing -> assert "There should be a property 'Prop3'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be (BinaryCombinator \"and\")"
+            case calculation of
+              (Q (BQD _ (BinaryCombinator "and") _ _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileBinaryStep: make a binary operation with `and` on Number."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n    property: Prop2 (mandatory, functional, Number)\n    property: Prop3 = Prop1 and Prop2\n    \n"
+    (\e -> case e of
+      (WrongTypeForOperator _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
+
+  makeTest "compileBinaryStep: make a binary operation with 'filter'."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role2 = filter Role1 with Prop1"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role2" calculatedRoles of
+        Nothing -> assert "There should be a role 'Role2'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should be (BinaryCombinator \"filter\")"
+            case calculation of
+              (Q (BQD _ (BinaryCombinator "filter") _ _ _)) -> true
+              otherwise -> false
+              )

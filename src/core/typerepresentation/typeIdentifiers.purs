@@ -47,8 +47,8 @@ instance writeForeignRoleType :: WriteForeign RoleType where
 instance readForeignRoleType :: ReadForeign RoleType where
   readImpl r = readImpl r
 instance showRoleType :: Show RoleType where
-  show (ENR r) = show r
-  show (CR r) = show r
+  show (ENR r) = "ENR " <>  show r
+  show (CR r) = "CR " <> show r
 instance eqRoleType :: Eq RoleType where
   eq (ENR _) (CR _) = false
   eq (CR _) (ENR _) = false

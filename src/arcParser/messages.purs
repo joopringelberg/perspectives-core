@@ -14,6 +14,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
@@ -50,6 +51,7 @@ data PerspectivesError
     | IncompatibleComposition ArcPosition Range Domain
     | TypesCannotBeCompared ArcPosition Range Range
     | NotABoolean ArcPosition
+    | WrongTypeForOperator ArcPosition (Array EP.Range)
 
     | Custom String
 
@@ -80,6 +82,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the argument of the right operand (" <> show right <> ") are incompatible."
   show (TypesCannotBeCompared pos left right) = "(TypesCannotBeCompared) The result of the left operand (" <> show left <> ") and of the right operand (" <> show right <> ") are incompatible."
   show (NotABoolean pos) = "(NotABoolean) The expression starting at " <> show pos <> " does not result in a boolean value."
+  show (WrongTypeForOperator pos allowedOps) = "(WrongTypeForOperator) This operator requires its arguments to be (one of): " <> show allowedOps
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

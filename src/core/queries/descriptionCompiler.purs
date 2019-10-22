@@ -54,7 +54,6 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
       case head pts of
         Nothing -> throwError $ RoleHasNoProperty r ident
         (Just (pt :: PropertyType)) -> do
-          -- TODO: controleer of hier niet een 'expandedADT_' voor PropertyClass gebruikt moet worden.
           (rOfpt :: Range) <- lift2 $ rangeOfPropertyType pt
           pure $ SQD currentDomain (PropertyGetter pt) (VDOM rOfpt)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
@@ -90,7 +89,7 @@ compileSimpleStep currentDomain s@(Binder pos binderName) = do
       -- That is, its binding (an ADT) must be more general than the currentDomain.
       (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ expandedADT_ (ENR qBinderType)
       if r `lessThenOrEqualTo` bindingOfBinder
-        then pure $ SQD currentDomain (DataTypeGetterWithParameter "getUnqualifiedRoleBinders" binderName) (RDOM $ ST qBinderType)
+        then pure $ SQD currentDomain (DataTypeGetterWithParameter "getRoleBinders" (unwrap qBinderType)) (RDOM $ ST qBinderType)
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
@@ -149,40 +148,46 @@ compileUnaryStep currentDomain (LogicalNot pos s) = do
 compileUnaryStep currentDomain st@(Exists pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    VDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
     otherwise -> pure $ UQD currentDomain (UnaryCombinator "exists") descriptionOfs (VDOM PBool)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
-compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) = do
-    f1 <- compileStep currentDomain left
-    f2 <- compileStep (range f1) right
-
-    case operator of
-      Compose pos -> do
-        -- The range of f1 must be more general than or equal to the domain of f2
-        gt <- lift2 ((range f1) `greaterThanOrEqualTo_` (domain f2))
-        if gt
-          then pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
-          else throwError $ IncompatibleComposition pos (range f1) (domain f2)
-
-      Equals pos -> comparison pos f1 f2 "equals"
-      NotEquals pos -> comparison pos f1 f2 "notEquals"
-      LessThan pos -> comparison pos f1 f2 "lessThan"
-      LessThanEqual pos -> comparison pos f1 f2 "lessThanEqual"
-      GreaterThan pos -> comparison pos f1 f2 "greaterThan"
-      GreaterThanEqual pos -> comparison pos f1 f2 "greaterThanEqual"
-
-      LogicalAnd pos -> binOp pos f1 f2 [PBool] "and"
-      LogicalOr pos -> binOp pos f1 f2 [PBool] "or"
-      Add pos -> binOp pos f1 f2 [PNumber, PString] "add"
-      Subtract pos -> binOp pos f1 f2 [PNumber, PString] "subtract"
-      Divide pos -> binOp pos f1 f2 [PNumber] "divide"
-      Multiply pos -> binOp pos f1 f2 [PNumber] "multiply"
-
+compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
+  case operator of
+    Filter pos -> do
+      f1 <- compileStep currentDomain left
+      f2 <- compileStep (range f1) right
       -- f1 is the source to be filtered, f2 is the criterium.
-      Filter pos -> case range f2 of
+      case range f2 of
         VDOM PBool -> pure $ BQD currentDomain (BinaryCombinator "filter") f1 f2 (range f1)
         otherwise -> throwError $ NotABoolean (startOf right)
+    Compose pos -> do
+      f1 <- compileStep currentDomain left
+      f2 <- compileStep (range f1) right
+      pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
+
+    otherwise -> do
+      f1 <- compileStep currentDomain left
+      f2 <- compileStep currentDomain right
+
+      case operator of
+
+        Equals pos -> comparison pos f1 f2 "equals"
+        NotEquals pos -> comparison pos f1 f2 "notEquals"
+        LessThan pos -> comparison pos f1 f2 "lessThan"
+        LessThanEqual pos -> comparison pos f1 f2 "lessThanEqual"
+        GreaterThan pos -> comparison pos f1 f2 "greaterThan"
+        GreaterThanEqual pos -> comparison pos f1 f2 "greaterThanEqual"
+
+        LogicalAnd pos -> binOp pos f1 f2 [PBool] "and"
+        LogicalOr pos -> binOp pos f1 f2 [PBool] "or"
+        Add pos -> binOp pos f1 f2 [PNumber, PString] "add"
+        Subtract pos -> binOp pos f1 f2 [PNumber, PString] "subtract"
+        Divide pos -> binOp pos f1 f2 [PNumber] "divide"
+        Multiply pos -> binOp pos f1 f2 [PNumber] "multiply"
+
+        Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached" 
+        Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
 
   where
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> String -> PhaseThree QueryFunctionDescription
@@ -195,7 +200,10 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) = do
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> String -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
-      (VDOM rc1), (VDOM rc2) | rc1 == rc2 && allowed rc1 && allowed rc2 -> pure $ BQD currentDomain (BinaryCombinator functionName) left' right' (VDOM rc1)
+      (VDOM rc1), (VDOM rc2) | rc1 == rc2 ->
+        if  allowed rc1 && allowed rc2
+          then pure $ BQD currentDomain (BinaryCombinator functionName) left' right' (VDOM rc1)
+          else throwError $ WrongTypeForOperator pos allowedRangeConstructors
       l, r -> throwError $ TypesCannotBeCompared pos l r
       where
         allowed :: Range -> Boolean

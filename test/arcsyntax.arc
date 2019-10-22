@@ -29,6 +29,7 @@ domain: Feest
       Bind with AnotherView
         indirectObject: AnotherRole (ViewOnAnotherRole)
         subjectView: ViewOpGast
+  user: GoedeGast = filter Gast with WellBehaved
   bot: for Gast
     perspective on: Wens (ViewOpWens): Delete
   user: Eregast = Gast > binding

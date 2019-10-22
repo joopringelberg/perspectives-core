@@ -50,7 +50,7 @@ phaseThree df@{_id} = do
         qualifyBindings
         qualifyPropertyReferences
         qualifyViewReferences
-        inverseBindings
+        -- inverseBindings  -- not yet implemented, probably unnecessary.
         qualifyReturnsClause
         compileExpressions
         )
@@ -275,7 +275,6 @@ compileExpressions = do
     _id
     (DomeinFile df)
     (compileExpressions' df)
--- compileExpressions = (lift $ gets _.dfr) >>= compileExpressions'
   where
     compileExpressions' :: DomeinFileRecord -> PhaseThree Unit
     compileExpressions' {calculatedRoles, calculatedProperties} = do

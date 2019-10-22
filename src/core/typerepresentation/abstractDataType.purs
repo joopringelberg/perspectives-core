@@ -27,7 +27,6 @@ data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | NOTYPE
 
 derive instance genericRepBinding :: Generic (ADT a) _
 
--- TODO. This implementation causes an endless loop.
 instance showADT :: (Show a) => Show (ADT a) where
   show (ST a) = "(" <> "ST" <> " " <> show a <> ")"
   show NOTYPE = "NOTYPE"

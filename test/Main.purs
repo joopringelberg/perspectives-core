@@ -10,6 +10,7 @@ import Test.Parsing.Arc as TPA
 import Test.Parsing.Arc.PhaseTwo (theSuite) as TPA2
 import Test.Parsing.Arc.PhaseThree as TPA3
 import Test.Parsing.Arc.Expression as TPAE
+import Test.Query.DescriptionCompiler as QDC
 import Test.Unit.Main (runTest)
 
 main :: Effect Unit
@@ -19,3 +20,4 @@ main = runTest do
   TPA2.theSuite
   TPA3.theSuite
   TPAE.theSuite
+  QDC.theSuite
