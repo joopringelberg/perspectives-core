@@ -20,6 +20,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
+import Perspectives.Parsing.Arc.Expression.AST (Operator(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
@@ -27,7 +28,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..), requiredObjectProperties)
+import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -36,7 +37,7 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
-import Perspectives.Representation.View (View(..), propertyReferences)
+import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, roleInContext)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -415,3 +416,25 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                       case calculation of
                         (Q (SQD _ (ComputedRoleGetter "ModellenM") _)) -> true
                         otherwise -> false
+
+  test "Action with Condition" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Voornaam (mandatory, functional, String)\n    view: AnotherView (Voornaam)\n    perspective on: Party\n      Consult with ViewOnParty\n        subjectView: AnotherView\n        if Party >> Datum > 10\n  thing: Party (mandatory, functional)\n    property: Naam (mandatory, functional, String)\n    property: Datum (mandatory, functional, DateTime)\n    view: ViewOnParty (Naam)\n    view: AnotherView (Datum)" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
+                case lookup "model:Test$Gast$ConsultParty" actions of
+                  (Just (Action{condition})) -> assert "The condition should have operator '>'"
+                    (case condition of
+                      (Q (BQD _ (BinaryCombinator "greaterThan") _ _ _)) -> true
+                      otherwise -> false)
+                  otherwise -> assert "There should be an action Consult Party" false

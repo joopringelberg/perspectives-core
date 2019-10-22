@@ -17,20 +17,21 @@ import Data.Symbol (SProxy(..))
 import Effect.Class (liftEffect)
 import Effect.Class.Console (logShow, log)
 import Foreign.Object (lookup)
-import Node.Encoding (Encoding(..))
+import Node.Encoding (Encoding(..)) as ENC
 import Node.FS.Sync (readTextFile)
 import Node.Path as Path
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo, evalPhaseTwo', expandNamespace, traverseDomain, withNamespaces)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Verb(..))
+import Perspectives.Representation.Action (Action(..), Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
@@ -265,7 +266,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
 
   test "Parse a file and pass phase two over it" do
     fileName <- pure "arcsyntax.arc"
-    text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
+    text <- liftEffect (readTextFile ENC.UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -484,3 +485,22 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               (Just (EnumeratedRole{binding})) -> assert "The binding of Uitje should be an External Role"
                 (binding == (ST $ EnumeratedRoleType "Speeltuin$External"))
               otherwise -> assert "The binding of Uitje should be an External Role" false
+
+  test "Action with Condition" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    perspective on: Party\n      Consult with ViewOnGuest\n        subjectView: AnotherView\n        if Prop1 > 10" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr'@{actions})) -> do
+            -- logShow dr'
+            case lookup "model:Test$Gast$ConsultParty" actions of
+              (Just (Action{condition})) -> assert "The condition should have operator '>'"
+                (case condition of
+                  S (Binary (BinaryStep{operator})) -> case operator of
+                    (GreaterThan _) -> true
+                    otherwise -> false
+                  otherwise -> false)
+              otherwise -> assert "There should be an action Consult Party" false

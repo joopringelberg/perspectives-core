@@ -15,7 +15,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
+theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -53,7 +53,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "UnaryStep: create" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "create MyRole" unaryStep
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "createRole MyRole" simpleStep
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -276,3 +276,22 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
         logShow a
         assert "bla" true
       otherwise -> assert "'\"aap\"' should be parsed as a (Value _ PBoolean \"aap\")" false
+
+  test "date" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "1995-12-17T03:24:00" simpleStep
+    -- logShow r -- (Right (Simple (Value (ArcPosition { column: 1, line: 1 }) PNumber "1995")))
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Simple (Value _ PDate _))) -> do
+        logShow a
+        assert "bla" true
+      otherwise -> assert "'1995-12-17T03:24:00' should be parsed as a (Date _ PDate ...)" false
+
+  testOnly "date" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "1995-12-17" simpleStep
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Simple (Value _ PDate _))) -> do
+        logShow a
+        assert "bla" true
+      otherwise -> assert "'1995-12-17' should be parsed as a (Date _ PDate ...)" false

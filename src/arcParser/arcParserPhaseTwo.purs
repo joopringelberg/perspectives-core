@@ -21,6 +21,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
@@ -33,7 +34,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
 import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..), defaultContext)
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), defaultEnumeratedProperty)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
@@ -485,15 +486,11 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , subject: EnumeratedRoleType rolename
     , verb: verb
     , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
-    , requiredObjectProperties: case head (filter (case _ of
-          (ObjectView _) -> true
-          otherwise -> false) actionParts) of
-        Nothing -> defaultObjectView
-        (Just (ObjectView v)) -> Just $ ViewType v
+    , requiredObjectProperties: Nothing
     , requiredSubjectProperties: Nothing
     , requiredIndirectObjectProperties: Nothing
     , indirectObject: Nothing
-    , condition: Nothing
+    , condition: S (Expr.Simple (Expr.Value pos PBool "true"))
     , effect: Nothing
     , executedByBot: executedByBot
     , pos
@@ -519,3 +516,6 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
 
     -- INDIRECTOBJECTVIEW
     handleParts _ (Action ar) (IndirectObjectView iov) = pure $ Action (ar {requiredIndirectObjectProperties = Just $ ViewType iov})
+
+    -- CONDITION
+    handleParts _ (Action ar) (Condition s) = pure $ Action (ar {condition = S s})

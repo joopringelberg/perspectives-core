@@ -21,7 +21,8 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesT
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.Action (Action, condition, effect, object)
+import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.Class.Action (condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
@@ -102,7 +103,7 @@ compileBotAction actionType contextId =
       (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (unsafePartial $ fromJust $ effect action) objectGetter actionType
       -- The Left Hand Side of the Action is a query that computes boolean values.
       -- These values depend on a number of Assumptions.
-      (lhs :: (ContextInstance ~~> Value)) <- context2propertyValue $ unsafePartial $ fromJust $ condition action
+      (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
       -- Now construct the updater by combining the lhs with the rhs.
       (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
       -- Cache the result.

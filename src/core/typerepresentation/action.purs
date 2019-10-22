@@ -3,42 +3,17 @@ module Perspectives.Representation.Action where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Assignment (AssignmentStatement)
+import Perspectives.Representation.Calculation (Calculation)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedRoleType, RoleType, ViewType)
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, RoleType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
-
------------------------------------------------------------
--- ACTION TYPE CLASS
------------------------------------------------------------
-class ActionClass c where
-  subject :: c -> EnumeratedRoleType
-  verb :: c -> Verb
-  object :: c -> RoleType
-  indirectObject :: c -> Maybe RoleType
-  requiredObjectProperties :: c -> Maybe ViewType
-  requiredSubjectProperties :: c -> Maybe ViewType
-  requiredIndirectObjectProperties :: c -> Maybe ViewType
-  condition :: c -> Maybe QueryFunctionDescription
-  effect :: c -> Maybe AssignmentStatement
-
-instance actionActionClass :: ActionClass Action where
-  subject = _.subject <<< unwrap
-  verb = _.verb <<< unwrap
-  object = _.object <<< unwrap
-  indirectObject = _.indirectObject <<< unwrap
-  requiredObjectProperties = _.requiredObjectProperties <<< unwrap
-  requiredSubjectProperties = _.requiredSubjectProperties <<< unwrap
-  requiredIndirectObjectProperties = _.requiredIndirectObjectProperties <<< unwrap
-  condition = _.condition <<< unwrap
-  effect = _.effect <<< unwrap
 
 -----------------------------------------------------------
 -- ACTION
@@ -58,7 +33,7 @@ type ActionRecord =
   , requiredSubjectProperties :: Maybe ViewType
   , requiredIndirectObjectProperties :: Maybe ViewType
   , indirectObject :: Maybe RoleType
-  , condition :: Maybe QueryFunctionDescription
+  , condition :: Calculation
   , effect :: Maybe AssignmentStatement
   , executedByBot :: Boolean
   , pos :: ArcPosition

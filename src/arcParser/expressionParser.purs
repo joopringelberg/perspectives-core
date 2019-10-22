@@ -2,14 +2,20 @@ module Perspectives.Parsing.Arc.Expression where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
+import Control.Monad.Trans.Class (lift)
+import Data.DateTime (DateTime(..))
+import Data.JSDate (JSDate, parse, readDate, toDateTime)
 import Data.Maybe (Maybe(..))
-import Data.String (length)
+import Data.String (length, trim)
+import Effect.Class (liftEffect)
+import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
+import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (try, (<?>))
 
 step :: IP Step
@@ -34,6 +40,8 @@ simpleStep = try
   <|>
   Simple <$> (Value <$> getPosition <*> pure PBool <*> boolean)
   <|>
+  Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
+  <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
   -- TODO: date
   <|>
@@ -42,11 +50,20 @@ simpleStep = try
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> (defer \_ -> arcIdentifier)))
   ) <?> "binding, binder, context, extern or a valid identifier"
 
+-- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
+parseDate :: IP DateTime
+parseDate = try do
+  s <- stringUntilNewline
+  (d :: JSDate) <- pure $ unsafePerformEffect $ parse $ trim s
+  case toDateTime d of
+    Nothing -> fail "Not a date"
+    (Just (dt :: DateTime)) -> pure dt
+
 unaryStep :: IP Step
 unaryStep = try
   (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
   <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr>, createContext  <identifier>, createRole <identifier>, exists <step>"
+  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr>, exists <step>"
 
 compoundStep :: IP Step
 compoundStep = try (defer \_->binaryStep) <|> (defer \_->filterStep)

@@ -20,7 +20,7 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Si
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
 import Perspectives.Representation.Class.Property (rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_)
@@ -186,7 +186,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Divide pos -> binOp pos f1 f2 [PNumber] "divide"
         Multiply pos -> binOp pos f1 f2 [PNumber] "multiply"
 
-        Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached" 
+        Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
 
   where
@@ -196,7 +196,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       gt <- lift2 $ pure ((range left') `eq` (range right'))
       if gt
         then pure $ BQD currentDomain (BinaryCombinator functionName) left' right' (range right')
-        else throwError $ TypesCannotBeCompared pos (range left') (domain right')
+        else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> String -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of

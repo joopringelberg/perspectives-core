@@ -32,15 +32,15 @@ import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
-import Perspectives.Representation.Class.PersistentType (typeExists)
-import Perspectives.Representation.Class.Role (expandedADT_)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.Role (contextOfRepresentation, expandedADT_)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, map, pure, unit, void, ($), (<>), (==), discard, (>>=))
+import Prelude (Unit, bind, map, pure, unit, void, ($), (<>), (==), discard, (>>=), (<<<))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -277,10 +277,11 @@ compileExpressions = do
     (compileExpressions' df)
   where
     compileExpressions' :: DomeinFileRecord -> PhaseThree Unit
-    compileExpressions' {calculatedRoles, calculatedProperties} = do
+    compileExpressions' {calculatedRoles, calculatedProperties, actions} = do
       compRoles <- traverseWithIndex compileRolExpr calculatedRoles
       compProps <- traverseWithIndex compilePropertyExpr calculatedProperties
-      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps}
+      compActions <- traverseWithIndex compileActionCondition actions
+      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps, actions = compActions}
 
     compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
     compileRolExpr roleName (CalculatedRole cr@{calculation, context}) = case calculation of
@@ -295,3 +296,11 @@ compileExpressions = do
       S stp -> do
         descr <- compileStep (RDOM $ ST role) stp
         pure $ CalculatedProperty (cr {calculation = Q descr})
+
+    compileActionCondition :: String -> Action -> PhaseThree Action
+    compileActionCondition actionName (Action ar@{subject, condition}) = case condition of
+      Q _ -> pure $ Action ar
+      S stp -> do
+        ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
+        descr <- compileStep (CDOM $ ST ctxt) stp
+        pure $ Action (ar {condition = Q descr})
