@@ -1,25 +1,15 @@
-perspectives-core
+perspectives-distributed-runtime
 ======================
 
-The core provides the middleware between Couchd and clients. It can be approached through two channels:
-* an internal channel
-* a TCP (socket-based) channel on port 7777.
+### About
+The Perspectives Distributed Runtime (PDR) is part of the software created in the course of the [Perspectives Project](https://academy.perspect.it).
 
-Clients communicate with the core on both channels using exactly the same protocol that essentially is querying for roles or properties.
+The PDR interprets models written in the Perspectives Design Language. **Patterns of co-operation** can easily be expressed in the PDL. Examples of co-operation are: buying and selling, renting stuff, a formal meeting, etc.
 
-### Develop this interface
-Assuming code will be changed with Atom (and the Atom-purescript-ide), changes in source code will be immediately compiled into javascript in the `output` directory. If
+The PDR has an API for client programs that offer end users screens to interact with each other. Users of such programs exchange information directly, in a Peer-to-Peer fashion, without intermediate servers that store their information.
 
-`npm run watch`
+### Getting started
+The PDR is work in progress. It is not yet in a state that it can be used. Hence, we provide no instructions on how to use it right now. However, [here](./technicalreadme.md) is a page with instructions for developers of the PDR.
 
-is executed before changing code, changes will be immediately reflected in the bundled code in `dist/perspectives-core.js`.
-
-### Symlinks for easy updates
-`package.json` contains a run target `symlinks` that will replace the subdirectories
-* aff-sockets
-* perspectives-apitypes
-* avar-monadask
-
-in the .psc-package directory with symlinks to projects in ~Code. Run this script after calling `npm install`. A change in this project is then immediately picked up by webpack (when watching, of course).
-
-**Note**. If a new version of `psc-0.11.7-perspectives-core3` is created, the script needs to be adapted!
+### Contributing
+The PDR is being intensively developed by the core team. We appreciate feedback on the code you can find in this repository
