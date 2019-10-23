@@ -5,11 +5,13 @@ ONTWIKKELING
 
 7. Al deze onderdelen (parsers, descriptioncompilers) samen onderbrengen in één geheel dat resulteert in ofwel een opgeslagen DomeinFile, ofwel in foutmeldingen voor de modelleur.
 
-8. Tests maken voor de voltooide parser met expressies.
-
 9. Condities en rules voor bots toevoegen.
 
 10. Functies voor collecties (sum etc) toevoegen.
+
+11. Multiple binding met And toevoegen.
+
+12. Parser for dates.
 
 KLAAR
 1. ComputedRoles afmaken:		
@@ -28,4 +30,6 @@ KLAAR
 6. De DescriptionCompiler uitbreiden voor assignment- en expressie AST (en integreren met Perspectives.Representation.Assignment$AssignmentStatement).
 
 9. Representeer getallen, strings, booleans en datums in SimpleStep.
+
+8. Tests maken voor de voltooide parser met expressies.
 

@@ -9,6 +9,7 @@ Ik wil splitsen in drie delen:
 	- src/parser
 	- src/test
 	- src/model
+	- src/core/queries
 3. de documentatie en de rest	==> perspectives-documentation
 	- design
 	- testOUD
@@ -30,3 +31,30 @@ Aanpak:
 4. Maak drie subdirectories
 5. Splits drie projecten af.
 
+DEPENDENCIES
+Hoe worden de afhankelijkheden?
+
+De core blijkt afhankelijk van 
+	* src/arcParser
+		Parsing.Messages 
+			- Checking.PerspectivesTypeChecker
+				- BasicConstructors
+				- LoadCRL
+				- Api
+	* src/parser, via
+		Main >> SetupUser >> LoadCRL >> ContextRoleParser
+		Main is echter het hoofdprogramma voor InPlace, niet voor de runtime zelf, vermoed ik.
+
+Een korte verkenning laat talloze wederzijdse afhankelijkheden zien, die niet zomaar ontvlocht kunnen worden.
+
+
+WE PAKKEN HET ANDERS AAN
+Ik neem aan dat ik ter zijner tijd met WebPack of Purs bundles kan maken waarin alleen de vereiste source zit. Ik hoef om die spaarzaamheid te bereiken, niet nu te splitsen in projecten.
+Ik beperk me daarom nu tot:
+
+1. Merge met de trunk
+2. Verwijder de branch
+3. Verwijder de overbodige directories
+4. Maak een 'rest' directory (3 hierboven)
+5. Splits die rest af.
+6. Verwijder uit perspectives-core
