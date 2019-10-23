@@ -1,5 +1,6 @@
 module Perspectives.QueryAST where
 
+-- TODO: OBSOLETE!
 -- | This module gives an Abstract Syntax Tree representation for querypaths. A querypath is an expression that
 -- | starts at a Context or Role and ends at a Context, Role or a value for a Property.
 -- | The `Perspectives.Query.DescriptionCompiler` turns such an AST into a QueryFunctionDescription. Such a description
