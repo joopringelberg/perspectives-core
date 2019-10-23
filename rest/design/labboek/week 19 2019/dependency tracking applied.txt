@@ -1,8 +1,0 @@
-DEPENDENCY TRACKING APPLIED
-De volgende toepassingen van `trackedAs` zijn riskant omdat hun ObjectsGetter samengesteld is. De triples die met de door trackedAs samengestelde TripleGetter worden opgeleverd, zullen nooit worden geactualiseerd.
-
-ModelBasedTripleGetters.rolHasTypeWithLocalName
-ModelBasedTripleGetters.sumToSequence
-TripleGetterFromObjectGetter.constructExternalPropertySearch
-TripleGetterFromObjectGetter.constructInternalPropertyLookup
-TripleGetterFromObjectGetter.constructRolPropertySearch

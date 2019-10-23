@@ -1,5 +1,0 @@
-DE TYPE CHECKER VOOR MOGELIJKE BINDING
-1. Gegeven een te binden type T en een roltype R.
-2. a is de verzameling van alle Aspecten van T.
-3. mb is de verzameling mogelijkeBindingen van R.
-3. Als een x in mb voorkomt in a, kunnen instanties van T gebonden worden aan instanties van R.
