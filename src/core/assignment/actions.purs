@@ -29,12 +29,13 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, union)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Function (applyFlipped)
+import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
@@ -43,8 +44,8 @@ import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect, object)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
+import Perspectives.Representation.Class.Action (condition, effect, object)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
 import Perspectives.Representation.Context (Context, actions)
@@ -58,8 +59,8 @@ type RHS = WithAssumptions Value -> MonadPerspectivesTransaction Unit
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a set of given boolean values.
-constructRHS :: AssignmentStatement -> RoleGetter -> ActionType -> MonadPerspectives (ContextInstance -> RHS)
-constructRHS a objectGetter actionType = case a of
+constructRHS :: RoleGetter -> ActionType -> AssignmentStatement -> MonadPerspectives (ContextInstance -> RHS)
+constructRHS objectGetter actionType a = case a of
   (SetRol rt (query :: QueryFunctionDescription)) -> do
     (valueComputer :: RoleGetter) <- context2role query
     pure $ f rt valueComputer setRol
@@ -121,12 +122,14 @@ compileBotAction actionType contextId =
       -- The result of this function is dependent on any number of Assumptions.
       (objectGetter :: RoleGetter) <- getCalculation objectOfAction >>= context2role
       -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
-      (makeRHS :: (ContextInstance -> RHS)) <- constructRHS (unsafePartial $ fromJust $ effect action) objectGetter actionType
+      (makeRHSs :: Array (ContextInstance -> RHS)) <- traverse (constructRHS objectGetter actionType) (effect action)
       -- The Left Hand Side of the Action is a query that computes boolean values.
       -- These values depend on a number of Assumptions.
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
-      -- Now construct the updater by combining the lhs with the rhs.
-      (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=> (makeRHS contextId)))
+      rhss <- pure (map (applyFlipped contextId) makeRHSs)
+      (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=>
+        (\values -> for_ rhss (applyFlipped values))
+      ))
       -- Cache the result.
       _ <- pure $ cacheAction actionType updater
       pure updater

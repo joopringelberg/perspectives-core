@@ -134,6 +134,12 @@ instance eqOperator :: Eq Operator where eq = genericEq
 
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
+instance eqAssignment :: Eq Assignment where eq = genericEq
+instance writeForeignAssignment :: WriteForeign Assignment where
+  writeImpl q = unsafeToForeign (writeJSON q)
+instance readForeignAssignment :: ReadForeign Assignment where
+  readImpl q = readJSON' (unsafeFromForeign q)
 
 derive instance genericAssignmentOperator :: Generic AssignmentOperator _
 instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
+instance eqAssignmentOperator :: Eq AssignmentOperator where eq = genericEq

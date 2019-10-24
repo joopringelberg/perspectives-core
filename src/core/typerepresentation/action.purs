@@ -28,10 +28,10 @@ import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Representation.Assignment (AssignmentStatement)
 import Perspectives.Representation.Calculation (Calculation)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
+import Perspectives.Representation.SideEffect (SideEffect)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, RoleType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
@@ -55,7 +55,7 @@ type ActionRecord =
   , requiredIndirectObjectProperties :: Maybe ViewType
   , indirectObject :: Maybe RoleType
   , condition :: Calculation
-  , effect :: Maybe AssignmentStatement
+  , effect :: Maybe SideEffect
   , executedByBot :: Boolean
   , pos :: ArcPosition
   }

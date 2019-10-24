@@ -22,17 +22,18 @@
 module Perspectives.Representation.Class.Action where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.Action (Action, Verb)
+import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Assignment (AssignmentStatement)
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, RoleType, ViewType)
-import Prelude ((<<<), pure, (<>), ($))
+import Prelude (pure, ($), (<<<), (<>))
 
 -----------------------------------------------------------
 -- ACTION TYPE CLASS
@@ -46,7 +47,7 @@ class ActionClass c where
   requiredSubjectProperties :: c -> Maybe ViewType
   requiredIndirectObjectProperties :: c -> Maybe ViewType
   condition :: c -> MonadPerspectives QueryFunctionDescription
-  effect :: c -> Maybe AssignmentStatement
+  effect :: c -> Array AssignmentStatement
 
 instance actionActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
@@ -59,4 +60,6 @@ instance actionActionClass :: ActionClass Action where
   condition r = case (unwrap r).condition of
     Q qd -> pure qd
     otherwise -> throwError (error ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
-  effect = _.effect <<< unwrap
+  effect (Action{effect:et}) = case et of
+    (Just (AS ar)) -> ar
+    otherwise -> []

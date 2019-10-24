@@ -40,12 +40,12 @@ import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data Calculation = S Step | Q QueryFunctionDescription
 
-derive instance genericRepVerb :: Generic Calculation _
-instance writeForeignVerb :: WriteForeign Calculation where
+derive instance genericRepCalculation :: Generic Calculation _
+instance writeForeignCalculation :: WriteForeign Calculation where
   writeImpl = writeImpl <<< genericSumToVariant
-instance readForeignVerb :: ReadForeign Calculation where
+instance readForeignCalculation :: ReadForeign Calculation where
   readImpl f = readImpl f
-instance showVerb :: Show Calculation where
+instance showCalculation :: Show Calculation where
   show = genericShow
-instance eqVerb :: Eq Calculation where
+instance eqCalculation :: Eq Calculation where
   eq = genericEq

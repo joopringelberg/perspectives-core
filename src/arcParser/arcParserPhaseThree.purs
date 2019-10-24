@@ -74,6 +74,7 @@ phaseThree df@{_id} = do
         -- inverseBindings  -- not yet implemented, probably unnecessary.
         qualifyReturnsClause
         compileExpressions
+        compileRules
         )
       df
     case ei of
@@ -325,3 +326,7 @@ compileExpressions = do
         ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
         descr <- compileStep (CDOM $ ST ctxt) stp
         pure $ Action (ar {condition = Q descr})
+
+-- | For each Action that has a SideEffect for its `effect` member, compile an Array of `AssignmentStatement`s for it.
+compileRules :: PhaseThree Unit
+compileRules = pure unit

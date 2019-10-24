@@ -42,6 +42,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -58,6 +59,7 @@ import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<))
@@ -540,3 +542,6 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
 
     -- CONDITION
     handleParts _ (Action ar) (Condition s) = pure $ Action (ar {condition = S s})
+
+    -- ASSIGNMENT
+    handleParts _ (Action ar) (AssignmentPart a) = pure $ Action (ar {effect = Just $ A a})

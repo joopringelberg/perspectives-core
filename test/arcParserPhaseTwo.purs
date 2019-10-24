@@ -39,6 +39,7 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -523,3 +524,27 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                     otherwise -> false
                   otherwise -> false)
               otherwise -> assert "There should be an action Consult Party" false
+
+  test "Bot Action with if-then rule" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  bot: for Gast\n    perspective on: Party\n      if Prop1 > 10 then Prop2 = 20\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr'@{actions})) -> do
+            -- logShow dr'
+            case lookup "model:Test$Gast$ChangeParty" actions of
+              (Just (Action{condition, effect})) -> do
+                assert "The condition should have operator '>'"
+                  (case condition of
+                    S (Binary (BinaryStep{operator})) -> case operator of
+                      (GreaterThan _) -> true
+                      otherwise -> false
+                    otherwise -> false)
+                assert "There should be an effect"
+                  (case effect of
+                    Just (A _) -> true
+                    otherwise -> false)
+              otherwise -> assert "There should be an action Change Party" false
