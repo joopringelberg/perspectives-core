@@ -1,6 +1,3 @@
--- | Perspectives types are represented in several modules.
--- | * [Context](Perspectives.Representation.Context.html#t:ContextClass)
--- | * [EnumeratedRole](Perspectives.Representation.EnumeratedRole.html#t:EnumeratedRole)
 -- BEGIN LICENSE
 -- Perspectives Distributed Runtime
 -- Copyright (C) 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
@@ -22,4 +19,25 @@
 
 -- END LICENSE
 
-module Perspectives.TypeRepresentation.Docu where
+-- | Perspectives is a strongly typed representation language. Define your own types using Contexts, Roles, Views, etc.
+-- | These types are represented in several modules.
+-- | * [Context](Perspectives.Representation.Context.html#t:ContextClass)
+-- | * [EnumeratedRole](Perspectives.Representation.EnumeratedRole.html#t:EnumeratedRole)
+-- | * [CalculatedRole](Perspectives.Representation.CalculatedRole.html#t:CalculatedRole)
+-- | * [EnumeratedProperty](Perspectives.Representation.EnumeratedProperty.html#t:EnumeratedProperty)
+-- | * [CalculatedProperty](Perspectives.Representation.CalculatedProperty.html#t:CalculatedProperty)
+-- | * [Action](Perspectives.Representation.Action.html#t:Action)
+-- | * [View](Perspectives.Representation.View.html#t:View)
+-- |
+-- | Types can be combined in [Abstract Data types](Perspectives.Representation.ADT.html#t:ADT)
+-- |
+-- | Types are complex representations that are identified by Purescript newtypes, see
+-- | * [Type identifiers](Perspectives.Representation.TypeIdentifiers.html#t:x)
+-- | * the [Identifiable](Perspectives.Representation.Class.Identifiable.html#t:x) module for the relation between a type and its identifier.
+-- |
+-- | Type representations are persisted to a database in a so-called DomeinFile. See:
+-- | * [PersistentType](Perspectives.Representation.Class.PersistentType.html#t:PersistentType)
+-- | * [Perspectives.DomeinFile](Perspectives.DomeinFile.html#t:DomeinFile)
+-- | * [DomeinCache](Perspectives.DomeinCache.html#t:DomeinCache)
+
+module Perspectives.Docu.TypeRepresentation where

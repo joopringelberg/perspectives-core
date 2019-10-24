@@ -19,6 +19,22 @@
 
 -- END LICENSE
 
+-- | All types are identified with a `TypeIdentifier`. Invariably, a TypeIdentifier is a Purescript newtype (there is no representation of newtypes in the compiled code: they are just used by the compiler).
+-- | Examples are `ContextType`, `EnumeratedRoleType`, `ViewType`, etc.
+-- |
+-- | Each newtype is an instance of several Type Classes:
+-- |  * Generic
+-- |  * Newtype
+-- |  * WriteForeign
+-- |  * ReadForeign
+-- |  * Show
+-- |  * Eq.
+-- |
+-- | Of interest are furthermore [RoleType](#t:RoleType) and [PropertyType](#t:PropertyType): abstractions over enumerated and calculated types.
+-- |
+-- | [RoleKind](#t:RoleKind) distinghuishes various EnumeratedRoleTypes: does the role represent a user, a bot, a context and so on.
+
+
 module Perspectives.Representation.TypeIdentifiers where
 
 import Prelude
@@ -76,10 +92,12 @@ instance eqRoleType :: Eq RoleType where
   eq (CR r1) (CR r2) = r1 == r2
   eq (ENR r1) (ENR r2) = r1 == r2
 
+-- | Get the string representation of a RoleType.
 roletype2string :: RoleType -> String
 roletype2string (ENR s) = unwrap s
 roletype2string (CR s) = unwrap s
 
+-- | RoleKind codes the 'role' of the role in the context. Is it an external rol, a bot role, etc.
 data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
 derive instance genericRepRoleKind :: Generic RoleKind _
 instance writeForeignRoleKind :: WriteForeign RoleKind where

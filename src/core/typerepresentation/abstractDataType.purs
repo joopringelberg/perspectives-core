@@ -1,10 +1,13 @@
 -- | An Algebraic Data Type to represent the type of roles with more than one type of binding.
 -- | `a` invariably is a newtype representing entities on the type level of Perspectives.
--- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`.
+-- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`, never with `CalculatedRoleType`.
+-- |
+-- | ADT's are constructed for ContextType, too.
 -- |
 -- | ### Equivalences
--- | `SUM x NOTYPE` equals `NOTYPE`
--- | `PROD x NOTYPE` equals `x`
+-- | * `SUM x NOTYPE` equals `NOTYPE`
+-- |
+-- | * `PROD x NOTYPE` equals `x`
 
 -- BEGIN LICENSE
 -- Perspectives Distributed Runtime
@@ -33,7 +36,6 @@ import Data.Array (elemIndex, filter, head, intersect, uncons, union)
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
-import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))

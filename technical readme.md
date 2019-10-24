@@ -14,6 +14,7 @@ Follow these steps to start developing.
 2. Install [Purescript](http://www.purescript.org).
 3. Install [psc-package](https://github.com/purescript/psc-package)
 4. Install [pulp](https://github.com/purescript-contrib/pulp)
+5. Install [Webpack](https://webpack.js.org/)
 5. To install the dependencies, run:
 
 ```
@@ -31,12 +32,15 @@ Additionally, install [Atom](https://atom.io/) and two packages to support Pures
   * [nwolverson/atom-ide-purescript](https://github.com/nwolverson/atom-ide-purescript) provides build support, REPL, and autocomplete etc. via psc-ide
 
 
-### Develop this interface
-Assuming code will be changed with Atom (and the Atom-purescript-ide), changes in source code will be immediately compiled into javascript in the `output` directory. If
+### Develop this interface; construct a bundle
+Assuming code will be changed with Atom (and the Atom-purescript-ide), changes in source code will be immediately compiled into javascript in the `output` directory. The project contains a Webpack configuration file. If
 
 `npm run watch`
 
 is executed before changing code, changes will be immediately reflected in the bundled code in `dist/perspectives-core.js`.
+
+### Program documentation
+The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](generated-docs/Perspectives.Docu.Main.html#t:x).
 
 ### Symlinks for easy updates
 `package.json` contains a run target `symlinks` that will replace the subdirectories
