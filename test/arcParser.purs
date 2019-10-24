@@ -532,3 +532,27 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
     case r of
       (Left (ParseError _ pos)) -> assert "The error should be situated at (2, 16)" (unsafeCoerce pos == ArcPosition {line: 2, column: 16})
       otherwise -> assert "The modelname is not well-formed and that should be detected" false
+
+  test "Perspective with a rule" do
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject\n  if Prop1 > 10 then\n    AnotherProp = 20\n    YetAnotherProp =+ \"aap\"" perspectiveE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+        -- logShow pre
+        (assert "The Perspective should have an action with Verb 'Change'"
+          (isJust (findIndex (case _ of
+            (Act (ActionE {verb: v})) -> v == Change
+            otherwise -> false) perspectiveParts)))
+        (assert "The action with Verb 'Change' should have a Condition"
+          (isJust (findIndex (case _ of
+            (Act (ActionE {verb, actionParts})) -> verb == Change && (isJust (findIndex (case _ of
+              (Condition _) -> true
+              otherwise -> false) actionParts))
+            otherwise -> false) perspectiveParts)))
+        (assert "The action with Verb 'Change' should have an Assignment"
+          (isJust (findIndex (case _ of
+            (Act (ActionE {verb, actionParts})) -> verb == Change && (2 == length (filter (case _ of
+              (AssignmentPart _) -> true
+              otherwise -> false) actionParts))
+            otherwise -> false) perspectiveParts)))
+      otherwise -> assert "Parsed an unexpected type" false

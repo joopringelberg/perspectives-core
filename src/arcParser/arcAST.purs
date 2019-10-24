@@ -27,7 +27,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
-import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment, Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
@@ -71,7 +71,7 @@ newtype PerspectiveE = PerspectiveE
   , perspectiveParts :: List PerspectivePart
   , pos :: ArcPosition}
 
-data PerspectivePart = Object String | DefaultView String | Act ActionE
+data PerspectivePart = Object String | DefaultView String | Act ActionE | Rule RuleE
 
 newtype ActionE = ActionE
   { id :: String
@@ -80,7 +80,9 @@ newtype ActionE = ActionE
   , pos :: ArcPosition
   }
 
-data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String | Condition Step
+data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String | Condition Step | AssignmentPart Assignment
+
+data RuleE = RuleE Step Assignment
 
 newtype ViewE = ViewE
   { id :: String
@@ -110,6 +112,9 @@ instance showPerspectiveElement :: Show PerspectiveE where show = genericShow
 
 derive instance genericPerspectivePart :: Generic PerspectivePart _
 instance showPerspectivePart :: Show PerspectivePart where show = genericShow
+
+derive instance genericRuleElement :: Generic RuleE _
+instance showRuleElement :: Show RuleE where show = genericShow
 
 derive instance genericActionElement :: Generic ActionE _
 instance showActionElement :: Show ActionE where show = genericShow

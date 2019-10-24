@@ -52,7 +52,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of

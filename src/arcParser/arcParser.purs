@@ -28,7 +28,8 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (step)
+import Perspectives.Parsing.Arc.Expression (assignment, step)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
 import Perspectives.Parsing.Arc.Token (token)
@@ -279,7 +280,7 @@ perspectiveE = try do
   withEntireBlock
     (\parts otherActions -> PRE $ PerspectiveE {id: "", perspectiveParts: parts <> otherActions, pos: pos})
     perspective_
-    actionE
+    (actionE <|> ruleE)
   where
     perspective_ :: IP (List PerspectivePart)
     perspective_ = do
@@ -312,6 +313,8 @@ constructVerb v = case v of
 -- |    indirectObject: AnotherRole (ViewOnAnotherRole)
 -- |  Consult
 -- |    indirectObject: AnotherRole
+-- |  Consult
+-- |    if Prop1 < 10
 actionE :: IP PerspectivePart
 actionE = try $ withEntireBlock
   (\{pos, verb, mview} parts -> Act $ ActionE {id: "", verb, actionParts: case mview of
@@ -350,6 +353,22 @@ actionE = try $ withEntireBlock
       pos <- getPosition
       expr <- reserved "if" *> step
       pure $ Cons (Condition expr) Nil
+
+-- | A rule is a special format for a Bot action:
+-- |   if Wens >> Bedrag > 10 then
+-- |     SomeProp = false
+-- |     SomeOtherProp =+ "aap"
+ruleE :: IP PerspectivePart
+ruleE = try $ withEntireBlock
+  (\{pos, condition} assignments -> Act $ ActionE {id: "", verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos})
+  ruleE_
+  assignment
+  where
+    ruleE_ :: IP {pos :: ArcPosition, condition :: Step}
+    ruleE_ = do
+      pos <- getPosition
+      cond <- reserved "if" *> step <* reserved "then"
+      pure {pos: pos, condition: cond}
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

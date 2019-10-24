@@ -35,7 +35,9 @@ domain: Feest
   user: Eregast = Gast > binding
   bot: for Eregast
     perspective on: Wens
-      --if Wens >> Bedrag > 10 then SomeProp = false
+      -- Should generate an Action with a Condition and an Assignment.
+      if Wens >> Bedrag > 10 then
+        SomeProp = false
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
     property: VoorBigBrother = Datum > '1995-12-17'
     -- comment
