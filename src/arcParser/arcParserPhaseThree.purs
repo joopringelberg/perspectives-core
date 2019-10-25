@@ -39,7 +39,8 @@ import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, values)
-import Perspectives.CoreTypes ((###=), MP)
+import Perspectives.CoreTypes ((###=), MP, type (~~~>))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
@@ -63,8 +64,8 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<<<), (<>), (==), (>>=))
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<<<), (<>), (==), (>>=), (>=>))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -269,6 +270,7 @@ inverseBindings = pure unit
 
 -- | A Computed Role has a clause that specifies the type of Role that is computed.
 -- | The modeller can use an unqualified name, that should be resolved against all Roles in the Domain.
+-- TODO: qualificeer Computed properties!
 qualifyReturnsClause :: PhaseThree Unit
 qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
   where
@@ -336,7 +338,7 @@ compileRules = do
       modifyDF \dfr -> dfr {actions = compActions}
       where
         compileRule :: String -> Action -> PhaseThree Action
-        compileRule actionName a@(Action ar@{subject, effect}) = case effect of
+        compileRule actionName a@(Action ar@{subject, effect, object}) = case effect of
           (Just (A assignments)) -> do
             (aStatements :: Array AssignmentStatement) <- traverse
               (\ass -> catchJust
@@ -345,7 +347,7 @@ compileRules = do
                   -- Let the NotUniquelyIdentifying error fall through.
                   otherwise -> Nothing)
                 (compileRoleRule ass)
-                compilePropertyRule)
+                (compilePropertyRule object))
               assignments
             pure $ Action ar {effect = Just $ AS aStatements}
           otherwise -> pure a
@@ -354,6 +356,7 @@ compileRules = do
             -- Assignment on an EnumeratedRole.
             compileRoleRule :: Assignment -> PhaseThree AssignmentStatement
             compileRoleRule (Assignment{lhs, operator, value, start, end}) = do
+              -- TODO: limit this to roles of the Context of the Action?
               (er :: EnumeratedRoleType) <- qualifyRoleType start lhs enumeratedRoles
               ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
               (mdescr :: Maybe QueryFunctionDescription) <- traverse (compileStep (CDOM $ ST ctxt)) value
@@ -366,8 +369,37 @@ compileRules = do
                   AddTo _ -> pure $ AddToRol er descr
                   DeleteFrom _ -> pure $ RemoveFromRol er descr
                   Delete _ -> throwError $ Custom "An Assignment with operator Delete should not be followed by a value expression. This counts as a system programming error."
-              -- pure $ Action ar {effect = Just $ AS [assignment]}
 
-            -- TODO: implementeer compilePropertyRule.
-            compilePropertyRule :: Assignment -> PhaseThree AssignmentStatement
-            compilePropertyRule s = pure $ DeleteProperty $ EnumeratedPropertyType ""
+            -- The left hand side must identify an EnumeratedProperty on the Object of the Action.
+            compilePropertyRule :: RoleType -> Assignment -> PhaseThree AssignmentStatement
+            compilePropertyRule roletype (Assignment{lhs, operator, value, start, end}) = do
+              (qualifiedProp :: EnumeratedPropertyType) <- qualifyProperty roletype start lhs
+              dom <- lift2 $ expandedADT_ roletype
+              (mdescr :: Maybe QueryFunctionDescription) <- traverse (compileStep (RDOM dom)) value
+              case mdescr of
+                Nothing -> case operator of
+                  (Delete p) -> pure $ DeleteProperty qualifiedProp
+                  otherwise -> throwError $ MissingValueForAssignment start end
+                Just descr -> case operator of
+                  Set _ -> pure $ SetProperty qualifiedProp descr
+                  AddTo _ -> pure $ AddToProperty qualifiedProp descr
+                  DeleteFrom _ -> pure $ RemoveFromProperty qualifiedProp descr
+                  Delete _ -> throwError $ Custom "An Assignment with operator Delete should not be followed by a value expression. This counts as a system programming error."
+
+            qualifyProperty :: RoleType -> ArcPosition -> String -> PhaseThree EnumeratedPropertyType
+            qualifyProperty erole pos propType = do
+              -- Note that we need the DomeinFile with qualified bindings in the cache
+              -- for this function to work correctly!
+              if isQualifiedWithDomein propType
+                then pure $ EnumeratedPropertyType propType
+                else do
+                  (candidates :: Array PropertyType) <- lift2 (erole ###= (f >=> lookForUnqualifiedPropertyType propType))
+                  case head candidates of
+                    Nothing -> throwError $ UnknownProperty pos propType
+                    (Just (ENP t)) | length candidates == 1 -> pure t
+                    otherwise -> throwError $ NotUniquelyIdentifying pos propType (map propertytype2string candidates)
+              where
+                f :: RoleType ~~~> ADT EnumeratedRoleType
+                f rt = ArrayT do
+                  adt <- expandedADT_ rt
+                  pure [adt]

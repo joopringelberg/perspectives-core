@@ -20,7 +20,6 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
-import Perspectives.Parsing.Arc.Expression.AST (Operator(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
@@ -91,19 +90,19 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                 (Just (ContextType "model:MyTestDomain")) -> true
                 otherwise -> false
 
-            roles <- runP $
+            roles' <- runP $
               withDomeinFile "model:MyTestDomain" df
                 ((ContextType "model:MyTestDomain") ###= (contextAspectsClosure >=> roleInContext))
             assert "(contextAspectsClosure >=> roleInContext) should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-              case head roles of
+              case head roles' of
                 (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
                 otherwise -> false
 
-            roles <- runP $
+            roles'' <- runP $
               withDomeinFile "model:MyTestDomain" df
                 ((ContextType "model:MyTestDomain") ###= (lookForUnqualifiedRoleType "AnotherRole"))
             assert "lookForUnqualifiedRoleType should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-              (isJust (head roles))
+              (isJust (head roles''))
 
   -- testOnly "Testing qualifyActionRoles." do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
@@ -336,10 +335,10 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                         Nothing -> assert "We should be able to find the qualified version of 'Datum'" false
                         (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum")))  | length candidates == 1 -> assert "" true
                         otherwise -> assert "There is only one property with local name 'Datum' defined but we've found more?!" false
-                      x <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) (propertiesOfADT (ST (EnumeratedRoleType "model:MyTestDomain$Feest")))
-                      case head x of
+                      xx <- runP $ withDomeinFile "model:MyTestDomain" (DomeinFile correctedDFR) (propertiesOfADT (ST (EnumeratedRoleType "model:MyTestDomain$Feest")))
+                      case head xx of
                         Nothing -> assert "geen properties" false
-                        (Just p) | length x == 1 -> assert "The properties of 'model:MyTestDomain$Feest' should include 'model:MyTestDomain$FeestVoorbereiding$Datum'" (p == ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))
+                        (Just p) | length xx == 1 -> assert "The properties of 'model:MyTestDomain$Feest' should include 'model:MyTestDomain$FeestVoorbereiding$Datum'" (p == ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))
                         otherwise -> assert "There is only one property defined for 'Feest'" false
 
                 case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
@@ -442,7 +441,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                   otherwise -> assert "There should be an action Consult Party" false
 
   testOnly "Bot Action with if-then rule" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop2 (mandatory, functional, Number)\n  thing: Party (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Party\n      if Party >> Prop1 > 10 then\n        Gast =+ createRole Gast\n        delete Party\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop2 (mandatory, functional, Number)\n  thing: Party (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Party\n      if Party >> Prop1 > 10 then\n        Gast =+ createRole Gast\n        delete Party\n        Prop1 = 20\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -464,7 +463,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                         otherwise -> false)
                     assert "The effect should have one AssignmentStatement"
                       (case effect of
-                        Just (AS stmts) -> length stmts == 2
+                        Just (AS stmts) -> length stmts == 3
                         otherwise -> false)
                     assert "One of the assignmentStatements should have operator Delete"
                       (case effect of
@@ -476,6 +475,12 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       (case effect of
                         Just (AS stmts) -> (isJust (findIndex (case _ of
                           AddToRol (EnumeratedRoleType "model:Test$Gast") _ -> true
+                          otherwise -> false) stmts))
+                        otherwise -> false)
+                    assert "One of the assignmentStatements should have operator SetProperty"
+                      (case effect of
+                        Just (AS stmts) -> (isJust (findIndex (case _ of
+                          SetProperty (EnumeratedPropertyType "model:Test$Party$Prop1") _ -> true
                           otherwise -> false) stmts))
                         otherwise -> false)
                   otherwise -> assert "There should be an action Consult Party" false
