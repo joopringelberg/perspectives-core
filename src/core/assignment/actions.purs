@@ -38,7 +38,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, removeProperty, removeRol, setProperty, setRol)
+import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>))
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2propertyValue, context2role)
@@ -70,6 +70,7 @@ constructRHS objectGetter actionType a = case a of
   (RemoveFromRol rt (query :: QueryFunctionDescription)) -> do
     valueComputer <- context2role query
     pure $ f rt valueComputer removeRol
+  (DeleteRol rt) -> pure $ f' rt
   (SetProperty pt (query :: QueryFunctionDescription)) -> do
     (valueComputer :: ContextPropertyValueGetter) <- context2propertyValue query
     pure $ g pt valueComputer setProperty
@@ -79,6 +80,7 @@ constructRHS objectGetter actionType a = case a of
   (RemoveFromProperty pt (query :: QueryFunctionDescription)) -> do
     (valueComputer :: ContextPropertyValueGetter) <- context2propertyValue query
     pure $ g pt valueComputer removeProperty
+  (DeleteProperty pt) -> pure $ g' pt
   (EffectFullFunction fun args) -> case fun of
     -- TODO: vervang dit zodra de parser weer werkt.
     "storeDomeinFile" -> pure \contextInstance bools -> pure unit
@@ -97,6 +99,18 @@ constructRHS objectGetter actionType a = case a of
           void $ pure $ roleUpdater contextId rt value
         else pure unit
 
+    -- Delete an entire role.
+    f' :: EnumeratedRoleType -> (ContextInstance -> RHS)
+    f' rt contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
+        then do
+          -- The Object of the Action (where the bot is the Subject).
+          -- We compute it here just for the assumptions.
+          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
+          -- Cache the association between the assumptions found for this ActionInstance.
+          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 a2)
+          void $ pure $ deleteRol contextId rt
+        else pure unit
+
     g :: EnumeratedPropertyType -> ContextPropertyValueGetter -> PropertyUpdater -> (ContextInstance -> RHS)
     g rt valueGetter propertyUpdater contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
         then do
@@ -106,6 +120,17 @@ constructRHS objectGetter actionType a = case a of
           -- Cache the association between the assumptions found for this ActionInstance.
           pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
           void $ pure $ propertyUpdater object rt value
+        else pure unit
+
+    -- delete an entire property
+    g' :: EnumeratedPropertyType -> (ContextInstance -> RHS)
+    g' rt contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
+        then do
+          -- The Object of the Action (where the bot is the Subject).
+          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
+          -- Cache the association between the assumptions found for this ActionInstance.
+          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 a2)
+          void $ pure $ deleteProperty object rt
         else pure unit
 
 -- | From the description of an Action, compile an Updater of ContextInstance.

@@ -3,7 +3,7 @@ module Test.Parsing.Arc.PhaseThree where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (elemIndex, filter, head, length)
+import Data.Array (elemIndex, filter, findIndex, head, length)
 import Data.Either (Either(..))
 import Data.Lens (_Just, preview, traversed)
 import Data.Lens.At (at)
@@ -29,6 +29,7 @@ import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.Assignment (AssignmentStatement(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -36,6 +37,7 @@ import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, roleInContext)
@@ -52,7 +54,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -437,4 +439,43 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     (case condition of
                       (Q (BQD _ (BinaryCombinator "greaterThan") _ _ _)) -> true
                       otherwise -> false)
+                  otherwise -> assert "There should be an action Consult Party" false
+
+  testOnly "Bot Action with if-then rule" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop2 (mandatory, functional, Number)\n  thing: Party (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Party\n      if Party >> Prop1 > 10 then\n        Gast =+ createRole Gast\n        delete Party\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
+                case lookup "model:Test$Gast$ChangeParty" actions of
+                  (Just (Action{condition, effect})) -> do
+                    assert "The condition should have operator '>'"
+                      (case condition of
+                        (Q (BQD _ (BinaryCombinator "greaterThan") _ _ _)) -> true
+                        otherwise -> false)
+                    assert "The effect should have one AssignmentStatement"
+                      (case effect of
+                        Just (AS stmts) -> length stmts == 2
+                        otherwise -> false)
+                    assert "One of the assignmentStatements should have operator Delete"
+                      (case effect of
+                        Just (AS stmts) -> (isJust (findIndex (case _ of
+                          DeleteRol (EnumeratedRoleType "model:Test$Party") -> true
+                          otherwise -> false) stmts))
+                        otherwise -> false)
+                    assert "One of the assignmentStatements should have operator AddToRol"
+                      (case effect of
+                        Just (AS stmts) -> (isJust (findIndex (case _ of
+                          AddToRol (EnumeratedRoleType "model:Test$Gast") _ -> true
+                          otherwise -> false) stmts))
+                        otherwise -> false)
                   otherwise -> assert "There should be an action Consult Party" false

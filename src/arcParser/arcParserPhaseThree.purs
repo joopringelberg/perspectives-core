@@ -27,7 +27,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 -- | a role that is 'later' in the source text).
 -- |
 
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (catchJust, throwError)
 import Control.Monad.State (gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, head, length)
@@ -38,11 +38,12 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, keys, lookup, values)
+import Foreign.Object (Object, insert, keys, lookup, values)
 import Perspectives.CoreTypes ((###=), MP)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -50,6 +51,7 @@ import Perspectives.Query.DescriptionCompiler (compileStep)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.Assignment (AssignmentStatement(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
@@ -58,10 +60,11 @@ import Perspectives.Representation.Class.Role (contextOfRepresentation, expanded
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.SideEffect (SideEffect(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, map, pure, unit, void, ($), (<>), (==), discard, (>>=), (<<<))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<<<), (<>), (==), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -165,15 +168,18 @@ qualifyBindings = (lift $ gets _.dfr) >>= qualifyBindings'
             modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
       where
         qualifyBinding :: ArcPosition -> EnumeratedRoleType -> PhaseThree (ADT EnumeratedRoleType)
-        qualifyBinding pos i@(EnumeratedRoleType ident) = if isQualifiedWithDomein ident
-          then pure $ ST i
-          else do
-            (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) (keys roles)
-            case head candidates of
-              Nothing -> throwError $ UnknownRole pos ident
-              (Just qname) | length candidates == 1 -> pure $ ST $ EnumeratedRoleType $ qname
-              otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
+        qualifyBinding pos i@(EnumeratedRoleType ident) = qualifyRoleType pos ident roles >>= pure <<< ST
 
+-- | If the name is unqualified, look for an EnumeratedRol with matching local name in the Domain.
+qualifyRoleType :: ArcPosition -> String -> Object EnumeratedRole -> PhaseThree EnumeratedRoleType
+qualifyRoleType pos ident enumeratedRoles = if isQualifiedWithDomein ident
+  then pure $ EnumeratedRoleType ident
+  else do
+    (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) (keys enumeratedRoles)
+    case head candidates of
+      Nothing -> throwError $ UnknownRole pos ident
+      (Just qname) | length candidates == 1 -> pure $ EnumeratedRoleType qname
+      otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
 
 -- | Qualify the references to Properties in each View.
 qualifyPropertyReferences :: PhaseThree Unit
@@ -262,7 +268,7 @@ inverseBindings :: PhaseThree Unit
 inverseBindings = pure unit
 
 -- | A Computed Role has a clause that specifies the type of Role that is computed.
--- | The modeller can use an unqualfied name, that should be resolved against all Roles in the Domain.
+-- | The modeller can use an unqualified name, that should be resolved against all Roles in the Domain.
 qualifyReturnsClause :: PhaseThree Unit
 qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
   where
@@ -271,25 +277,13 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
           Q (SQD dom (ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType)))) -> do
-            qComputedType <- qualifyType pos computedType
+            qComputedType <- qualifyRoleType pos computedType enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
                 modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
           otherwise -> pure unit)
 
-      where
-        qualifyType :: ArcPosition -> String -> PhaseThree EnumeratedRoleType
-        qualifyType pos ident = if isQualifiedWithDomein ident
-          then pure $ EnumeratedRoleType ident
-          else do
-            (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) (keys enumeratedRoles)
-            case head candidates of
-              Nothing -> throwError $ UnknownRole pos ident
-              (Just qname) | length candidates == 1 -> pure $ EnumeratedRoleType qname
-              otherwise -> throwError $ NotUniquelyIdentifying pos ident candidates
-
--- TODO: compile the expressions in conditions for actions.
 compileExpressions :: PhaseThree Unit
 compileExpressions = do
   df@{_id} <- lift $ gets _.dfr
@@ -329,4 +323,51 @@ compileExpressions = do
 
 -- | For each Action that has a SideEffect for its `effect` member, compile an Array of `AssignmentStatement`s for it.
 compileRules :: PhaseThree Unit
-compileRules = pure unit
+compileRules = do
+  df@{_id} <- lift $ gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (compileRules' df)
+  where
+    compileRules' :: DomeinFileRecord -> PhaseThree Unit
+    compileRules' {actions, enumeratedRoles} = do
+      compActions <- traverseWithIndex compileRule actions
+      modifyDF \dfr -> dfr {actions = compActions}
+      where
+        compileRule :: String -> Action -> PhaseThree Action
+        compileRule actionName a@(Action ar@{subject, effect}) = case effect of
+          (Just (A assignments)) -> do
+            (aStatements :: Array AssignmentStatement) <- traverse
+              (\ass -> catchJust
+                (\e -> case e of
+                  UnknownRole _ _ -> Just ass
+                  -- Let the NotUniquelyIdentifying error fall through.
+                  otherwise -> Nothing)
+                (compileRoleRule ass)
+                compilePropertyRule)
+              assignments
+            pure $ Action ar {effect = Just $ AS aStatements}
+          otherwise -> pure a
+
+          where
+            -- Assignment on an EnumeratedRole.
+            compileRoleRule :: Assignment -> PhaseThree AssignmentStatement
+            compileRoleRule (Assignment{lhs, operator, value, start, end}) = do
+              (er :: EnumeratedRoleType) <- qualifyRoleType start lhs enumeratedRoles
+              ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
+              (mdescr :: Maybe QueryFunctionDescription) <- traverse (compileStep (CDOM $ ST ctxt)) value
+              case mdescr of
+                Nothing -> case operator of
+                  (Delete p) -> pure $ DeleteRol er
+                  otherwise -> throwError $ MissingValueForAssignment start end
+                Just descr -> case operator of
+                  Set _ -> pure $ SetRol er descr
+                  AddTo _ -> pure $ AddToRol er descr
+                  DeleteFrom _ -> pure $ RemoveFromRol er descr
+                  Delete _ -> throwError $ Custom "An Assignment with operator Delete should not be followed by a value expression. This counts as a system programming error."
+              -- pure $ Action ar {effect = Just $ AS [assignment]}
+
+            -- TODO: implementeer compilePropertyRule.
+            compilePropertyRule :: Assignment -> PhaseThree AssignmentStatement
+            compilePropertyRule s = pure $ DeleteProperty $ EnumeratedPropertyType ""

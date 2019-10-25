@@ -33,7 +33,7 @@ import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, empty, insert, lookup, pop)
+import Foreign.Object (Object, empty, insert, lookup, pop, delete)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
@@ -98,6 +98,9 @@ addContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (flip A
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 removeContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (Arr.delete rolId) ct
+
+deleteContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> PerspectContext
+deleteContext_rolInContext (PerspectContext ct@{rolInContext}) rolName = PerspectContext (ct {rolInContext = delete (unwrap rolName) rolInContext})
 
 setContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance -> PerspectContext
 setContext_rolInContext ct rolName rolIDs = set (_roleInstances rolName) rolIDs ct
@@ -193,6 +196,9 @@ addRol_property rl propertyName values = over (_propertyValues propertyName) (fl
 
 removeRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 removeRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.difference values) rl
+
+deleteRol_property :: PerspectRol -> EnumeratedPropertyType -> PerspectRol
+deleteRol_property (PerspectRol rl@{properties}) propertyName = PerspectRol (rl {properties = delete (unwrap propertyName) properties})
 
 setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 setRol_property rl propertyName values = set (_propertyValues propertyName) values rl

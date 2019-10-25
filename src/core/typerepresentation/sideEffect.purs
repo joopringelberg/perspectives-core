@@ -38,7 +38,7 @@ import Perspectives.Representation.Assignment (AssignmentStatement)
 import Prelude (class Eq, class Show, (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
-data SideEffect = A Assignment | AS (Array AssignmentStatement)
+data SideEffect = A (Array Assignment) | AS (Array AssignmentStatement)
 
 derive instance genericRepSideEffect :: Generic SideEffect _
 instance writeForeignSideEffect :: WriteForeign SideEffect where

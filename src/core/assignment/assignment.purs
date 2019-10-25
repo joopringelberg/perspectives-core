@@ -44,6 +44,9 @@ data AssignmentStatement
   | AddToProperty EnumeratedPropertyType QueryFunctionDescription
   | RemoveFromProperty EnumeratedPropertyType QueryFunctionDescription
   | EffectFullFunction FunctionName (Array String)
+  | DeleteRol EnumeratedRoleType
+  | DeleteProperty EnumeratedPropertyType
+  -- TODO: full delete.
 
 derive instance genericRepAssignmentStatement :: Generic AssignmentStatement _
 
@@ -59,9 +62,11 @@ instance writeForeignAssignmentStatement :: WriteForeign AssignmentStatement whe
   writeImpl (SetRol r v) = unsafeToForeign $ writeJSON {tag: "SetRol", dat: [writeJSON r, writeJSON v]}
   writeImpl (AddToRol r v) = unsafeToForeign $ writeJSON {tag: "AddToRol", dat: [writeJSON r, writeJSON v]}
   writeImpl (RemoveFromRol r v) = unsafeToForeign $ writeJSON {tag: "RemoveFromRol", dat: [writeJSON r, writeJSON v]}
+  writeImpl (DeleteRol r) = unsafeToForeign $ writeJSON {tag: "DeleteRol", dat: [writeJSON r]}
   writeImpl (SetProperty r v) = unsafeToForeign $ writeJSON {tag: "SetProperty", dat: [writeJSON r, writeJSON v]}
   writeImpl (AddToProperty r v) = unsafeToForeign $ writeJSON {tag: "AddToProperty", dat: [writeJSON r, writeJSON v]}
   writeImpl (RemoveFromProperty r v) = unsafeToForeign $ writeJSON {tag: "RemoveFromProperty", dat: [writeJSON r, writeJSON v]}
+  writeImpl (DeleteProperty r) = unsafeToForeign $ writeJSON {tag: "DeleteProperty", dat: [writeJSON r]}
   writeImpl (EffectFullFunction f as) = unsafeToForeign $ writeJSON {tag: "EffectFullFunction", dat: cons f as}
 
 

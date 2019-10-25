@@ -26,6 +26,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (Assumption)
 import Perspectives.TypesForDeltas (BindingDelta(..), PropertyDelta(..), RoleDelta(..))
 
+-- | Class `DeltaAssumption` abstracts over Deltas to provide a function that turns a Delta into an Assumption.
 class DeltaAssumption d where
   assumption :: d -> Assumption
 

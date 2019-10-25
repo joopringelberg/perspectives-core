@@ -27,8 +27,8 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (difference, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeRol_binding, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
-import Perspectives.CoreTypes (Updater, MonadPerspectivesTransaction)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeRol_binding, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addBindingDelta, addRoleDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances (class PersistentInstance, getPerspectEntiteit, saveVersionedEntiteit)
@@ -128,7 +128,7 @@ addRol contextId rolName rolInstances = do
                 { id : contextId
                 , role: rolName
                 , deltaType: Add
-                , instance: rolInstance
+                , instance: Just rolInstance
                 }
 
 removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
@@ -140,8 +140,19 @@ removeRol contextId rolName rolInstances = do
                 { id : contextId
                 , role: rolName
                 , deltaType: Remove
-                , instance: rolInstance
+                , instance: Just rolInstance
                 }
+
+deleteRol :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
+deleteRol contextId rolName = do
+  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
+  saveEntiteit contextId (deleteContext_rolInContext pe rolName)
+  addRoleDelta $ RoleDelta
+              { id : contextId
+              , role: rolName
+              , deltaType: Delete
+              , instance: Nothing
+              }
 
 setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 setRol contextId rolName rolInstances = do
@@ -152,7 +163,7 @@ setRol contextId rolName rolInstances = do
                 { id : contextId
                 , role: rolName
                 , deltaType: Change
-                , instance: rolInstance
+                , instance: Just rolInstance
                 }
 
 -----------------------------------------------------------
@@ -169,7 +180,7 @@ addProperty rids propertyName values = for_ rids \rid -> do
                 { id : rid
                 , property: propertyName
                 , deltaType: Add
-                , value: val
+                , value: Just val
                 }
 
 removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
@@ -181,8 +192,19 @@ removeProperty rids propertyName values = for_ rids \rid -> do
                 { id : rid
                 , property: propertyName
                 , deltaType: Remove
-                , value: val
+                , value: Just val
                 }
+
+deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction Unit
+deleteProperty rids propertyName = for_ rids \rid -> do
+  (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
+  saveEntiteit rid (deleteRol_property pe propertyName)
+  addPropertyDelta $ PropertyDelta
+              { id : rid
+              , property: propertyName
+              , deltaType: Delete
+              , value: Nothing
+              }
 
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = for_ rids \rid -> do
@@ -193,5 +215,5 @@ setProperty rids propertyName values = for_ rids \rid -> do
                 { id : rid
                 , property: propertyName
                 , deltaType: Change
-                , value: value
+                , value: Just value
                 }

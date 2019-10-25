@@ -42,7 +42,7 @@ import Simple.JSON (class WriteForeign)
 newtype RoleDelta = RoleDelta
   { id :: ContextInstance
   , role :: EnumeratedRoleType
-  , instance :: RoleInstance
+  , instance :: Maybe RoleInstance
   , deltaType :: DeltaType
   }
 
@@ -79,7 +79,7 @@ derive newtype instance writeForeignBindingDelta :: WriteForeign BindingDelta
 newtype PropertyDelta = PropertyDelta
   { id :: RoleInstance
   , property :: EnumeratedPropertyType
-  , value :: Value
+  , value :: Maybe Value
   , deltaType :: DeltaType
   }
 
@@ -95,7 +95,7 @@ derive newtype instance writeForeignPropertyDelta :: WriteForeign PropertyDelta
 -----------------------------------------------------------
 -- DELTATYPE
 -----------------------------------------------------------
-data DeltaType = Add | Remove | Change
+data DeltaType = Add | Remove | Change | Delete
 
 derive instance genericDeltaType :: Generic DeltaType _
 derive instance eqDeltaType :: Eq DeltaType
@@ -107,6 +107,7 @@ instance writeForeignDeltaType :: WriteForeign DeltaType where
   writeImpl Add = unsafeToForeign "Add"
   writeImpl Remove = unsafeToForeign "Remove"
   writeImpl Change = unsafeToForeign "Change"
+  writeImpl Delete = unsafeToForeign "Delete"
 
 encodeDefault :: forall t a. Generic a t => GenericEncode t => a -> Foreign
 encodeDefault = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
