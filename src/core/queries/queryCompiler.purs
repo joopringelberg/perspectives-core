@@ -1,8 +1,3 @@
--- | The QueryCompiler constructs functions to calculate an instance of a Role for a Context or a Value for a Property,
--- | from a `QueryFunctionDescription`. It operates on a Variant `CompiledFunction` that covers all combinations of
--- | Domain and Range that can be computed.
--- | Instances of `QueryFunctionDescription` are computed by the function [compileQueryStep](Perspectives.Query.DescriptionCompiler.html#t:compileQueryStep).
-
 -- BEGIN LICENSE
 -- Perspectives Distributed Runtime
 -- Copyright (C) 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
@@ -23,6 +18,11 @@
 -- Full text of this license can be found in the LICENSE file in the projects root.
 
 -- END LICENSE
+
+-- | The QueryCompiler constructs functions to calculate an instance of a Role for a Context or a Value for a Property,
+-- | from a `QueryFunctionDescription`. It operates on a Variant `CompiledFunction` that covers all combinations of
+-- | Domain and Range that can be computed.
+-- | Instances of `QueryFunctionDescription` are computed by the function [compileQueryStep](Perspectives.Query.DescriptionCompiler.html#t:compileQueryStep).
 
 module Perspectives.Query.Compiler where
 

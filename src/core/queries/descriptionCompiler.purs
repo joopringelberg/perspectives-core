@@ -172,6 +172,8 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
     otherwise -> pure $ UQD currentDomain (UnaryCombinator "exists") descriptionOfs (VDOM PBool)
 
+compileUnaryStep currentDomain st@(SequenceStep pos s) = throwError $ Custom "Implement compileUnaryStep for SequenceStep"
+
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
   case operator of

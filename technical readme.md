@@ -42,6 +42,12 @@ is executed before changing code, changes will be immediately reflected in the b
 ### Program documentation
 The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](generated-docs/Perspectives.Docu.Main.html#t:x).
 
+Generate a new version of the documentation with:
+
+```
+pulp docs -- --format html
+```
+
 ### Symlinks for easy updates
 `package.json` contains a run target `symlinks` that will replace the subdirectories
 * aff-sockets

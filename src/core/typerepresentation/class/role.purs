@@ -127,6 +127,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
 -- | A pattern of computation shared in the recursive computation of roleAspects, properties and views of a role.
 -- | It computes the local value for an EnumeratedRole and then the value of the binding of the role, returning
 -- | the union of the two.
+-- TODO: kan dit niet vervangen worden door reduce?
 includeBinding :: forall r i a. RoleClass r i => Eq a =>
   (r -> Array a) ->
   (ADT EnumeratedRoleType -> MP (Array a)) ->

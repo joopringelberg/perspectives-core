@@ -23,7 +23,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 
 -- | An Abstract Syntax Tree data model for Perspectives expressions. The expression grammar is below.
 -- |
--- | step = simpleStep | unaryStep | compoundStep
+-- | step = simpleStep | unaryStep | compoundStep | let*
 -- |
 -- | simpleStep = ArcIdentifier
 -- |
@@ -37,9 +37,18 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | | Value
 -- |
--- | unaryStep = 'not' step | 'create' ArcIdentifier | 'exists' ArcIdentifier
+-- | | variable
 -- |
--- | compoundStep = (filter step 'with' step) | (step operator step) | filter step 'with' step | step operator step
+-- | unaryStep =
+-- |    'not' step
+-- |  | 'create' ArcIdentifier
+-- |  | 'exists' ArcIdentifier
+-- |  | >>= SequenceFunction
+-- |
+-- | compoundStep =
+-- |    'filter' step 'with' step
+-- |  | step operator step
+-- |  | 'bind_' step 'in' step
 -- |
 -- | operator = '>>' | '==' | '<' | '>' | '<=' | '>=' | 'and' | 'or' | '+' | '-' | '*' | '/'
 -- |
@@ -52,6 +61,18 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- | PropertyName = ArcIdentifier
 -- |
 -- | Value = number | boolean | string | date
+-- |
+-- | SequenceFunction = 'sum' | 'count' | 'product' | 'minimum' | 'maximum'
+-- |
+-- |
+-- | let* = 'let*' binding+ 'in' body
+-- |
+-- | binding = variable '<-' expressie
+-- |
+-- | body = step | assignment+
+-- |
+-- | variable = lowerCaseName
+
 
 import Prelude
 
@@ -81,6 +102,7 @@ data SimpleStep =
 data UnaryStep =
   LogicalNot ArcPosition Step
   | Exists ArcPosition Step
+  | SequenceStep ArcPosition String
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 

@@ -31,7 +31,7 @@ import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -86,7 +86,9 @@ unaryStep :: IP Step
 unaryStep = try
   (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
   <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr>, exists <step>"
+  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
+  <|>
+  Unary <$> (SequenceStep <$> getPosition <*> (reserved ">>=" *> lowerCaseName))) <?> "not <expr>, exists <step>, >>= <function on sequence of values>"
 
 compoundStep :: IP Step
 compoundStep = try (defer \_->binaryStep) <|> (defer \_->filterStep)
@@ -182,6 +184,7 @@ startOf stp = case stp of
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
+    startOfUnary (SequenceStep p _) = p
 
 endOf :: Step -> ArcPosition
 endOf stp = case stp of
@@ -203,6 +206,7 @@ endOf stp = case stp of
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
     endOfUnary (Exists (ArcPosition{line, column}) step') = endOf step'
+    endOfUnary (SequenceStep (ArcPosition{line, column}) s) = ArcPosition{line, column: 4 + length s}
 
     col_ :: ArcPosition -> Int
     col_ (ArcPosition{column}) = column

@@ -37,7 +37,10 @@ domain: Feest
     perspective on: Wens
       -- Should generate an Action with a Condition and an Assignment.
       if Wens >> Bedrag > 10 then
-        SomeProp = false
+        let*
+          a <- createRole Gast
+        in
+          a$SomeProp = false
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
     property: VoorBigBrother = Datum > '1995-12-17'
     -- comment

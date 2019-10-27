@@ -15,7 +15,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
+theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -311,3 +311,31 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
             (Simple (Value _ PDate _)) -> true
             otherwise -> false
       otherwise -> assert "'MyProp > '1995-12-17'' should be parsed as a a GreaterThan" false
+
+  testOnly "sequenceStep" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp >>= sum" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Unary (SequenceStep pos sequenceFunction))) -> do
+        logShow a
+        assert "'MyProp >>= sum' should be parsed as a a SequenceFunction with sequenceFunction equal to 'sum'"
+          case sequenceFunction of
+            "sum" -> true
+            otherwise -> false
+      otherwise -> do
+        logShow otherwise
+        assert "'MyProp >>= sum' should be parsed as a a SequenceFunction" false
+
+  test "sequenceStep with complex left side" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Unary (SequenceStep pos sequenceFunction))) -> do
+        logShow a
+        assert "'MyRole >> MyProp >>= sum' should be parsed as a a SequenceFunction with sequenceFunction equal to 'sum'"
+          case sequenceFunction of
+            "sum" -> true
+            otherwise -> false
+      x -> do
+        logShow x
+        assert "'MyRole >> MyProp >>= sum' should be parsed as a a SequenceFunction" false

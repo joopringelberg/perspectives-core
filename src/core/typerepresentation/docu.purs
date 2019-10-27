@@ -39,5 +39,11 @@
 -- | * [PersistentType](Perspectives.Representation.Class.PersistentType.html#t:PersistentType)
 -- | * [Perspectives.DomeinFile](Perspectives.DomeinFile.html#t:DomeinFile)
 -- | * [DomeinCache](Perspectives.DomeinCache.html#t:DomeinCache)
+-- |
+-- | Several Type Classes provide a layer of abstraction:
+-- | * [Role](Perspectives.Representation.Class.Role.html#t:x) over `EnumeratedRole` and `CalculatedRole`
+-- | * [Property](Perspectives.Representation.Class.Property.html#t:x) over `EnumeratedProperty` and `CalculatedProperty`
+-- | * [Action](Perspectives.Representation.Class.Action.html#t:x)
+
 
 module Perspectives.Docu.TypeRepresentation where
