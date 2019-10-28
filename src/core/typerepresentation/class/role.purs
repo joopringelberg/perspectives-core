@@ -53,6 +53,9 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   mandatory :: r -> MonadPerspectives Boolean
   calculation :: r -> MonadPerspectives QueryFunctionDescription
   properties :: r -> MonadPerspectives (Array PropertyType)
+  -- | The type of the Role. For an EnumeratedRole this is just `ST EnumeratedRoleType`.
+  -- | For a CalculatedRole it is the range of its calculation.
+  typeExcludingBinding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   -- | The type of the Role, including its binding. Is expanded just for CalculatedRole.
   typeIncludingBinding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   -- | The type of the Role, fully expanded for both CalculatedRole and EnumeratedRole.
@@ -90,6 +93,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
     Q qd -> pure qd
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   properties = rangeOfCalculatedRole >=> propertiesOfADT
+  typeExcludingBinding = rangeOfCalculatedRole
   typeIncludingBinding = rangeOfCalculatedRole
   expandedADT = rangeOfCalculatedRole
   views =  rangeOfCalculatedRole >=> viewsOfADT
@@ -100,7 +104,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
     roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
     roleCalculationRange qfd = case QT.range qfd of
       (RDOM p) -> pure p
-      otherwise -> throwError (error ("range of calculation of a calculated role is not an enumerated role."))
+      otherwise -> throwError (error ("range of calculation of a calculated role is not a role Domain."))
 
 -----------------------------------------------------------
 -- ENUMERATED ROLE INSTANCE
@@ -115,6 +119,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   mandatory r = pure (unwrap r).mandatory
   calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
   properties r = includeBinding (\r' -> (unwrap r').properties) propertiesOfADT r
+  typeExcludingBinding r = pure (ST $ identifier r)
   typeIncludingBinding r = do
     pure $ case (unwrap r).binding of
       PROD terms -> PROD (cons (ST $ identifier r) terms)

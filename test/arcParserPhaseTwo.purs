@@ -371,7 +371,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
         case evalPhaseTwo (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) true
           (Right (DomeinFile dr')) -> do
-            logShow dr'
+            -- logShow dr'
             assert "An Action in a Perspective should end up in the DomeinFile."
               (isJust (lookup "model:MyTestDomain$MySelf$ConsultsAnotherRole" dr'.actions))
             assert "The Role MySelf should have a Perspective on 'model:MyTestDomain$AnotherRole' that includes the Action 'model:MyTestDomain$MySelf$ConsultsAnotherRole'."
@@ -548,3 +548,23 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                     Just (A _) -> true
                     otherwise -> false)
               otherwise -> assert "There should be an action Change Party" false
+
+  test "A role with a CalculatedProperty" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= sum" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            assert "The property 'NumberOfGuests' should have a calculation"
+              case lookup "model:Test$Guest$NumberOfGuests" dr'.calculatedProperties of
+                (Just (CalculatedProperty {calculation})) -> case calculation of
+                  (S (Binary (BinaryStep{operator}))) -> case operator of
+                    Sequence _ -> true
+                    _ -> false
+                  _ -> false
+                _ -> false

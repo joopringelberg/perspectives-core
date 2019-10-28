@@ -39,6 +39,8 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | | variable
 -- |
+-- | | this
+-- |
 -- | unaryStep =
 -- |    'not' step
 -- |  | 'create' ArcIdentifier
@@ -97,8 +99,8 @@ data SimpleStep =
   | Binder ArcPosition String
   | Context ArcPosition
   | Extern ArcPosition
-  | NoOp ArcPosition
   | SequenceFunction ArcPosition String
+  | Identity ArcPosition
 
 data UnaryStep =
   LogicalNot ArcPosition Step

@@ -19,6 +19,7 @@ domain: Feest
     view: ViewOpWens (Naam, Bedrag)
   user: Gast (not mandatory, not functional) filledBy: sys:User
     property: Naam (mandatory, functional, String)
+    property: AantalGasten = this >>= sum
     view: ViewOpGast (Naam)
     perspective on: Wens (ViewOpWens): Consult, Change
     property: WellBehaved = context > Gast > Binding > Naam

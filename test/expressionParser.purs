@@ -15,7 +15,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.Expression" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -39,8 +39,8 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: when it fails" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "notmatched" simpleStep
     case r of
-      (Left (ParseError m _)) -> assert "Should fail with: 'Expected binding, binder, context, extern or a valid identifier'" (m == "Expected binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)")
-      (Right id) -> assert "Should fail with: 'Expected binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)'" false
+      (Left (ParseError m _)) -> assert "Should fail with: 'binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count")
+      (Right id) -> assert "Should fail with: 'Expectedbinding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count'" false
 
   test "UnaryStep: LogicalNot" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "not MyProperty" unaryStep
@@ -127,7 +127,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       (Left (ParseError m _)) -> do
         logShow m
         assert "In 'Prop1 ? Prop2', '?' is an invalid operator and that should be detected."
-          (m == "Expected >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *")
+          (m == "Expected >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>=")
       (Right id) -> do
         logShow id
         assert "In 'Prop1 ? Prop2', '?' is an invalid operator and that should be detected." false
@@ -365,7 +365,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         logShow x
         assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
 
-  testOnly "sequenceStep with complex left side" do
+  test "sequenceStep with complex left side" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum + 1" step
     case r of
       (Left e) -> assert (show e) false

@@ -241,6 +241,20 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
 
   -- Skipping createRole because it is an exact copy of createContext
 
+  makeTest "compileSimpleStep: Identity."
+    "domain: Test\n  thing: Guest (mandatory, functional)\n  thing: GuestToo = Guest >> this"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$GuestToo" calculatedRoles of
+        Nothing -> assert "There should be a role 'GuestToo'" false
+        Just (CalculatedRole{calculation}) -> do
+          assert "The calculation should be a composition,of which the second operand is the Identity function."
+            case calculation of
+              (Q (BQD _ _ _ (SQD _ (DataTypeGetter "identity") _) _)) -> true
+              otherwise -> false
+              )
+
   makeTest "compileUnaryStep: LogicalNot."
     "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n    property: Prop2 = not Prop1\n"
     (\e -> assert (show e) false)
@@ -359,3 +373,24 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
               (Q (BQD _ (BinaryCombinator "filter") _ _ _)) -> true
               otherwise -> false
               )
+
+  makeTest "compileBinaryStep: make a binary operation with '>>='."
+    "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= count"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Guest$NumberOfGuests" calculatedProperties of
+        Nothing -> assert "There should be a property 'NumberOfGuests'" false
+        Just (CalculatedProperty{calculation}) -> do
+          assert "The calculation should be (DataTypeGetter \"count\")"
+            case calculation of
+              (Q (SQD _ (DataTypeGetter "count") (VDOM PNumber))) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileBinaryStep: make a binary operation with '>>=', not a sequence function"
+    "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= fantasy"
+    (\e -> case e of
+      (TypesCannotBeCompared _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)

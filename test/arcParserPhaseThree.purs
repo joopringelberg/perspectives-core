@@ -53,7 +53,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -107,8 +107,8 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   -- testOnly "Testing qualifyActionRoles." do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
 
-  test "Testing qualifyActionRoles." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  bot: for MySelf\n    perspective on: AnotherRole\n      Consult\n        indirectObject: AnotherRole \n  thing: AnotherRole = Role >> binding" ARC.domain
+  testOnly "Testing qualifyActionRoles." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  bot: for MySelf\n    perspective on: AnotherRole\n      Consult\n        indirectObject: AnotherRole \n  thing: Role (mandatory, functional) filledBy: YetAnotherRole\n  thing: AnotherRole = Role >> binding\n  thing: YetAnotherRole (mandatory, functional)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -347,7 +347,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))) -> assert "" true
                     otherwise -> assert "There should be a Property 'model:MyTestDomain$FeestVoorbereiding$Datum' in ViewOpFeest" false
 
-  test "Testing qualifyViewReferences: reference to View on Action." do
+  testOnly "Testing qualifyViewReferences: reference to View on Action." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: BigParty = Guest > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -418,7 +418,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                         (Q (SQD _ (ComputedRoleGetter "ModellenM") _)) -> true
                         otherwise -> false
 
-  test "Action with Condition" do
+  testOnly "Action with Condition" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Voornaam (mandatory, functional, String)\n    view: AnotherView (Voornaam)\n    perspective on: Party\n      Consult with ViewOnParty\n        subjectView: AnotherView\n        if Party >> Datum > 10\n  thing: Party (mandatory, functional)\n    property: Naam (mandatory, functional, String)\n    property: Datum (mandatory, functional, DateTime)\n    view: ViewOnParty (Naam)\n    view: AnotherView (Datum)" ARC.domain
     case r of
       (Left e) -> assert (show e) false

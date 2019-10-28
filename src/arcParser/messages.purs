@@ -74,6 +74,7 @@ data PerspectivesError
     | NotABoolean ArcPosition
     | WrongTypeForOperator ArcPosition (Array EP.Range)
     | MissingValueForAssignment ArcPosition ArcPosition
+    | ArgumentMustBeSequenceFunction ArcPosition
 
     | Custom String
 
@@ -106,6 +107,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotABoolean pos) = "(NotABoolean) The expression starting at " <> show pos <> " does not result in a boolean value."
   show (WrongTypeForOperator pos allowedOps) = "(WrongTypeForOperator) This operator requires its arguments to be (one of): " <> show allowedOps
   show (MissingValueForAssignment start end) = "(MissingValueForAssignment) This assignment statement needs a value expression on the right: from " <> show start <> " to " <> show end
+  show (ArgumentMustBeSequenceFunction pos) = "(ArgumentMustBeSequenceFunction) The right operand of '>>=' must be a monoidal function such as sum, product, minimum, or maximum, at: " <> show pos
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

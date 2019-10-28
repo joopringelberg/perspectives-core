@@ -73,10 +73,13 @@ simpleStep = try
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> (defer \_ -> arcIdentifier)))
   <|>
   Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
-  ) <?> "binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)"
+  <|>
+  Simple <$> (Identity <$> getPosition <* reserved "this")
+  ) <?> "binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count"
 
 sequenceFunction :: IP String
-sequenceFunction = token.symbol "sum" <|> token.symbol "product" <|> token.symbol "minimum" <|> token.symbol "maximum"
+sequenceFunction = (token.symbol "sum" <|> token.symbol "product" <|> token.symbol "minimum" <|> token.symbol "maximum" <|> token.symbol "count") <?> "sum, product, minimum,\
+\ maximum or count"
 
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
@@ -189,8 +192,8 @@ startOf stp = case stp of
     startOfSimple (Extern p) = p
     startOfSimple (CreateContext p _) = p
     startOfSimple (CreateEnumeratedRole p _) = p
-    startOfSimple (NoOp p) = p
     startOfSimple (SequenceFunction p _) = p
+    startOfSimple (Identity p) = p
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
@@ -210,8 +213,8 @@ endOf stp = case stp of
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
-    endOfSimple (NoOp pos) = pos
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length fname}
+    endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}

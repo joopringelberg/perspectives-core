@@ -58,7 +58,7 @@ defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
   , displayName: dname
   , kindOfRole: kindOfRole
 
-  , calculation: S $ Simple $ NoOp $ ArcPosition{column: 0, line: 0}
+  , calculation: S $ Simple $ Identity $ ArcPosition{column: 0, line: 0}
   , context: ContextType context
 
   , pos: pos

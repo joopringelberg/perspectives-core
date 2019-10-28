@@ -156,10 +156,10 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
   pure $ SQD currentDomain (DataTypeGetterWithParameter "createRole" (unwrap qroleType)) (RDOM (ST qroleType))
 
-compileSimpleStep currentDomain (NoOp _) = pure $ SQD currentDomain (DataTypeGetter "identity") currentDomain
+compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (DataTypeGetter "identity") currentDomain
 
--- TODO: Doe iets zinnigs hier.
-compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (DataTypeGetter "identity") currentDomain
+-- We compile the SequenceFunction as a UnaryCombinator, which is a stretch.
+compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (UnaryCombinator fname) currentDomain
 
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
@@ -188,6 +188,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
     Compose pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep (range f1) right
+      -- TODO. An optimalisation: if the left or right term is Identity, replace the entire composition by the other term.
       pure $ BQD currentDomain (BinaryCombinator "compose") f1 f2 (range f2)
 
     otherwise -> do
@@ -213,7 +214,13 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
 
-        Sequence _ -> throwError $ Custom "Implement compileUnaryStep for SequenceStep"
+        Sequence pos -> case f2 of
+          -- The sequenceFunctionName is compiled as a UnaryCombinator
+          -- Notice by the domain and range that we assume functions that are Monoids.
+          SQD _ (UnaryCombinator fname) _ -> case fname of
+            "count" -> pure $ SQD currentDomain (DataTypeGetter fname) (VDOM PNumber)
+            _ -> pure $ SQD currentDomain (DataTypeGetter fname) currentDomain
+          _ -> throwError $ ArgumentMustBeSequenceFunction pos
 
   where
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> String -> PhaseThree QueryFunctionDescription
