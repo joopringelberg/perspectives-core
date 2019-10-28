@@ -508,7 +508,7 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     , subject: EnumeratedRoleType rolename
     , verb: verb
     , object: (ENR $ EnumeratedRoleType object) -- But it may be Calculated!
-    , requiredObjectProperties: Nothing
+    , requiredObjectProperties: defaultObjectView
     , requiredSubjectProperties: Nothing
     , requiredIndirectObjectProperties: Nothing
     , indirectObject: Nothing
