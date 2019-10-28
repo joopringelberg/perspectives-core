@@ -155,7 +155,11 @@ contextOfADT NOTYPE = pure NOTYPE
 
 -- | The binding of an ADT.
 bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-bindingOfADT = reduce (getEnumeratedRole >=> binding)
+-- bindingOfADT = reduce (getEnumeratedRole >=> binding)
+bindingOfADT (ST a) = getEnumeratedRole a >>= binding
+bindingOfADT (SUM adts) = map SUM (traverse bindingOfADT adts)
+bindingOfADT (PROD adts) = map PROD (traverse bindingOfADT adts)
+bindingOfADT NOTYPE = pure NOTYPE
 
 -- | A functional role can be filled with a relational role (but then we need to select). E.g.:
 -- | one of the party-goers was the driver.
@@ -243,6 +247,10 @@ expandedADT_ = getRole >=> (case _ of
   E r -> expandedADT r
   C r -> expandedADT r)
 
+typeExcludingBinding_ :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
+typeExcludingBinding_ = getRole >=> (case _ of
+  E r -> typeExcludingBinding r
+  C r -> typeExcludingBinding r)
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------

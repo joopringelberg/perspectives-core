@@ -44,7 +44,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
 import Perspectives.Representation.Class.Property (rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_)
+import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, typeExcludingBinding_)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
@@ -66,8 +66,8 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
       case head rts of
         Nothing -> throwError $ ContextHasNoRole c ident
         (Just (rt :: RoleType)) -> do
-          (expandedType :: ADT EnumeratedRoleType) <- lift $ lift $ expandedADT_ rt
-          pure $ SQD currentDomain (RolGetter rt) (RDOM $ expandedType)
+          (typeExcludingBinding :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt
+          pure $ SQD currentDomain (RolGetter rt) (RDOM $ typeExcludingBinding)
     (RDOM r) -> do
       (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
         then  lift2 $ runArrayT $ lookForPropertyType ident r
