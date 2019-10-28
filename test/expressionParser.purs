@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
-import Perspectives.Parsing.Arc.Expression (assignment, assignmentOperator, binaryStep, compoundStep, filterStep, simpleStep, step, unaryStep)
+import Perspectives.Parsing.Arc.Expression (assignment, assignmentOperator, binaryStep, compoundStep, filterStep, operator, simpleStep, step, unaryStep)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -312,15 +312,35 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
       otherwise -> assert "'MyProp > '1995-12-17'' should be parsed as a a GreaterThan" false
 
-  testOnly "sequenceStep" do
+  test "SimpleStep: sum" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "sum" simpleStep
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        logShow id
+        assert "'sum' should be parsed as a the simple step SequenceFunction" case id of
+          (Simple (SequenceFunction (ArcPosition{column: 1, line: 1}) "sum")) -> true
+          otherwise -> false
+
+  test "Operator: >>=" do
+    (r :: Either ParseError Operator) <- pure $ unwrap $ runIndentParser ">>=" operator
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        logShow id
+        assert "'>>=' should be parsed as a the operator Sequence" case id of
+          (Sequence (ArcPosition{column: 1, line: 1})) -> true
+          otherwise -> false
+
+  test "sequenceStep" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp >>= sum" step
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Unary (SequenceStep pos sequenceFunction))) -> do
+      (Right a@(Binary (BinaryStep {operator}))) -> do
         logShow a
-        assert "'MyProp >>= sum' should be parsed as a a SequenceFunction with sequenceFunction equal to 'sum'"
-          case sequenceFunction of
-            "sum" -> true
+        assert "'MyProp >>= sum' should be parsed as a a BinaryStep with operator equal to 'Sequence'"
+          case operator of
+            Sequence _ -> true
             otherwise -> false
       otherwise -> do
         logShow otherwise
@@ -330,12 +350,30 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum" step
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Unary (SequenceStep pos sequenceFunction))) -> do
-        logShow a
-        assert "'MyRole >> MyProp >>= sum' should be parsed as a a SequenceFunction with sequenceFunction equal to 'sum'"
-          case sequenceFunction of
-            "sum" -> true
-            otherwise -> false
+      (Right a@(Binary (BinaryStep {right}))) -> do
+        -- logShow a
+        case right of
+          (Binary (BinaryStep{right:right'})) -> do
+            case right' of
+              (Binary (BinaryStep{operator})) -> assert "'MyRole >> MyProp >>= sum' should be parsed as a a BinaryStep with operator equal to 'Sequence'"
+                case operator of
+                  Sequence _ -> true
+                  otherwise -> false
+              otherwise -> assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
+          otherwise -> assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
       x -> do
         logShow x
-        assert "'MyRole >> MyProp >>= sum' should be parsed as a a SequenceFunction" false
+        assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
+
+  testOnly "sequenceStep with complex left side" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum + 1" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Binary (BinaryStep {operator}))) -> do
+        assert "'MyRole >> binding >> MyProp >>= sum + 1' should be parsed as a a BinaryStep with operator equal to 'add'"
+          case operator of
+            Add _ -> true
+            otherwise -> false
+      x -> do
+        -- logShow x
+        assert "'MyRole >> binding >> MyProp >>= sum + 1' should be parsed as a BinaryStep with operator equal to add" false

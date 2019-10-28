@@ -158,6 +158,9 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
 
 compileSimpleStep currentDomain (NoOp _) = pure $ SQD currentDomain (DataTypeGetter "identity") currentDomain
 
+-- TODO: Doe iets zinnigs hier.
+compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (DataTypeGetter "identity") currentDomain
+
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
   -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool) range value.
@@ -171,8 +174,6 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
   case range descriptionOfs of
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
     otherwise -> pure $ UQD currentDomain (UnaryCombinator "exists") descriptionOfs (VDOM PBool)
-
-compileUnaryStep currentDomain st@(SequenceStep pos s) = throwError $ Custom "Implement compileUnaryStep for SequenceStep"
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
@@ -211,6 +212,8 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
+
+        Sequence _ -> throwError $ Custom "Implement compileUnaryStep for SequenceStep"
 
   where
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> String -> PhaseThree QueryFunctionDescription

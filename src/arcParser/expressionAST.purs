@@ -98,11 +98,11 @@ data SimpleStep =
   | Context ArcPosition
   | Extern ArcPosition
   | NoOp ArcPosition
+  | SequenceFunction ArcPosition String
 
 data UnaryStep =
   LogicalNot ArcPosition Step
   | Exists ArcPosition Step
-  | SequenceStep ArcPosition String
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 
@@ -121,6 +121,7 @@ data Operator =
   | Divide ArcPosition
   | Multiply ArcPosition
   | Filter ArcPosition
+  | Sequence ArcPosition
 
 newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
 

@@ -31,7 +31,7 @@ import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Effect.Unsafe (unsafePerformEffect)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -71,7 +71,13 @@ simpleStep = try
   Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> (defer \_ -> arcIdentifier)))
   <|>
   Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> (defer \_ -> arcIdentifier)))
+  <|>
+  Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
   ) <?> "binding, binder, context, extern, a valid identifier or a number, boolean, string (between double quotes) or date (between single quotes)"
+
+sequenceFunction :: IP String
+sequenceFunction = token.symbol "sum" <|> token.symbol "product" <|> token.symbol "minimum" <|> token.symbol "maximum"
+
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 parseDate :: IP DateTime
@@ -86,9 +92,7 @@ unaryStep :: IP Step
 unaryStep = try
   (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
   <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
-  <|>
-  Unary <$> (SequenceStep <$> getPosition <*> (reserved ">>=" *> lowerCaseName))) <?> "not <expr>, exists <step>, >>= <function on sequence of values>"
+  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr> or exists <step>."
 
 compoundStep :: IP Step
 compoundStep = try (defer \_->binaryStep) <|> (defer \_->filterStep)
@@ -123,31 +127,35 @@ binaryStep = try do
     otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
 
 operator :: IP Operator
-operator = ((Compose <$> (getPosition <* reserved ">>"))
+operator =
+  (Sequence <$> (getPosition <* token.reservedOp ">>="))
   <|>
-  (Equals <$> (getPosition <* reserved "=="))
+  ((Compose <$> (getPosition <* token.reservedOp ">>"))
   <|>
-  (NotEquals <$> (getPosition <* reserved "/="))
+  (Equals <$> (getPosition <* token.reservedOp "=="))
   <|>
-  (LessThan <$> (getPosition <* reserved "<"))
+  (NotEquals <$> (getPosition <* token.reservedOp "/="))
   <|>
-  (LessThanEqual <$> (getPosition <* reserved "<="))
+  (LessThan <$> (getPosition <* token.reservedOp "<"))
   <|>
-  (GreaterThan <$> (getPosition <* reserved ">"))
+  (LessThanEqual <$> (getPosition <* token.reservedOp "<="))
   <|>
-  (GreaterThanEqual <$> (getPosition <* reserved ">="))
+  (GreaterThan <$> (getPosition <* token.reservedOp ">"))
   <|>
-  (LogicalAnd <$> (getPosition <* reserved "and"))
+  (GreaterThanEqual <$> (getPosition <* token.reservedOp ">="))
   <|>
-  (LogicalOr <$> (getPosition <* reserved "or"))
+  (LogicalAnd <$> (getPosition <* token.reservedOp "and"))
   <|>
-  (Add <$> (getPosition <* reserved "+"))
+  (LogicalOr <$> (getPosition <* token.reservedOp "or"))
   <|>
-  (Subtract <$> (getPosition <* reserved "-"))
+  (Add <$> (getPosition <* token.reservedOp "+"))
   <|>
-  (Divide <$> (getPosition <* reserved "/"))
+  (Subtract <$> (getPosition <* token.reservedOp "-"))
   <|>
-  (Multiply <$> (getPosition <* reserved "*"))) <?> ">>, ==, /=, <, <=, >, >=, and, or, +, -, /, *"
+  (Divide <$> (getPosition <* token.reservedOp "/"))
+  <|>
+  (Multiply <$> (getPosition <* token.reservedOp "*"))
+  ) <?> ">>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>="
 
 operatorPrecedence :: Operator -> Int
 operatorPrecedence (Compose _) = 8
@@ -163,6 +171,7 @@ operatorPrecedence (Add _) = 3
 operatorPrecedence (Subtract _) = 2
 operatorPrecedence (Divide _) = 4
 operatorPrecedence (Multiply _) = 5
+operatorPrecedence (Sequence _) = 8
 operatorPrecedence (Filter _) = 9
 
 startOf :: Step -> ArcPosition
@@ -181,10 +190,10 @@ startOf stp = case stp of
     startOfSimple (CreateContext p _) = p
     startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (NoOp p) = p
+    startOfSimple (SequenceFunction p _) = p
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
-    startOfUnary (SequenceStep p _) = p
 
 endOf :: Step -> ArcPosition
 endOf stp = case stp of
@@ -202,11 +211,11 @@ endOf stp = case stp of
     endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (NoOp pos) = pos
+    endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length fname}
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
     endOfUnary (Exists (ArcPosition{line, column}) step') = endOf step'
-    endOfUnary (SequenceStep (ArcPosition{line, column}) s) = ArcPosition{line, column: 4 + length s}
 
     col_ :: ArcPosition -> Int
     col_ (ArcPosition{column}) = column
@@ -225,11 +234,11 @@ assignment = deletion <|> try do
 
 assignmentOperator :: IP AssignmentOperator
 assignmentOperator = try
-  (DeleteFrom <$> (getPosition <* reserved "=-"))
+  (DeleteFrom <$> (getPosition <* token.reservedOp "=-"))
   <|>
-  (AddTo <$> (getPosition <* reserved "=+"))
+  (AddTo <$> (getPosition <* token.reservedOp "=+"))
   <|>
-  ((Set <$> (getPosition <* reserved "="))
+  ((Set <$> (getPosition <* token.reservedOp "="))
   ) <?> "=, =+, =-"
 
 deletion :: IP Assignment
