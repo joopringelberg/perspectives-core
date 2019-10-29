@@ -2,7 +2,7 @@
   "name": "perspectives-core",
   "version": "1.0.0",
   "description": "Core functionality of Perspectives",
-  "license": "GPL-3.0-or-later"
+  "license": "GPL-3.0-or-later",
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "dependencies": {
     "xhr2-cookies": "^1.1.0",
@@ -16,7 +16,8 @@
   "homepage": "https://github.com/joopringelberg/perspectives-core#readme",
   "scripts": {
     "watch": "webpack --watch",
-    "symlinks": "./createPerspectivesLinks.sh"
+    "symlinks": "./createPerspectivesLinks.sh",
+    "docs": "./gendocs.sh"
   },
   "devDependencies": {
     "webpack": "^4.15.0",

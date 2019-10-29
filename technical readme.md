@@ -33,7 +33,13 @@ Additionally, install [Atom](https://atom.io/) and two packages to support Pures
 
 
 ### Develop this interface; construct a bundle
-Assuming code will be changed with Atom (and the Atom-purescript-ide), changes in source code will be immediately compiled into javascript in the `output` directory. The project contains a Webpack configuration file. If
+Assuming code will be changed with Atom (and the Atom-purescript-ide), changes in source code will be immediately compiled into javascript in the `output` directory. Alternatively, execute this command to build the source:
+
+```
+pulp build
+```
+
+The project contains a Webpack configuration file. If
 
 `npm run watch`
 
