@@ -41,11 +41,13 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | | this
 -- |
+-- | | >>= SequenceFunction
+-- |
 -- | unaryStep =
 -- |    'not' step
--- |  | 'create' ArcIdentifier
+-- |  | 'createRole' ArcIdentifier
+-- |  | 'createContext' ArcIdentifier
 -- |  | 'exists' ArcIdentifier
--- |  | >>= SequenceFunction
 -- |
 -- | compoundStep =
 -- |    'filter' step 'with' step
