@@ -51,8 +51,10 @@ The source files have many annotations. Moreover, the compiler can generate stan
 Generate a new version of the documentation with:
 
 ```
-pulp docs -- --format html
+npm run docs
 ```
+
+__NOTE__ do not use the `pulp docs` command. It [generates documentation](https://github.com/purescript-contrib/pulp#building-documentation) in the directory `generated-docs`, while [Github Pages](https://help.github.com/en/github/working-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site) expects it to be in `docs`.
 
 ### Symlinks for easy updates
 `package.json` contains a run target `symlinks` that will replace the subdirectories
