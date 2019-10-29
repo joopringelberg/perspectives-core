@@ -40,7 +40,7 @@ Assuming code will be changed with Atom (and the Atom-purescript-ide), changes i
 is executed before changing code, changes will be immediately reflected in the bundled code in `dist/perspectives-core.js`.
 
 ### Program documentation
-The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](generated-docs/Perspectives.Docu.Main.html#t:x).
+The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](https://joopringelberg.github.io/perspectives-core/Perspectives.Docu.Main.html#t:x).
 
 Generate a new version of the documentation with:
 
