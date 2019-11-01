@@ -270,7 +270,7 @@ isContainingNamespace ns ident = case indexOf (Pattern ns) ident of
 -- | "model:Model$First$Second$Third" `endsWithSegments` "Second$Third" == true
 -- | "model:Model$First$Second$Third" `endsWithSegments` "Second" == false
 endsWithSegments :: String -> String -> Boolean
-endsWithSegments whole part = isJust $ stripSuffix (Pattern part) whole
+endsWithSegments whole part = isJust $ stripSuffix (Pattern ("$" <> part)) whole
 
 -- | "Second$Third" `areLastSegmentsOf` "model:Model$First$Second$Third" == true
 -- | "Second" `areLastSegmentsOf` "model:Model$First$Second$Third" == false
