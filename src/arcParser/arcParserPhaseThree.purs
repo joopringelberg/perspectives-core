@@ -118,7 +118,10 @@ qualifyActionRoles = do
               Nothing -> throwError (Custom $ "Impossible error: cannot find '" <> a <> "' in model.")
               (Just (Action ar@{_id: actId, object, indirectObject: mindirectObject, pos})) -> do
                 ar' <- do
-                  qname <- qualifiedRoleType ctxtId pos (roletype2string object)
+                  qname <- case object of
+                    (ENR (EnumeratedRoleType "External")) -> pure $ ENR $ EnumeratedRoleType ((unwrap ctxtId) <> "$" <> "External")  -- TODO: check naamgeving externe rol!
+                    other -> qualifiedRoleType ctxtId pos (roletype2string other)
+                  -- qname <- qualifiedRoleType ctxtId pos (roletype2string object)
                   pure $ ar {object = qname}
                 ar'' <- case mindirectObject of
                   (Just indirectObject) -> do

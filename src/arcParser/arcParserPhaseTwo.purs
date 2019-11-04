@@ -29,7 +29,7 @@ import Data.Foldable (foldl)
 import Data.Identity (Identity)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
-import Data.List (List, filter, findIndex, foldM, head)
+import Data.List (List(..), filter, findIndex, foldM, head)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -53,7 +53,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCa
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
-import Perspectives.Representation.Class.Role (Role(..))
+import Perspectives.Representation.Class.Role (Role(..), kindOfRole)
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
@@ -154,7 +154,12 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
       (PREFIX _ _) -> true
       otherwise -> false) contextParts)
     do
-      context' <- foldM handleParts context contextParts
+      contextParts' <- case (head (filter (case _ of
+        RE (RoleE{id:rid}) -> rid == "External"
+        otherwise -> false) contextParts)) of
+          Nothing -> pure $ Cons (RE (RoleE{id: "External", kindOfRole: ExternalRole, roleParts: Nil, pos})) contextParts
+          otherwise -> pure contextParts
+      context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
       pure context'
 
@@ -198,7 +203,7 @@ traverseContextE (ContextE {id, kindOfContext, contextParts, pos}) ns = do
     insertRoleInto (E (EnumeratedRole {_id, kindOfRole})) c = case kindOfRole, c of
       RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR _id) rolInContext}
       ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR _id) contextRol}
-      ExternalRole, (Context cr) -> Context $ cr {externeRol = _id}
+      ExternalRole, ctxt -> ctxt
       -- We may have added the user before, on handling his BotRole.
       UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex _id gebruikerRol of
         Nothing -> cons _id gebruikerRol

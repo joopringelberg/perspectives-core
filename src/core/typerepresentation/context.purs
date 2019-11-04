@@ -31,7 +31,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
-import Prelude (class Eq, class Show, map, (<<<), (==))
+import Prelude (class Eq, class Show, map, (<<<), (<>), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 -----------------------------------------------------------
@@ -54,7 +54,7 @@ instance contextContextClass :: ContextClass Context where
   defaultPrototype = _.defaultPrototype <<< unwrap
   roleInContext = _.rolInContext <<< unwrap
   contextRole = _.contextRol <<< unwrap
-  externalRole = _.externeRol <<< unwrap
+  externalRole (Context{_id}) = EnumeratedRoleType ((unwrap _id) <> "$External")
   userRole = _.gebruikerRol <<< unwrap
   actions = _.actions <<< unwrap
   aspects = _.contextAspects <<< unwrap
@@ -77,7 +77,6 @@ type ContextRecord =
 
   , rolInContext :: Array RoleType
   , contextRol :: Array RoleType
-  , externeRol :: EnumeratedRoleType
   , gebruikerRol :: Array EnumeratedRoleType
 
   , nestedContexts :: Array ContextType
@@ -89,6 +88,7 @@ type ContextRecord =
 
 data ContextKind = Domain | Case | Party | Activity | State
 
+-- | We assume the id is a qualified name.
 defaultContext :: String -> String -> ContextKind -> Maybe String -> ArcPosition -> Context
 defaultContext id dname kind context pos = Context { _id: (ContextType id)
   , _rev: Nothing
@@ -99,7 +99,6 @@ defaultContext id dname kind context pos = Context { _id: (ContextType id)
 
   , rolInContext: []
   , contextRol: []
-  , externeRol: EnumeratedRoleType ""
   , gebruikerRol: []
 
   , nestedContexts: []

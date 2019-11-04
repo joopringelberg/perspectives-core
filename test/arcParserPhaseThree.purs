@@ -54,7 +54,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -105,7 +105,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             assert "lookForUnqualifiedRoleType should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
               (isJust (head roles''))
 
-  -- testOnly "Testing qualifyActionRoles." do
+  -- test "Testing qualifyActionRoles." do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
 
   test "Testing qualifyActionRoles." do
@@ -143,6 +143,30 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "indirectObject")) <<< _Just
                     in case (preview _o correctedDFR) of
                       (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
+                      -- (Just (CR _)) -> true
+                      otherwise -> false
+                    )
+
+  test "Testing qualifyActionRoles: External." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  user: Driver\n    perspective on: External\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x <- runP $ phaseThree dr'
+            case x of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR) -> do
+                -- logShow correctedDFR
+                assert "The Object of the action 'ConsultExternal' should be 'model:MyTestDomain$External'."
+                  (let
+                    _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$Driver$ConsultExternal" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
+                    in case (preview _o correctedDFR) of
+                      (Just (ENR (EnumeratedRoleType "model:MyTestDomain$External"))) -> true
                       -- (Just (CR _)) -> true
                       otherwise -> false
                     )

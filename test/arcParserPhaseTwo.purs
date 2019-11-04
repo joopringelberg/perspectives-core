@@ -77,6 +77,22 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               ((Just $ ENR $ EnumeratedRoleType "model:MyTestDomain$MyCase$MyRoleInContext") == (preview (prop (SProxy :: SProxy "contexts") <<< at "model:MyTestDomain$MyCase" <<< traversed <<< _Newtype <<< (prop (SProxy :: SProxy "rolInContext")) <<< ix 0) dr'))
             assert "The Domain should have the id 'MyTestDomain'" (id == "MyTestDomain")
 
+  testOnly "A domain should have an external role, too." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- (DomeinFile dr) <- pure defaultDomeinFile
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            -- logShow context
+            assert "The DomeinFile should have context 'model:MyTestDomain'."
+              (isJust (lookup "model:MyTestDomain" dr'.contexts))
+            assert "The DomeinFile should have role 'model:MyTestDomain$External'."
+              (isJust (lookup "model:MyTestDomain$External" dr'.enumeratedRoles))
+
   test "A Context with a CalculatedRole and a position." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext\n      Calculation : context >> Role" domain
     case r of

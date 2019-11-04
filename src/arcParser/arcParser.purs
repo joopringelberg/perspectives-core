@@ -23,7 +23,7 @@ module Perspectives.Parsing.Arc where
 
 import Control.Alt (map, void, (<|>))
 import Data.Array (elemIndex)
-import Data.List (List(..), singleton)
+import Data.List (List(..), singleton, (:))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
@@ -37,7 +37,7 @@ import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=), (<$>), (<*>))
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -288,18 +288,21 @@ perspectiveE = try do
   where
     perspective_ :: IP (List PerspectivePart)
     perspective_ = do
-      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> arcIdentifier >>= pure <<< Object
+      (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> arcIdentifier <|> reserved' "External" >>= pure <<< Object
       (mdefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
-      (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')
+      pos <- getPosition
+      (actions :: List PerspectivePart) <- option
+        (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : Nil))
+        (colon *> token.commaSep minimalAction')
       case mdefaultView of
         Nothing -> pure $ Cons object actions
         (Just defaultView) -> pure $ Cons defaultView (Cons object actions)
 
     minimalAction' :: IP PerspectivePart
-    minimalAction' = do
-      pos <- getPosition
-      verbName <- token.identifier
-      pure $ Act $ ActionE {id: "", verb: constructVerb verbName, actionParts: Nil, pos}
+    minimalAction' = mkActionFromVerb <$> getPosition <*> token.identifier
+
+    mkActionFromVerb :: ArcPosition -> String -> PerspectivePart
+    mkActionFromVerb pos v = Act $ ActionE {id: "", verb: constructVerb v, actionParts: Nil, pos}
 
 constructVerb :: String -> Verb
 constructVerb v = case v of

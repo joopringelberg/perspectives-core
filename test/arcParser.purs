@@ -313,7 +313,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
-  test "Perspective with just an ObjectRef" do
+  test "Perspective without named Verbs should have default actions." do
     (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject" perspectiveE
     case r of
       (Left e) -> assert (show e) false
@@ -322,6 +322,23 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
         (assert "The Perspective should have the object 'MyObject'"
           (isJust (findIndex (case _ of
             (Object _) -> true
+            otherwise -> false) perspectiveParts)))
+        (assert "There should be an Action for Consult"
+          (isJust (findIndex (case _ of
+            (Act (ActionE{verb})) -> verb == Consult
+            otherwise -> false) perspectiveParts))
+        )
+      otherwise -> assert "Parsed an unexpected type" false
+
+  test "Perspective on External" do
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: External" perspectiveE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+        -- logShow pre
+        (assert "The Perspective should have the object 'External'"
+          (isJust (findIndex (case _ of
+            (Object "External") -> true
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
