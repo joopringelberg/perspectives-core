@@ -30,11 +30,11 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
-import Perspectives.Instances.Combinators (closure_, disjunction, filter')
+import Perspectives.Instances.Combinators (closure_, conjunction, disjunction, filter')
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
 import Perspectives.Representation.Class.Role (class RoleClass, getRole', properties, propertiesOfADT, views, viewsOfADT)
-import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole, contextRole) as Context
+import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole, contextRole, userRole) as Context
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Prelude (pure, (==), (>>>), (<<<), (>=>), bind, ($), (<>))
 
@@ -67,6 +67,9 @@ lookForRoleInContext criterium = filter' (contextAspectsClosure >=> roleInContex
 lookForContextRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
 lookForContextRole criterium = filter' (contextAspectsClosure >=> contextRole) criterium
 
+lookForUserRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
+lookForUserRole criterium = filter' (contextAspectsClosure >=> userRole) criterium
+
 lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
 lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s))
 
@@ -78,13 +81,16 @@ lookForRoleOfADT :: (RoleType -> Boolean) -> ADT ContextType ~~~> RoleType
 lookForRoleOfADT criterium = ArrayT <<< reduce f
   where
     f :: ContextType -> MonadPerspectives (Array RoleType)
-    f = unwrap <<< lookForRoleInContext criterium
+    f = unwrap <<< conjunction (lookForRoleInContext criterium) (conjunction (lookForUserRole criterium) (lookForContextRole criterium))
 
 roleInContext :: ContextType ~~~> RoleType
 roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.roleInContext)
 
 contextRole :: ContextType ~~~> RoleType
 contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.contextRole)
+
+userRole :: ContextType ~~~> RoleType
+userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< map ENR <<< Context.userRole)
 
 contextAspectsClosure :: ContextType ~~~> ContextType
 contextAspectsClosure = closure_ f where
