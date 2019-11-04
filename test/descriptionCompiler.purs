@@ -30,7 +30,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Text.Parsing.Parser (ParseError(..))
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
@@ -388,9 +388,11 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
               otherwise -> false
               )
 
-  makeTest "compileBinaryStep: make a binary operation with '>>=', not a sequence function"
-    "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= fantasy"
-    (\e -> case e of
-      (TypesCannotBeCompared _ _ _) -> pure unit
-      e' -> assert (show e') false)
-    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that the terms have differnet types" false)
+  test "compileBinaryStep: make a binary operation with '>>=', not a sequence function" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= fantasy" ARC.domain
+    case r of
+      (Left (ParseError m _)) -> do
+        assert "Should fail with message 'binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count")
+      otherwise -> do
+        logShow otherwise
+        assert "The non-existing sequence function name should have been detected." false

@@ -48,6 +48,7 @@ step = do
   left <- token.parens step <|> leftSide
   mop <- optionMaybe (try operator)
   case mop of
+    -- Nothing -> pos >>= failWithPosition "with, or an operator: >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>="
     Nothing -> pure left
     (Just op) -> do
       right <- step
@@ -63,8 +64,12 @@ step = do
           }
           else pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
-leftSide :: IP Step
-leftSide = defer \_ -> reserved "filter" *> step <|> defer \_ -> unaryStep <|> simpleStep
+  where
+    leftSide :: IP Step
+    leftSide = defer \_ -> reserved "filter" *> step <|> defer \_ -> unaryStep <|> simpleStep
+
+    -- pos :: IP Position
+    -- pos = getPosition >>= \(ArcPosition{line, column}) -> pure $  Position {line, column}
 
 simpleStep :: IP Step
 simpleStep = try

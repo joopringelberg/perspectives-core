@@ -3,6 +3,7 @@ module Test.Parsing.Arc.PhaseThree where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, filter, findIndex, head, length)
 import Data.Either (Either(..))
 import Data.Lens (_Just, preview, traversed)
@@ -14,15 +15,15 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Effect.Class.Console (logShow, log)
 import Foreign.Object (lookup)
-import Perspectives.CoreTypes (MonadPerspectives, (###=))
+import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
-import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Identifiers (Namespace)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
-import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, evalPhaseTwo', lift2, traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
@@ -37,9 +38,9 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, roleInContext)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForContextRole, lookForRoleInContext, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -53,7 +54,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -107,7 +108,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   -- testOnly "Testing qualifyActionRoles." do
   --   (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : blabla" domain
 
-  testOnly "Testing qualifyActionRoles." do
+  test "Testing qualifyActionRoles." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  bot: for MySelf\n    perspective on: AnotherRole\n      Consult\n        indirectObject: AnotherRole \n  thing: Role (mandatory, functional) filledBy: YetAnotherRole\n  thing: AnotherRole = Role >> binding\n  thing: YetAnotherRole (mandatory, functional)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -347,8 +348,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                     (Just (ENP (EnumeratedPropertyType "model:MyTestDomain$FeestVoorbereiding$Datum"))) -> assert "" true
                     otherwise -> assert "There should be a Property 'model:MyTestDomain$FeestVoorbereiding$Datum' in ViewOpFeest" false
 
-  testOnly "Testing qualifyViewReferences: reference to View on Action." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: BigParty = Guest > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
+  test "Testing qualifyViewReferences: reference to View on Action." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: Feest (mandatory, functional) filledBy: FeestVoorbereiding\n    property: BigParty = context >> Guest >>= count > 10\n    view: ViewOpFeest (Datum, BigParty)\n  thing: FeestVoorbereiding (mandatory, functional)\n    property: Datum (mandatory, functional, DateTime)\n  user: Guest (mandatory, functional)\n    perspective on: Feest (ViewOpFeest) Consult" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -357,12 +358,10 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
-            x <- runP $ phaseThree dr'
-            case x of
+            x' <- runP $ phaseThree dr'
+            case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
-                -- logShow correctedDFR
-                -- get the action
                 case lookup "model:MyTestDomain$Guest$ConsultFeest" actions of
                   Nothing -> assert "There should be an Action 'model:MyTestDomain$Guest$ConsultFeest'." false
                   (Just (Action{requiredObjectProperties})) -> case requiredObjectProperties of
@@ -418,8 +417,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                         (Q (SQD _ (ComputedRoleGetter "ModellenM") _)) -> true
                         otherwise -> false
 
-  testOnly "Action with Condition" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Voornaam (mandatory, functional, String)\n    view: AnotherView (Voornaam)\n    perspective on: Party\n      Consult with ViewOnParty\n        subjectView: AnotherView\n        if Party >> Datum > 10\n  thing: Party (mandatory, functional)\n    property: Naam (mandatory, functional, String)\n    property: Datum (mandatory, functional, DateTime)\n    view: ViewOnParty (Naam)\n    view: AnotherView (Datum)" ARC.domain
+  test "Action with Condition" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Voornaam (mandatory, functional, String)\n    view: AnotherView (Voornaam)\n    perspective on: Party\n      Consult with ViewOnParty\n        subjectView: AnotherView\n        if Party >> Datum > '2019-11-04'\n  thing: Party (mandatory, functional)\n    property: Naam (mandatory, functional, String)\n    property: Datum (mandatory, functional, DateTime)\n    view: ViewOnParty (Naam)\n    view: AnotherView (Datum)" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -484,3 +483,8 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                           otherwise -> false) stmts))
                         otherwise -> false)
                   otherwise -> assert "There should be an action Consult Party" false
+
+x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
+x correctedDFR = withDomeinFile "model:MyTestDomain"
+  (DomeinFile correctedDFR)
+  ((runTypeLevelToArray (ST (ContextType "model:MyTestDomain")) (lookForUnqualifiedRoleTypeOfADT "Guest")))

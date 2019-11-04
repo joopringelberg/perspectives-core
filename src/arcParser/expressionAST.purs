@@ -71,7 +71,7 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- |
 -- | let* = 'let*' binding+ 'in' body
 -- |
--- | binding = variable '<-' expressie
+-- | binding = variable '<-' step
 -- |
 -- | body = step | assignment+
 -- |

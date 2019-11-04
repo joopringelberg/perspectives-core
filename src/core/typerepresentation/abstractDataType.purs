@@ -1,14 +1,3 @@
--- | An Algebraic Data Type to represent the type of roles with more than one type of binding.
--- | `a` invariably is a newtype representing entities on the type level of Perspectives.
--- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`, never with `CalculatedRoleType`.
--- |
--- | ADT's are constructed for ContextType, too.
--- |
--- | ### Equivalences
--- | * `SUM x NOTYPE` equals `NOTYPE`
--- |
--- | * `PROD x NOTYPE` equals `x`
-
 -- BEGIN LICENSE
 -- Perspectives Distributed Runtime
 -- Copyright (C) 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
@@ -29,6 +18,17 @@
 -- Full text of this license can be found in the LICENSE file in the projects root.
 
 -- END LICENSE
+
+-- | An Algebraic Data Type to represent the type of roles with more than one type of binding.
+-- | `a` invariably is a newtype representing entities on the type level of Perspectives.
+-- | The dataconstructor ST is by construction used just with `EnumeratedRoleType`, never with `CalculatedRoleType`.
+-- |
+-- | ADT's are constructed for ContextType, too.
+-- |
+-- | ### Equivalences
+-- | * `SUM x NOTYPE` equals `x`
+-- |
+-- | * `PROD x NOTYPE` equals `NOTYPE`
 
 module Perspectives.Representation.ADT where
 

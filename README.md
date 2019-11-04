@@ -4,7 +4,7 @@ perspectives-distributed-runtime
 ### About
 The Perspectives Distributed Runtime (PDR) is part of the software created in the course of the [Perspectives Project](https://academy.perspect.it).
 
-The PDR interprets models written in the Perspectives Design Language. **Patterns of co-operation** can easily be expressed in the PDL. Examples of co-operation are: buying and selling, renting stuff, a formal meeting, etc.
+The PDR interprets models written in the Perspectives Language. **Patterns of co-operation** can easily be expressed in PL. Examples of co-operation are: buying and selling, renting stuff, a formal meeting, etc.
 
 The PDR has an API for client programs that offer end users screens to interact with each other. Users of such programs exchange information directly, in a Peer-to-Peer fashion, without intermediate servers that store their information.
 

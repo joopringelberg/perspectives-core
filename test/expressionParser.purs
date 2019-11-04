@@ -6,7 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
-import Perspectives.Parsing.Arc.Expression (assignment, assignmentOperator, binaryStep, compoundStep, filterStep, operator, simpleStep, step, unaryStep)
+import Perspectives.Parsing.Arc.Expression (assignment, operator, simpleStep, step, unaryStep)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -21,7 +21,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'MyRole' should be parsed as a the simple step ArcIdentifier" case id of
           (Simple (ArcIdentifier (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
           otherwise -> false
@@ -31,7 +31,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'MyRole' should be parsed as a the simple step Binding" case id of
           (Simple (Binding (ArcPosition{column: 1, line: 1}))) -> true
           otherwise -> false
@@ -47,7 +47,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'not MyProperty' should be parsed as a the unary step LogicalNot" case id of
           (Unary (LogicalNot (ArcPosition{column: 1, line: 1}) _)) -> true
           otherwise -> false
@@ -57,17 +57,17 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'create MyRole' should be parsed as a the unary step Create" case id of
           (Simple (CreateEnumeratedRole (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
           otherwise -> false
 
   test "FilterStep" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with ItsBooleanProp" filterStep
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with ItsBooleanProp" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'filter MyRole with ItsBooleanProp' should be parsed as a a binary step with operator 'Filter'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -80,7 +80,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'(filter MyRole with ItsBooleanProp)' should be parsed as a a binary step with operator 'Filter'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -89,11 +89,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "BinaryStep with ==" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 == Prop2" binaryStep
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 == Prop2" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'Prop1 == Prop2' should be parsed as a a binary step with operator 'Equals'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -113,7 +113,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'AnotherRole >> binding' should be parsed as a a binary step with operator 'Compose'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -122,18 +122,18 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
 
   test "BinaryStep that fails on operator" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 ? Prop2" binaryStep
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "Prop1 ? Prop2" step
     case r of
       (Left (ParseError m _)) -> do
-        logShow m
+        -- logShow m
         assert "In 'Prop1 ? Prop2', '?' is an invalid operator and that should be detected."
-          (m == "Expected >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>=")
+          (m == "with, or an operator: >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>=")
       (Right id) -> do
-        logShow id
-        assert "In 'Prop1 ? Prop2', '?' is an invalid operator and that should be detected." false
+        -- logShow id
+        assert "Of 'Prop1 ? Prop2', just the first term should be parsed." (id == (Simple (ArcIdentifier (ArcPosition { column: 1, line: 1 }) "Prop1")))
 
   test "Step on == with nested filter expression left" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "(filter MyRole with ItsBooleanProp) == MyOtherRole" step
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with ItsBooleanProp == MyOtherRole" step
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
@@ -150,7 +150,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'MyRole >> MyProp == MyOtherRole >> MyProp' should be parsed as a a binary step with operator 'Equals'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -163,7 +163,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'MyRole >> MyProp == filter MyRole with MyProp' should be parsed as a a binary step with operator 'Equals'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -176,7 +176,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'(MyRole) >> (MyProp)' should be parsed as a a binary step with operator 'Compose'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -189,7 +189,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'MyProp1 + MyProp2 * MyProp3' should be parsed as a a binary step with operator 'Add'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -215,7 +215,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Assignment{operator})) -> do
-        logShow a
+        -- logShow a
         assert "'MyRole = AnotherRole' should be parsed as a an Assignment with operator Set"
           case operator of
             (Set _) -> true
@@ -226,7 +226,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Assignment{operator})) -> do
-        logShow a
+        -- logShow a
         assert "'MyRole =+ AnotherRole >> binding' should be parsed as a an Assignment with operator AddTo"
           case operator of
             (AddTo _) -> true
@@ -237,7 +237,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Assignment{operator})) -> do
-        logShow a
+        -- logShow a
         assert "'delete Myprop' should be parsed as a an Assignment with operator Delete"
           case operator of
             (Delete _) -> true
@@ -248,7 +248,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep{operator, right}))) -> do
-        logShow a
+        -- logShow a
         assert "'MyProp > 10' should be parsed as a a GreaterThen with left operand the number 10"
           case operator of
             (GreaterThan _) -> true
@@ -264,7 +264,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PBool "false"))) -> do
-        logShow a
+        -- logShow a
         assert "bla" true
       otherwise -> assert "'false' should be parsed as a (Value _ PBoolean \"false\")" false
 
@@ -273,7 +273,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PString "aap"))) -> do
-        logShow a
+        -- logShow a
         assert "bla" true
       otherwise -> assert "'\"aap\"' should be parsed as a (Value _ PBoolean \"aap\")" false
 
@@ -283,7 +283,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PDate _))) -> do
-        logShow a
+        -- logShow a
         assert "bla" true
       otherwise -> assert "\"1995-12-17T03:24:00\" should be parsed as a (Date _ PDate ...)" false
 
@@ -292,7 +292,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Simple (Value _ PDate _))) -> do
-        logShow a
+        -- logShow a
         assert "bla" true
       otherwise -> assert "'1995-12-17' should be parsed as a (Date _ PDate ...)" false
 
@@ -301,7 +301,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep{operator, right}))) -> do
-        logShow a
+        -- logShow a
         assert "'MyProp > 10' should be parsed as a a GreaterThan with right operand the DateTime '1995-12-17'"
           case operator of
             (GreaterThan _) -> true
@@ -317,7 +317,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'sum' should be parsed as a the simple step SequenceFunction" case id of
           (Simple (SequenceFunction (ArcPosition{column: 1, line: 1}) "sum")) -> true
           otherwise -> false
@@ -327,7 +327,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'>>=' should be parsed as a the operator Sequence" case id of
           (Sequence (ArcPosition{column: 1, line: 1})) -> true
           otherwise -> false
@@ -337,14 +337,24 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Binary (BinaryStep {operator}))) -> do
-        logShow a
+        -- logShow a
         assert "'MyProp >>= sum' should be parsed as a a BinaryStep with operator equal to 'Sequence'"
           case operator of
             Sequence _ -> true
             otherwise -> false
       otherwise -> do
-        logShow otherwise
+        -- logShow otherwise
         assert "'MyProp >>= sum' should be parsed as a a SequenceFunction" false
+
+  test "sequenceStep with non-existing sequenceFunction" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser " this >>= fantasy" step
+    case r of
+      (Left (ParseError m _)) -> do
+        -- logShow m
+        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or coun'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count")
+      (Right id) -> do
+        -- logShow id
+        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or coun'" false
 
   test "sequenceStep with complex left side" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum" step
@@ -362,7 +372,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
               otherwise -> assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
           otherwise -> assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
       x -> do
-        logShow x
+        -- logShow x
         assert "'MyRole >> binding >> MyProp >>= sum' should be parsed as a a Sequence" false
 
   test "sequenceStep with complex left side" do

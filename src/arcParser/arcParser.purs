@@ -125,7 +125,7 @@ roleE = try $ withEntireBlock
 
     rolePart :: IP RolePart
     rolePart = do
-      typeOfPart <- lookAhead ((reserved' "property" <|> reserved' "perspective" <|> reserved' "view" <|> reserved' "aspect") <?> "property, perspectives, aspect or view")
+      typeOfPart <- lookAhead (reserved' "property" <|> reserved' "perspective" <|> reserved' "view" <|> reserved' "aspect")
       case typeOfPart of
         "property" -> propertyE
         "perspective" -> perspectiveE
@@ -207,13 +207,17 @@ propertyE = try do
   pos <- getPosition
   uname <- reserved "property" *> colon *> arcIdentifier
   _ <- lookAhead (token.reservedOp "=" <|> (token.reservedOp "(")) <?> "property attributes in parentheses, or '=' followed by a calculation."
-  (calculatedProperty pos uname) <|> (enumeratedProperty pos uname)
+  isCalculated <- optionMaybe (token.reservedOp "=")
+  case isCalculated of
+    Nothing -> enumeratedProperty pos uname
+    otherwise -> calculatedProperty pos uname
+  -- (calculatedProperty pos uname) <|> (enumeratedProperty pos uname)
 
   where
 
     calculatedProperty :: ArcPosition -> String -> IP RolePart
     calculatedProperty pos uname = try do
-      token.reservedOp "="
+      -- token.reservedOp "="
       calc <- step
       pure $ PE $ PropertyE
         { id: uname
