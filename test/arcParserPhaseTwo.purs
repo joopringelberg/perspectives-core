@@ -256,6 +256,33 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                 Nothing -> false
                 (Just (EnumeratedProperty {range})) -> range == PString
 
+  test "A role with a Number property withOUT attributes" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  thing: MyRoleInContext\n    property: MyProp" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            assert "The DomeinFile should have the property 'MyProp'" (isJust (lookup "model:MyTestDomain$MyRoleInContext$MyProp" dr'.enumeratedProperties))
+            assert "MyRoleInContext should have the property MyProp"
+              case (lookup "model:MyTestDomain$MyRoleInContext" dr'.enumeratedRoles) of
+                Nothing -> false
+                (Just (EnumeratedRole {properties})) -> case (head properties) of
+                  Nothing -> false
+                  (Just (ENP (EnumeratedPropertyType v))) -> v == "model:MyTestDomain$MyRoleInContext$MyProp"
+                  otherwise -> false
+            assert "The property 'MyProp' should have attribute 'Functional' False and 'Mandatory' False."
+              case lookup "model:MyTestDomain$MyRoleInContext$MyProp" dr'.enumeratedProperties of
+                Nothing -> false
+                (Just (EnumeratedProperty {functional, mandatory})) -> functional == true && mandatory == false
+            assert "The property 'MyProp' should have 'PString' as 'range'."
+              case lookup "model:MyTestDomain$MyRoleInContext$MyProp" dr'.enumeratedProperties of
+                Nothing -> false
+                (Just (EnumeratedProperty {range})) -> range == PString
+
   test "A role with a CalculatedProperty" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    Property : StringProperty : MyProp\n      Calculation : Prop1 + Prop2" domain
     case r of

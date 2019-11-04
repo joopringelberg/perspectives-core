@@ -61,7 +61,7 @@ defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
   , role: EnumeratedRoleType role
   , range: range
   , functional: true
-  , mandatory: true
+  , mandatory: false
   , pos: pos}
 
 derive instance genericRepEnumeratedProperty :: Generic EnumeratedProperty _

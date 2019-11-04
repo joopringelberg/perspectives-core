@@ -206,7 +206,7 @@ propertyE :: IP RolePart
 propertyE = try do
   pos <- getPosition
   uname <- reserved "property" *> colon *> arcIdentifier
-  _ <- lookAhead (token.reservedOp "=" <|> (token.reservedOp "(")) <?> "property attributes in parentheses, or '=' followed by a calculation."
+  -- _ <- lookAhead (token.reservedOp "=" <|> (token.reservedOp "(")) <?> "property attributes in parentheses, or '=' followed by a calculation."
   isCalculated <- optionMaybe (token.reservedOp "=")
   case isCalculated of
     Nothing -> enumeratedProperty pos uname
@@ -227,7 +227,7 @@ propertyE = try do
 
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
     enumeratedProperty pos uname = try do
-      attributes <- propertyAttributes
+      attributes <- option (Tuple PString Nil) propertyAttributes
       pure $ PE $ PropertyE
         { id: uname
         , range: Just $ fst attributes
