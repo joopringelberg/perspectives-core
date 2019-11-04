@@ -53,7 +53,7 @@ evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
 evalPhaseTwo = unwrap <<< evalPhaseTwo'
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -162,6 +162,22 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               case (lookup "model:MyTestDomain$MyRoleInContext" dr'.enumeratedRoles) of
                 Nothing -> false
                 (Just (EnumeratedRole {functional, mandatory})) -> functional == false && mandatory == true
+
+  test "A role withOUT attributes" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  thing: MyRole\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            assert "The DomeinFile should have the role 'model:Test$MyRole' with\
+            \ attribute 'functional' equal to true and 'mandatory' false"
+              case (lookup "model:Test$MyRole" dr'.enumeratedRoles) of
+                Nothing -> false
+                (Just (EnumeratedRole {functional, mandatory})) -> functional == true && mandatory == false
 
   test "A role with binding" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    FilledBy : model:MyTestDomain$MyOtherRole" domain

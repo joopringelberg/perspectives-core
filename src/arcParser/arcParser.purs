@@ -167,7 +167,7 @@ roleE = try $ withEntireBlock
       pure {uname, knd, pos, parts: Cons (Computation functionName computedType) Nil }
 
     roleAttributes :: IP (List RolePart)
-    roleAttributes = token.parens do
+    roleAttributes = option Nil $ token.parens do
       ma <- mandatory
       fu <- token.comma *> functional
       pure (Cons ma (Cons fu Nil))

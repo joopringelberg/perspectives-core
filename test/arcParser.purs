@@ -90,6 +90,14 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
         assert "The Role should have the id 'MyRole'" (id == "MyRole")
       otherwise -> assert "Parsed an unexpected type" false
 
+  test "Role withOUT attributes" do
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing : MyRole\n" roleE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(RE (RoleE{id}))) -> do
+        assert "The Role should have the id 'MyRole'" (id == "MyRole")
+      otherwise -> assert "Parsed an unexpected type" false
+
   test "Domain with a role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole (not mandatory, not functional)" domain
     case r of
