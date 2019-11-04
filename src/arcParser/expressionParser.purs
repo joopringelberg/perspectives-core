@@ -25,6 +25,7 @@ import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Array (many)
 import Data.DateTime (DateTime)
+import Data.Either (Either(..))
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
 import Data.String (length)
@@ -37,15 +38,33 @@ import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (between, try, (<?>))
+import Text.Parsing.Parser.Combinators (between, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
 import Text.Parsing.Parser.Token (alphaNum)
 
 step :: IP Step
-step = step_ <|> token.parens step_
-  where
-    step_ :: IP Step
-    step_ = try (defer \_-> compoundStep <|> defer \_ -> unaryStep <|> simpleStep)
+step = do
+  start <- getPosition
+  left <- token.parens step <|> leftSide
+  mop <- optionMaybe (try operator)
+  case mop of
+    Nothing -> pure left
+    (Just op) -> do
+      right <- step
+      end <- getPosition
+      case right of
+        (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight})) -> if (operatorPrecedence op) > (operatorPrecedence opOfRight)
+          then pure $ Binary $ BinaryStep
+            { start
+            , end -- equals endOfRight.
+            , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight})
+            , operator: opOfRight
+            , right: rightOfRight
+          }
+          else pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
+        otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
+leftSide :: IP Step
+leftSide = defer \_ -> reserved "filter" *> step <|> defer \_ -> unaryStep <|> simpleStep
 
 simpleStep :: IP Step
 simpleStep = try
@@ -97,40 +116,10 @@ unaryStep = try
   <|>
   Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr> or exists <step>."
 
-compoundStep :: IP Step
-compoundStep = try (defer \_->binaryStep) <|> (defer \_->filterStep)
-
-filterStep :: IP Step
-filterStep = try do
-  start <- getPosition
-  reserved "filter"
-  source <- step
-  reserved "with"
-  criterium <- step
-  end <- getPosition
-  pure $ Binary $ BinaryStep {start, end, operator: Filter start, left: source, right: criterium}
-
-binaryStep :: IP Step
-binaryStep = try do
-  start <- getPosition
-  left <- simpleStep <|> token.parens step
-  op <- operator
-  right <- step
-  end <- getPosition
-  case right of
-    (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight})) -> if (operatorPrecedence op) > (operatorPrecedence opOfRight)
-      then pure $ Binary $ BinaryStep
-        { start
-        , end -- equals endOfRight.
-        , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight})
-        , operator: opOfRight
-        , right: rightOfRight
-      }
-      else pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
-    otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
-
 operator :: IP Operator
 operator =
+  (Filter <$> (getPosition <* reserved "with"))
+  <|>
   (Sequence <$> (getPosition <* token.reservedOp ">>="))
   <|>
   ((Compose <$> (getPosition <* token.reservedOp ">>"))
