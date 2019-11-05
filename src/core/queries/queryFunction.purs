@@ -31,6 +31,7 @@ import Prelude (class Eq, class Show)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 type FunctionName = String
+type VariableName = String
 
 data QueryFunction
   = DataTypeGetter FunctionName
@@ -40,6 +41,7 @@ data QueryFunction
   -- 'Computed' is not 'calculated': call a Purescript function here.
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
+  | VariableLookup VariableName
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)

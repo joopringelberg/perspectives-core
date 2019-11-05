@@ -28,16 +28,17 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (assignment, step)
+import Perspectives.Parsing.Arc.Expression (assignment, letStep_, step)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, getPosition, withEntireBlock, nextLine)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, entireBlock, getPosition, nextLine, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=), (<$>), (<*>))
+import Text.Parsing.Indent (indented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -291,9 +292,7 @@ perspectiveE = try do
       (object :: PerspectivePart) <- reserved "perspective" *> reserved "on" *> colon *> arcIdentifier <|> reserved' "External" >>= pure <<< Object
       (mdefaultView :: Maybe PerspectivePart) <- optionMaybe (token.parens $ arcIdentifier >>= pure <<< DefaultView)
       pos <- getPosition
-      (actions :: List PerspectivePart) <- option
-        (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : Nil))
-        (colon *> token.commaSep minimalAction')
+      (actions :: List PerspectivePart) <- option Nil (colon *> token.commaSep minimalAction')
       case mdefaultView of
         Nothing -> pure $ Cons object actions
         (Just defaultView) -> pure $ Cons defaultView (Cons object actions)
@@ -301,8 +300,8 @@ perspectiveE = try do
     minimalAction' :: IP PerspectivePart
     minimalAction' = mkActionFromVerb <$> getPosition <*> token.identifier
 
-    mkActionFromVerb :: ArcPosition -> String -> PerspectivePart
-    mkActionFromVerb pos v = Act $ ActionE {id: "", verb: constructVerb v, actionParts: Nil, pos}
+mkActionFromVerb :: ArcPosition -> String -> PerspectivePart
+mkActionFromVerb pos v = Act $ ActionE {id: "", verb: constructVerb v, actionParts: Nil, pos}
 
 constructVerb :: String -> Verb
 constructVerb v = case v of
@@ -361,21 +360,39 @@ actionE = try $ withEntireBlock
       expr <- reserved "if" *> step
       pure $ Cons (Condition expr) Nil
 
+ruleE :: IP PerspectivePart
+ruleE = withPos do
+  lhs <- ruleE_
+  (ruleWithLet lhs <|> ruleWithAssignments lhs)
+  -- TODO. IK SNAP niet waarom dit faalt. De positie in het resultaat van de LetStep (bijvoorbeeld) is rechts
+  -- van die van de if. Waarom dan niet indented?
+  -- indented *> (ruleWithLet lhs <|> ruleWithAssignments lhs)
+
+ruleE_ :: IP {pos :: ArcPosition, condition :: Step}
+ruleE_ = do
+  pos <- getPosition
+  cond <- reserved "if" *> step <* reserved "then"
+  pure {pos: pos, condition: cond}
+
 -- | A rule is a special format for a Bot action:
 -- |   if Wens >> Bedrag > 10 then
 -- |     SomeProp = false
 -- |     SomeOtherProp =+ "aap"
-ruleE :: IP PerspectivePart
-ruleE = try $ withEntireBlock
-  (\{pos, condition} assignments -> Act $ ActionE {id: "", verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos})
-  ruleE_
-  assignment
-  where
-    ruleE_ :: IP {pos :: ArcPosition, condition :: Step}
-    ruleE_ = do
-      pos <- getPosition
-      cond <- reserved "if" *> step <* reserved "then"
-      pure {pos: pos, condition: cond}
+ruleWithAssignments :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
+ruleWithAssignments {pos, condition} = try do
+  assignments <- entireBlock assignment
+  pure $ Act $ ActionE {id: "", verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos}
+
+-- | A rule may also have a let* expression for its right hand side:
+-- |  if Wens >> Bedrag > 10 then
+-- |    let*
+-- |      a <- <expression>
+-- |    in
+-- |      SomeProp = a
+ruleWithLet :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
+ruleWithLet {pos, condition}= try do
+  lt <- letStep_
+  pure $ Act $ ActionE {id: "", verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

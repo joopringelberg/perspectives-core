@@ -27,7 +27,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment, Step)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
@@ -80,7 +80,7 @@ newtype ActionE = ActionE
   , pos :: ArcPosition
   }
 
-data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String | Condition Step | AssignmentPart Assignment
+data ActionPart = IndirectObject String | SubjectView String | ObjectView String | IndirectObjectView String | Condition Step | AssignmentPart Assignment | LetPart LetStep
 
 data RuleE = RuleE Step Assignment
 

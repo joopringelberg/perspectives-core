@@ -75,6 +75,7 @@ data PerspectivesError
     | WrongTypeForOperator ArcPosition (Array EP.Range)
     | MissingValueForAssignment ArcPosition ArcPosition
     | ArgumentMustBeSequenceFunction ArcPosition
+    | UnknownVariable ArcPosition String
 
     | Custom String
 
@@ -108,6 +109,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (WrongTypeForOperator pos allowedOps) = "(WrongTypeForOperator) This operator requires its arguments to be (one of): " <> show allowedOps
   show (MissingValueForAssignment start end) = "(MissingValueForAssignment) This assignment statement needs a value expression on the right: from " <> show start <> " to " <> show end
   show (ArgumentMustBeSequenceFunction pos) = "(ArgumentMustBeSequenceFunction) The right operand of '>>=' must be a monoidal function such as sum, product, minimum, or maximum, at: " <> show pos
+  show (UnknownVariable pos varName) = "(UnknownVariable) The variable '" <> varName <> "' is not known at position: " <> show pos
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

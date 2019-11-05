@@ -7,7 +7,7 @@ import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
 import Perspectives.Parsing.Arc.Expression (assignment, operator, simpleStep, step, unaryStep)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -351,10 +351,16 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left (ParseError m _)) -> do
         -- logShow m
-        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or coun'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count")
+        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number,\
+         \boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product,\
+          \minimum, maximum) or count'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a\
+           \number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum,\
+            \product, minimum, maximum) or count")
       (Right id) -> do
         -- logShow id
-        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or coun'" false
+        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number,\
+         \boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product,\
+          \minimum, maximum) or coun'" false
 
   test "sequenceStep with complex left side" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum" step
@@ -386,4 +392,16 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
             otherwise -> false
       x -> do
         -- logShow x
-        assert "'MyRole >> binding >> MyProp >>= sum + 1' should be parsed as a BinaryStep with operator equal to add" false
+        assert "'MyRole >> binding >> MyProp >>= sum + 1' should be parsed \
+        \as a BinaryStep with operator equal to add" false
+
+  test "LetStep" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "let*\n  a <- MyProp\nin\n  AnotherProp = a" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Let (LetStep {bindings}))) -> do
+        logShow a
+        assert "bla bla" true
+      x -> do
+        logShow x
+        assert "'let*\n  a <- MyProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false

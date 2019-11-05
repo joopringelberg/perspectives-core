@@ -21,19 +21,19 @@
 
 module Perspectives.Parsing.Arc.Expression where
 
-import Control.Alt ((<|>))
+import Control.Alt (map, (<|>))
 import Control.Lazy (defer)
 import Data.Array (many)
 import Data.DateTime (DateTime)
-import Data.Either (Either(..))
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
 import Data.String (length)
 import Data.String.CodeUnits as SCU
+import Data.Tuple (Tuple(..))
 import Effect.Unsafe (unsafePerformEffect)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, reserved)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..), Binding)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, entireBlock, getPosition, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
@@ -66,7 +66,7 @@ step = do
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
   where
     leftSide :: IP Step
-    leftSide = defer \_ -> reserved "filter" *> step <|> defer \_ -> unaryStep <|> simpleStep
+    leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> defer \_ -> unaryStep <|> simpleStep
 
     -- pos :: IP Position
     -- pos = getPosition >>= \(ArcPosition{line, column}) -> pure $  Position {line, column}
@@ -99,6 +99,8 @@ simpleStep = try
   Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
   <|>
   Simple <$> (Identity <$> getPosition <* reserved "this")
+  <|>
+  Simple <$> (Variable <$> getPosition <*> lowerCaseName)
   ) <?> "binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count"
 
 sequenceFunction :: IP String
@@ -176,6 +178,7 @@ startOf stp = case stp of
   (Simple s) -> startOfSimple s
   (Binary (BinaryStep{start})) -> start
   (Unary us) -> startOfUnary us
+  (Let (LetStep {start})) -> start
 
   where
     startOfSimple (ArcIdentifier p _) = p
@@ -188,6 +191,7 @@ startOf stp = case stp of
     startOfSimple (CreateEnumeratedRole p _) = p
     startOfSimple (SequenceFunction p _) = p
     startOfSimple (Identity p) = p
+    startOfSimple (Variable p _) = p
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
@@ -197,6 +201,7 @@ endOf stp = case stp of
   (Simple s) -> endOfSimple s
   (Binary (BinaryStep{end})) -> end
   (Unary us) -> endOfUnary us
+  (Let (LetStep {end})) -> end
 
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
@@ -209,6 +214,7 @@ endOf stp = case stp of
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length fname}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
+    endOfSimple (Variable (ArcPosition{line, column}) v) = ArcPosition{line, column: column + length v}
 
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
@@ -257,3 +263,19 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
 
     dateChar :: IP Char
     dateChar = alphaNum <|> char ':' <|> char '+' <|> char '-' <|> char ' ' <|> char '.'
+
+letStep :: IP Step
+letStep = map Let (defer \_ -> letStep_)
+
+letStep_ :: IP LetStep
+letStep_ = do
+  start <- getPosition
+  bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
+  assignments <- withEntireBlock (\_ bs -> bs) (reserved "in") assignment
+  end <- getPosition
+  pure $ LetStep {start, end, bindings, assignments}
+
+  where
+
+    binding :: IP Binding
+    binding = Tuple <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step

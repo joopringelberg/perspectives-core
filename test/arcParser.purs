@@ -574,10 +574,22 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
               (Condition _) -> true
               otherwise -> false) actionParts))
             otherwise -> false) perspectiveParts)))
-        (assert "The action with Verb 'Change' should have an Assignment"
+      otherwise -> assert "Parsed an unexpected type" false
+
+  test "Perspective with a rule with a let* on the rhs." do
+    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject\n  if Prop1 > 10 then\n    let*\n      a <- 20\n    in\n      AnotherProp = a\n" perspectiveE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
+        -- logShow pre
+        (assert "The Perspective should have an action with Verb 'Change'"
           (isJust (findIndex (case _ of
-            (Act (ActionE {verb, actionParts})) -> verb == Change && (2 == length (filter (case _ of
-              (AssignmentPart _) -> true
+            (Act (ActionE {verb: v})) -> v == Change
+            otherwise -> false) perspectiveParts)))
+        (assert "The action with Verb 'Change' should have a Condition"
+          (isJust (findIndex (case _ of
+            (Act (ActionE {verb, actionParts})) -> verb == Change && (isJust (findIndex (case _ of
+              (Condition _) -> true
               otherwise -> false) actionParts))
             otherwise -> false) perspectiveParts)))
       otherwise -> assert "Parsed an unexpected type" false

@@ -32,14 +32,15 @@ import Control.Monad.State (gets)
 import Data.Array (elemIndex, head, length)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
+import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, getVariableBindings, lift2)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
@@ -55,6 +56,7 @@ compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
 compileStep currentDomain (Binary st) = compileBinaryStep currentDomain st
+compileStep currentDomain (Let st) = compileLetStep currentDomain st
 
 compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
@@ -161,6 +163,12 @@ compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (DataTyp
 -- We compile the SequenceFunction as a UnaryCombinator, which is a stretch.
 compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (UnaryCombinator fname) currentDomain
 
+compileSimpleStep currentDomain (Variable pos varName) = do
+  bindings <- getVariableBindings
+  case lookup varName bindings of
+    Nothing -> throwError $ UnknownVariable pos varName
+    (Just fdesc) -> pure $ SQD currentDomain (VariableLookup varName) (range fdesc)
+
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
   -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool) range value.
@@ -241,6 +249,9 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       where
         allowed :: Range -> Boolean
         allowed r = isJust $ elemIndex r allowedRangeConstructors
+
+compileLetStep :: Domain -> LetStep -> FD
+compileLetStep currentDomain st = throwError $ Custom "Implement compileLetStep"
 
 type FD = PhaseThree QueryFunctionDescription
 

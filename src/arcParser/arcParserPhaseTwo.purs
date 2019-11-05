@@ -29,7 +29,7 @@ import Data.Foldable (foldl)
 import Data.Identity (Identity)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
-import Data.List (List(..), filter, findIndex, foldM, head)
+import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
@@ -41,6 +41,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -53,7 +54,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCa
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
-import Perspectives.Representation.Class.Role (Role(..), kindOfRole)
+import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..), defaultContext)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), Range(..), defaultEnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
@@ -61,14 +62,14 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<))
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<), (&&), not)
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
 -- However, we don't know when traversing the Arc AST.
 -- (2) We need a way to indicate PRODUCT types for bindings.
 
-type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String}
+type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String, variableBindings :: Object QueryFunctionDescription}
 
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
 -- | and allows exceptions.
@@ -80,14 +81,14 @@ runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError 
 runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord
 
 runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty}
+runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty, variableBindings: empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
 evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord
 
 evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> m (Either PerspectivesError a)
-evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty}
+evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, variableBindings: empty}
 
 type PhaseTwo a = PhaseTwo' a Identity
 
@@ -112,6 +113,9 @@ modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 
 getDF :: PhaseTwo DomeinFileRecord
 getDF = lift $ gets _.dfr
+
+getVariableBindings :: forall m. Monad m => PhaseTwo' (Object QueryFunctionDescription) m
+getVariableBindings = lift $ gets _.variableBindings
 
 -- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
 withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a
@@ -264,6 +268,7 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
         roleName <- pure (ns <> "$" <> id)
         pure (defaultEnumeratedRole roleName id kindOfRole ns pos)
   role' <- foldM (unsafePartial $ handleParts (unwrap roleName)) role roleParts
+  -- Now we've handled traverseActionE (where we set executedByBot), we can restore the 'bot' member of state.
   subjectIsNotABot
   modifyDF (\domeinFile -> addRoleToDomeinFile (E role') domeinFile)
   pure (E role')
@@ -483,10 +488,16 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
       (DefaultView _) -> true
       otherwise -> false) perspectiveParts)
 
-  -- Now construct all Actions.
-  actions <- foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) [] (filter (case _ of
-      (Act _) -> true
-      otherwise -> false) perspectiveParts)
+  -- Now construct all Actions. If there are no Actions and this is not a bot, fill in the defaults for Users.
+  actions <- do
+    (acts :: List PerspectivePart) <- pure $ (filter (case _ of
+        (Act _) -> true
+        otherwise -> false) perspectiveParts)
+    isabot <- isSubjectBot
+    if null acts && not isabot
+      then foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) []
+        (map (mkActionFromVerb pos) ("Consult" : "Change" : "Delete" : "Create" : Nil))
+      else foldM (unsafePartial $ traverseActionE object defaultObjectView rolename) [] acts
 
   pure (Tuple object actions)
 
