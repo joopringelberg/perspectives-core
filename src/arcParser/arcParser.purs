@@ -28,17 +28,17 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..), fst, snd)
 import Perspectives.Identifiers (isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
-import Perspectives.Parsing.Arc.Expression (assignment, letStep_, step)
-import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Expression (assignment, letStep, startOf, step)
+import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, reserved, colon, lowerCaseName)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, entireBlock, getPosition, nextLine, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, arcPosition2Position, entireBlock, getPosition, nextLine, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=), (<$>), (<*>))
-import Text.Parsing.Indent (indented, withPos)
+import Text.Parsing.Indent (withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
 import Unsafe.Coerce (unsafeCoerce)
@@ -390,9 +390,12 @@ ruleWithAssignments {pos, condition} = try do
 -- |    in
 -- |      SomeProp = a
 ruleWithLet :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
-ruleWithLet {pos, condition}= try do
-  lt <- letStep_
-  pure $ Act $ ActionE {id: "", verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
+ruleWithLet {pos, condition} = try do
+  ltst <- letStep
+  case ltst of
+    (Let lt) -> pure $ Act $ ActionE {id: "", verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
+    (PureLet (PureLetStep{body})) -> failWithPosition "assignment expression" (arcPosition2Position (startOf body))
+    otherwise -> fail "let* expression"
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

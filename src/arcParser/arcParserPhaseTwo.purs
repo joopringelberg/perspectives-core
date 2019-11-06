@@ -117,6 +117,12 @@ getDF = lift $ gets _.dfr
 getVariableBindings :: forall m. Monad m => PhaseTwo' (Object QueryFunctionDescription) m
 getVariableBindings = lift $ gets _.variableBindings
 
+addBinding :: forall m. Monad m => String -> QueryFunctionDescription -> PhaseTwo' Unit m
+addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = insert varName qfd variableBindings}
+
+clearVariableBindings :: forall m. Monad m => PhaseTwo' Unit m
+clearVariableBindings = void $ modify \s -> s {variableBindings = (empty :: Object QueryFunctionDescription)}
+
 -- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
 withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a
 withNamespaces pairs pt = do
@@ -505,7 +511,7 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
 -- | from the ActionE. Returns the fully qualified name of the Action in the ActionType.
 -- | Adds each Action to the DomeinFileRecord.
 traverseActionE :: Partial =>                     -- The function is partial because we just handle ActionE.
-  String ->                                       -- The qualified identifier of the Object.
+  String ->                                       -- The unqualified identifier of the Object.
   Maybe ViewType ->                               -- The unqualified identifier of the Default View on the Object.
   Namespace ->                                    -- The namespace, i.e. the qualified identifier of the Role.
   (Array ActionType) ->                           -- Accumulator: an array of Actions.
@@ -562,3 +568,6 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
     handleParts _ (Action ar@{effect}) (AssignmentPart a) = case effect of
       Nothing -> pure $ Action (ar {effect = Just $ A [a]})
       Just (A as) -> pure $ Action (ar {effect = Just $ A (cons a as)})
+
+    -- LETPART
+    handleParts _ (Action ar) (LetPart lstep) = pure $ Action (ar {effect = Just $ L lstep})

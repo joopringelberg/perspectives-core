@@ -56,9 +56,10 @@ lookForRoleType s = disjunction
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s = disjunction
+lookForUnqualifiedRoleType s = conjunction
   (lookForRoleInContext (roletype2string >>> areLastSegmentsOf s))
-  (lookForContextRole (roletype2string >>> areLastSegmentsOf s))
+  (conjunction (lookForContextRole (roletype2string >>> areLastSegmentsOf s))
+    (lookForUserRole (roletype2string >>> areLastSegmentsOf s)))
 
 -- TODO. sluit Aspecten in via ADT. Kunnen we Context een ADT geven?
 lookForRoleInContext :: (RoleType -> Boolean) -> ContextType ~~~> RoleType

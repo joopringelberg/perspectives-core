@@ -21,18 +21,20 @@
 
 module Perspectives.Representation.Assignment where
 
-import Data.Array.Partial (head, tail)
 import Data.Array (cons)
+import Data.Array.Partial (head, tail)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.List (List)
 import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign, F)
+import Foreign.Object (Object)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
-import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON)
 import Prelude (class Eq, class Show, pure, ($), (<>), show, (<$>), (<*>))
+import Simple.JSON (class ReadForeign, class WriteForeign, readJSON, readJSON', writeJSON)
 
 type FunctionName = String
 
@@ -48,6 +50,8 @@ data AssignmentStatement
   | DeleteProperty EnumeratedPropertyType
   -- TODO: full delete.
 
+newtype LetWithAssignment = LetWithAssignment {variableBindings :: Object QueryFunctionDescription, assignments:: List AssignmentStatement}
+
 derive instance genericRepAssignmentStatement :: Generic AssignmentStatement _
 
 instance showAssignmentStatement :: Show AssignmentStatement where
@@ -57,6 +61,16 @@ instance eqAssignmentStatement :: Eq AssignmentStatement where
   eq x = genericEq x
 
 type ConstructorRep = {tag :: String, dat :: Array String}
+
+instance writeForeignLetWithAssignment :: WriteForeign LetWithAssignment where
+  writeImpl q = unsafeToForeign (writeJSON q)
+instance readForeignLetWithAssignment :: ReadForeign LetWithAssignment where
+  readImpl q = readJSON' (unsafeFromForeign q)
+derive instance genericRepLetWithAssignment :: Generic LetWithAssignment _
+instance showLetWithAssignment :: Show LetWithAssignment where
+  show x = genericShow x
+instance eqLetWithAssignment :: Eq LetWithAssignment where
+  eq x = genericEq x
 
 instance writeForeignAssignmentStatement :: WriteForeign AssignmentStatement where
   writeImpl (SetRol r v) = unsafeToForeign $ writeJSON {tag: "SetRol", dat: [writeJSON r, writeJSON v]}

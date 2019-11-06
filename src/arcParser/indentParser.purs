@@ -34,6 +34,7 @@ import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, ($
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
+import Text.Parsing.Parser.Pos (Position(..))
 import Text.Parsing.Parser.String (eof)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -79,6 +80,9 @@ newtype ArcPosition = ArcPosition
   { line :: Int
   , column :: Int
   }
+
+arcPosition2Position :: ArcPosition -> Position
+arcPosition2Position = unsafeCoerce
 
 -- | `withBlock f a p` parses `a`
 -- | followed by an indented block of `p`, where the entire block must have been consumed,

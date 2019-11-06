@@ -30,17 +30,19 @@ module Perspectives.Query.DescriptionCompiler where
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, head, length)
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
+import Data.Tuple (Tuple(..))
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, getVariableBindings, lift2)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, clearVariableBindings, getVariableBindings, lift2)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
@@ -50,13 +52,14 @@ import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, eq, flip, map, pure, ($), (==), (&&))
+import Prelude (bind, eq, flip, map, pure, ($), (==), (&&), discard)
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
 compileStep currentDomain (Binary st) = compileBinaryStep currentDomain st
-compileStep currentDomain (Let st) = compileLetStep currentDomain st
+compileStep currentDomain (PureLet st) = compileLetStep currentDomain st
+compileStep currentDomain (Let st) = throwError $ NotAPureLet st
 
 compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
@@ -250,8 +253,15 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         allowed :: Range -> Boolean
         allowed r = isJust $ elemIndex r allowedRangeConstructors
 
-compileLetStep :: Domain -> LetStep -> FD
-compileLetStep currentDomain st = throwError $ Custom "Implement compileLetStep"
+compileLetStep :: Domain -> PureLetStep -> FD
+compileLetStep currentDomain (PureLetStep{bindings, body}) = do
+  for_ bindings
+    \(Tuple varName step) -> do
+      qfd <- compileStep currentDomain step
+      addBinding varName qfd
+  r <- compileStep currentDomain body
+  void <- clearVariableBindings
+  pure r
 
 type FD = PhaseThree QueryFunctionDescription
 

@@ -33,6 +33,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, head, length)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
+import Data.List (List)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -44,15 +45,15 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_')
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, getVariableBindings, lift2, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (compileStep)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Assignment (AssignmentStatement(..))
+import Perspectives.Representation.Assignment (AssignmentStatement(..), LetWithAssignment(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
@@ -349,27 +350,47 @@ compileRules = do
         -- a PropertyRule - but not when it fails because an unqualified name can
         -- be qualified in more than one way.
         compileRule :: String -> Action -> PhaseThree Action
-        compileRule actionName a@(Action ar@{subject, effect, object}) = case effect of
-          (Just (A assignments)) -> do
-            (aStatements :: Array AssignmentStatement) <- traverse
-              (\ass -> catchJust
-                (\e -> case e of
-                  UnknownRole _ _ -> Just ass
-                  -- Let the NotUniquelyIdentifying error fall through.
-                  otherwise -> Nothing)
-                (compileRoleRule ass)
-                (compilePropertyRule object))
-              assignments
-            pure $ Action ar {effect = Just $ AS aStatements}
-          otherwise -> pure a
+        compileRule actionName a@(Action ar@{subject, effect, object}) = do
+          ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
+          case effect of
+            (Just (A assignments)) -> do
+              (aStatements :: Array AssignmentStatement) <- traverse
+                (\ass -> catchJust
+                  (\e -> case e of
+                    UnknownRole _ _ -> Just ass
+                    -- Let the NotUniquelyIdentifying error fall through.
+                    otherwise -> Nothing)
+                  (compileRoleRule ctxt ass)
+                  (compilePropertyRule object))
+                assignments
+              pure $ Action ar {effect = Just $ AS aStatements}
+              -- Compile the LetStep into a LetWithAssignment
+            (Just (L (LetStep {bindings, assignments}))) -> do
+              -- Store a QueryFunctionDescription for each named variable in state:
+              for_ bindings
+                \(Tuple varName step) -> do
+                  qfd <- compileStep (CDOM $ ST ctxt) step
+                  addBinding varName qfd
+              -- Now compile all assignments.
+              (aStatements :: List AssignmentStatement) <- traverse
+                (\ass -> catchJust
+                  (\e -> case e of
+                    UnknownRole _ _ -> Just ass
+                    -- Let the NotUniquelyIdentifying error fall through.
+                    otherwise -> Nothing)
+                  (compileRoleRule ctxt ass)
+                  (compilePropertyRule object))
+                assignments
+              bindings' <- getVariableBindings
+              pure $ Action ar {effect = Just $ LS $ LetWithAssignment{variableBindings: bindings', assignments: aStatements}}
+            otherwise -> pure a
 
           where
             -- Assignment on an EnumeratedRole.
-            compileRoleRule :: Assignment -> PhaseThree AssignmentStatement
-            compileRoleRule (Assignment{lhs, operator, value, start, end}) = do
+            compileRoleRule :: ContextType -> Assignment -> PhaseThree AssignmentStatement
+            compileRoleRule ctxt (Assignment{lhs, operator, value, start, end}) = do
               -- TODO: limit this to roles of the Context of the Action?
               (er :: EnumeratedRoleType) <- qualifyRoleType start lhs enumeratedRoles
-              ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
               (mdescr :: Maybe QueryFunctionDescription) <- traverse (compileStep (CDOM $ ST ctxt)) value
               case mdescr of
                 Nothing -> case operator of

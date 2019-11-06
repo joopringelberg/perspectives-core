@@ -31,7 +31,7 @@ import Data.List.Lazy.NonEmpty (singleton)
 import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Parsing.Arc.Expression.AST (Step)
+import Perspectives.Parsing.Arc.Expression.AST (LetStep(..), PureLetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
@@ -76,6 +76,8 @@ data PerspectivesError
     | MissingValueForAssignment ArcPosition ArcPosition
     | ArgumentMustBeSequenceFunction ArcPosition
     | UnknownVariable ArcPosition String
+    | NotALetWithAssignment PureLetStep
+    | NotAPureLet LetStep
 
     | Custom String
 
@@ -110,6 +112,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (MissingValueForAssignment start end) = "(MissingValueForAssignment) This assignment statement needs a value expression on the right: from " <> show start <> " to " <> show end
   show (ArgumentMustBeSequenceFunction pos) = "(ArgumentMustBeSequenceFunction) The right operand of '>>=' must be a monoidal function such as sum, product, minimum, or maximum, at: " <> show pos
   show (UnknownVariable pos varName) = "(UnknownVariable) The variable '" <> varName <> "' is not known at position: " <> show pos
+  show (NotALetWithAssignment (PureLetStep{start, end})) = "(NotALetWithAssignment) This let*-expression does not have an assignment in its body, hence is of no use in a rule. From " <> show start <> " to " <> show end
+  show (NotAPureLet (LetStep{start, end})) = "(NotAPureLet) This let*-expression has an assignment in its body but it is used in a pure expression, so its body should be a pure expression, too. From " <> show start <> " to " <> show end
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

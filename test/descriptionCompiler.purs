@@ -25,6 +25,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Test.Perspectives.Utils (runP)
@@ -67,7 +68,7 @@ makeTestOnly :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFi
 makeTestOnly = makeTest_ testOnly
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
+theSuite = suite "Perspectives.Query.DescriptionCompiler" do
 
   makeTest "compileSimpleStep: ArcIdentifier, Role."
     "domain: Test\n  thing: Role = AnotherRole\n  thing: AnotherRole (mandatory, functional)"
@@ -396,3 +397,14 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
       otherwise -> do
         logShow otherwise
         assert "The non-existing sequence function name should have been detected." false
+
+  makeTestOnly "compileLetStep."
+    "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{enumeratedRoles}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Self" enumeratedRoles of
+        Nothing -> assert "There should be a role 'Self'" false
+        Just (EnumeratedRole{perspectives}) -> do
+          logShow perspectives
+          assert "bla" true)

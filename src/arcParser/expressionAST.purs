@@ -19,8 +19,6 @@
 
 -- END LICENSE
 
-module Perspectives.Parsing.Arc.Expression.AST where
-
 -- | An Abstract Syntax Tree data model for Perspectives expressions. The expression grammar is below.
 -- |
 -- | step = simpleStep | unaryStep | compoundStep | let*
@@ -78,6 +76,8 @@ module Perspectives.Parsing.Arc.Expression.AST where
 -- | variable = lowerCaseName
 
 
+module Perspectives.Parsing.Arc.Expression.AST where
+
 import Prelude
 
 import Data.Generic.Rep (class Generic)
@@ -92,7 +92,7 @@ import Perspectives.Representation.EnumeratedProperty (Range)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | Step represents an Expression conforming to the grammar given above.
-data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetStep
+data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetStep | PureLet PureLetStep
 
 data SimpleStep =
   ArcIdentifier ArcPosition String
@@ -114,6 +114,8 @@ data UnaryStep =
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 
 newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List Binding, assignments :: List Assignment}
+
+newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List Binding, body :: Step}
 
 type Binding = Tuple String Step
 
@@ -165,6 +167,15 @@ instance eqUnaryStep :: Eq UnaryStep where eq u1 u2 = genericEq u1 u2
 derive instance genericLetStep :: Generic LetStep _
 instance showLetStep :: Show LetStep where show = genericShow
 instance eqLetStep :: Eq LetStep where eq u1 u2 = genericEq u1 u2
+instance writeForeignLetStep :: WriteForeign LetStep where
+  writeImpl q = unsafeToForeign (writeJSON q)
+instance readForeignLetStep :: ReadForeign LetStep where
+  readImpl q = readJSON' (unsafeFromForeign q)
+
+
+derive instance genericPureLetStep :: Generic PureLetStep _
+instance showPureLetStep :: Show PureLetStep where show = genericShow
+instance eqPureLetStep :: Eq PureLetStep where eq u1 u2 = genericEq u1 u2
 
 derive instance genericOperator :: Generic Operator _
 instance showOperator :: Show Operator where show = genericShow

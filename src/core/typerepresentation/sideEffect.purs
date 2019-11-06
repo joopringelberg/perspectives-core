@@ -33,12 +33,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Kishimen (genericSumToVariant)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment)
-import Perspectives.Representation.Assignment (AssignmentStatement)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep)
+import Perspectives.Representation.Assignment (AssignmentStatement, LetWithAssignment)
 import Prelude (class Eq, class Show, (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
-data SideEffect = A (Array Assignment) | AS (Array AssignmentStatement)
+data SideEffect = A (Array Assignment) | AS (Array AssignmentStatement) | L LetStep | LS LetWithAssignment
 
 derive instance genericRepSideEffect :: Generic SideEffect _
 instance writeForeignSideEffect :: WriteForeign SideEffect where

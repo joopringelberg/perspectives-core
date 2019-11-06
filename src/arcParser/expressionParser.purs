@@ -31,7 +31,7 @@ import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Data.Tuple (Tuple(..))
 import Effect.Unsafe (unsafePerformEffect)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..), Binding)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Binding, LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, entireBlock, getPosition, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
@@ -179,6 +179,7 @@ startOf stp = case stp of
   (Binary (BinaryStep{start})) -> start
   (Unary us) -> startOfUnary us
   (Let (LetStep {start})) -> start
+  (PureLet (PureLetStep {start})) -> start
 
   where
     startOfSimple (ArcIdentifier p _) = p
@@ -202,6 +203,7 @@ endOf stp = case stp of
   (Binary (BinaryStep{end})) -> end
   (Unary us) -> endOfUnary us
   (Let (LetStep {end})) -> end
+  (PureLet (PureLetStep {end})) -> end
 
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
@@ -264,16 +266,22 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
     dateChar :: IP Char
     dateChar = alphaNum <|> char ':' <|> char '+' <|> char '-' <|> char ' ' <|> char '.'
 
-letStep :: IP Step
-letStep = map Let (defer \_ -> letStep_)
+-- letStep :: IP Step
+-- letStep = map Let (defer \_ -> letStep_)
 
-letStep_ :: IP LetStep
-letStep_ = do
+letStep :: IP Step
+letStep = do
   start <- getPosition
   bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
-  assignments <- withEntireBlock (\_ bs -> bs) (reserved "in") assignment
-  end <- getPosition
-  pure $ LetStep {start, end, bindings, assignments}
+  massignments <- optionMaybe $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
+  case massignments of
+    (Just assignments) -> do
+      end <- getPosition
+      pure $ Let $ LetStep {start, end, bindings, assignments}
+    Nothing -> do
+      body <- reserved "in" *> step
+      end <- getPosition
+      pure $ PureLet $ PureLetStep {start, end, bindings, body}
 
   where
 
