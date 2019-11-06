@@ -4,7 +4,8 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.List (length)
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff (Aff)
 import Effect.Class.Console (logShow)
@@ -21,12 +22,15 @@ import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Action (Action(..))
+import Perspectives.Representation.Assignment (LetWithAssignment(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -398,13 +402,35 @@ theSuite = suite "Perspectives.Query.DescriptionCompiler" do
         logShow otherwise
         assert "The non-existing sequence function name should have been detected." false
 
-  makeTestOnly "compileLetStep."
+  makeTest "compileLetStep."
     "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n"
     (\e -> assert (show e) false)
-    (\(correctedDFR@{enumeratedRoles}) -> do
+    (\(correctedDFR@{enumeratedRoles, actions}) -> do
       -- logShow correctedDFR
       case lookup "model:Test$Self" enumeratedRoles of
         Nothing -> assert "There should be a role 'Self'" false
         Just (EnumeratedRole{perspectives}) -> do
-          logShow perspectives
-          assert "bla" true)
+          -- logShow perspectives
+          assert "bla" true
+      case lookup "model:Test$Self_bot$ChangeSelf" actions of
+        Nothing -> assert "There should be an action 'model:Test$Self_bot$ChangeSelf'" false
+        (Just (Action{effect})) -> case effect of
+          Nothing -> assert "There should be an effect in the action 'model:Test$Self_bot$ChangeSelf'" false
+          (Just (LS (LetWithAssignment{assignments, variableBindings}))) -> do
+            assert "There should be a variable 'a' in the bindings of the let"
+              (isJust $ lookup "a" variableBindings)
+            assert "There should be an assignment in the let"
+              (length assignments == 1)
+          otherwise -> do
+            logShow otherwise
+            assert "There should be a LetStep in the effect of the action." false
+          )
+
+  testOnly "compileLetStep. Rule with PureLetStep" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          a\n" ARC.domain
+    case r of
+      (Left (ParseError m _)) -> do
+        assert "bla" true
+      otherwise -> do
+        logShow otherwise
+        assert "It should have been detected that the let* doesn't have an assignment in its body." false

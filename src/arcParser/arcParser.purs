@@ -361,12 +361,12 @@ actionE = try $ withEntireBlock
       pure $ Cons (Condition expr) Nil
 
 ruleE :: IP PerspectivePart
-ruleE = withPos do
+ruleE = withPos (do
   lhs <- ruleE_
-  (ruleWithLet lhs <|> ruleWithAssignments lhs)
+  (pureLetBody lhs <|> assignmentList lhs) <?> "one or more assignment expressions")
   -- TODO. IK SNAP niet waarom dit faalt. De positie in het resultaat van de LetStep (bijvoorbeeld) is rechts
   -- van die van de if. Waarom dan niet indented?
-  -- indented *> (ruleWithLet lhs <|> ruleWithAssignments lhs)
+  -- indented *> (pureLetBody lhs <|> assignmentList lhs)
 
 ruleE_ :: IP {pos :: ArcPosition, condition :: Step}
 ruleE_ = do
@@ -378,8 +378,8 @@ ruleE_ = do
 -- |   if Wens >> Bedrag > 10 then
 -- |     SomeProp = false
 -- |     SomeOtherProp =+ "aap"
-ruleWithAssignments :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
-ruleWithAssignments {pos, condition} = try do
+assignmentList :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
+assignmentList {pos, condition} = try do
   assignments <- entireBlock assignment
   pure $ Act $ ActionE {id: "", verb: Change, actionParts: Cons (Condition condition) (map AssignmentPart assignments), pos}
 
@@ -389,8 +389,8 @@ ruleWithAssignments {pos, condition} = try do
 -- |      a <- <expression>
 -- |    in
 -- |      SomeProp = a
-ruleWithLet :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
-ruleWithLet {pos, condition} = try do
+pureLetBody :: {pos :: ArcPosition, condition :: Step} -> IP PerspectivePart
+pureLetBody {pos, condition} = try do
   ltst <- letStep
   case ltst of
     (Let lt) -> pure $ Act $ ActionE {id: "", verb: Change, actionParts: ((Condition condition) : (LetPart lt) : Nil), pos}
