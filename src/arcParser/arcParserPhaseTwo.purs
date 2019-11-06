@@ -518,10 +518,11 @@ traverseActionE :: Partial =>                     -- The function is partial bec
   PerspectivePart ->                              -- The ActionE element.
   PhaseTwo (Array ActionType)
 traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb, actionParts, pos})) = do
-  -- If there is no id, create one by concatenating the Object and the Verb.
-  actionId <- if id == ""
-    then pure (rolename <> "$" <> show verb <> object)
-    else pure (rolename <> "$" <> id)
+  isabot <- isSubjectBot
+  actionId <- if isabot
+    -- Different names for the same verb and object for the bot and its master, otherwise they will overwrite.
+    then pure (rolename <> "_bot$" <> show verb <> object)
+    else pure (rolename <> "$" <> show verb <> object)
   executedByBot <- isSubjectBot
   action <- pure $ Action
     { _id: ActionType actionId
