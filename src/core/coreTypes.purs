@@ -37,6 +37,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT, runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Sync.Transaction (Transaction)
 import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
@@ -58,6 +59,8 @@ type PerspectivesState = CouchdbState
   , domeinCache :: DomeinCache
 
   , queryAssumptionRegister :: AssumptionRegister
+
+  , variableBindings :: Environment String
   )
 
 -----------------------------------------------------------

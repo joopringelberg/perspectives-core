@@ -30,7 +30,8 @@ import Perspectives.CoreTypes (DomeinCache, MonadPerspectives, PerspectivesState
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
-import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=))
+import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
+import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void)
 
 newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
 newPerspectivesState uinfo av =
@@ -38,6 +39,7 @@ newPerspectivesState uinfo av =
   , contextInstances: new unit
   , domeinCache: new unit
   , queryAssumptionRegister: empty
+  , variableBindings: ENV.empty
   -- CouchdbState
   , userInfo: uinfo
   , couchdbSessionStarted: false
@@ -85,6 +87,27 @@ queryAssumptionRegister = gets _.queryAssumptionRegister
 
 queryAssumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
 queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister}) -> s {queryAssumptionRegister = f queryAssumptionRegister}
+
+-----------------------------------------------------------
+-- FUNCTIONS TO HANDLE VARIABLE BINDINGS
+-----------------------------------------------------------
+getVariableBindings :: MonadPerspectives (ENV.Environment String)
+getVariableBindings = gets _.variableBindings
+
+addBinding :: String -> String -> MonadPerspectives Unit
+addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = ENV.addVariable varName qfd variableBindings}
+
+lookupVariableBinding :: String -> MonadPerspectives (Maybe String)
+lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup varName)
+
+withFrame :: forall a. MonadPerspectives a -> MonadPerspectives a
+withFrame computation = do
+  old <- getVariableBindings
+  void $ modify \s@{variableBindings} -> s {variableBindings = (ENV._pushFrame old)}
+  r <- computation
+  void $ modify \s@{variableBindings} -> s {variableBindings = old}
+  pure r
+
 -----------------------------------------------------------
 -- FUNCTIONS TO MODIFY GLOBAL UNSAFE STRMAPS IN PERSPECTIVESSTATE
 -----------------------------------------------------------
