@@ -41,6 +41,8 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Instances.Environment (Environment, _pushFrame)
+import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
@@ -62,14 +64,14 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<), (&&), not)
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<), (&&), not, (>>=))
 
 -- TODO
 -- (1) In a view, we need to indicate whether the property is calculated or enumerated.
 -- However, we don't know when traversing the Arc AST.
 -- (2) We need a way to indicate PRODUCT types for bindings.
 
-type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String, variableBindings :: Object QueryFunctionDescription}
+type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String, variableBindings :: Environment QueryFunctionDescription}
 
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
 -- | and allows exceptions.
@@ -81,14 +83,14 @@ runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError 
 runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord
 
 runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty, variableBindings: empty}
+runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty, variableBindings: ENV.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
 evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord
 
 evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> m (Either PerspectivesError a)
-evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, variableBindings: empty}
+evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, variableBindings: ENV.empty}
 
 type PhaseTwo a = PhaseTwo' a Identity
 
@@ -114,14 +116,22 @@ modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 getDF :: PhaseTwo DomeinFileRecord
 getDF = lift $ gets _.dfr
 
-getVariableBindings :: forall m. Monad m => PhaseTwo' (Object QueryFunctionDescription) m
+getVariableBindings :: forall m. Monad m => PhaseTwo' (Environment QueryFunctionDescription) m
 getVariableBindings = lift $ gets _.variableBindings
 
 addBinding :: forall m. Monad m => String -> QueryFunctionDescription -> PhaseTwo' Unit m
-addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = insert varName qfd variableBindings}
+addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = ENV.addVariable varName qfd variableBindings}
 
-clearVariableBindings :: forall m. Monad m => PhaseTwo' Unit m
-clearVariableBindings = void $ modify \s -> s {variableBindings = (empty :: Object QueryFunctionDescription)}
+lookupVariableBinding :: forall m. Monad m => String -> PhaseTwo' (Maybe QueryFunctionDescription) m
+lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup varName)
+
+withFrame :: forall a m. Monad m => PhaseTwo' a m -> PhaseTwo' a m
+withFrame computation = do
+  old <- getVariableBindings
+  void $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
+  r <- computation
+  void $ modify \s@{variableBindings} -> s {variableBindings = old}
+  pure r
 
 -- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
 withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a

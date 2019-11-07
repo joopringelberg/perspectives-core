@@ -14,6 +14,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace)
+import Perspectives.Instances.Environment (lookup) as ENV
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
@@ -402,7 +403,7 @@ theSuite = suite "Perspectives.Query.DescriptionCompiler" do
         logShow otherwise
         assert "The non-existing sequence function name should have been detected." false
 
-  makeTest "compileLetStep."
+  makeTestOnly "compileLetStep."
     "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{enumeratedRoles, actions}) -> do
@@ -418,7 +419,7 @@ theSuite = suite "Perspectives.Query.DescriptionCompiler" do
           Nothing -> assert "There should be an effect in the action 'model:Test$Self_bot$ChangeSelf'" false
           (Just (LS (LetWithAssignment{assignments, variableBindings}))) -> do
             assert "There should be a variable 'a' in the bindings of the let"
-              (isJust $ lookup "a" variableBindings)
+              (isJust $ ENV.lookup "a" variableBindings)
             assert "There should be an assignment in the let"
               (length assignments == 1)
           otherwise -> do

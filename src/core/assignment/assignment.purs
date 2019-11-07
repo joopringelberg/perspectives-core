@@ -29,8 +29,8 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign, F)
-import Foreign.Object (Object)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Instances.Environment (Environment)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, pure, ($), (<>), show, (<$>), (<*>))
@@ -50,7 +50,7 @@ data AssignmentStatement
   | DeleteProperty EnumeratedPropertyType
   -- TODO: full delete.
 
-newtype LetWithAssignment = LetWithAssignment {variableBindings :: Object QueryFunctionDescription, assignments:: List AssignmentStatement}
+newtype LetWithAssignment = LetWithAssignment {variableBindings :: Environment QueryFunctionDescription, assignments:: List AssignmentStatement}
 
 derive instance genericRepAssignmentStatement :: Generic AssignmentStatement _
 

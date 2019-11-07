@@ -34,7 +34,6 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -42,7 +41,7 @@ import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, clearVariableBindings, getVariableBindings, lift2)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
@@ -167,8 +166,8 @@ compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (DataTyp
 compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (UnaryCombinator fname) currentDomain
 
 compileSimpleStep currentDomain (Variable pos varName) = do
-  bindings <- getVariableBindings
-  case lookup varName bindings of
+  mBinding <- lookupVariableBinding varName
+  case mBinding of
     Nothing -> throwError $ UnknownVariable pos varName
     (Just fdesc) -> pure $ SQD currentDomain (VariableLookup varName) (range fdesc)
 
@@ -254,14 +253,12 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         allowed r = isJust $ elemIndex r allowedRangeConstructors
 
 compileLetStep :: Domain -> PureLetStep -> FD
-compileLetStep currentDomain (PureLetStep{bindings, body}) = do
+compileLetStep currentDomain (PureLetStep{bindings, body}) = withFrame do
   for_ bindings
     \(Tuple varName step) -> do
       qfd <- compileStep currentDomain step
       addBinding varName qfd
-  r <- compileStep currentDomain body
-  void <- clearVariableBindings
-  pure r
+  compileStep currentDomain body
 
 type FD = PhaseThree QueryFunctionDescription
 
