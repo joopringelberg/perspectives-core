@@ -28,6 +28,7 @@ module Perspectives.Query.Compiler where
 
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
+import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
 import Data.Maybe (Maybe(..), fromJust)
 import Effect.Exception (error)
@@ -36,7 +37,8 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
+import Perspectives.PerspectivesState (lookupVariableBinding)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -48,6 +50,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (bind, ($), pure, (>=>), (<>), show, (>>=))
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Variant to hold the six types of functions that can be computed.
 data CompiledFunction =
@@ -83,6 +86,18 @@ compileFunction (SQD _ (DataTypeGetter "context") _) = pure $ R2C context
 compileFunction (SQD _ (DataTypeGetter "binding") _) = pure $ R2R binding
 
 compileFunction (SQD _ (ComputedRoleGetter functionName) _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
+
+compileFunction (SQD (CDOM _) (VariableLookup varName) (CDOM _)) = pure $ C2C (unsafeCoerce (lookup varName) :: ContextInstance ~~> ContextInstance)
+
+compileFunction (SQD (CDOM _) (VariableLookup varName) (RDOM _)) = pure $ C2R (unsafeCoerce (lookup varName) :: ContextInstance ~~> RoleInstance)
+
+compileFunction (SQD (CDOM _) (VariableLookup varName) (VDOM _)) = pure $ C2V (unsafeCoerce (lookup varName) :: ContextInstance ~~> Value)
+
+compileFunction (SQD (RDOM _) (VariableLookup varName) (RDOM _)) = pure $ R2R (unsafeCoerce (lookup varName) :: RoleInstance ~~> RoleInstance)
+
+compileFunction (SQD (RDOM _) (VariableLookup varName) (CDOM _)) = pure $ R2C (unsafeCoerce (lookup varName) :: RoleInstance ~~> ContextInstance)
+
+compileFunction (SQD (RDOM _) (VariableLookup varName) (VDOM _)) = pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
 
 compileFunction (BQD _ (BinaryCombinator "compose") f1 f2 _) = do
   f1' <- compileFunction f1
@@ -138,6 +153,11 @@ compileFunction (BQD _ (BinaryCombinator "conjunction") f1 f2 _) = do
 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> show qd <> "'.")
+
+lookup :: String -> String ~~> String
+lookup varName _ = do
+    mv <- lift $ lift (lookupVariableBinding varName)
+    pure $ (unsafePartial (fromJust mv))
 
 ---------------------------------------------------------------------------------------------------
 -- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS
