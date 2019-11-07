@@ -45,7 +45,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, getVariableBindings, lift2, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -367,8 +367,9 @@ compileRules = do
               -- Compile the LetStep into a LetWithAssignment
             (Just (L (LetStep {bindings, assignments}))) -> do
               -- Store a QueryFunctionDescription for each named variable in state:
+              -- TODO: make the runtime function descriptions, too, as in compileLetStep in the DescriptionCompiler. 
               for_ bindings
-                \(Tuple varName step) -> do
+                \(VarBinding varName step) -> do
                   qfd <- compileStep (CDOM $ ST ctxt) step
                   addBinding varName qfd
               -- Now compile all assignments.

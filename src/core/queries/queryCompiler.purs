@@ -37,7 +37,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
-import Perspectives.PerspectivesState (lookupVariableBinding)
+import Perspectives.PerspectivesState (addBinding, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -49,10 +49,10 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (bind, ($), pure, (>=>), (<>), show, (>>=))
+import Prelude (bind, ($), pure, (>=>), (<>), show, (>>=), (*>), discard)
 import Unsafe.Coerce (unsafeCoerce)
 
--- | A Variant to hold the six types of functions that can be computed.
+-- | A Sum to hold the six types of functions that can be computed.
 data CompiledFunction =
     C2C (ContextInstance ~~> ContextInstance)
   | C2R (ContextInstance ~~> RoleInstance)
@@ -151,8 +151,48 @@ compileFunction (BQD _ (BinaryCombinator "conjunction") f1 f2 _) = do
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
     _,  _ -> throwError (error $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
+compileFunction (BQD _ (BinaryCombinator "sequence") f1 f2 _) = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2C a), (C2C b) -> pure $ C2C (a *> b)
+    (C2R a), (C2C b) -> pure $ C2C (a *> b)
+    (C2V a), (C2C b) -> pure $ C2C (a *> b)
+    (C2C a), (C2R b) -> pure $ C2R (a *> b)
+    (C2R a), (C2R b) -> pure $ C2R (a *> b)
+    (C2V a), (C2R b) -> pure $ C2R (a *> b)
+    (C2C a), (C2V b) -> pure $ C2V (a *> b)
+    (C2R a), (C2V b) -> pure $ C2V (a *> b)
+    (C2V a), (C2V b) -> pure $ C2V (a *> b)
+    (R2C a), (R2C b) -> pure $ R2C (a *> b)
+    (R2R a), (R2C b) -> pure $ R2C (a *> b)
+    (R2V a), (R2C b) -> pure $ R2C (a *> b)
+    (R2C a), (R2R b) -> pure $ R2R (a *> b)
+    (R2R a), (R2R b) -> pure $ R2R (a *> b)
+    (R2V a), (R2R b) -> pure $ R2R (a *> b)
+    (R2C a), (R2V b) -> pure $ R2V (a *> b)
+    (R2R a), (R2V b) -> pure $ R2V (a *> b)
+    (R2V a), (R2V b) -> pure $ R2V (a *> b)
+    _, _ -> throwError (error $ "This is not a valid sequence: '" <> show f1 <> "', '" <> show f2 <> "'." )
+
+compileFunction (UQD _ (BindVariable varName) f1 _) = do
+  f1' <- compileFunction f1
+  case f1' of
+    (C2C a) -> pure $ C2C (unsafeCoerce addBinding_ varName a)
+    (C2R a) -> pure $ C2R (unsafeCoerce addBinding_ varName a)
+    (C2V a) -> pure $ C2V (unsafeCoerce addBinding_ varName a)
+    (R2C a) -> pure $ R2C (unsafeCoerce addBinding_ varName a)
+    (R2R a) -> pure $ R2R (unsafeCoerce addBinding_ varName a)
+    (R2V a) -> pure $ R2V (unsafeCoerce addBinding_ varName a)
+
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> show qd <> "'.")
+
+addBinding_ :: String -> (String ~~> String) -> String ~~> String
+addBinding_ varName computation ctxt  = do
+  v <- computation ctxt
+  lift $ lift $ addBinding varName v
+  pure v
 
 lookup :: String -> String ~~> String
 lookup varName _ = do

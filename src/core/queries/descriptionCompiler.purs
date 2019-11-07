@@ -30,16 +30,15 @@ module Perspectives.Query.DescriptionCompiler where
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, head, length)
-import Data.Foldable (for_)
+import Data.List (foldM, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
-import Data.Tuple (Tuple(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -51,7 +50,7 @@ import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, eq, flip, map, pure, ($), (==), (&&), discard)
+import Prelude (bind, eq, flip, map, pure, ($), (==), (&&), discard, (<$>), (<*>))
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
@@ -252,13 +251,33 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         allowed :: Range -> Boolean
         allowed r = isJust $ elemIndex r allowedRangeConstructors
 
+-- | Compile a PureLetStep into a sequence of QueryFunctionDescriptions that ends with the body.
+-- | Each binding compiles to a description of a function that will add a name-value pair to the runtime environment.
 compileLetStep :: Domain -> PureLetStep -> FD
-compileLetStep currentDomain (PureLetStep{bindings, body}) = withFrame do
-  for_ bindings
-    \(Tuple varName step) -> do
-      qfd <- compileStep currentDomain step
-      addBinding varName qfd
-  compileStep currentDomain body
+compileLetStep currentDomain (PureLetStep{bindings, body}) = withFrame
+  case uncons bindings of
+    -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
+    Nothing -> compileStep currentDomain body
+    (Just {head: bnd, tail}) -> do
+      head_ <- compileVarBinding currentDomain bnd
+      combine <$> foldM makeSequence head_ bindings <*> compileStep currentDomain body
+  where
+    -- The range of a sequence equals that of its second term.
+    -- The fold is left associative: ((binding1 *> binding2) *> binding3). The compiler handles that ok.
+    makeSequence :: QueryFunctionDescription -> VarBinding -> FD
+    makeSequence seq v@(VarBinding varName step) = combine <$> pure seq <*> (compileVarBinding currentDomain v)
+
+    combine :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+    combine left right = BQD currentDomain (BinaryCombinator "sequence") left right (range right)
+
+-- | Make a QueryFunctionDescription of a runtime function that evaluates the step of the binding and
+-- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to the
+-- | compile time environment (PhaseThree).
+compileVarBinding :: Domain -> VarBinding -> FD
+compileVarBinding currentDomain (VarBinding varName step) = do
+  step_ <- compileStep currentDomain step
+  addBinding varName step_
+  pure $ UQD currentDomain (BindVariable varName) step_ (range step_)
 
 type FD = PhaseThree QueryFunctionDescription
 

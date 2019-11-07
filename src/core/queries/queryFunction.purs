@@ -42,6 +42,7 @@ data QueryFunction
   | ComputedRoleGetter FunctionName
   | ComputedPropertyGetter FunctionName
   | VariableLookup VariableName
+  | BindVariable VariableName
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)

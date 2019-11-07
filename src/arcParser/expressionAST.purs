@@ -85,7 +85,6 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.List (List)
 import Data.Maybe (Maybe)
-import Data.Tuple (Tuple)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.EnumeratedProperty (Range)
@@ -113,11 +112,11 @@ data UnaryStep =
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 
-newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List Binding, assignments :: List Assignment}
+newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List VarBinding, assignments :: List Assignment}
 
-newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List Binding, body :: Step}
+newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List VarBinding, body :: Step}
 
-type Binding = Tuple String Step
+data VarBinding = VarBinding String Step
 
 data Operator =
   Compose ArcPosition
@@ -176,6 +175,10 @@ instance readForeignLetStep :: ReadForeign LetStep where
 derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow
 instance eqPureLetStep :: Eq PureLetStep where eq u1 u2 = genericEq u1 u2
+
+derive instance genericVarBinding :: Generic VarBinding _
+instance showVarBinding :: Show VarBinding where show = genericShow
+instance eqVarBinding :: Eq VarBinding where eq = genericEq
 
 derive instance genericOperator :: Generic Operator _
 instance showOperator :: Show Operator where show = genericShow

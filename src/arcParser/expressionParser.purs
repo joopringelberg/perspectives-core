@@ -21,7 +21,7 @@
 
 module Perspectives.Parsing.Arc.Expression where
 
-import Control.Alt (map, (<|>))
+import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Array (many)
 import Data.DateTime (DateTime)
@@ -29,11 +29,10 @@ import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
 import Data.String (length)
 import Data.String.CodeUnits as SCU
-import Data.Tuple (Tuple(..))
 import Effect.Unsafe (unsafePerformEffect)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), Binding, LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), VarBinding(..), LetStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
-import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, entireBlock, getPosition, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
@@ -285,5 +284,5 @@ letStep = do
 
   where
 
-    binding :: IP Binding
-    binding = Tuple <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
+    binding :: IP VarBinding
+    binding = VarBinding <$> (lowerCaseName <* token.reservedOp "<-") <*> defer \_ -> step
