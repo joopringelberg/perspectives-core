@@ -29,27 +29,28 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, union)
 import Data.Foldable (for_)
-import Data.Function (applyFlipped)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF)
-import Data.Traversable (traverse)
+import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
+import Foreign.Object (empty)
+import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, removeProperty, removeRol, setProperty, setRol)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>))
+import Perspectives.BasicConstructors (constructAnotherRol)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP)
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
-import Perspectives.Representation.Class.Action (condition, effect, object)
+import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
-import Perspectives.Representation.Class.Role (Role, getCalculation, getRole)
 import Perspectives.Representation.Context (Context, actions)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 
 -----------------------------------------------------------
@@ -133,85 +134,60 @@ constructRHS objectGetter actionType a = case a of
           void $ pure $ deleteProperty object rt
         else pure unit
 
--- | From the description of an Action, compile an Updater of ContextInstance.
--- | The results of these rather expensive computations are cached.
--- compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
--- compileBotAction actionType contextId =
---   case retrieveAction actionType of
---     (Just a) -> pure a
---     Nothing -> do
---       (action :: Action) <- getPerspectType actionType
---       -- objectOfAction is a type of Role.
---       (objectOfAction :: Role) <- getRole (object action)
---       -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
---       -- The result of this function is dependent on any number of Assumptions.
---       (objectGetter :: RoleGetter) <- getCalculation objectOfAction >>= context2role
---       -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
---       (makeRHSs :: Array (ContextInstance -> RHS)) <- traverse (constructRHS objectGetter actionType) (effect action)
---       -- The Left Hand Side of the Action is a query that computes boolean values.
---       -- These values depend on a number of Assumptions.
---       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
---       rhss <- pure (map (applyFlipped contextId) makeRHSs)
---
---       (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=>
---         (\values -> for_ rhss (applyFlipped values))
---       ))
---       -- Cache the result.
---       _ <- pure $ cacheAction actionType updater
---       pure updater
-
--- compileBotAction' :: ActionType -> (Updater ContextInstance)
--- compileBotAction' actionType contextId =
---   case retrieveAction actionType of
---     (Just a) -> a contextId
---     Nothing -> do
---       (action :: Action) <- lift $ lift $ getPerspectType actionType
---       eff <- lift $ lift $ effect action
---       -- hier zijn twee functies mogelijk.
---       effectFullFunction <- lift $ lift $ compileRoleUpdater eff
---       (lhs :: (ContextInstance ~~> Value)) <- lift $ lift $ condition action >>= context2propertyValue
---       roleRuleRunner lhs effectFullFunction contextId
---
---   where
---     roleRuleRunner :: (ContextInstance ~~> Value) ->
---       (Updater ContextInstance) ->
---       (Updater ContextInstance)
---     roleRuleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
---       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
---       if (alaF Conj foldMap (eq (Value "true")) bools)
---           then do
---             -- Cache the association between the assumptions found for this ActionInstance.
---             pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
---             effectFullFunction contextId
---           else pure unit
-
--- It is always an (Updater ContextInstance).
--- However, for a Property updater, we provide the object.
--- compileRoleUpdater :: QueryFunctionDescription -> Updater ContextInstance
--- compileFunction (BQD (CDOM _) (AssignmentOperator "SetRol") rol value (CDOM _)
--- compileFunction (BQD (CDOM _) (AssignmentOperator "AddToRol") rol value (CDOM _)
--- compileFunction (BQD (CDOM _) (AssignmentOperator "RemoveFromRol") rol value (CDOM _)
--- compileFunction (UQD (CDOM _) (AssignmentOperator "DeleteRol") rol (CDOM _) =
-
--- compileFunction (BQD (RDOM _) (AssignmentOperator "SetProperty") prop value ())
--- compileFunction (BQD (RDOM _) (AssignmentOperator "AddToProperty") prop value ())
--- compileFunction (BQD (RDOM _) (AssignmentOperator "RemoveFromProperty") prop value ())
--- compileFunction (UQD (RDOM _) (AssignmentOperator "DeleteProperty") prop ()) =
-
-
-
 -- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
 -- | on Assumptions in the actionAssumptionRegister in PerspectivesState.
 setupBotActions :: ContextInstance -> MonadPerspectives Unit
-setupBotActions cid = pure unit
--- setupBotActions cid = do
---   -- TODO: filter, keeping just those actions that are to be executed by a Bot.
---   (ct :: ContextType) <- cid ##>> contextType
---   (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
---   -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
---   -- actionAssumptionRegister in PerspectivesState.
---   for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
+setupBotActions cid = do
+  -- TODO: filter, keeping just those actions that are to be executed by a Bot.
+  (ct :: ContextType) <- cid ##>> contextType
+  (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
+  -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
+  -- actionAssumptionRegister in PerspectivesState.
+  for_ actions \(a :: ActionType) -> (compileBotAction a) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
 
 -- | Remove all actions associated with this context.
 tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
 tearDownBotActions = pure <<< removeContextInstanceDependencies
+
+-- | Compile the action to an Updater. Cache for later use.
+compileBotAction :: ActionType -> MP (Updater ContextInstance)
+compileBotAction actionType =
+  case retrieveAction actionType of
+    (Just a) -> pure a
+    Nothing -> do
+      (action :: Action) <- getPerspectType actionType
+      eff <- effect action
+      (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff
+      (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
+      updater <- pure $ ruleRunner lhs effectFullFunction
+      void $ pure $ cacheAction actionType updater
+      pure updater
+
+  where
+    -- | Actual effectfull function for which we track dependencies. If one of them changes,
+    -- | the function is executed again.
+    ruleRunner :: (ContextInstance ~~> Value) ->
+      (Updater ContextInstance) ->
+      (Updater ContextInstance)
+    ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
+      (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+      if (alaF Conj foldMap (eq (Value "true")) bools)
+          then do
+            -- Cache the association between the assumptions found for this ActionInstance.
+            pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
+            effectFullFunction contextId
+          else pure unit
+
+compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
+compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  pure \contextId -> do
+    ctxts <- lift $ lift (contextId ##= contextGetter)
+    for_ ctxts \ctxt -> constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization{properties: PropertySerialization empty, binding: Nothing})
+
+compileAssignment (BQD _ (QF.BinaryCombinator "sequence") _ _ _ ) = pure \_ -> pure unit
+
+-- Vergeet EffectFullFunction niet!
+
+-- Catchall, remove when all cases have been covered.
+compileAssignment _ = pure \_ -> pure unit

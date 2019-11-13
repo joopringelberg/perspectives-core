@@ -44,13 +44,14 @@ data QueryFunction
   | VariableLookup VariableName
   | BindVariable VariableName
   | AssignmentOperator FunctionName
+  | Identity
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)
   | BinaryCombinator FunctionName
   | Constant Range String
 
-  | CreateRole' EnumeratedRoleType
+  | CreateRole EnumeratedRoleType
 	| CreateContext' ContextType
 	| Bind EnumeratedRoleType
   | Bind_
@@ -60,6 +61,7 @@ data QueryFunction
 	| DeleteProperty EnumeratedPropertyType
   | Move
   | Remove
+  -- | EffectFullFunction
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 

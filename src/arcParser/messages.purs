@@ -36,7 +36,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleKind, RoleType)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
@@ -78,6 +78,8 @@ data PerspectivesError
     | UnknownVariable ArcPosition String
     | NotALetWithAssignment PureLetStep
     | NotAPureLet LetStep
+    | CannotCreateCalculatedRole CalculatedRoleType ArcPosition ArcPosition
+    | NotAContextDomain Domain ArcPosition ArcPosition
 
     | Custom String
 
@@ -114,6 +116,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownVariable pos varName) = "(UnknownVariable) The variable '" <> varName <> "' is not known at position: " <> show pos
   show (NotALetWithAssignment (PureLetStep{start, end})) = "(NotALetWithAssignment) This let*-expression does not have an assignment in its body, hence is of no use in a rule. From " <> show start <> " to " <> show end
   show (NotAPureLet (LetStep{start, end})) = "(NotAPureLet) This let*-expression has an assignment in its body but it is used in a pure expression, so its body should be a pure expression, too. From " <> show start <> " to " <> show end
+  show (CannotCreateCalculatedRole cr start end) = "(CannotCreateCalculatedRole) Can not create an instance of a calculated role (" <> show cr <> ") between: " <> show start <> " and: " <> show end
+  show (NotAContextDomain dom start end) = "(NotAContextDomain) Here we expect an expression that results in a context type: " <> show dom <> ", between " <> show start <> " and " <> show end
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

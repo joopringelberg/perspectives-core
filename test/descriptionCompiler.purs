@@ -394,7 +394,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
               otherwise -> false
               )
 
-  makeTestOnly "compileLetStep."
+  makeTest "compileLetStep."
     "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n          Prop1 = a\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{enumeratedRoles, actions}) -> do

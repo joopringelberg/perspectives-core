@@ -40,7 +40,7 @@ import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, values)
-import Perspectives.CoreTypes ((###=), MP, type (~~~>))
+import Perspectives.CoreTypes ((###=), MP, type (~~~>), (###>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -50,7 +50,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -62,12 +62,12 @@ import Perspectives.Representation.Class.Role (contextOfRepresentation, expanded
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<<<), (<>), (==), (>>=), (>=>), (<$>), (<*>))
+import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
+import Prelude (Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -283,12 +283,12 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
     qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
-          Q (SQD dom (ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType)))) -> do
+          Q (SQD dom (QF.ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType)))) -> do
             qComputedType <- qualifyRoleType pos computedType enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
-                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
+                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (QF.ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
           otherwise -> pure unit)
 
 -- | The calculation of a CalculatedRole or CalculatedProperty, and the condition of an Action are all expressions. This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.
@@ -330,7 +330,6 @@ compileExpressions = do
         descr <- compileStep (CDOM $ ST ctxt) stp
         pure $ Action (ar {condition = Q descr})
 
-{-
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
 compileRules :: PhaseThree Unit
@@ -382,6 +381,41 @@ compileRules = do
             addAssignmentToSequence :: Domain -> QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
             addAssignmentToSequence currentDomain seq v = makeSequence <$> pure seq <*> (compileAssignment currentDomain v)
 
+            -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
+            compileAssignment :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
+            compileAssignment currentDomain ass = case ass of
+              Remove {roleExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              CreateRole {roleIdentifier, contextExpression, start, end} -> do
+                (cte :: QueryFunctionDescription) <- case contextExpression of
+                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain)
+                  (Just stp) -> compileStep currentDomain stp
+                qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
+                pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain
+              Move {roleExpression, contextExpression} -> do
+                (cte :: QueryFunctionDescription) <- case contextExpression of
+                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain)
+                  (Just stp) -> compileStep currentDomain stp
+                rle <- compileStep currentDomain roleExpression
+                pure $ BQD currentDomain QF.Move rle cte currentDomain
+              Bind {bindingExpression, roleIdentifier, contextExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              Bind_ {bindingExpression, binderExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              Unbind {bindingExpression, roleIdentifier} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              Unbind_ {bindingExpression, binderExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              Delete {identifier, expression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+
+              where
+                qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
+                qualifyWithRespectTo roleIdentifier contextFunctionDescription start end= do
+                  (ct :: ADT ContextType) <- case range contextFunctionDescription of
+                    (CDOM ct') -> pure ct'
+                    otherwise -> throwError $ NotAContextDomain otherwise start end
+                  mrt <- lift2 (ct ###> lookForRoleTypeOfADT roleIdentifier)
+                  case mrt of
+                    Just (ENR et) -> pure et
+                    Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
+                    otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
+{-
             -- Assume the assignment is on a Role. When that fails, compile it as
             -- an assignment on a Property - but not when it fails because an
             -- unqualified name can be qualified in more than one way.

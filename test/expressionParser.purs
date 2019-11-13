@@ -17,7 +17,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.Expression" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -460,7 +460,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         assert "There should be no roleExpression" (isNothing roleExpression)
       otherwise -> assert ("'MyProp = 10' should be parsed as a PropertyAssignment assignment, instead this was returned: " <> show otherwise) false
 
-  testOnly "Assignment: propertyAssignment for another role" do
+  test "Assignment: propertyAssignment for another role" do
     (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyProp = 10 for AnotherRole" assignment
     case r of
       (Left e) -> assert (show e) false
