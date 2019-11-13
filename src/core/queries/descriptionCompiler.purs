@@ -42,7 +42,7 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Pu
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, range)
 import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
 import Perspectives.Representation.Class.Property (rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, typeExcludingBinding_)
@@ -260,15 +260,15 @@ compileLetStep currentDomain (PureLetStep{bindings, body}) = withFrame
     Nothing -> compileStep currentDomain body
     (Just {head: bnd, tail}) -> do
       head_ <- compileVarBinding currentDomain bnd
-      combine <$> foldM makeSequence head_ bindings <*> compileStep currentDomain body
-  where
-    -- The range of a sequence equals that of its second term.
-    -- The fold is left associative: ((binding1 *> binding2) *> binding3). The compiler handles that ok.
-    makeSequence :: QueryFunctionDescription -> VarBinding -> FD
-    makeSequence seq v@(VarBinding varName step) = combine <$> pure seq <*> (compileVarBinding currentDomain v)
+      makeSequence <$> foldM addVarBindingToSequence head_ tail <*> compileStep currentDomain body
 
-    combine :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
-    combine left right = BQD currentDomain (BinaryCombinator "sequence") left right (range right)
+-- The range of a sequence equals that of its second term.
+-- The fold is left associative: ((binding1 *> binding2) *> binding3). The compiler handles that ok.
+addVarBindingToSequence :: QueryFunctionDescription -> VarBinding -> FD
+addVarBindingToSequence seq v = makeSequence <$> pure seq <*> (compileVarBinding (domain seq) v)
+
+makeSequence :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+makeSequence left right = BQD (domain left) (BinaryCombinator "sequence") left right (range right)
 
 -- | Make a QueryFunctionDescription of a runtime function that evaluates the step of the binding and
 -- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to the
@@ -280,13 +280,6 @@ compileVarBinding currentDomain (VarBinding varName step) = do
   pure $ UQD currentDomain (BindVariable varName) step_ (range step_)
 
 type FD = PhaseThree QueryFunctionDescription
-
--- compileRoleDescription :: ContextType -> Step -> MonadPerspectives QueryFunctionDescription
--- compileRoleDescription ct s = do
---   r <- runExceptT (compileStep (CDOM $ ST ct) s)
---   case r of
---     (Left m) -> throwError (error (show m))
---     (Right d) -> pure d
 
 greaterThanOrEqualTo_ :: Domain -> Domain -> MonadPerspectives Boolean
 greaterThanOrEqualTo_ = flip lessThenOrEqualTo_

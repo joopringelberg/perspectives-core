@@ -143,6 +143,12 @@ data AssignmentOperator =
   | DeleteFrom ArcPosition
   | Delete ArcPosition
 
+type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
+
+data Assignment' =
+	Remove (WithTextRange (roleExpression :: Step))
+	| Create (WithTextRange (roleType :: String, contextExpression :: Maybe Step))
+
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq

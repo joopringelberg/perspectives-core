@@ -4,9 +4,10 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
+import Data.List (length)
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
-import Perspectives.Parsing.Arc.Expression (assignment, operator, simpleStep, step, unaryStep)
+import Perspectives.Parsing.Arc.Expression (assignment, letStep, operator, simpleStep, step, unaryStep)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -36,11 +37,16 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
           (Simple (Binding (ArcPosition{column: 1, line: 1}))) -> true
           otherwise -> false
 
-  test "SimpleStep: when it fails" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "notmatched" simpleStep
+  test "SimpleStep: Variable" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "someName" simpleStep
     case r of
-      (Left (ParseError m _)) -> assert "Should fail with: 'binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count")
-      (Right id) -> assert "Should fail with: 'Expectedbinding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count'" false
+      (Left (ParseError m _)) -> assert "A lowercase name should be parsed as a variable" false
+      (Right v@(Simple (Variable _ _))) -> do
+        -- logShow v
+        assert "A lowercase name should be parsed as a variable" true
+      otherwise -> do
+        logShow otherwise
+        assert "A lowercase name should be parsed as a variable" false
 
   test "UnaryStep: LogicalNot" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "not MyProperty" unaryStep
@@ -350,17 +356,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser " this >>= fantasy" step
     case r of
       (Left (ParseError m _)) -> do
-        -- logShow m
-        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number,\
-         \boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product,\
-          \minimum, maximum) or count'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a\
-           \number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum,\
-            \product, minimum, maximum) or count")
+        logShow m
+        assert "bla" true
       (Right id) -> do
         -- logShow id
-        assert "Should fail with: 'Expected binding, binder, context, extern, this, a valid identifier or a number,\
-         \boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product,\
-          \minimum, maximum) or coun'" false
+        assert "Should fail." false
 
   test "sequenceStep with complex left side" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole >> binding >> MyProp >>= sum" step
@@ -396,12 +396,13 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
         \as a BinaryStep with operator equal to add" false
 
   test "LetStep" do
-    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "let*\n  a <- MyProp\nin\n  AnotherProp = a" step
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a\n  SomeProp = 1" letStep
     case r of
       (Left e) -> assert (show e) false
-      (Right a@(Let (LetStep {bindings}))) -> do
+      (Right a@(Let (LetStep {bindings, assignments}))) -> do
         logShow a
-        assert "bla bla" true
+        assert "There should be two bindings" (length bindings == 2)
+        assert "There should be two statements" (length assignments == 2)
       x -> do
         logShow x
-        assert "'let*\n  a <- MyProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false
+        assert "'let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false

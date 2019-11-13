@@ -492,6 +492,10 @@ traversePerspectiveE (PerspectiveE {id, perspectiveParts, pos}) rolename = do
       -- we cannot be sure at this point that it will actually be so.
       -- We pass the unqualified name and have PhaseThree look it up.
       (Just (Object o)) -> pure o
+        -- TODO. Case analyse: als o een expressie (step) is, maak dan een CalculatedRole. We hoeven hem niet toe te voegen aan een context.
+        -- Immers, de enige referentie ernaar is vanuit de acties die we in het kader
+        -- van dit perspectief maken. We genereren een id en verspreiden die naar de
+        -- Acties.
       otherwise -> throwError (MissingObject pos id)
 
   -- Similarly, find and use the DefaultObjectView, if the Action has not provided its own View.
@@ -577,8 +581,8 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
 
     -- ASSIGNMENT
     handleParts _ (Action ar@{effect}) (AssignmentPart a) = case effect of
-      Nothing -> pure $ Action (ar {effect = Just $ A [a]})
-      Just (A as) -> pure $ Action (ar {effect = Just $ A (cons a as)})
+      Nothing -> pure $ Action (ar {effect = Just $ A (a : Nil)})
+      Just (A as) -> pure $ Action (ar {effect = Just $ A (a : as)})
 
     -- LETPART
     handleParts _ (Action ar) (LetPart lstep) = pure $ Action (ar {effect = Just $ L lstep})

@@ -21,7 +21,7 @@
 
 module Perspectives.Parsing.Arc.Expression where
 
-import Control.Alt ((<|>))
+import Control.Alt (void, (<|>))
 import Control.Lazy (defer)
 import Data.Array (many)
 import Data.DateTime (DateTime)
@@ -37,7 +37,7 @@ import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
 import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (between, optionMaybe, try, (<?>))
+import Text.Parsing.Parser.Combinators (between, lookAhead, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
 import Text.Parsing.Parser.Token (alphaNum)
 
@@ -47,7 +47,6 @@ step = do
   left <- token.parens step <|> leftSide
   mop <- optionMaybe (try operator)
   case mop of
-    -- Nothing -> pos >>= failWithPosition "with, or an operator: >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, >>="
     Nothing -> pure left
     (Just op) -> do
       right <- step
@@ -65,10 +64,7 @@ step = do
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
   where
     leftSide :: IP Step
-    leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> defer \_ -> unaryStep <|> simpleStep
-
-    -- pos :: IP Position
-    -- pos = getPosition >>= \(ArcPosition{line, column}) -> pure $  Position {line, column}
+    leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> unaryStep <|> simpleStep
 
 simpleStep :: IP Step
 simpleStep = try
@@ -89,7 +85,6 @@ simpleStep = try
   Simple <$> (Value <$> getPosition <*> pure PBool <*> boolean)
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
-  -- TODO: date
   <|>
   Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> (defer \_ -> arcIdentifier)))
   <|>
@@ -265,14 +260,12 @@ dateTimeLiteral = (go <?> "date-time") <* token.whiteSpace
     dateChar :: IP Char
     dateChar = alphaNum <|> char ':' <|> char '+' <|> char '-' <|> char ' ' <|> char '.'
 
--- letStep :: IP Step
--- letStep = map Let (defer \_ -> letStep_)
-
 letStep :: IP Step
 letStep = do
+  lookAhead (reserved "let*")
   start <- getPosition
   bindings <- withEntireBlock (\_ bs -> bs) (reserved "let*") binding
-  massignments <- optionMaybe $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
+  massignments <- optionMaybe $ try $ withEntireBlock (\_ bs -> bs) (reserved "in") assignment
   case massignments of
     (Just assignments) -> do
       end <- getPosition

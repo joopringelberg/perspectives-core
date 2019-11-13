@@ -41,7 +41,7 @@ import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActi
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>))
 import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Query.Compiler (context2propertyValue, context2role)
+import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
@@ -152,6 +152,7 @@ compileBotAction actionType contextId =
       -- These values depend on a number of Assumptions.
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
       rhss <- pure (map (applyFlipped contextId) makeRHSs)
+
       (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=>
         (\values -> for_ rhss (applyFlipped values))
       ))
@@ -159,16 +160,43 @@ compileBotAction actionType contextId =
       _ <- pure $ cacheAction actionType updater
       pure updater
 
+compileBotAction' :: ActionType -> (Updater ContextInstance)
+compileBotAction' actionType contextId =
+  case retrieveAction actionType of
+    (Just a) -> a contextId
+    Nothing -> do
+      (action :: Action) <- lift $ lift $ getPerspectType actionType
+      eff <- lift $ lift $ effect action
+      -- Dit kan niet door context2context geleverd worden. We moeten voor assignment
+      -- in een andere monad werken, namelijk MonadPerspectivesTransaction.
+      effectFullFunction <- lift $ lift $ context2context eff
+      (lhs :: (ContextInstance ~~> Value)) <- lift $ lift $ condition action >>= context2propertyValue
+      roleRuleRunner lhs effectFullFunction contextId
+
+  where
+    roleRuleRunner :: (ContextInstance ~~> Value) ->
+      (Updater ContextInstance) ->
+      (Updater ContextInstance)
+    roleRuleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
+      (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+      if (alaF Conj foldMap (eq (Value "true")) bools)
+          then do
+            -- Cache the association between the assumptions found for this ActionInstance.
+            pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
+            effectFullFunction contextId
+          else pure unit
+
 -- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
 -- | on Assumptions in the actionAssumptionRegister in PerspectivesState.
 setupBotActions :: ContextInstance -> MonadPerspectives Unit
-setupBotActions cid = do
-  -- TODO: filter, keeping just those actions that are to be executed by a Bot.
-  (ct :: ContextType) <- cid ##>> contextType
-  (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
-  -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
-  -- actionAssumptionRegister in PerspectivesState.
-  for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
+setupBotActions cid = pure unit
+-- setupBotActions cid = do
+--   -- TODO: filter, keeping just those actions that are to be executed by a Bot.
+--   (ct :: ContextType) <- cid ##>> contextType
+--   (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
+--   -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
+--   -- actionAssumptionRegister in PerspectivesState.
+--   for_ actions \(a :: ActionType) -> (compileBotAction a cid) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
 
 -- | Remove all actions associated with this context.
 tearDownBotActions :: ContextInstance -> MonadPerspectives Unit

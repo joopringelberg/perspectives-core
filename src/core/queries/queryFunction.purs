@@ -26,7 +26,7 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.EnumeratedProperty (Range)
-import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Show)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
@@ -43,11 +43,19 @@ data QueryFunction
   | ComputedPropertyGetter FunctionName
   | VariableLookup VariableName
   | BindVariable VariableName
+  | AssignmentOperator FunctionName
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)
   | BinaryCombinator FunctionName
   | Constant Range String
+
+  | CreateRole EnumeratedRoleType
+	| CreateContext ContextType
+	| Bind EnumeratedRoleType
+	| Unbind EnumeratedRoleType
+	| DeleteRol EnumeratedRoleType
+	| DeleteProperty EnumeratedPropertyType
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 

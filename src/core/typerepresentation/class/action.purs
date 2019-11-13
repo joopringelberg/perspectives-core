@@ -28,7 +28,6 @@ import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Action (Action(..), Verb)
-import Perspectives.Representation.Assignment (AssignmentStatement)
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.SideEffect (SideEffect(..))
@@ -47,7 +46,7 @@ class ActionClass c where
   requiredSubjectProperties :: c -> Maybe ViewType
   requiredIndirectObjectProperties :: c -> Maybe ViewType
   condition :: c -> MonadPerspectives QueryFunctionDescription
-  effect :: c -> Array AssignmentStatement
+  effect :: c -> MonadPerspectives QueryFunctionDescription
 
 instance actionActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
@@ -60,6 +59,6 @@ instance actionActionClass :: ActionClass Action where
   condition r = case (unwrap r).condition of
     Q qd -> pure qd
     otherwise -> throwError (error ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
-  effect (Action{effect:et}) = case et of
-    (Just (AS ar)) -> ar
-    otherwise -> []
+  effect (Action{_id, effect:et}) = case et of
+    (Just (EF ar)) -> pure ar
+    otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))

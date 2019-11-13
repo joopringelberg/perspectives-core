@@ -21,11 +21,11 @@ exports._addVariable = function(varName, value, environment) {
 // The first element corresponds to the frame at the top of the stack.
 exports._toObjectArray = function( env ) {
   // The prototype of the prototype of empty is null.
-  var proto = Object.getProtoTypeOf( env );
+  var proto = Object.getPrototypeOf( env );
   var accumulator = [env];
   while (proto) {
     accumulator.push(proto);
-    proto = Object.getProtoTypeOf( proto );
+    proto = Object.getPrototypeOf( proto );
   }
   return accumulator;
 }

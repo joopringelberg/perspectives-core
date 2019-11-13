@@ -394,17 +394,8 @@ theSuite = suite "Perspectives.Query.DescriptionCompiler" do
               otherwise -> false
               )
 
-  test "compileBinaryStep: make a binary operation with '>>=', not a sequence function" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  thing: Guest (mandatory, functional)\n    property: NumberOfGuests = this >>= fantasy" ARC.domain
-    case r of
-      (Left (ParseError m _)) -> do
-        assert "Should fail with message 'binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count'" (m == "Expected binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count")
-      otherwise -> do
-        logShow otherwise
-        assert "The non-existing sequence function name should have been detected." false
-
   makeTestOnly "compileLetStep."
-    "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n"
+    "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          AnotherProp = a\n          Prop1 = a\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{enumeratedRoles, actions}) -> do
       -- logShow correctedDFR
@@ -415,19 +406,19 @@ theSuite = suite "Perspectives.Query.DescriptionCompiler" do
           assert "bla" true
       case lookup "model:Test$Self_bot$ChangeSelf" actions of
         Nothing -> assert "There should be an action 'model:Test$Self_bot$ChangeSelf'" false
-        (Just (Action{effect})) -> case effect of
-          Nothing -> assert "There should be an effect in the action 'model:Test$Self_bot$ChangeSelf'" false
-          (Just (LS (LetWithAssignment{assignments, variableBindings}))) -> do
-            assert "There should be a variable 'a' in the bindings of the let"
-              (isJust $ ENV.lookup "a" variableBindings)
-            assert "There should be an assignment in the let"
-              (length assignments == 1)
-          otherwise -> do
-            logShow otherwise
-            assert "There should be a LetStep in the effect of the action." false
+        (Just (Action{effect})) -> do
+          -- logShow effect
+          case effect of
+            Nothing -> assert "There should be an effect in the action 'model:Test$Self_bot$ChangeSelf'" false
+            (Just qfd@(EF (BQD _ (BinaryCombinator "sequence") (UQD _ (BindVariable "a") _ _) (BQD _ (BinaryCombinator "sequence") (BQD _ (AssignmentOperator "SetProperty") _ _ _) (BQD _ (AssignmentOperator "SetProperty") _ _ _) _) _ ))) -> do
+              logShow qfd
+              assert "Tests ok" true
+            otherwise -> do
+              logShow otherwise
+              assert "There should be a LetStep in the effect of the action." false
           )
 
-  testOnly "compileLetStep. Rule with PureLetStep" do
+  test "compileLetStep. Rule with PureLetStep" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Self\n    property: Prop1 (mandatory, functional, Number)\n    property: AnotherProp (mandatory, functional, Number)\n  bot: for Self\n    perspective on: Self\n      if Self >> Prop1 > 10 then\n        let*\n          a <- 20\n        in\n          a\n" ARC.domain
     case r of
       (Left (ParseError m _)) -> do

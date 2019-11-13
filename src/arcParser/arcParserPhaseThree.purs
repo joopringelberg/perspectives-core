@@ -33,7 +33,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, head, length)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.List (List)
+import Data.List (List, foldM, uncons)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -45,28 +45,29 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, getVariableBindings, lift2, runPhaseTwo_')
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.DescriptionCompiler (compileStep)
+import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Assignment (AssignmentStatement(..), LetWithAssignment(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.Property (rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, expandedADT_)
 import Perspectives.Representation.Context (Context(..))
+import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<<<), (<>), (==), (>>=), (>=>))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<<<), (<>), (==), (>>=), (>=>), (<$>), (<*>))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -329,7 +330,7 @@ compileExpressions = do
         descr <- compileStep (CDOM $ ST ctxt) stp
         pure $ Action (ar {condition = Q descr})
 
--- | For each Action that has a SideEffect for its `effect` member, compile the Assignments in it to `AssignmentStatement`s.
+-- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
 compileRules :: PhaseThree Unit
 compileRules = do
@@ -341,83 +342,108 @@ compileRules = do
   where
     compileRules' :: DomeinFileRecord -> PhaseThree Unit
     compileRules' {actions, enumeratedRoles} = do
-      -- First filter out all variable bindings.
-      -- Then compile the rules.
       compActions <- traverseWithIndex compileRule actions
       modifyDF \dfr -> dfr {actions = compActions}
       where
-        -- Try to compile each rule as a RoleRule. When it fails, compile it as
-        -- a PropertyRule - but not when it fails because an unqualified name can
-        -- be qualified in more than one way.
         compileRule :: String -> Action -> PhaseThree Action
         compileRule actionName a@(Action ar@{subject, effect, object}) = do
           ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< contextOfRepresentation)
+          currentDomain <- pure (CDOM $ ST ctxt)
           case effect of
+            -- Compile a series of Assignments into a QueryDescription.
             (Just (A assignments)) -> do
-              (aStatements :: Array AssignmentStatement) <- traverse
-                (\ass -> catchJust
-                  (\e -> case e of
-                    UnknownRole _ _ -> Just ass
-                    -- Let the NotUniquelyIdentifying error fall through.
-                    otherwise -> Nothing)
-                  (compileRoleRule ctxt ass)
-                  (compilePropertyRule object))
-                assignments
-              pure $ Action ar {effect = Just $ AS aStatements}
-              -- Compile the LetStep into a LetWithAssignment
-            (Just (L (LetStep {bindings, assignments}))) -> do
-              -- Store a QueryFunctionDescription for each named variable in state:
-              -- TODO: make the runtime function descriptions, too, as in compileLetStep in the DescriptionCompiler. 
-              for_ bindings
-                \(VarBinding varName step) -> do
-                  qfd <- compileStep (CDOM $ ST ctxt) step
-                  addBinding varName qfd
-              -- Now compile all assignments.
-              (aStatements :: List AssignmentStatement) <- traverse
-                (\ass -> catchJust
-                  (\e -> case e of
-                    UnknownRole _ _ -> Just ass
-                    -- Let the NotUniquelyIdentifying error fall through.
-                    otherwise -> Nothing)
-                  (compileRoleRule ctxt ass)
-                  (compilePropertyRule object))
-                assignments
-              bindings' <- getVariableBindings
-              pure $ Action ar {effect = Just $ LS $ LetWithAssignment{variableBindings: bindings', assignments: aStatements}}
+              (aStatements :: QueryFunctionDescription) <- sequenceOfAssignments currentDomain assignments
+              pure $ Action ar {effect = Just $ EF aStatements}
+              -- Compile the LetStep into a QueryDescription.
+            (Just (L (LetStep {bindings, assignments}))) -> withFrame
+              case uncons bindings of
+                -- no variableBindings at all. Just the body. This will probably never occur as the parser breaks on it.
+                -- Note we cannot factor sequenceOfAssignments out, even though it occurs
+                -- in both cases. In the second case, we first need to build up the
+                -- variable bindings.
+                Nothing -> do
+                  (aStatements :: QueryFunctionDescription) <- sequenceOfAssignments currentDomain assignments
+                  pure $ Action ar {effect = Just $ EF aStatements}
+                (Just {head: bnd, tail}) -> do
+                  head_ <- compileVarBinding currentDomain bnd
+                  compiledLet <- makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments currentDomain assignments
+                  pure $ Action ar {effect = Just $ EF compiledLet}
             otherwise -> pure a
 
           where
+            sequenceOfAssignments :: Domain -> List Assignment -> PhaseThree QueryFunctionDescription
+            sequenceOfAssignments currentDomain assignments = case uncons assignments of
+              Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
+              (Just {head, tail}) -> do
+                head_ <- compileAssignment currentDomain head
+                foldM (addAssignmentToSequence currentDomain) head_ tail
+
+            addAssignmentToSequence :: Domain -> QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
+            addAssignmentToSequence currentDomain seq v = makeSequence <$> pure seq <*> (compileAssignment currentDomain v)
+
+            -- Assume the assignment is on a Role. When that fails, compile it as
+            -- an assignment on a Property - but not when it fails because an
+            -- unqualified name can be qualified in more than one way.
+            compileAssignment :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
+            compileAssignment currentDomain ass = catchJust
+              (\e -> case e of
+                UnknownRole _ _ -> Just ass
+                -- Let the NotUniquelyIdentifying error fall through.
+                otherwise -> Nothing)
+              (compileRoleAssignment currentDomain ass)
+              (compilePropertyAssignment object)
+
             -- Assignment on an EnumeratedRole.
-            compileRoleRule :: ContextType -> Assignment -> PhaseThree AssignmentStatement
-            compileRoleRule ctxt (Assignment{lhs, operator, value, start, end}) = do
-              -- TODO: limit this to roles of the Context of the Action?
+            compileRoleAssignment :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
+            compileRoleAssignment currentDomain (Assignment{lhs, operator, value, start, end}) = do
               (er :: EnumeratedRoleType) <- qualifyRoleType start lhs enumeratedRoles
-              (mdescr :: Maybe QueryFunctionDescription) <- traverse (compileStep (CDOM $ ST ctxt)) value
-              case mdescr of
+              (mValueDescription :: Maybe QueryFunctionDescription) <- traverse (compileStep currentDomain) value
+              case mValueDescription of
                 Nothing -> case operator of
-                  (Delete p) -> pure $ DeleteRol er
+                  (Delete p) -> pure $ UQD currentDomain (AssignmentOperator "DeleteRol") (SQD currentDomain (RolGetter (ENR er)) (RDOM (ST er))) currentDomain
                   otherwise -> throwError $ MissingValueForAssignment start end
-                Just descr -> case operator of
-                  Set _ -> pure $ SetRol er descr
-                  AddTo _ -> pure $ AddToRol er descr
-                  DeleteFrom _ -> pure $ RemoveFromRol er descr
+                Just valueDescription -> case operator of
+                  Set _ -> pure $ makeAssignment er valueDescription "SetRol"
+                  AddTo _ -> pure $ makeAssignment er valueDescription "AddToRol"
+                  DeleteFrom _ -> pure $ makeAssignment er valueDescription "RemoveFromRol"
                   Delete _ -> throwError $ Custom "An Assignment with operator Delete should not be followed by a value expression. This counts as a system programming error."
+                  where
+                    -- The function we describe has an CDOM result, equal to the
+                    -- current domain.
+                    makeAssignment :: EnumeratedRoleType -> QueryFunctionDescription -> String -> QueryFunctionDescription
+                    makeAssignment er valueDescription opName = BQD
+                      currentDomain
+                      (AssignmentOperator opName)
+                      (SQD currentDomain (RolGetter (ENR er)) (RDOM (ST er)))
+                      valueDescription
+                      currentDomain
 
             -- The left hand side must identify an EnumeratedProperty on the Object of the Action.
-            compilePropertyRule :: RoleType -> Assignment -> PhaseThree AssignmentStatement
-            compilePropertyRule roletype (Assignment{lhs, operator, value, start, end}) = do
+            compilePropertyAssignment :: RoleType -> Assignment -> PhaseThree QueryFunctionDescription
+            compilePropertyAssignment roletype (Assignment{lhs, operator, value, start, end}) = do
               (qualifiedProp :: EnumeratedPropertyType) <- qualifyProperty roletype start lhs
               dom <- lift2 $ expandedADT_ roletype
-              (mdescr :: Maybe QueryFunctionDescription) <- traverse (compileStep (RDOM dom)) value
-              case mdescr of
+              propRange <- lift $ lift $ rangeOfPropertyType (ENP qualifiedProp)
+              (mValueDescription :: Maybe QueryFunctionDescription) <- traverse (compileStep (RDOM dom)) value
+              case mValueDescription of
                 Nothing -> case operator of
-                  (Delete p) -> pure $ DeleteProperty qualifiedProp
+                  (Delete p) -> pure $ UQD (RDOM dom) (AssignmentOperator "DeleteProperty") (SQD (RDOM dom) (PropertyGetter (ENP qualifiedProp)) (VDOM propRange)) (VDOM propRange)
                   otherwise -> throwError $ MissingValueForAssignment start end
-                Just descr -> case operator of
-                  Set _ -> pure $ SetProperty qualifiedProp descr
-                  AddTo _ -> pure $ AddToProperty qualifiedProp descr
-                  DeleteFrom _ -> pure $ RemoveFromProperty qualifiedProp descr
+                Just valueDescription -> case operator of
+                  Set _ -> pure $ makeAssignment (RDOM dom) propRange qualifiedProp valueDescription "SetProperty"
+                  AddTo _ -> pure $ makeAssignment (RDOM dom) propRange qualifiedProp valueDescription "AddToProperty"
+                  DeleteFrom _ -> pure $ makeAssignment (RDOM dom) propRange qualifiedProp valueDescription "RemoveFromProperty"
                   Delete _ -> throwError $ Custom "An Assignment with operator Delete should not be followed by a value expression. This counts as a system programming error."
+              where
+                -- The function we describe has a VDOM Range (e.g. VDOM Boolean), where
+                -- Range is the range of the Property.
+                makeAssignment :: Domain -> Range -> EnumeratedPropertyType -> QueryFunctionDescription -> String -> QueryFunctionDescription
+                makeAssignment currentDomain propRange qualifiedProp valueDescription opName = BQD
+                  currentDomain
+                  (AssignmentOperator opName)
+                  (SQD currentDomain (PropertyGetter (ENP qualifiedProp)) (VDOM propRange))
+                  valueDescription
+                  (VDOM propRange)
 
             qualifyProperty :: RoleType -> ArcPosition -> String -> PhaseThree EnumeratedPropertyType
             qualifyProperty erole pos propType = do

@@ -224,6 +224,18 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
+  test "Role with two properties" do
+    (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "thing : MyRole (mandatory, not functional) filledBy : Host, Guest\n  property: Prop1\n  property: Prop2" roleE
+    case r of
+      (Left e) -> assert (show e) false
+      (Right rl@(RE (RoleE{roleParts}))) -> do
+        -- logShow rl
+        assert "Role should have two properties"
+          (2 == (length (filter (case _ of
+            (PE _) -> true
+            otherwise -> false) roleParts)))
+      otherwise -> assert "Role should have parts" false
+
   test "BotRole" do
     (r :: Either ParseError ContextPart) <- pure $ unwrap $ runIndentParser "bot : for MySelf" roleE
     case r of
@@ -236,7 +248,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
           otherwise -> assert "BotRole should have ForUser part" false
       otherwise -> assert "BotRole should have a ForUser part." false
 
-  test "Property with functional and mandatory properties" do
+  test "Property with functional and mandatory attributes" do
     (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "property: MyProperty (mandatory, not functional, Number)" propertyE
     case r of
       (Left e) -> assert (show e) false
@@ -311,23 +323,6 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
           (isJust (findIndex (case _ of
             (Act (ActionE {verb: v})) -> v == Change
             otherwise -> false) perspectiveParts)))
-      otherwise -> assert "Parsed an unexpected type" false
-
-  test "Perspective without named Verbs should have default actions." do
-    (r :: Either ParseError RolePart) <- pure $ unwrap $ runIndentParser "perspective on: MyObject" perspectiveE
-    case r of
-      (Left e) -> assert (show e) false
-      (Right pre@(PRE (PerspectiveE{id, perspectiveParts}))) -> do
-        -- logShow pre
-        (assert "The Perspective should have the object 'MyObject'"
-          (isJust (findIndex (case _ of
-            (Object _) -> true
-            otherwise -> false) perspectiveParts)))
-        (assert "There should be an Action for Consult"
-          (isJust (findIndex (case _ of
-            (Act (ActionE{verb})) -> verb == Consult
-            otherwise -> false) perspectiveParts))
-        )
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Perspective on External" do

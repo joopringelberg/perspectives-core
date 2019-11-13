@@ -87,17 +87,25 @@ compileFunction (SQD _ (DataTypeGetter "binding") _) = pure $ R2R binding
 
 compileFunction (SQD _ (ComputedRoleGetter functionName) _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
 
-compileFunction (SQD (CDOM _) (VariableLookup varName) (CDOM _)) = pure $ C2C (unsafeCoerce (lookup varName) :: ContextInstance ~~> ContextInstance)
+compileFunction (SQD dom (VariableLookup varName) range) =
+  case dom, range of
+    (CDOM _), (CDOM _) -> pure $ C2C (unsafeCoerce (lookup varName) :: ContextInstance ~~> ContextInstance)
+    (CDOM _), (RDOM _) -> pure $ C2R (unsafeCoerce (lookup varName) :: ContextInstance ~~> RoleInstance)
+    (CDOM _), (VDOM _) -> pure $ C2V (unsafeCoerce (lookup varName) :: ContextInstance ~~> Value)
+    (RDOM _), (RDOM _) -> pure $ R2R (unsafeCoerce (lookup varName) :: RoleInstance ~~> RoleInstance)
+    (RDOM _), (CDOM _) -> pure $ R2C (unsafeCoerce (lookup varName) :: RoleInstance ~~> ContextInstance)
+    (RDOM _), (VDOM _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
+    _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
-compileFunction (SQD (CDOM _) (VariableLookup varName) (RDOM _)) = pure $ C2R (unsafeCoerce (lookup varName) :: ContextInstance ~~> RoleInstance)
+-- compileFunction (BQD (CDOM _) (AssignmentOperator "SetRol") rol value (CDOM _)
+-- compileFunction (BQD (CDOM _) (AssignmentOperator "AddToRol") rol value (CDOM _)
+-- compileFunction (BQD (CDOM _) (AssignmentOperator "RemoveFromRol") rol value (CDOM _)
+-- compileFunction (UQD (CDOM _) (AssignmentOperator "DeleteRol") rol (CDOM _) =
 
-compileFunction (SQD (CDOM _) (VariableLookup varName) (VDOM _)) = pure $ C2V (unsafeCoerce (lookup varName) :: ContextInstance ~~> Value)
-
-compileFunction (SQD (RDOM _) (VariableLookup varName) (RDOM _)) = pure $ R2R (unsafeCoerce (lookup varName) :: RoleInstance ~~> RoleInstance)
-
-compileFunction (SQD (RDOM _) (VariableLookup varName) (CDOM _)) = pure $ R2C (unsafeCoerce (lookup varName) :: RoleInstance ~~> ContextInstance)
-
-compileFunction (SQD (RDOM _) (VariableLookup varName) (VDOM _)) = pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
+-- compileFunction (BQD (RDOM _) (AssignmentOperator "SetProperty") prop value ())
+-- compileFunction (BQD (RDOM _) (AssignmentOperator "AddToProperty") prop value ())
+-- compileFunction (BQD (RDOM _) (AssignmentOperator "RemoveFromProperty") prop value ())
+-- compileFunction (UQD (RDOM _) (AssignmentOperator "DeleteProperty") prop ()) =
 
 compileFunction (BQD _ (BinaryCombinator "compose") f1 f2 _) = do
   f1' <- compileFunction f1
@@ -219,6 +227,12 @@ getRoleFunction id = unsafePartial $
   do
     (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType id)
     (C2R f) <- RC.calculation p >>= compileFunction
+    pure f
+
+-- | Construct a function to compute instances of a ContextType from an instance of a Context.
+context2context :: QueryFunctionDescription -> MP (ContextInstance ~~> ContextInstance)
+context2context qd = unsafePartial $ do
+    (C2C f) <- compileFunction qd
     pure f
 
 -- | Construct a function to compute instances of a RoleType from an instance of a Context.
