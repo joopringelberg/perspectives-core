@@ -21,7 +21,7 @@
 
 module Perspectives.Parsing.Arc.Expression where
 
-import Control.Alt (void, (<|>))
+import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Array (many)
 import Data.DateTime (DateTime)
@@ -86,9 +86,9 @@ simpleStep = try
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
   <|>
-  Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> (defer \_ -> arcIdentifier)))
+  Simple <$> (CreateContext <$> getPosition <*> (reserved "createContext" *> arcIdentifier))
   <|>
-  Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> (defer \_ -> arcIdentifier)))
+  Simple <$> (CreateEnumeratedRole <$> getPosition <*> (reserved "createRole" *> arcIdentifier))
   <|>
   Simple <$> (SequenceFunction <$> getPosition <*> sequenceFunction)
   <|>
@@ -223,13 +223,82 @@ endOf stp = case stp of
     line_ (ArcPosition{line}) = line
 
 assignment :: IP Assignment
-assignment = deletion <|> try do
+assignment = defer \_->propertyAssignment <|> roleAssignment <|> deletion
+
+roleAssignment :: IP Assignment
+roleAssignment = defer \_-> removal
+  <|> roleCreation
+  <|> move
+  <|> bind'
+  <|> bind_
+  <|> unbind
+  <|> unbind_
+
+removal :: IP Assignment
+removal = do
   start <- getPosition
-  lhs <- arcIdentifier
+  roleExpression <- (reserved "remove" *> step)
+  end <- getPosition
+  pure $ Remove {start, end, roleExpression}
+
+roleCreation :: IP Assignment
+roleCreation = do
+  start <- getPosition
+  roleIdentifier <- reserved "createRole" *> arcIdentifier
+  contextExpression <- optionMaybe (reserved "in" *> step)
+  end <- getPosition
+  pure $ CreateRole {start, end, roleIdentifier, contextExpression}
+
+move :: IP Assignment
+move = do
+  start <- getPosition
+  roleExpression <- (reserved "move" *> step)
+  contextExpression <- optionMaybe (reserved "to" *> step)
+  end <- getPosition
+  pure $ Move {start, end, roleExpression, contextExpression}
+
+bind' :: IP Assignment
+bind' = do
+  start <- getPosition
+  bindingExpression <- (reserved "bind" *> step)
+  roleIdentifier <- reserved "to" *> arcIdentifier
+  contextExpression <- optionMaybe (reserved "in" *> step)
+  end <- getPosition
+  pure $ Bind {start, end, bindingExpression, roleIdentifier, contextExpression}
+
+bind_ :: IP Assignment
+bind_ = do
+  start <- getPosition
+  bindingExpression <- (reserved "bind_" *> step)
+  binderExpression <- reserved "to" *> step
+  end <- getPosition
+  pure $ Bind_ {start, end, bindingExpression, binderExpression}
+
+unbind :: IP Assignment
+unbind = do
+  start <- getPosition
+  bindingExpression <- (reserved "unbind" *> step)
+  roleIdentifier <- reserved "from" *> arcIdentifier
+  end <- getPosition
+  pure $ Unbind {start, end, bindingExpression, roleIdentifier}
+
+unbind_ :: IP Assignment
+unbind_ = do
+  start <- getPosition
+  bindingExpression <- (reserved "unbind_" *> step)
+  binderExpression <- reserved "from" *> step
+  end <- getPosition
+  pure $ Unbind_ {start, end, bindingExpression, binderExpression}
+
+propertyAssignment :: IP Assignment
+propertyAssignment = try do
+  start <- getPosition
+  propertyIdentifier <- arcIdentifier
   op <- assignmentOperator
   val <- step
   end <- getPosition
-  pure $ Assignment {start, end, lhs, operator: op, value: Just val}
+  roleExpression <- optionMaybe (reserved "for" *> step)
+  pure $ PropertyAssignment {start, end, propertyIdentifier, operator: op, valueExpression: val, roleExpression}
 
 assignmentOperator :: IP AssignmentOperator
 assignmentOperator = try
@@ -244,9 +313,10 @@ deletion :: IP Assignment
 deletion = try do
   start <- getPosition
   reserved "delete"
-  lhs <- arcIdentifier
+  identifier <- arcIdentifier
+  expression <- optionMaybe (reserved "from" *> step)
   end <- getPosition
-  pure $ Assignment {start, end, lhs, operator: Delete start, value: Nothing }
+  pure $ Delete {start, end, identifier, expression}
 
 -- | Parse between single quotes.
 dateTimeLiteral :: IP String

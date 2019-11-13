@@ -53,9 +53,13 @@ data QueryFunction
   | CreateRole EnumeratedRoleType
 	| CreateContext ContextType
 	| Bind EnumeratedRoleType
+  | Bind_
 	| Unbind EnumeratedRoleType
-	| DeleteRol EnumeratedRoleType
+  | Unbind_
+	| DeleteRole EnumeratedRoleType
 	| DeleteProperty EnumeratedPropertyType
+  | Move
+  | Remove
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 

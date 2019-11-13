@@ -135,56 +135,70 @@ constructRHS objectGetter actionType a = case a of
 
 -- | From the description of an Action, compile an Updater of ContextInstance.
 -- | The results of these rather expensive computations are cached.
-compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
-compileBotAction actionType contextId =
-  case retrieveAction actionType of
-    (Just a) -> pure a
-    Nothing -> do
-      (action :: Action) <- getPerspectType actionType
-      -- objectOfAction is a type of Role.
-      (objectOfAction :: Role) <- getRole (object action)
-      -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
-      -- The result of this function is dependent on any number of Assumptions.
-      (objectGetter :: RoleGetter) <- getCalculation objectOfAction >>= context2role
-      -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
-      (makeRHSs :: Array (ContextInstance -> RHS)) <- traverse (constructRHS objectGetter actionType) (effect action)
-      -- The Left Hand Side of the Action is a query that computes boolean values.
-      -- These values depend on a number of Assumptions.
-      (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
-      rhss <- pure (map (applyFlipped contextId) makeRHSs)
+-- compileBotAction :: ActionType -> ContextInstance -> MonadPerspectives (Updater ContextInstance)
+-- compileBotAction actionType contextId =
+--   case retrieveAction actionType of
+--     (Just a) -> pure a
+--     Nothing -> do
+--       (action :: Action) <- getPerspectType actionType
+--       -- objectOfAction is a type of Role.
+--       (objectOfAction :: Role) <- getRole (object action)
+--       -- objectGetter is a function that computes the actual instance(s) of the objectRole of the Action.
+--       -- The result of this function is dependent on any number of Assumptions.
+--       (objectGetter :: RoleGetter) <- getCalculation objectOfAction >>= context2role
+--       -- The Right Hand Side of the Action has side effects (updates Roles and Properties)
+--       (makeRHSs :: Array (ContextInstance -> RHS)) <- traverse (constructRHS objectGetter actionType) (effect action)
+--       -- The Left Hand Side of the Action is a query that computes boolean values.
+--       -- These values depend on a number of Assumptions.
+--       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
+--       rhss <- pure (map (applyFlipped contextId) makeRHSs)
+--
+--       (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=>
+--         (\values -> for_ rhss (applyFlipped values))
+--       ))
+--       -- Cache the result.
+--       _ <- pure $ cacheAction actionType updater
+--       pure updater
 
-      (updater :: Updater ContextInstance) <- pure (((lift <<< lift <<< flip runMonadPerspectivesQuery lhs) >=>
-        (\values -> for_ rhss (applyFlipped values))
-      ))
-      -- Cache the result.
-      _ <- pure $ cacheAction actionType updater
-      pure updater
+-- compileBotAction' :: ActionType -> (Updater ContextInstance)
+-- compileBotAction' actionType contextId =
+--   case retrieveAction actionType of
+--     (Just a) -> a contextId
+--     Nothing -> do
+--       (action :: Action) <- lift $ lift $ getPerspectType actionType
+--       eff <- lift $ lift $ effect action
+--       -- hier zijn twee functies mogelijk.
+--       effectFullFunction <- lift $ lift $ compileRoleUpdater eff
+--       (lhs :: (ContextInstance ~~> Value)) <- lift $ lift $ condition action >>= context2propertyValue
+--       roleRuleRunner lhs effectFullFunction contextId
+--
+--   where
+--     roleRuleRunner :: (ContextInstance ~~> Value) ->
+--       (Updater ContextInstance) ->
+--       (Updater ContextInstance)
+--     roleRuleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
+--       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+--       if (alaF Conj foldMap (eq (Value "true")) bools)
+--           then do
+--             -- Cache the association between the assumptions found for this ActionInstance.
+--             pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
+--             effectFullFunction contextId
+--           else pure unit
 
-compileBotAction' :: ActionType -> (Updater ContextInstance)
-compileBotAction' actionType contextId =
-  case retrieveAction actionType of
-    (Just a) -> a contextId
-    Nothing -> do
-      (action :: Action) <- lift $ lift $ getPerspectType actionType
-      eff <- lift $ lift $ effect action
-      -- Dit kan niet door context2context geleverd worden. We moeten voor assignment
-      -- in een andere monad werken, namelijk MonadPerspectivesTransaction.
-      effectFullFunction <- lift $ lift $ context2context eff
-      (lhs :: (ContextInstance ~~> Value)) <- lift $ lift $ condition action >>= context2propertyValue
-      roleRuleRunner lhs effectFullFunction contextId
+-- It is always an (Updater ContextInstance).
+-- However, for a Property updater, we provide the object.
+-- compileRoleUpdater :: QueryFunctionDescription -> Updater ContextInstance
+-- compileFunction (BQD (CDOM _) (AssignmentOperator "SetRol") rol value (CDOM _)
+-- compileFunction (BQD (CDOM _) (AssignmentOperator "AddToRol") rol value (CDOM _)
+-- compileFunction (BQD (CDOM _) (AssignmentOperator "RemoveFromRol") rol value (CDOM _)
+-- compileFunction (UQD (CDOM _) (AssignmentOperator "DeleteRol") rol (CDOM _) =
 
-  where
-    roleRuleRunner :: (ContextInstance ~~> Value) ->
-      (Updater ContextInstance) ->
-      (Updater ContextInstance)
-    roleRuleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
-      (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-      if (alaF Conj foldMap (eq (Value "true")) bools)
-          then do
-            -- Cache the association between the assumptions found for this ActionInstance.
-            pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
-            effectFullFunction contextId
-          else pure unit
+-- compileFunction (BQD (RDOM _) (AssignmentOperator "SetProperty") prop value ())
+-- compileFunction (BQD (RDOM _) (AssignmentOperator "AddToProperty") prop value ())
+-- compileFunction (BQD (RDOM _) (AssignmentOperator "RemoveFromProperty") prop value ())
+-- compileFunction (UQD (RDOM _) (AssignmentOperator "DeleteProperty") prop ()) =
+
+
 
 -- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
 -- | on Assumptions in the actionAssumptionRegister in PerspectivesState.

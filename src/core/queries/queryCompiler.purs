@@ -97,16 +97,6 @@ compileFunction (SQD dom (VariableLookup varName) range) =
     (RDOM _), (VDOM _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
     _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
--- compileFunction (BQD (CDOM _) (AssignmentOperator "SetRol") rol value (CDOM _)
--- compileFunction (BQD (CDOM _) (AssignmentOperator "AddToRol") rol value (CDOM _)
--- compileFunction (BQD (CDOM _) (AssignmentOperator "RemoveFromRol") rol value (CDOM _)
--- compileFunction (UQD (CDOM _) (AssignmentOperator "DeleteRol") rol (CDOM _) =
-
--- compileFunction (BQD (RDOM _) (AssignmentOperator "SetProperty") prop value ())
--- compileFunction (BQD (RDOM _) (AssignmentOperator "AddToProperty") prop value ())
--- compileFunction (BQD (RDOM _) (AssignmentOperator "RemoveFromProperty") prop value ())
--- compileFunction (UQD (RDOM _) (AssignmentOperator "DeleteProperty") prop ()) =
-
 compileFunction (BQD _ (BinaryCombinator "compose") f1 f2 _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2

@@ -135,19 +135,26 @@ data Operator =
   | Filter ArcPosition
   | Sequence ArcPosition
 
-newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
+-- newtype Assignment = Assignment {start :: ArcPosition, end :: ArcPosition, lhs :: String, operator :: AssignmentOperator, value :: Maybe Step}
 
 data AssignmentOperator =
   Set ArcPosition
   | AddTo ArcPosition
   | DeleteFrom ArcPosition
-  | Delete ArcPosition
 
 type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
 
-data Assignment' =
+data Assignment =
 	Remove (WithTextRange (roleExpression :: Step))
-	| Create (WithTextRange (roleType :: String, contextExpression :: Maybe Step))
+	| CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
+  | Move (WithTextRange (roleExpression :: Step, contextExpression :: Maybe Step))
+  | Bind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String, contextExpression :: Maybe Step))
+  | Bind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
+  | Unbind (WithTextRange (bindingExpression :: Step, roleIdentifier :: String))
+  | Unbind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
+  | Delete (WithTextRange (identifier :: String, expression :: Maybe Step))
+  | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
+
 
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
