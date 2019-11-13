@@ -50,8 +50,8 @@ data QueryFunction
   | BinaryCombinator FunctionName
   | Constant Range String
 
-  | CreateRole EnumeratedRoleType
-	| CreateContext ContextType
+  | CreateRole' EnumeratedRoleType
+	| CreateContext' ContextType
 	| Bind EnumeratedRoleType
   | Bind_
 	| Unbind EnumeratedRoleType

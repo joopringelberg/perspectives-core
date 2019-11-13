@@ -73,7 +73,7 @@ makeTestOnly :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFi
 makeTestOnly = makeTest_ testOnly
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Query.DescriptionCompiler" do
+theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
 
   makeTest "compileSimpleStep: ArcIdentifier, Role."
     "domain: Test\n  thing: Role = AnotherRole\n  thing: AnotherRole (mandatory, functional)"

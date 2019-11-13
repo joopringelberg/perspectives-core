@@ -80,7 +80,7 @@ phaseThree df@{_id} = do
         -- inverseBindings  -- not yet implemented, probably unnecessary.
         qualifyReturnsClause
         compileExpressions
-        compileRules
+        -- compileRules
         )
       df
     case ei of
@@ -330,6 +330,7 @@ compileExpressions = do
         descr <- compileStep (CDOM $ ST ctxt) stp
         pure $ Action (ar {condition = Q descr})
 
+{-
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
 compileRules :: PhaseThree Unit
@@ -462,3 +463,4 @@ compileRules = do
                 f rt = ArrayT do
                   adt <- expandedADT_ rt
                   pure [adt]
+-}

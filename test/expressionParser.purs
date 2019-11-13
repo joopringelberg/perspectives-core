@@ -5,6 +5,7 @@ import Prelude
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.List (length)
+import Data.Maybe (isJust, isNothing)
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)
 import Perspectives.Parsing.Arc.Expression (assignment, letStep, operator, simpleStep, step, unaryStep)
@@ -16,7 +17,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
+theSuite = suite "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -216,39 +217,6 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
               otherwise -> false
             otherwise -> false
 
-  test "Assignment: MyRole = AnotherRole" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyRole = AnotherRole" assignment
-    case r of
-      (Left e) -> assert (show e) false
-      (Right a@(Assignment{operator})) -> do
-        -- logShow a
-        assert "'MyRole = AnotherRole' should be parsed as a an Assignment with operator Set"
-          case operator of
-            (Set _) -> true
-            otherwise -> false
-
-  test "MyRole =+ AnotherRole >> binding" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyRole =+ AnotherRole >> binding" assignment
-    case r of
-      (Left e) -> assert (show e) false
-      (Right a@(Assignment{operator})) -> do
-        -- logShow a
-        assert "'MyRole =+ AnotherRole >> binding' should be parsed as a an Assignment with operator AddTo"
-          case operator of
-            (AddTo _) -> true
-            otherwise -> false
-
-  test "delete MyProp" do
-    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "delete Myprop" assignment
-    case r of
-      (Left e) -> assert (show e) false
-      (Right a@(Assignment{operator})) -> do
-        -- logShow a
-        assert "'delete Myprop' should be parsed as a an Assignment with operator Delete"
-          case operator of
-            (Delete _) -> true
-            otherwise -> false
-
   test "number in equation" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyProp > 10" step
     case r of
@@ -406,3 +374,96 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
       x -> do
         logShow x
         assert "'let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false
+-----------------------------------------------------------------------------------
+---- ASSIGNMENT
+-----------------------------------------------------------------------------------
+  test "Assignment: remove" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "remove MyRole" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Remove _)) -> do
+        -- logShow a
+        assert "'remove MyRole' should be parsed as a Remove assignment" true
+      otherwise -> assert ("'remove MyRole' should be parsed as a Remove assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: createRole" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "createRole MyRole" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(CreateRole {contextExpression})) -> do
+        -- logShow a
+        assert "There should be no contextExpression" (isNothing contextExpression)
+      otherwise -> assert ("'createRole MyRole' should be parsed as a CreateRole assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: createRole in an embedded context" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "createRole MyRole in SomeContextRole >> binding >> context" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(CreateRole {contextExpression})) -> do
+        -- logShow a
+        assert "There should be a contextExpression" (isJust contextExpression)
+      otherwise -> assert ("'createRole MyRole in SomeContextRole >> binding >> context' should be parsed as a CreateRole assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: move" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "move MyRole" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Move {roleExpression: Simple (ArcIdentifier _ "MyRole"), contextExpression})) -> do
+        -- logShow a
+        assert "test ok" (isNothing contextExpression)
+      otherwise -> assert ("'move MyRole' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: move to an embedded context" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "move MyRole to SomeContextRole >> binding >> context" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Move {contextExpression})) -> do
+        logShow a
+        assert "There should be a contextExpression" (isJust contextExpression)
+      otherwise -> assert ("'move MyRole to SomeContextRole >> binding >> context' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: bind" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "bind MyRole to AnotherRole" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier})) -> do
+        -- logShow a
+        assert "roleIdentifier should be 'AnotherRole'" (roleIdentifier == "AnotherRole")
+      otherwise -> assert ("'bind MyRole to AnotherRole' should be parsed as a Bind assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: bind in an embedded context" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "bind MyRole to AnotherRole in SomeContextRole >> binding >> context" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(Bind {bindingExpression: Simple (ArcIdentifier _ "MyRole"), roleIdentifier, contextExpression})) -> do
+        -- logShow a
+        assert "roleIdentifier should be 'AnotherRole'" (isJust contextExpression)
+      otherwise -> assert ("'bind MyRole to AnotherRole in SomeContextRole >> binding >> context' should be parsed as a Bind assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: bind with path as second term should fail" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "bind MyRole to (SomeContextRole >> binding >> context >> AnotherRole)" assignment
+    case r of
+      (Left e) -> assert "failure expected" true
+      otherwise -> assert "'bind MyRole to SomeContextRole >> binding >> context >> AnotherRole' should fail because the second term must be an identifier" false
+
+  test "Assignment: propertyAssignment" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyProp = 10" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression})) -> do
+        -- logShow a
+        assert "propertyIdentifier should be 'MyProp'" (propertyIdentifier == "MyProp")
+        assert "operator should be Set" (case operator of
+          (Set _) -> true
+          otherwise -> false)
+        assert "valueExpression should be Simple" (valueExpression == (Simple (Value (ArcPosition { column: 10, line: 1 }) PNumber "10")))
+        assert "There should be no roleExpression" (isNothing roleExpression)
+      otherwise -> assert ("'MyProp = 10' should be parsed as a PropertyAssignment assignment, instead this was returned: " <> show otherwise) false
+
+  testOnly "Assignment: propertyAssignment for another role" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "MyProp = 10 for AnotherRole" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(PropertyAssignment {roleExpression})) -> do
+        assert "There should be a roleExpression" (isJust roleExpression)
+      otherwise -> assert ("'MyProp = 10 for AnotherRole' should be parsed as a PropertyAssignment assignment, instead this was returned: " <> show otherwise) false
