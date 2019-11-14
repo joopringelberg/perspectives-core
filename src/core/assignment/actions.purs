@@ -185,6 +185,10 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
     ctxts <- lift $ lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization{properties: PropertySerialization empty, binding: Nothing})
 
+-- compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _) = do
+--   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
+--   (roleGetter :: (ContextInstance ~~> RoleInstance)) = context2role roleToMove
+
 compileAssignment (BQD _ (QF.BinaryCombinator "sequence") _ _ _ ) = pure \_ -> pure unit
 
 -- Vergeet EffectFullFunction niet!

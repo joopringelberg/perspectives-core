@@ -32,7 +32,6 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign, unsafeToForeign)
--- import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
@@ -54,6 +53,12 @@ domain :: QueryFunctionDescription -> Range
 domain (SQD d _ _) = d
 domain (UQD d _ _ _) = d
 domain (BQD d _ _ _ _) = d
+
+-- | This function is partial, because we can only establish the functionality of
+-- | an RDOM.
+-- NOTE: We cannot have that function here, because it needs Perspectives.Representation.Class.Role and that introduces a cycle in modules.
+-- isFunctional :: Partial => QueryFunctionDescription -> MP Boolean
+-- isFunctional (RDOM adt) = functional' adt
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 

@@ -392,6 +392,8 @@ compileRules = do
                 qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
                 pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain
               Move {roleExpression, contextExpression} -> do
+                -- TODO: kunnen we nagaan dat cte functioneel is?
+                -- Hier moeten we nagaan of er wel contexten worden opgeleverd!
                 (cte :: QueryFunctionDescription) <- case contextExpression of
                   Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain)
                   (Just stp) -> compileStep currentDomain stp
