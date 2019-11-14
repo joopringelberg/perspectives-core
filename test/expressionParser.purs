@@ -12,6 +12,7 @@ import Perspectives.Parsing.Arc.Expression (assignment, letStep, operator, simpl
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
@@ -293,7 +294,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
       (Right id) -> do
         -- logShow id
         assert "'sum' should be parsed as a the simple step SequenceFunction" case id of
-          (Simple (SequenceFunction (ArcPosition{column: 1, line: 1}) "sum")) -> true
+          (Simple (SequenceFunction (ArcPosition{column: 1, line: 1}) AddF)) -> true
           otherwise -> false
 
   test "Operator: >>=" do

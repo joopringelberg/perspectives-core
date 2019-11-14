@@ -47,6 +47,7 @@ import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
 import Perspectives.Representation.Class.Property (rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, typeExcludingBinding_)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
@@ -92,7 +93,7 @@ compileSimpleStep currentDomain s@(Binding pos) = do
       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
       case typeOfBinding of
         NOTYPE -> throwError $ RoleHasNoBinding pos r
-        adt -> pure $ SQD currentDomain (QF.DataTypeGetter "binding") (RDOM adt)
+        adt -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM adt)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Binder pos binderName) = do
@@ -113,7 +114,7 @@ compileSimpleStep currentDomain s@(Binder pos binderName) = do
       -- That is, its binding (an ADT) must be more general than the currentDomain.
       (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ expandedADT_ (ENR qBinderType)
       if r `lessThenOrEqualTo` bindingOfBinder
-        then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter "getRoleBinders" (unwrap qBinderType)) (RDOM $ ST qBinderType)
+        then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM $ ST qBinderType)
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
@@ -121,14 +122,14 @@ compileSimpleStep currentDomain s@(Context pos) = do
   case currentDomain of
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       (typeOfContext :: ADT ContextType) <- lift2 $ contextOfADT r
-      pure $ SQD currentDomain (QF.DataTypeGetter "context") (CDOM typeOfContext)
+      pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM typeOfContext)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Extern pos) = do
   case currentDomain of
     (CDOM c) -> do
       (rts :: ADT EnumeratedRoleType) <- lift2 $ externalRoleOfADT c
-      pure $ SQD currentDomain (QF.DataTypeGetter "externalRole") (RDOM $ rts)
+      pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM $ rts)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain (CreateContext pos ident) = do
@@ -143,7 +144,7 @@ compileSimpleStep currentDomain (CreateContext pos ident) = do
         Nothing -> throwError $ UnknownContext pos ident
         (Just qn) | length qnames == 1 -> pure qn
         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
-  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter "createContext" (unwrap qcontextType)) (CDOM (ST qcontextType))
+  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateContextF (unwrap qcontextType)) (CDOM (ST qcontextType))
 
 compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
   -- If `ident` is not qualified, try to qualify it in the Domain.
@@ -157,9 +158,9 @@ compileSimpleStep currentDomain (CreateEnumeratedRole pos ident) = do
         Nothing -> throwError $ UnknownRole pos ident
         (Just qn) | length qnames == 1 -> pure qn
         otherwise -> throwError $ NotUniquelyIdentifying pos ident (map unwrap qnames)
-  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter "createRole" (unwrap qroleType)) (RDOM (ST qroleType))
+  pure $ SQD currentDomain (QF.DataTypeGetterWithParameter CreateRoleF (unwrap qroleType)) (RDOM (ST qroleType))
 
-compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (QF.DataTypeGetter "identity") currentDomain
+compileSimpleStep currentDomain (Identity _) = pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain
 
 -- We compile the SequenceFunction as a UnaryCombinator, which is a stretch.
 compileSimpleStep currentDomain (SequenceFunction _ fname) = pure $ SQD currentDomain (QF.UnaryCombinator fname) currentDomain
@@ -175,14 +176,14 @@ compileUnaryStep currentDomain (LogicalNot pos s) = do
   -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool) range value.
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    VDOM PBool -> pure $ UQD currentDomain (QF.UnaryCombinator "not") descriptionOfs (VDOM PBool)
+    VDOM PBool -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs (VDOM PBool)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain s
 
 compileUnaryStep currentDomain st@(Exists pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
-    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator "exists") descriptionOfs (VDOM PBool)
+    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
@@ -192,13 +193,13 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       f2 <- compileStep (range f1) right
       -- f1 is the source to be filtered, f2 is the criterium.
       case range f2 of
-        VDOM PBool -> pure $ BQD currentDomain (QF.BinaryCombinator "filter") f1 f2 (range f1)
+        VDOM PBool -> pure $ BQD currentDomain (QF.BinaryCombinator FilterF) f1 f2 (range f1)
         otherwise -> throwError $ NotABoolean (startOf right)
     Compose pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep (range f1) right
       -- TODO. An optimalisation: if the left or right term is Identity, replace the entire composition by the other term.
-      pure $ BQD currentDomain (QF.BinaryCombinator "compose") f1 f2 (range f2)
+      pure $ BQD currentDomain (QF.BinaryCombinator ComposeF) f1 f2 (range f2)
 
     otherwise -> do
       f1 <- compileStep currentDomain left
@@ -206,19 +207,19 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
       case operator of
 
-        Equals pos -> comparison pos f1 f2 "equals"
-        NotEquals pos -> comparison pos f1 f2 "notEquals"
-        LessThan pos -> comparison pos f1 f2 "lessThan"
-        LessThanEqual pos -> comparison pos f1 f2 "lessThanEqual"
-        GreaterThan pos -> comparison pos f1 f2 "greaterThan"
-        GreaterThanEqual pos -> comparison pos f1 f2 "greaterThanEqual"
+        Equals pos -> comparison pos f1 f2 EqualsF
+        NotEquals pos -> comparison pos f1 f2 NotEqualsF
+        LessThan pos -> comparison pos f1 f2 LessThanF
+        LessThanEqual pos -> comparison pos f1 f2 LessThanEqualF
+        GreaterThan pos -> comparison pos f1 f2 GreaterThanF
+        GreaterThanEqual pos -> comparison pos f1 f2 GreaterThanEqualF
 
-        LogicalAnd pos -> binOp pos f1 f2 [PBool] "and"
-        LogicalOr pos -> binOp pos f1 f2 [PBool] "or"
-        Add pos -> binOp pos f1 f2 [PNumber, PString] "add"
-        Subtract pos -> binOp pos f1 f2 [PNumber, PString] "subtract"
-        Divide pos -> binOp pos f1 f2 [PNumber] "divide"
-        Multiply pos -> binOp pos f1 f2 [PNumber] "multiply"
+        LogicalAnd pos -> binOp pos f1 f2 [PBool] AndF
+        LogicalOr pos -> binOp pos f1 f2 [PBool] OrF
+        Add pos -> binOp pos f1 f2 [PNumber, PString] AddF
+        Subtract pos -> binOp pos f1 f2 [PNumber, PString] SubtractF
+        Divide pos -> binOp pos f1 f2 [PNumber] DivideF
+        Multiply pos -> binOp pos f1 f2 [PNumber] MultiplyF
 
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
@@ -227,12 +228,12 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
           -- The sequenceFunctionName is compiled as a UnaryCombinator
           -- Notice by the domain and range that we assume functions that are Monoids.
           SQD _ (QF.UnaryCombinator fname) _ -> case fname of
-            "count" -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber)
+            CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber)
             _ -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain
           _ -> throwError $ ArgumentMustBeSequenceFunction pos
 
   where
-    comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> String -> PhaseThree QueryFunctionDescription
+    comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> FunctionName -> PhaseThree QueryFunctionDescription
     comparison pos left' right' functionName = do
       -- Both ranges must be equal
       gt <- lift2 $ pure ((range left') `eq` (range right'))
@@ -240,7 +241,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (range right')
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
-    binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> String -> PhaseThree QueryFunctionDescription
+    binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
       (VDOM rc1), (VDOM rc2) | rc1 == rc2 ->
         if  allowed rc1 && allowed rc2
@@ -268,7 +269,7 @@ addVarBindingToSequence :: QueryFunctionDescription -> VarBinding -> FD
 addVarBindingToSequence seq v = makeSequence <$> pure seq <*> (compileVarBinding (domain seq) v)
 
 makeSequence :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
-makeSequence left right = BQD (domain left) (QF.BinaryCombinator "sequence") left right (range right)
+makeSequence left right = BQD (domain left) (QF.BinaryCombinator SequenceF) left right (range right)
 
 -- | Make a QueryFunctionDescription of a runtime function that evaluates the step of the binding and
 -- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to the

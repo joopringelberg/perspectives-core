@@ -47,7 +47,7 @@ import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (bind, ($), pure, (>=>), (<>), show, (>>=), (*>), discard)
 import Unsafe.Coerce (unsafeCoerce)
@@ -79,11 +79,11 @@ compileFunction (SQD _ (PropertyGetter (CP pt)) _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
   PC.calculation cp >>= compileFunction
 
-compileFunction (SQD _ (DataTypeGetter "externalRole") _) = pure $ C2R externalRole
+compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _) = pure $ C2R externalRole
 
-compileFunction (SQD _ (DataTypeGetter "context") _) = pure $ R2C context
+compileFunction (SQD _ (DataTypeGetter ContextF) _) = pure $ R2C context
 
-compileFunction (SQD _ (DataTypeGetter "binding") _) = pure $ R2R binding
+compileFunction (SQD _ (DataTypeGetter BindingF) _) = pure $ R2R binding
 
 compileFunction (SQD _ (ComputedRoleGetter functionName) _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
 
@@ -97,7 +97,7 @@ compileFunction (SQD dom (VariableLookup varName) range) =
     (RDOM _), (VDOM _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
     _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
-compileFunction (BQD _ (BinaryCombinator "compose") f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -114,7 +114,7 @@ compileFunction (BQD _ (BinaryCombinator "compose") f1 f2 _) = do
     (R2R a), (R2V b) -> pure $ R2V (a >=> b)
     _,  _ -> throwError (error $  "Cannot compose '" <> show f1 <> "' with '" <> show f2 <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator "filter") criterium source _) = do
+compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _) = do
   criterium' <- compileFunction criterium
   source' <- compileFunction source
   case criterium', source' of
@@ -125,7 +125,7 @@ compileFunction (BQD _ (BinaryCombinator "filter") criterium source _) = do
     -- TODO: filter Values.
     _,  _ -> throwError (error $  "Cannot filter '" <> show source <> "' with '" <> show criterium <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator "disjunction") f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -137,7 +137,7 @@ compileFunction (BQD _ (BinaryCombinator "disjunction") f1 f2 _) = do
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.disjunction a b
     _,  _ -> throwError (error $ "Cannot create disjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator "conjunction") f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -149,7 +149,7 @@ compileFunction (BQD _ (BinaryCombinator "conjunction") f1 f2 _) = do
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
     _,  _ -> throwError (error $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator "sequence") f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of

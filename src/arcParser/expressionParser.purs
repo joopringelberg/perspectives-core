@@ -35,6 +35,7 @@ import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseNa
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (between, lookAhead, optionMaybe, try, (<?>))
@@ -97,8 +98,13 @@ simpleStep = try
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)
   ) <?> "binding, binder, context, extern, this, a valid identifier or a number, boolean, string (between double quotes), date (between single quotes) or a monoid function (sum, product, minimum, maximum) or count"
 
-sequenceFunction :: IP String
-sequenceFunction = (token.symbol "sum" <|> token.symbol "product" <|> token.symbol "minimum" <|> token.symbol "maximum" <|> token.symbol "count") <?> "sum, product, minimum,\
+sequenceFunction :: IP FunctionName
+sequenceFunction = (token.symbol "sum" *> pure AddF
+  <|> token.symbol "product" *> pure MultiplyF
+  <|> token.symbol "minimum" *> pure MinimumF
+  <|> token.symbol "maximum" *> pure MaximumF
+  <|> token.symbol "count" *> pure CountF
+  ) <?> "sum, product, minimum,\
 \ maximum or count"
 
 
@@ -208,7 +214,7 @@ endOf stp = case stp of
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (CreateContext (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
     endOfSimple (CreateEnumeratedRole (ArcPosition{line, column}) ident) = ArcPosition{ line, column: column + length ident + 7}
-    endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length fname}
+    endOfSimple (SequenceFunction (ArcPosition{line, column}) fname) = ArcPosition{line, column: column + length (show fname)}
     endOfSimple (Identity (ArcPosition{line, column})) = ArcPosition{line, column: column + 4}
     endOfSimple (Variable (ArcPosition{line, column}) v) = ArcPosition{line, column: column + length v}
 

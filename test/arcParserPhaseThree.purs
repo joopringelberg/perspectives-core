@@ -36,7 +36,7 @@ import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
@@ -132,7 +132,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                   )
                 assert "The Object of the action 'ConsultAnotherRole' should be a qualified CalculatedRole type."
                   (let
-                    _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
+                    _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf_bot$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "object"))
                     in case (preview _o correctedDFR) of
                       (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
                       -- (Just (CR _)) -> true
@@ -140,7 +140,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     )
                 assert "The IndirectObject of the action 'ConsultAnotherRole' should be a qualified CalculatedRole type."
                   (let
-                    _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "indirectObject")) <<< _Just
+                    _o = prop (SProxy :: (SProxy "actions")) <<< at "model:MyTestDomain$MySelf_bot$ConsultAnotherRole" <<< traversed <<< _Newtype <<< prop (SProxy :: (SProxy "indirectObject")) <<< _Just
                     in case (preview _o correctedDFR) of
                       (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
                       -- (Just (CR _)) -> true
@@ -459,7 +459,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                 case lookup "model:Test$Gast$ConsultParty" actions of
                   (Just (Action{condition})) -> assert "The condition should have operator '>'"
                     (case condition of
-                      (Q (BQD _ (BinaryCombinator "greaterThan") _ _ _)) -> true
+                      (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _)) -> true
                       otherwise -> false)
                   otherwise -> assert "There should be an action Consult Party" false
 
@@ -468,7 +468,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
-        logShow ctxt
+        -- logShow ctxt
         case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
@@ -477,16 +477,12 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
-                -- logShow correctedDFR
-                case lookup "model:Test$Gast$ChangeParty" actions of
+                logShow correctedDFR
+                case lookup "model:Test$Gast_bot$ChangeParty" actions of
                   (Just (Action{condition, effect})) -> do
                     assert "The condition should have operator '>'"
                       (case condition of
-                        (Q (BQD _ (BinaryCombinator "greaterThan") _ _ _)) -> true
-                        otherwise -> false)
-                    assert "The effect should have one AssignmentStatement"
-                      (case effect of
-                        Just (EF stmt) -> true
+                        (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _)) -> true
                         otherwise -> false)
                     -- assert "One of the assignmentStatements should have operator Delete"
                     --   (case effect of

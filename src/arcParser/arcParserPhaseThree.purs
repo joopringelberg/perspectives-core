@@ -80,7 +80,7 @@ phaseThree df@{_id} = do
         -- inverseBindings  -- not yet implemented, probably unnecessary.
         qualifyReturnsClause
         compileExpressions
-        -- compileRules
+        compileRules
         )
       df
     case ei of
@@ -384,7 +384,7 @@ compileRules = do
             -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
             compileAssignment :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
             compileAssignment currentDomain ass = case ass of
-              Remove {roleExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              Remove {roleExpression} -> throwError $ Custom "Remove: Not all cases are implemented in compileAssignment!"
               CreateRole {roleIdentifier, contextExpression, start, end} -> do
                 (cte :: QueryFunctionDescription) <- case contextExpression of
                   Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain)
@@ -399,12 +399,12 @@ compileRules = do
                   (Just stp) -> compileStep currentDomain stp
                 rle <- compileStep currentDomain roleExpression
                 pure $ BQD currentDomain QF.Move rle cte currentDomain
-              Bind {bindingExpression, roleIdentifier, contextExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
-              Bind_ {bindingExpression, binderExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
-              Unbind {bindingExpression, roleIdentifier} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
-              Unbind_ {bindingExpression, binderExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
-              Delete {identifier, expression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
-              PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression} -> throwError $ Custom "Not all cases are implemented in compileAssignment!"
+              Bind {bindingExpression, roleIdentifier, contextExpression} -> throwError $ Custom "Bind: Not all cases are implemented in compileAssignment!"
+              Bind_ {bindingExpression, binderExpression} -> throwError $ Custom "Bind_: Not all cases are implemented in compileAssignment!"
+              Unbind {bindingExpression, roleIdentifier} -> throwError $ Custom "Unbind: Not all cases are implemented in compileAssignment!"
+              Unbind_ {bindingExpression, binderExpression} -> throwError $ Custom "Unbind_: Not all cases are implemented in compileAssignment!"
+              Delete {identifier, expression} -> throwError $ Custom "Delete: Not all cases are implemented in compileAssignment!"
+              PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression} -> throwError $ Custom "PropertyAssignment: Not all cases are implemented in compileAssignment!"
 
               where
                 qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType

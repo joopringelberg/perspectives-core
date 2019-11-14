@@ -30,8 +30,39 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPrope
 import Prelude (class Eq, class Show)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
-type FunctionName = String
 type VariableName = String
+
+data FunctionName =
+  ContextF
+  | BindingF
+  | ExternalRoleF
+  | IdentityF
+  | SequenceF
+  | NotF
+  | ExistsF
+  | FilterF
+  | ComposeF
+  | DisjunctionF
+  | ConjunctionF
+  | CreateContextF
+  | CreateRoleF
+  | GetRoleBindersF
+  | EqualsF
+  | NotEqualsF
+  | LessThanF
+  | LessThanEqualF
+  | GreaterThanF
+  | GreaterThanEqualF
+  | AddF
+  | SubtractF
+  | DivideF
+  | MultiplyF
+  | AndF
+  | OrF
+  | CountF
+  | MinimumF
+  | MaximumF
+
 
 data QueryFunction
   = DataTypeGetter FunctionName
@@ -39,8 +70,8 @@ data QueryFunction
   | PropertyGetter PropertyType
   | RolGetter RoleType
   -- 'Computed' is not 'calculated': call a Purescript function here.
-  | ComputedRoleGetter FunctionName
-  | ComputedPropertyGetter FunctionName
+  | ComputedRoleGetter String
+  | ComputedPropertyGetter String
   | VariableLookup VariableName
   | BindVariable VariableName
   | AssignmentOperator FunctionName
@@ -78,3 +109,39 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction where
 
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
   readImpl q = readJSON' (unsafeFromForeign q)
+
+derive instance genericFunctionName :: Generic FunctionName _
+
+-- | The show function produces the very same string that the parser parses.
+instance showFunctionName :: Show FunctionName where
+    show ContextF = "context"
+    show BindingF = "binding"
+    show ExternalRoleF = "external" -- TODO klopt dit met de parser?
+    show IdentityF = "identity"
+    show SequenceF = "sequence"
+    show NotF = "not"
+    show ExistsF = "exists"
+    show FilterF = "filter"
+    show ComposeF = "compose"
+    show DisjunctionF = "disjunction"
+    show ConjunctionF = "conjunction"
+    show CreateContextF = "createContext"
+    show CreateRoleF = "createRole"
+    show GetRoleBindersF = "binder" -- TODO en dit?
+    show EqualsF = "="
+    show NotEqualsF = "/="
+    show LessThanF = "<"
+    show LessThanEqualF = "<="
+    show GreaterThanF = ">"
+    show GreaterThanEqualF = ">="
+    show AddF = "+"
+    show SubtractF = "-"
+    show DivideF = "/"
+    show MultiplyF = "*"
+    show AndF = "and"
+    show OrF = "or"
+    show CountF = "count"
+    show MinimumF = "minimum"
+    show MaximumF = "maximum"
+
+instance eqFunctionName :: Eq FunctionName where eq = genericEq

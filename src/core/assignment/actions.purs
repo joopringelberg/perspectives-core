@@ -50,6 +50,7 @@ import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Context (Context, actions)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 
@@ -189,7 +190,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
 --   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
 --   (roleGetter :: (ContextInstance ~~> RoleInstance)) = context2role roleToMove
 
-compileAssignment (BQD _ (QF.BinaryCombinator "sequence") _ _ _ ) = pure \_ -> pure unit
+compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ ) = pure \_ -> pure unit
 
 -- Vergeet EffectFullFunction niet!
 

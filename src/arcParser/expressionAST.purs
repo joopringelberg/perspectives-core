@@ -88,6 +88,7 @@ import Data.Maybe (Maybe)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.EnumeratedProperty (Range)
+import Perspectives.Representation.QueryFunction (FunctionName)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | Step represents an Expression conforming to the grammar given above.
@@ -102,7 +103,7 @@ data SimpleStep =
   | Binder ArcPosition String
   | Context ArcPosition
   | Extern ArcPosition
-  | SequenceFunction ArcPosition String
+  | SequenceFunction ArcPosition FunctionName
   | Identity ArcPosition
   | Variable ArcPosition String
 
