@@ -180,7 +180,7 @@ compileBotAction actionType =
           else pure unit
 
 compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
-compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _) = do
+compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
@@ -190,7 +190,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
 --   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
 --   (roleGetter :: (ContextInstance ~~> RoleInstance)) = context2role roleToMove
 
-compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ ) = pure \_ -> pure unit
+compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ _ _) = pure \_ -> pure unit
 
 -- Vergeet EffectFullFunction niet!
 

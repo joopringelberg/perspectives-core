@@ -26,6 +26,7 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.EnumeratedProperty (Range)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Show)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
@@ -62,6 +63,38 @@ data FunctionName =
   | CountF
   | MinimumF
   | MaximumF
+
+isFunctionalFunction :: FunctionName -> ThreeValuedLogic
+isFunctionalFunction fn = case fn of
+  ContextF -> True
+  BindingF -> True
+  ExternalRoleF -> True
+  IdentityF -> Unknown
+  SequenceF -> Unknown
+  NotF -> True
+  ExistsF -> True
+  FilterF -> Unknown
+  ComposeF -> Unknown
+  DisjunctionF -> Unknown
+  ConjunctionF -> False
+  CreateContextF -> True
+  CreateRoleF -> True
+  GetRoleBindersF -> False
+  EqualsF -> True
+  NotEqualsF -> True
+  LessThanF -> True
+  LessThanEqualF -> True
+  GreaterThanF -> True
+  GreaterThanEqualF -> True
+  AddF -> True
+  SubtractF -> True
+  DivideF -> True
+  MultiplyF -> True
+  AndF -> True
+  OrF -> True
+  CountF -> True
+  MinimumF -> True
+  MaximumF -> True
 
 
 data QueryFunction

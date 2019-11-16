@@ -31,11 +31,12 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
-import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getEnumeratedProperty)
+import Perspectives.Representation.Class.PersistentType (getCalculatedProperty, getEnumeratedProperty, getPerspectType)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty, Range)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..))
-import Prelude (pure, (>>=), ($), (<>), bind)
+import Prelude (pure, (>>=), ($), (<>), bind, (>=>), (<<<))
 
 -- TODO. Controleer of de opzet van RoleClass.expandedADT hier van toepassing is.
 -----------------------------------------------------------
@@ -71,10 +72,27 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty Enu
   range r = pure (unwrap r).range
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = pure $ SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range)
+  calculation r = pure $ SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
 
 rangeOfPropertyType :: PropertyType -> MonadPerspectives Range
 rangeOfPropertyType (ENP pt) = getEnumeratedProperty pt >>= range
 rangeOfPropertyType (CP pt) = getCalculatedProperty pt >>= range
 
 data Property = E EnumeratedProperty | C CalculatedProperty
+
+-----------------------------------------------------------
+-- FUNCTIONS ON PROPERTYTYPE
+-----------------------------------------------------------
+getProperty :: PropertyType -> MonadPerspectives Property
+getProperty (ENP e) = getPerspectType e >>= pure <<< E
+getProperty (CP c) = getPerspectType c >>= pure <<< C
+
+propertyTypeIsFunctional :: PropertyType -> MonadPerspectives Boolean
+propertyTypeIsFunctional = getProperty >=> (case _ of
+  E r -> functional r
+  C r -> functional r)
+
+propertyTypeIsMandatory :: PropertyType -> MonadPerspectives Boolean
+propertyTypeIsMandatory = getProperty >=> (case _ of
+  E r -> mandatory r
+  C r -> mandatory r)

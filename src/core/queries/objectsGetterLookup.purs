@@ -21,53 +21,55 @@
 
 module Perspectives.ObjectGetterLookup where
 
-import Data.Array (elemIndex, index)
-import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Maybe (Maybe)
+import Foreign.Object (Object, empty, insert, lookup)
 import Perspectives.CoreTypes (RoleGetter, PropertyValueGetter)
-import Prelude (Unit, unit)
+import Prelude ((<$>))
 
--- | A tuple of two arrays. By construction, the items with the same indices belong to each other as name and RoleGetter.
-type RoleGetterCache = (Tuple (Array RoleGetter) (Array String))
+type ComputedFunction f = {func :: f, functional :: Boolean, mandatory :: Boolean}
 
-type PropertyValueGetterCache = (Tuple (Array PropertyValueGetter) (Array String))
+type RoleGetterCache = Object (ComputedFunction RoleGetter)
+
+type PropertyValueGetterCache = Object (ComputedFunction PropertyValueGetter)
+
+roleGetterCache :: RoleGetterCache
+roleGetterCache = empty
+
+propertyValueGetterCache :: PropertyValueGetterCache
+propertyValueGetterCache = empty
+
+lookupGetterByName :: forall f. Object (ComputedFunction f) -> String -> Maybe f
+lookupGetterByName cache name = _.func <$> lookup name cache
 
 lookupRoleGetterByName :: String -> Maybe RoleGetter
-lookupRoleGetterByName name = case elemIndex name (snd roleGetterCache) of
-  Nothing -> Nothing
-  (Just i) -> case (index (fst roleGetterCache) i :: Maybe RoleGetter) of
-    Nothing -> (Nothing :: Maybe RoleGetter)
-    (Just og) -> Just og
-
-roleGetterCacheInsert :: String -> RoleGetter -> Unit
-roleGetterCacheInsert name getter = case lookupRoleGetterByName name of
-  Nothing -> let
-    ignore1 = addToArray name (snd roleGetterCache)
-    ignore2 = addToArray getter (fst roleGetterCache)
-    in unit
-  otherwise -> unit
-
--- | This cache is modified destructively out of sight of Purescript.
-roleGetterCache :: RoleGetterCache
-roleGetterCache = Tuple [][]
+lookupRoleGetterByName = lookupGetterByName roleGetterCache
 
 lookupPropertyValueGetterByName :: String -> Maybe PropertyValueGetter
-lookupPropertyValueGetterByName name = case elemIndex name (snd propertyValueGetterCache) of
-  Nothing -> Nothing
-  (Just i) -> case (index (fst propertyValueGetterCache) i :: Maybe PropertyValueGetter) of
-    Nothing -> (Nothing :: Maybe PropertyValueGetter)
-    (Just og) -> Just og
+lookupPropertyValueGetterByName = lookupGetterByName propertyValueGetterCache
 
-propertyValueGetterCacheInsert :: String -> PropertyValueGetter -> Unit
-propertyValueGetterCacheInsert name getter = case lookupPropertyValueGetterByName name of
-  Nothing -> let
-    ignore1 = addToArray name (snd propertyValueGetterCache)
-    ignore2 = addToArray getter (fst propertyValueGetterCache)
-    in unit
-  otherwise -> unit
+getterCacheInsert :: forall f. Object (ComputedFunction f) -> String -> f -> Boolean -> Boolean ->  Object(ComputedFunction f)
+getterCacheInsert cache name getter functional mandatory = insert name {func: getter, functional, mandatory} cache
 
--- | This cache is modified destructively out of sight of Purescript.
-propertyValueGetterCache :: PropertyValueGetterCache
-propertyValueGetterCache = Tuple [][]
+roleGetterCacheInsert :: String -> RoleGetter -> Boolean -> Boolean -> RoleGetterCache
+roleGetterCacheInsert = getterCacheInsert roleGetterCache
 
-foreign import addToArray :: forall a. a -> Array a -> Array a
+propertyGetterCacheInsert :: String -> PropertyValueGetter -> Boolean -> Boolean -> PropertyValueGetterCache
+propertyGetterCacheInsert = getterCacheInsert propertyValueGetterCache
+
+isGetterFunctional :: forall f. Object (ComputedFunction f) -> String -> Maybe Boolean
+isGetterFunctional cache name = _.functional <$> lookup name cache
+
+isRoleGetterFunctional :: String -> Maybe Boolean
+isRoleGetterFunctional = isGetterFunctional roleGetterCache
+
+isPropertyGetterFunctional :: String -> Maybe Boolean
+isPropertyGetterFunctional = isGetterFunctional propertyValueGetterCache
+
+isGetterMandatory :: forall f. Object (ComputedFunction f) -> String -> Maybe Boolean
+isGetterMandatory cache name = _.mandatory <$> lookup name cache
+
+isRoleGetterMandatory :: String -> Maybe Boolean
+isRoleGetterMandatory = isGetterFunctional roleGetterCache
+
+isPropertyGetterMandatory :: String -> Maybe Boolean
+isPropertyGetterMandatory = isGetterFunctional propertyValueGetterCache

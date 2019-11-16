@@ -37,6 +37,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable, ident
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.ThreeValuedLogic (bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
 import Prelude (class Show, map, pure, ($), (<<<), (>=>), (>>=), bind, class Eq, (<>))
 
@@ -73,9 +74,9 @@ rangeOfRoleCalculation' r = rangeOfRoleCalculation'_ (EnumeratedRoleType r) <|> 
   where
     rangeOfRoleCalculation'_ :: forall r i. RoleClass r i => i -> MonadPerspectives (ADT EnumeratedRoleType)
     rangeOfRoleCalculation'_ i = getRole' i >>= getCalculation' >>= case _ of
-        SQD _ _ (RDOM p) -> pure p
-        UQD _ _ _ (RDOM p) -> pure p
-        BQD _ _ _ _ (RDOM p) -> pure p
+        SQD _ _ (RDOM p) _ _ -> pure p
+        UQD _ _ _ (RDOM p) _ _ -> pure p
+        BQD _ _ _ _ (RDOM p) _ _ -> pure p
         otherwise -> empty
 
 -----------------------------------------------------------
@@ -117,7 +118,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r)))
+  calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
   properties r = includeBinding (\r' -> (unwrap r').properties) propertiesOfADT r
   typeExcludingBinding r = pure (ST $ identifier r)
   typeIncludingBinding r = do
@@ -237,9 +238,9 @@ getRole (CR c) = getPerspectType c >>= pure <<< C
 -- | Does not include the binding, for (ENR (EnumeratedRoleType e)).
 rangeOfRoleCalculation :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
-    SQD _ _ (RDOM p) -> pure p
-    UQD _ _ _ (RDOM p) -> pure p
-    BQD _ _ _ _ (RDOM p) -> pure p
+    SQD _ _ (RDOM p) _ _ -> pure p
+    UQD _ _ _ (RDOM p) _ _ -> pure p
+    BQD _ _ _ _ (RDOM p) _ _ -> pure p
     otherwise -> empty -- NB: The Alt instance of Aff throws an error on empty!
 
 expandedADT_ :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
@@ -251,6 +252,17 @@ typeExcludingBinding_ :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 typeExcludingBinding_ = getRole >=> (case _ of
   E r -> typeExcludingBinding r
   C r -> typeExcludingBinding r)
+
+roleTypeIsFunctional :: RoleType -> MonadPerspectives Boolean
+roleTypeIsFunctional = getRole >=> (case _ of
+  E r -> functional r
+  C r -> functional r)
+
+roleTypeIsMandatory :: RoleType -> MonadPerspectives Boolean
+roleTypeIsMandatory = getRole >=> (case _ of
+  E r -> mandatory r
+  C r -> mandatory r)
+
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------

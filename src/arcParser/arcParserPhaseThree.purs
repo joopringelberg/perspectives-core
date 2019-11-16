@@ -45,12 +45,13 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..))
+import Perspectives.Parsing.Arc.Expression (endOf, startOf)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), functional, range)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -64,9 +65,10 @@ import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedViewType)
+import Perspectives.Types.ObjectGetters (lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType)
 import Prelude (Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
@@ -283,12 +285,12 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
     qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
-          Q (SQD dom (QF.ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType)))) -> do
+          Q (SQD dom (QF.ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
             qComputedType <- qualifyRoleType pos computedType enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
-                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (QF.ComputedRoleGetter f) (RDOM (ST qComputedType))}) calculatedRoles})
+                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (QF.ComputedRoleGetter f) (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
           otherwise -> pure unit)
 
 -- | The calculation of a CalculatedRole or CalculatedProperty, and the condition of an Action are all expressions. This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.
@@ -382,23 +384,26 @@ compileRules = do
             addAssignmentToSequence currentDomain seq v = makeSequence <$> pure seq <*> (compileAssignment currentDomain v)
 
             -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
+            -- The assignment functions arbitrarily return the currentContext. Hence,
+            -- we declare the functions to be both functional and mandatory.
             compileAssignment :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
             compileAssignment currentDomain ass = case ass of
               Remove {roleExpression} -> throwError $ Custom "Remove: Not all cases are implemented in compileAssignment!"
               CreateRole {roleIdentifier, contextExpression, start, end} -> do
                 (cte :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain)
-                  (Just stp) -> compileStep currentDomain stp
+                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  (Just stp) -> ensureContext currentDomain stp
                 qualifiedRoleIdentifier <- qualifyWithRespectTo roleIdentifier cte start end
-                pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain
+                pure $ UQD currentDomain (QF.CreateRole qualifiedRoleIdentifier) cte currentDomain True True
               Move {roleExpression, contextExpression} -> do
-                -- TODO: kunnen we nagaan dat cte functioneel is?
-                -- Hier moeten we nagaan of er wel contexten worden opgeleverd!
-                (cte :: QueryFunctionDescription) <- case contextExpression of
-                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain)
-                  (Just stp) -> compileStep currentDomain stp
-                rle <- compileStep currentDomain roleExpression
-                pure $ BQD currentDomain QF.Move rle cte currentDomain
+                case contextExpression of
+                  Nothing -> do
+                    rle <- ensureRole currentDomain roleExpression
+                    pure $ BQD currentDomain QF.Move rle (SQD currentDomain QF.Identity currentDomain True True) currentDomain True True
+                  (Just (stp :: Step)) -> do
+                    (cte :: QueryFunctionDescription) <- ensureContext currentDomain stp >>= ensureFunctional stp
+                    rle <- compileStep currentDomain roleExpression
+                    pure $ BQD currentDomain QF.Move rle cte currentDomain True True
               Bind {bindingExpression, roleIdentifier, contextExpression} -> throwError $ Custom "Bind: Not all cases are implemented in compileAssignment!"
               Bind_ {bindingExpression, binderExpression} -> throwError $ Custom "Bind_: Not all cases are implemented in compileAssignment!"
               Unbind {bindingExpression, roleIdentifier} -> throwError $ Custom "Unbind: Not all cases are implemented in compileAssignment!"
@@ -412,11 +417,32 @@ compileRules = do
                   (ct :: ADT ContextType) <- case range contextFunctionDescription of
                     (CDOM ct') -> pure ct'
                     otherwise -> throwError $ NotAContextDomain otherwise start end
-                  mrt <- lift2 (ct ###> lookForRoleTypeOfADT roleIdentifier)
+                  mrt <- lift2 (ct ###> lookForUnqualifiedRoleTypeOfADT roleIdentifier)
                   case mrt of
                     Just (ENR et) -> pure et
                     Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
                     otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
+
+ensureContext :: Domain -> Step -> PhaseThree QueryFunctionDescription
+ensureContext currentDomain stp = do
+  qfd <- compileStep currentDomain stp
+  case range qfd of
+    (CDOM _) -> pure qfd
+    otherwise -> throwError $ NotAContextDomain (range qfd) (startOf stp) (endOf stp)
+
+ensureRole :: Domain -> Step -> PhaseThree QueryFunctionDescription
+ensureRole currentDomain stp = do
+  qfd <- compileStep currentDomain stp
+  case range qfd of
+    (RDOM _) -> pure qfd
+    otherwise -> throwError $ NotARoleDomain (range qfd) (startOf stp) (endOf stp)
+
+ensureFunctional :: Step -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
+ensureFunctional stp qfd = case functional qfd of
+  True -> pure qfd
+  Unknown -> throwError $ MaybeNotFunctional (startOf stp) (endOf stp) stp
+  False -> throwError $ NotFunctional (startOf stp) (endOf stp) stp
+
 {-
             -- Assume the assignment is on a Role. When that fails, compile it as
             -- an assignment on a Property - but not when it fails because an

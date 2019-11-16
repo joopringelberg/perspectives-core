@@ -85,11 +85,11 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:Test$AnotherRole))' as its Range"
             case calculation of
-              (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:Test$AnotherRole"))))) -> true
+              (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:Test$AnotherRole"))) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(RolGetter \"model:Test$AnotherRole\")'"
             case calculation of
-              (Q (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$AnotherRole"))) _)) -> true
+              (Q (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$AnotherRole"))) _ _ _)) -> true
               otherwise -> false)
 
   makeTest "compileSimpleStep: ArcIdentifier, missing Role."
@@ -109,11 +109,11 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should have '(VDOM PBool)' as its Range"
             case calculation of
-              (Q (SQD _ _ (VDOM PBool))) -> true
+              (Q (SQD _ _ (VDOM PBool) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(PropertyGetter \"model:Test$AnotherRole\")'"
             case calculation of
-              (Q (SQD _ (PropertyGetter (ENP (EnumeratedPropertyType "model:Test$Role$Prop2"))) _)) -> true
+              (Q (SQD _ (PropertyGetter (ENP (EnumeratedPropertyType "model:Test$Role$Prop2"))) _ _ _)) -> true
               otherwise -> false)
 
   makeTest "compileSimpleStep: ArcIdentifier, missing Property."
@@ -133,11 +133,11 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should have '(VDOM PNumber)' as its Range"
             case calculation of
-              (Q (SQD _ _ (VDOM PNumber))) -> true
+              (Q (SQD _ _ (VDOM PNumber) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(Constant PNumber \"1\")'"
             case calculation of
-              (Q (SQD _ (Constant PNumber "1") _)) -> true
+              (Q (SQD _ (Constant PNumber "1") _ _ _)) -> true
               otherwise -> false)
 
   makeTest "compileSimpleStep: Binding."
@@ -150,7 +150,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be a composition, the first step of which is 'binding'"
             case calculation of
-              (Q (BQD _ _ (SQD _ (DataTypeGetter BindingF) _) _ _)) -> true
+              (Q (BQD _ _ (SQD _ (DataTypeGetter BindingF) _ _ _) _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -171,7 +171,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be a composition, the second step of which is 'getRoleBinders'"
             case calculation of
-              (Q (BQD _ _ _ (SQD _ (DataTypeGetterWithParameter GetRoleBindersF "model:Test$Role1") _) _)) -> true
+              (Q (BQD _ _ _ (SQD _ (DataTypeGetterWithParameter GetRoleBindersF "model:Test$Role1") _ _ _) _ _ _)) -> true
               otherwise -> false
               )
 
@@ -192,7 +192,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be a composition, the second step of which is a composition the first of which 'context'"
             case calculation of
-              (Q (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter ContextF) _) _ _) _)) -> true
+              (Q (BQD _ _ _ (BQD _ _ (SQD _ (DataTypeGetter ContextF) _ _ _) _ _ _ _) _ _ _)) -> true
               otherwise -> false
               )
 
@@ -213,7 +213,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be a simple calculation,of which the queryfunction is '(DataTypeGetter \"externalRole\")'"
             case calculation of
-              (Q (SQD _ (DataTypeGetter ExternalRoleF) _)) -> true
+              (Q (SQD _ (DataTypeGetter ExternalRoleF) _ _ _)) -> true
               otherwise -> false
               )
 
@@ -234,7 +234,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be a composition,of which the first operand is a simple function the queryfunction is '(CreateContext \"model:Test$Case1\")'"
             case calculation of
-              (Q (BQD _ _ (SQD _ (DataTypeGetterWithParameter CreateContextF "model:Test$Case1") _) _ _)) -> true
+              (Q (BQD _ _ (SQD _ (DataTypeGetterWithParameter CreateContextF "model:Test$Case1") _ _ _) _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -257,7 +257,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be a composition,of which the second operand is the Identity function."
             case calculation of
-              (Q (BQD _ _ _ (SQD _ (DataTypeGetter IdentityF) _) _)) -> true
+              (Q (BQD _ _ _ (SQD _ (DataTypeGetter IdentityF) _ _ _) _ _ _)) -> true
               otherwise -> false
               )
 
@@ -271,7 +271,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be a Unary combination, the queryFunction of which should be '(UnaryCombinator \"not\")'"
             case calculation of
-              (Q (UQD _ (UnaryCombinator NotF) _ _)) -> true
+              (Q (UQD _ (UnaryCombinator NotF) _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -292,7 +292,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be a Unary combination, the queryFunction of which should be '(UnaryCombinator \"exists\")'"
             case calculation of
-              (Q (UQD _ (UnaryCombinator ExistsF) _ _)) -> true
+              (Q (UQD _ (UnaryCombinator ExistsF) _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -313,7 +313,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be a composition"
             case calculation of
-              (Q (BQD _ (BinaryCombinator ComposeF) _ _ _)) -> true
+              (Q (BQD _ (BinaryCombinator ComposeF) _ _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -334,7 +334,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be (BinaryCombinator \"equals\")"
             case calculation of
-              (Q (BQD _ (BinaryCombinator EqualsF) _ _ _)) -> true
+              (Q (BQD _ (BinaryCombinator EqualsF) _ _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -355,7 +355,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be (BinaryCombinator \"and\")"
             case calculation of
-              (Q (BQD _ (BinaryCombinator AndF) _ _ _)) -> true
+              (Q (BQD _ (BinaryCombinator AndF) _ _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -376,7 +376,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be (BinaryCombinator \"filter\")"
             case calculation of
-              (Q (BQD _ (BinaryCombinator FilterF) _ _ _)) -> true
+              (Q (BQD _ (BinaryCombinator FilterF) _ _ _ _ _)) -> true
               otherwise -> false
               )
 
@@ -390,7 +390,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be (DataTypeGetter \"count\")"
             case calculation of
-              (Q (SQD _ (DataTypeGetter CountF) (VDOM PNumber))) -> true
+              (Q (SQD _ (DataTypeGetter CountF) (VDOM PNumber) _ _)) -> true
               otherwise -> false
               )
 {-

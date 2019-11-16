@@ -67,27 +67,27 @@ data CompiledFunction =
 -- | But in the instance representation, there is no need for that. All (Enumerated)
 -- | roles have the same runtime representation and their names are unique.
 compileFunction :: QueryFunctionDescription -> MP CompiledFunction
-compileFunction (SQD _ (RolGetter (ENR r)) _) = pure $ C2R $ getRole r
+compileFunction (SQD _ (RolGetter (ENR r)) _ _ _) = pure $ C2R $ getRole r
 
-compileFunction (SQD _ (RolGetter (CR cr)) _) = do
+compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
   RC.calculation ct >>= compileFunction
 
-compileFunction (SQD _ (PropertyGetter (ENP pt)) _) = pure $ R2V $ getProperty pt
+compileFunction (SQD _ (PropertyGetter (ENP pt)) _ _ _) = pure $ R2V $ getProperty pt
 
-compileFunction (SQD _ (PropertyGetter (CP pt)) _) = do
+compileFunction (SQD _ (PropertyGetter (CP pt)) _ _ _) = do
   (cp :: CalculatedProperty) <- getPerspectType pt
   PC.calculation cp >>= compileFunction
 
-compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _) = pure $ C2R externalRole
+compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ C2R externalRole
 
-compileFunction (SQD _ (DataTypeGetter ContextF) _) = pure $ R2C context
+compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ R2C context
 
-compileFunction (SQD _ (DataTypeGetter BindingF) _) = pure $ R2R binding
+compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ R2R binding
 
-compileFunction (SQD _ (ComputedRoleGetter functionName) _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
+compileFunction (SQD _ (ComputedRoleGetter functionName) _ _ _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
 
-compileFunction (SQD dom (VariableLookup varName) range) =
+compileFunction (SQD dom (VariableLookup varName) range _ _) =
   case dom, range of
     (CDOM _), (CDOM _) -> pure $ C2C (unsafeCoerce (lookup varName) :: ContextInstance ~~> ContextInstance)
     (CDOM _), (RDOM _) -> pure $ C2R (unsafeCoerce (lookup varName) :: ContextInstance ~~> RoleInstance)
@@ -97,7 +97,7 @@ compileFunction (SQD dom (VariableLookup varName) range) =
     (RDOM _), (VDOM _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
     _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
-compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -114,7 +114,7 @@ compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _) = do
     (R2R a), (R2V b) -> pure $ R2V (a >=> b)
     _,  _ -> throwError (error $  "Cannot compose '" <> show f1 <> "' with '" <> show f2 <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _) = do
+compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _ _ _) = do
   criterium' <- compileFunction criterium
   source' <- compileFunction source
   case criterium', source' of
@@ -125,7 +125,7 @@ compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _) = do
     -- TODO: filter Values.
     _,  _ -> throwError (error $  "Cannot filter '" <> show source <> "' with '" <> show criterium <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -137,7 +137,7 @@ compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _) = do
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.disjunction a b
     _,  _ -> throwError (error $ "Cannot create disjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -149,7 +149,7 @@ compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _) = do
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
     _,  _ -> throwError (error $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _) = do
+compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
@@ -173,7 +173,7 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _) = do
     (R2V a), (R2V b) -> pure $ R2V (a *> b)
     _, _ -> throwError (error $ "This is not a valid sequence: '" <> show f1 <> "', '" <> show f2 <> "'." )
 
-compileFunction (UQD _ (BindVariable varName) f1 _) = do
+compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
   case f1' of
     (C2C a) -> pure $ C2C (unsafeCoerce addBinding_ varName a)

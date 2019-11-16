@@ -35,24 +35,36 @@ import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | A description of a calculation with its domain and range.
+-- | The last two members represent whether the described function is functional and whether it is mandatory.
 data QueryFunctionDescription =
-  SQD Domain QueryFunction Range |
-  UQD Domain QueryFunction QueryFunctionDescription Range |
-  BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range
+  SQD Domain QueryFunction Range ThreeValuedLogic ThreeValuedLogic |
+  UQD Domain QueryFunction QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic|
+  BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic
 
 range :: QueryFunctionDescription -> Range
-range (SQD _ _ r) = r
-range (UQD _ _ _ r) = r
-range (BQD _ _ _ _ r) = r
+range (SQD _ _ r _ _) = r
+range (UQD _ _ _ r _ _) = r
+range (BQD _ _ _ _ r _ _) = r
 
 domain :: QueryFunctionDescription -> Range
-domain (SQD d _ _) = d
-domain (UQD d _ _ _) = d
-domain (BQD d _ _ _ _) = d
+domain (SQD d _ _ _ _) = d
+domain (UQD d _ _ _ _ _) = d
+domain (BQD d _ _ _ _ _ _) = d
+
+functional :: QueryFunctionDescription -> ThreeValuedLogic
+functional (SQD _ _ _ f _) = f
+functional (UQD _ _ _ _ f _) = f
+functional (BQD _ _ _ _ _ f _) = f
+
+mandatory :: QueryFunctionDescription -> ThreeValuedLogic
+mandatory (SQD _ _ _ _ f ) = f
+mandatory (UQD _ _ _ _ _ f) = f
+mandatory (BQD _ _ _ _ _ _ f ) = f
 
 -- | This function is partial, because we can only establish the functionality of
 -- | an RDOM.
@@ -63,9 +75,9 @@ domain (BQD d _ _ _ _) = d
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 
 instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
-  eq d1@(SQD _ _ _) d2@(SQD _ _ _ ) = eq d1 d2
-  eq d1@(UQD _ _ _ _) d2@(UQD _ _ _ _) = eq d1 d2
-  eq d1@(BQD _ _ _ _ _) d2@(BQD _ _ _ _ _) = eq d1 d2
+  eq d1@(SQD _ _ _ _ _ ) d2@(SQD _ _ _ _ _ ) = eq d1 d2
+  eq d1@(UQD _ _ _ _ _ _) d2@(UQD _ _ _ _ _ _) = eq d1 d2
+  eq d1@(BQD _ _ _ _ _ _ _) d2@(BQD _ _ _ _ _ _ _) = eq d1 d2
   eq _ _ = false
 
 instance writeForeignQueryFunctionDescription :: WriteForeign QueryFunctionDescription where

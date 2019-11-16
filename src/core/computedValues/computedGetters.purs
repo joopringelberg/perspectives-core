@@ -29,7 +29,7 @@ import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (type (~~>), MP, RoleGetter, assumption)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
-import Perspectives.ObjectGetterLookup (roleGetterCacheInsert)
+import Perspectives.ObjectGetterLookup (ComputedFunction, roleGetterCacheInsert)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Prelude (Unit, discard, map, pure, ($), (<<<), (<>), (>>=))
 
@@ -47,10 +47,10 @@ modellenM c = ArrayT do
 
 -- | An Array of RoleGetters. Each RoleGetter is inserted into the RoleGetterCache and can be retrieved
 -- | with `Perspectives.ObjectGetterLookup.lookupRoleGetterByName`.
-computedRoleGetters :: Array (Tuple String RoleGetter)
+computedRoleGetters :: Array (Tuple String (ComputedFunction RoleGetter))
 computedRoleGetters = [
-  Tuple "modellenM" modellenM
+  Tuple "modellenM" {func: modellenM, functional: false, mandatory: true}
 ]
 
 addComputedTripleGetters :: MP Unit
-addComputedTripleGetters = for_ computedRoleGetters \(Tuple n f) -> pure $ roleGetterCacheInsert n f
+addComputedTripleGetters = for_ computedRoleGetters \(Tuple n f) -> pure $ roleGetterCacheInsert n f.func f.functional f.mandatory

@@ -30,7 +30,7 @@ import Data.Identity (Identity)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
@@ -43,6 +43,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinF
 import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
+import Perspectives.ObjectGetterLookup (isRoleGetterFunctional, isRoleGetterMandatory)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
@@ -62,6 +63,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..), R
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEnumeratedRole)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<), (&&), not, (>>=))
@@ -425,7 +427,7 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     handleParts (CalculatedRole roleUnderConstruction) (Computation functionName computedType) = let
-      calculation = Q $ SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType)))
+      calculation = Q $ SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
       in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type

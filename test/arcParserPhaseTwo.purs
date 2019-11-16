@@ -121,11 +121,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               Just (CalculatedRole{calculation}) -> do
                 assert "The calculation should '(RDOM (ST EnumeratedRoleType sys:Modellen))' as its Range"
                   case calculation of
-                    (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))))) -> true
+                    (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))) _ _)) -> true
                     otherwise -> false
                 assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
                   case calculation of
-                    (Q (SQD _ (ComputedRoleGetter "ModellenM") _)) -> true
+                    (Q (SQD _ (ComputedRoleGetter "ModellenM") _ _ _)) -> true
                     otherwise -> false
 
   test "A Context with an external property and role." do

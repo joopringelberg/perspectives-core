@@ -54,7 +54,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -434,11 +434,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                   Just (CalculatedRole{calculation}) -> do
                     assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
                       case calculation of
-                        (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))))) -> true
+                        (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))) _ _)) -> true
                         otherwise -> false
                     assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
                       case calculation of
-                        (Q (SQD _ (ComputedRoleGetter "ModellenM") _)) -> true
+                        (Q (SQD _ (ComputedRoleGetter "ModellenM") _ _ _)) -> true
                         otherwise -> false
 
   test "Action with Condition" do
@@ -459,12 +459,12 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                 case lookup "model:Test$Gast$ConsultParty" actions of
                   (Just (Action{condition})) -> assert "The condition should have operator '>'"
                     (case condition of
-                      (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _)) -> true
+                      (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _ _ _)) -> true
                       otherwise -> false)
                   otherwise -> assert "There should be an action Consult Party" false
 
-  test "Bot Action with if-then rule" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop2 (mandatory, functional, Number)\n  thing: Party (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Party\n      if Party >> Prop1 > 10 then\n        Gast =+ createRole Gast\n        delete Party\n" ARC.domain
+  testOnly "Bot Action with if-then rule" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop2 (mandatory, functional, Number)\n  thing: Party (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Party\n      if Party >> Prop1 > 10 then\n        createRole Gast\n        delete Prop1\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -477,13 +477,16 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeParty" actions of
                   (Just (Action{condition, effect})) -> do
                     assert "The condition should have operator '>'"
                       (case condition of
-                        (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _)) -> true
+                        (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _ _ _)) -> true
                         otherwise -> false)
+                    assert "tests CreateRole and context target OK" case effect of
+                      (Just (EF (UQD _ (CreateRole (EnumeratedRoleType "model:Test$Gast")) (SQD _ Identity _ _ _) _ _ _))) -> true
+                      otherwise -> false
                     -- assert "One of the assignmentStatements should have operator Delete"
                     --   (case effect of
                     --     Just (EF stmt) -> (isJust (findIndex (case _ of
