@@ -117,34 +117,42 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
         otherwise -> pure $ PROD r
   reduce f NOTYPE = pure NOTYPE
 
--- | `q greaterThanOrEqualTo p` means: q is more general than p, or equal to p.
+-- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
+-- | If you use `less specific` instead of `more specific`, flip the arguments.
+-- | If you use `more general` instead of `more specific`, flip them, too.
+-- | So `less specific` instead of `more general` means flipping twice and is a no-op.
+-- | Therefore `less specific` equals `more general`.
 greaterThanOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
-greaterThanOrEqualTo = flip lessThenOrEqualTo
+greaterThanOrEqualTo = flip lessThanOrEqualTo
 
--- | `p lessThenOrEqualTo q` means: p is less specific than q, or equal to q.
+-- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
+-- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
 -- | This function is semantically correct only on a fully expanded type: use `Perspectives.Representation.Class.Role.expandedADT`.
-lessThenOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
-lessThenOrEqualTo (ST x) (ST y) = x == y
-lessThenOrEqualTo (SUM adts) q = let
-  (bools :: Array Boolean) = map (flip lessThenOrEqualTo q) adts
+lessThanOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
+lessThanOrEqualTo (ST x) (ST y) = x == y
+-- p must be less than or equal to every member of q.
+lessThanOrEqualTo p@(ST _) (SUM adts) = let
+  (bools :: Array Boolean) = map (lessThanOrEqualTo p) adts
   in unwrap $ foldMap Conj bools
-lessThenOrEqualTo (PROD adts) q = let
-  (bools :: Array Boolean) = map (flip lessThenOrEqualTo q) adts
+-- p must be less than or equal to one of the members of q.
+lessThanOrEqualTo p@(ST _) (PROD adts) = let
+  (bools :: Array Boolean) = map (lessThanOrEqualTo p) adts
   in unwrap $ foldMap Disj bools
+-- NOTYPE is less specific than any other type.
+lessThanOrEqualTo (ST _) NOTYPE = false
+-- A sum is less than or equal to a type if that type is greater than or equal to any of its members.
+lessThanOrEqualTo (SUM adts) q = let
+  (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
+  in unwrap $ foldMap Conj bools
+-- A product is less than or equal to a type if that type is greater than or equal to one of its members.
+lessThanOrEqualTo (PROD adts) q = let
+  (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
+  in unwrap $ foldMap Disj bools
+
 -- p = NOTYPE
 -- q = _
--- lessThenOrEqualTo _ NOTYPE = false
+-- lessThanOrEqualTo _ NOTYPE = false
 -- (q <= p) = false
 -- not (q <= p) = true
 -- not (q <= p) ==> q > p ==> p <= q
-lessThenOrEqualTo NOTYPE _ = true
--- p must be equal to every member of q (note that lessThenOrEqualTo is in effect 'equalTo' when p or q is an ST).
-lessThenOrEqualTo p@(ST _) (SUM adts) = let
-  (bools :: Array Boolean) = map (lessThenOrEqualTo p) adts
-  in unwrap $ foldMap Conj bools
--- p must be equal to one of the members of q.
-lessThenOrEqualTo p@(ST _) (PROD adts) = let
-  (bools :: Array Boolean) = map (lessThenOrEqualTo p) adts
-  in unwrap $ foldMap Disj bools
--- NOTYPE is not equal to (ST _).
-lessThenOrEqualTo (ST _) NOTYPE = false
+lessThanOrEqualTo NOTYPE _ = true

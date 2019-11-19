@@ -24,6 +24,7 @@ module Perspectives.Representation.QueryFunction where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Data.Maybe (Maybe)
 import Foreign (unsafeFromForeign, unsafeToForeign)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -119,7 +120,7 @@ data QueryFunction
 	| CreateContext' ContextType
 	| Bind EnumeratedRoleType
   | Bind_
-	| Unbind EnumeratedRoleType
+	| Unbind (Maybe EnumeratedRoleType)
   | Unbind_
 	| DeleteRole EnumeratedRoleType
 	| DeleteProperty EnumeratedPropertyType

@@ -34,7 +34,6 @@ import Data.List (foldM, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
@@ -43,7 +42,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range)
-import Perspectives.Representation.ADT (ADT(..), lessThenOrEqualTo)
+import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
 import Perspectives.Representation.EnumeratedProperty (Range(..))
@@ -53,7 +52,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, eq, flip, map, pure, ($), (==), (&&), discard, (<$>), (<*>))
+import Prelude (bind, eq, map, pure, ($), (==), (&&), discard, (<$>), (<*>))
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
@@ -119,7 +118,7 @@ compileSimpleStep currentDomain s@(Binder pos binderName) = do
       -- Now we have a qualified Rolename for the binder, check if it indeed binds the role that is the currentDomain.
       -- That is, its binding (an ADT) must be more general than the currentDomain.
       (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ expandedADT_ (ENR qBinderType)
-      if r `lessThenOrEqualTo` bindingOfBinder
+      if r `lessThanOrEqualTo` bindingOfBinder
         then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM $ ST qBinderType) False False
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
@@ -287,14 +286,3 @@ compileVarBinding currentDomain (VarBinding varName step) = do
   pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) (functional step_) (mandatory step_)
 
 type FD = PhaseThree QueryFunctionDescription
-
-greaterThanOrEqualTo_ :: Domain -> Domain -> MonadPerspectives Boolean
-greaterThanOrEqualTo_ = flip lessThenOrEqualTo_
-
--- | `p lessThenOrEqualTo q` means: p is less specific than q, or equal to q.
--- | This function is semantically correct only on a fully expanded types: use `Perspectives.Representation.Class.Role.expandedADT`.
-lessThenOrEqualTo_ :: Domain -> Domain -> MonadPerspectives Boolean
-lessThenOrEqualTo_ (RDOM adtL) (RDOM adtR) = pure (adtL `lessThenOrEqualTo` adtR)
-lessThenOrEqualTo_ (CDOM adtL) (CDOM adtR) = pure (adtL `lessThenOrEqualTo` adtR)
-lessThenOrEqualTo_ (VDOM r1) (VDOM r2) = pure $ r1 `eq` r2
-lessThenOrEqualTo_ _ _ = pure false

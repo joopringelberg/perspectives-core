@@ -105,6 +105,9 @@ productOfDomains (RDOM a) (RDOM b) = Just (RDOM (PROD [a, b]))
 productOfDomains (CDOM a) (CDOM b) = Just (CDOM (PROD [a, b]))
 productOfDomains _ _ = Nothing
 
+domain2roleType :: Partial => Domain -> ADT EnumeratedRoleType
+domain2roleType (RDOM r) = r
+
 derive instance genericDomain :: Generic Domain _
 
 instance showDomain :: Show Domain where

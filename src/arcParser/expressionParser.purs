@@ -284,7 +284,7 @@ unbind :: IP Assignment
 unbind = do
   start <- getPosition
   bindingExpression <- (reserved "unbind" *> step)
-  roleIdentifier <- reserved "from" *> arcIdentifier
+  roleIdentifier <- optionMaybe (reserved "from" *> arcIdentifier)
   end <- getPosition
   pure $ Unbind {start, end, bindingExpression, roleIdentifier}
 

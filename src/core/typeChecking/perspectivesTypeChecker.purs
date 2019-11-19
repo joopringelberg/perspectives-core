@@ -32,11 +32,11 @@ import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
-import Perspectives.Representation.ADT (lessThenOrEqualTo)
+import Perspectives.Representation.ADT (lessThanOrEqualTo)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, EnumeratedRoleType, getPerspectType)
-import Perspectives.Representation.Class.Role (rangeOfRoleCalculation, expansionOfADT, kindOfRole)
+import Perspectives.Representation.Class.Role (expandedADT_, expansionOfADT, kindOfRole, rangeOfRoleCalculation)
 import Perspectives.Representation.Context (Context, contextAspects, contextRole, defaultPrototype, externalRole, roleInContext, userRole, position)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -105,6 +105,6 @@ checkContext c = do
 -----------------------------------------------------------
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
-  eit <- (roleType_ >=> rangeOfRoleCalculation <<< ENR >=> expansionOfADT) instanceToBind
-  ert <- (rangeOfRoleCalculation >=> expansionOfADT) roletype
-  pure $ lessThenOrEqualTo ert eit
+  eit <- (roleType_ >=> expandedADT_ <<< ENR) instanceToBind
+  ert <- expandedADT_ roletype
+  pure (ert `lessThanOrEqualTo` eit)

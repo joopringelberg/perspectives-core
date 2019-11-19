@@ -263,6 +263,13 @@ roleTypeIsMandatory = getRole >=> (case _ of
   E r -> mandatory r
   C r -> mandatory r)
 
+bindingOfRole :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
+bindingOfRole = getRole >=> binding'
+  where
+    binding' :: Role -> MonadPerspectives (ADT EnumeratedRoleType)
+    binding' (E r) = binding r
+    binding' (C r) = binding r
+
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------
