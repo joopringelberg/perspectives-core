@@ -355,7 +355,7 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
     -- TODO (augmentADT) Handle PROD types.
     augmentADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     augmentADT adt roleName = case adt of
-      NOTYPE -> ST $ EnumeratedRoleType roleName
+      EMPTY -> ST $ EnumeratedRoleType roleName
       SUM terms -> SUM $ cons (ST $ EnumeratedRoleType roleName) terms
       p@(PROD _) -> SUM [p, ST $ EnumeratedRoleType roleName]
       s@(ST _) -> SUM [s, ST $ EnumeratedRoleType roleName]

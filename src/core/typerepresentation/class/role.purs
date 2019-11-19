@@ -124,7 +124,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   typeIncludingBinding r = do
     pure $ case (unwrap r).binding of
       PROD terms -> PROD (cons (ST $ identifier r) terms)
-      NOTYPE -> (ST $ identifier r)
+      EMPTY -> (ST $ identifier r)
       st@(ST _) -> PROD [(ST $ identifier r), st]
       sum@(SUM _) -> PROD [(ST $ identifier r), sum]
   expandedADT r = expansionOfADT (ST $ identifier r)
@@ -152,7 +152,7 @@ contextOfADT :: ADT EnumeratedRoleType -> MP (ADT ContextType)
 contextOfADT (ST et) = (getEnumeratedRole >=> context) et
 contextOfADT (SUM adts) = map SUM (traverse contextOfADT adts)
 contextOfADT (PROD adts) = map PROD (traverse contextOfADT adts)
-contextOfADT NOTYPE = pure NOTYPE
+contextOfADT EMPTY = pure EMPTY
 
 -- | The binding of an ADT.
 bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
@@ -160,7 +160,7 @@ bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
 bindingOfADT (ST a) = getEnumeratedRole a >>= binding
 bindingOfADT (SUM adts) = map SUM (traverse bindingOfADT adts)
 bindingOfADT (PROD adts) = map PROD (traverse bindingOfADT adts)
-bindingOfADT NOTYPE = pure NOTYPE
+bindingOfADT EMPTY = pure EMPTY
 
 -- | A functional role can be filled with a relational role (but then we need to select). E.g.:
 -- | one of the party-goers was the driver.
@@ -207,8 +207,8 @@ roleAspectsOfADT = reduce g
 -- | in the same type (the expansion is the fixpoint).
 -- | Expand a reference to an EnumeratedType to a type that includes its binding . E.g.:
 -- | ST (EnumeratedRoleType e), where the binding of e is ST (EnumeratedRoleType e1)
--- | and e1 has binding NOTYPE
--- | becomes PROD [ST (EnumeratedRoleType e), PROD [ST (EnumeratedRoleType e1), NOTYPE]]
+-- | and e1 has binding EMPTY
+-- | becomes PROD [ST (EnumeratedRoleType e), PROD [ST (EnumeratedRoleType e1), EMPTY]]
 expansionOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
 expansionOfADT = reduce g
   where

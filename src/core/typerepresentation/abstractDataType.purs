@@ -26,9 +26,9 @@
 -- | ADT's are constructed for ContextType, too.
 -- |
 -- | ### Equivalences
--- | * `SUM x NOTYPE` equals `x`
+-- | * `SUM x EMPTY` equals `x`
 -- |
--- | * `PROD x NOTYPE` equals `NOTYPE`
+-- | * `PROD x EMPTY` equals `EMPTY`
 
 module Perspectives.Representation.ADT where
 
@@ -46,13 +46,13 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, ($), (==), (<>), show)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
-data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | NOTYPE
+data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | EMPTY 
 
 derive instance genericRepBinding :: Generic (ADT a) _
 
 instance showADT :: (Show a) => Show (ADT a) where
   show (ST a) = "(" <> "ST" <> " " <> show a <> ")"
-  show NOTYPE = "NOTYPE"
+  show EMPTY = "EMPTY"
   show (SUM adts) = "(" <> "SUM" <> show adts <> ")"
   show (PROD adts) = "(" <> "PROD" <> show adts <> ")"
 
@@ -79,7 +79,7 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
   reduce f (PROD adts) = do
     (bools :: Array Boolean) <- traverse (reduce f) adts
     pure $ unwrap $ foldMap Disj bools
-  reduce f NOTYPE = pure false
+  reduce f EMPTY = pure false
 
 -- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
 -- | Includes the binding of a role: this means that the computation recurses on the binding.
@@ -92,7 +92,7 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (PROD adts) = do
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
     pure $ foldl union [] arrays
-  reduce f NOTYPE = pure []
+  reduce f EMPTY = pure []
 
 -- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.
 -- | `reduce f` then has type `ADT a` -> MP (ADT b)`.
@@ -100,22 +100,22 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f (ST et) = f et
   reduce f (SUM adts) = do
     (x :: Array (ADT b)) <- traverse (reduce f) adts
-    -- Simplify: all members of the SUM must have a binding, otherwise the binding of the SUM is NOTYPE.
-    case elemIndex NOTYPE x of
-      Nothing -> pure NOTYPE
+    -- Simplify: all members of the SUM must have a binding, otherwise the binding of the SUM is EMPTY.
+    case elemIndex EMPTY x of
+      Nothing -> pure EMPTY
       otherwise -> pure $ SUM x
   reduce f (PROD adts) = do
     (x :: Array (ADT b)) <- traverse (reduce f) adts
-    -- Simplify: remove all NOTYPE's.
-    r <- pure $ filter (notEq NOTYPE) x
+    -- Simplify: remove all EMPTY's.
+    r <- pure $ filter (notEq EMPTY) x
     case uncons r of
-      -- SUM [] == NOTYPE
-      Nothing -> pure NOTYPE
+      -- SUM [] == EMPTY
+      Nothing -> pure EMPTY
       (Just {head : hd, tail}) -> case head tail of
         -- SUM [a] = a
         Nothing -> pure hd
         otherwise -> pure $ PROD r
-  reduce f NOTYPE = pure NOTYPE
+  reduce f EMPTY = pure EMPTY
 
 -- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
 -- | If you use `less specific` instead of `more specific`, flip the arguments.
@@ -138,8 +138,8 @@ lessThanOrEqualTo p@(ST _) (SUM adts) = let
 lessThanOrEqualTo p@(ST _) (PROD adts) = let
   (bools :: Array Boolean) = map (lessThanOrEqualTo p) adts
   in unwrap $ foldMap Disj bools
--- NOTYPE is less specific than any other type.
-lessThanOrEqualTo (ST _) NOTYPE = false
+-- EMPTY is less specific than any other type.
+lessThanOrEqualTo (ST _) EMPTY = false
 -- A sum is less than or equal to a type if that type is greater than or equal to any of its members.
 lessThanOrEqualTo (SUM adts) q = let
   (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
@@ -149,10 +149,10 @@ lessThanOrEqualTo (PROD adts) q = let
   (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
   in unwrap $ foldMap Disj bools
 
--- p = NOTYPE
+-- p = EMPTY
 -- q = _
--- lessThanOrEqualTo _ NOTYPE = false
+-- lessThanOrEqualTo _ EMPTY = false
 -- (q <= p) = false
 -- not (q <= p) = true
 -- not (q <= p) ==> q > p ==> p <= q
-lessThanOrEqualTo NOTYPE _ = true
+lessThanOrEqualTo EMPTY _ = true

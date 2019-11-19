@@ -73,7 +73,7 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   , properties: []
 
   , context: ContextType context
-  , binding: NOTYPE
+  , binding: EMPTY
 
   , views: []
 
