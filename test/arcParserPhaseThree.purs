@@ -803,11 +803,10 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
             -- logShow dr'
             x' <- runP $ phaseThree dr'
             case x' of
-              (Left (UnknownRole _ _)) -> assert "ok" true
-              -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
+              (Left (LocalRoleDoesNotBind _ _ _ _)) -> assert "ok" true
               otherwise -> do
                 logShow otherwise
-                assert "Expected the error UnknownRole" false
+                assert "Expected the error LocalRoleDoesNotBind" false
 
 x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
 x correctedDFR = withDomeinFile "model:MyTestDomain"

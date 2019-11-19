@@ -30,7 +30,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, head, length)
+import Data.Array (filter, head, length, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.List (List, foldM, uncons)
@@ -437,7 +437,6 @@ compileRules = do
                 -- Now create a function description.
                 pure $ BQD currentDomain QF.Bind_ bindings binders currentDomain True True
 
-              -- TODO: splits zodat RoleDoesNotBind apart gegenereerd wordt.
               Unbind f@{bindingExpression, roleIdentifier} -> do
                 (bindings :: QueryFunctionDescription) <- ensureRole currentDomain bindingExpression
                 -- binderType (roleIdentifier) should be an EnumeratedRoleType (local name should resolve w.r.t. the binders of the bindings). We try to resolve in the model and then filter candidates on whether they bind the bindings.
@@ -466,9 +465,12 @@ compileRules = do
                 qualifyBinderType (Just ident) bindings start end = if isQualifiedWithDomein ident
                   then pure $ Just $ EnumeratedRoleType ident
                   else do
-                    (candidates :: Array String) <- pure (map (unwrap <<< _._id <<< unwrap) (filter f (values enumeratedRoles)))
+                    (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id}) -> (unwrap _id) `endsWithSegments` ident) (values enumeratedRoles))
+                    (candidates :: Array String) <- pure (map (unwrap <<< _._id <<< unwrap) (filter (\(EnumeratedRole{binding}) -> binding `lessThanOrEqualTo` bindings) nameMatches))
                     case head candidates of
-                      Nothing -> throwError $ UnknownRole start ident
+                      Nothing -> if null nameMatches
+                        then throwError $ UnknownRole start ident
+                        else throwError $ LocalRoleDoesNotBind start end ident bindings
                       (Just qname) | length candidates == 1 -> pure $ Just $ EnumeratedRoleType qname
                       otherwise -> throwError $ NotUniquelyIdentifying start ident candidates
                   where
