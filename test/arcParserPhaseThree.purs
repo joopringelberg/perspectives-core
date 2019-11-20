@@ -497,6 +497,66 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a sequence" false
 
+  test "Bot Action with move" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        move C1 >> binding >> context >> Employee to C2 >> binding >> context\n  context: C1 filledBy: Company\n  context: C2 filledBy: Company\n  party: Company\n    user: Employee\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr'
+            case x' of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
+                case lookup "model:Test$Gast_bot$ChangeGast" actions of
+                  Just (Action{effect}) -> do
+                    case effect of
+                      (Just (EF (BQD _ qf rle cte _ _ _))) -> do
+                        assert "The queryfunction should be move" (eq qf QF.Move )
+                        assert "The binding should be a rolgetter for model:Test$Company$Employee"
+                          case rle of
+                            (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee"))) _ _) -> true
+                            otherwise -> false
+                        logShow cte
+                        assert "The role to move should come from C2"
+                          case cte of
+                            (BQD _ _ (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$C2"))) _ _ _) _ _ _ _) -> true
+                            otherwise -> false
+                      otherwise -> assert "Side effect expected" false
+                  Nothing -> assert "The effect should compile to a binary query function" false
+
+  test "Bot Action with move to current context" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  context: C1 filledBy: Company\n  context: C2 filledBy: Company\n  party: Company\n    user: Employee\n    user: Gast (mandatory, functional)\n      property: Prop1 (mandatory, functional, Number)\n    bot: for Gast\n      perspective on: Gast\n        if Gast >> Prop1 > 10 then\n          move extern >> binder C1 >> context >> C2 >> binding >> context >> Employee\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr'
+            case x' of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
+                case lookup "model:Test$Company$Gast_bot$ChangeGast" actions of
+                  Just (Action{effect}) -> do
+                    case effect of
+                      (Just (EF (BQD _ qf rle cte _ _ _))) -> do
+                        assert "The queryfunction should be move" (eq qf QF.Move )
+                        logShow rle
+                        assert "The role to move should come from the current context, an instance of Company"
+                          case cte of
+                            (SQD (CDOM (ST (ContextType "model:Test$Company"))) Identity _ _ _) -> true
+                            otherwise -> false
+                      otherwise -> assert "Side effect expected" false
+                  Nothing -> assert "The effect should compile to a binary query function" false
+
   test "Bot Action with bind" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  user: EreGast filledBy: Gast\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        bind Gast to EreGast\n" ARC.domain
     case r of
@@ -969,7 +1029,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                 logShow otherwise
                 assert "Expected the error NotAPropertyRange" false
 
-  testOnly "Bot Action with property assignment on another role" do
+  test "Bot Action with property assignment on another role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  user: Organiser\n    property: Prop2 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        Prop2 =+ 10 for Organiser\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
