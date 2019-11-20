@@ -229,7 +229,7 @@ endOf stp = case stp of
     line_ (ArcPosition{line}) = line
 
 assignment :: IP Assignment
-assignment = defer \_->propertyAssignment <|> roleAssignment <|> deletion
+assignment = defer \_-> propertyAssignment <|> roleAssignment
 
 roleAssignment :: IP Assignment
 roleAssignment = defer \_-> removal
@@ -239,6 +239,7 @@ roleAssignment = defer \_-> removal
   <|> bind_
   <|> unbind
   <|> unbind_
+  <|> roleDeletion
 
 removal :: IP Assignment
 removal = do
@@ -297,14 +298,28 @@ unbind_ = do
   pure $ Unbind_ {start, end, bindingExpression, binderExpression}
 
 propertyAssignment :: IP Assignment
-propertyAssignment = try do
-  start <- getPosition
-  propertyIdentifier <- arcIdentifier
-  op <- assignmentOperator
-  val <- step
-  end <- getPosition
-  roleExpression <- optionMaybe (reserved "for" *> step)
-  pure $ PropertyAssignment {start, end, propertyIdentifier, operator: op, valueExpression: val, roleExpression}
+propertyAssignment = (propertyDeletion <|> propertyAssignment')
+  where
+    propertyAssignment' :: IP Assignment
+    propertyAssignment' = try do
+      start <- getPosition
+      propertyIdentifier <- arcIdentifier
+      op <- assignmentOperator
+      val <- step
+      end <- getPosition
+      roleExpression <- optionMaybe (reserved "for" *> step)
+      pure $ PropertyAssignment {start, end, propertyIdentifier, operator: op, valueExpression: val, roleExpression}
+
+    propertyDeletion :: IP Assignment
+    propertyDeletion = try do
+      start <- getPosition
+      reserved "delete"
+      reserved "property"
+      propertyIdentifier <- arcIdentifier
+      roleExpression <- optionMaybe (reserved "from" *> step)
+      end <- getPosition
+      pure $ DeleteProperty {start, end, propertyIdentifier, roleExpression}
+
 
 assignmentOperator :: IP AssignmentOperator
 assignmentOperator = try
@@ -315,14 +330,13 @@ assignmentOperator = try
   ((Set <$> (getPosition <* token.reservedOp "="))
   ) <?> "=, =+, =-"
 
-deletion :: IP Assignment
-deletion = try do
+roleDeletion :: IP Assignment
+roleDeletion = try do
   start <- getPosition
   reserved "delete"
-  identifier <- arcIdentifier
-  expression <- optionMaybe (reserved "from" *> step)
+  roleExpression <- step
   end <- getPosition
-  pure $ Delete {start, end, identifier, expression}
+  pure $ DeleteRole {start, end, roleExpression}
 
 -- | Parse between single quotes.
 dateTimeLiteral :: IP String

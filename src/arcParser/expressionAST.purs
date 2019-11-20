@@ -154,7 +154,8 @@ data Assignment =
   -- TODO: Maybe String voor roleIdentifier. Pas de parser aan.
   | Unbind (WithTextRange (bindingExpression :: Step, roleIdentifier :: Maybe String))
   | Unbind_ (WithTextRange (bindingExpression :: Step, binderExpression :: Step))
-  | Delete (WithTextRange (identifier :: String, expression :: Maybe Step))
+  | DeleteRole (WithTextRange (roleExpression :: Step))
+  | DeleteProperty (WithTextRange (propertyIdentifier :: String, roleExpression :: Maybe Step))
   | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
 
 

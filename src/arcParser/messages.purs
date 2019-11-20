@@ -36,7 +36,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType, ContextType, EnumeratedRoleType, RoleKind, RoleType)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
@@ -80,6 +80,7 @@ data PerspectivesError
     | NotALetWithAssignment PureLetStep
     | NotAPureLet LetStep
     | CannotCreateCalculatedRole CalculatedRoleType ArcPosition ArcPosition
+    | CannotCreateCalculatedProperty CalculatedPropertyType ArcPosition ArcPosition
     | NotAContextDomain Domain ArcPosition ArcPosition
     | NotARoleDomain Domain ArcPosition ArcPosition
     | NotFunctional ArcPosition ArcPosition Step
@@ -122,6 +123,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotALetWithAssignment (PureLetStep{start, end})) = "(NotALetWithAssignment) This let*-expression does not have an assignment in its body, hence is of no use in a rule. From " <> show start <> " to " <> show end
   show (NotAPureLet (LetStep{start, end})) = "(NotAPureLet) This let*-expression has an assignment in its body but it is used in a pure expression, so its body should be a pure expression, too. From " <> show start <> " to " <> show end
   show (CannotCreateCalculatedRole cr start end) = "(CannotCreateCalculatedRole) Can not create an instance of a calculated role (" <> show cr <> ") between: " <> show start <> " and: " <> show end
+  show (CannotCreateCalculatedProperty pt start end) = "(CannotCreateCalculatedProperty) Can not add a value to a property that is calculated, between: " <> show start <> " and: " <> show end
   show (NotARoleDomain dom start end) = "(NotARoleDomain) This expression should have a role type: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotAContextDomain dom start end) = "(NotAContextDomain) This expression should have a context type: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotFunctional start end qfd) = "(NotFunctional) This expression is not a single value, between " <> show start <> " and " <> show end

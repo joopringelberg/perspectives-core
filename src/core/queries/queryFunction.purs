@@ -122,7 +122,7 @@ data QueryFunction
   | Bind_
 	| Unbind (Maybe EnumeratedRoleType)
   | Unbind_
-	| DeleteRole EnumeratedRoleType
+	| DeleteRole
 	| DeleteProperty EnumeratedPropertyType
   | Move
   | Remove

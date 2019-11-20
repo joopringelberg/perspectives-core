@@ -65,9 +65,9 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType)
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (&&))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
@@ -443,13 +443,29 @@ compileRules = do
                 (qualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
                 pure $ UQD currentDomain (QF.Unbind qualifiedRoleIdentifier) bindings currentDomain True True
 
-              Unbind_ {bindingExpression, binderExpression} -> throwError $ Custom "Unbind_: Not all cases are implemented in compileAssignment!"
-              Delete {identifier, expression} -> throwError $ Custom "Delete: Not all cases are implemented in compileAssignment!"
+              Unbind_ {bindingExpression, binderExpression} -> do
+                -- bindingExpression should result in a functional role
+                (bindings :: QueryFunctionDescription) <- ensureRole currentDomain bindingExpression >>= ensureFunctional bindingExpression
+                -- binderExpression should result in a functional role
+                (binders :: QueryFunctionDescription) <- ensureRole currentDomain binderExpression >>= ensureFunctional binderExpression
+                -- Now create a function description.
+                pure $ BQD currentDomain QF.Unbind_ bindings binders currentDomain True True
+
+              DeleteRole {roleExpression} -> do
+                roleF <- ensureRole currentDomain roleExpression
+                pure $ UQD currentDomain QF.DeleteRole roleF currentDomain True True
+
+              DeleteProperty f@{propertyIdentifier, roleExpression} -> do
+                -- (roleF :: QueryFunctionDescription) <- ensureRole currentDomain roleExpression
+                -- (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleExpression f.start f.end
+                -- pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleF currentDomain True True
+                throwError $ Custom "DeleteProperty: Not all cases are implemented in compileAssignment!"
+
               PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression} -> throwError $ Custom "PropertyAssignment: Not all cases are implemented in compileAssignment!"
 
               where
                 qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
-                qualifyWithRespectTo roleIdentifier contextFunctionDescription start end= do
+                qualifyWithRespectTo roleIdentifier contextFunctionDescription start end = do
                   (ct :: ADT ContextType) <- case range contextFunctionDescription of
                     (CDOM ct') -> pure ct'
                     otherwise -> throwError $ NotAContextDomain otherwise start end
@@ -458,6 +474,17 @@ compileRules = do
                     Just (ENR et) -> pure et
                     Just (CR ct') -> throwError $ CannotCreateCalculatedRole ct' start end
                     otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
+
+                qualifyPropertyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedPropertyType
+                qualifyPropertyWithRespectTo propertyIdentifier roleFunctionDescription start end = do
+                  (rt :: ADT EnumeratedRoleType) <- case range roleFunctionDescription of
+                    (RDOM rt') -> pure rt'
+                    otherwise -> throwError $ NotARoleDomain otherwise start end
+                  (mrt :: Maybe PropertyType) <- lift2 (rt ###> lookForUnqualifiedPropertyType propertyIdentifier)
+                  case mrt of
+                    Just (ENP et) -> pure et
+                    Just (CP ct') -> throwError $ CannotCreateCalculatedProperty ct' start end
+                    otherwise -> throwError $ RoleHasNoProperty rt propertyIdentifier
 
                 -- | If the name is unqualified, look for an EnumeratedRol with matching local name in the Domain.
                 qualifyBinderType :: Maybe String -> ADT EnumeratedRoleType -> ArcPosition -> ArcPosition -> PhaseThree (Maybe EnumeratedRoleType)

@@ -49,7 +49,7 @@ type ActionRecord =
   -- TODO: For synchronization, we might need to allow CalculatedRoles as subject of an action.
   , subject :: EnumeratedRoleType
   , verb :: Verb
-  , object :: RoleType
+  , object :: RoleType -- TODO: Maybe Step ofzo? Of QueryFunctionDescription.
   , requiredObjectProperties :: Maybe ViewType
   , requiredSubjectProperties :: Maybe ViewType
   , requiredIndirectObjectProperties :: Maybe ViewType

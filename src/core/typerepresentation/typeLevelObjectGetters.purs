@@ -105,13 +105,16 @@ lookForPropertyType_ s i = lookForProperty (propertytype2string >>> ((==) s)) (S
 lookForUnqualifiedPropertyType_ :: String -> (EnumeratedRoleType ~~~> PropertyType)
 lookForUnqualifiedPropertyType_ s i = lookForProperty (propertytype2string >>> areLastSegmentsOf s) (ST i)
 
+-- | Look for a Property on a given ADT, using a qualified name.
+-- | Note: use this function to check that the property is actually defined.
 lookForPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForPropertyType s = lookForProperty (propertytype2string >>> ((==) s))
 
--- | We simply require the Pattern to match the end of the string.
+-- | Look for a Property on a given ADT, using the postfix of a name.
 lookForUnqualifiedPropertyType :: String -> (ADT EnumeratedRoleType ~~~> PropertyType)
 lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> areLastSegmentsOf s)
 
+-- | Look for a Property on a given ADT, using a criterium.
 lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
 lookForProperty criterium = filter' (ArrayT <<< propertiesOfADT) criterium
 
