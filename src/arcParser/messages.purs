@@ -85,6 +85,8 @@ data PerspectivesError
     | NotARoleDomain Domain ArcPosition ArcPosition
     | NotFunctional ArcPosition ArcPosition Step
     | MaybeNotFunctional ArcPosition ArcPosition Step
+    | WrongPropertyRange ArcPosition ArcPosition EP.Range EP.Range
+    | NotAPropertyRange  ArcPosition ArcPosition EP.Range
 
     | Custom String
 
@@ -128,6 +130,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotAContextDomain dom start end) = "(NotAContextDomain) This expression should have a context type: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotFunctional start end qfd) = "(NotFunctional) This expression is not a single value, between " <> show start <> " and " <> show end
   show (MaybeNotFunctional start end qfd) = "(MaybeNotFunctional) This expression might not be a single value, between " <> show start <> " and " <> show end
+  show (WrongPropertyRange start end expected received) = "(WrongPropertyRange) Expected the range '" <> show expected <> "', got '" <> show received <> "', between " <> show start <> " and " <> show end
+  show (NotAPropertyRange start end expected) = "(NotAPropertyRange) Expression does not yield a property value. Expected the range '" <> show expected <> "', between " <> show start <> " and " <> show end
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

@@ -46,7 +46,7 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), LetStep(..), Step)
+import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -57,7 +57,8 @@ import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (bindingOfRole, expansionOfADT, getCalculation, getRole)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, expandedADT_, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
@@ -68,7 +69,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (&&))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (&&), (>=>))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -452,17 +453,33 @@ compileRules = do
                 pure $ BQD currentDomain QF.Unbind_ bindings binders currentDomain True True
 
               DeleteRole {roleExpression} -> do
-                roleF <- ensureRole currentDomain roleExpression
-                pure $ UQD currentDomain QF.DeleteRole roleF currentDomain True True
+                roleQfd <- ensureRole currentDomain roleExpression
+                pure $ UQD currentDomain QF.DeleteRole roleQfd currentDomain True True
 
               DeleteProperty f@{propertyIdentifier, roleExpression} -> do
-                (roleF :: QueryFunctionDescription) <- case roleExpression of
+                (roleQfd :: QueryFunctionDescription) <- case roleExpression of
                   Nothing -> lift $ lift $ getRole object >>= getCalculation
                   Just e -> ensureRole currentDomain e
-                (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleF f.start f.end
-                pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleF currentDomain True True
+                (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
+                pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleQfd currentDomain True True
 
-              PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression} -> throwError $ Custom "PropertyAssignment: Not all cases are implemented in compileAssignment!"
+              PropertyAssignment f@{propertyIdentifier, operator, valueExpression, roleExpression} -> do
+                (roleQfd :: QueryFunctionDescription) <- case roleExpression of
+                  Nothing -> lift $ lift $ (getRole >=> getCalculation) object
+                  Just e -> ensureRole currentDomain e
+                (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
+                -- Compile the value expression to a QueryFunctionDescription. Its range must comply with the range of the qualifiedProperty. It is compiled relative to the current context; not relative to the object!
+                valueQfd <- compileStep currentDomain valueExpression
+                rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
+                fname <- case operator of
+                  Set _ -> pure QF.SetPropertyValue
+                  AddTo _ -> pure QF.AddPropertyValue
+                  DeleteFrom _ -> pure QF.RemovePropertyValue
+                case range valueQfd of
+                  (VDOM r) | r == rangeOfProperty -> pure unit
+                  (VDOM r) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
+                  otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
+                pure $ BQD currentDomain fname valueQfd roleQfd currentDomain True True
 
               where
                 qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
@@ -477,8 +494,8 @@ compileRules = do
                     otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
 
                 qualifyPropertyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedPropertyType
-                qualifyPropertyWithRespectTo propertyIdentifier roleFunctionDescription start end = do
-                  (rt :: ADT EnumeratedRoleType) <- case range roleFunctionDescription of
+                qualifyPropertyWithRespectTo propertyIdentifier roleQfdunctionDescription start end = do
+                  (rt :: ADT EnumeratedRoleType) <- case range roleQfdunctionDescription of
                     (RDOM rt') -> pure rt'
                     otherwise -> throwError $ NotARoleDomain otherwise start end
                   (mrt :: Maybe PropertyType) <- lift2 (rt ###> lookForUnqualifiedPropertyType propertyIdentifier)
@@ -525,23 +542,3 @@ ensureFunctional stp qfd = case functional qfd of
   True -> pure qfd
   Unknown -> throwError $ MaybeNotFunctional (startOf stp) (endOf stp) stp
   False -> throwError $ NotFunctional (startOf stp) (endOf stp) stp
-
-{-
-qualifyProperty :: RoleType -> ArcPosition -> String -> PhaseThree EnumeratedPropertyType
-qualifyProperty erole pos propType = do
-  -- Note that we need the DomeinFile with qualified bindings in the cache
-  -- for this function to work correctly!
-  if isQualifiedWithDomein propType
-    then pure $ EnumeratedPropertyType propType
-    else do
-      (candidates :: Array PropertyType) <- lift2 (erole ###= (f >=> lookForUnqualifiedPropertyType propType))
-      case head candidates of
-        Nothing -> throwError $ UnknownProperty pos propType
-        (Just (ENP t)) | length candidates == 1 -> pure t
-        otherwise -> throwError $ NotUniquelyIdentifying pos propType (map propertytype2string candidates)
-  where
-    f :: RoleType ~~~> ADT EnumeratedRoleType
-    f rt = ArrayT do
-      adt <- expandedADT_ rt
-      pure [adt]
--}

@@ -126,6 +126,9 @@ data QueryFunction
 	| DeleteProperty EnumeratedPropertyType
   | Move
   | Remove
+  | AddPropertyValue
+  | RemovePropertyValue
+  | SetPropertyValue
   -- | EffectFullFunction
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
