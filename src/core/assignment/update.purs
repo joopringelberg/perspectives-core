@@ -166,6 +166,10 @@ setRol contextId rolName rolInstances = do
                 , instance: Just rolInstance
                 }
 
+-- | Detach the role instances from their current context and attach them to the new context.
+-- TODO: implement moveRoles.
+moveRoles :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+moveRoles contextId rolName rolInstances = pure unit
 -----------------------------------------------------------
 -- UPDATE A PROPERTY
 -----------------------------------------------------------

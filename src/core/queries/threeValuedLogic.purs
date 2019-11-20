@@ -49,6 +49,14 @@ bool2threeValued :: Boolean -> ThreeValuedLogic
 bool2threeValued true = True
 bool2threeValued false = False
 
+pessimistic :: ThreeValuedLogic -> Boolean
+pessimistic True = true
+pessimistic _ = false
+
+optimistic :: ThreeValuedLogic -> Boolean
+optimistic False = false
+optimistic _ = true
+
 and :: ThreeValuedLogic -> ThreeValuedLogic -> ThreeValuedLogic
 and True True = True
 and Unknown _ = Unknown

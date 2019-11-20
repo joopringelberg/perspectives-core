@@ -51,6 +51,7 @@ import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, voi
 constructContexts :: ContextsSerialisation -> MonadPerspectives (Array UserMessage)
 constructContexts (ContextsSerialisation contexts) = (traverse (constructContext >=> (pure <<< (either identity (const [])))) >=> (pure <<< concat)) contexts
 
+-- | As constructContext but rethrows errors.
 constructContext' :: ContextSerialization -> MonadPerspectives ContextInstance
 constructContext' c = do
       r <- constructContext c

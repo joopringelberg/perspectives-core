@@ -88,6 +88,7 @@ data PerspectivesError
     | WrongPropertyRange ArcPosition ArcPosition EP.Range EP.Range
     | NotAPropertyRange  ArcPosition ArcPosition EP.Range
 
+    | ParserError String ArcPosition
     | Custom String
 
 derive instance eqPerspectivesError :: Eq PerspectivesError
@@ -106,6 +107,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownView pos qname) = "(UnknownView) The view '" <> qname <> "' is not defined, at: " <> show pos
   show (NotUniquelyIdentifying pos lname alts) = "(NotUniquelyIdentifying) The local name '" <> lname <> "' does not uniquely identify a resource. Choose one from: " <> show alts <> ", at: " <> show pos
   show (Custom s) = s
+  show (ParserError message pos) = "(ParserError) " <> message <> show pos
   -- TODO: Als extra kunnen we de Constructors hieronder voorzien van ArcPosition.
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos

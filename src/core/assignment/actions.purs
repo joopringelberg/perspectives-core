@@ -27,7 +27,7 @@ import Prelude
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldMap, union)
+import Data.Array (foldMap, uncons, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
@@ -38,9 +38,11 @@ import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, removeProperty, removeRol, setProperty, setRol)
+import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, moveRoles, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.BasicConstructors (constructAnotherRol)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP, (##>))
+import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
@@ -52,6 +54,7 @@ import Perspectives.Representation.Context (Context, actions)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 
 -----------------------------------------------------------
@@ -180,15 +183,57 @@ compileBotAction actionType =
           else pure unit
 
 compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
+compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
+  roleGetter <- context2role rle
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    case uncons roles of
+      Nothing -> pure unit
+      Just {head, tail} -> do
+        ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+        removeRol context pspType roles
+
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization{properties: PropertySerialization empty, binding: Nothing})
 
--- compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _) = do
---   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
---   (roleGetter :: (ContextInstance ~~> RoleInstance)) = context2role roleToMove
+compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleToMove
+  if (pessimistic mry)
+    then pure \contextId -> do
+      c <- lift $ lift (contextId ##>> contextGetter)
+      (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+      case uncons roles of
+        Nothing -> pure unit
+        Just {head, tail} -> do
+          ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+          moveRoles context pspType roles
+    else pure \contextId -> do
+      ctxt <- lift $ lift (contextId ##> contextGetter)
+      case ctxt of
+        Nothing -> pure unit
+        Just c -> do
+          (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+          case uncons roles of
+            Nothing -> pure unit
+            Just {head, tail} -> do
+              ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+              moveRoles context pspType roles
+
+compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
+  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
+  pure \contextId -> do
+    ctxts <- lift $ lift (contextId ##= contextGetter)
+    (bindings' :: Array RoleInstance) <- lift $ lift (contextId ##= bindingsGetter)
+    -- TODO: handle errors when creating a new Role instance in Bind.
+    for_ ctxts \ctxt -> do
+      for_ bindings' \bndg -> do
+        constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
+          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})
 
 compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ _ _) = pure \_ -> pure unit
 

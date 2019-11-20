@@ -73,7 +73,7 @@ modifyDomeinFileInCache modifier ns = do
 -----------------------------------------------------------
 --
 -----------------------------------------------------------
-
+-- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
 retrieveDomeinFile ns = do
   mAvar <- domeinCacheLookup ns
@@ -119,7 +119,8 @@ saveCachedDomeinFile ns = do
       df <- liftAff $ read avar
       modifyDomeinFileInCouchdb df avar
 
--- | Either create or modify the DomeinFile in couchdb. Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
+-- | Either create or modify the DomeinFile in couchdb. Caches.
+-- | Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
 storeDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
 storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
   mAvar <- domeinCacheLookup _id
@@ -129,7 +130,7 @@ storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
     (Just avar) -> modifyDomeinFileInCouchdb df avar
 
 createDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
-createDomeinFileInCouchdb df@(DomeinFile dfr@{_id, contexts}) = do
+createDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
   ev <- (liftAff empty) >>= domeinCacheInsert _id
   res <- liftAff $ AX.put ResponseFormat.string (modelsURL <> escapeCouchdbDocumentName _id) (RequestBody.string (writeJSON df))
 

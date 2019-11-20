@@ -377,17 +377,17 @@ compileRules = do
             sequenceOfAssignments currentDomain assignments = case uncons assignments of
               Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
               (Just {head, tail}) -> do
-                head_ <- compileAssignment currentDomain head
+                head_ <- describeAssignmentStatement currentDomain head
                 foldM (addAssignmentToSequence currentDomain) head_ tail
 
             addAssignmentToSequence :: Domain -> QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
-            addAssignmentToSequence currentDomain seq v = makeSequence <$> pure seq <*> (compileAssignment currentDomain v)
+            addAssignmentToSequence currentDomain seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement currentDomain v)
 
             -- we need the Object of the Perspective. Right now it is a RoleType, possibly a(n anonymous) CalculatedRole.
             -- The assignment functions arbitrarily return the currentContext. Hence,
             -- we declare the functions to be both functional and mandatory.
-            compileAssignment :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
-            compileAssignment currentDomain ass = case ass of
+            describeAssignmentStatement :: Domain -> Assignment -> PhaseThree QueryFunctionDescription
+            describeAssignmentStatement currentDomain ass = case ass of
               Remove {roleExpression} -> do
                 rle <- ensureRole currentDomain roleExpression
                 pure $ UQD currentDomain QF.Remove rle currentDomain True True
@@ -407,10 +407,9 @@ compileRules = do
                 -- Bind <binding-expression> to <binderType> [in <context-expression>]. Check:
                 -- bindingExpression should result in roles
                 (bindings :: QueryFunctionDescription) <- ensureRole currentDomain bindingExpression
-                -- contextExpression should result in a single context
                 (cte :: QueryFunctionDescription) <- case contextExpression of
                   Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
-                  (Just (stp :: Step)) -> ensureContext currentDomain stp >>= ensureFunctional stp
+                  (Just (stp :: Step)) -> ensureContext currentDomain stp
                 -- binderType should be an EnumeratedRoleType (local name should resolve w.r.t. the contextExpression)
                 (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier cte f.start f.end
                 -- If the roleIdentifier is functional, the bindings should be functional too.
