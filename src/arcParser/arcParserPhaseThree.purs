@@ -58,14 +58,14 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, typeExists)
-import Perspectives.Representation.Class.Role (bindingOfRole, expansionOfADT)
+import Perspectives.Representation.Class.Role (bindingOfRole, expansionOfADT, getCalculation, getRole)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, expandedADT_, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType)
 import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (&&))
@@ -456,10 +456,11 @@ compileRules = do
                 pure $ UQD currentDomain QF.DeleteRole roleF currentDomain True True
 
               DeleteProperty f@{propertyIdentifier, roleExpression} -> do
-                -- (roleF :: QueryFunctionDescription) <- ensureRole currentDomain roleExpression
-                -- (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleExpression f.start f.end
-                -- pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleF currentDomain True True
-                throwError $ Custom "DeleteProperty: Not all cases are implemented in compileAssignment!"
+                (roleF :: QueryFunctionDescription) <- case roleExpression of
+                  Nothing -> lift $ lift $ getRole object >>= getCalculation
+                  Just e -> ensureRole currentDomain e
+                (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleF f.start f.end
+                pure $ UQD currentDomain (QF.DeleteProperty qualifiedProperty) roleF currentDomain True True
 
               PropertyAssignment {propertyIdentifier, operator, valueExpression, roleExpression} -> throwError $ Custom "PropertyAssignment: Not all cases are implemented in compileAssignment!"
 

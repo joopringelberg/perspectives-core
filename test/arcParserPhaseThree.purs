@@ -37,6 +37,7 @@ import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
@@ -808,7 +809,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                 logShow otherwise
                 assert "Expected the error LocalRoleDoesNotBind" false
 
-  testOnly "Bot Action with delete role" do
+  test "Bot Action with delete role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        delete Gast\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -836,6 +837,69 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                           otherwise -> assert "The binding should be a rolgetter" false
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false
+
+  test "Bot Action with delete property and default object" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        delete property Prop1\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr'
+            case x' of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
+                case lookup "model:Test$Gast_bot$ChangeGast" actions of
+                  Just (Action{effect}) -> do
+                    case effect of
+                      (Just (EF (UQD _ qf bndg _ _ _))) -> do
+                        assert "The queryfunction should be DeleteProperty" (case qf of
+                          QF.DeleteProperty (EnumeratedPropertyType "model:Test$Gast$Prop1") -> true
+                          otherwise -> false )
+                        case bndg of
+                          (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast")))_ _ _) ->
+                            assert "The binding should be a rolgetter for Gast" true
+                          otherwise -> assert "The binding should be a rolgetter" false
+                      otherwise -> assert "Side effect expected" false
+                  Nothing -> assert "The effect should compile to a binary query function" false
+
+  test "Bot Action with delete property, property doesn't exist." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        delete property AnotherProp\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr'
+            case x' of
+              (Left (RoleHasNoProperty _ _)) -> assert "ok" true
+              otherwise -> do
+                logShow otherwise
+                assert "Expected the error RoleHasNoProperty" false
+
+  testOnly "Bot Action with delete property, property is calculated." do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n    property: Prop2 = Prop1\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        delete property Prop2\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP $ phaseThree dr'
+            case x' of
+              (Left (CannotCreateCalculatedProperty _ _ _)) -> assert "ok" true
+              otherwise -> do
+                logShow otherwise
+                assert "Expected the error CannotCreateCalculatedProperty" false
 
 x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
 x correctedDFR = withDomeinFile "model:MyTestDomain"
