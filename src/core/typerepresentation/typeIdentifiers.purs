@@ -25,7 +25,7 @@
 -- | Each newtype is an instance of several Type Classes:
 -- |  * Generic
 -- |  * Newtype
--- |  * WriteForeign
+-- |  * Encode
 -- |  * ReadForeign
 -- |  * Show
 -- |  * Eq.
@@ -43,13 +43,14 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
-import Kishimen (genericSumToVariant)
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
+import Foreign.Class (class Encode)
+import Foreign.Generic (defaultOptions, genericEncode)
+import Simple.JSON (class ReadForeign, readImpl)
 
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
 derive instance genericRepContextType :: Generic ContextType _
-derive newtype instance writeForeignContextType :: WriteForeign ContextType
+derive newtype instance encodeContextType :: Encode ContextType
 derive newtype instance readForeignContextType :: ReadForeign ContextType
 instance showContextType :: Show ContextType where
   show i = "ContextType " <> (unwrap i)
@@ -59,7 +60,7 @@ instance eqContextType :: Eq ContextType where
 newtype EnumeratedRoleType = EnumeratedRoleType String
 derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
 derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
-derive newtype instance writeForeignEnumeratedRolType :: WriteForeign EnumeratedRoleType
+derive newtype instance encodeEnumeratedRolType :: Encode EnumeratedRoleType
 derive newtype instance readForeignEnumeratedRolType :: ReadForeign EnumeratedRoleType
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
   show i = "EnumeratedRoleType " <> (unwrap i)
@@ -69,7 +70,7 @@ instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
 newtype CalculatedRoleType = CalculatedRoleType String
 derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
 derive instance genericRepComputedRolType :: Generic CalculatedRoleType _
-derive newtype instance writeForeignComputedRolType :: WriteForeign CalculatedRoleType
+derive newtype instance encodeComputedRolType :: Encode CalculatedRoleType
 derive newtype instance readForeignComputedRolType :: ReadForeign CalculatedRoleType
 instance showComputedRolType :: Show CalculatedRoleType where
   show i = "CalculatedRoleType " <> (unwrap i)
@@ -78,9 +79,8 @@ instance eqComputedRolType :: Eq CalculatedRoleType where
 
 data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
-instance writeForeignRoleType :: WriteForeign RoleType where
-  writeImpl (ENR r) = writeImpl r
-  writeImpl (CR r) = writeImpl r
+instance encodeRoleType :: Encode RoleType where
+  encode = genericEncode defaultOptions
 instance readForeignRoleType :: ReadForeign RoleType where
   readImpl r = readImpl r
 instance showRoleType :: Show RoleType where
@@ -100,8 +100,8 @@ roletype2string (CR s) = unwrap s
 -- | RoleKind codes the 'role' of the role in the context. Is it an external rol, a bot role, etc.
 data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
 derive instance genericRepRoleKind :: Generic RoleKind _
-instance writeForeignRoleKind :: WriteForeign RoleKind where
-  writeImpl = writeImpl <<< genericSumToVariant
+instance encodeRoleKind :: Encode RoleKind where
+  encode = genericEncode defaultOptions
 instance readForeignRoleKind :: ReadForeign RoleKind where
   readImpl f = readImpl f
 instance showRoleKind :: Show RoleKind where
@@ -112,7 +112,7 @@ instance eqRoleKind :: Eq RoleKind where
 newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
 derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyType _
-derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
+derive newtype instance encodeEnumeratedPropertyType :: Encode EnumeratedPropertyType
 derive newtype instance readForeignEnumeratedPropertyType :: ReadForeign EnumeratedPropertyType
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
   show i = "EnumeratedPropertyType " <> (unwrap i)
@@ -122,7 +122,7 @@ instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
 newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
 derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyType _
-derive newtype instance writeForeignCalculatedPropertyType :: WriteForeign CalculatedPropertyType
+derive newtype instance encodeCalculatedPropertyType :: Encode CalculatedPropertyType
 derive newtype instance readForeignCalculatedPropertyType :: ReadForeign CalculatedPropertyType
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
   show i = "CalculatedPropertyType " <> (unwrap i)
@@ -136,9 +136,8 @@ propertytype2string (ENP s) = unwrap s
 propertytype2string (CP s) = unwrap s
 
 derive instance genericRepPropertyType :: Generic PropertyType _
-instance writeForeignPropertyType :: WriteForeign PropertyType where
-  writeImpl (ENP r) = writeImpl r
-  writeImpl (CP r) = writeImpl r
+instance encodePropertyType :: Encode PropertyType where
+  encode = genericEncode defaultOptions
 instance readForeignPropertyType :: ReadForeign PropertyType where
   readImpl r = readImpl r
 instance showPropertyType :: Show PropertyType where
@@ -153,7 +152,7 @@ instance eqPropertyType :: Eq PropertyType where
 newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _
 derive instance genericRepViewType :: Generic ViewType _
-derive newtype instance writeForeignViewType :: WriteForeign ViewType
+derive newtype instance encodeViewType :: Encode ViewType
 derive newtype instance readForeignViewType :: ReadForeign ViewType
 instance showViewType :: Show ViewType where
   show i = "ViewType " <> (unwrap i)
@@ -163,7 +162,7 @@ instance eqViewType :: Eq ViewType where
 newtype ActionType = ActionType String
 derive instance newtypeActionType :: Newtype ActionType _
 derive instance genericRepActionType :: Generic ActionType _
-derive newtype instance writeForeignActionType :: WriteForeign ActionType
+derive newtype instance encodeActionType :: Encode ActionType
 derive newtype instance readForeignActionType :: ReadForeign ActionType
 instance showActionType :: Show ActionType where
   show i = "ActionType " <> (unwrap i)

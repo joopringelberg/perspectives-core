@@ -26,6 +26,9 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign (unsafeFromForeign, unsafeToForeign)
+import Foreign.Class (class Encode)
+import Foreign.Generic (defaultOptions, genericEncode)
+import Kishimen (genericSumToVariant)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
@@ -139,15 +142,20 @@ instance showQueryFunction :: Show QueryFunction where
 instance eqQueryFunction :: Eq QueryFunction where
   eq x = genericEq x
 
-type ConstructorRep = {tag :: String, dat :: Array String}
-
-instance writeForeignQueryFunction :: WriteForeign QueryFunction where
-  writeImpl q = unsafeToForeign (writeJSON q)
+-- instance writeForeignQueryFunction :: WriteForeign QueryFunction where
+  -- writeImpl q = unsafeToForeign (writeJSON ((genericSumToVariant q)))
+  -- writeImpl q = genericEncode defaultOptions q
 
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
   readImpl q = readJSON' (unsafeFromForeign q)
 
 derive instance genericFunctionName :: Generic FunctionName _
+instance writeForeignFunctionName :: WriteForeign FunctionName where
+  writeImpl q = unsafeToForeign (writeJSON (genericSumToVariant q))
+instance readForeignFunctionName :: ReadForeign FunctionName where
+  readImpl q = readJSON' (unsafeFromForeign q)
+instance encodeFunctionName :: Encode FunctionName where
+  encode = genericEncode defaultOptions
 
 -- | The show function produces the very same string that the parser parses.
 instance showFunctionName :: Show FunctionName where

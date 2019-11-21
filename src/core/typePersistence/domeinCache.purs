@@ -37,6 +37,7 @@ import Effect.Aff (Aff, catchError)
 import Effect.Aff.AVar (AVar, empty, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
+import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
@@ -132,7 +133,7 @@ storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
 createDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
 createDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
   ev <- (liftAff empty) >>= domeinCacheInsert _id
-  res <- liftAff $ AX.put ResponseFormat.string (modelsURL <> escapeCouchdbDocumentName _id) (RequestBody.string (writeJSON df))
+  res <- liftAff $ AX.put ResponseFormat.string (modelsURL <> escapeCouchdbDocumentName _id) (RequestBody.string (genericEncodeJSON defaultOptions df))
 
   if res.status == (StatusCode 409)
     then do

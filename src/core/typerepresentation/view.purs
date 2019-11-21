@@ -24,6 +24,8 @@ module Perspectives.Representation.View where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Encode)
+import Foreign.Generic (defaultOptions, genericEncode)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
@@ -59,6 +61,8 @@ type ViewRecord =
   }
 
 derive instance genericRepView :: Generic View _
+instance encodeView :: Encode View where
+  encode = genericEncode defaultOptions
 
 instance showView :: Show View where
   show = genericShow
@@ -67,8 +71,6 @@ instance eqView :: Eq View where
   eq (View {_id : id1}) (View {_id : id2}) = id1 == id2
 
 derive instance newtypeView :: Newtype View _
-
-derive newtype instance writeForeignView :: WriteForeign View
 
 derive newtype instance readForeignView :: ReadForeign View
 

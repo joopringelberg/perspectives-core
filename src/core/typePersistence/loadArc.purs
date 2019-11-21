@@ -18,29 +18,36 @@ import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentPar
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Prelude (bind, pure, show, ($), discard)
+import Prelude (bind, pure, show, ($), (*>))
 import Text.Parsing.Parser (ParseError(..))
 
--- | Load an Arc file from a directory. Parse the file completely. Store and cache it.
-loadArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
+-- | Load an Arc file from a directory. Parse the file completely.
+loadArcFile :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
 loadArcFile fileName directoryName = do
   procesDir <- liftEffect cwd
   catchError do
       text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, fileName])
       (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
       case r of
-        (Left e) -> pure [parseError2PerspectivesError e]
+        (Left e) -> pure $ Left [parseError2PerspectivesError e]
         (Right ctxt) -> do
           case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
-            (Left e) -> pure [e]
+            (Left e) -> pure $ Left [e]
             (Right (DomeinFile dr')) -> do
               (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'
               case x' of
-                (Left e) -> pure [e]
+                (Left e) -> pure $ Left [e]
                 (Right correctedDFR) -> do
-                  storeDomeinFileInCouchdb (DomeinFile correctedDFR)
-                  pure []
-    \e -> pure [Custom (show e)]
+                  pure $ Right $ DomeinFile correctedDFR
+    \e -> pure $ Left [Custom (show e)]
+
+-- | Load an Arc file from a directory. Parse the file completely. Store and cache it.
+loadAndSaveArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadAndSaveArcFile fileName directoryName = do
+  r <- loadArcFile fileName directoryName
+  case r of
+    Left m -> pure m
+    Right df -> (storeDomeinFileInCouchdb df) *> pure []
 
 parseError2PerspectivesError :: ParseError -> PerspectivesError
 parseError2PerspectivesError (ParseError message pos) = ParserError message (position2ArcPosition pos)
