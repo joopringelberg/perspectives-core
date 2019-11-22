@@ -27,13 +27,15 @@ import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Data.Maybe (Maybe, maybe)
+import Data.Newtype (unwrap)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as F
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinFile (DomeinFile, defaultDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (Prefix, QualifiedName(..))
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (<>), (>>=))
 import Text.Parsing.Indent (runIndent)
 import Text.Parsing.Parser (ParseError, ParserT, runParserT)
@@ -44,13 +46,31 @@ import Text.Parsing.Parser.Pos (Position)
 -- | - the namespace for context declarations. The namespace does not terminate on a $!
 -- | - the section, i.e. the current role that should be used to stick a role in a context;
 -- | - the prefixes: a map of prefixes to namespaces.
-type ContextRoleParserState = { rolOccurrences :: F.Object Int, namespace :: String, typeNamespace :: String, section :: QualifiedName, prefixes :: F.Object String, domeinFile :: DomeinFile, nameCounter :: Int}
+type ContextRoleParserState =
+  { rolOccurrences :: F.Object Int
+  , namespace :: String
+  , typeNamespace :: String
+  , section :: QualifiedName
+  , prefixes :: F.Object String
+  , nameCounter :: Int
+  , contextInstances :: F.Object PerspectContext
+  , roleInstances :: F.Object PerspectRol
+}
 
 defaultPrefixes :: F.Object String
 defaultPrefixes = F.fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
-initialContextRoleParserMonadState = {rolOccurrences: F.empty, namespace: "model:Perspectives", typeNamespace: "model:Perspectives", section: (QualifiedName "model:Perspectives" "rolInContext"), prefixes: defaultPrefixes, domeinFile: defaultDomeinFile, nameCounter: 0}
+initialContextRoleParserMonadState =
+  { rolOccurrences: F.empty
+  , namespace: "model:Perspectives"
+  , typeNamespace: "model:Perspectives"
+  , section: (QualifiedName "model:Perspectives" "rolInContext")
+  , prefixes: defaultPrefixes
+  , nameCounter: 0
+  , contextInstances: F.empty
+  , roleInstances: F.empty
+}
 
 -- | This is the monad stack we use for the ContextRoleParser.
 -- | The underlying monad is MonadPerspectives, which we need to access couchdb.
@@ -191,3 +211,19 @@ setPrefix pre exp = do
 
 getPrefix :: Prefix -> IP (Maybe String)
 getPrefix pre = lift (lift (gets (\{prefixes} -> F.lookup pre prefixes)))
+
+-----------------------------------------------------------
+-- ContextInstances
+-----------------------------------------------------------
+addContextInstance :: ContextInstance -> PerspectContext -> IP Unit
+addContextInstance contextId context = void $ lift (lift (modify f))
+  where
+    f s@{contextInstances} = s {contextInstances = F.insert (unwrap contextId) context contextInstances}
+
+-----------------------------------------------------------
+-- RoleInstances
+-----------------------------------------------------------
+addRoleInstance :: RoleInstance -> PerspectRol -> IP Unit
+addRoleInstance roleId role = void $ lift (lift (modify f))
+  where
+    f s@{roleInstances} = s {roleInstances = F.insert (unwrap roleId) role roleInstances}

@@ -160,7 +160,7 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   oldDf <- liftAff $ take av
   res <- liftAff $ AX.put
     ResponseFormat.string
-    (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision)
+    (modelsURL <> escapeCouchdbDocumentName _id <> "?rev=" <> originalRevision)
     (RequestBody.string (genericEncodeJSON defaultOptions (DomeinFile dfr {_rev = _rev})))
   if res.status == (StatusCode 409)
     then do

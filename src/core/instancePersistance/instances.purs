@@ -53,9 +53,9 @@ import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (ensureAuthentication, defaultPerspectRequest, retrieveDocumentVersion)
+import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Persistent (class Persistent, cacheCachedEntiteit, changeRevision, readEntiteitFromCache, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Persistent (class Persistent, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase)
 
@@ -131,10 +131,12 @@ saveEntiteitPreservingVersion = saveEntiteit
 
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
 saveEntiteit id = do
-  pe <- readEntiteitFromCache id
-  case rev pe of
+  (pe :: Maybe a) <- tryGetPerspectEntiteit id
+  case pe of
     Nothing -> saveUnversionedEntiteit id
-    otherwise -> saveVersionedEntiteit id pe
+    Just pe' -> case rev pe' of
+      Nothing -> saveUnversionedEntiteit id
+      otherwise -> saveVersionedEntiteit id pe'
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
@@ -162,10 +164,7 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
     (Just rev) -> do
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions entiteit)}
-      if res.status == (StatusCode 409)
-        then retrieveDocumentVersion (unwrap entId) >>= pure <<< (flip changeRevision entiteit) <<< Just >>= saveVersionedEntiteit entId
-        else do
-          void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
-            (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (changeRevision (unwrap a).rev entiteit)))
-          pure entiteit
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions entiteit)}
+      void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
+        (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (changeRevision (unwrap a).rev entiteit)))
+      pure entiteit

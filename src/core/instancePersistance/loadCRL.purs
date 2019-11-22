@@ -25,29 +25,33 @@ import Prelude
 
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
+import Data.FoldableWithIndex (forWithIndex_)
+import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Foreign.Object (Object)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Instances (saveEntiteitPreservingVersion)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Perspectives.SaveUserData (saveDomeinFileAsUserData)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 
 -- | Loads a file from a directory relative to the active process.
 -- | All context and role instances are loaded into the cache. Does not save to the database.
-loadCrlFile :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) (Array RoleInstance))
+loadCrlFile :: String ->
+  String ->
+  MonadPerspectives (Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol)))
 loadCrlFile file directoryName = do
   procesDir <- liftEffect cwd
   text <- lift $ readTextFile UTF8 (Path.concat [procesDir, directoryName, file])
   parseResult <- parseAndCache text
   case parseResult of
-    Right buitenRollen -> do
-      saveDomeinFileAsUserData buitenRollen
-      pure $ Right buitenRollen
     Left e -> pure $ Left [Custom (show e)]
+    Right contextsAndRoles -> pure $ Right contextsAndRoles
 
 -- | Loads a file from the directory "src/model" relative to the directory of the active process.
 -- | All instances are loaded into the cache, and stored in Couchdb.
@@ -56,4 +60,9 @@ loadAndSaveCrlFile file directoryName = do
   r <- loadCrlFile file directoryName
   case r of
     Left e -> pure e
-    Right buitenRollen -> saveDomeinFileAsUserData buitenRollen *> pure []
+    Right (Tuple contextInstances roleInstances) -> do
+      forWithIndex_ contextInstances
+        \i (_ :: PerspectContext) -> saveEntiteitPreservingVersion (ContextInstance i)
+      forWithIndex_ roleInstances
+        \i (_ :: PerspectRol) -> saveEntiteitPreservingVersion (RoleInstance i)
+      pure []

@@ -39,7 +39,7 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, rol_
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
-import Perspectives.IndentParser (IP, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
+import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Representation.Class.Persistent (cacheEntiteitPreservingVersion)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -147,11 +147,11 @@ localContextName = identLetterString
 
 -- localPropertyName = lower alphaNum*
 localPropertyName ::  IP String
-localPropertyName = uncapitalizedString
+localPropertyName = capitalizedString
 
 -- localPropertyName = lower alphaNum*
 localRolName ::  IP String
-localRolName = uncapitalizedString
+localRolName = capitalizedString
 
 -- prefix = lower+ ':'
 prefix ::  IP String
@@ -218,7 +218,7 @@ relativePropertyTypeName = lexeme do
 
 relativeRolTypeNameOutsideNamespace ::  IP QualifiedName
 relativeRolTypeNameOutsideNamespace = lexeme do
-  ln <- (STRING.string "?") *> uncapitalizedString
+  ln <- (STRING.string "?") *> capitalizedString
   pure $ QualifiedName "?" ln
 
 contextName ::  IP QualifiedName
@@ -387,10 +387,14 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
         Nothing -> 0
 
 cacheRol ::  RoleInstance -> PerspectRol -> IP Unit
-cacheRol rolId rol = liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
+cacheRol rolId rol = do
+  liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
+  addRoleInstance rolId rol
 
 cacheContext ::  ContextInstance -> PerspectContext -> IP Unit
-cacheContext contextId ctxt = liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
+cacheContext contextId ctxt = do
+  liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
+  addContextInstance contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
 -- | what is returned from the context parser is the QualifiedName of its buitenRol.
@@ -618,9 +622,7 @@ userData = do
   withPos do
     _ <- userDataDeclaration
     _ <- AR.many importExpression
-    contexts <- AR.many context
-    -- Hier kan ik ook de rollen van de domeinfile nemen.
-    pure contexts
+    AR.many context
   where
 
     userDataDeclaration :: IP Unit
@@ -631,9 +633,9 @@ userData = do
 -----------------------------------------------------------
 -- catchError :: forall a. m a -> (e -> m a) -> m a
 
-parseAndCache ::  String -> MonadPerspectives (Either ParseError (Array RoleInstance))
+parseAndCache ::  String -> MonadPerspectives (Either ParseError (Tuple (FO.Object PerspectContext)(FO.Object PerspectRol)))
 parseAndCache text = do
-  (Tuple parseResult {domeinFile}) <- runIndentParser' text userData
+  (Tuple parseResult {roleInstances, contextInstances}) <- runIndentParser' text userData
   case parseResult of
     (Left e) -> pure $ Left e
-    (Right r) -> pure $ Right r
+    (Right r) -> pure $ Right $ Tuple contextInstances roleInstances

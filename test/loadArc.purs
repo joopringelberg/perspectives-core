@@ -22,8 +22,8 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadArc" do
-  test "Load a model file and store it in Couchdb" do
+theSuite = suiteSkip "Perspectives.loadArc" do
+  test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ loadAndSaveArcFile "test1.arc" testDirectory
     if null messages

@@ -1,0 +1,6 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCase usr:MijnTestCase
+	$Self => ()
