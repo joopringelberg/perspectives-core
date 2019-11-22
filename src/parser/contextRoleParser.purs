@@ -510,8 +510,7 @@ context = withRoleCounting context' where
           do
             -- Parsing the body
             (prototype :: Maybe ContextID) <- option Nothing (indented *> prototypeDeclaration)
-            (publicProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "buitenRolBeschrijving" (block publicContextPropertyAssignment))
-            (privateProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "binnenRolBeschrijving" (block privateContextPropertyAssignment))
+            (publicProps :: List (Tuple ID (Array Value))) <- option Nil (indented *> withExtendedTypeNamespace "External" (block publicContextPropertyAssignment))
             (rolebindings :: List (Tuple RolName RoleInstance)) <- option Nil (indented *> (block $ roleBinding instanceName))
 
             -- Storing
@@ -526,7 +525,7 @@ context = withRoleCounting context' where
             cacheRol (RoleInstance $ buitenRol (show instanceName))
               (PerspectRol defaultRolRecord
                 { _id = RoleInstance $ buitenRol (show instanceName)
-                , pspType = EnumeratedRoleType $ show typeName <> "$buitenRolBeschrijving"
+                , pspType = EnumeratedRoleType $ show typeName <> "$External"
                 , context = (ContextInstance $ show instanceName)
                 , binding = Just $ RoleInstance $ maybe "" buitenRol prototype
                 , properties = FO.fromFoldable publicProps

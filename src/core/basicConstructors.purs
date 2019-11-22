@@ -106,7 +106,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
       lift $ cacheUncachedEntiteit externalRole
         (PerspectRol defaultRolRecord
           { _id = externalRole
-          , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$buitenRolBeschrijving"
+          , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$External"
           , context = contextInstanceId
           , binding = b
           , properties = constructProperties externeProperties
