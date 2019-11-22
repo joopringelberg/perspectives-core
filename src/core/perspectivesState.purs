@@ -26,10 +26,11 @@ import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Foreign.Object (empty)
+import Perspectives.Assignment.ActionCache (ActionCache, actionCache)
 import Perspectives.CoreTypes (ActionInstanceCache, AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, ActionAssumptionCache)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, clear, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void)
 

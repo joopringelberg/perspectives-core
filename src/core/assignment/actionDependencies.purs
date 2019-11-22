@@ -33,7 +33,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, ensure, keys, modify, 
 import Perspectives.PerspectivesState (actionAssumptionCache, actionInstanceCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..))
-import Prelude (class Eq, Unit, const, flip, join, unit, ($), (<#>), (<$>), (&&), eq, map, bind, pure, discard, void)
+import Prelude (Unit, const, flip, join, unit, ($), (<#>), (<$>), map, bind, pure, discard, void)
 
 
 -- | Creates reciprocal entries in the ActionAssumptionCache and the ActionInstanceCache.

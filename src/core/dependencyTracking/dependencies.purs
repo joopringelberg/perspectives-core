@@ -37,7 +37,7 @@ import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, ResponseRecord(..))
 import Perspectives.CoreTypes (Assumption, AssumptionRegister, MP, type (~~>), runMonadPerspectivesQuery)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, peek, poke, new)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Unsafe.Coerce (unsafeCoerce)
 

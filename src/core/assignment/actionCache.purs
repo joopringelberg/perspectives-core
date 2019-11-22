@@ -24,7 +24,7 @@ module Perspectives.Assignment.ActionCache where
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (Updater)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, clear, new, peek, poke)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Prelude (unit)
