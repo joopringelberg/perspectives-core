@@ -25,29 +25,26 @@ module Perspectives.Actions where
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldMap, uncons, union)
+import Data.Array (foldMap, uncons)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
-import Perspectives.Assignment.DependencyTracking (ActionInstance(..), cacheActionInstanceDependencies, removeContextInstanceDependencies)
+import Perspectives.Assignment.DependencyTracking (cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, moveRoles, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.BasicConstructors (constructAnotherRol)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP, (##>))
+import Perspectives.CoreTypes (ActionInstance(..), type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP, (##>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Assignment (AssignmentStatement(..))
 import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.Context (Context, actions)
@@ -62,6 +59,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPrope
 -----------------------------------------------------------
 type RHS = WithAssumptions Value -> MonadPerspectivesTransaction Unit
 
+{-
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect for a Context, conditional on a set of given boolean values.
 constructRHS :: RoleGetter -> ActionType -> AssignmentStatement -> MonadPerspectives (ContextInstance -> RHS)
@@ -137,6 +135,7 @@ constructRHS objectGetter actionType a = case a of
           pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 a2)
           void $ pure $ deleteProperty object rt
         else pure unit
+-}
 
 -- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
 -- | on Assumptions in the actionAssumptionRegister in PerspectivesState.
@@ -151,7 +150,7 @@ setupBotActions cid = do
 
 -- | Remove all actions associated with this context.
 tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
-tearDownBotActions = pure <<< removeContextInstanceDependencies
+tearDownBotActions = removeContextInstanceDependencies
 
 -- | Compile the action to an Updater. Cache for later use.
 compileBotAction :: ActionType -> MP (Updater ContextInstance)
@@ -178,7 +177,7 @@ compileBotAction actionType =
       if (alaF Conj foldMap (eq (Value "true")) bools)
           then do
             -- Cache the association between the assumptions found for this ActionInstance.
-            pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
+            lift $ lift $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
             effectFullFunction contextId
           else pure unit
 

@@ -29,8 +29,8 @@ import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (new)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.Assignment.DependencyTracking (ActionInstance(..), actionInstancesDependingOn)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Assumption)
+import Perspectives.Assignment.DependencyTracking (actionInstancesDependingOn)
+import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, Assumption)
 import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
@@ -79,13 +79,12 @@ assumptionsInTransaction (Transaction{roleDeltas, bindingDeltas, propertyDeltas}
 -- | Execute every ActionInstance that is triggered by changes in the Transaction.
 -- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
 runActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runActions t = case actionInstancesDependingOn $ assumptionsInTransaction t of
-  Nothing -> pure t
-  (Just as) -> do
-    lift $ void $ AA.modify cloneEmptyTransaction
-    for_ as \(ActionInstance ctxt atype) ->
-        case retrieveAction atype of
-          Nothing -> pure unit
-          (Just a) -> a ctxt
-    nt <- lift AA.get
-    pure <<< (<>) t =<< runActions nt
+runActions t = do
+  as <- lift $ lift $ actionInstancesDependingOn $ assumptionsInTransaction t
+  lift $ void $ AA.modify cloneEmptyTransaction
+  for_ as \(ActionInstance ctxt atype) ->
+      case retrieveAction atype of
+        Nothing -> pure unit
+        (Just a) -> a ctxt
+  nt <- lift AA.get
+  pure <<< (<>) t =<< runActions nt

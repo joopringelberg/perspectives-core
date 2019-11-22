@@ -35,12 +35,13 @@ import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT, runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=), class Eq, (&&), eq, unit)
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -59,6 +60,10 @@ type PerspectivesState = CouchdbState
   , domeinCache :: DomeinCache
 
   , queryAssumptionRegister :: AssumptionRegister
+
+  , actionAssumptionCache :: ActionAssumptionCache
+
+  , actionInstanceCache :: ActionInstanceCache
 
   , variableBindings :: Environment String
   )
@@ -81,6 +86,32 @@ assumption = Tuple
 -- | registered with.
 type AssumptionRegister = F.Object (F.Object (Array CorrelationIdentifier))
 
+-----------------------------------------------------------
+-- ASSIGNMENT (RULE) DEPENDENCYTRACKING
+-----------------------------------------------------------
+-- | An ActionInstance represents the applicability of an Action to the instance of a Context.
+data ActionInstance = ActionInstance ContextInstance ActionType
+
+instance eqActionInstance :: Eq ActionInstance where
+  eq (ActionInstance c1 a1) (ActionInstance c2 a2) = eq c1 c2 && eq a1 a2
+
+-- | Actions should be re-run as the Assumptions underlying their computation change.
+-- | We register the dependency of Actions for ContextInstances with a double registration that allows us to
+-- | travel from Assumptions to ActionInstances and vice versa by simple lookup.
+
+-- | The ActionAssumptionCache is indexed by the two elements of an Assumption, in order.
+-- | It allows us to cache ActionInstances, signifying those that should be re-applied when an Assumption is touched.
+type ActionAssumptionCache = GLStrMap (GLStrMap (Array ActionInstance))
+
+-- | The ActionInstanceCache is indexed by the two elements of the ActionInstance, unwrapped. So given an
+-- | ActionInstance, we can look up the Assumptions used in its computations.
+type ActionInstanceCache = GLStrMap (GLStrMap (Array Assumption))
+
+actionAssumptionCache :: ActionAssumptionCache
+actionAssumptionCache = new unit
+
+actionInstanceCache :: ActionInstanceCache
+actionInstanceCache = new unit
 -----------------------------------------------------------
 -- MONADPERSPECTIVES
 -----------------------------------------------------------

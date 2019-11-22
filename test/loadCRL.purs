@@ -12,7 +12,7 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.loadCRL" do
+theSuite = suite "Perspectives.loadCRL" do
   test "Load a file with a context instance" do
     void $ runP $ loadCRLFile "systeemInstanties.crl"
     assert "bla" true

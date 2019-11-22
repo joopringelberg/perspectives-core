@@ -26,7 +26,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Foreign.Object (empty)
-import Perspectives.CoreTypes (DomeinCache, MonadPerspectives, PerspectivesState, AssumptionRegister)
+import Perspectives.CoreTypes (ActionInstanceCache, AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, ActionAssumptionCache)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete)
@@ -39,6 +39,8 @@ newPerspectivesState uinfo av =
   , contextInstances: new unit
   , domeinCache: new unit
   , queryAssumptionRegister: empty
+  , actionAssumptionCache: new unit
+  , actionInstanceCache: new unit
   , variableBindings: ENV.empty
   -- CouchdbState
   , userInfo: uinfo
@@ -84,6 +86,12 @@ domeinCacheRemove = remove domeinCache
 
 queryAssumptionRegister :: MonadPerspectives AssumptionRegister
 queryAssumptionRegister = gets _.queryAssumptionRegister
+
+actionInstanceCache :: MonadPerspectives ActionInstanceCache
+actionInstanceCache = gets _.actionInstanceCache
+
+actionAssumptionCache :: MonadPerspectives ActionAssumptionCache
+actionAssumptionCache = gets _.actionAssumptionCache
 
 queryAssumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
 queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister}) -> s {queryAssumptionRegister = f queryAssumptionRegister}
