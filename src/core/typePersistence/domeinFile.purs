@@ -22,10 +22,10 @@
 module Perspectives.DomeinFile where
 
 import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
@@ -37,7 +37,7 @@ import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.View (View)
-import Prelude (class Show, ($), (>>>))
+import Prelude (class Show, ($), class Eq)
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
@@ -58,13 +58,16 @@ derive instance genericDomeinFile :: Generic DomeinFile _
 derive instance newtypeDomeinFile :: Newtype DomeinFile _
 
 instance encodeDomeinFile :: Encode DomeinFile where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+  encode = genericEncode $ defaultOptions --{unwrapSingleConstructors = true}
 
 instance decodeDomeinFile :: Decode DomeinFile where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
+  decode = genericDecode $ defaultOptions --{unwrapSingleConstructors = true}
 
 instance showDomeinFile :: Show DomeinFile where
   show = genericShow
+
+instance eqDomeinFile :: Eq DomeinFile where
+  eq = genericEq
 
 defaultDomeinFileRecord :: DomeinFileRecord
 defaultDomeinFileRecord = { _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}

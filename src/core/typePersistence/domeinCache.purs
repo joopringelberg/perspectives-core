@@ -41,7 +41,7 @@ import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion)
+import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion, documentExists)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
@@ -121,12 +121,19 @@ saveCachedDomeinFile ns = do
 
 -- | Either create or modify the DomeinFile in couchdb. Caches.
 -- | Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
+-- | If the model is not found in the cache, assumes it is not in the database either.
 storeDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
 storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
   mAvar <- domeinCacheLookup _id
   -- mAvar <- liftEffect $ peek domeinCache _id
   case mAvar of
-    Nothing -> createDomeinFileInCouchdb df
+    Nothing -> do
+      exists <- documentExists (modelsURL <> escapeCouchdbDocumentName _id)
+      if exists
+        then do
+          ev <- (liftAff empty) >>= domeinCacheInsert _id
+          modifyDomeinFileInCouchdb df ev
+        else createDomeinFileInCouchdb df
     (Just avar) -> modifyDomeinFileInCouchdb df avar
 
 createDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
