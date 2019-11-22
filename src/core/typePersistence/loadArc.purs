@@ -21,7 +21,8 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Prelude (bind, pure, show, ($), (*>))
 import Text.Parsing.Parser (ParseError(..))
 
--- | Load an Arc file from a directory. Parse the file completely.
+-- | Load an Arc file from a directory relative to the active process. Parse the file completely.
+-- | Does neither cache nor save the model.
 loadArcFile :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
 loadArcFile fileName directoryName = do
   procesDir <- liftEffect cwd

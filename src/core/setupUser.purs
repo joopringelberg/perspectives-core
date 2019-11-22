@@ -25,13 +25,16 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances (tryGetPerspectEntiteit)
-import Perspectives.LoadCRL (loadCRLFile)
+import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Prelude (Unit, bind, pure, unit, void, ($))
+
+modelDirectory :: String
+modelDirectory = "./src/model"
 
 setupUser :: MonadPerspectives Unit
 setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit (ContextInstance "model:User$MijnSysteem")
   case mu of
-    Nothing -> void $ loadCRLFile "systeemInstanties.crl"
+    Nothing -> void $ loadAndSaveCrlFile "systeemInstanties.crl" modelDirectory
     otherwise -> pure unit
