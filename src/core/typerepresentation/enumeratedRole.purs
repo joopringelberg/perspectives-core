@@ -25,6 +25,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
@@ -32,7 +34,6 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- ENUMERATEDROLE
@@ -95,9 +96,11 @@ instance eqEnumeratedRole :: Eq EnumeratedRole where
 
 derive instance newtypeEnumeratedRole :: Newtype EnumeratedRole _
 
-derive newtype instance writeForeignEnumeratedRole :: WriteForeign EnumeratedRole
+instance encodeEnumeratedRole :: Encode EnumeratedRole where
+  encode = genericEncode defaultOptions
 
-derive newtype instance readForeignEnumeratedRole :: ReadForeign EnumeratedRole
+instance decodeEnumeratedRole :: Decode EnumeratedRole where
+  decode = genericDecode defaultOptions
 
 instance revisionEnumeratedRole :: Revision EnumeratedRole where
   rev = _._rev <<< unwrap

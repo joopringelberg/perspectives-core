@@ -29,9 +29,9 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Identity (Identity)
 import Data.List (List(..), many, singleton)
-import Kishimen (genericSumToVariant)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Prelude (class Eq, class Monad, class Show, Unit, bind, discard, pure, ($), (*>), (<), (>), (<*), (<<<), (<=), (>>=), unit)
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
 import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
 import Text.Parsing.Parser.Pos (Position)
@@ -66,11 +66,10 @@ put' p = lift (put $ unsafeCoerce p)
 derive instance genericArcPosition :: Generic ArcPosition _
 instance showArcPosition :: Show ArcPosition where show = genericShow
 derive instance eqArcPosition :: Eq ArcPosition
-instance writeForeignArcPosition :: WriteForeign ArcPosition where
-  writeImpl = writeImpl <<< genericSumToVariant
-instance readForeignArcPosition :: ReadForeign ArcPosition where
-  readImpl f = readImpl f
-
+instance decodeArcPosition :: Decode ArcPosition where
+  decode = genericDecode defaultOptions
+instance encodeArcPosition :: Encode ArcPosition where
+  encode = genericEncode defaultOptions
 
 -- | `Position` represents the position of the parser in the input.
 -- |

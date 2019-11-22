@@ -55,7 +55,6 @@ import Perspectives.TypesForDeltas (BindingDelta(..), DeltaType(..), PropertyDel
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
-import Simple.JSON (writeJSON)
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
 runTransactie :: Transaction -> MonadPerspectivesTransaction Unit

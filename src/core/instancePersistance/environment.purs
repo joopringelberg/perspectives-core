@@ -30,9 +30,9 @@ module Perspectives.Instances.Environment where
 import Data.Function.Uncurried (Fn1, Fn3, Fn4, runFn3, runFn4)
 import Data.Maybe (Maybe(..))
 import Foreign (unsafeFromForeign, unsafeToForeign)
+import Foreign.Class (class Decode, class Encode, encode)
 import Foreign.Object (Object)
-import Prelude (class Show, class Eq, pure, (<<<), (>>=), ($), show, eq)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
+import Prelude (class Eq, class Show, eq, map, pure, show, ($), (<<<))
 
 foreign import data Environment :: Type -> Type
 
@@ -52,13 +52,15 @@ addVariable = runFn3 _addVariable
 
 foreign import _toObjectArray :: forall a. Fn1 (Environment a) (Array (Object a))
 
-instance writeForeignEnvironment :: WriteForeign a => WriteForeign (Environment a) where
-  writeImpl q = unsafeToForeign (writeJSON (_toObjectArray q))
+instance encodeEnvironment :: Encode a => Encode (Environment a) where
+  -- encode q = unsafeToForeign (writeJSON (map encode (_toObjectArray q)))
+  encode q = unsafeToForeign (map encode (_toObjectArray q))
 
 foreign import _fromObjectArray :: forall a. Fn1 (Array (Object a)) (Environment a)
 
-instance readForeignEnvironment :: ReadForeign a => ReadForeign (Environment a) where
-  readImpl q = (readJSON' (unsafeFromForeign q)) >>= pure <<< _fromObjectArray
+instance decodeEnvironment :: Decode a => Decode (Environment a) where
+  -- decode q = (readJSON' (unsafeFromForeign q)) >>= pure <<< _fromObjectArray
+  decode = pure <<< _fromObjectArray <<< unsafeFromForeign
 
 instance showEnvironment :: Show a => Show (Environment a) where
   show e = show $ _toObjectArray e

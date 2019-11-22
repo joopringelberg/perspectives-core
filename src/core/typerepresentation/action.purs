@@ -26,6 +26,8 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Calculation (Calculation)
@@ -34,7 +36,6 @@ import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.SideEffect (SideEffect)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, RoleType, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 -----------------------------------------------------------
 -- ACTION
@@ -70,9 +71,11 @@ instance eqAction :: Eq Action where
 
 derive instance newtypeAction :: Newtype Action _
 
-derive newtype instance writeForeignAction :: WriteForeign Action
+instance encodeAction :: Encode Action where
+  encode = genericEncode defaultOptions
 
-derive newtype instance readForeignAction :: ReadForeign Action
+instance decodeAction :: Decode Action where
+  decode = genericDecode defaultOptions
 
 instance revisionAction :: Revision Action where
   rev = _._rev <<< unwrap
@@ -88,10 +91,10 @@ instance identifiableAction :: Identifiable Action ActionType where
 data Verb = Create | Consult | Change | Delete | Custom String
 
 derive instance genericRepVerb :: Generic Verb _
-instance writeForeignVerb :: WriteForeign Verb where
-  writeImpl = writeImpl <<< genericSumToVariant
-instance readForeignVerb :: ReadForeign Verb where
-  readImpl f = readImpl f
+instance encodeVerb :: Encode Verb where
+  encode = genericEncode defaultOptions
+instance decodeVerb :: Decode Verb where
+  decode = genericDecode defaultOptions
 instance showVerb :: Show Verb where
   show = genericShow
 instance eqVerb :: Eq Verb where

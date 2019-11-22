@@ -31,13 +31,13 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Foreign (unsafeFromForeign, unsafeToForeign)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | A description of a calculation with its domain and range.
 -- | The last two members represent whether the described function is functional and whether it is mandatory.
@@ -80,11 +80,11 @@ instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
   eq d1@(BQD _ _ _ _ _ _ _) d2@(BQD _ _ _ _ _ _ _) = eq d1 d2
   eq _ _ = false
 
-instance writeForeignQueryFunctionDescription :: WriteForeign QueryFunctionDescription where
-  writeImpl q = unsafeToForeign (writeJSON q)
+instance encodeQueryFunctionDescription :: Encode QueryFunctionDescription where
+  encode q = genericEncode defaultOptions q
 
-instance readForeignQueryFunctionDescription :: ReadForeign QueryFunctionDescription where
-  readImpl q = readJSON' (unsafeFromForeign q)
+instance decodeQueryFunctionDescription :: Decode QueryFunctionDescription where
+  decode q = genericDecode defaultOptions q
 
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
   show q = genericShow q
@@ -94,6 +94,13 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM EP.Range
 
 type Range = Domain
+
+instance encodeDomain :: Encode Domain where
+  encode = genericEncode defaultOptions
+
+instance decodeDomain :: Decode Domain where
+  decode = genericDecode defaultOptions
+
 
 sumOfDomains :: Domain -> Domain -> Maybe Domain
 sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))

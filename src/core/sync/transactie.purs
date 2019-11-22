@@ -36,12 +36,13 @@ import Data.Symbol (SProxy(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (RoleDelta, BindingDelta, PropertyDelta)
 import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<))
-import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -66,7 +67,11 @@ derive instance newtypeTransactie :: Newtype Transaction _
 instance showTransactie :: Show Transaction where
   show = genericShow
 
-derive newtype instance writeForeignTransactie :: WriteForeign Transaction
+instance encodeTransactie :: Encode Transaction where
+  encode = genericEncode defaultOptions
+
+instance decodeTransactie :: Decode Transaction where
+  decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
   append t1@(Transaction {author, timeStamp, roleDeltas, bindingDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})

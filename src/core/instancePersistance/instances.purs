@@ -40,13 +40,16 @@ import Affjax.RequestBody as RequestBody
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
+import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Class (class Decode)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
@@ -55,9 +58,8 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Class.Persistent (class Persistent, cacheCachedEntiteit, changeRevision, readEntiteitFromCache, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase)
-import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON)
 
-class (Persistent v i, WriteForeign v, ReadForeign v, Decode v) <= PersistentInstance v i | i -> v,  v -> i
+class (Persistent v i, Encode v, Decode v) <= PersistentInstance v i | i -> v,  v -> i
 
 instance persistentInstancePerspectContext :: PersistentInstance PerspectContext ContextInstance
 
@@ -120,14 +122,14 @@ fetchEntiteit id = ensureAuthentication $ catchError
   \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
 -- | Save a user Resource.
-saveEntiteitPreservingVersion :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
+saveEntiteitPreservingVersion :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
 -- saveEntiteitPreservingVersion id = catchError do
 --     (_ :: a) <- fetchPerspectEntiteitFromCouchdb id
 --     saveEntiteit id
 --   \e -> saveEntiteit id
 saveEntiteitPreservingVersion = saveEntiteit
 
-saveEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
+saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
 saveEntiteit id = do
   pe <- readEntiteitFromCache id
   case rev pe of
@@ -136,7 +138,7 @@ saveEntiteit id = do
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function.
-saveUnversionedEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
+saveUnversionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
 saveUnversionedEntiteit id = ensureAuthentication $ do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -145,7 +147,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
       pe <- liftAff $ take avar
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (writeJSON pe)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions pe)}
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) <<< Just >>= saveVersionedEntiteit id
         else do
@@ -153,14 +155,14 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
             (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ liftAff $ put (changeRevision (unwrap a).rev pe) avar))
           pure pe
 
-saveVersionedEntiteit :: forall a i. PersistentInstance a i => i -> a -> MonadPerspectives a
+saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectives a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
   case (rev entiteit) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)
     (Just rev) -> do
       ebase <- entitiesDatabase
       (rq :: (Request String)) <- defaultPerspectRequest
-      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (writeJSON entiteit)}
+      res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?_rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions entiteit)}
       if res.status == (StatusCode 409)
         then retrieveDocumentVersion (unwrap entId) >>= pure <<< (flip changeRevision entiteit) <<< Just >>= saveVersionedEntiteit entId
         else do

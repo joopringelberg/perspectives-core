@@ -30,10 +30,9 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, head, length, null)
+import Data.Array (filter, head, length, null, foldM, uncons)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.List (List, foldM, uncons)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -373,7 +372,7 @@ compileRules = do
             otherwise -> pure a
 
           where
-            sequenceOfAssignments :: Domain -> List Assignment -> PhaseThree QueryFunctionDescription
+            sequenceOfAssignments :: Domain -> Array Assignment -> PhaseThree QueryFunctionDescription
             sequenceOfAssignments currentDomain assignments = case uncons assignments of
               Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
               (Just {head, tail}) -> do

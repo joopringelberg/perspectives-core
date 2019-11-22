@@ -26,7 +26,9 @@ import Prelude
 import Control.Monad.Trans.Class (lift)
 import Data.Array (difference, union)
 import Data.Foldable (for_)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
+import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeRol_binding, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addBindingDelta, addRoleDelta, addPropertyDelta)
@@ -89,7 +91,7 @@ setBinding roleId (newBindingId :: RoleInstance) = do
       saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
 -- saveEntiteit :: RoleInstance -> PerspectRol -> MonadPerspectivesTransaction Unit
-saveEntiteit :: forall a i. PersistentInstance a i => i -> a -> MonadPerspectivesTransaction Unit
+saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectivesTransaction Unit
 saveEntiteit rid rol = do
   lift $ lift $ void $ cacheCachedEntiteit rid rol
   lift $ lift $ void $ saveVersionedEntiteit rid rol

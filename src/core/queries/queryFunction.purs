@@ -25,15 +25,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
-import Foreign (unsafeFromForeign, unsafeToForeign)
-import Foreign.Class (class Encode)
-import Foreign.Generic (defaultOptions, genericEncode)
-import Kishimen (genericSumToVariant)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Show)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 type VariableName = String
 
@@ -142,20 +139,17 @@ instance showQueryFunction :: Show QueryFunction where
 instance eqQueryFunction :: Eq QueryFunction where
   eq x = genericEq x
 
--- instance writeForeignQueryFunction :: WriteForeign QueryFunction where
-  -- writeImpl q = unsafeToForeign (writeJSON ((genericSumToVariant q)))
-  -- writeImpl q = genericEncode defaultOptions q
+instance encodeQueryFunction :: Encode QueryFunction where
+  encode q = genericEncode defaultOptions q
 
-instance readForeignQueryFunction :: ReadForeign QueryFunction where
-  readImpl q = readJSON' (unsafeFromForeign q)
+instance decodeQueryFunction :: Decode QueryFunction where
+  decode = genericDecode defaultOptions
 
 derive instance genericFunctionName :: Generic FunctionName _
-instance writeForeignFunctionName :: WriteForeign FunctionName where
-  writeImpl q = unsafeToForeign (writeJSON (genericSumToVariant q))
-instance readForeignFunctionName :: ReadForeign FunctionName where
-  readImpl q = readJSON' (unsafeFromForeign q)
 instance encodeFunctionName :: Encode FunctionName where
   encode = genericEncode defaultOptions
+instance decodeFunctionName :: Decode FunctionName where
+  decode = genericDecode defaultOptions
 
 -- | The show function produces the very same string that the parser parses.
 instance showFunctionName :: Show FunctionName where

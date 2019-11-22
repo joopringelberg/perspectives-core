@@ -11,7 +11,7 @@ import Foreign.Object (lookup)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadArcFile)
+import Perspectives.TypePersistence.LoadArc (loadAndSaveArcFile, loadArcFile)
 import Simple.JSON (writeJSON)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -23,15 +23,9 @@ testDirectory = "test"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb" do
-    r <- runP $ loadArcFile "test1.arc" testDirectory
-    case r of
-      Left messages -> do
+    messages <- runP $ loadAndSaveArcFile "test1.arc" testDirectory
+    if null messages
+      then pure unit
+      else do
         logShow messages
-        assert "Could not parse and process model" false
-      Right df@(DomeinFile{contexts, enumeratedRoles}) -> do
-        -- logShow df
-        case lookup "model:Test$External" enumeratedRoles of
-          Nothing -> pure unit
-          Just e -> do
-            serialised <- pure $ writeJSON (EMPTY :: ADT EnumeratedRoleType)
-            pure unit
+        assert "The file could not be saved" false

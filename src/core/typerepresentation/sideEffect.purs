@@ -32,20 +32,19 @@ module Perspectives.Representation.SideEffect where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.List (List)
-import Foreign (unsafeToForeign)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Prelude (class Eq, class Show)
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeJSON)
 
-data SideEffect = A (List Assignment) | L LetStep | EF QueryFunctionDescription
+data SideEffect = A (Array Assignment) | L LetStep | EF QueryFunctionDescription
 
 derive instance genericRepSideEffect :: Generic SideEffect _
-instance writeForeignSideEffect :: WriteForeign SideEffect where
-  writeImpl q = unsafeToForeign (writeJSON q)
-instance readForeignSideEffect :: ReadForeign SideEffect where
-  readImpl f = readImpl f
+instance encodeSideEffect :: Encode SideEffect where
+  encode = genericEncode defaultOptions
+instance decodeSideEffect :: Decode SideEffect where
+  decode = genericDecode defaultOptions
 instance showSideEffect :: Show SideEffect where
   show = genericShow
 instance eqSideEffect :: Eq SideEffect where

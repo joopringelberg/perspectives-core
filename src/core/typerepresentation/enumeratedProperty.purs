@@ -26,6 +26,8 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
@@ -33,7 +35,6 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign, writeImpl)
 
 -----------------------------------------------------------
 -- ENUMERATEDPROPERTY
@@ -74,9 +75,11 @@ instance eqEnumeratedProperty :: Eq EnumeratedProperty where
 
 derive instance newtypeEnumeratedProperty :: Newtype EnumeratedProperty _
 
-derive newtype instance writeForeignEnumeratedProperty :: WriteForeign EnumeratedProperty
+instance decodeEnumeratedProperty :: Decode EnumeratedProperty where
+  decode = genericDecode defaultOptions
 
-derive newtype instance readForeignEnumeratedProperty :: ReadForeign EnumeratedProperty
+instance encodeEnumeratedProperty :: Encode EnumeratedProperty where
+  encode = genericEncode defaultOptions
 
 instance revisionEnumeratedProperty :: Revision EnumeratedProperty where
   rev = _._rev <<< unwrap
@@ -94,11 +97,11 @@ derive instance genericRange :: Generic Range _
 
 instance eqRange :: Eq Range where eq = genericEq
 
-instance writeForeignRange :: WriteForeign Range where
-  writeImpl = writeImpl <<< genericSumToVariant
+instance encodeRange :: Encode Range where
+  encode = genericEncode defaultOptions
 
-instance readForeignRange :: ReadForeign Range where
-  readImpl = enumReadForeign
+instance decodeRange :: Decode Range where
+  decode = genericDecode defaultOptions
 
 instance rangeShow :: Show Range where
   show = genericShow

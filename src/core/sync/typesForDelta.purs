@@ -29,12 +29,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
 import Foreign (Foreign, unsafeToForeign)
-import Foreign.Generic (defaultOptions, genericEncode)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (class Show, ($))
-import Simple.JSON (class WriteForeign)
 
 -----------------------------------------------------------
 -- ROLEDELTA
@@ -53,7 +53,10 @@ instance showRoleDelta :: Show RoleDelta where
 
 derive instance eqRoleDelta :: Eq RoleDelta
 
-derive newtype instance writeForeignRoleDelta :: WriteForeign RoleDelta
+instance encodeRoleDelta :: Encode RoleDelta where
+  encode = genericEncode defaultOptions
+instance decodeRoleDelta :: Decode RoleDelta where
+  decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
 -- BINDINGDELTA
@@ -71,7 +74,10 @@ instance showBindingDelta :: Show BindingDelta where
 
 derive instance eqBindingDelta :: Eq BindingDelta
 
-derive newtype instance writeForeignBindingDelta :: WriteForeign BindingDelta
+instance encodeBindingDelta :: Encode BindingDelta where
+  encode = genericEncode defaultOptions
+instance decodeBindingDelta :: Decode BindingDelta where
+  decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
 -- PROPERTYDELTA
@@ -90,7 +96,10 @@ instance showPropertyDelta :: Show PropertyDelta where
 
 derive instance eqPropertyDelta :: Eq PropertyDelta
 
-derive newtype instance writeForeignPropertyDelta :: WriteForeign PropertyDelta
+instance encodePropertyDelta :: Encode PropertyDelta where
+  encode = genericEncode defaultOptions
+instance decodePropertyDelta :: Decode PropertyDelta where
+  decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
 -- DELTATYPE
@@ -103,11 +112,7 @@ derive instance eqDeltaType :: Eq DeltaType
 instance showDeltaType :: Show DeltaType where
   show = genericShow
 
-instance writeForeignDeltaType :: WriteForeign DeltaType where
-  writeImpl Add = unsafeToForeign "Add"
-  writeImpl Remove = unsafeToForeign "Remove"
-  writeImpl Change = unsafeToForeign "Change"
-  writeImpl Delete = unsafeToForeign "Delete"
-
-encodeDefault :: forall t a. Generic a t => GenericEncode t => a -> Foreign
-encodeDefault = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
+instance encodeDeltaType :: Encode DeltaType where
+  encode = genericEncode defaultOptions
+instance decodeDeltaType :: Decode DeltaType where
+  decode = genericDecode defaultOptions

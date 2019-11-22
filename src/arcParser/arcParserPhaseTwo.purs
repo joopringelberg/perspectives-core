@@ -583,8 +583,8 @@ traverseActionE object defaultObjectView rolename actions (Act (ActionE{id, verb
 
     -- ASSIGNMENT
     handleParts _ (Action ar@{effect}) (AssignmentPart a) = case effect of
-      Nothing -> pure $ Action (ar {effect = Just $ A (a : Nil)})
-      Just (A as) -> pure $ Action (ar {effect = Just $ A (a : as)})
+      Nothing -> pure $ Action (ar {effect = Just $ A [a]})
+      Just (A as) -> pure $ Action (ar {effect = Just $ A (cons a as)})
 
     -- LETPART
     handleParts _ (Action ar) (LetPart lstep) = pure $ Action (ar {effect = Just $ L lstep})

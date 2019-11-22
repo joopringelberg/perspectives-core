@@ -25,6 +25,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
 import Perspectives.Representation.Calculation (Calculation(..))
@@ -32,7 +34,6 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
-import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- CALCULATEDROLE
@@ -74,9 +75,11 @@ instance eqCalculatedRole :: Eq CalculatedRole where
 
 derive instance newtypeCalculatedRole :: Newtype CalculatedRole _
 
-derive newtype instance writeForeignCalculatedRole :: WriteForeign CalculatedRole
+instance encodeCalculatedRole :: Encode CalculatedRole where
+  encode = genericEncode defaultOptions
 
-derive newtype instance readForeignCalculatedRole :: ReadForeign CalculatedRole
+instance decodeCalculatedRole :: Decode CalculatedRole where
+  decode = genericDecode defaultOptions
 
 instance revisionCalculatedRole :: Revision CalculatedRole where
   rev = _._rev <<< unwrap

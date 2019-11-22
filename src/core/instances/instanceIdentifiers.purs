@@ -23,14 +23,14 @@ module Perspectives.Representation.InstanceIdentifiers where
 
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
+import Foreign.Class (class Decode, class Encode)
 import Prelude (class Eq, class Ord, class Show, compare, show, (<<<), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign)
 
 newtype ContextInstance = ContextInstance String
 derive instance newtypeContextInstance :: Newtype ContextInstance _
 derive instance genericRepContextInstance :: Generic ContextInstance _
-derive newtype instance writeForeignContextInstance :: WriteForeign ContextInstance
-derive newtype instance readForeignContextInstance :: ReadForeign ContextInstance
+derive newtype instance encodeContextInstance :: Encode ContextInstance
+derive newtype instance decodeContextInstance :: Decode ContextInstance
 instance showContextInstance :: Show ContextInstance where
   show = show <<< unwrap
 instance eqContextInstance :: Eq ContextInstance where
@@ -41,8 +41,8 @@ instance ordContextInstance :: Ord ContextInstance where
 newtype RoleInstance = RoleInstance String
 derive instance newtypeRoleInstance :: Newtype RoleInstance _
 derive instance genericRepRoleInstance :: Generic RoleInstance _
-derive newtype instance writeForeignRoleInstance :: WriteForeign RoleInstance
-derive newtype instance readForeignRoleInstance :: ReadForeign RoleInstance
+derive newtype instance encodeRoleInstance :: Encode RoleInstance
+derive newtype instance decodeRoleInstance :: Decode RoleInstance
 instance showRoleInstance :: Show RoleInstance where
   show = show <<< unwrap
 instance eqRoleInstance :: Eq RoleInstance where
@@ -53,8 +53,8 @@ instance ordRoleInstance :: Ord RoleInstance where
 newtype Value = Value String
 derive instance newtypeValue :: Newtype Value _
 derive instance genericRepValue :: Generic Value _
-derive newtype instance writeForeignValue :: WriteForeign Value
-derive newtype instance readForeignValue :: ReadForeign Value
+derive newtype instance encodeValue :: Encode Value
+derive newtype instance decodeValue :: Decode Value
 instance showValue :: Show Value where
   show = show <<< unwrap
 instance eqValue :: Eq Value where

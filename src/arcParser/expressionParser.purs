@@ -23,7 +23,7 @@ module Perspectives.Parsing.Arc.Expression where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Data.Array (many)
+import Data.Array (fromFoldable, many)
 import Data.DateTime (DateTime)
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
@@ -359,11 +359,11 @@ letStep = do
   case massignments of
     (Just assignments) -> do
       end <- getPosition
-      pure $ Let $ LetStep {start, end, bindings, assignments}
+      pure $ Let $ LetStep {start, end, bindings: fromFoldable bindings, assignments: fromFoldable assignments}
     Nothing -> do
       body <- reserved "in" *> step
       end <- getPosition
-      pure $ PureLet $ PureLetStep {start, end, bindings, body}
+      pure $ PureLet $ PureLetStep {start, end, bindings: fromFoldable bindings, body}
 
   where
 

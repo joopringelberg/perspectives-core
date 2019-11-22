@@ -25,15 +25,14 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, over)
-import Foreign (unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object) as F
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Show, class Eq, (==), (>>>), (<<<), eq)
-import Simple.JSON (class ReadForeign, class WriteForeign, writeJSON, readJSON')
+import Prelude (class Show, class Eq, (==), (<<<), eq)
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT TYPE CLASS
@@ -70,18 +69,15 @@ instance showPerspectContext :: Show PerspectContext where
   show = genericShow
 
 instance encodePerspectContext :: Encode PerspectContext where
-  encode = writeJSON >>> unsafeToForeign
+  encode = genericEncode defaultOptions
 
 instance decodePerspectContext :: Decode PerspectContext where
-  decode = unsafeFromForeign >>> readJSON'
+  decode = genericDecode defaultOptions
 
 instance eqPerspectContext :: Eq PerspectContext where
   eq (PerspectContext {_id : id1}) (PerspectContext {_id : id2}) = id1 == id2
 
 derive instance newtypePerspectContext :: Newtype PerspectContext _
-
-derive newtype instance writeForeignPerspectContext :: WriteForeign PerspectContext
-derive newtype instance readForeignPerspectContext :: ReadForeign PerspectContext
 
 instance identifiablePerspectContext :: Identifiable PerspectContext ContextInstance where
   identifier (PerspectContext{_id}) = _id
@@ -119,14 +115,10 @@ instance eqPerspectRol :: Eq PerspectRol where
 derive instance newtypePerspectRol :: Newtype PerspectRol _
 
 instance encodePerspectRol :: Encode PerspectRol where
-  encode = writeJSON >>> unsafeToForeign
+  encode = genericEncode defaultOptions
 
 instance decodePerspectRol :: Decode PerspectRol where
-  decode = unsafeFromForeign >>> readJSON'
-
-derive newtype instance writeForeignPerspectRol :: WriteForeign PerspectRol
-
-derive newtype instance readForeignPerspectRol :: ReadForeign PerspectRol
+  decode = genericDecode defaultOptions
 
 instance revisionPerspectRol :: Revision PerspectRol where
   rev = _._rev <<< unwrap

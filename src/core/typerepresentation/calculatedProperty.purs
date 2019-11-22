@@ -25,6 +25,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
 import Perspectives.Representation.Calculation (Calculation(..))
@@ -32,7 +34,6 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==), ($))
-import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- CALCULATEDPROPERTY
@@ -70,9 +71,11 @@ instance eqCalculatedProperty :: Eq CalculatedProperty where
 
 derive instance newtypeCalculatedProperty :: Newtype CalculatedProperty _
 
-derive newtype instance writeForeignCalculatedProperty :: WriteForeign CalculatedProperty
+instance encodeCalculatedProperty :: Encode CalculatedProperty where
+  encode = genericEncode defaultOptions
 
-derive newtype instance readForeignCalculatedProperty :: ReadForeign CalculatedProperty
+instance decodeCalculatedProperty :: Decode CalculatedProperty where
+  decode = genericDecode defaultOptions
 
 instance revisionCalculatedProperty :: Revision CalculatedProperty where
   rev = _._rev <<< unwrap

@@ -25,6 +25,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -32,7 +34,6 @@ import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
 import Prelude (class Eq, class Show, map, (<<<), (<>), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 -----------------------------------------------------------
 -- CONTEXT TYPE CLASS
@@ -117,9 +118,11 @@ instance eqContext :: Eq Context where
 
 derive instance newtypeContext :: Newtype Context _
 
-derive newtype instance writeForeignContext :: WriteForeign Context
+instance endodeContext :: Encode Context where
+  encode = genericEncode defaultOptions
 
-derive newtype instance readForeignContext :: ReadForeign Context
+instance decodeContext :: Decode Context where
+  decode = genericDecode defaultOptions
 
 instance revisionContext :: Revision Context where
   rev = _._rev <<< unwrap
@@ -131,7 +134,7 @@ instance identifiableContext :: Identifiable Context ContextType where
 derive instance genericContextKind :: Generic ContextKind _
 instance showContextKind :: Show ContextKind where show = genericShow
 derive instance eqContextKind :: Eq ContextKind
-instance writeForeignContextKind :: WriteForeign ContextKind where
-  writeImpl = writeImpl <<< genericSumToVariant
-instance readForeignContextKind :: ReadForeign ContextKind where
-  readImpl f = readImpl f
+instance encodeContextKind :: Encode ContextKind where
+  encode = genericEncode defaultOptions
+instance decodeContextKind :: Decode ContextKind where
+  decode = genericDecode defaultOptions

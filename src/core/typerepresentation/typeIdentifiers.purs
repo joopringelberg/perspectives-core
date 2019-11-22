@@ -43,15 +43,14 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
-import Foreign.Class (class Encode)
-import Foreign.Generic (defaultOptions, genericEncode)
-import Simple.JSON (class ReadForeign, readImpl)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
 derive instance genericRepContextType :: Generic ContextType _
 derive newtype instance encodeContextType :: Encode ContextType
-derive newtype instance readForeignContextType :: ReadForeign ContextType
+derive newtype instance decodeContextType :: Decode ContextType
 instance showContextType :: Show ContextType where
   show i = "ContextType " <> (unwrap i)
 instance eqContextType :: Eq ContextType where
@@ -61,7 +60,7 @@ newtype EnumeratedRoleType = EnumeratedRoleType String
 derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
 derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
 derive newtype instance encodeEnumeratedRolType :: Encode EnumeratedRoleType
-derive newtype instance readForeignEnumeratedRolType :: ReadForeign EnumeratedRoleType
+derive newtype instance decodeEnumeratedRolType :: Decode EnumeratedRoleType
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
   show i = "EnumeratedRoleType " <> (unwrap i)
 instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
@@ -71,7 +70,7 @@ newtype CalculatedRoleType = CalculatedRoleType String
 derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
 derive instance genericRepComputedRolType :: Generic CalculatedRoleType _
 derive newtype instance encodeComputedRolType :: Encode CalculatedRoleType
-derive newtype instance readForeignComputedRolType :: ReadForeign CalculatedRoleType
+derive newtype instance decodeCalculatedRoleType :: Decode CalculatedRoleType
 instance showComputedRolType :: Show CalculatedRoleType where
   show i = "CalculatedRoleType " <> (unwrap i)
 instance eqComputedRolType :: Eq CalculatedRoleType where
@@ -81,8 +80,8 @@ data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
 instance encodeRoleType :: Encode RoleType where
   encode = genericEncode defaultOptions
-instance readForeignRoleType :: ReadForeign RoleType where
-  readImpl r = readImpl r
+instance decodeRoleType :: Decode RoleType where
+  decode = genericDecode defaultOptions
 instance showRoleType :: Show RoleType where
   show (ENR r) = "ENR " <>  show r
   show (CR r) = "CR " <> show r
@@ -102,8 +101,8 @@ data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | BotRole
 derive instance genericRepRoleKind :: Generic RoleKind _
 instance encodeRoleKind :: Encode RoleKind where
   encode = genericEncode defaultOptions
-instance readForeignRoleKind :: ReadForeign RoleKind where
-  readImpl f = readImpl f
+instance decodeRoleKind :: Decode RoleKind where
+  decode = genericDecode defaultOptions
 instance showRoleKind :: Show RoleKind where
   show = genericShow
 instance eqRoleKind :: Eq RoleKind where
@@ -113,7 +112,7 @@ newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
 derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyType _
 derive newtype instance encodeEnumeratedPropertyType :: Encode EnumeratedPropertyType
-derive newtype instance readForeignEnumeratedPropertyType :: ReadForeign EnumeratedPropertyType
+derive newtype instance decodeEnumeratedPropertyType :: Decode EnumeratedPropertyType
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
   show i = "EnumeratedPropertyType " <> (unwrap i)
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
@@ -123,7 +122,7 @@ newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
 derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyType _
 derive newtype instance encodeCalculatedPropertyType :: Encode CalculatedPropertyType
-derive newtype instance readForeignCalculatedPropertyType :: ReadForeign CalculatedPropertyType
+derive newtype instance decodeCalculatedPropertyType :: Decode CalculatedPropertyType
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
   show i = "CalculatedPropertyType " <> (unwrap i)
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
@@ -138,8 +137,8 @@ propertytype2string (CP s) = unwrap s
 derive instance genericRepPropertyType :: Generic PropertyType _
 instance encodePropertyType :: Encode PropertyType where
   encode = genericEncode defaultOptions
-instance readForeignPropertyType :: ReadForeign PropertyType where
-  readImpl r = readImpl r
+instance decodePropertyType :: Decode PropertyType where
+  decode = genericDecode defaultOptions
 instance showPropertyType :: Show PropertyType where
   show (ENP r) = show r
   show (CP r) = show r
@@ -153,7 +152,7 @@ newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _
 derive instance genericRepViewType :: Generic ViewType _
 derive newtype instance encodeViewType :: Encode ViewType
-derive newtype instance readForeignViewType :: ReadForeign ViewType
+derive newtype instance decodeViewType :: Decode ViewType
 instance showViewType :: Show ViewType where
   show i = "ViewType " <> (unwrap i)
 instance eqViewType :: Eq ViewType where
@@ -163,7 +162,7 @@ newtype ActionType = ActionType String
 derive instance newtypeActionType :: Newtype ActionType _
 derive instance genericRepActionType :: Generic ActionType _
 derive newtype instance encodeActionType :: Encode ActionType
-derive newtype instance readForeignActionType :: ReadForeign ActionType
+derive newtype instance decodeActionType :: Decode ActionType
 instance showActionType :: Show ActionType where
   show i = "ActionType " <> (unwrap i)
 instance eqActionType :: Eq ActionType where

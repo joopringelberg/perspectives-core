@@ -26,8 +26,8 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Foreign (unsafeFromForeign, unsafeToForeign)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 
 data ThreeValuedLogic = True | Unknown | False
 
@@ -39,11 +39,11 @@ instance showThreeValuedLogic :: Show ThreeValuedLogic where
 instance eqThreeValuedLogic :: Eq ThreeValuedLogic where
   eq = genericEq
 
-instance writeForeignThreeValuedLogic :: WriteForeign ThreeValuedLogic where
-  writeImpl q = unsafeToForeign (writeJSON q)
+instance encodeThreeValuedLogic :: Encode ThreeValuedLogic where
+  encode = genericEncode defaultOptions
 
-instance readForeignThreeValuedLogic :: ReadForeign ThreeValuedLogic where
-  readImpl q = readJSON' (unsafeFromForeign q)
+instance decodeThreeValuedLogic :: Decode ThreeValuedLogic where
+  decode = genericDecode defaultOptions
 
 bool2threeValued :: Boolean -> ThreeValuedLogic
 bool2threeValued true = True

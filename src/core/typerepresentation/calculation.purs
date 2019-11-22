@@ -32,19 +32,20 @@ module Perspectives.Representation.Calculation where
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Prelude (class Eq, class Show, (<<<))
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data Calculation = S Step | Q QueryFunctionDescription
 
 derive instance genericRepCalculation :: Generic Calculation _
-instance writeForeignCalculation :: WriteForeign Calculation where
-  writeImpl = writeImpl <<< genericSumToVariant
-instance readForeignCalculation :: ReadForeign Calculation where
-  readImpl f = readImpl f
+instance encodeCalculation :: Encode Calculation where
+  encode = genericEncode defaultOptions
+instance decodeCalculation :: Decode Calculation where
+  decode = genericDecode defaultOptions
 instance showCalculation :: Show Calculation where
   show = genericShow
 instance eqCalculation :: Eq Calculation where

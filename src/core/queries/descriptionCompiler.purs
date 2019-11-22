@@ -29,8 +29,7 @@ module Perspectives.Query.DescriptionCompiler where
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, head, length)
-import Data.List (foldM, uncons)
+import Data.Array (elemIndex, head, length, uncons, foldM)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)

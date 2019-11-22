@@ -42,11 +42,12 @@ import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign (unsafeFromForeign, unsafeToForeign)
+import Foreign.Class (class Decode, class Encode, decode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, ($), (==), (<>), show)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
+import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, show, unit, ($), (<>), (==))
 
-data ADT a = ST a | SUM (Array (ADT a)) | PROD (Array (ADT a)) | EMPTY 
+data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a))
 
 derive instance genericRepBinding :: Generic (ADT a) _
 
@@ -59,11 +60,11 @@ instance showADT :: (Show a) => Show (ADT a) where
 instance eqADT :: (Eq a) => Eq (ADT a) where
   eq b1 b2 = genericEq b1 b2
 
-instance writeForeignADT :: (WriteForeign a) => WriteForeign (ADT a) where
-  writeImpl b = unsafeToForeign (writeJSON b)
+instance encodeADT :: (Encode a) => Encode (ADT a) where
+  encode q = genericEncode defaultOptions q
 
-instance readForeignADT :: (ReadForeign a) => ReadForeign (ADT a) where
-  readImpl b = readJSON' (unsafeFromForeign b)
+instance decodeADT :: (Decode a) => Decode (ADT a) where
+  decode q = genericDecode defaultOptions q
 
 -- | The `Reducible` class implements a pattern to recursively process an ADT.
 class Reducible a b where

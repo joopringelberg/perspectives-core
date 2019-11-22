@@ -22,10 +22,12 @@
 module Perspectives.Sync.DateTime where
 
 import Data.DateTime (DateTime)
-import Foreign (unsafeToForeign)
-import Foreign.Class (class Encode)
-import Prelude (class Show, show, ($))
-import Simple.JSON (class WriteForeign)
+import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)
+import Data.Maybe (fromJust)
+import Data.Time.Duration (Milliseconds(..))
+import Foreign.Class (class Decode, class Encode, decode, encode)
+import Partial.Unsafe (unsafePartial)
+import Prelude (class Show, ($), (>>=), pure)
 
 -----------------------------------------------------------
 -- DATETIME
@@ -34,10 +36,11 @@ import Simple.JSON (class WriteForeign)
 newtype SerializableDateTime = SerializableDateTime DateTime
 
 instance encodeSerializableDateTime :: Encode SerializableDateTime where
-  encode d = unsafeToForeign $ show d
+  encode (SerializableDateTime d) = case unInstant (fromDateTime d) of
+    (Milliseconds n) -> encode n
 
 instance showSerializableDateTime :: Show SerializableDateTime where
   show (SerializableDateTime d) = "todo"
 
-instance writeForeignSerializableDateTime :: WriteForeign SerializableDateTime where
-  writeImpl (SerializableDateTime dt) = unsafeToForeign $ show dt
+instance decodeSerializableDateTime :: Decode SerializableDateTime where
+  decode d = decode d >>= \m -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds m)

@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
-import Data.List (length)
+import Data.Array (length)
 import Data.Maybe (isJust, isNothing)
 import Data.Newtype (unwrap)
 import Effect.Class.Console (logShow)

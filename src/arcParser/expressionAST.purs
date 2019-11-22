@@ -83,13 +83,12 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
-import Data.List (List)
 import Data.Maybe (Maybe)
-import Foreign (unsafeFromForeign, unsafeToForeign)
+import Foreign.Class (class Decode, class Encode)
+import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.EnumeratedProperty (Range)
 import Perspectives.Representation.QueryFunction (FunctionName)
-import Simple.JSON (class ReadForeign, class WriteForeign, readJSON', writeJSON)
 
 -- | Step represents an Expression conforming to the grammar given above.
 data Step = Simple SimpleStep | Binary BinaryStep | Unary UnaryStep | Let LetStep | PureLet PureLetStep
@@ -113,9 +112,9 @@ data UnaryStep =
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 
-newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List VarBinding, assignments :: List Assignment}
+newtype LetStep = LetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, assignments :: Array Assignment}
 
-newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: List VarBinding, body :: Step}
+newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, body :: Step}
 
 data VarBinding = VarBinding String Step
 
@@ -162,52 +161,79 @@ data Assignment =
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq
-instance writeForeignStep :: WriteForeign Step where
-  writeImpl q = unsafeToForeign (writeJSON q)
-instance readForeignStep :: ReadForeign Step where
-  readImpl q = readJSON' (unsafeFromForeign q)
+instance encodeStep :: Encode Step where
+  encode = genericEncode defaultOptions
+instance decodeStep :: Decode Step where
+  decode = genericDecode defaultOptions
 
 derive instance genericSimpleStep :: Generic SimpleStep _
 instance showSimpleStep :: Show SimpleStep where show = genericShow
 instance eqSimpleStep :: Eq SimpleStep where eq = genericEq
+instance encodeSimpleStep :: Encode SimpleStep where
+  encode = genericEncode defaultOptions
+instance decodeSimpleStep :: Decode SimpleStep where
+  decode = genericDecode defaultOptions
 
 derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow
 instance eqBinaryStep :: Eq BinaryStep where eq s1 s2 = genericEq s1 s2
+instance encodeBinaryStep :: Encode BinaryStep where
+  encode q = genericEncode defaultOptions q
+instance decodeBinaryStep :: Decode BinaryStep where
+  decode q = genericDecode defaultOptions q
 
 derive instance genericUnaryStep :: Generic UnaryStep _
 instance showUnaryStep :: Show UnaryStep where show = genericShow
 instance eqUnaryStep :: Eq UnaryStep where eq u1 u2 = genericEq u1 u2
+instance encodeUnaryStep :: Encode UnaryStep where
+  encode q = genericEncode defaultOptions q
+instance decodeUnaryStep :: Decode UnaryStep where
+  decode q = genericDecode defaultOptions q
 
 derive instance genericLetStep :: Generic LetStep _
 instance showLetStep :: Show LetStep where show = genericShow
 instance eqLetStep :: Eq LetStep where eq u1 u2 = genericEq u1 u2
-instance writeForeignLetStep :: WriteForeign LetStep where
-  writeImpl q = unsafeToForeign (writeJSON q)
-instance readForeignLetStep :: ReadForeign LetStep where
-  readImpl q = readJSON' (unsafeFromForeign q)
-
+instance encodeLetStep :: Encode LetStep where
+  encode q = genericEncode defaultOptions q
+instance decodeLetStep :: Decode LetStep where
+  decode q = genericDecode defaultOptions q
 
 derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow
 instance eqPureLetStep :: Eq PureLetStep where eq u1 u2 = genericEq u1 u2
+instance encodePureLetStep :: Encode PureLetStep where
+  encode q = genericEncode defaultOptions q
+instance decodePureLetStep :: Decode PureLetStep where
+  decode q = genericDecode defaultOptions q
 
 derive instance genericVarBinding :: Generic VarBinding _
 instance showVarBinding :: Show VarBinding where show = genericShow
 instance eqVarBinding :: Eq VarBinding where eq = genericEq
+instance encodeVarBinding :: Encode VarBinding where
+  encode q = genericEncode defaultOptions q
+instance decodeVarBinding :: Decode VarBinding where
+  decode q = genericDecode defaultOptions q
 
 derive instance genericOperator :: Generic Operator _
 instance showOperator :: Show Operator where show = genericShow
 instance eqOperator :: Eq Operator where eq = genericEq
+instance encodeOperator :: Encode Operator where
+  encode = genericEncode defaultOptions
+instance decodeOperator :: Decode Operator where
+  decode = genericDecode defaultOptions
 
 derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
 instance eqAssignment :: Eq Assignment where eq = genericEq
-instance writeForeignAssignment :: WriteForeign Assignment where
-  writeImpl q = unsafeToForeign (writeJSON q)
-instance readForeignAssignment :: ReadForeign Assignment where
-  readImpl q = readJSON' (unsafeFromForeign q)
+instance encodeAssignment :: Encode Assignment where
+  encode q = genericEncode defaultOptions q
+instance decodeAssignment :: Decode Assignment where
+  decode q = genericDecode defaultOptions q
 
 derive instance genericAssignmentOperator :: Generic AssignmentOperator _
 instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
 instance eqAssignmentOperator :: Eq AssignmentOperator where eq = genericEq
+instance encodeAssignmentOperator :: Encode AssignmentOperator where
+  encode = genericEncode defaultOptions
+instance decodeAssignmentOperator :: Decode AssignmentOperator where
+  decode = genericDecode defaultOptions

@@ -37,7 +37,7 @@ import Effect.Aff (Aff, catchError)
 import Effect.Aff.AVar (AVar, empty, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic (defaultOptions, genericEncode, genericEncodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
@@ -48,7 +48,6 @@ import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
 import Perspectives.Representation.Class.Revision (revision)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=), (<<<))
-import Simple.JSON (writeJSON)
 
 type URL = String
 
@@ -155,7 +154,7 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
   res <- liftAff $ AX.put
     ResponseFormat.string
     (modelsURL <> escapeCouchdbDocumentName _id <> "?_rev=" <> originalRevision)
-    (RequestBody.string (writeJSON (DomeinFile dfr {_rev = _rev})))
+    (RequestBody.string (genericEncodeJSON defaultOptions (DomeinFile dfr {_rev = _rev})))
   if res.status == (StatusCode 409)
     then do
       rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
