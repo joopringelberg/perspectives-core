@@ -32,7 +32,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Exception (Error, error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (>>>), (||))
+import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||))
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -44,26 +44,14 @@ modelRegex = unsafeRegex "^model:(\\w*)$" noFlags
 isModelName :: String -> Boolean
 isModelName s = test modelRegex s
 
-binnenRol :: String -> String
-binnenRol s = if isModelName s
-  then s <> "$_binnenRol"
-  else s <> "_binnenRol"
-
--- | Returns the identifier minus the "_binnenRol" or "$_binnenRol" part.
-deconstructBinnenRol :: String -> String
-deconstructBinnenRol s = replaceAll (Pattern "_binnenRol") (Replacement "")(replaceAll (Pattern "$_binnenRol") (Replacement "") s)
-
 buitenRol :: String -> String
 buitenRol s = if isModelName s
   then s <> "$_External"
   else s <> "_External"
 
--- | Returns the identifier minus the "_buitenRol" or "$_buitenRol" part.
+-- | Returns the identifier minus the "_External" or "$_buitenRol" part.
 deconstructBuitenRol :: String -> String
-deconstructBuitenRol s = replaceAll (Pattern "_buitenRol") (Replacement "")(replaceAll (Pattern "$_buitenRol") (Replacement "") s)
-
-buitenToBinnenRol :: String -> String
-buitenToBinnenRol = deconstructBuitenRol >>> binnenRol
+deconstructBuitenRol s = replaceAll (Pattern "_External") (Replacement "")(replaceAll (Pattern "$_External") (Replacement "") s)
 
 type Namespace = String
 type LocalName = String
@@ -216,16 +204,6 @@ isUserURI = test userUriRegEx
 
 isUserEntiteitID :: String -> Boolean
 isUserEntiteitID id = isUserURI id || isUserURI id
-
------------------------------------------------------------
--- BINNENROL
------------------------------------------------------------
-binnenRolRegEx :: Regex
-binnenRolRegEx = unsafeRegex "binnenRol$" noFlags
-
--- | True iff the string ends on "binnenRol"
-isBinnenRol :: String -> Boolean
-isBinnenRol = test binnenRolRegEx
 
 -----------------------------------------------------------
 -- ROLNAMES
