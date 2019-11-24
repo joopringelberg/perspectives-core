@@ -24,7 +24,7 @@ module Perspectives.Sync.Transaction where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-import Data.Array (union)
+import Data.Array (null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -42,7 +42,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (RoleDelta, BindingDelta, PropertyDelta)
-import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<))
+import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<), (&&))
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -116,6 +116,17 @@ cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
   , deletedContexts: []
   , deletedRoles: []
   , changedDomeinFiles: []}
+
+isEmptyTransaction :: Transaction -> Boolean
+isEmptyTransaction (Transaction t) =
+  null t.roleDeltas
+  && null t.bindingDeltas
+  && null t.propertyDeltas
+  && null t.createdContexts
+  && null t.createdRoles
+  && null t.deletedContexts
+  && null t.deletedRoles
+  && null t.changedDomeinFiles
 
 transactieID :: Transaction -> String
 transactieID (Transaction{author, timeStamp}) = author <> "_" <> show timeStamp

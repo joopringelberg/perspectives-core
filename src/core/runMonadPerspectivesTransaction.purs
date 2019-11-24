@@ -35,7 +35,7 @@ import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
 import Perspectives.Sync.Class.Assumption (assumption)
-import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie)
+import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
 
 -----------------------------------------------------------
@@ -52,9 +52,9 @@ runMonadPerspectivesTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< c
     run = do
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
-      -- 2. Now run actions, collecting further Deltas in a new Transaction.
+      -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
       (ft :: Transaction) <- lift AA.get >>= runActions
-      -- 3. Send deltas to other participants, save changed domeinfiles, etc.
+      -- 3. Send deltas to other participants, save changed domeinfiles.
       runTransactie ft
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
@@ -87,4 +87,6 @@ runActions t = do
         Nothing -> pure unit
         (Just a) -> a ctxt
   nt <- lift AA.get
-  pure <<< (<>) t =<< runActions nt
+  if isEmptyTransaction nt
+    then pure t
+    else pure <<< (<>) t =<< runActions nt
