@@ -28,7 +28,7 @@ import Prelude
 
 import Data.Array (cons, delete, elemIndex, partition)
 import Data.Foldable (for_)
-import Data.Lens (_Just, firstOf, over, traversed)
+import Data.Lens (_Just, firstOf, over, set, traversed, view)
 import Data.Lens.At (at)
 import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -114,7 +114,12 @@ isRegistered corrId assumption = findDependencies assumption >>= pure <<<
   (maybe false (maybe false (const true) <<< (elemIndex corrId)) )
 
 registerDependency :: CorrelationIdentifier -> Assumption -> MP Unit
-registerDependency corrId a = queryAssumptionRegisterModify (over (_assumptionDependencies a) (cons corrId))
+registerDependency corrId a = queryAssumptionRegisterModify \r -> case view (_assumptionDependencies' a) r of
+  Nothing -> set (_assumptionDependencies' a) (Just [corrId]) r
+  Just deps -> set (_assumptionDependencies' a) (Just (cons corrId deps)) r
+  where
+    _assumptionDependencies' :: Assumption -> Traversal' AssumptionRegister (Maybe (Array CorrelationIdentifier))
+    _assumptionDependencies' (Tuple rid pid) = at rid <<< traversed <<< at pid
 
 deregisterDependency :: CorrelationIdentifier -> Assumption -> MP Unit
 deregisterDependency corrId a = queryAssumptionRegisterModify (over (_assumptionDependencies a) (delete corrId))

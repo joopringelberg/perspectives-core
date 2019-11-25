@@ -37,25 +37,28 @@ import Prelude
 
 import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
+import Affjax.ResponseHeader (ResponseHeader, name, value)
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.Except (catchError, throwError)
+import Control.Monad.Except (class MonadError, catchError, runExcept, throwError)
 import Data.Either (Either(..))
+import Data.Foldable (find)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
+import Data.String (toLower)
 import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
+import Effect.Exception (error, Error)
 import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic (decodeJSON, defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Persistent (class Persistent, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Persistent (class Persistent, Revision_, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase)
 
@@ -117,7 +120,9 @@ fetchEntiteit id = ensureAuthentication $ catchError
     (rq :: (Request String)) <- defaultPerspectRequest
     res <- liftAff $ request $ rq {url = ebase <> unwrap id}
     void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
-      (onCorrectCallAndResponse "fetchEntiteit" res.body \(a :: a) -> put a v)
+      (onCorrectCallAndResponse "fetchEntiteit" res.body \a -> do
+        rev <- version res.headers
+        put (changeRevision rev a) v)
     liftAff $ read v
   \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
@@ -154,7 +159,9 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
         then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) <<< Just >>= saveVersionedEntiteit id
         else do
           void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-            (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ liftAff $ put (changeRevision (unwrap a).rev pe) avar))
+            (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do
+              v <- version res.headers
+              void $ liftAff $ put (changeRevision v pe) avar))
           pure pe
 
 saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectives a
@@ -166,5 +173,14 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
       (rq :: (Request String)) <- defaultPerspectRequest
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions entiteit)}
       void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
-        (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> void $ cacheCachedEntiteit entId (changeRevision (unwrap a).rev entiteit)))
+        (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do
+          v <- version res.headers
+          void $ cacheCachedEntiteit entId (changeRevision v entiteit)))
       pure entiteit
+
+version :: forall m. MonadError Error m => Array ResponseHeader -> m Revision_
+version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
+  Nothing -> throwError $ error ("Perspectives.Instances.version: retrieveDocumentVersion: couchdb returns no ETag header holding a document version number")
+  (Just h) -> case runExcept $ decodeJSON (value h) of
+    Left e -> pure Nothing
+    Right v -> pure $ Just v

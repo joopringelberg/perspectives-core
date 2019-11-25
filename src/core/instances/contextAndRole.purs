@@ -21,9 +21,10 @@
 
 module Perspectives.ContextAndRole where
 
+import Data.Array (cons)
 import Data.Array (delete, difference, elemIndex, last, snoc, union) as Arr
 import Data.Int (floor, fromString, toNumber)
-import Data.Lens (Lens', Traversal', _Just, over, set)
+import Data.Lens (Lens', Traversal', _Just, over, set, view)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
@@ -93,8 +94,17 @@ _roleInstances (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t <<< 
     _rolInContext :: forall a r. Lens' { rolInContext :: a | r } a
     _rolInContext = prop (SProxy :: SProxy "rolInContext")
 
+_roleInstances' :: EnumeratedRoleType -> Traversal' PerspectContext (Maybe (Array RoleInstance))
+_roleInstances' (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t
+  where
+    _rolInContext :: forall a r. Lens' { rolInContext :: a | r } a
+    _rolInContext = prop (SProxy :: SProxy "rolInContext")
+
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
-addContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (flip Arr.snoc rolId) ct
+addContext_rolInContext ct rolName rolId = case view (_roleInstances' rolName) ct of
+  Nothing -> set (_roleInstances' rolName) (Just [rolId]) ct
+  Just roles -> set (_roleInstances' rolName) (Just (cons rolId roles)) ct
+-- addContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (flip Arr.snoc rolId) ct
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 removeContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (Arr.delete rolId) ct
@@ -107,8 +117,12 @@ setContext_rolInContext ct rolName rolIDs = set (_roleInstances rolName) rolIDs 
 
 type Modifier = Array RoleInstance -> Array RoleInstance
 
+-- TODO: gaat fout bij de eerste instantie van een roltype.
 modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> PerspectContext
-modifyContext_rolInContext ct rolName f = over (_roleInstances rolName) f ct
+modifyContext_rolInContext ct rolName f = case view (_roleInstances' rolName) ct of
+  Nothing -> set (_roleInstances' rolName) (Just $ f []) ct
+  Just roles -> set (_roleInstances' rolName) (Just (f roles)) ct
+  -- over (_roleInstances rolName) f ct
 
 context_changeRolIdentifier :: PerspectContext -> EnumeratedRoleType -> EnumeratedRoleType -> PerspectContext
 context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
@@ -188,11 +202,20 @@ _propertyValues (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t <
     _properties :: forall a r. Lens' { properties :: a | r } a
     _properties = prop (SProxy :: SProxy "properties")
 
+_propertyValues' :: EnumeratedPropertyType -> Traversal' PerspectRol (Maybe (Array Value))
+_propertyValues' (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t
+  where
+    _properties :: forall a r. Lens' { properties :: a | r } a
+    _properties = prop (SProxy :: SProxy "properties")
+
 rol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value
 rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (unwrap pn) properties)
 
 addRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
-addRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.union values) rl
+-- addRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.union values) rl
+addRol_property rl propertyName values = case view (_propertyValues' propertyName) rl of
+  Nothing -> set (_propertyValues' propertyName) (Just values) rl
+  Just pvals -> set (_propertyValues' propertyName) (Just (Arr.union pvals values)) rl
 
 removeRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 removeRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.difference values) rl

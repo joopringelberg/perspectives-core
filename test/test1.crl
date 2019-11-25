@@ -2,5 +2,7 @@ GebruikerGegevens
 
 import model:Test als tst:
 
-tst:TestCase usr:MijnTestCase
+tst:TestCase usr:MyTestCase
 	$Self => ()
+	$AContextRole =>
+		$NestedCase usr:MyNestedCase

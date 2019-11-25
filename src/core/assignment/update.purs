@@ -68,6 +68,8 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -----------------------------------------------------------
 -- UPDATE A BINDING
 -----------------------------------------------------------
+-- | Change the binding, save the role in cache and in couchdb.
+-- | Add a Delta to the transaction.
 setBinding :: RoleInstance -> (Updater RoleInstance)
 setBinding roleId (newBindingId :: RoleInstance) = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
@@ -121,6 +123,8 @@ removeBinding roleId = do
 -----------------------------------------------------------
 type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 
+-- | Modify the context instance with the new Roles. Adds Role deltas, but does not
+-- | cache or save them.
 addRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 addRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId

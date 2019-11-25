@@ -46,10 +46,10 @@ import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (bind, ($), pure, (>=>), (<>), show, (>>=), (*>), discard)
+import Prelude (bind, const, discard, identity, pure, show, ($), (*>), (<<<), (<>), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -84,6 +84,17 @@ compileFunction (SQD _ (DataTypeGetter ExternalRoleF) _ _ _) = pure $ C2R extern
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ R2C context
 
 compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ R2R binding
+
+compileFunction (SQD dom Identity _ _ _) = case dom of
+  CDOM _ -> pure $ C2C (pure <<< identity)
+  RDOM _ -> pure $ R2R (pure <<< identity)
+  VDOM _ -> throwError (error "There is no identity function for value.")
+
+compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
+  CDOM _ -> pure $ C2V (pure <<< const (Value value))
+  RDOM _ -> pure $ R2V (pure <<< const (Value value))
+  VDOM _ -> throwError (error "There is no constant function for value.")
+
 
 compileFunction (SQD _ (ComputedRoleGetter functionName) _ _ _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
 

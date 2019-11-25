@@ -31,6 +31,7 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.AVar (AVar)
 import Effect.Aff (error, throwError)
+import Effect.Class.Console (logShow)
 import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
@@ -40,7 +41,7 @@ import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getN
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances (getPerspectEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Instances (getPerspectEntiteit, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.Representation.Class.Persistent (cacheUncachedEntiteit, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -144,11 +145,11 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
             rolIds <- traverseWithIndex (constructRol rolType (ContextInstance contextInstanceId) rolId) rollen'
             pure rolIds
 
--- | Caches the result but does not save it to Couchdb.
+-- | Constructs a rol, caches it and saves it to Couchdb.
 constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RoleInstance
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
   rolInstanceId <- pure $ RoleInstance (localName <> "_" <> (rol_padOccurrence i))
-  lift$ cacheUncachedEntiteit rolInstanceId
+  lift $ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
       , pspType = rolType
@@ -157,11 +158,12 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
       , properties = constructProperties properties
       , occurrence = i
       })
+  lift $ void $ saveEntiteit rolInstanceId
   pure rolInstanceId
 
 -- | Construct and add a Rol instance to the Context instance, provided the construction process doesn't yield
 -- | exceptions and that the resulting context instance is semantically correct.
--- | Saves the new Rol instance.
+-- | Saves the new Rol instance in cache and in couchdb.
 constructAnotherRol :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction (Either (Array UserMessage) RoleInstance)
 constructAnotherRol rolType id rolSerialisation = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id

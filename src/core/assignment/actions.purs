@@ -32,7 +32,7 @@ import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (empty)
+import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (cacheActionInstanceDependencies, removeContextInstanceDependencies)
@@ -46,13 +46,14 @@ import Perspectives.Query.Compiler (context2context, context2propertyValue, cont
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
-import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
-import Perspectives.Representation.Context (Context, actions)
+import Perspectives.Representation.Class.PersistentType (ActionType, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Context (Context, actions, userRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -143,10 +144,19 @@ setupBotActions :: ContextInstance -> MonadPerspectives Unit
 setupBotActions cid = do
   -- TODO: filter, keeping just those actions that are to be executed by a Bot.
   (ct :: ContextType) <- cid ##>> contextType
-  (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
-  -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
-  -- actionAssumptionRegister in PerspectivesState.
-  for_ actions \(a :: ActionType) -> (compileBotAction a) >>= \(updater :: Updater ContextInstance) -> pure $ updater cid
+  -- For all user roles, get their perspective; then take all automatic actions.
+  (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
+  void $ runMonadPerspectivesTransaction (for_ users \(u :: EnumeratedRoleType) -> do
+    perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
+    for_ (values perspectives) \actions ->
+      for_ actions \(a :: ActionType) ->
+        (lift $ lift $ compileBotAction a) >>= \(updater :: Updater ContextInstance) -> updater cid
+    )
+
+  -- (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
+  -- -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
+  -- -- actionAssumptionRegister in PerspectivesState.
+  -- void $ runMonadPerspectivesTransaction (for_ actions \(a :: ActionType) -> (lift $ lift $ compileBotAction a) >>= \(updater :: Updater ContextInstance) -> updater cid)
 
 -- | Remove all actions associated with this context.
 tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
@@ -154,7 +164,7 @@ tearDownBotActions = removeContextInstanceDependencies
 
 -- | Compile the action to an Updater. Cache for later use.
 compileBotAction :: ActionType -> MP (Updater ContextInstance)
-compileBotAction actionType =
+compileBotAction actionType = do
   case retrieveAction actionType of
     (Just a) -> pure a
     Nothing -> do
@@ -196,7 +206,8 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
-    for_ ctxts \ctxt -> constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization{properties: PropertySerialization empty, binding: Nothing})
+    -- TODO: foutmeldingen uit constructAnotherRol worden genegeerd. Nu worden die overigens niet gegenereerd...
+    for_ ctxts \ctxt -> constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo

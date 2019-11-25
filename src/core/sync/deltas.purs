@@ -57,6 +57,7 @@ import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
 
 -- TODO: doe ook wat met de andere modificaties in de transactie?
+-- Waarschijnlijk niet. De update functies (Perspectives.Assignment.Update) slaan op in cache en in couchdb.
 runTransactie :: Transaction -> MonadPerspectivesTransaction Unit
 runTransactie t@(Transaction{changedDomeinFiles}) = do
   lift $ lift $ for_ changedDomeinFiles saveCachedDomeinFile
