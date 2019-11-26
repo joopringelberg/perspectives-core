@@ -24,13 +24,13 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadCRL" do
+theSuite = suiteSkip "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "test1.crl" testDirectory
     logShow r
     pure unit
 
-  testOnly "Load a file with a context instance in couchdb" do
+  test "Load a file with a context instance in couchdb" do
     r <- runP do
       r' <- loadAndSaveCrlFile "test1.crl" testDirectory
       if null r'

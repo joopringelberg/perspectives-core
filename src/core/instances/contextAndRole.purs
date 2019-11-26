@@ -42,7 +42,7 @@ import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), 
 import Perspectives.Representation.Class.Revision (Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType(..))
-import Prelude (flip, identity, show, ($), (+), (/), (<<<), (<>))
+import Prelude (flip, identity, show, ($), (+), (/), (<<<), (<>), (<$>))
 
 -- CONTEXT
 
@@ -104,31 +104,26 @@ addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance
 addContext_rolInContext ct rolName rolId = case view (_roleInstances' rolName) ct of
   Nothing -> set (_roleInstances' rolName) (Just [rolId]) ct
   Just roles -> set (_roleInstances' rolName) (Just (cons rolId roles)) ct
--- addContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (flip Arr.snoc rolId) ct
 
 removeContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 removeContext_rolInContext ct rolName rolId = over (_roleInstances rolName) (Arr.delete rolId) ct
+-- removeContext_rolInContext ct rolName rolId = case view (_roleInstances' rolName) ct of
+--   Nothing -> ct
+--   Just roles -> set (_roleInstances' rolName) (Just (Arr.delete rolId roles)) ct
 
 deleteContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> PerspectContext
 deleteContext_rolInContext (PerspectContext ct@{rolInContext}) rolName = PerspectContext (ct {rolInContext = delete (unwrap rolName) rolInContext})
 
 setContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance -> PerspectContext
-setContext_rolInContext ct rolName rolIDs = set (_roleInstances rolName) rolIDs ct
+setContext_rolInContext ct rolName rolIDs = set (_roleInstances' rolName) (Just rolIDs) ct
 
 type Modifier = Array RoleInstance -> Array RoleInstance
 
--- TODO: gaat fout bij de eerste instantie van een roltype.
 modifyContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> Modifier -> PerspectContext
 modifyContext_rolInContext ct rolName f = case view (_roleInstances' rolName) ct of
   Nothing -> set (_roleInstances' rolName) (Just $ f []) ct
   Just roles -> set (_roleInstances' rolName) (Just (f roles)) ct
   -- over (_roleInstances rolName) f ct
-
-context_changeRolIdentifier :: PerspectContext -> EnumeratedRoleType -> EnumeratedRoleType -> PerspectContext
-context_changeRolIdentifier ct@(PerspectContext cr@{rolInContext}) oldName newName =
-  case pop (unwrap oldName) rolInContext of
-    Nothing -> ct
-    (Just (Tuple vs cr')) -> PerspectContext cr {rolInContext = insert (unwrap newName) vs cr'}
 
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
@@ -224,7 +219,7 @@ deleteRol_property :: PerspectRol -> EnumeratedPropertyType -> PerspectRol
 deleteRol_property (PerspectRol rl@{properties}) propertyName = PerspectRol (rl {properties = delete (unwrap propertyName) properties})
 
 setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
-setRol_property rl propertyName values = set (_propertyValues propertyName) values rl
+setRol_property rl propertyName values = set (_propertyValues' propertyName) (Just values) rl
 
 rol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen

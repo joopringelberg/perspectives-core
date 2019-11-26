@@ -27,6 +27,7 @@ module Perspectives.Instances
 , removeEntiteit
 , getPerspectEntiteit
 , getPerspectContext
+, getPerspectRol
 , tryGetPerspectEntiteit
 , getAVarRepresentingPerspectEntiteit
 , class PersistentInstance
@@ -80,6 +81,9 @@ getPerspectEntiteit id =
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
+
+getPerspectRol :: RoleInstance -> MP PerspectRol
+getPerspectRol = getPerspectEntiteit
 
 tryGetPerspectEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
