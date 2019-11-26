@@ -19,6 +19,19 @@
 
 -- END LICENSE
 
+-- | Instances of contexts and roles (represented as PerspectContext and PerspectRol respectively) are stored in
+-- | Couchdb. Before they are stored, and when they are retrieved, they are cached.
+-- | On saving a document to Couchdb, it receives a Couchdb version parameter `_rev`.
+-- | However, because of the way we serialise our data, we do not 'see' that parameter in our types when they are
+-- | fetched and deserialized (Couchdb adds them to the outer JSON value, which is thrown away by generic
+-- | deserialisation).
+-- |
+-- | Therefore we have added a `_rev` parameter to our types and on receiving a JSON document from Couchdb, we set
+-- | the actual revision value (sent in the HTTP headers as well) in our data.
+-- |
+-- | Warning to implementers: in Couchdb you will therefore see **two** _rev parameters: an outer one with the
+-- | correct version, and an inner one that is always one step behind.
+
 module Perspectives.Instances
 ( saveVersionedEntiteit
 , saveEntiteit
@@ -114,7 +127,7 @@ removeEntiteit entId = do
         res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> unwrap entId <> "?rev=" <> rev)}
         onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit
 
--- | Fetch the definition of a resource asynchronously.
+-- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
 fetchEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
 fetchEntiteit id = ensureAuthentication $ catchError
   do
@@ -138,6 +151,8 @@ saveEntiteitPreservingVersion :: forall a i r. GenericEncode r => Generic a r =>
 --   \e -> saveEntiteit id
 saveEntiteitPreservingVersion = saveEntiteit
 
+-- | Save an entity, whether it has been saved before or not. It must be present in the cache.
+-- | On success it will have the same version in cache as in Couchdb.
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
 saveEntiteit id = do
   (pe :: Maybe a) <- tryGetPerspectEntiteit id
@@ -148,7 +163,7 @@ saveEntiteit id = do
       otherwise -> saveVersionedEntiteit id pe'
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
--- | couchdb with this function.
+-- | couchdb with this function. Set its version (_rev) in the cache.
 saveUnversionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
 saveUnversionedEntiteit id = ensureAuthentication $ do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
@@ -160,6 +175,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
       (rq :: (Request String)) <- defaultPerspectRequest
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions pe)}
       if res.status == (StatusCode 409)
+        -- Unexpectedly we do have a version in Couchdb.
         then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) <<< Just >>= saveVersionedEntiteit id
         else do
           void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
@@ -168,6 +184,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
               void $ liftAff $ put (changeRevision v pe) avar))
           pure pe
 
+-- | Save an Entiteit and set its new _rev parameter in the cache.
 saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectives a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
   case (rev entiteit) of
