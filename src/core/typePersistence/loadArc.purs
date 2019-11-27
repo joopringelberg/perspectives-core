@@ -26,6 +26,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path

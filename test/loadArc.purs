@@ -2,18 +2,13 @@ module Test.LoadArc where
 
 import Prelude
 
+import Control.Monad.Error.Class (catchError)
 import Control.Monad.Free (Free)
 import Data.Array (null)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
 import Effect.Class.Console (logShow)
-import Foreign.Object (lookup)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, retrieveDomeinFile)
-import Perspectives.DomeinFile (DomeinFile(..))
-import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadAndSaveArcFile, loadArcFile)
-import Simple.JSON (writeJSON)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -22,7 +17,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.loadArc" do
+theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
     messages <- runP $ loadAndSaveArcFile "test1.arc" testDirectory
@@ -42,3 +37,13 @@ theSuite = suiteSkip "Perspectives.loadArc" do
       Left e -> assert "The same file loaded the second time fails" false
       Right reParsedModel -> assert "The model reloaded from couchdb should equal the model loaded from file."
         (eq retrievedModel reParsedModel)
+
+  testOnly "Load a model file and store it in Couchdb" do
+    -- 1. Load and save a model.
+    messages <- runP $ catchError (loadAndSaveArcFile "test1.arc" testDirectory)
+      \e -> logShow e *> pure []
+    if null messages
+      then pure unit
+      else do
+        logShow messages
+        assert "The file could not be parsed, compiled or saved" false

@@ -33,6 +33,7 @@ import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
+import Perspectives.Actions (setupAndRunBotActions)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -41,7 +42,9 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 
 -- | Loads a file from a directory relative to the active process.
--- | All context and role instances are loaded into the cache. Does not save to the database.
+-- | All context and role instances are loaded into the cache.
+-- | Runs all bot actions.
+-- | Does not save to the database.
 loadCrlFile :: String ->
   String ->
   MonadPerspectives (Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol)))
@@ -51,9 +54,13 @@ loadCrlFile file directoryName = do
   parseResult <- parseAndCache text
   case parseResult of
     Left e -> pure $ Left [Custom (show e)]
-    Right contextsAndRoles -> pure $ Right contextsAndRoles
+    Right contextsAndRoles@(Tuple contextInstances _) -> do
+      forWithIndex_ contextInstances
+        \i (_ :: PerspectContext) -> setupAndRunBotActions (ContextInstance i)
+      pure $ Right contextsAndRoles
 
 -- | Loads a file from the directory "src/model" relative to the directory of the active process.
+-- | Runs all bot actions.
 -- | All instances are loaded into the cache, and stored in Couchdb.
 loadAndSaveCrlFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
 loadAndSaveCrlFile file directoryName = do

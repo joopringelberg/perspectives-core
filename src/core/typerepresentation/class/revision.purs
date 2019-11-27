@@ -25,7 +25,7 @@ import Data.Maybe (Maybe(..))
 
 class Revision v where
   rev :: v -> Revision_
-  changeRevision :: Maybe String -> v -> v
+  changeRevision :: Revision_ -> v -> v
 
 type Revision_ = Maybe String
 

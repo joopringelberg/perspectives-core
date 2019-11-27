@@ -4,6 +4,5 @@ import model:Test als tst:
 
 tst:TestCase usr:MyTestCase
 	$Self => ()
-		Prop1 = 0
 	$AContextRole =>
 		$NestedCase usr:MyNestedCase

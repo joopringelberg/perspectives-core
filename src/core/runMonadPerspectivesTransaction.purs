@@ -26,6 +26,7 @@ import Control.Monad.Reader (lift, runReaderT)
 import Data.Array (foldM, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
@@ -85,7 +86,7 @@ runActions t = do
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
         Nothing -> pure unit
-        (Just a) -> a ctxt
+        (Just (Tuple _ a)) -> a ctxt
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t

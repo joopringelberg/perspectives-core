@@ -31,23 +31,33 @@ import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Except (throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..), fromJust)
-import Data.Newtype (unwrap)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect.Aff (Aff, catchError)
 import Effect.Aff.AVar (AVar, empty, put, read, take)
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion, documentExists)
+import Perspectives.Couchdb.Databases (defaultPerspectRequest, retrieveDocumentVersion, documentExists, version)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.PerspectivesState (domeinCacheInsert, domeinCacheLookup, domeinCacheRemove)
-import Perspectives.Representation.Class.Revision (revision)
+import Perspectives.Representation.Class.Revision (Revision_)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>), (==), (>>=), (<<<))
+
+-- | as in [Perspectives.Instances](Perspectives.Instances.html#t:x), a DomeinFile stored
+-- | in Couchdb has a tag `_rev` in its serialisation that is filled by Couchb, and
+-- | a similar member in its type, that is always one step behind.
+-- | We therefore actualise the version number of a DomeinFile in cache on receiving
+-- | it from Couchdb. We also actualise it upon storing a new version. In this way
+-- | we make sure that the 'internal' _rev equals the current 'external' _rev in Couchdb.
+-- |
+-- |
+-- |
 
 type URL = String
 
@@ -86,7 +96,10 @@ retrieveDomeinFile ns = do
         (liftAff $ AX.request $ domeinRequest {url = modelsURL <> escapeCouchdbDocumentName ns})
         \e -> throwError $ error $ "Failure in retrieveDomeinFile for: " <> ns <> ". " <> show e
       onAccepted res.status [200, 304] "retrieveDomeinFile"
-        (onCorrectCallAndResponse "retrieveDomeinFile" res.body (\(a :: DomeinFile) -> liftAff $ put a ev))
+        (onCorrectCallAndResponse "retrieveDomeinFile" res.body (\(DomeinFile a) -> do
+          v <- version res.headers
+          liftAff $ put (DomeinFile (a {_rev = v})) ev
+        ))
     (Just avar) -> liftAff $ read avar
 
 retrieveDomeinFileFromCache :: Namespace -> MonadPerspectives (Maybe DomeinFile)
@@ -123,16 +136,17 @@ saveCachedDomeinFile ns = do
 -- | Do not use createDomeinFileInCouchdb or modifyDomeinFileInCouchdb directly.
 -- | If the model is not found in the cache, assumes it is not in the database either.
 storeDomeinFileInCouchdb :: DomeinFile -> MonadPerspectives Unit
-storeDomeinFileInCouchdb df@(DomeinFile {_id}) = do
+storeDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
   mAvar <- domeinCacheLookup _id
   -- mAvar <- liftEffect $ peek domeinCache _id
   case mAvar of
     Nothing -> do
-      exists <- documentExists (modelsURL <> escapeCouchdbDocumentName _id)
-      if exists
+      rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
+      if isJust rev
         then do
-          ev <- (liftAff empty) >>= domeinCacheInsert _id
-          modifyDomeinFileInCouchdb df ev
+          versionedDf <- pure (DomeinFile dfr {_rev = rev})
+          ev <- storeDomeinFileInCache _id versionedDf
+          modifyDomeinFileInCouchdb versionedDf ev
         else createDomeinFileInCouchdb df
     (Just avar) -> modifyDomeinFileInCouchdb df avar
 
@@ -148,20 +162,21 @@ createDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) = do
       updatedDomeinFile <- liftAff $ read ev
       modifyDomeinFileInCouchdb updatedDomeinFile ev
     else onAccepted res.status [200, 201] "createDomeinFileInCouchdb"
-      (void $ onCorrectCallAndResponse "createDomeinFileInCouchdb" res.body \(a :: PutCouchdbDocument) -> setRevision (unsafePartial $ fromJust $ (unwrap a).rev) ev)
+      (void $ onCorrectCallAndResponse "createDomeinFileInCouchdb" res.body \(a :: PutCouchdbDocument) -> do
+        v <- version res.headers
+        void $ setRevision v ev)
+
   where
-    setRevision :: String -> (AVar DomeinFile) -> MonadPerspectives Unit
-    setRevision s av = liftAff $ put (DomeinFile (dfr {_rev = (revision s)})) av
+    setRevision :: Revision_ -> (AVar DomeinFile) -> MonadPerspectives Unit
+    setRevision s av = liftAff $ put (DomeinFile (dfr {_rev = s})) av
 
 modifyDomeinFileInCouchdb :: DomeinFile -> (AVar DomeinFile) -> MonadPerspectives Unit
-modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
-  (DomeinFile {_rev}) <- liftAff $ read av
-  originalRevision <- pure $ unsafePartial $ fromJust _rev
+modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id, _rev}) av = do
   oldDf <- liftAff $ take av
   res <- liftAff $ AX.put
     ResponseFormat.string
-    (modelsURL <> escapeCouchdbDocumentName _id <> "?rev=" <> originalRevision)
-    (RequestBody.string (genericEncodeJSON defaultOptions (DomeinFile dfr {_rev = _rev})))
+    (modelsURL <> escapeCouchdbDocumentName _id <> "?rev=" <> (unsafePartial $ fromJust _rev))
+    (RequestBody.string (genericEncodeJSON defaultOptions df))
   if res.status == (StatusCode 409)
     then do
       rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName _id)
@@ -169,18 +184,23 @@ modifyDomeinFileInCouchdb df@(DomeinFile dfr@{_id}) av = do
       updatedDomeinFile <- liftAff $ read av
       modifyDomeinFileInCouchdb updatedDomeinFile av
     else onAccepted res.status [200, 201] "modifyDomeinFileInCouchdb"
-      (void (onCorrectCallAndResponse "modifyDomeinFileInCouchdb" res.body \(a :: PutCouchdbDocument)-> setRevision (unsafePartial $ fromJust $ (unwrap a).rev)))
+      (void (onCorrectCallAndResponse "modifyDomeinFileInCouchdb" res.body \(a :: PutCouchdbDocument)-> do
+        rev <- version res.headers
+        setRevision rev))
   where
-    setRevision :: String -> MonadPerspectives Unit
-    setRevision s = liftAff $ put (DomeinFile (dfr {_rev = (revision s)})) av
+    setRevision :: Revision_ -> MonadPerspectives Unit
+    setRevision s = liftAff $ put (DomeinFile (dfr {_rev = s})) av
 
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: Namespace -> MonadPerspectives Unit
 removeDomeinFileFromCouchdb ns = do
-  rev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName ns)
-  (rq :: (AX.Request String)) <- defaultPerspectRequest
-  res <- liftAff $ AX.request $ rq {method = Left DELETE, url = (modelsURL <> escapeCouchdbDocumentName ns <> "?rev=" <> rev)}
-  onAccepted res.status [200, 202] "removeDomeinFileFromCouchdb" $ domeinCacheRemove ns *> pure unit
+  mrev <- retrieveDocumentVersion (modelsURL <> escapeCouchdbDocumentName ns)
+  case mrev of
+    Nothing -> throwError (error "removeDomeinFileFromCouchdb needs a revision of the document to be removed.")
+    Just rev -> do
+      (rq :: (AX.Request String)) <- defaultPerspectRequest
+      res <- liftAff $ AX.request $ rq {method = Left DELETE, url = (modelsURL <> escapeCouchdbDocumentName ns <> "?rev=" <> rev)}
+      onAccepted res.status [200, 202] "removeDomeinFileFromCouchdb" $ domeinCacheRemove ns *> pure unit
 
 modelsURL :: URL
 modelsURL = "http://localhost:5984/perspect_models/"

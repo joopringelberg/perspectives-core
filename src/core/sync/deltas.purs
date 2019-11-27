@@ -73,19 +73,23 @@ distributeTransactie t = do
   -- _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
+-- TODO: Pas addContextToTransactie toe, ergens!
 addContextToTransactie :: PerspectContext ->
   MonadPerspectivesTransaction Unit
 addContextToTransactie c = lift $ AA.modify (over Transaction \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
 
+-- TODO: Pas addRolToTransactie toe, ergens!
 addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
 addRolToTransactie c = lift $ AA.modify (over Transaction \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})
 
+-- TODO: Pas deleteContextFromTransactie toe, ergens!
 deleteContextFromTransactie :: PerspectContext -> MonadPerspectivesTransaction Unit
 deleteContextFromTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transaction \(t@{createdContexts, deletedContexts}) ->
   case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
     Nothing -> t {deletedContexts = cons _id deletedContexts}
     (Just i) -> t {createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
+-- TODO: Pas deleteRolFromTransactie toe, ergens!
 deleteRolFromTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
 deleteRolFromTransactie c@(PerspectRol{_id}) = lift $ AA.modify (over Transaction \(t@{createdRoles, deletedRoles}) ->
   case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of

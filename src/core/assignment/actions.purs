@@ -34,7 +34,7 @@ import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.ActionCache (cacheAction, retrieveAction)
+import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty, addRol, deleteProperty, deleteRol, moveRoles, removeProperty, removeRol, setProperty, setRol)
 import Perspectives.BasicConstructors (constructAnotherRol)
@@ -138,11 +138,12 @@ constructRHS objectGetter actionType a = case a of
         else pure unit
 -}
 
--- | For a Context, set up its Actions. Register these Actions in the ActionRegister. Register their dependency
--- | on Assumptions in the actionAssumptionRegister in PerspectivesState.
-setupBotActions :: ContextInstance -> MonadPerspectives Unit
-setupBotActions cid = do
-  -- TODO: filter, keeping just those actions that are to be executed by a Bot.
+-- | For a Context, set up its Actions. Register these Actions in the ActionRegister.
+-- | Register their dependency on Assumptions in the actionAssumptionRegister in
+-- | PerspectivesState. Execute the actions once.
+setupAndRunBotActions :: ContextInstance -> MonadPerspectives Unit
+setupAndRunBotActions cid = do
+  -- TODO: filter, keeping just those actions that are to be executed by the Bot for the current user.
   (ct :: ContextType) <- cid ##>> contextType
   -- For all user roles, get their perspective; then take all automatic actions.
   (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
@@ -150,20 +151,34 @@ setupBotActions cid = do
     perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
     for_ (values perspectives) \actions ->
       for_ actions \(a :: ActionType) ->
-        (lift $ lift $ compileBotAction a) >>= \(updater :: Updater ContextInstance) -> updater cid
+        (lift $ lift $ compileBotAction a) >>= \((Tuple _ updater) :: Tuple LHS (Updater ContextInstance)) -> updater cid
     )
 
-  -- (actions :: Array ActionType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< actions
-  -- -- Run the updater once. It will collect the Assumptions it depends on and register itself in the
-  -- -- actionAssumptionRegister in PerspectivesState.
-  -- void $ runMonadPerspectivesTransaction (for_ actions \(a :: ActionType) -> (lift $ lift $ compileBotAction a) >>= \(updater :: Updater ContextInstance) -> updater cid)
+-- | For a Context, set up its Actions. Register these Actions in the ActionRegister.
+-- | Register their dependency on Assumptions in the actionAssumptionRegister in
+-- | PerspectivesState. Does **not** execute the actions.
+setupBotActions :: ContextInstance -> MonadPerspectives Unit
+setupBotActions cid = do
+  -- TODO: filter, keeping just those actions that are to be executed by the Bot for the current user.
+  (ct :: ContextType) <- cid ##>> contextType
+  -- For all user roles, get their perspective; then take all automatic actions.
+  (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
+  (for_ users \(u :: EnumeratedRoleType) -> do
+    perspectives <- getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
+    for_ (values perspectives) \actions ->
+      for_ actions \(a :: ActionType) ->
+        (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
+          -- Evaluate the lhs to set up the dependency administration.
+          (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
+          cacheActionInstanceDependencies (ActionInstance cid a) ass
+    )
 
 -- | Remove all actions associated with this context.
 tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
 tearDownBotActions = removeContextInstanceDependencies
 
 -- | Compile the action to an Updater. Cache for later use.
-compileBotAction :: ActionType -> MP (Updater ContextInstance)
+compileBotAction :: ActionType -> MP (Tuple LHS (Updater ContextInstance))
 compileBotAction actionType = do
   case retrieveAction actionType of
     (Just a) -> pure a
@@ -173,8 +188,8 @@ compileBotAction actionType = do
       (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff
       (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
       updater <- pure $ ruleRunner lhs effectFullFunction
-      void $ pure $ cacheAction actionType updater
-      pure updater
+      void $ pure $ cacheAction actionType (Tuple lhs updater)
+      pure $ Tuple lhs updater
 
   where
     -- | Actual effectfull function for which we track dependencies. If one of them changes,

@@ -176,7 +176,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions pe)}
       if res.status == (StatusCode 409)
         -- Unexpectedly we do have a version in Couchdb.
-        then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) <<< Just >>= saveVersionedEntiteit id
+        then retrieveDocumentVersion (ebase <> unwrap id) >>= pure <<< (flip changeRevision pe) >>= saveVersionedEntiteit id
         else do
           void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
             (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do

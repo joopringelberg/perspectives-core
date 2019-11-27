@@ -34,6 +34,7 @@ import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addBindingDelta, addRoleDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances (class PersistentInstance, getPerspectEntiteit, saveVersionedEntiteit)
+import Perspectives.Instances (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Persistent (EnumeratedPropertyType, EnumeratedRoleType, cacheCachedEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.TypesForDeltas (BindingDelta(..), RoleDelta(..), DeltaType(..), PropertyDelta(..))
@@ -96,7 +97,7 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectivesTransaction Unit
 saveEntiteit rid rol = do
   lift $ lift $ void $ cacheCachedEntiteit rid rol
-  lift $ lift $ void $ saveVersionedEntiteit rid rol
+  lift $ lift $ void $ Instances.saveEntiteit rid
 
 -- | Removes the binding R of the rol, if any.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
