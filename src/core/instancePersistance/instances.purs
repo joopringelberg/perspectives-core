@@ -44,6 +44,7 @@ module Perspectives.Instances
 , tryGetPerspectEntiteit
 , getAVarRepresentingPerspectEntiteit
 , class Persistent
+, database
   )
 where
 
@@ -71,16 +72,26 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
+import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (entitiesDatabase)
+import Perspectives.User (entitiesDatabase, getCouchdbBaseURL)
 
-class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i
+class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
+  database :: i -> MP String
 
-instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance
+instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
+  database _ = entitiesDatabase
 
-instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance
+instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
+  database _ = entitiesDatabase
+
+instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
+  database _ = do
+    cdbUrl <- getCouchdbBaseURL
+    pure $ cdbUrl <> "perspect_models/"
+
 
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -123,7 +134,7 @@ removeEntiteit entId = do
     case (rev entiteit) of
       Nothing -> throwError $ error ("removeEntiteit: entiteit has no revision, removal is impossible: " <> unwrap entId)
       (Just rev) -> do
-        ebase <- entitiesDatabase
+        ebase <- database entId
         (rq :: (Request String)) <- defaultPerspectRequest
         res <- liftAff $ request $ rq {method = Left DELETE, url = (ebase <> unwrap entId <> "?rev=" <> rev)}
         onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit
@@ -134,7 +145,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
   do
     v <- representInternally id
     -- _ <- forkAff do
-    ebase <- entitiesDatabase
+    ebase <- database id
     (rq :: (Request String)) <- defaultPerspectRequest
     res <- liftAff $ request $ rq {url = ebase <> unwrap id}
     void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
@@ -172,7 +183,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
     Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> unwrap id)
     (Just avar) -> do
       pe <- liftAff $ take avar
-      ebase <- entitiesDatabase
+      ebase <- database id
       (rq :: (Request String)) <- defaultPerspectRequest
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap id), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions pe)}
       if res.status == (StatusCode 409)
@@ -191,7 +202,7 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
   case (rev entiteit) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)
     (Just rev) -> do
-      ebase <- entitiesDatabase
+      ebase <- database entId
       (rq :: (Request String)) <- defaultPerspectRequest
       res <- liftAff $ request $ rq {method = Left PUT, url = (ebase <> unwrap entId <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions entiteit)}
       void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"

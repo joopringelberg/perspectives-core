@@ -388,12 +388,12 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
 
 cacheRol ::  RoleInstance -> PerspectRol -> IP Unit
 cacheRol rolId rol = do
-  liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
+  _ <- liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
   addRoleInstance rolId rol
 
 cacheContext ::  ContextInstance -> PerspectContext -> IP Unit
 cacheContext contextId ctxt = do
-  liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
+  _ <- liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
   addContextInstance contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,

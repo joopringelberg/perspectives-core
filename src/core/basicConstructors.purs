@@ -31,7 +31,6 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.AVar (AVar)
 import Effect.Aff (error, throwError)
-import Effect.Class.Console (logShow)
 import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
@@ -93,7 +92,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
       -- ik denk dat we moeten mappen. Maar de keys moeten ook veranderen.
       (rolIds :: FO.Object (Array RoleInstance)) <-constructRollen
       externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
-      lift $ cacheUncachedEntiteit contextInstanceId
+      _ <- lift $ cacheUncachedEntiteit contextInstanceId
         (PerspectContext defaultContextRecord
           { _id = contextInstanceId
           , displayName  = localName
@@ -104,7 +103,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
       (b :: Maybe RoleInstance) <- case prototype of
         Nothing -> pure Nothing
         (Just p) -> pure (Just $ RoleInstance (buitenRol (expandDefaultNamespaces p)))
-      lift $ cacheUncachedEntiteit externalRole
+      _ <- lift $ cacheUncachedEntiteit externalRole
         (PerspectRol defaultRolRecord
           { _id = externalRole
           , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$External"
@@ -149,7 +148,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
 constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> ExceptT (Array UserMessage) (MonadPerspectives) RoleInstance
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
   rolInstanceId <- pure $ RoleInstance (localName <> "_" <> (rol_padOccurrence i))
-  lift $ cacheUncachedEntiteit rolInstanceId
+  _ <- lift $ cacheUncachedEntiteit rolInstanceId
     (PerspectRol defaultRolRecord
       { _id = rolInstanceId
       , pspType = rolType

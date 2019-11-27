@@ -25,19 +25,20 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.Revision (Revision_)
+import Perspectives.Representation.Class.Identifiable (class Identifiable)
+import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.View (View)
-import Prelude (class Show, ($), class Eq)
+import Prelude (class Eq, class Ord, class Show, compare, ($), (==), (<<<), show)
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
@@ -68,6 +69,25 @@ instance showDomeinFile :: Show DomeinFile where
 
 instance eqDomeinFile :: Eq DomeinFile where
   eq = genericEq
+
+instance identifiableDomeinFile :: Identifiable DomeinFile DomeinFileId where
+  identifier (DomeinFile{_id}) = DomeinFileId _id
+
+instance revisionDomeinFile :: Revision DomeinFile where
+  rev = _._rev <<< unwrap
+  changeRevision s = over DomeinFile (\vr -> vr {_rev = s})
+
+newtype DomeinFileId = DomeinFileId String
+derive instance newtypeDomeinFileId :: Newtype DomeinFileId _
+derive instance genericRepDomeinFileId :: Generic DomeinFileId _
+derive newtype instance encodeDomeinFileId :: Encode DomeinFileId
+derive newtype instance decodeDomeinFileId :: Decode DomeinFileId
+instance showDomeinFileId :: Show DomeinFileId where
+  show = show <<< unwrap
+instance eqDomeinFileId :: Eq DomeinFileId where
+  eq (DomeinFileId id1) (DomeinFileId id2) = id1 == id2
+instance ordDomeinFileId :: Ord DomeinFileId where
+  compare (DomeinFileId a) (DomeinFileId b) = compare a b
 
 defaultDomeinFileRecord :: DomeinFileRecord
 defaultDomeinFileRecord = { _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}

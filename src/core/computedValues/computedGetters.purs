@@ -40,7 +40,7 @@ modellenM c = ArrayT do
 
   where
     getListOfModels :: MP (Array RoleInstance)
-    getListOfModels = lift $ catchError ((documentNamesInDatabase "perspect_models") >>= pure <<< map (RoleInstance <<< (_ <> "$External"))) \_ -> pure []
+    getListOfModels = catchError ((documentNamesInDatabase "perspect_models") >>= pure <<< map (RoleInstance <<< (_ <> "$External"))) \_ -> pure []
 
     ophaalTellerName :: String
     ophaalTellerName = "model:System$PerspectivesSystem$External$ModelOphaalTeller"
