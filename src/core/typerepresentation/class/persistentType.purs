@@ -21,7 +21,7 @@
 
 module Perspectives.Representation.Class.PersistentType
   ( module Perspectives.Representation.Class.PersistentType
-  , module Perspectives.Representation.Class.Persistent
+  , module Perspectives.Representation.Class.Cacheable
   , module Perspectives.Representation.Class.Revision
   , module Perspectives.Representation.TypeIdentifiers) where
 
@@ -40,7 +40,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
-import Perspectives.Representation.Class.Persistent (class Persistent, retrieveInternally)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, retrieveInternally)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)

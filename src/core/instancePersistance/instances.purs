@@ -43,7 +43,7 @@ module Perspectives.Instances
 , getPerspectRol
 , tryGetPerspectEntiteit
 , getAVarRepresentingPerspectEntiteit
-, class PersistentInstance
+, class Persistent
   )
 where
 
@@ -72,17 +72,17 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Persistent (class Persistent, Revision_, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase)
 
-class (Persistent v i, Encode v, Decode v) <= PersistentInstance v i | i -> v,  v -> i
+class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i
 
-instance persistentInstancePerspectContext :: PersistentInstance PerspectContext ContextInstance
+instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance
 
-instance persistentInstancePerspectRol :: PersistentInstance PerspectRol RoleInstance
+instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance
 
-getPerspectEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
+getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
   do
     (av :: Maybe (AVar a)) <- retrieveInternally id
@@ -98,13 +98,13 @@ getPerspectContext = getPerspectEntiteit
 getPerspectRol :: RoleInstance -> MP PerspectRol
 getPerspectRol = getPerspectEntiteit
 
-tryGetPerspectEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives (Maybe a)
+tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
   \_ -> do
     (_ :: Maybe (AVar a)) <- removeInternally id
     pure Nothing
 
-getAVarRepresentingPerspectEntiteit :: forall a i. PersistentInstance a i  => i -> MonadPerspectives (AVar a)
+getAVarRepresentingPerspectEntiteit :: forall a i. Persistent a i  => i -> MonadPerspectives (AVar a)
 getAVarRepresentingPerspectEntiteit id =
   do
     (av :: Maybe (AVar a)) <- retrieveInternally id
@@ -113,9 +113,10 @@ getAVarRepresentingPerspectEntiteit id =
       Nothing -> do
         (_ :: a) <- fetchEntiteit id
         mavar <- retrieveInternally id
+        -- NOTE: this may fail if the Entiteit was not stored in Couchdb.
         pure $ unsafePartial $ fromJust mavar
 
-removeEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
+removeEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 removeEntiteit entId = do
   entiteit <- getPerspectEntiteit entId
   ensureAuthentication $ do
@@ -128,7 +129,7 @@ removeEntiteit entId = do
         onAccepted res.status [200, 202] "removeEntiteit" $ (removeInternally entId :: MP (Maybe (AVar a))) *> pure entiteit
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
-fetchEntiteit :: forall a i. PersistentInstance a i => i -> MonadPerspectives a
+fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 fetchEntiteit id = ensureAuthentication $ catchError
   do
     v <- representInternally id
@@ -144,7 +145,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
   \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
 -- | Save a user Resource.
-saveEntiteitPreservingVersion :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
+saveEntiteitPreservingVersion :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 -- saveEntiteitPreservingVersion id = catchError do
 --     (_ :: a) <- fetchPerspectEntiteitFromCouchdb id
 --     saveEntiteit id
@@ -153,7 +154,7 @@ saveEntiteitPreservingVersion = saveEntiteit
 
 -- | Save an entity, whether it has been saved before or not. It must be present in the cache.
 -- | On success it will have the same version in cache as in Couchdb.
-saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
+saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = do
   (pe :: Maybe a) <- tryGetPerspectEntiteit id
   case pe of
@@ -164,7 +165,7 @@ saveEntiteit id = do
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function. Set its version (_rev) in the cache.
-saveUnversionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> MonadPerspectives a
+saveUnversionedEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveUnversionedEntiteit id = ensureAuthentication $ do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -185,7 +186,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
           pure pe
 
 -- | Save an Entiteit and set its new _rev parameter in the cache.
-saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectives a
+saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
   case (rev entiteit) of
     Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)

@@ -33,9 +33,9 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, chang
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addBindingDelta, addRoleDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances (class PersistentInstance, getPerspectEntiteit, saveVersionedEntiteit)
+import Perspectives.Instances (class Persistent, getPerspectEntiteit, saveVersionedEntiteit)
 import Perspectives.Instances (saveEntiteit) as Instances
-import Perspectives.Representation.Class.Persistent (EnumeratedPropertyType, EnumeratedRoleType, cacheCachedEntiteit)
+import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheCachedEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.TypesForDeltas (BindingDelta(..), RoleDelta(..), DeltaType(..), PropertyDelta(..))
 
@@ -63,7 +63,7 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
   - de gewijzigde context opslaan;
 -}
 -- | Create update functions on PerspectContext or PerspectRol.
--- | The result is an ObjectsGetter that always returns the (ID of the) PersistentInstance.
+-- | The result is an ObjectsGetter that always returns the (ID of the) Persistent.
 -- | Sets up the Bot actions for a Context.
 
 -----------------------------------------------------------
@@ -94,7 +94,7 @@ setBinding roleId (newBindingId :: RoleInstance) = do
       saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
 -- saveEntiteit :: RoleInstance -> PerspectRol -> MonadPerspectivesTransaction Unit
-saveEntiteit :: forall a i r. GenericEncode r => Generic a r => PersistentInstance a i => i -> a -> MonadPerspectivesTransaction Unit
+saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
 saveEntiteit rid rol = do
   lift $ lift $ void $ cacheCachedEntiteit rid rol
   lift $ lift $ void $ Instances.saveEntiteit rid

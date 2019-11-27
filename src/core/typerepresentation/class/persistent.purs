@@ -19,12 +19,12 @@
 
 -- END LICENSE
 
-module Perspectives.Representation.Class.Persistent
-  ( module Perspectives.Representation.Class.Persistent
+module Perspectives.Representation.Class.Cacheable
+  ( module Perspectives.Representation.Class.Cacheable
   , module Perspectives.Representation.Class.Revision
   , module Perspectives.Representation.TypeIdentifiers) where
 
--- | Members of Persistent trade identifiers for a representation.
+-- | Members of Cacheable trade identifiers for a representation.
 
 import Prelude
 
@@ -44,12 +44,12 @@ import Perspectives.Representation.Class.Revision (class Revision, Revision_, ch
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
 
--- | Members of Persistent trade identifiers for a representation.
+-- | Members of Cacheable trade identifiers for a representation.
 
 type Identifier = String
 type Namespace = String
 
-class (Identifiable v i, Revision v, Newtype i String) <= Persistent v i | v -> i, i -> v where
+class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i, i -> v where
   cache :: i -> MonadPerspectives (GLStrMap (AVar v))
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: i -> MonadPerspectives (AVar v)
@@ -59,7 +59,7 @@ class (Identifiable v i, Revision v, Newtype i String) <= Persistent v i | v -> 
 changeRevisionDefault :: forall f. String -> {_rev :: Revision_ | f} -> {_rev :: Revision_ | f}
 changeRevisionDefault rev cr = cr {_rev = Just rev}
 
-ensureInternalRepresentation :: forall i a. Persistent a i => i -> MonadPerspectives (AVar a)
+ensureInternalRepresentation :: forall i a. Cacheable a i => i -> MonadPerspectives (AVar a)
 ensureInternalRepresentation c = do
     mav <- retrieveInternally c
     case mav of
@@ -68,7 +68,7 @@ ensureInternalRepresentation c = do
 
 -- | Caches the entiteit. If it was cached before, ensures that the newly cached
 -- | entiteit has the same revision value as the old one.
-cacheEntiteitPreservingVersion :: forall a i. Persistent a i => i -> a -> MonadPerspectives Unit
+cacheEntiteitPreservingVersion :: forall a i. Cacheable a i => i -> a -> MonadPerspectives Unit
 cacheEntiteitPreservingVersion id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -80,7 +80,7 @@ cacheEntiteitPreservingVersion id e = do
 
 -- | If the entiteit is represented in an AVar, overwrites the stored value.
 -- | Otherwise adds an AVar and stores the entiteit in it.
-cacheEntiteit :: forall a i. Persistent a i => i -> a -> MonadPerspectives Unit
+cacheEntiteit :: forall a i. Cacheable a i => i -> a -> MonadPerspectives Unit
 cacheEntiteit id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -88,7 +88,7 @@ cacheEntiteit id e = do
     otherwise -> void $ cacheCachedEntiteit id e
 
 -- | Store an internally created PerspectEntiteit for the first time in the local store.
-cacheUncachedEntiteit :: forall a i. Persistent a i => i -> a -> MonadPerspectives Unit
+cacheUncachedEntiteit :: forall a i. Cacheable a i => i -> a -> MonadPerspectives Unit
 cacheUncachedEntiteit id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -99,7 +99,7 @@ cacheUncachedEntiteit id e = do
     otherwise -> throwError $ error $ "cacheUncachedEntiteit: the cache should not hold an AVar for " <> unwrap id
 
 -- | Modify a PerspectEntiteit in the cache.
-cacheCachedEntiteit :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
+cacheCachedEntiteit :: forall a i. Cacheable a i => i -> a -> MonadPerspectives a
 cacheCachedEntiteit id e = do
   mAvar <- retrieveInternally id
   case mAvar of
@@ -114,7 +114,7 @@ cacheCachedEntiteit id e = do
 
 -- | Returns an entity. Throws an error if the resource is not represented in cache or not
 -- | immediately available in cache.
-readEntiteitFromCache :: forall a i. Persistent a i => i -> MonadPerspectives a
+readEntiteitFromCache :: forall a i. Cacheable a i => i -> MonadPerspectives a
 readEntiteitFromCache id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
@@ -128,7 +128,7 @@ readEntiteitFromCache id = do
 -----------------------------------------------------------
 -- INSTANCES
 -----------------------------------------------------------
-instance persistentPerspectContext :: Persistent PerspectContext ContextInstance where
+instance persistentPerspectContext :: Cacheable PerspectContext ContextInstance where
   -- identifier = _._id <<< unwrap
   cache _ = gets _.contextInstances
   representInternally c = do
@@ -137,7 +137,7 @@ instance persistentPerspectContext :: Persistent PerspectContext ContextInstance
   retrieveInternally i = lookup (cache (ContextInstance "")) (unwrap i)
   removeInternally i = remove (cache (ContextInstance "")) (unwrap i)
 
-instance persistentPerspectRol :: Persistent PerspectRol RoleInstance where
+instance persistentPerspectRol :: Cacheable PerspectRol RoleInstance where
   cache _ = gets _.rolInstances
   representInternally c = do
     av <- liftAff empty
