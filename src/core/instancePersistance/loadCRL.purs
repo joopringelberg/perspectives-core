@@ -37,7 +37,7 @@ import Perspectives.Actions (setupAndRunBotActions)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances (saveEntiteitPreservingVersion)
+import Perspectives.Instances (saveEntiteit)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 
@@ -69,7 +69,7 @@ loadAndSaveCrlFile file directoryName = do
     Left e -> pure e
     Right (Tuple contextInstances roleInstances) -> do
       forWithIndex_ contextInstances
-        \i (_ :: PerspectContext) -> saveEntiteitPreservingVersion (ContextInstance i)
+        \i (_ :: PerspectContext) -> saveEntiteit (ContextInstance i)
       forWithIndex_ roleInstances
-        \i (_ :: PerspectRol) -> saveEntiteitPreservingVersion (RoleInstance i)
+        \i (_ :: PerspectRol) -> saveEntiteit (RoleInstance i)
       pure []

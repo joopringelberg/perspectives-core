@@ -22,7 +22,11 @@
 module Perspectives.Representation.Class.Cacheable
   ( module Perspectives.Representation.Class.Cacheable
   , module Perspectives.Representation.Class.Revision
-  , module Perspectives.Representation.TypeIdentifiers) where
+  , module Perspectives.Representation.TypeIdentifiers
+  , cachePreservingRevision
+  , cacheInitially
+  , cacheOverwritingRevision
+  ) where
 
 -- | Members of Cacheable trade identifiers for a representation.
 
@@ -45,7 +49,18 @@ import Perspectives.Representation.Class.Revision (class Revision, Revision_, ch
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
 
--- | Members of Cacheable trade identifiers for a representation.
+-- | Members of class Cacheable provide functionality to cache and retrieve their representation.
+-- | Members are by definition also members of class Revision. We now have two dimensions:
+-- |  * is an entitity in cache?
+-- |  * do want to preserve the revision on overwriting the cache with a new value for the entity?
+-- | This gives rise to four possibilities, one of which is nonsense (not cached before,
+-- | but preserve the revision). These are the three remaining functions:
+-- |
+-- | * cacheInitially;
+-- | * cachePreservingRevision: before overwriting the cached value, take its revision and
+-- | store it in the new value to cache;
+-- | * cacheOverwritingRevision: just overwrite the cached value.
+-- |
 
 type Identifier = String
 type Namespace = String
@@ -57,55 +72,44 @@ class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i
   retrieveInternally :: i -> MonadPerspectives (Maybe (AVar v))
   removeInternally :: i -> MonadPerspectives (Maybe (AVar v))
 
-changeRevisionDefault :: forall f. String -> {_rev :: Revision_ | f} -> {_rev :: Revision_ | f}
-changeRevisionDefault rev cr = cr {_rev = Just rev}
-
-ensureInternalRepresentation :: forall i a. Cacheable a i => i -> MonadPerspectives (AVar a)
-ensureInternalRepresentation c = do
-    mav <- retrieveInternally c
-    case mav of
-      Nothing -> representInternally c
-      (Just av) -> pure av
-
--- | Caches the entiteit. If it was cached before, ensures that the newly cached
--- | entiteit has the same revision value as the old one.
-cacheEntiteitPreservingVersion :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cacheEntiteitPreservingVersion id e = do
+-- | Caches the entiteit. This operation is neutral w.r.t. the revision value
+-- | (ff it was cached before, ensures that the newly cached
+-- | entiteit has the same revision value as the old one).
+-- overwriteWithOldRevision
+cachePreservingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
+cachePreservingRevision id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> cacheUncachedEntiteit id e
+    Nothing -> cacheInitially id e
     (Just avar) -> do
-      ent <- liftAff $ take avar
-      e' <- pure $ changeRevision (rev ent) e
-      liftAff $ put e' avar
-      pure avar
-
--- | If the entiteit is represented in an AVar, overwrites the stored value.
--- | Otherwise adds an AVar and stores the entiteit in it.
-cacheEntiteit :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cacheEntiteit id e = do
-  (mAvar :: Maybe (AVar a)) <- retrieveInternally id
-  case mAvar of
-    Nothing -> cacheUncachedEntiteit id e
-    otherwise -> cacheCachedEntiteit id e
+      empty <- liftAff $ (status >=> pure <<< isEmpty) avar
+      -- This is a precaution to prevent us from waiting on an operation that does not return.
+      if empty
+        then liftAff $ put e avar *> pure avar
+        else do
+          ent <- liftAff $ take avar
+          e' <- pure $ changeRevision (rev ent) e
+          liftAff $ put e' avar
+          pure avar
 
 -- | Store an internally created PerspectEntiteit for the first time in the local store.
-cacheUncachedEntiteit :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cacheUncachedEntiteit id e = do
+-- cacheInitially
+cacheInitially :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
+cacheInitially id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
     Nothing -> do
       (av :: AVar a) <- representInternally id
       liftAff $ put e av
       pure av
-    otherwise -> throwError $ error $ "cacheUncachedEntiteit: the cache should not hold an AVar for " <> unwrap id
+    otherwise -> throwError $ error $ "cacheInitially: the cache should not hold an AVar for " <> unwrap id
 
--- | Modify a PerspectEntiteit in the cache.
-cacheCachedEntiteit :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cacheCachedEntiteit id e = do
+-- | Modify a PerspectEntiteit in the cache. Overwrites the revision value.
+cacheOverwritingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
+cacheOverwritingRevision id e = do
   mAvar <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error $ "cacheCachedEntiteit: cannot change an entiteit that is not cached: " <> unwrap id
+    Nothing -> cacheInitially id e
     (Just avar) -> do
       empty <- liftAff $ (status >=> pure <<< isEmpty) avar
       if empty

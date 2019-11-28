@@ -24,17 +24,17 @@ module Perspectives.Sync.Class.Assumption where
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Perspectives.CoreTypes (Assumption)
-import Perspectives.TypesForDeltas (BindingDelta(..), PropertyDelta(..), RoleDelta(..))
+import Perspectives.TypesForDeltas (RoleDelta(..), PropertyDelta(..), ContextDelta(..))
 
 -- | Class `DeltaAssumption` abstracts over Deltas to provide a function that turns a Delta into an Assumption.
 class DeltaAssumption d where
   assumption :: d -> Assumption
 
-instance roleDeltaAssumption :: DeltaAssumption RoleDelta where
-  assumption (RoleDelta{id, role}) = Tuple (unwrap id) (unwrap role)
+instance roleDeltaAssumption :: DeltaAssumption ContextDelta where
+  assumption (ContextDelta{id, role}) = Tuple (unwrap id) (unwrap role)
 
-instance bindingDeltaAssumption :: DeltaAssumption BindingDelta where
-  assumption (BindingDelta{id, binding}) = Tuple (unwrap id) "model:Perspectives$Role$binding"
+instance bindingDeltaAssumption :: DeltaAssumption RoleDelta where
+  assumption (RoleDelta{id, binding}) = Tuple (unwrap id) "model:Perspectives$Role$binding"
 
 instance propertyDeltaAssumption :: DeltaAssumption PropertyDelta where
   assumption (PropertyDelta{id, property}) = Tuple (unwrap id) (unwrap property)

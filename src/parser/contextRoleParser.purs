@@ -41,7 +41,7 @@ import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, runIndentParser', setNamespace, setPrefix, setRoleInstances, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Representation.Class.Cacheable (cacheEntiteitPreservingVersion)
+import Perspectives.Representation.Class.Cacheable (cacheInitially)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.Syntax (ContextDeclaration(..), EnclosingContextDeclaration(..))
@@ -388,12 +388,12 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
 
 cacheRol ::  RoleInstance -> PerspectRol -> IP Unit
 cacheRol rolId rol = do
-  _ <- liftAffToIP $ cacheEntiteitPreservingVersion rolId rol
+  _ <- liftAffToIP $ cacheInitially rolId rol
   addRoleInstance rolId rol
 
 cacheContext ::  ContextInstance -> PerspectContext -> IP Unit
 cacheContext contextId ctxt = do
-  _ <- liftAffToIP $ cacheEntiteitPreservingVersion contextId ctxt
+  _ <- liftAffToIP $ cacheInitially contextId ctxt
   addContextInstance contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,

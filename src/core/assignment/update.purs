@@ -31,13 +31,13 @@ import Data.Maybe (Maybe(..))
 import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeRol_binding, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
-import Perspectives.Deltas (addBindingDelta, addRoleDelta, addPropertyDelta)
+import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances (class Persistent, getPerspectEntiteit, saveVersionedEntiteit)
+import Perspectives.Instances (class Persistent, getPerspectEntiteit)
 import Perspectives.Instances (saveEntiteit) as Instances
-import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheCachedEntiteit)
+import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.TypesForDeltas (BindingDelta(..), RoleDelta(..), DeltaType(..), PropertyDelta(..))
+import Perspectives.TypesForDeltas (RoleDelta(..), ContextDelta(..), DeltaType(..), PropertyDelta(..))
 
 {-
 Om een door de gebruiker aangebrachte wijziging door te voeren, moet je:
@@ -75,7 +75,7 @@ setBinding :: RoleInstance -> (Updater RoleInstance)
 setBinding roleId (newBindingId :: RoleInstance) = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
   saveEntiteit roleId (changeRol_binding newBindingId originalRole)
-  addBindingDelta $ BindingDelta
+  addRoleDelta $ RoleDelta
               { id : roleId
               , binding: Just newBindingId
               , deltaType: Change
@@ -96,7 +96,10 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 -- saveEntiteit :: RoleInstance -> PerspectRol -> MonadPerspectivesTransaction Unit
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
 saveEntiteit rid rol = do
-  lift $ lift $ void $ cacheCachedEntiteit rid rol
+  -- We can use cacheOverwritingRevision instead of cachePreservingRevision because a) we know there is
+  -- a cached entiteit, in this context of updating, so b) we do not accidentally overwrite
+  -- the version number (because we don't create entities in this file).
+  lift $ lift $ void $ cacheOverwritingRevision rid rol
   lift $ lift $ void $ Instances.saveEntiteit rid
 
 -- | Removes the binding R of the rol, if any.
@@ -105,7 +108,7 @@ removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
   saveEntiteit roleId (removeRol_binding originalRole)
-  addBindingDelta $ BindingDelta
+  addRoleDelta $ RoleDelta
               { id : roleId
               , binding: (rol_binding originalRole)
               , deltaType: Remove
@@ -124,14 +127,16 @@ removeBinding roleId = do
 -----------------------------------------------------------
 type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 
--- | Modify the context instance with the new Roles. Adds Role deltas, but does not
--- | cache or save them.
+-- | Modify the context instance with the new Role instances.
+-- | Adds Role deltas to the Transaction.
+-- | Notice that this function does not cache nor save the rolInstances themselves.
+-- | It does, however, cache and save the modified Context instance.
 addRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 addRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
   saveEntiteit contextId (modifyContext_rolInContext pe rolName (flip union rolInstances))
   for_ rolInstances \rolInstance ->
-    addRoleDelta $ RoleDelta
+    addContextDelta $ ContextDelta
                 { id : contextId
                 , role: rolName
                 , deltaType: Add
@@ -142,8 +147,10 @@ removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstan
 removeRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
   saveEntiteit contextId (modifyContext_rolInContext pe rolName (flip difference rolInstances))
+  -- TODO. Hier verdwijnt ook een rol instance. Dat moet óók naar de transactie!
+  -- Bovendien moet de rol instance zelf nog verwijderd worden.
   for_ rolInstances \rolInstance ->
-    addRoleDelta $ RoleDelta
+    addContextDelta $ ContextDelta
                 { id : contextId
                 , role: rolName
                 , deltaType: Remove
@@ -154,7 +161,9 @@ deleteRol :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransacti
 deleteRol contextId rolName = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
   saveEntiteit contextId (deleteContext_rolInContext pe rolName)
-  addRoleDelta $ RoleDelta
+  -- TODO. Hier verdwijnen diverse rol instances. Dat moet óók naar de transactie!
+  -- Bovendien moet de rol instance zelf nog verwijderd worden.
+  addContextDelta $ ContextDelta
               { id : contextId
               , role: rolName
               , deltaType: Delete
@@ -165,8 +174,10 @@ setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance)
 setRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
   saveEntiteit contextId (setContext_rolInContext pe rolName (rolInstances :: Array RoleInstance))
+  -- TODO. Hier verdwijnen mogelijk diverse rol instances. Dat moet óók naar de transactie!
+  -- Bovendien moet de rol instance zelf nog verwijderd worden.
   for_ rolInstances \rolInstance ->
-    addRoleDelta $ RoleDelta
+    addContextDelta $ ContextDelta
                 { id : contextId
                 , role: rolName
                 , deltaType: Change

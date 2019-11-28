@@ -38,14 +38,14 @@ import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), onAccepted
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.Instances (fetchEntiteit, removeEntiteit, saveEntiteit)
+import Perspectives.Instances (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.PerspectivesState (domeinCacheRemove)
-import Perspectives.Representation.Class.Cacheable (cacheCachedEntiteit, cacheEntiteit, retrieveInternally)
+import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, cachePreservingRevision, retrieveInternally)
 import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<$>), (<>), (<<<))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
-storeDomeinFileInCache ns df= cacheEntiteit (DomeinFileId ns) df
+storeDomeinFileInCache ns df= cachePreservingRevision (DomeinFileId ns) df
 
 removeDomeinFileFromCache :: Namespace -> MonadPerspectives Unit
 removeDomeinFileFromCache = void <<< domeinCacheRemove
@@ -59,7 +59,9 @@ modifyDomeinFileInCache modifier ns =
       Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
       (Just avar) -> do
         df <- liftAff $ take avar
-        _ <- cacheCachedEntiteit (DomeinFileId ns) (modifier df)
+        -- Because we modify the existing Entiteit, we do not overwrite the version number -
+        -- unless that is what our modifier does.
+        _ <- cacheOverwritingRevision (DomeinFileId ns) (modifier df)
         pure unit
 
 -----------------------------------------------------------
@@ -67,7 +69,7 @@ modifyDomeinFileInCache modifier ns =
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
-retrieveDomeinFile ns = fetchEntiteit (DomeinFileId ns)
+retrieveDomeinFile ns = getPerspectEntiteit (DomeinFileId ns)
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String

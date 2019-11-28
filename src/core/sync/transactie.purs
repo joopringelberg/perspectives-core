@@ -41,7 +41,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
-import Perspectives.TypesForDeltas (RoleDelta, BindingDelta, PropertyDelta)
+import Perspectives.TypesForDeltas (ContextDelta, RoleDelta, PropertyDelta)
 import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<), (&&))
 
 -----------------------------------------------------------
@@ -50,8 +50,8 @@ import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<),
 newtype Transaction = Transaction
   { author :: String
   , timeStamp :: SerializableDateTime
+  , contextDeltas :: Array ContextDelta
   , roleDeltas :: Array RoleDelta
-  , bindingDeltas :: Array BindingDelta
   , propertyDeltas :: Array PropertyDelta
   , createdContexts :: Array PerspectContext
   , createdRoles :: Array PerspectRol
@@ -74,12 +74,12 @@ instance decodeTransactie :: Decode Transaction where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, roleDeltas, bindingDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
-    t2@(Transaction {author: a, timeStamp: t, roleDeltas: r, bindingDeltas: b, propertyDeltas: p, createdContexts: cc, createdRoles: cr, deletedContexts: dc, deletedRoles: dr, changedDomeinFiles: cd}) = Transaction
+  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
+    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, createdContexts: cc, createdRoles: cr, deletedContexts: dc, deletedRoles: dr, changedDomeinFiles: cd}) = Transaction
       { author: author
       , timeStamp: timeStamp
-      , roleDeltas: union roleDeltas r
-      , bindingDeltas: union bindingDeltas b
+      , contextDeltas: union contextDeltas r
+      , roleDeltas: union roleDeltas b
       , propertyDeltas: union propertyDeltas p
       , createdContexts: union createdContexts cc
       , createdRoles: union createdRoles cr
@@ -95,8 +95,8 @@ createTransactie author =
     pure $ Transaction
       { author: author
       , timeStamp: SerializableDateTime (toDateTime n)
+      , contextDeltas: []
       , roleDeltas: []
-      , bindingDeltas: []
       , propertyDeltas: []
       , createdContexts: []
       , createdRoles: []
@@ -108,8 +108,8 @@ cloneEmptyTransaction :: Transaction -> Transaction
 cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
   { author: author
   , timeStamp: timeStamp
+  , contextDeltas: []
   , roleDeltas: []
-  , bindingDeltas: []
   , propertyDeltas: []
   , createdContexts: []
   , createdRoles: []
@@ -119,8 +119,8 @@ cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
 
 isEmptyTransaction :: Transaction -> Boolean
 isEmptyTransaction (Transaction t) =
-  null t.roleDeltas
-  && null t.bindingDeltas
+  null t.contextDeltas
+  && null t.roleDeltas
   && null t.propertyDeltas
   && null t.createdContexts
   && null t.createdRoles

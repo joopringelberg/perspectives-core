@@ -33,16 +33,12 @@
 -- | correct version, and an inner one that is always one step behind.
 
 module Perspectives.Instances
-( saveVersionedEntiteit
-, saveEntiteit
-, saveEntiteitPreservingVersion
-, fetchEntiteit
+( saveEntiteit
 , removeEntiteit
 , getPerspectEntiteit
 , getPerspectContext
 , getPerspectRol
 , tryGetPerspectEntiteit
-, getAVarRepresentingPerspectEntiteit
 , class Persistent
 , database
   )
@@ -74,7 +70,7 @@ import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndRes
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheCachedEntiteit, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase, getCouchdbBaseURL)
 
@@ -155,14 +151,6 @@ fetchEntiteit id = ensureAuthentication $ catchError
     liftAff $ read v
   \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
--- | Save a user Resource.
-saveEntiteitPreservingVersion :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
--- saveEntiteitPreservingVersion id = catchError do
---     (_ :: a) <- fetchPerspectEntiteitFromCouchdb id
---     saveEntiteit id
---   \e -> saveEntiteit id
-saveEntiteitPreservingVersion = saveEntiteit
-
 -- | Save an entity, whether it has been saved before or not. It must be present in the cache.
 -- | On success it will have the same version in cache as in Couchdb.
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
@@ -208,7 +196,8 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
       void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
         (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do
           v <- version res.headers
-          void $ cacheCachedEntiteit entId (changeRevision v entiteit)))
+          -- We **must** use cacheOverwritingRevision because we want to overwrite the version number.
+          void $ cacheOverwritingRevision entId (changeRevision v entiteit)))
       pure entiteit
 
 version :: forall m. MonadError Error m => Array ResponseHeader -> m Revision_

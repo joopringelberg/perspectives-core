@@ -19,7 +19,12 @@
 
 -- END LICENSE
 
-module Perspectives.SaveUserData where
+module Perspectives.SaveUserData
+  ( saveUserContext
+  , removeUserContext
+  , removeUserRol)
+
+  where
 
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.State (StateT, lift)
@@ -31,13 +36,13 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Foreign.Object (values)
 import Perspectives.Actions (tearDownBotActions)
-import Perspectives.Assignment.Update (saveEntiteit)
+import Perspectives.Assignment.Update (saveEntiteit) as Update
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeContext_rolInContext, removeRol_gevuldeRollen, rol_pspType)
 import Perspectives.CoreTypes (MP, MonadPerspectives, Updater, MonadPerspectivesTransaction)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances (getPerspectEntiteit, removeEntiteit, saveEntiteitPreservingVersion)
+import Perspectives.Instances (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.Sync.Transaction (_createdContexts, _createdRoles, _deletedContexts)
 import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>>))
@@ -45,21 +50,13 @@ import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>>))
 -- | These functions are Updaters, too. They do not push deltas like the Updaters that change PerspectEntities, but
 -- | they modify other members of Transaction (createdContexts, deletedContexts, createdRoles, deletedRoles).
 
-type UserDataState = Array ID
-
-type MonadSaveUserData = StateT UserDataState MonadPerspectives
-
-saveDomeinFileAsUserData :: Array RoleInstance -> MonadPerspectives Unit
-saveDomeinFileAsUserData ids = do
-  for_ ids (unwrap >>> deconstructBuitenRol >>> ContextInstance >>> saveEntiteitPreservingVersion :: ContextInstance -> MP PerspectContext)
-
--- This function saves a previously cached ContextInstance and adds it to the Transaction
+-- This function saves a previously cached ContextInstance and all its Roles and adds them to the Transaction
 saveUserContext :: Updater ContextInstance
 saveUserContext id = do
-  (ctxt :: PerspectContext) <- lift $ lift $ saveEntiteitPreservingVersion id
+  (ctxt :: PerspectContext) <- lift $ lift $ saveEntiteit id
   lift $ modify (over _createdContexts (cons ctxt))
-  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> lift $ lift $ saveEntiteitPreservingVersion rol :: MonadPerspectives PerspectRol
-  (_ :: PerspectRol) <- lift $ lift $ saveEntiteitPreservingVersion (context_buitenRol ctxt)
+  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> lift $ lift $ saveEntiteit rol :: MonadPerspectives PerspectRol
+  (_ :: PerspectRol) <- lift $ lift $ saveEntiteit (context_buitenRol ctxt)
   pure unit
 
 iedereRolInContext :: PerspectContext -> Array RoleInstance
@@ -90,7 +87,7 @@ removeUserRol_ roleId = do
     (Just oldBindingId) -> do
       -- Remove this roleinstance as a binding role from its binding.
       (oldBinding :: PerspectRol) <- lift $ lift $ getPerspectEntiteit oldBindingId
-      saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
+      Update.saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
 
   -- Now handle all Roles that have this Role as binding.
   forWithIndex_ gevuldeRollen \rol filledRollen ->
@@ -98,7 +95,7 @@ removeUserRol_ roleId = do
     for_ filledRollen \filledRolId -> do
       -- ... remove the removed Role from that instance.
       (filledRol :: PerspectRol) <- lift $ lift $ getPerspectEntiteit filledRolId
-      saveEntiteit filledRolId (removeRol_gevuldeRollen filledRol (rol_pspType originalRole) roleId)
+      Update.saveEntiteit filledRolId (removeRol_gevuldeRollen filledRol (rol_pspType originalRole) roleId)
   pure originalRole
 
 -- | Adds the Role to the Transaction.
@@ -107,4 +104,4 @@ removeUserRol pr = do
   r@(PerspectRol{pspType, context}) <- removeUserRol_ pr
   lift $ modify (over _createdRoles (cons r))
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit context
-  saveEntiteit context (removeContext_rolInContext pe pspType pr)
+  Update.saveEntiteit context (removeContext_rolInContext pe pspType pr)

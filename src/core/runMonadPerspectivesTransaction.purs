@@ -75,7 +75,7 @@ runMonadPerspectivesTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< c
 
 -- | Derive Assumptions from the Deltas in a Transaction. Each Assumption in the result is unique.
 assumptionsInTransaction :: Transaction -> Array Assumption
-assumptionsInTransaction (Transaction{roleDeltas, bindingDeltas, propertyDeltas}) = union (assumption <$> roleDeltas) (union (assumption <$> bindingDeltas) (assumption <$> propertyDeltas))
+assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas}) = union (assumption <$> contextDeltas) (union (assumption <$> roleDeltas) (assumption <$> propertyDeltas))
 
 -- | Execute every ActionInstance that is triggered by changes in the Transaction.
 -- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.

@@ -37,12 +37,33 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, Enum
 import Prelude (class Show, ($))
 
 -----------------------------------------------------------
--- ROLEDELTA
+-- CONTEXTDELTA
 -----------------------------------------------------------
-newtype RoleDelta = RoleDelta
+newtype ContextDelta = ContextDelta
   { id :: ContextInstance
   , role :: EnumeratedRoleType
   , instance :: Maybe RoleInstance
+  , deltaType :: DeltaType
+  }
+
+derive instance genericContextDelta :: Generic ContextDelta _
+
+instance showContextDelta :: Show ContextDelta where
+  show = genericShow
+
+derive instance eqContextDelta :: Eq ContextDelta
+
+instance encodeContextDelta :: Encode ContextDelta where
+  encode = genericEncode defaultOptions
+instance decodeContextDelta :: Decode ContextDelta where
+  decode = genericDecode defaultOptions
+
+-----------------------------------------------------------
+-- ROLEDELTA
+-----------------------------------------------------------
+newtype RoleDelta = RoleDelta
+  { id :: RoleInstance
+  , binding :: Maybe RoleInstance
   , deltaType :: DeltaType
   }
 
@@ -56,27 +77,6 @@ derive instance eqRoleDelta :: Eq RoleDelta
 instance encodeRoleDelta :: Encode RoleDelta where
   encode = genericEncode defaultOptions
 instance decodeRoleDelta :: Decode RoleDelta where
-  decode = genericDecode defaultOptions
-
------------------------------------------------------------
--- BINDINGDELTA
------------------------------------------------------------
-newtype BindingDelta = BindingDelta
-  { id :: RoleInstance
-  , binding :: Maybe RoleInstance
-  , deltaType :: DeltaType
-  }
-
-derive instance genericBindingDelta :: Generic BindingDelta _
-
-instance showBindingDelta :: Show BindingDelta where
-  show = genericShow
-
-derive instance eqBindingDelta :: Eq BindingDelta
-
-instance encodeBindingDelta :: Encode BindingDelta where
-  encode = genericEncode defaultOptions
-instance decodeBindingDelta :: Decode BindingDelta where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------

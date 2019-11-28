@@ -51,7 +51,7 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (BindingDelta(..), DeltaType(..), PropertyDelta(..), RoleDelta(..))
+import Perspectives.TypesForDeltas (RoleDelta(..), DeltaType(..), PropertyDelta(..), ContextDelta(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
@@ -100,8 +100,8 @@ addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
 addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
-addBindingDelta :: BindingDelta -> MonadPerspectivesTransaction Unit
-addBindingDelta d = lift $ AA.modify (over Transaction \t@{bindingDeltas} -> t {bindingDeltas = cons d bindingDeltas})
+addContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
+addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas} -> t {contextDeltas = cons d contextDeltas})
 
 addRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
 addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
@@ -128,7 +128,7 @@ addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas} -> t
 -- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.
 -- | Add that Triple to the TripleQueue.
--- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke RoleDelta, BindingDelta, enz.
+-- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke ContextDelta, RoleDelta, enz.
 -- addDelta :: Delta -> MonadPerspectives Unit
 -- addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
 --   t@(Transaction tf@{deltas}) <- transactie
