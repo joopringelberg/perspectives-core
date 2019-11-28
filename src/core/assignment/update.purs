@@ -142,7 +142,7 @@ addRol contextId rolName rolInstances = do
 -- | Modifies the context instance.
 -- | Adds Context deltas to the Transaction.
 -- | Caches and saves the context instance.
--- | Notice that this function does neither cache nor save the rolInstances themselves. Instead, use removeUserRoleInstance.
+-- | Notice that this function does neither cache nor save the rolInstances themselves. Instead, use removeRoleInstance.
 removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 removeRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId

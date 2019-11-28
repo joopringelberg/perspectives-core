@@ -22,7 +22,7 @@
 module Perspectives.SaveUserData
   ( saveUserContext
   , removeUserContext
-  , removeUserRoleInstance)
+  , removeRoleInstance)
 
   where
 
@@ -99,8 +99,8 @@ removeUserRol_ roleId = do
 -- | Removes the rol from the inverse administration of its binding.
 -- | Removes the rol as binding from all its binders.
 -- | Adds the Role to the Transaction.
-removeUserRoleInstance :: Updater RoleInstance
-removeUserRoleInstance pr = do
+removeRoleInstance :: Updater RoleInstance
+removeRoleInstance pr = do
   r@(PerspectRol{pspType, context}) <- removeUserRol_ pr
   lift $ modify (over _createdRoles (cons r))
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit context
