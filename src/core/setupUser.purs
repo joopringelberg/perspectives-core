@@ -24,7 +24,7 @@ module Perspectives.SetupUser where
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext)
-import Perspectives.Instances (tryGetPerspectEntiteit)
+import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Prelude (Unit, bind, pure, unit, void, ($))

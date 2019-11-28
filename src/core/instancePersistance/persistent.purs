@@ -32,7 +32,7 @@
 -- | Warning to implementers: in Couchdb you will therefore see **two** _rev parameters: an outer one with the
 -- | correct version, and an inner one that is always one step behind.
 
-module Perspectives.Instances
+module Perspectives.Persistent
 ( saveEntiteit
 , removeEntiteit
 , getPerspectEntiteit

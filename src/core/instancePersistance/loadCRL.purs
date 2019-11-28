@@ -37,7 +37,7 @@ import Perspectives.Actions (setupAndRunBotActions)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances (saveEntiteit)
+import Perspectives.Persistent (saveEntiteit)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 

@@ -38,7 +38,7 @@ import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), onAccepted
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
-import Perspectives.Instances (getPerspectEntiteit, removeEntiteit, saveEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, cachePreservingRevision, retrieveInternally)
 import Perspectives.User (getCouchdbBaseURL)

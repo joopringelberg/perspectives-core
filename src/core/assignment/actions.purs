@@ -40,7 +40,7 @@ import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.CoreTypes (ActionInstance(..), type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP, (##>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances (getPerspectEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))

@@ -25,7 +25,7 @@ import Control.Monad.Error.Class (catchError)
 import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances (class Persistent, getPerspectEntiteit)
+import Perspectives.Persistent (class Persistent, getPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (pure, (>=>), (<<<), (>>=))
 

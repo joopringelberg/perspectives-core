@@ -19,7 +19,12 @@
 
 -- END LICENSE
 
-module Perspectives.BasicConstructors where
+module Perspectives.BasicConstructors
+  ( constructContext
+  , constructAnotherRol
+  )
+
+where
 
 import Control.Monad.Except (ExceptT, lift, runExceptT)
 import Data.Array (concat, length)
@@ -41,7 +46,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransacti
 import Perspectives.Deltas (addRolToTransactie)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.Representation.Class.Cacheable (cacheInitially, removeInternally)
 import Perspectives.Representation.Class.Identifiable (identifier)

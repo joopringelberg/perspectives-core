@@ -36,7 +36,7 @@ import Perspectives.CoreTypes (type (~~>), assumption, type (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
-import Perspectives.Instances (getPerspectContext, getPerspectEntiteit)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (($), (<>), (<<<), pure, (*>), bind, discard, (>=>), (>>>), map, (==))

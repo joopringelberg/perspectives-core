@@ -42,7 +42,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, Updater, MonadPerspectives
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances (getPerspectEntiteit, removeEntiteit, saveEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.Sync.Transaction (_createdContexts, _createdRoles, _deletedContexts)
 import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>>))
