@@ -76,7 +76,6 @@ iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
   deleteContextFromTransactie id
-  -- lift $ lift $ tearDownBotActions id
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectEntiteit id
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> removeRoleInstance_ rol
   void $ removeRoleInstance_ (context_buitenRol ctxt)

@@ -39,7 +39,7 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (setupBotActions)
+import Perspectives.Actions (setupAndRunBotActions, tearDownBotActions)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
@@ -202,10 +202,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (Left messages) -> sendResponse (Error corrId (show messages)) setter
           (Right id) -> do
             void $ runMonadPerspectivesTransaction $ saveContextInstance id
-            setupBotActions id
+            setupAndRunBotActions id
             sendResponse (Result corrId [buitenRol $ unwrap id]) setter
     Api.DeleteContext -> do
       void $ runMonadPerspectivesTransaction $ removeContextInstance (ContextInstance subject)
+      tearDownBotActions (ContextInstance subject)
       sendResponse (Result corrId []) setter
     Api.RemoveRol -> do
         void $ runMonadPerspectivesTransaction $ removeRoleInstance (RoleInstance object)

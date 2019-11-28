@@ -31,13 +31,7 @@ theSuite = suite "Perspectives.loadCRL" do
     pure unit
 
   testOnly "Load a file with a context instance in couchdb" do
-    r <- runP do
-      r' <- loadAndSaveCrlFile "test1.crl" testDirectory
-      if null r'
-        then do
-          setupBotActions $ ContextInstance "model:User$MyTestCase"
-          pure []
-        else pure r'
+    r <- runP $ loadAndSaveCrlFile "test1.crl" testDirectory
     if null r
       then do
         srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCase$SomeRole"))

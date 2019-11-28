@@ -19,102 +19,31 @@
 
 -- END LICENSE
 
-module Perspectives.Actions where
+module Perspectives.CompileAssignment where
 
 -- | From the description of an assignment or effectful function, construct a function
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldMap)
+import Data.Array (uncons)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
-import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF, unwrap)
-import Data.Tuple (Tuple(..))
-import Foreign.Object (values)
-import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.DependencyTracking (cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.CompileAssignment (compileAssignment)
-import Perspectives.CoreTypes (ActionInstance(..), type (~~>), MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, runMonadPerspectivesQuery, MP, (##>>))
-import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Query.Compiler (context2propertyValue)
-import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect)
-import Perspectives.Representation.Class.PersistentType (ActionType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Context (Context, userRole)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-
-
--- | For a Context, set up its Actions. Register these Actions in the ActionRegister.
--- | Register their dependency on Assumptions in the actionAssumptionRegister in
--- | PerspectivesState. Execute the actions once.
-setupAndRunBotActions :: ContextInstance -> MonadPerspectives Unit
-setupAndRunBotActions cid = do
-  -- TODO: filter, keeping just those actions that are to be executed by the Bot for the current user.
-  (ct :: ContextType) <- cid ##>> contextType
-  -- For all user roles, get their perspective; then take all automatic actions.
-  (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
-  void $ runMonadPerspectivesTransaction (for_ users \(u :: EnumeratedRoleType) -> do
-    perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
-    for_ (values perspectives) \actions ->
-      for_ actions \(a :: ActionType) ->
-        (lift $ lift $ compileBotAction a) >>= \((Tuple _ updater) :: Tuple LHS (Updater ContextInstance)) -> updater cid
-    )
-
--- | For a Context, set up its Actions. Register these Actions in the ActionRegister.
--- | Register their dependency on Assumptions in the actionAssumptionRegister in
--- | PerspectivesState. Does **not** execute the actions.
-setupBotActions :: ContextInstance -> MonadPerspectives Unit
-setupBotActions cid = do
-  -- TODO: filter, keeping just those actions that are to be executed by the Bot for the current user.
-  (ct :: ContextType) <- cid ##>> contextType
-  -- For all user roles, get their perspective; then take all automatic actions.
-  (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
-  (for_ users \(u :: EnumeratedRoleType) -> do
-    perspectives <- getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
-    for_ (values perspectives) \actions ->
-      for_ actions \(a :: ActionType) ->
-        (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
-          -- Evaluate the lhs to set up the dependency administration.
-          (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
-          cacheActionInstanceDependencies (ActionInstance cid a) ass
-    )
-
--- | Remove all actions associated with this context.
-tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
-tearDownBotActions = removeContextInstanceDependencies
-
--- | Compile the action to an Updater. Cache for later use.
-compileBotAction :: ActionType -> MP (Tuple LHS (Updater ContextInstance))
-compileBotAction actionType = do
-  case retrieveAction actionType of
-    (Just a) -> pure a
-    Nothing -> do
-      (action :: Action) <- getPerspectType actionType
-      eff <- effect action
-      (effectFullFunction :: Updater ContextInstance) <- compileAssignment eff
-      (lhs :: (ContextInstance ~~> Value)) <- condition action >>= context2propertyValue
-      updater <- pure $ ruleRunner lhs effectFullFunction
-      void $ pure $ cacheAction actionType (Tuple lhs updater)
-      pure $ Tuple lhs updater
-
-  where
-    -- | Actual effectfull function for which we track dependencies. If one of them changes,
-    -- | the function is executed again.
-    ruleRunner :: (ContextInstance ~~> Value) ->
-      (Updater ContextInstance) ->
-      (Updater ContextInstance)
-    ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
-      (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-      if (alaF Conj foldMap (eq (Value "true")) bools)
-          then do
-            -- Cache the association between the assumptions found for this ActionInstance.
-            lift $ lift $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
-            effectFullFunction contextId
-          else pure unit
+import Data.Newtype (unwrap)
+import Foreign.Object (empty)
+import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
+import Perspectives.Assignment.Update (moveRoles, removeRol)
+import Perspectives.BasicConstructors (constructAnotherRol)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction, Updater, WithAssumptions, (##>>), (##=), MP, (##>))
+import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.Query.Compiler (context2context, context2role)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.QueryFunction (FunctionName(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.ThreeValuedLogic (pessimistic)
+import Perspectives.SaveUserData (saveRoleInstance)
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -198,3 +127,63 @@ constructRHS objectGetter actionType a = case a of
           void $ pure $ deleteProperty object rt
         else pure unit
 -}
+
+compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
+compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
+  roleGetter <- context2role rle
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    case uncons roles of
+      Nothing -> pure unit
+      Just {head, tail} -> do
+        ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+        removeRol context pspType roles
+
+compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  pure \contextId -> do
+    ctxts <- lift $ lift (contextId ##= contextGetter)
+    for_ ctxts \ctxt -> (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})) >>= saveRoleInstance
+
+compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleToMove
+  if (pessimistic mry)
+    then pure \contextId -> do
+      c <- lift $ lift (contextId ##>> contextGetter)
+      (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+      case uncons roles of
+        Nothing -> pure unit
+        Just {head, tail} -> do
+          ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+          moveRoles context pspType roles
+    else pure \contextId -> do
+      ctxt <- lift $ lift (contextId ##> contextGetter)
+      case ctxt of
+        Nothing -> pure unit
+        Just c -> do
+          (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+          case uncons roles of
+            Nothing -> pure unit
+            Just {head, tail} -> do
+              ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
+              moveRoles context pspType roles
+
+compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
+  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
+  pure \contextId -> do
+    ctxts <- lift $ lift (contextId ##= contextGetter)
+    (bindings' :: Array RoleInstance) <- lift $ lift (contextId ##= bindingsGetter)
+    -- TODO: handle errors when creating a new Role instance in Bind.
+    for_ ctxts \ctxt -> do
+      for_ bindings' \bndg -> do
+        (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
+          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})) >>= saveRoleInstance
+
+compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ _ _) = pure \_ -> pure unit
+
+-- Vergeet EffectFullFunction niet!
+
+-- Catchall, remove when all cases have been covered.
+compileAssignment _ = pure \_ -> pure unit

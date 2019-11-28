@@ -77,23 +77,20 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
       candidate <- runExceptT $ constructContext_
       case candidate of
         (Left messages) -> do
+          -- TODO. Hier kunnen alle gecachede rollen weer verwijderd worden...
           removeFromCache contextInstanceId
           pure $ Left messages
         (Right _) -> do
           -- (m :: Array UserMessage) <- checkAContext $ Context contextInstanceId
           m <- pure []
           case length m of
-            0 -> pure $ Right contextInstanceId
+            0 -> do
+              -- setupAndRunBotActions contextInstanceId
+              pure $ Right contextInstanceId
             otherwise -> do
-              -- TODO. Hier moeten alle aangemaakte rollen weer verwijderd worden...
-              -- Beter: eerst alleen rollen cachen.
-              -- Als de context dan foutloos geconstrueerd kan worden:
-              -- * save alle rollen en voeg ze toe aan de Transactie
-              -- * voeg de context toe aan de Transactie.
-              -- We hoeven geen Context- of Rol- of PropertyDelta's op te slaan.
+              -- TODO. Hier kunnen alle gecachede rollen weer verwijderd worden...
               removeFromCache contextInstanceId
               pure $ Left m
-          -- pure $ Right contextInstanceId
     otherwise -> pure $ Left $ [ContextExists $ unwrap contextInstanceId]
 
   where
