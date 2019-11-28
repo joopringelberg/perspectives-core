@@ -161,7 +161,7 @@ removeRol contextId rolName rolInstances = do
 -- | Caches and saves the context instance.
 -- | Notice that this function does not remove the rolInstances themselves, nor
 -- | add them to the Transaction.
--- | Instead, use deleteAllRoleInstances for that.
+-- | Instead, use removeAllRoleInstances for that.
 deleteRol :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
 deleteRol contextId rolName = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
@@ -178,7 +178,7 @@ deleteRol contextId rolName = do
 -- | Caches and saves the context instance.
 -- | Notice that this function does not remove the rolInstances themselves, nor
 -- | add them to the Transaction.
--- | Instead, use deleteAllRoleInstances for that.
+-- | Instead, use removeAllRoleInstances for that.
 setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 setRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId

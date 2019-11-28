@@ -49,6 +49,7 @@ import Perspectives.Representation.Class.Property (functional) as P
 import Perspectives.Representation.Class.Role (functional) as R
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleDelta(..), DeltaType(..), PropertyDelta(..), ContextDelta(..))
@@ -73,27 +74,23 @@ distributeTransactie t = do
   -- _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
 
--- TODO: Pas addContextToTransactie toe, ergens!
 addContextToTransactie :: PerspectContext ->
   MonadPerspectivesTransaction Unit
 addContextToTransactie c = lift $ AA.modify (over Transaction \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
 
--- TODO: Pas addRolToTransactie toe, ergens!
 addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
 addRolToTransactie c = lift $ AA.modify (over Transaction \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})
 
--- TODO: Pas deleteContextFromTransactie toe, ergens!
-deleteContextFromTransactie :: PerspectContext -> MonadPerspectivesTransaction Unit
-deleteContextFromTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transaction \(t@{createdContexts, deletedContexts}) ->
-  case findIndex (\(PerspectContext{_id: i}) -> _id == i) createdContexts of
-    Nothing -> t {deletedContexts = cons _id deletedContexts}
+deleteContextFromTransactie :: ContextInstance -> MonadPerspectivesTransaction Unit
+deleteContextFromTransactie contextId = lift $ AA.modify (over Transaction \(t@{createdContexts, deletedContexts}) ->
+  case findIndex (\(PerspectContext{_id: i}) -> contextId == i) createdContexts of
+    Nothing -> t {deletedContexts = cons contextId deletedContexts}
     (Just i) -> t {createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
 
--- TODO: Pas deleteRolFromTransactie toe, ergens!
-deleteRolFromTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
-deleteRolFromTransactie c@(PerspectRol{_id}) = lift $ AA.modify (over Transaction \(t@{createdRoles, deletedRoles}) ->
-  case findIndex (\(PerspectRol{_id: i}) -> _id == i) createdRoles of
-    Nothing -> t {deletedRoles = cons _id deletedRoles}
+deleteRolFromTransactie :: RoleInstance -> MonadPerspectivesTransaction Unit
+deleteRolFromTransactie rolId = lift $ AA.modify (over Transaction \(t@{createdRoles, deletedRoles}) ->
+  case findIndex (\(PerspectRol{_id: i}) -> rolId == i) createdRoles of
+    Nothing -> t {deletedRoles = cons rolId deletedRoles}
     (Just i) -> t {createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit

@@ -27,24 +27,21 @@ module Perspectives.SaveUserData
 
   where
 
-import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.State (lift)
-import Data.Array (cons, nub)
+import Data.Array (nub)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Lens (over)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_)
 import Foreign.Object (values)
--- import Perspectives.Actions (tearDownBotActions)
 import Perspectives.Assignment.Update (addRol)
 import Perspectives.Assignment.Update (saveEntiteit) as Update
-import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeContext_rolInContext, removeRol_gevuldeRollen, rol_pspType)
+import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeRol_gevuldeRollen, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTransaction)
+import Perspectives.Deltas (addContextToTransactie, addRolToTransactie, deleteContextFromTransactie, deleteRolFromTransactie)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Perspectives.Sync.Transaction (_createdContexts, _createdRoles, _deletedContexts, _deletedRoles)
 import Prelude (bind, discard, join, pure, unit, void, ($))
 
 -- | These functions are Updaters, too. They do not push deltas like the Updaters that change PerspectEntities, but
@@ -54,7 +51,7 @@ import Prelude (bind, discard, join, pure, unit, void, ($))
 saveContextInstance :: Updater ContextInstance
 saveContextInstance id = do
   (ctxt :: PerspectContext) <- lift $ lift $ saveEntiteit id
-  lift $ modify (over _createdContexts (cons ctxt))
+  addContextToTransactie ctxt
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> do
     lift $ lift $ void $ saveEntiteit rol :: MonadPerspectives PerspectRol
     void (saveRoleInstance rol)
@@ -68,7 +65,7 @@ saveRoleInstance :: Updater RoleInstance
 saveRoleInstance id = do
   (role@(PerspectRol{_id, context, pspType}) :: PerspectRol) <- lift $ lift $ saveEntiteit id
   void $ addRol context pspType [_id]
-  lift $ modify (over _createdRoles (cons role))
+  addRolToTransactie role
 
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
@@ -78,7 +75,7 @@ iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 -- | them themselves.
 removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
-  lift $ modify (over _deletedContexts (cons id))
+  deleteContextFromTransactie id
   -- lift $ lift $ tearDownBotActions id
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectEntiteit id
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> removeRoleInstance_ rol
@@ -120,12 +117,12 @@ removeRoleInstance_ roleId = do
 removeRoleInstance :: Updater RoleInstance
 removeRoleInstance pr = do
   r@(PerspectRol{pspType, context}) <- removeRoleInstance_ pr
-  lift $ modify (over _deletedRoles (cons pr))
+  deleteRolFromTransactie pr
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
 -- | Does NOT remove the role instances from their context. Use deleteRol for that.
 -- | ContextDelta's are not necessary (see removeRoleInstance).
 -- | TODO: Implementeer removeRole.
-deleteAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
-deleteAllRoleInstances et cid = pure unit
+removeAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
+removeAllRoleInstances et cid = pure unit
