@@ -58,7 +58,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SaveUserData (removeUserContext, removeUserRol, saveUserContext)
+import Perspectives.SaveUserData (removeUserContext, removeUserRoleInstance, saveUserContext)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
@@ -208,8 +208,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       void $ runMonadPerspectivesTransaction $ removeUserContext (ContextInstance subject)
       sendResponse (Result corrId []) setter
     Api.RemoveRol -> do
-        void $ runMonadPerspectivesTransaction $ removeUserRol (RoleInstance object)
-        -- void $ removeRol predicate object subject
+        void $ runMonadPerspectivesTransaction $ removeUserRoleInstance (RoleInstance object)
         sendResponse (Result corrId []) setter
     Api.CreateRol -> do
       rol <- runMonadPerspectivesTransaction $ (constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription))

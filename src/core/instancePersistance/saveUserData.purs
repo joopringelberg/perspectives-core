@@ -22,30 +22,27 @@
 module Perspectives.SaveUserData
   ( saveUserContext
   , removeUserContext
-  , removeUserRol)
+  , removeUserRoleInstance)
 
   where
 
 import Control.Monad.AvarMonadAsk (modify)
-import Control.Monad.State (StateT, lift)
+import Control.Monad.State (lift)
 import Data.Array (cons, nub)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (over)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (unwrap)
 import Data.Traversable (for_)
 import Foreign.Object (values)
 import Perspectives.Actions (tearDownBotActions)
 import Perspectives.Assignment.Update (saveEntiteit) as Update
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeContext_rolInContext, removeRol_gevuldeRollen, rol_pspType)
-import Perspectives.CoreTypes (MP, MonadPerspectives, Updater, MonadPerspectivesTransaction)
-import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Identifiers (deconstructBuitenRol)
+import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTransaction)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.Transaction (_createdContexts, _createdRoles, _deletedContexts)
-import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (>>>))
+import Prelude (bind, discard, join, pure, unit, void, ($))
 
 -- | These functions are Updaters, too. They do not push deltas like the Updaters that change PerspectEntities, but
 -- | they modify other members of Transaction (createdContexts, deletedContexts, createdRoles, deletedRoles).
@@ -98,9 +95,12 @@ removeUserRol_ roleId = do
       Update.saveEntiteit filledRolId (removeRol_gevuldeRollen filledRol (rol_pspType originalRole) roleId)
   pure originalRole
 
+-- | Removes the rol from the cache and from the database.
+-- | Removes the rol from the inverse administration of its binding.
+-- | Removes the rol as binding from all its binders.
 -- | Adds the Role to the Transaction.
-removeUserRol :: Updater RoleInstance
-removeUserRol pr = do
+removeUserRoleInstance :: Updater RoleInstance
+removeUserRoleInstance pr = do
   r@(PerspectRol{pspType, context}) <- removeUserRol_ pr
   lift $ modify (over _createdRoles (cons r))
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit context

@@ -39,7 +39,7 @@ import Effect.Aff (error, throwError)
 import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextsSerialisation(..), ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
-import Perspectives.Assignment.Update (addRol, removeRol)
+import Perspectives.Assignment.Update (addRol)
 import Perspectives.Checking.PerspectivesTypeChecker.Messages (UserMessage(..))
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
@@ -187,14 +187,7 @@ constructAnotherRol rolType id rolSerialisation = do
     (Left messages) -> pure $ Left messages
     (Right (PerspectRol{_id})) -> do
       void $ addRol contextInstanceId rolType [_id]
-      -- (m :: Array UserMessage) <- checkAContext $ Context contextInstanceId
-      m <- pure []
-      case length m of
-        0 -> do
-          pure $ Right _id
-        otherwise -> do
-          void $ removeRol contextInstanceId rolType [_id]
-          pure $ Left m
+      pure $ Right _id
 
 constructProperties :: PropertySerialization -> FO.Object (Array Value)
 constructProperties (PropertySerialization props) = ((FO.toUnfoldable :: FO.Object (Array String) -> Array (Tuple String (Array String))) >>> map keyValuePair >>> FO.fromFoldable) props

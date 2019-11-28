@@ -33,8 +33,8 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, chang
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Instances (class Persistent, getPerspectEntiteit)
-import Perspectives.Instances (saveEntiteit) as Instances
+import Perspectives.Persistent (class Persistent, getPerspectEntiteit)
+import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.TypesForDeltas (RoleDelta(..), ContextDelta(..), DeltaType(..), PropertyDelta(..))
@@ -69,8 +69,10 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -----------------------------------------------------------
 -- UPDATE A BINDING
 -----------------------------------------------------------
--- | Change the binding, save the role in cache and in couchdb.
--- | Add a Delta to the transaction.
+-- | Changes the binding.
+-- | Modifies the Role instance.
+-- | Caches and saves the Role instance.
+-- | Adds a RoleDelta to the transaction.
 setBinding :: RoleInstance -> (Updater RoleInstance)
 setBinding roleId (newBindingId :: RoleInstance) = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
@@ -93,17 +95,11 @@ setBinding roleId (newBindingId :: RoleInstance) = do
       newBinding <- lift $ lift $ getPerspectEntiteit newBindingId
       saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
--- saveEntiteit :: RoleInstance -> PerspectRol -> MonadPerspectivesTransaction Unit
-saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
-saveEntiteit rid rol = do
-  -- We can use cacheOverwritingRevision instead of cachePreservingRevision because a) we know there is
-  -- a cached entiteit, in this context of updating, so b) we do not accidentally overwrite
-  -- the version number (because we don't create entities in this file).
-  lift $ lift $ void $ cacheOverwritingRevision rid rol
-  lift $ lift $ void $ Instances.saveEntiteit rid
-
 -- | Removes the binding R of the rol, if any.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
+-- | Modifies the Role instance.
+-- | Caches and saves the Role instance.
+-- | Adds a RoleDelta to the transaction.
 removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
@@ -127,10 +123,10 @@ removeBinding roleId = do
 -----------------------------------------------------------
 type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 
--- | Modify the context instance with the new Role instances.
--- | Adds Role deltas to the Transaction.
--- | Notice that this function does not cache nor save the rolInstances themselves.
--- | It does, however, cache and save the modified Context instance.
+-- | Modifies the context instance.
+-- | Adds Context deltas to the Transaction.
+-- | Caches and saves the context instance.
+-- | Notice that this function does neither cache nor save the rolInstances themselves.
 addRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 addRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
@@ -143,6 +139,10 @@ addRol contextId rolName rolInstances = do
                 , instance: Just rolInstance
                 }
 
+-- | Modifies the context instance.
+-- | Adds Context deltas to the Transaction.
+-- | Caches and saves the context instance.
+-- | Notice that this function does neither cache nor save the rolInstances themselves. Instead, use removeUserRoleInstance.
 removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 removeRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
@@ -157,6 +157,10 @@ removeRol contextId rolName rolInstances = do
                 , instance: Just rolInstance
                 }
 
+-- | Modifies the context instance.
+-- | Adds Context deltas to the Transaction.
+-- | Caches and saves the context instance.
+-- | Notice that this function does neither cache nor save the rolInstances themselves.
 deleteRol :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
 deleteRol contextId rolName = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
@@ -170,6 +174,10 @@ deleteRol contextId rolName = do
               , instance: Nothing
               }
 
+-- | Modifies the context instance.
+-- | Adds Context deltas to the Transaction.
+-- | Caches and saves the context instance.
+-- | Notice that this function does neither cache nor save the rolInstances themselves.
 setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 setRol contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
@@ -185,6 +193,10 @@ setRol contextId rolName rolInstances = do
                 }
 
 -- | Detach the role instances from their current context and attach them to the new context.
+-- | Modifies both context instances.
+-- | Adds Context deltas to the Transaction.
+-- | Caches and saves the context instances.
+-- | Notice that this function does neither cache nor save the rolInstances themselves.
 -- TODO: implement moveRoles.
 moveRoles :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 moveRoles contextId rolName rolInstances = pure unit
@@ -193,6 +205,9 @@ moveRoles contextId rolName rolInstances = pure unit
 -----------------------------------------------------------
 type PropertyUpdater = Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 
+-- | Modify the role instance with the new property values.
+-- | Adds PropertyDeltas to the Transaction.
+-- | Caches and saves the modified Role instance.
 addProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 addProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
@@ -205,6 +220,9 @@ addProperty rids propertyName values = for_ rids \rid -> do
                 , value: Just val
                 }
 
+-- | Modify the role instance with the new property values.
+-- | Adds PropertyDeltas to the Transaction.
+-- | Caches and saves the modified Role instance.
 removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 removeProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
@@ -217,6 +235,9 @@ removeProperty rids propertyName values = for_ rids \rid -> do
                 , value: Just val
                 }
 
+-- | Modify the role instance with the new property values.
+-- | Adds PropertyDeltas to the Transaction.
+-- | Caches and saves the modified Role instance.
 deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction Unit
 deleteProperty rids propertyName = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
@@ -228,6 +249,9 @@ deleteProperty rids propertyName = for_ rids \rid -> do
               , value: Nothing
               }
 
+-- | Modify the role instance with the new property values.
+-- | Adds PropertyDeltas to the Transaction.
+-- | Caches and saves the modified Role instance.
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
@@ -239,3 +263,15 @@ setProperty rids propertyName values = for_ rids \rid -> do
                 , deltaType: Change
                 , value: Just value
                 }
+
+-----------------------------------------------------------
+-- LOCAL SAVENTITEIT
+-----------------------------------------------------------
+-- Save the entity in cache and in couchdb.
+saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
+saveEntiteit rid rol = do
+  -- We can use cacheOverwritingRevision instead of cachePreservingRevision because a) we know there is
+  -- a cached entiteit, in this context of updating, so b) we do not accidentally overwrite
+  -- the version number (because we don't create entities in this file).
+  lift $ lift $ void $ cacheOverwritingRevision rid rol
+  lift $ lift $ void $ Instances.saveEntiteit rid
