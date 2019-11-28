@@ -37,9 +37,11 @@ import Perspectives.Actions (setupAndRunBotActions)
 import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistent (saveEntiteit)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistent (saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.SaveUserData (saveContextInstance)
 
 -- | Loads a file from a directory relative to the active process.
 -- | All context and role instances are loaded into the cache.
@@ -62,6 +64,7 @@ loadCrlFile file directoryName = do
 -- | Loads a file from the directory "src/model" relative to the directory of the active process.
 -- | Runs all bot actions.
 -- | All instances are loaded into the cache, and stored in Couchdb.
+-- | All instances are added to a Transaction and that Transaction is run.
 loadAndSaveCrlFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
 loadAndSaveCrlFile file directoryName = do
   r <- loadCrlFile file directoryName
@@ -72,4 +75,6 @@ loadAndSaveCrlFile file directoryName = do
         \i (_ :: PerspectContext) -> saveEntiteit (ContextInstance i)
       forWithIndex_ roleInstances
         \i (_ :: PerspectRol) -> saveEntiteit (RoleInstance i)
+      void $ runMonadPerspectivesTransaction $ (forWithIndex_ contextInstances
+        \i _ -> saveContextInstance (ContextInstance i))
       pure []

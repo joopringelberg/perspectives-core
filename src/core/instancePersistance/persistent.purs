@@ -123,6 +123,7 @@ getAVarRepresentingPerspectEntiteit id =
         -- NOTE: this may fail if the Entiteit was not stored in Couchdb.
         pure $ unsafePartial $ fromJust mavar
 
+-- | Remove from Couchdb and on success remove from the cache, too.
 removeEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 removeEntiteit entId = do
   entiteit <- getPerspectEntiteit entId

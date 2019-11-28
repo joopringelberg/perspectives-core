@@ -40,8 +40,8 @@ import Perspectives.Assignment.Update (PropertyUpdater, RoleUpdater, addProperty
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.CoreTypes (ActionInstance(..), type (~~>), MonadPerspectives, MonadPerspectivesTransaction, RoleGetter, Updater, WithAssumptions, ContextPropertyValueGetter, runMonadPerspectivesQuery, (##>>), (##=), MP, (##>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (contextType)
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
@@ -54,6 +54,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.SaveUserData (saveRoleInstance)
 
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
@@ -221,8 +222,7 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
-    -- TODO: foutmeldingen uit constructAnotherRol worden genegeerd. Nu worden die overigens niet gegenereerd...
-    for_ ctxts \ctxt -> constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})
+    for_ ctxts \ctxt -> (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})) >>= saveRoleInstance
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
@@ -257,8 +257,8 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
     -- TODO: handle errors when creating a new Role instance in Bind.
     for_ ctxts \ctxt -> do
       for_ bindings' \bndg -> do
-        constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
-          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})
+        (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
+          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})) >>= saveRoleInstance
 
 compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ _ _) = pure \_ -> pure unit
 

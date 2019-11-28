@@ -20,8 +20,9 @@
 -- END LICENSE
 
 module Perspectives.SaveUserData
-  ( saveUserContext
-  , removeUserContext
+  ( saveContextInstance
+  , saveRoleInstance
+  , removeContextInstance
   , removeRoleInstance)
 
   where
@@ -34,39 +35,54 @@ import Data.Lens (over)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_)
 import Foreign.Object (values)
-import Perspectives.Actions (tearDownBotActions)
+-- import Perspectives.Actions (tearDownBotActions)
+import Perspectives.Assignment.Update (addRol)
 import Perspectives.Assignment.Update (saveEntiteit) as Update
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeContext_rolInContext, removeRol_gevuldeRollen, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTransaction)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Sync.Transaction (_createdContexts, _createdRoles, _deletedContexts)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
+import Perspectives.Sync.Transaction (_createdContexts, _createdRoles, _deletedContexts, _deletedRoles)
 import Prelude (bind, discard, join, pure, unit, void, ($))
 
 -- | These functions are Updaters, too. They do not push deltas like the Updaters that change PerspectEntities, but
 -- | they modify other members of Transaction (createdContexts, deletedContexts, createdRoles, deletedRoles).
 
--- This function saves a previously cached ContextInstance and all its Roles and adds them to the Transaction
-saveUserContext :: Updater ContextInstance
-saveUserContext id = do
+-- This function saves a previously cached ContextInstance and all its Roles and adds them all to the Transaction
+saveContextInstance :: Updater ContextInstance
+saveContextInstance id = do
   (ctxt :: PerspectContext) <- lift $ lift $ saveEntiteit id
   lift $ modify (over _createdContexts (cons ctxt))
-  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> lift $ lift $ saveEntiteit rol :: MonadPerspectives PerspectRol
+  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> do
+    lift $ lift $ void $ saveEntiteit rol :: MonadPerspectives PerspectRol
+    void (saveRoleInstance rol)
   (_ :: PerspectRol) <- lift $ lift $ saveEntiteit (context_buitenRol ctxt)
+  void (saveRoleInstance (context_buitenRol ctxt))
   pure unit
+
+-- | Saves a previously cached Role instance and adds it to the Transaction.
+-- | Adds the Role instance to its Context instance and adds a ContextDelta to the Transaction.
+saveRoleInstance :: Updater RoleInstance
+saveRoleInstance id = do
+  (role@(PerspectRol{_id, context, pspType}) :: PerspectRol) <- lift $ lift $ saveEntiteit id
+  void $ addRol context pspType [_id]
+  lift $ modify (over _createdRoles (cons role))
 
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
 -- | Remove the ContextInstance both from the cache and from the database and adds it to the Transaction.
-removeUserContext :: Updater ContextInstance
-removeUserContext id = do
+-- | We do not add the removed role instances to the Transaction, as the receiving PDR's will recompute
+-- | them themselves.
+removeContextInstance :: Updater ContextInstance
+removeContextInstance id = do
   lift $ modify (over _deletedContexts (cons id))
-  lift $ lift $ tearDownBotActions id
+  -- lift $ lift $ tearDownBotActions id
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectEntiteit id
-  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> removeUserRol_ rol
-  void $ removeUserRol_ (context_buitenRol ctxt)
+  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> removeRoleInstance_ rol
+  void $ removeRoleInstance_ (context_buitenRol ctxt)
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   pure unit
 
@@ -74,9 +90,8 @@ removeUserContext id = do
 -- Removes the rol from the cache and from the database.
 -- Removes the rol from the inverse administration of its binding.
 -- Removes the rol as binding from all its binders.
--- We do not need to push Delta's, as receiving cores will recompute the effect of the removed Role.
-removeUserRol_ :: RoleInstance -> MonadPerspectivesTransaction PerspectRol
-removeUserRol_ roleId = do
+removeRoleInstance_ :: RoleInstance -> MonadPerspectivesTransaction PerspectRol
+removeRoleInstance_ roleId = do
   -- Remove from couchdb, remove from the cache.
   originalRole@(PerspectRol{context, gevuldeRollen, binding, pspType}) <- lift $ lift $ removeEntiteit roleId :: MonadPerspectives PerspectRol
   case binding of
@@ -95,13 +110,22 @@ removeUserRol_ roleId = do
       Update.saveEntiteit filledRolId (removeRol_gevuldeRollen filledRol (rol_pspType originalRole) roleId)
   pure originalRole
 
--- | Removes the rol from the cache and from the database.
--- | Removes the rol from the inverse administration of its binding.
--- | Removes the rol as binding from all its binders.
--- | Adds the Role to the Transaction.
+-- | Removes the role instance from the cache and from the database.
+-- | Removes the role instance from the inverse administration of its binding.
+-- | Removes the role instance as binding from all its binders.
+-- | Does NOT remove the role instance from its context. Use removeRol for that.
+-- | Adds the Role to the Transaction in deletedRoles. We do not push a ContextDelta, as the
+-- | receiving PDR's will recompute the effect of destroying this instance on their context
+-- | instances themselves.
 removeRoleInstance :: Updater RoleInstance
 removeRoleInstance pr = do
-  r@(PerspectRol{pspType, context}) <- removeUserRol_ pr
-  lift $ modify (over _createdRoles (cons r))
-  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit context
-  Update.saveEntiteit context (removeContext_rolInContext pe pspType pr)
+  r@(PerspectRol{pspType, context}) <- removeRoleInstance_ pr
+  lift $ modify (over _deletedRoles (cons pr))
+
+-- | Remove all instances of EnumeratedRoleType from the context instance.
+-- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
+-- | Does NOT remove the role instances from their context. Use deleteRol for that.
+-- | ContextDelta's are not necessary (see removeRoleInstance).
+-- | TODO: Implementeer removeRole.
+deleteAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
+deleteAllRoleInstances et cid = pure unit
