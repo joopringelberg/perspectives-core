@@ -15,10 +15,16 @@ Follow these steps to start developing.
 3. Install [psc-package](https://github.com/purescript/psc-package)
 4. Install [pulp](https://github.com/purescript-contrib/pulp)
 5. Install [Webpack](https://webpack.js.org/)
-5. To install the dependencies, run:
+5. To install the purescript dependencies, run:
 
 ```
   $ psc-package install
+```
+
+6. To install the javascript dependencies, run:
+
+```
+  $ npm install
 ```
 
 6. To compile the .purs source files, run:

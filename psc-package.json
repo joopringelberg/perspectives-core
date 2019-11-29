@@ -27,6 +27,7 @@
     "simple-json",
     "kishimen",
     "validation",
-    "profunctor-lenses"
+    "profunctor-lenses",
+    "yargs"
   ]
 }
