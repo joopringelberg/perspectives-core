@@ -61,6 +61,7 @@ type ContextRecord =
   , pspType :: ContextType
   , buitenRol :: RoleInstance
   , rolInContext :: F.Object (Array RoleInstance)
+  , me :: RoleInstance
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _
@@ -102,6 +103,7 @@ type RolRecord =
   , properties :: F.Object (Array Value)
   , gevuldeRollen :: F.Object (Array RoleInstance)
   , occurrence :: Int
+  , isMe :: Boolean
   }
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _

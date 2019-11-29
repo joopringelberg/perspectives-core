@@ -133,6 +133,7 @@ defaultContextRecord =
   , pspType: ContextType ""
   , buitenRol: RoleInstance ""
   , rolInContext: empty
+  , me: RoleInstance ""
   }
 
 defaultRolRecord :: RolRecord
@@ -145,6 +146,7 @@ defaultRolRecord =
   , properties: empty
   , gevuldeRollen: empty
   , occurrence: 0
+  , isMe: false
   }
 
 -- ROL

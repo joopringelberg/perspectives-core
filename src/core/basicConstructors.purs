@@ -45,11 +45,11 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, (##=))
 import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.Persistent (getPerspectEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit, tryGetPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.Class.Cacheable (cacheInitially, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
-import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>), (<$>))
+import Prelude (Unit, bind, const, discard, identity, map, pure, show, unit, void, ($), (<<<), (<>), (>=>), (>>>), (<$>), (>>=))
 
 -- | Construct contexts and roles from the serialisation.
 constructContexts :: ContextsSerialisation -> MonadPerspectives (Array UserMessage)
@@ -155,6 +155,9 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, internePr
 -- | Constructs a rol and caches it.
 constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> MonadPerspectives RoleInstance
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
+  isMe <- case bnd of
+    Nothing -> pure false
+    Just id -> getPerspectRol (RoleInstance id) >>= pure <<< (\(PerspectRol{isMe}) -> isMe)
   rolInstanceId <- pure $ RoleInstance (localName <> "_" <> (rol_padOccurrence i))
   role <- pure (PerspectRol defaultRolRecord
         { _id = rolInstanceId
@@ -163,6 +166,7 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
         , binding = maybe Nothing (Just <<< RoleInstance <<< expandDefaultNamespaces) bnd
         , properties = constructProperties properties
         , occurrence = i
+        , isMe = isMe
         })
   void $ cacheInitially rolInstanceId role
   pure rolInstanceId
