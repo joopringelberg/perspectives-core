@@ -28,6 +28,7 @@ import Data.Either (Either(..))
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import Foreign.Object (Object)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
@@ -38,8 +39,7 @@ import Perspectives.ContextRoleParser (parseAndCache)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (saveEntiteit)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (saveContextInstance)
 
@@ -71,10 +71,6 @@ loadAndSaveCrlFile file directoryName = do
   case r of
     Left e -> pure e
     Right (Tuple contextInstances roleInstances) -> do
-      forWithIndex_ contextInstances
-        \i (_ :: PerspectContext) -> saveEntiteit (ContextInstance i)
-      forWithIndex_ roleInstances
-        \i (_ :: PerspectRol) -> saveEntiteit (RoleInstance i)
       void $ runMonadPerspectivesTransaction $ (forWithIndex_ contextInstances
         \i _ -> saveContextInstance (ContextInstance i))
       pure []

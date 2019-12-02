@@ -54,9 +54,7 @@ saveContextInstance id = do
   addContextToTransactie ctxt
   for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> do
     lift $ lift $ void $ saveEntiteit rol :: MonadPerspectives PerspectRol
-    void (saveRoleInstance rol)
   (_ :: PerspectRol) <- lift $ lift $ saveEntiteit (context_buitenRol ctxt)
-  void (saveRoleInstance (context_buitenRol ctxt))
   pure unit
 
 -- | Saves a previously cached Role instance and adds it to the Transaction.

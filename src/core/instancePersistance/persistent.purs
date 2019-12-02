@@ -89,7 +89,6 @@ instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId wher
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> "perspect_models/"
 
-
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
   do

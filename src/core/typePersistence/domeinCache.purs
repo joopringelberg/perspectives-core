@@ -26,7 +26,7 @@ where
 
 import Affjax (Request, request) as AX
 import Affjax.ResponseFormat as ResponseFormat
-import Control.Monad.Except (lift, throwError)
+import Control.Monad.Except (catchError, lift, throwError)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
@@ -42,7 +42,7 @@ import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntitei
 import Perspectives.PerspectivesState (domeinCacheRemove)
 import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, cachePreservingRevision, retrieveInternally)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (<$>), (<>), (<<<))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>))
 
 storeDomeinFileInCache :: Namespace -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache ns df= cachePreservingRevision (DomeinFileId ns) df
@@ -69,7 +69,8 @@ modifyDomeinFileInCache modifier ns =
 -----------------------------------------------------------
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
-retrieveDomeinFile ns = getPerspectEntiteit (DomeinFileId ns)
+retrieveDomeinFile ns = catchError (getPerspectEntiteit (DomeinFileId ns))
+  \e -> throwError $ error ("retrieveDomeinFile: " <> show e)
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String
