@@ -36,6 +36,7 @@ import Data.String (Pattern(..), split)
 import Data.String.CodeUnits (fromCharArray)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (logShow)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -43,7 +44,7 @@ import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Persistence (getPerspectRol)
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Representation.Class.Cacheable (cacheInitially)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -535,7 +536,7 @@ context = withRoleCounting context' where
                 { _id = RoleInstance $ buitenRol (show instanceName)
                 , pspType = EnumeratedRoleType $ show typeName <> "$External"
                 , context = (ContextInstance $ show instanceName)
-                , binding = Just $ RoleInstance $ maybe "" buitenRol prototype
+                , binding = RoleInstance <<< buitenRol <$> prototype
                 , properties = FO.fromFoldable publicProps
                 })
             pure $ RoleInstance $ buitenRol (show instanceName)
