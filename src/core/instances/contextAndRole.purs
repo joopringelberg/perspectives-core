@@ -237,6 +237,9 @@ setRol_property rl propertyName values = set (_propertyValues' propertyName) (Ju
 rol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance)
 rol_gevuldeRollen (PerspectRol{gevuldeRollen}) = gevuldeRollen
 
+setRol_gevuldeRollen :: PerspectRol -> Object (Array RoleInstance) -> PerspectRol
+setRol_gevuldeRollen (PerspectRol r) grollen = PerspectRol (r {gevuldeRollen = grollen})
+
 rol_gevuldeRol :: PerspectRol -> EnumeratedRoleType -> Array RoleInstance
 rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup (unwrap rn) gevuldeRollen)
 

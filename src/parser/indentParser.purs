@@ -26,7 +26,7 @@ import Control.Monad.State (StateT, evalStateT, runStateT)
 import Control.Monad.State.Trans (gets, modify, put, get)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.String (null)
 import Data.Tuple (Tuple(..))
@@ -111,11 +111,11 @@ incrementRoleInstances roleName = void $ lift (lift (modify f))
   where
     f s@{rolOccurrences} = s {rolOccurrences = F.insert roleName (maybe 1 ((+)1) (F.lookup roleName rolOccurrences)) rolOccurrences}
 
-getRoleInstances :: IP (F.Object Int)
-getRoleInstances = lift (lift get) >>= pure <<< (_.rolOccurrences)
+getAllRoleOccurrences :: IP (F.Object Int)
+getAllRoleOccurrences = lift (lift get) >>= pure <<< (_.rolOccurrences)
 
-setRoleInstances :: (F.Object Int) -> IP Unit
-setRoleInstances rmap = do
+setRoleOccurrences :: (F.Object Int) -> IP Unit
+setRoleOccurrences rmap = do
   s <- lift (lift get)
   lift (lift (put s {rolOccurrences = rmap}))
 
@@ -220,6 +220,12 @@ addContextInstance contextId context = void $ lift (lift (modify f))
   where
     f s@{contextInstances} = s {contextInstances = F.insert (unwrap contextId) context contextInstances}
 
+modifyContextInstance :: (PerspectContext -> PerspectContext) -> ContextInstance -> IP Unit
+modifyContextInstance modifier contextId = void $ lift (lift (modify f))
+  where
+    f s@{contextInstances} = case F.lookup (unwrap contextId) contextInstances of
+      Nothing -> s
+      Just context -> s {contextInstances = F.insert (unwrap contextId) context contextInstances}
 -----------------------------------------------------------
 -- RoleInstances
 -----------------------------------------------------------
@@ -227,3 +233,9 @@ addRoleInstance :: RoleInstance -> PerspectRol -> IP Unit
 addRoleInstance roleId role = void $ lift (lift (modify f))
   where
     f s@{roleInstances} = s {roleInstances = F.insert (unwrap roleId) role roleInstances}
+
+getRoleInstances :: IP (F.Object PerspectRol)
+getRoleInstances = lift (lift get) >>= pure <<< (_.roleInstances)
+
+setRoleInstances :: F.Object PerspectRol -> IP Unit
+setRoleInstances r = void $ lift $ lift (modify (_ {roleInstances = r}))
