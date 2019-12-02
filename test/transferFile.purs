@@ -200,7 +200,7 @@ theSuite = suiteSkip "Perspectives.Parsing.TransferFile" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Parse a file" do
-    fileName <- pure "parsetest1.arc"
+    fileName <- pure "parsecontextAndRole.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
     case r of

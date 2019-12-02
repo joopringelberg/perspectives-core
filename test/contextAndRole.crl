@@ -1,6 +1,6 @@
 GebruikerGegevens
 
-import model:Test als tst:
+import model:ContextAndRole als tst:
 
 tst:TestCase usr:MyTestCase
 	$Self => ()

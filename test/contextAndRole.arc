@@ -1,4 +1,4 @@
-domain: Test
+domain: ContextAndRole
   case: TestCase
     user: Self
       property: Prop1 (mandatory, not functional, Number)

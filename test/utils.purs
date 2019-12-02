@@ -2,8 +2,10 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk as AA
 import Effect.Aff (Aff)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.RunPerspectives (runPerspectives)
 import Test.Unit.Assert as Assert
 
@@ -11,7 +13,7 @@ import Test.Unit.Assert as Assert
 runP :: forall a.
   MonadPerspectives a ->
   Aff a
-runP t = runPerspectives "cor" "geheim" t 
+runP t = runPerspectives "cor" "geheim" t
 
 p :: String -> String
 p s = "model:Perspectives$" <> s
@@ -40,3 +42,9 @@ assertEqual message test result = do
       show result <> "\nReceived: " <>
       show r)
       false
+
+clearUserDatabase :: MonadPerspectives Unit
+clearUserDatabase = do
+  uname <- (AA.gets _.userInfo.userName)
+  deleteDatabase $ "user_" <> uname <> "_entities"
+  createDatabase $ "user_" <> uname <> "_entities"

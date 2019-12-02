@@ -16,7 +16,7 @@ import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Test.Perspectives.Utils (runP)
+import Test.Perspectives.Utils (clearUserDatabase, runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -26,16 +26,17 @@ testDirectory = "test"
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
-    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "test1.crl" testDirectory
-    logShow r
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "contextAndRole.crl" testDirectory
+    -- logShow r
     pure unit
 
   testOnly "Load a file with a context instance in couchdb" do
-    r <- runP $ loadAndSaveCrlFile "test1.crl" testDirectory
+    r <- runP $ loadAndSaveCrlFile "contextAndRole.crl" testDirectory
     if null r
       then do
-        srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCase$SomeRole"))
+        srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
         assert "There shoule be an instance of SomeRole." (length srole == 1)
+        runP clearUserDatabase
       else do
         logShow r
         assert "Expected to load a file into couchdb" false
