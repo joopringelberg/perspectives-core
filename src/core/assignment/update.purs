@@ -29,10 +29,11 @@ import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Foreign.Generic.Class (class GenericEncode)
-import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeRol_binding, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_pspType, setContext_rolInContext, setRol_property)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeContext_me, changeRol_binding, changeRol_isMe, context_me, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_context, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
@@ -83,6 +84,15 @@ setBinding roleId (newBindingId :: RoleInstance) = do
               , deltaType: Change
               }
 
+  newBinding@(PerspectRol{isMe, context}) <- lift $ lift $ getPerspectEntiteit newBindingId
+  if isMe
+    then do
+      modifiedRole <- lift $ lift $ getPerspectEntiteit roleId
+      saveEntiteit roleId (changeRol_isMe modifiedRole isMe)
+      -- set roleId to be the value of Me of its context.
+      setMe context (Just roleId)
+    else pure unit
+
   -- Handle inverse binding.
   case rol_binding originalRole of
     Nothing -> pure unit
@@ -92,7 +102,6 @@ setBinding roleId (newBindingId :: RoleInstance) = do
       saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
 
       -- Add this roleinstance as a binding role for the new binding.
-      newBinding <- lift $ lift $ getPerspectEntiteit newBindingId
       saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
 -- | Removes the binding R of the rol, if any.
@@ -103,7 +112,12 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
-  saveEntiteit roleId (removeRol_binding originalRole)
+  saveEntiteit roleId (changeRol_isMe (removeRol_binding originalRole) false)
+  -- TODO: if roleId is the value of Me in its context, remove it.
+  ctxt <- lift $ lift $ getPerspectContext $ rol_context originalRole
+  if (context_me ctxt == (Just roleId))
+    then setMe (rol_context originalRole) Nothing
+    else pure unit
   addRoleDelta $ RoleDelta
               { id : roleId
               , binding: (rol_binding originalRole)
@@ -274,3 +288,13 @@ saveEntiteit rid rol = do
   -- the version number (because we don't create entities in this file).
   lift $ lift $ void $ cacheOverwritingRevision rid rol
   lift $ lift $ void $ Instances.saveEntiteit rid
+
+-----------------------------------------------------------
+-- SET ME
+-----------------------------------------------------------
+-- | Even though we modify the ContextInstance, we do not push a Delta.
+-- | This is because the value of Me is indexed and never communicated with other users.
+setMe :: ContextInstance -> Maybe RoleInstance -> MonadPerspectivesTransaction Unit
+setMe cid me = do
+  ctxt <- lift $ lift $ getPerspectContext cid
+  saveEntiteit cid (changeContext_me ctxt me)

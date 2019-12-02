@@ -38,14 +38,16 @@ import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (moveRoles, removeRol)
 import Perspectives.BasicConstructors (constructAnotherRol)
+import Perspectives.ContextAndRole (changeContext_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (contextType)
+import Perspectives.Persistent (saveEntiteit_, getPerspectEntiteit)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ActionType, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Context (Context, userRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
@@ -142,7 +144,14 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
     ctxts <- lift $ lift (contextId ##= contextGetter)
-    for_ ctxts \ctxt -> (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})) >>= saveRoleInstance
+    for_ ctxts \ctxt -> do
+      role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing}))
+      if rol_isMe role
+        then lift $ lift $ do
+          c <- getPerspectEntiteit ctxt
+          void $ saveEntiteit_ ctxt (changeContext_me c (Just (identifier role)))
+        else pure unit
+      saveRoleInstance (identifier role)
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
@@ -177,8 +186,15 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
     -- TODO: handle errors when creating a new Role instance in Bind.
     for_ ctxts \ctxt -> do
       for_ bindings' \bndg -> do
-        (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
-          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})) >>= saveRoleInstance
+        role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
+          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)}))
+        saveRoleInstance (identifier role)
+        if rol_isMe role
+          then lift $ lift $ do
+            c <- getPerspectEntiteit ctxt
+            void $ saveEntiteit_ ctxt (changeContext_me c (Just (identifier role)))
+          else pure unit
+
 
 compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ _ _) = pure \_ -> pure unit
 

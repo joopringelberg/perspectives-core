@@ -34,6 +34,7 @@
 
 module Perspectives.Persistent
 ( saveEntiteit
+, saveEntiteit_
 , removeEntiteit
 , getPerspectEntiteit
 , getPerspectContext
@@ -162,6 +163,12 @@ saveEntiteit id = do
     Just pe' -> case rev pe' of
       Nothing -> saveUnversionedEntiteit id
       otherwise -> saveVersionedEntiteit id pe'
+
+saveEntiteit_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
+saveEntiteit_ id pe = do
+  case rev pe of
+    Nothing -> saveUnversionedEntiteit id
+    otherwise -> saveVersionedEntiteit id pe
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to
 -- | couchdb with this function. Set its version (_rev) in the cache.

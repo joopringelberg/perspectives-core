@@ -45,13 +45,18 @@ import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestReco
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
+import Perspectives.ContextAndRole (changeContext_me, rol_context, rol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
+import Perspectives.Persistence (getPerspectEntiteit)
+import Perspectives.Persistent (saveEntiteit_)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (rangeOfRoleCalculation')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -60,7 +65,7 @@ import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance, saveContextInstance, saveRoleInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
-import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=), (*>))
+import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -212,8 +217,16 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         void $ runMonadPerspectivesTransaction $ removeRoleInstance (RoleInstance object)
         sendResponse (Result corrId []) setter
     Api.CreateRol -> do
-      (rol :: Array RoleInstance) <- runMonadPerspectivesTransaction ((lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)) >>= \rolId -> saveRoleInstance rolId *> pure rolId)
-      sendResponse (Result corrId (unwrap <$> rol)) setter
+      (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction do
+        role <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+        saveRoleInstance (identifier role)
+        if rol_isMe role
+          then lift $ lift $ do
+            c <- getPerspectEntiteit (rol_context role)
+            void $ saveEntiteit_ (rol_context role) (changeContext_me c (Just (identifier role)))
+          else pure unit
+        pure (identifier role)
+      sendResponse (Result corrId (unwrap <$> rolInsts)) setter
     -- Check whether a role exists for ContextDef with the localRolName and then create a new instance of it according to the rolDescription.
     -- subject :: Context, predicate :: localRolName, object :: ContextDef. rolDescription must be present!
     Api.CreateRolWithLocalName -> do
@@ -224,7 +237,15 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           -- (CR ctype) -> pure unit
           (CR ctype) -> sendResponse (Error corrId ("Cannot construct an instance of CalculatedRole '" <> unwrap ctype <> "'!")) setter
           (ENR eroltype) -> do
-            rol <- runMonadPerspectivesTransaction ((lift $ lift $ constructAnotherRol eroltype subject (unsafePartial $ fromJust rolDescription)) >>=  \rolId -> saveRoleInstance rolId *> pure rolId)
+            rol <- runMonadPerspectivesTransaction do
+              role <- lift $ lift $ constructAnotherRol eroltype subject (unsafePartial $ fromJust rolDescription)
+              saveRoleInstance (identifier role)
+              if rol_isMe role
+                then lift $ lift $ do
+                  c <- getPerspectEntiteit (rol_context role)
+                  void $ saveEntiteit_ (rol_context role) (changeContext_me c (Just (identifier role)))
+                else pure unit
+              pure $ (identifier :: PerspectRol -> RoleInstance) role
             sendResponse (Result corrId (unwrap <$> rol)) setter
     Api.AddRol -> catchError
       do
@@ -253,9 +274,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.BindInNewRol -> catchError
       do
         void $ runMonadPerspectivesTransaction do
-          rol <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
-          saveRoleInstance rol
-          setBinding rol (RoleInstance object)
+          role <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+          saveRoleInstance (identifier role)
+          if rol_isMe role
+            then lift $ lift $ do
+              c <- getPerspectEntiteit (rol_context role)
+              void $ saveEntiteit_ (rol_context role) (changeContext_me c (Just (identifier role)))
+            else pure unit
+          setBinding (identifier role) (RoleInstance object)
         sendResponse (Result corrId ["ok"]) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Check whether a role exists for ContextDef with the localRolName and whether it allows RolID as binding.

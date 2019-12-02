@@ -33,8 +33,7 @@ import Data.Newtype (unwrap)
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Symbol (SProxy(..))
-import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, empty, insert, lookup, pop, delete)
+import Foreign.Object (Object, empty, insert, lookup, delete)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (Namespace, deconstructNamespace)
@@ -42,7 +41,7 @@ import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), 
 import Perspectives.Representation.Class.Revision (Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), EnumeratedPropertyType(..))
-import Prelude (flip, identity, show, ($), (+), (/), (<<<), (<>), (<$>))
+import Prelude (flip, identity, show, ($), (+), (/), (<<<), (<>))
 
 -- CONTEXT
 
@@ -87,6 +86,12 @@ context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 
 context_rolInContext :: PerspectContext -> EnumeratedRoleType -> Array RoleInstance
 context_rolInContext (PerspectContext{rolInContext}) rn = maybe [] identity (lookup (unwrap rn) rolInContext)
+
+context_me :: PerspectContext -> Maybe RoleInstance
+context_me (PerspectContext{me}) = me
+
+changeContext_me :: PerspectContext -> Maybe RoleInstance -> PerspectContext
+changeContext_me (PerspectContext cr) me = PerspectContext cr {me = me}
 
 _roleInstances :: EnumeratedRoleType -> Traversal' PerspectContext (Array RoleInstance)
 _roleInstances (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t <<< _Just
@@ -133,7 +138,7 @@ defaultContextRecord =
   , pspType: ContextType ""
   , buitenRol: RoleInstance ""
   , rolInContext: empty
-  , me: RoleInstance ""
+  , me: Nothing
   }
 
 defaultRolRecord :: RolRecord
@@ -189,6 +194,12 @@ rol_context (PerspectRol{context}) = context
 
 changeRol_context :: ContextInstance -> PerspectRol -> PerspectRol
 changeRol_context cid (PerspectRol rp) = PerspectRol rp {context = cid}
+
+rol_isMe :: PerspectRol -> Boolean
+rol_isMe (PerspectRol {isMe}) = isMe
+
+changeRol_isMe :: PerspectRol -> Boolean -> PerspectRol
+changeRol_isMe (PerspectRol cr) isMe = PerspectRol $ cr {isMe = isMe}
 
 rol_properties :: PerspectRol -> Object (Array Value)
 rol_properties (PerspectRol{properties}) = properties

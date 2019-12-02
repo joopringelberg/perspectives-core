@@ -38,13 +38,11 @@ import Prelude (class Show, class Eq, (==), (<<<), eq)
 -- PERSPECTCONTEXT TYPE CLASS
 -----------------------------------------------------------
 class PerspectContextClass c where
-  identifier :: c -> ContextInstance
   pspType :: c -> ContextType
   externalRole :: c -> RoleInstance
   roles :: c -> F.Object (Array RoleInstance)
 
 instance perspectContextPerspectContextClass :: PerspectContextClass PerspectContext where
-  identifier c = (unwrap c)._id
   pspType c = (unwrap c).pspType
   externalRole c = (unwrap c).buitenRol
   roles c = (unwrap c).rolInContext
@@ -61,7 +59,7 @@ type ContextRecord =
   , pspType :: ContextType
   , buitenRol :: RoleInstance
   , rolInContext :: F.Object (Array RoleInstance)
-  , me :: RoleInstance
+  , me :: Maybe RoleInstance
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _
