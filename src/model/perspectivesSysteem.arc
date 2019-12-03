@@ -12,16 +12,16 @@ domain: System
 
   case: PerspectivesSystem
     external:
-      property: ModelOphaalTeller (mandatory, verplicht, Number)
-      thing: TheTrustedCluster (not mandatory, functional) filledBy TrustedCluster
-      user: User (mandatory, functional)
-        property: Achternaam (mandatory, not functional, String)
-        property: Voornaam (mandatory, not functional, String)
-        view: VolledigeNaam (Voornaam, Achternaam)
-      -- Het type van ModellenM bepalen we met de clause 'returns:'
-      thing: Modellen = apicall "ModellenM" returns: sys:Model
-      thing: IndexedContexts (not mandatory, not functional)
-      context: ModelsInUse (not mandatory, not functional) filledBy Model
+      property: ModelOphaalTeller (mandatory, functional, Number)
+    context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
+    user: User (mandatory, functional)
+      property: Achternaam (mandatory, not functional, String)
+      property: Voornaam (mandatory, not functional, String)
+      view: VolledigeNaam (Voornaam, Achternaam)
+    -- Het type van ModellenM bepalen we met de clause 'returns:'
+    context: Modellen = apicall "ModellenM" returns: Model$External
+    thing: IndexedContexts (not mandatory, not functional)
+    context: ModelsInUse (not mandatory, not functional) filledBy: Model
 
   case: Model
     external:

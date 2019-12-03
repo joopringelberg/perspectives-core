@@ -1,0 +1,16 @@
+GebruikerGegevens
+
+import model:System als sys:
+
+-- 	$indexedContexts -> usr:MijnSysteem
+-- NB: Deze file wordt nooit van deze lokatie geladen. Wel b.v. in het project perspectives-react-integrated-client
+sys:PerspectivesSystem usr:MijnSysteem
+	extern $ModelOphaalTeller = 0
+	$User(1) => ()
+		$Voornaam = "Joop"
+		$Achternaam = "Ringelberg"
+	$TheTrustedCluster =>
+		sys:TrustedCluster $MijnCluster
+			extern $Naam = "Het cluster van Joop"
+			$ClusterGenoot -> $$User(1)
+				$Url = "http://localhost"

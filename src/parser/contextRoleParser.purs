@@ -451,7 +451,7 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
       pure $ show qn
 
     rolInHigherContext :: IP QualifiedName
-    rolInHigherContext = lexeme do
+    rolInHigherContext = try $ lexeme do
       namespace <- getNamespace -- not $-terminated!
       namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
       localName <- segmentedName

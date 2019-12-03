@@ -22,12 +22,15 @@
 module Perspectives.SetupUser where
 
 import Data.Maybe (Maybe(..))
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.ContextAndRole (changeRol_isMe)
+import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.InstanceRepresentation (PerspectContext)
-import Perspectives.Persistent (tryGetPerspectEntiteit)
+import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
+import Perspectives.Persistent (saveEntiteit_, tryGetPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
-import Prelude (Unit, bind, pure, unit, void, ($))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Prelude (Unit, bind, pure, unit, void, ($), discard)
 
 modelDirectory :: String
 modelDirectory = "./src/model"
@@ -36,5 +39,11 @@ setupUser :: MonadPerspectives Unit
 setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit (ContextInstance "model:User$MijnSysteem")
   case mu of
-    Nothing -> void $ loadAndSaveCrlFile "systeemInstanties.crl" modelDirectory
+    Nothing -> do
+      void $ loadAndSaveCrlFile "systemInstances.crl" modelDirectory
+      -- now set isMe of "model:User$MijnSysteem$User_0001" to true.
+      user <- ContextInstance "model:User$MijnSysteem" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+      userRol <- getPerspectRol user
+      void $ saveEntiteit_ user (changeRol_isMe userRol true)
+
     otherwise -> pure unit
