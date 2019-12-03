@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple)
 import Effect.Class.Console (logShow)
 import Foreign.Object (Object, lookup)
-import Perspectives.Assignment.Update (setBinding)
+import Perspectives.Assignment.Update (removeBinding, setBinding)
 import Perspectives.ContextAndRole (context_me, rol_gevuldeRollen, rol_isMe)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.Deltas (runTransactie)
@@ -76,7 +76,7 @@ theSuite = suite "ContextRoleParser" do
       getPerspectRol (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
     assert "Self should have isMe == true" (rol_isMe ra)
 
-  testOnly "me for a role we bind with a role that represents the user." do
+  test "me for a role we bind with a role that represents the user." do
     c <- runP do
       _ <- setupUser
       _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
@@ -87,3 +87,13 @@ theSuite = suite "ContextRoleParser" do
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     -- logShow c
     assert "MyNestedCase3 should have 'me' equal to model:User$MyTestCase$MyNestedCase3$NestedSelf_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001"))
+
+  testOnly "me for the context of a role from which we remove the binding." do
+    c <- runP do
+      _ <- setupUser
+      _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
+      void $ runMonadPerspectivesTransaction $ removeBinding
+        (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
+      getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
+    assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
