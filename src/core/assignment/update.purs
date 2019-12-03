@@ -33,8 +33,7 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, chang
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Persistent (getPerspectContext)
-import Perspectives.Persistent (class Persistent, getPerspectEntiteit)
+import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
@@ -74,6 +73,8 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -- | Modifies the Role instance.
 -- | Caches and saves the Role instance.
 -- | Adds a RoleDelta to the transaction.
+-- | Sets isMe on the Role instance if the binding represents the user.
+-- | Sets me on the context of the Role instance if the binding represents the user.
 setBinding :: RoleInstance -> (Updater RoleInstance)
 setBinding roleId (newBindingId :: RoleInstance) = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
@@ -84,13 +85,13 @@ setBinding roleId (newBindingId :: RoleInstance) = do
               , deltaType: Change
               }
 
-  newBinding@(PerspectRol{isMe, context}) <- lift $ lift $ getPerspectEntiteit newBindingId
+  newBinding@(PerspectRol{isMe}) <- lift $ lift $ getPerspectEntiteit newBindingId
   if isMe
     then do
       modifiedRole <- lift $ lift $ getPerspectEntiteit roleId
       saveEntiteit roleId (changeRol_isMe modifiedRole isMe)
       -- set roleId to be the value of Me of its context.
-      setMe context (Just roleId)
+      setMe (rol_context modifiedRole) (Just roleId)
     else pure unit
 
   -- Handle inverse binding.
@@ -109,6 +110,8 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 -- | Modifies the Role instance.
 -- | Caches and saves the Role instance.
 -- | Adds a RoleDelta to the transaction.
+-- | Sets isMe to Nothing on the Role instance if the binding we removed represents the user.
+-- | Removes me from the context of the Role instance if the binding we removed represents the user.
 removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
