@@ -637,7 +637,10 @@ userData = do
       (\id role -> do
         isMe <- representsCurrentUser roles role
         -- Set the me role on the context of this role.
-        modifyContextInstance (flip changeContext_me (Just $ RoleInstance id)) (rol_context role)
+        if isMe
+          then modifyContextInstance (flip changeContext_me (Just $ RoleInstance id)) (rol_context role)
+          else pure unit
+        -- Idempotent if isMe was true anyway.
         pure $ changeRol_isMe role isMe
         )
     setRoleInstances x
