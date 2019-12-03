@@ -34,7 +34,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "ContextRoleParser" do
+theSuite = suiteSkip "ContextRoleParser" do
   test "inverse binding" do
     ra <- runP do
       _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
@@ -122,7 +122,7 @@ theSuite = suite "ContextRoleParser" do
     assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$Self_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
     \$NestedSelf_0000"))
 
-  testOnly "isMe for a constructed role." do
+  test "isMe for a constructed role." do
     ra <- runP do
       _ <- setupUser
       _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory

@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (length, null)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Tuple (Tuple)
 import Effect.Class.Console (logShow)
 import Foreign.Object (Object)
@@ -16,7 +16,8 @@ import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Test.Perspectives.Utils (clearUserDatabase, runP)
+import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile)
+import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -27,7 +28,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.loadCRL" do
+theSuite = suite "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "contextAndRole.crl" testDirectory
     -- logShow r
@@ -38,11 +39,20 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
     if null r
       then do
         srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
-        assert "There shoule be an instance of SomeRole." (length srole == 1)
+        assert "There should not be an instance of SomeRole." (length srole == 0)
         runP clearUserDatabase
       else do
         logShow r
         assert "Expected to load a file into couchdb" false
+
+  testOnly "Load a file with a context instance, setup bot action" do
+    r <- runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
+      _ <- loadCrlFile "contextAndRole2.crl" testDirectory
+      ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
+    assert "There should be an instance of SomeRole." (length r == 1)
 
   test "Load a file with a context instance in couchdb" do
     r <- runP $ loadAndSaveCrlFile "systemInstances.crl" modelDirectory

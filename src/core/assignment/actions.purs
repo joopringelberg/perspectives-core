@@ -38,72 +38,71 @@ import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (moveRoles, removeRol)
 import Perspectives.BasicConstructors (constructAnotherRol)
-import Perspectives.ContextAndRole (changeContext_me, rol_isMe)
+import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Persistent (saveEntiteit_, getPerspectEntiteit)
+import Perspectives.Instances.ObjectGetters (roleType)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, saveEntiteit_)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect, isExecutedByBot)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ActionType, getAction, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Context (Context, userRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (saveRoleInstance)
 
 
--- | For a Context, set up its Actions. Register these Actions in the ActionRegister.
+-- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
 -- | Register their dependency on Assumptions in the actionAssumptionRegister in
 -- | PerspectivesState. Execute the actions once.
 setupAndRunBotActions :: ContextInstance -> MonadPerspectives Unit
 setupAndRunBotActions cid = do
-  -- TODO: filter, keeping just those actions that are to be executed by the Bot for the current user.
-  (ct :: ContextType) <- cid ##>> contextType
-  -- For all user roles, get their perspective; then take all automatic actions.
-  (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
-  void $ runMonadPerspectivesTransaction (for_ users \(u :: EnumeratedRoleType) -> do
-    perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
-    for_ (values perspectives) \actions ->
-      for_ actions \(a :: ActionType) -> lift $ lift $ do
-        -- Only when it is an automatic action
-        shouldRun <- getAction a >>= pure <<< isExecutedByBot
-        if shouldRun
-          then (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
-              -- Evaluate the lhs to set up the dependency administration.
-              (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
-              cacheActionInstanceDependencies (ActionInstance cid a) ass
-          else pure unit
-    )
+  -- For the me role, get its type.
+  maybeMe <- getPerspectContext cid >>= pure <<< context_me
+  case maybeMe of
+    Nothing -> pure unit
+    Just me -> do
+      u <- me ##>> roleType
+      void $ runMonadPerspectivesTransaction do
+        perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
+        for_ (values perspectives) \actions ->
+          for_ actions \(a :: ActionType) -> lift $ lift $ do
+            -- Only when it is an automatic action
+            shouldRun <- getAction a >>= pure <<< isExecutedByBot
+            if shouldRun
+              then (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
+                  -- Evaluate the lhs to set up the dependency administration.
+                  (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
+                  cacheActionInstanceDependencies (ActionInstance cid a) ass
+              else pure unit
 
--- | For a Context, set up its Actions. Register these Actions in the ActionRegister.
+-- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
 -- | Register their dependency on Assumptions in the actionAssumptionRegister in
 -- | PerspectivesState. Does **not** execute the actions.
 setupBotActions :: ContextInstance -> MonadPerspectives Unit
 setupBotActions cid = do
-  -- TODO: filter, keeping just those actions that are to be executed by the Bot for the current user.
-  (ct :: ContextType) <- cid ##>> contextType
-  -- For all user roles, get their perspective; then take all automatic actions.
-  (users :: Array EnumeratedRoleType) <- (getPerspectType ct :: MonadPerspectives Context) >>= pure <<< userRole
-  (for_ users \(u :: EnumeratedRoleType) -> do
-    perspectives <- getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
-    for_ (values perspectives) \actions ->
-      for_ actions \(a :: ActionType) -> do
-        -- Only when it is an automatic action
-        shouldRun <- getAction a >>= pure <<< isExecutedByBot
-        if shouldRun
-          then (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
-              -- Evaluate the lhs to set up the dependency administration.
-              (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
-              cacheActionInstanceDependencies (ActionInstance cid a) ass
-          else pure unit
-    )
+  -- For the me role, get its type.
+  maybeMe <- getPerspectContext cid >>= pure <<< context_me
+  case maybeMe of
+    Nothing -> pure unit
+    Just me -> do
+      u <- me ##>> roleType
+      perspectives <- getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
+      for_ (values perspectives) \actions ->
+        for_ actions \(a :: ActionType) -> do
+          -- Only when it is an automatic action
+          shouldRun <- getAction a >>= pure <<< isExecutedByBot
+          if shouldRun
+            then (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
+                -- Evaluate the lhs to set up the dependency administration.
+                (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
+                cacheActionInstanceDependencies (ActionInstance cid a) ass
+            else pure unit
 
 -- | Remove all actions associated with this context.
 tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
