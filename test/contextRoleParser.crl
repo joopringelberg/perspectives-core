@@ -1,0 +1,13 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCase usr:MyTestCase
+	$Self(1) => ()
+	$AContextRole =>
+		$NestedCase $MyNestedCase
+			$NestedSelf(1) -> $$Self(1)
+			$NestedSelf(2) -> $$Self(1)
+	$AContextRole2 =>
+		$NestedCase2 $MyNestedCase2
+			$NestedSelf -> $$Self(1)

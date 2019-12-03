@@ -24,13 +24,13 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadCRL" do
+theSuite = suiteSkip "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "contextAndRole.crl" testDirectory
     -- logShow r
     pure unit
 
-  testOnly "Load a file with a context instance in couchdb" do
+  test "Load a file with a context instance in couchdb with a light check" do
     r <- runP $ loadAndSaveCrlFile "contextAndRole.crl" testDirectory
     if null r
       then do
@@ -40,6 +40,11 @@ theSuite = suite "Perspectives.loadCRL" do
       else do
         logShow r
         assert "Expected to load a file into couchdb" false
+
+  test "Load a file with a context instance in couchdb" do
+    r <- runP $ loadAndSaveCrlFile "contextRoleParser.crl" testDirectory
+    logShow r
+    assert "A CRL file should load without problems" (null r)
 
   test "Setup bot action" do
     runP $ setupBotActions $ ContextInstance "model:User$MyTestCase"
