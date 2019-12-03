@@ -18,6 +18,9 @@ import Test.Unit.Assert (assert)
 testDirectory :: String
 testDirectory = "test"
 
+modelDirectory :: String
+modelDirectory = "src/model"
+
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
@@ -45,7 +48,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
 
   test "Load a model file and store it in Couchdb" do
     -- 1. Load and save a model.
-    messages <- runP $ catchError (loadAndSaveArcFile "contextAndRole.arc" testDirectory)
+    messages <- runP $ catchError (loadAndSaveArcFile "perspectivesSysteem.arc" modelDirectory)
       \e -> logShow e *> pure []
     if null messages
       then pure unit

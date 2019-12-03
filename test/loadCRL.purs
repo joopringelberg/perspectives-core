@@ -23,6 +23,9 @@ import Test.Unit.Assert (assert)
 testDirectory :: String
 testDirectory = "test"
 
+modelDirectory :: String
+modelDirectory = "src/model"
+
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
@@ -42,7 +45,7 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
         assert "Expected to load a file into couchdb" false
 
   test "Load a file with a context instance in couchdb" do
-    r <- runP $ loadAndSaveCrlFile "contextRoleParser.crl" testDirectory
+    r <- runP $ loadAndSaveCrlFile "systemInstances.crl" modelDirectory
     logShow r
     assert "A CRL file should load without problems" (null r)
 

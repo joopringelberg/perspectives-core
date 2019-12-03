@@ -228,7 +228,7 @@ modifyContextInstance modifier contextId = void $ lift (lift (modify f))
   where
     f s@{contextInstances} = case F.lookup (unwrap contextId) contextInstances of
       Nothing -> s
-      Just context -> s {contextInstances = F.insert (unwrap contextId) context contextInstances}
+      Just context -> s {contextInstances = F.insert (unwrap contextId) (modifier context) contextInstances}
 -----------------------------------------------------------
 -- RoleInstances
 -----------------------------------------------------------

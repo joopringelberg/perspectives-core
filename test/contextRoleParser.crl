@@ -1,9 +1,10 @@
 GebruikerGegevens
 
 import model:Test als tst:
+import model:System als sys:
 
 tst:TestCase usr:MyTestCase
-	$Self(1) => ()
+	$Self(1) -> usr:MijnSysteem$User(1)
 	$AContextRole =>
 		$NestedCase $MyNestedCase
 			$NestedSelf(1) -> $$Self(1)

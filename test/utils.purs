@@ -4,8 +4,14 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk as AA
 import Effect.Aff (Aff)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.ContextAndRole (changeRol_isMe)
+import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
+import Perspectives.Instances.ObjectGetters (getRole)
+import Perspectives.LoadCRL (loadCrlFile)
+import Perspectives.Persistent (getPerspectRol)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheOverwritingRevision)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.RunPerspectives (runPerspectives)
 import Test.Unit.Assert as Assert
 
@@ -48,3 +54,11 @@ clearUserDatabase = do
   uname <- (AA.gets _.userInfo.userName)
   deleteDatabase $ "user_" <> uname <> "_entities"
   createDatabase $ "user_" <> uname <> "_entities"
+
+setupUser :: MonadPerspectives Unit
+setupUser = do
+  void $ loadCrlFile "systemInstances.crl" "./src/model"
+  -- now set isMe of "model:User$MijnSysteem$User_0001" to true.
+  user <- ContextInstance "model:User$MijnSysteem" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+  userRol <- getPerspectRol user
+  void $ cacheOverwritingRevision user (changeRol_isMe userRol true)
