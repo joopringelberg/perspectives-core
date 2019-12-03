@@ -21,14 +21,14 @@
 
 module Perspectives.ContextRoleParser where
 
-import Control.Alt ((<|>))
-import Control.Monad.State (get, gets)
+import Control.Alt (void, (<|>))
+import Control.Monad.State (State, execState, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
 import Data.Array (dropEnd, filter, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
-import Data.Foldable (elem, fold)
+import Data.Foldable (elem, fold, for_, traverse_)
 import Data.List.Types (List(..))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
@@ -36,15 +36,17 @@ import Data.String (Pattern(..), split)
 import Data.String.CodeUnits (fromCharArray)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (logShow)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
+import Foreign.Object (alter)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.EntiteitAndRDFAliases (Comment, ID, RolName, ContextID)
 import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..), buitenRol)
-import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
+import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Representation.Class.Cacheable (cacheInitially)
+import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
@@ -631,15 +633,18 @@ userData = do
     -- Set the inverse bindings.
     setRoleInstances $ addGevuldeRollen roles <$> roles
     -- Check each role instance for binding to a role with isMe == true. Then set 'me' on their contexts.
-    x <- traverseWithIndex
+    x <- getRoleInstances >>= traverseWithIndex
       (\id role -> do
         isMe <- representsCurrentUser roles role
         -- Set the me role on the context of this role.
         modifyContextInstance (flip changeContext_me (Just $ RoleInstance id)) (rol_context role)
         pure $ changeRol_isMe role isMe
         )
-      roles
     setRoleInstances x
+    -- Now the contexts and roles have changed in the state of the parser, but not yet
+    -- in cache. Cache them.
+    getRoleInstances >>= traverse_ \r -> lift $ lift $ lift $ cacheOverwritingRevision (ID.identifier r) r
+    getContextInstances >>= traverse_ \r -> lift $ lift $ lift $ cacheOverwritingRevision (ID.identifier r) r
     pure eroles
   where
 
@@ -648,8 +653,15 @@ userData = do
 
     -- Find all roles that bind r. Add them as the value of gevuldeRollen to r, each under its type as key.
     addGevuldeRollen :: FO.Object PerspectRol -> PerspectRol -> PerspectRol
-    addGevuldeRollen roles r = setRol_gevuldeRollen r $
-      FO.fromFoldable ((\(b :: PerspectRol) -> Tuple (unwrap $ rol_pspType b) [(ID.identifier b)]) <$> filter (\role -> rol_binding role == Just (ID.identifier r)) (FO.values roles))
+    addGevuldeRollen roles r = setRol_gevuldeRollen r (execState collect FO.empty)
+      where
+        collect :: State (FO.Object (Array RoleInstance)) Unit
+        collect = for_ roles (\role -> if rol_binding role == Just (ID.identifier r)
+          then void $ modify
+            (alter
+              (Just <<< (maybe [ID.identifier role] (AR.cons (ID.identifier role))))
+              (unwrap $ rol_pspType role))
+          else pure unit)
 
     -- Either the role has isMe == true, or its binding recursively has. Stop recursion on leaving the model.
     representsCurrentUser :: FO.Object PerspectRol -> PerspectRol -> IP Boolean
@@ -672,4 +684,5 @@ parseAndCache text = do
   (Tuple parseResult {roleInstances, contextInstances}) <- runIndentParser' text userData
   case parseResult of
     (Left e) -> pure $ Left e
-    (Right r) -> pure $ Right $ Tuple contextInstances roleInstances
+    (Right r) -> do
+      pure $ Right $ Tuple contextInstances roleInstances

@@ -220,6 +220,9 @@ addContextInstance contextId context = void $ lift (lift (modify f))
   where
     f s@{contextInstances} = s {contextInstances = F.insert (unwrap contextId) context contextInstances}
 
+getContextInstances :: IP (F.Object PerspectContext)
+getContextInstances = lift (lift get) >>= pure <<< (_.contextInstances)
+
 modifyContextInstance :: (PerspectContext -> PerspectContext) -> ContextInstance -> IP Unit
 modifyContextInstance modifier contextId = void $ lift (lift (modify f))
   where
