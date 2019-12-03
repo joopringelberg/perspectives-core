@@ -71,7 +71,7 @@ constructContext' c = do
 -- | Caches the result but does not save it to Couchdb, neither adds it to a Transaction.
 -- | Instead, use saveContextInstance to do so.
 constructContext :: ContextSerialization -> MonadPerspectives (Either (Array UserMessage) ContextInstance)
-constructContext c@(ContextSerialization{id, prototype, ctype, rollen, interneProperties, externeProperties}) = do
+constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externeProperties}) = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
   (mc :: Maybe PerspectContext) <- tryGetPerspectEntiteit contextInstanceId
   case mc of

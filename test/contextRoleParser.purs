@@ -6,10 +6,12 @@ import Control.Monad.Free (Free)
 import Data.Array (length, null)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple(..))
 import Effect.Class.Console (logShow)
-import Foreign.Object (Object, lookup)
+import Foreign.Object (Object, fromFoldable, lookup, empty)
+import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (removeBinding, setBinding)
+import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.ContextAndRole (context_me, rol_gevuldeRollen, rol_isMe)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.Deltas (runTransactie)
@@ -18,8 +20,9 @@ import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectRol, getPerspectContext)
+import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SetupUser (setupUser) as SU
 import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile, loadAndSaveArcFile)
@@ -88,7 +91,7 @@ theSuite = suite "ContextRoleParser" do
     -- logShow c
     assert "MyNestedCase3 should have 'me' equal to model:User$MyTestCase$MyNestedCase3$NestedSelf_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001"))
 
-  testOnly "me for the context of a role from which we remove the binding." do
+  test "me for the context of a role from which we remove the binding." do
     c <- runP do
       _ <- setupUser
       _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
@@ -97,3 +100,37 @@ theSuite = suite "ContextRoleParser" do
         (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
+
+  test "me for a constructed context (isMe by implication)." do
+    c <- runP do
+      _ <- setupUser
+      _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
+      _ <- constructContext $ ContextSerialization
+        { id: "model:User$MyTestCase$MyNestedCase4"
+        , prototype: Nothing
+        , ctype: "model:Test$TestCase$NestedCase"
+        , rollen: fromFoldable [Tuple "model:Test$TestCase$NestedCase$NestedSelf"
+          [(RolSerialization
+            { properties: PropertySerialization empty
+            , binding: Just "model:User$MijnSysteem$User_0001"})]]
+        , externeProperties: PropertySerialization empty
+
+      }
+      getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase4")
+    -- logShow c
+    assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$Self_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
+    \$NestedSelf_0000"))
+
+  testOnly "isMe for a constructed role." do
+    ra <- runP do
+      _ <- setupUser
+      _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
+      (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
+      constructAnotherRol (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")
+        "model:User$MyTestCase$MyNestedCase4"
+        (RolSerialization
+            { properties: PropertySerialization empty
+            , binding: Just "model:User$MijnSysteem$User_0001"})
+    -- logShow ra
+    assert "The constructed Role should have 'isMe' == true" (rol_isMe ra)

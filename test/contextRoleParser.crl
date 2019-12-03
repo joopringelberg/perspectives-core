@@ -15,3 +15,5 @@ tst:TestCase usr:MyTestCase
 	$AContextRole(2) =>
 		$NestedCase $MyNestedCase3
 			$NestedSelf => ()
+	$AContextRole(3) =>
+		$NestedCase $MyNestedCase4
