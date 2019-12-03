@@ -26,13 +26,12 @@ import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
-import Effect.Class.Console (logShow)
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
+import Perspectives.DomeinCache (storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
@@ -63,6 +62,15 @@ loadArcFile fileName directoryName = do
                 (Right correctedDFR) -> do
                   pure $ Right $ DomeinFile correctedDFR
     \e -> pure $ Left [Custom (show e)]
+
+-- | Load an Arc file from a directory. Parse the file completely. Cache it.
+loadAndCacheArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadAndCacheArcFile fileName directoryName = do
+  r <- loadArcFile fileName directoryName
+  case r of
+    Left m -> pure m
+    Right df@(DomeinFile {_id}) -> storeDomeinFileInCache _id df *> pure []
+
 
 -- | Load an Arc file from a directory. Parse the file completely. Store and cache it.
 loadAndSaveArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
