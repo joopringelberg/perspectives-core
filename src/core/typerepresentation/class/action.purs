@@ -47,6 +47,7 @@ class ActionClass c where
   requiredIndirectObjectProperties :: c -> Maybe ViewType
   condition :: c -> MonadPerspectives QueryFunctionDescription
   effect :: c -> MonadPerspectives QueryFunctionDescription
+  isExecutedByBot :: c -> Boolean
 
 instance actionActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
@@ -62,3 +63,4 @@ instance actionActionClass :: ActionClass Action where
   effect (Action{_id, effect:et}) = case et of
     (Just (EF ar)) -> pure ar
     otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
+  isExecutedByBot r = (unwrap r).executedByBot

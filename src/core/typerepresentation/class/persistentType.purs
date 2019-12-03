@@ -78,6 +78,9 @@ getCalculatedProperty = getPerspectType
 getContext :: ContextType -> MP Context
 getContext = getPerspectType
 
+getAction :: ActionType -> MP Action
+getAction = getPerspectType
+
 typeExists :: forall v i. PersistentType v i => i -> MP Boolean
 typeExists id = catchError (((getPerspectType id) :: MP v) >>= pure <<< const true) \e -> pure false
 
