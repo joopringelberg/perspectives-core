@@ -28,7 +28,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.loadCRL" do
+theSuite = suiteSkip "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "contextAndRole.crl" testDirectory
     -- logShow r
@@ -45,7 +45,7 @@ theSuite = suite "Perspectives.loadCRL" do
         logShow r
         assert "Expected to load a file into couchdb" false
 
-  testOnly "Load a file with a context instance, setup bot action" do
+  test "Load a file with a context instance, setup bot action" do
     r <- runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser

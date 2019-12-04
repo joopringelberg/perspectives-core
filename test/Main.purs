@@ -16,6 +16,7 @@ import Test.LoadCRL as LCRL
 import Test.LoadArc as LARC
 import Test.ContextAndRole as CAR
 import Test.ContextRoleParser as CRP
+import Test.Actions as ACT
 import Test.Unit.Main (runTest)
 
 main :: Effect Unit
@@ -31,3 +32,4 @@ main = runTest do
   LARC.theSuite
   CAR.theSuite
   CRP.theSuite
+  ACT.theSuite

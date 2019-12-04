@@ -60,6 +60,15 @@ loadCrlFile file directoryName = do
         \i (_ :: PerspectContext) -> setupAndRunBotActions (ContextInstance i)
       pure $ Right contextsAndRoles
 
+loadCrlFile_ :: String ->
+  String ->
+  MonadPerspectives (Array PerspectivesError)
+loadCrlFile_ file directoryName = do
+  r <- loadCrlFile file directoryName
+  case r of
+    Left e -> pure e
+    Right _ -> pure []
+
 -- | Loads a file from the directory "src/model" relative to the directory of the active process.
 -- | Runs all bot actions.
 -- | All instances are loaded into the cache, and stored in Couchdb.
