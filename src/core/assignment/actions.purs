@@ -162,7 +162,9 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
           c <- getPerspectEntiteit ctxt
           void $ saveEntiteit_ ctxt (changeContext_me c (Just (identifier role)))
         else pure unit
+      -- save and add to context:
       saveRoleInstance (identifier role)
+      lift $ lift $ setupAndRunBotActions ctxt
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo

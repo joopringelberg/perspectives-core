@@ -156,6 +156,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externePr
             lift $ traverseWithIndex (constructRol rolType (ContextInstance contextInstanceId) rolId) rollen'
 
 -- | Constructs a rol and caches it.
+-- | Does not add it to its context.
 constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> MonadPerspectives PerspectRol
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
   isMe <- case bnd of
@@ -177,6 +178,7 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
 -- | Construct a Role instance for an existing Context instance.
 -- | Caches the instance but does not save it, nor add it to a Transaction.
 -- | User saveRoleInstance for that purpose
+-- | Does not add it to its context.
 constructAnotherRol :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectives PerspectRol
 constructAnotherRol rolType id rolSerialisation = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id

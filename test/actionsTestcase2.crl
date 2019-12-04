@@ -1,0 +1,6 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCase2 usr:MyTestCase
+	$Self -> usr:MijnSysteem$User(1)

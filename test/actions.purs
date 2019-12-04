@@ -29,7 +29,8 @@ modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Actions" do
-  testOnly "compileAssignment: Remove" do
+
+  test "compileAssignment: Remove" do
     r <- runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
@@ -45,3 +46,20 @@ theSuite = suite "Perspectives.Actions" do
     case r of
       Left e -> assert ("There are errors:\n" <> show e) false
       Right instances -> assert "There should be no instances of ARole." (length instances == 0)
+
+  testOnly "compileAssignment: CreateRole" do
+    r <- runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      if null modelErrors
+        then do
+          logShow "No model errors"
+          instanceErrors <- loadCrlFile_ "actionsTestcase2.crl" testDirectory
+          if null instanceErrors
+            then Right <$> ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCase2$ARole"))
+            else pure $ Left instanceErrors
+        else pure $ Left modelErrors
+    case r of
+      Left e -> assert ("There are errors:\n" <> show e) false
+      Right instances -> assert "There should be a single (new) instance of ARole." (length instances == 1)
