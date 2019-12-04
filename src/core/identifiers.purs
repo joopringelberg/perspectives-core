@@ -175,7 +175,7 @@ isLocalNameOf = flip hasLocalName
 -- CURIES
 -----------------------------------------------------------
 curieRegEx :: Regex
-curieRegEx = unsafeRegex "^(\\w+)\\:(\\w+)" noFlags
+curieRegEx = unsafeRegex "^(\\w+)\\:([\\w|\\$]+)" noFlags
 
 -- | Returns 'pre' from 'pre:someurl' or Nothing.
 deconstructPrefix :: String -> Maybe Prefix
