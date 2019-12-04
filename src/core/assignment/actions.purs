@@ -75,10 +75,7 @@ setupAndRunBotActions cid = do
             -- Only when it is an automatic action
             shouldRun <- getAction a >>= pure <<< isExecutedByBot
             if shouldRun
-              then (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
-                  -- Evaluate the lhs to set up the dependency administration.
-                  (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
-                  cacheActionInstanceDependencies (ActionInstance cid a) ass
+              then (compileBotAction a) >>= \((Tuple _ updater) :: Tuple LHS (Updater ContextInstance)) -> void $ runMonadPerspectivesTransaction $ updater cid
               else pure unit
 
 -- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
