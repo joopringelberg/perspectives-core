@@ -107,7 +107,7 @@ removeRoleInstance_ roleId = do
 -- | Removes the role instance from the cache and from the database.
 -- | Removes the role instance from the inverse administration of its binding.
 -- | Removes the role instance as binding from all its binders.
--- | Does NOT remove the role instance from its context. Use removeRol for that.
+-- | Does NOT remove the role instance from its context. Use removeRolFromContext for that.
 -- | Adds the Role to the Transaction in deletedRoles. We do not push a ContextDelta, as the
 -- | receiving PDR's will recompute the effect of destroying this instance on their context
 -- | instances themselves.

@@ -161,8 +161,8 @@ addRol contextId rolName rolInstances = do
 -- | Caches and saves the context instance.
 -- | Notice that this function does neither cache nor save the rolInstances themselves.
 -- | Instead, use removeRoleInstance.
-removeRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
-removeRol contextId rolName rolInstances = do
+removeRolFromContext :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+removeRolFromContext contextId rolName rolInstances = do
   (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
   saveEntiteit contextId (modifyContext_rolInContext pe rolName (flip difference rolInstances))
   for_ rolInstances \rolInstance ->

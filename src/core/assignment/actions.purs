@@ -36,7 +36,7 @@ import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (areBotActionsSetUp, cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.Assignment.Update (moveRoles, removeRol)
+import Perspectives.Assignment.Update (moveRoles, removeRolFromContext)
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
@@ -54,7 +54,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SaveUserData (saveRoleInstance)
+import Perspectives.SaveUserData (removeRoleInstance, saveRoleInstance)
 
 
 -- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
@@ -148,8 +148,8 @@ compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
       Just {head, tail} -> do
         ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
         lift $ lift $ setupAndRunBotActions context
-        -- TODO: removeRoleInstance instead
-        removeRol context pspType roles
+        removeRolFromContext context pspType roles
+        for_ roles removeRoleInstance
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
@@ -232,7 +232,7 @@ constructRHS objectGetter actionType a = case a of
     pure $ f rt valueComputer addRol
   (RemoveFromRol rt (query :: QueryFunctionDescription)) -> do
     valueComputer <- context2role query
-    pure $ f rt valueComputer removeRol
+    pure $ f rt valueComputer removeRolFromContext
   (DeleteRol rt) -> pure $ f' rt
   (SetProperty pt (query :: QueryFunctionDescription)) -> do
     (valueComputer :: ContextPropertyValueGetter) <- context2propertyValue query
