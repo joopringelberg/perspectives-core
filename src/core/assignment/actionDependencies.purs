@@ -24,7 +24,7 @@ module Perspectives.Assignment.DependencyTracking where
 -- | The ActionAssumptionRegister is indexed by the two elements of an Assumption, in order.
 import Data.Array (catMaybes)
 import Data.Array (cons, delete) as Arr
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
@@ -33,7 +33,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, ensure, keys, modify, 
 import Perspectives.PerspectivesState (actionAssumptionCache, actionInstanceCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..))
-import Prelude (Unit, const, flip, join, unit, ($), (<#>), (<$>), map, bind, pure, discard, void)
+import Prelude (Unit, const, flip, join, unit, ($), (<#>), (<$>), map, bind, pure, discard, void, (<<<), (>>=))
 
 
 -- | Creates reciprocal entries in the ActionAssumptionCache and the ActionInstanceCache.
@@ -60,6 +60,9 @@ retrieveActionInstanceSupports :: ActionInstance -> MP (Maybe (Array Assumption)
 retrieveActionInstanceSupports (ActionInstance c a) = do
   actionInstanceCache' <- actionInstanceCache
   pure $ join $ flip peek (unwrap a) <$> (peek actionInstanceCache' (unwrap c))
+
+areBotActionsSetUp :: ContextInstance -> MP Boolean
+areBotActionsSetUp contextId = actionInstanceCache >>= pure <<< isJust <<< flip peek (unwrap contextId)
 
 -- | Retrieve the ActionInstances that depend an an Assumption.
 retrieveAssumptionActionInstances :: Assumption -> MP (Maybe (Array ActionInstance))
