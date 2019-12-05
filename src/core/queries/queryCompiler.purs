@@ -30,7 +30,8 @@ import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Array (elemIndex)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
@@ -49,7 +50,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (bind, const, discard, identity, pure, show, ($), (*>), (<<<), (<>), (>=>), (>>=))
+import Prelude (class Eq, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<=), (<>), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -136,30 +137,6 @@ compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _ _ _) = do
     -- TODO: filter Values.
     _,  _ -> throwError (error $  "Cannot filter '" <> show source <> "' with '" <> show criterium <> "'.")
 
-compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) = do
-  f1' <- compileFunction f1
-  f2' <- compileFunction f2
-  case f1', f2' of
-    (C2C a), (C2C b) -> pure $ C2C $ Combinators.disjunction a b
-    (C2R a), (C2R b) -> pure $ C2R $ Combinators.disjunction a b
-    (C2V a), (C2V b) -> pure $ C2V $ Combinators.disjunction a b
-    (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
-    (R2R a), (R2R b) -> pure $ R2R $ Combinators.disjunction a b
-    (R2V a), (R2V b) -> pure $ R2V $ Combinators.disjunction a b
-    _,  _ -> throwError (error $ "Cannot create disjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
-
-compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
-  f1' <- compileFunction f1
-  f2' <- compileFunction f2
-  case f1', f2' of
-    (C2C a), (C2C b) -> pure $ C2C $ Combinators.conjunction a b
-    (C2R a), (C2R b) -> pure $ C2R $ Combinators.conjunction a b
-    (C2V a), (C2V b) -> pure $ C2V $ Combinators.conjunction a b
-    (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
-    (R2R a), (R2R b) -> pure $ R2R $ Combinators.conjunction a b
-    (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
-    _,  _ -> throwError (error $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
-
 compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
@@ -184,6 +161,54 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
     (R2V a), (R2V b) -> pure $ R2V (a *> b)
     _, _ -> throwError (error $ "This is not a valid sequence: '" <> show f1 <> "', '" <> show f2 <> "'." )
 
+compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2C a), (C2C b) -> pure $ C2C $ Combinators.disjunction a b
+    (C2R a), (C2R b) -> pure $ C2R $ Combinators.disjunction a b
+    (C2V a), (C2V b) -> pure $ C2V $ Combinators.disjunction a b
+    (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
+    (R2R a), (R2R b) -> pure $ R2R $ Combinators.disjunction a b
+    (R2V a), (R2V b) -> pure $ R2V $ Combinators.disjunction a b
+    _,  _ -> throwError (error $ "Cannot create disjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+
+compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2C a), (C2C b) -> pure $ C2C $ Combinators.conjunction a b
+    (C2R a), (C2R b) -> pure $ C2R $ Combinators.conjunction a b
+    (C2V a), (C2V b) -> pure $ C2V $ Combinators.conjunction a b
+    (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
+    (R2R a), (R2R b) -> pure $ R2R $ Combinators.conjunction a b
+    (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
+    _,  _ -> throwError (error $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [EqualsF, NotEqualsF] = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2C a), (C2C b) -> pure $ C2V $ compareContexts a b (unsafePartial $ compareFunction g)
+    (C2R a), (C2R b) -> pure $ C2V $ compareContexts a b (unsafePartial $ compareFunction g)
+    (C2V a), (C2V b) -> pure $ C2V $ compareContexts a b (unsafePartial $ compareFunction g)
+    (R2C a), (R2C b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
+    (R2R a), (R2R b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
+    (R2V a), (R2V b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
+    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+
+-- compileFunction (BQD _ (BinaryCombinator comparison) f1 f2 _ _ _) | isJust $ elemIndex comparison operators = do
+--   f1' <- compileFunction f1
+--   f2' <- compileFunction f2
+--   case f1', f2' of
+--     (C2C a), (C2C b) -> pure $ C2C $ Combinators.conjunction a b
+--     (C2R a), (C2R b) -> pure $ C2R $ Combinators.conjunction a b
+--     (C2V a), (C2V b) -> pure $ C2V $ Combinators.conjunction a b
+--     (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
+--     (R2R a), (R2R b) -> pure $ R2R $ Combinators.conjunction a b
+--     (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
+--     _,  _ -> throwError (error $ "Cannot create function out of binary expression for '" <> show f1 <> "' and '" <> show f2 <> "'.")
+
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
   case f1' of
@@ -196,6 +221,38 @@ compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> show qd <> "'.")
+
+compareContexts :: forall a. Eq a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
+compareContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+
+compareRoles :: forall a. Eq a => (RoleInstance ~~> a) -> (RoleInstance ~~> a) -> (a -> a -> Boolean) -> RoleInstance ~~> Value
+compareRoles a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+
+compareFunction :: forall a. Eq a => Partial => FunctionName -> (a -> a -> Boolean)
+compareFunction fname = case fname of
+  EqualsF -> eq
+  NotEqualsF -> notEq
+
+operators :: Array FunctionName
+operators =
+  [ DisjunctionF
+  , ConjunctionF
+
+  , EqualsF
+  , NotEqualsF
+  , LessThanF
+  , LessThanEqualF
+  , GreaterThanF
+  , GreaterThanEqualF
+
+  , AddF
+  , SubtractF
+  , DivideF
+  , MultiplyF
+
+  , AndF
+  , OrF
+  ]
 
 addBinding_ :: String -> (String ~~> String) -> String ~~> String
 addBinding_ varName computation ctxt  = do

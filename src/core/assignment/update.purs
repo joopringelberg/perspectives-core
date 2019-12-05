@@ -40,7 +40,7 @@ import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspe
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.TypesForDeltas (RoleDelta(..), ContextDelta(..), DeltaType(..), PropertyDelta(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), PropertyDelta(..), RoleDelta(..))
 
 {-
 Om een door de gebruiker aangebrachte wijziging door te voeren, moet je:
@@ -119,7 +119,6 @@ removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
   saveEntiteit roleId (changeRol_isMe (removeRol_binding originalRole) false)
-  -- TODO: if roleId is the value of Me in its context, remove it.
   ctxt <- lift $ lift $ getPerspectContext $ rol_context originalRole
   if (context_me ctxt == (Just roleId))
     then setMe (rol_context originalRole) Nothing
@@ -215,10 +214,27 @@ setRol contextId rolName rolInstances = do
 -- | Modifies both context instances.
 -- | Adds Context deltas to the Transaction.
 -- | Caches and saves the context instances.
--- | Notice that this function does neither cache nor save the rolInstances themselves.
--- TODO: implement moveRoles.
-moveRoles :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
-moveRoles contextId rolName rolInstances = throwError (error $ show (Custom "Implement moveRoles!"))
+-- | Nothing else is changed.
+moveRoles :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+moveRoles originContextId destinationContextId rolName rolInstances = do
+  origin <- lift $ lift $ getPerspectEntiteit originContextId
+  destination <- lift $ lift $ getPerspectEntiteit destinationContextId
+  saveEntiteit destinationContextId (modifyContext_rolInContext destination rolName (append rolInstances))
+  saveEntiteit originContextId (modifyContext_rolInContext origin rolName (flip difference rolInstances))
+  for_ rolInstances \rolInstance -> do
+    addContextDelta $ ContextDelta
+                { id : originContextId
+                , role: rolName
+                , deltaType: Delete
+                , instance: Just rolInstance
+                }
+    addContextDelta $ ContextDelta
+                { id : destinationContextId
+                , role: rolName
+                , deltaType: Add
+                , instance: Just rolInstance
+                }
+
 -----------------------------------------------------------
 -- UPDATE A PROPERTY
 -----------------------------------------------------------

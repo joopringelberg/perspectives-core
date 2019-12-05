@@ -211,6 +211,22 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 Nothing -> false
                 (Just (EnumeratedRole {binding})) -> binding == (ST $ EnumeratedRoleType "model:MyTestDomain$MyOtherRole")
 
+  test "A role with binding on a double segmented name" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  use: sys for model:System\n  user: MyUser filledBy: sys:PerspectivesSystem$User" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+
+        case evalPhaseTwo (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            logShow dr'
+            assert "The DomeinFile should have the role 'model:MyTestDomain$MyUser' that is\
+            \ filled with 'ST EnumeratedRoleType model:System$PerspectivesSystem$User'"
+              case (lookup "model:MyTestDomain$MyUser" dr'.enumeratedRoles) of
+                Nothing -> false
+                (Just (EnumeratedRole {binding})) -> binding == (ST $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
+
   test "Role has context" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    FilledBy : model:MyTestDomain$MyOtherRole" domain
     case r of

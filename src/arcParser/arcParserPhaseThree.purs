@@ -38,6 +38,7 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
 import Foreign.Object (Object, insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
@@ -272,7 +273,7 @@ qualifyViewReferences = do
 -- | For each Role with a binding, record that Role as an inverse binding for the value of the binding.
 -- TODO. Implement inverseBindings. Or don't we really need it?
 inverseBindings :: PhaseThree Unit
-inverseBindings = pure unit
+inverseBindings = throwError (Custom "Implement inverseBindings")
 
 -- | A Computed Role has a clause that specifies the type of Role that is computed.
 -- | The modeller can use an unqualified name, that should be resolved against all Roles in the Domain.

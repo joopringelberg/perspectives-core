@@ -67,6 +67,14 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
         logShow id
         assert "'pre:MyTestDomain$Context' should be parsed as a valid identifier" (id == "pre:MyTestDomain$Context")
 
+  test "arcIdentifier on prefixed double segmented name" do
+    (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "pre:MyTestDomain$Context$Role" arcIdentifier
+    case r of
+      (Left e) -> assert (show e) true
+      (Right id) -> do
+        logShow id
+        assert "'pre:MyTestDomain$Context$Role' should be parsed as a valid identifier" (id == "pre:MyTestDomain$Context$Role")
+
   test "arcIdentifier on fully qualified name" do
     (r :: Either ParseError String) <- pure $ unwrap $ runIndentParser "model:MyTestDomain$Context" arcIdentifier
     case r of

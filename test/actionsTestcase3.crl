@@ -1,0 +1,12 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCase3 usr:MyTestCase
+	$Self -> usr:MijnSysteem$User(1)
+		$Prop1 = true
+	$Nested1 =>
+		$NestedContext $MyNested1
+			$ARole => ()
+	$Nested2 =>
+		$NestedContext $MyNested2

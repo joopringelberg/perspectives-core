@@ -27,11 +27,13 @@ module Perspectives.SaveUserData
 
   where
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (lift)
 import Data.Array (nub)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_)
+import Effect.Exception (error)
 import Foreign.Object (values)
 import Perspectives.Assignment.Update (addRol)
 import Perspectives.Assignment.Update (saveEntiteit) as Update
@@ -39,10 +41,11 @@ import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContex
 import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTransaction)
 import Perspectives.Deltas (addContextToTransactie, addRolToTransactie, deleteContextFromTransactie, deleteRolFromTransactie)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (bind, discard, join, pure, unit, void, ($))
+import Prelude (bind, discard, join, pure, show, unit, void, ($))
 
 -- | These functions are Updaters, too. They do not push deltas like the Updaters that change PerspectEntities, but
 -- | they modify other members of Transaction (createdContexts, deletedContexts, createdRoles, deletedRoles).
@@ -120,6 +123,6 @@ removeRoleInstance pr = do
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
 -- | Does NOT remove the role instances from their context. Use deleteRol for that.
 -- | ContextDelta's are not necessary (see removeRoleInstance).
--- | TODO: Implementeer removeRole.
+-- | TODO: Implementeer removeAllRoleInstances.
 removeAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
-removeAllRoleInstances et cid = pure unit
+removeAllRoleInstances et cid = throwError (error $ show (Custom "Implement removeAllRoleInstances!"))

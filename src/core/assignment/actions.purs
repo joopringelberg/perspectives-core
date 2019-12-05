@@ -32,6 +32,9 @@ import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
+import Effect.Class.Console (logShow)
 import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
@@ -177,7 +180,7 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
         Nothing -> pure unit
         Just {head, tail} -> do
           ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-          moveRoles context pspType roles
+          moveRoles context c pspType roles
     else pure \contextId -> do
       ctxt <- lift $ lift (contextId ##> contextGetter)
       case ctxt of
@@ -188,7 +191,7 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
             Nothing -> pure unit
             Just {head, tail} -> do
               ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-              moveRoles context pspType roles
+              moveRoles context c pspType roles
 
 compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
