@@ -30,11 +30,12 @@ module Perspectives.DependencyTracking.Array.Trans where
 -- | This monad transformer extends the base monad.
 import Prelude
 
-import Control.Monad.Trans.Class (class MonadTrans)
+import Control.Monad.Error.Class (class MonadError, class MonadThrow, catchError, throwError)
+import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Control.MonadZero (class Alternative, class MonadZero)
 import Control.Plus (class Alt, class Plus)
 import Data.Array (catMaybes) as Arr
-import Data.Array (concat, foldl, singleton, union)
+import Data.Array (concat, singleton)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
@@ -114,3 +115,10 @@ instance plusArrayT :: Monad m => Plus (ArrayT m)  where
 instance alternativeArrayT :: Monad m => Alternative (ArrayT m)
 
 instance monadZeroArrayT :: Monad m => MonadZero (ArrayT m)
+
+instance monadThrowArrayT :: MonadThrow e m => MonadThrow e (ArrayT m) where
+  throwError = lift <<< throwError
+
+instance monadErrorArrayT :: MonadError e m => MonadError e (ArrayT m) where
+  catchError (ArrayT ma) h =
+    ArrayT (catchError ma (\e -> unwrap $ h e))

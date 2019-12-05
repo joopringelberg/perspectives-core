@@ -23,16 +23,19 @@ module Perspectives.Assignment.Update where
 
 import Prelude
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (difference, union)
 import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
+import Effect.Exception (error)
 import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeContext_me, changeRol_binding, changeRol_isMe, context_me, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_context, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
@@ -215,7 +218,7 @@ setRol contextId rolName rolInstances = do
 -- | Notice that this function does neither cache nor save the rolInstances themselves.
 -- TODO: implement moveRoles.
 moveRoles :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
-moveRoles contextId rolName rolInstances = pure unit
+moveRoles contextId rolName rolInstances = throwError (error $ show (Custom "Implement moveRoles!"))
 -----------------------------------------------------------
 -- UPDATE A PROPERTY
 -----------------------------------------------------------
