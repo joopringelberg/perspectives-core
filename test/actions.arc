@@ -25,3 +25,11 @@ domain: Test
           move Nested1 >> binding >> context >> ARole to Nested2 >> binding >> context
     case: NestedContext
       thing: ARole
+  case: TestCaseBind
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole filledBy: AnotherRole
+    thing: AnotherRole
+    bot: for Self
+      perspective on: Self
+        if true then
+          bind AnotherRole to ARole
