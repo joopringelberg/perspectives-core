@@ -59,3 +59,5 @@ instance showValue :: Show Value where
   show = show <<< unwrap
 instance eqValue :: Eq Value where
   eq (Value id1) (Value id2) = id1 == id2
+instance ordValue :: Ord Value where
+  compare (Value v1) (Value v2) = compare v1 v2

@@ -50,7 +50,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (class Eq, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<=), (<>), (>=>), (>>=))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (<), (<=), (>), (>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -118,6 +118,7 @@ compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = do
     (C2R a), (R2R b) -> pure $ C2R (a >=> b)
     (C2C a), (C2R b) -> pure $ C2R (a >=> b)
     (C2R a), (R2V b) -> pure $ C2V (a >=> b)
+    (C2C a), (C2V b) -> pure $ C2V (a >=> b)
     (R2C a), (C2C b) -> pure $ R2C (a >=> b)
     (R2R a), (R2C b) -> pure $ R2C (a >=> b)
     (R2R a), (R2R b) -> pure $ R2R (a >=> b)
@@ -197,17 +198,17 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
     (R2V a), (R2V b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
     _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
--- compileFunction (BQD _ (BinaryCombinator comparison) f1 f2 _ _ _) | isJust $ elemIndex comparison operators = do
---   f1' <- compileFunction f1
---   f2' <- compileFunction f2
---   case f1', f2' of
---     (C2C a), (C2C b) -> pure $ C2C $ Combinators.conjunction a b
---     (C2R a), (C2R b) -> pure $ C2R $ Combinators.conjunction a b
---     (C2V a), (C2V b) -> pure $ C2V $ Combinators.conjunction a b
---     (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
---     (R2R a), (R2R b) -> pure $ R2R $ Combinators.conjunction a b
---     (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
---     _,  _ -> throwError (error $ "Cannot create function out of binary expression for '" <> show f1 <> "' and '" <> show f2 <> "'.")
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2C a), (C2C b) -> pure $ C2V $ orderContexts a b (unsafePartial $ orderFunction g)
+    (C2R a), (C2R b) -> pure $ C2V $ orderContexts a b (unsafePartial $ orderFunction g)
+    (C2V a), (C2V b) -> pure $ C2V $ orderContexts a b (unsafePartial $ orderFunction g)
+    (R2C a), (R2C b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
+    (R2R a), (R2R b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
+    (R2V a), (R2V b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
+    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -232,6 +233,19 @@ compareFunction :: forall a. Eq a => Partial => FunctionName -> (a -> a -> Boole
 compareFunction fname = case fname of
   EqualsF -> eq
   NotEqualsF -> notEq
+
+orderContexts :: forall a. Ord a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
+orderContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+
+orderRoles :: forall a. Ord a => (RoleInstance ~~> a) -> (RoleInstance ~~> a) -> (a -> a -> Boolean) -> RoleInstance ~~> Value
+orderRoles a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+
+orderFunction :: forall a. Ord a => Partial => FunctionName -> (a -> a -> Boolean)
+orderFunction fname = case fname of
+  LessThanF -> (<)
+  LessThanEqualF -> (<=)
+  GreaterThanF -> (>)
+  GreaterThanEqualF -> (>=)
 
 operators :: Array FunctionName
 operators =
