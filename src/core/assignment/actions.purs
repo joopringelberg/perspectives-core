@@ -32,7 +32,6 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (logShow)
 import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
@@ -42,8 +41,8 @@ import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders, roleType)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders, roleType, context) as OG
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, saveEntiteit_)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
@@ -70,7 +69,7 @@ setupAndRunBotActions cid = areBotActionsSetUp cid >>= if _
     case maybeMe of
       Nothing -> pure unit
       Just me -> do
-        u <- me ##>> roleType
+        u <- me ##>> OG.roleType
         void $ runMonadPerspectivesTransaction do
           perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
           for_ (values perspectives) \actions ->
@@ -93,7 +92,7 @@ setupBotActions cid = areBotActionsSetUp cid >>= if _
     case maybeMe of
       Nothing -> pure unit
       Just me -> do
-        u <- me ##>> roleType
+        u <- me ##>> OG.roleType
         perspectives <- getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
         for_ (values perspectives) \actions ->
           for_ actions \(a :: ActionType) -> do
@@ -179,6 +178,7 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
         Just {head, tail} -> do
           ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
           moveRoles context c pspType roles
+          lift $ lift $ setupAndRunBotActions context
     else pure \contextId -> do
       ctxt <- lift $ lift (contextId ##> contextGetter)
       case ctxt of
@@ -190,6 +190,7 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
             Just {head, tail} -> do
               ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
               moveRoles context c pspType roles
+              lift $ lift $ setupAndRunBotActions context
 
 compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
@@ -199,6 +200,7 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
     (bindings' :: Array RoleInstance) <- lift $ lift (contextId ##= bindingsGetter)
     -- TODO: handle errors when creating a new Role instance in Bind.
     for_ ctxts \ctxt -> do
+      lift $ lift $ setupAndRunBotActions ctxt
       for_ bindings' \bndg -> do
         role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
           (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)}))
@@ -216,18 +218,21 @@ compileAssignment (BQD _ QF.Bind_ bindings binders _ _ _) = do
     (binding :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingsGetter)
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     maybe (pure unit) identity (setBinding <$> binder <*> binding)
+    case binder of
+      Nothing -> pure unit
+      Just b -> lift $ lift $ ((b ##>> OG.context) >>= setupAndRunBotActions)
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
   case mroleType of
     Nothing -> pure
       \contextId -> do
-        binders <- lift $ lift (contextId ##= bindingsGetter >=> allRoleBinders)
-        for_ binders removeBinding
+        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
+        for_ binders removeBindingAndRunRules
     Just roleType -> pure
       \contextId -> do
-        binders <- lift $ lift (contextId ##= bindingsGetter >=> getRoleBinders roleType)
-        for_ binders removeBinding
+        binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders roleType)
+        for_ binders removeBindingAndRunRules
 
 compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -237,7 +242,7 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     -- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so the binding argument
     -- is taken into account, too.
-    maybe (pure unit) identity (removeBinding <$> binder)
+    maybe (pure unit) identity (removeBindingAndRunRules <$> binder)
 
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.
@@ -252,6 +257,10 @@ compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
 -- Catchall, remove when all cases have been covered.
 compileAssignment _ = pure \_ -> pure unit
 
+removeBindingAndRunRules :: Updater RoleInstance
+removeBindingAndRunRules rid = do
+  removeBinding rid
+  lift $ lift $ ((rid ##>> OG.context) >>= setupAndRunBotActions)
 -----------------------------------------------------------
 -- CONSTRUCTACTIONFUNCTION
 -----------------------------------------------------------
