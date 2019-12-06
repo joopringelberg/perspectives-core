@@ -14,8 +14,10 @@ import Perspectives.IndentParser (getRoleInstances)
 import Perspectives.Instances.ObjectGetters (binding, getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile, loadCrlFile_)
 import Perspectives.Persistent (getPerspectRol)
+import Perspectives.Representation.Class.Action (effect)
+import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile, loadAndSaveArcFile)
 import Test.Perspectives.Utils (runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -81,17 +83,40 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  testOnly "compileAssignment: Bind" (runP do
+  test "compileAssignment: Bind" (runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
+          -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
+          -- logShow eff
           instanceErrors <- loadCrlFile_ "actionsTestBind.crl" testDirectory
           if null instanceErrors
             then do
               n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseBind$ARole") >=> binding)
               liftAff $ assert "ARole should have a binding." (length n1 == 1)
+              n2 <- ((ContextInstance "model:User$MyTestCase$MyNestedCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseBind$NestedCase$ARole") >=> binding)
+              liftAff $ assert "ARole in the NestedCase should have a binding." (length n2 == 1)
+            else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
+
+  testOnly "compileAssignment: Bind_" (runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      if null modelErrors
+        then do
+          -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
+          -- logShow eff
+          instanceErrors <- loadCrlFile_ "actionsTestBind_.crl" testDirectory
+          if null instanceErrors
+            then do
+              n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseBind_$ARole4") >=> binding)
+              liftAff $ assert "ARole4 should have a binding." (length n1 == 1)
+              n2 <- ((ContextInstance "model:User$MyTestCase$MyNestedCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseBind_$NestedCase4$ARole4") >=> binding)
+              liftAff $ assert "ARole4 in the NestedCase should have a binding." (length n2 == 1)
             else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
@@ -100,6 +125,6 @@ theSuite = suite "Perspectives.Actions" do
       _ <- loadAndSaveArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       _ <- loadAndSaveArcFile "actions.arc" testDirectory
-      _ <- loadAndSaveCrlFile "actionsTestcase3.crl" testDirectory
+      _ <- loadAndSaveCrlFile "actionsTestBind.crl" testDirectory
       pure unit
       )

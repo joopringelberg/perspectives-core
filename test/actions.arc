@@ -29,7 +29,23 @@ domain: Test
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole filledBy: AnotherRole
     thing: AnotherRole
+    context: Nested filledBy: NestedCase
     bot: for Self
       perspective on: Self
         if true then
           bind AnotherRole to ARole
+          bind AnotherRole to ARole in Nested >> binding >> context
+    case: NestedCase
+      thing: ARole
+  case: TestCaseBind_
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole4 filledBy: AnotherRole4
+    thing: AnotherRole4
+    context: Nested4 filledBy: NestedCase4
+    bot: for Self
+      perspective on: Self
+        if true then
+          bind_ AnotherRole4 to ARole4
+          bind_ AnotherRole4 to Nested4 >> binding >> context >> ARole4
+    case: NestedCase4
+      thing: ARole4 filledBy: AnotherRole4

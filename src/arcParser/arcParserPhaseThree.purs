@@ -351,6 +351,8 @@ compileRules = do
         compileRule actionName a@(Action ar@{subject, effect, object}) = do
           ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
           currentDomain <- pure (CDOM $ ST ctxt)
+          -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
+          -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF).
           case effect of
             -- Compile a series of Assignments into a QueryDescription.
             (Just (A assignments)) -> do
@@ -373,6 +375,8 @@ compileRules = do
             otherwise -> pure a
 
           where
+            -- This will return a QueryFunctionDescription that describes either a single assignment, or
+            -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
             sequenceOfAssignments :: Domain -> Array Assignment -> PhaseThree QueryFunctionDescription
             sequenceOfAssignments currentDomain assignments = case uncons assignments of
               Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
@@ -380,6 +384,7 @@ compileRules = do
                 head_ <- describeAssignmentStatement currentDomain head
                 foldM (addAssignmentToSequence currentDomain) head_ tail
 
+            -- Returns a BQD with QueryFunction (BinaryCombinator SequenceF)
             addAssignmentToSequence :: Domain -> QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription
             addAssignmentToSequence currentDomain seq v = makeSequence <$> pure seq <*> (describeAssignmentStatement currentDomain v)
 

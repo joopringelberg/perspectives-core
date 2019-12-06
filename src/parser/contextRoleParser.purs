@@ -25,7 +25,7 @@ import Control.Alt (void, (<|>))
 import Control.Monad.State (State, execState, get, gets, modify)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, many, snoc, length, fromFoldable, insert) as AR
-import Data.Array (dropEnd, filter, intercalate)
+import Data.Array (dropEnd, intercalate)
 import Data.Char.Unicode (isLower)
 import Data.Either (Either(..))
 import Data.Foldable (elem, fold, for_, traverse_)
@@ -36,8 +36,7 @@ import Data.String (Pattern(..), split)
 import Data.String.CodeUnits (fromCharArray)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (logShow)
-import Foreign.Object (Object, empty, fromFoldable, insert, lookup, values) as FO
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup) as FO
 import Foreign.Object (alter)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe, defaultContextRecord, defaultRolRecord, rol_binding, rol_context, rol_isMe, rol_padOccurrence, rol_pspType, setRol_gevuldeRollen)
 import Perspectives.CoreTypes (MonadPerspectives)

@@ -28,24 +28,22 @@ import Prelude
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, uncons)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
-import Effect.Aff.Class (liftAff)
-import Effect.Class (liftEffect)
 import Effect.Class.Console (logShow)
 import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (areBotActionsSetUp, cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.Assignment.Update (moveRoles, removeRolFromContext)
+import Perspectives.Assignment.Update (moveRoles, removeRolFromContext, setBinding)
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, saveEntiteit_)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
@@ -53,7 +51,7 @@ import Perspectives.Representation.Class.Action (condition, effect, isExecutedBy
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ActionType, getAction, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.QueryFunction (FunctionName(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
@@ -211,8 +209,21 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
             void $ saveEntiteit_ ctxt (changeContext_me c (Just (identifier role)))
           else pure unit
 
+compileAssignment (BQD _ QF.Bind_ bindings binders _ _ _) = do
+  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
+  (bindersGetter :: (ContextInstance ~~> RoleInstance)) <- context2role binders
+  pure \contextId -> do
+    (binding :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingsGetter)
+    (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
+    maybe (pure unit) identity (setBinding <$> binder <*> binding)
 
-compileAssignment (BQD _ (QF.BinaryCombinator SequenceF) _ _ _ _ _) = pure \_ -> pure unit
+-- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
+-- In the QueryCompiler, the components will be variable bindings.
+-- Here they will be assignments.
+compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
+  f1' <- compileAssignment f1
+  f2' <- compileAssignment f2
+  pure \c -> (f1' c *> f2' c)
 
 -- Vergeet EffectFullFunction niet!
 
