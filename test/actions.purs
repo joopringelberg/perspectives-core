@@ -121,7 +121,7 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  testOnly "compileAssignment: Unbind" (runP do
+  test "compileAssignment: Unbind" (runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
@@ -134,6 +134,23 @@ theSuite = suite "Perspectives.Actions" do
             then do
               n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseUnbind$AnotherRole5") >=> allRoleBinders)
               liftAff $ assert "ARole4 should have no binders." (length n1 == 0)
+            else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
+
+  testOnly "compileAssignment: UnbindQualified" (runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      if null modelErrors
+        then do
+          -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
+          -- logShow eff
+          instanceErrors <- loadCrlFile_ "actionsTestUnbindQualified.crl" testDirectory
+          if null instanceErrors
+            then do
+              n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseUnbindQualified$AnotherRole6") >=> allRoleBinders)
+              liftAff $ assert "ARole6 should have a single binder." (length n1 == 1)
             else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )

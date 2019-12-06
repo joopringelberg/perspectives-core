@@ -60,3 +60,14 @@ domain: Test
           unbind AnotherRole5
     case: NestedCase5
       thing: ARole5
+  case: TestCaseUnbindQualified
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole6 filledBy: AnotherRole6
+    thing: AnotherRole6
+    context: Nested6 filledBy: NestedCase6
+    bot: for Self
+      perspective on: Self
+        if true then
+          unbind AnotherRole6 from TestCaseUnbindQualified$ARole6
+    case: NestedCase6
+      thing: ARole6

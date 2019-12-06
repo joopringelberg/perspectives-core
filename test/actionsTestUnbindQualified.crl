@@ -1,0 +1,11 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCaseUnbindQualified usr:MyTestCase
+	$Self -> usr:MijnSysteem$User(1)
+	$AnotherRole6 => ()
+	$ARole6 -> $AnotherRole6(1)
+	$Nested6 =>
+		$NestedCase6 $MyNestedCase
+			$ARole6 -> $$AnotherRole6(1)
