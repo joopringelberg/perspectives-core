@@ -112,6 +112,8 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 -- | Adds a RoleDelta to the transaction.
 -- | Sets isMe to Nothing on the Role instance if the binding we removed represents the user.
 -- | Removes me from the context of the Role instance if the binding we removed represents the user.
+-- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so a binding argument
+-- is taken into account, too (we then only remove that binding, not all of them).
 removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
