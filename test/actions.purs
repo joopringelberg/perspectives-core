@@ -11,7 +11,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.IndentParser (getRoleInstances)
-import Perspectives.Instances.ObjectGetters (binding, getRole)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, binding, getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile, loadCrlFile_)
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Representation.Class.Action (effect)
@@ -102,7 +102,7 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  testOnly "compileAssignment: Bind_" (runP do
+  test "compileAssignment: Bind_" (runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
@@ -117,6 +117,23 @@ theSuite = suite "Perspectives.Actions" do
               liftAff $ assert "ARole4 should have a binding." (length n1 == 1)
               n2 <- ((ContextInstance "model:User$MyTestCase$MyNestedCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseBind_$NestedCase4$ARole4") >=> binding)
               liftAff $ assert "ARole4 in the NestedCase should have a binding." (length n2 == 1)
+            else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
+
+  testOnly "compileAssignment: Unbind" (runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      if null modelErrors
+        then do
+          -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
+          -- logShow eff
+          instanceErrors <- loadCrlFile_ "actionsTestUnbind.crl" testDirectory
+          if null instanceErrors
+            then do
+              n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseUnbind$AnotherRole5") >=> allRoleBinders)
+              liftAff $ assert "ARole4 should have no binders." (length n1 == 0)
             else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )

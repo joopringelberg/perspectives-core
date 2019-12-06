@@ -23,12 +23,13 @@ module Perspectives.Instances.ObjectGetters where
 
 import Control.Monad.Writer (lift, tell)
 import Data.Array (findIndex, index)
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Foreign.Object (keys, lookup)
+import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_pspType, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
@@ -39,7 +40,7 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (($), (<>), (<<<), pure, (*>), bind, discard, (>=>), (>>>), map, (==))
+import Prelude (bind, discard, join, map, pure, ($), (*>), (<<<), (<>), (==), (>=>), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -122,6 +123,13 @@ roleType = ArrayT <<< lift <<< (getRolMember \r -> [rol_pspType r])
 
 roleType_ :: RoleInstance -> MP EnumeratedRoleType
 roleType_ = (getRolMember \r -> rol_pspType r)
+
+-- | All the roles that bind the role instance.
+allRoleBinders :: RoleInstance ~~> RoleInstance
+allRoleBinders r = ArrayT do
+  ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+  for_ (keys gevuldeRollen) (\key -> tell [assumption (unwrap r) key])
+  pure $ join $ values gevuldeRollen
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given
 -- | type that bind it (that have it as their binding). The type of rname (RolDef) may

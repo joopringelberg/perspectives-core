@@ -49,3 +49,14 @@ domain: Test
           bind_ AnotherRole4 to Nested4 >> binding >> context >> ARole4
     case: NestedCase4
       thing: ARole4 filledBy: AnotherRole4
+  case: TestCaseUnbind
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole5 filledBy: AnotherRole5
+    thing: AnotherRole5
+    context: Nested5 filledBy: NestedCase5
+    bot: for Self
+      perspective on: Self
+        if true then
+          unbind AnotherRole5
+    case: NestedCase5
+      thing: ARole5

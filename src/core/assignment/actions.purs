@@ -37,12 +37,12 @@ import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (areBotActionsSetUp, cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.Assignment.Update (moveRoles, removeRolFromContext, setBinding)
+import Perspectives.Assignment.Update (moveRoles, removeBinding, removeRolFromContext, setBinding)
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders, roleType)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
@@ -216,6 +216,18 @@ compileAssignment (BQD _ QF.Bind_ bindings binders _ _ _) = do
     (binding :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingsGetter)
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     maybe (pure unit) identity (setBinding <$> binder <*> binding)
+
+compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
+  (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
+  case mroleType of
+    Nothing -> pure
+      \contextId -> do
+        binders <- lift $ lift (contextId ##= bindingsGetter >=> allRoleBinders)
+        for_ binders removeBinding
+    Just roleType -> pure
+      \contextId -> do
+        binders <- lift $ lift (contextId ##= bindingsGetter >=> getRoleBinders roleType)
+        for_ binders removeBinding
 
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.
