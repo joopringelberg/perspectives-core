@@ -155,7 +155,7 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  testOnly "compileAssignment: Unbind_" (runP do
+  test "compileAssignment: Unbind_" (runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
@@ -172,7 +172,7 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  test "Load files into couchdb" (runP do
+  testSkip "Load files into couchdb" (runP do
       _ <- loadAndSaveArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       _ <- loadAndSaveArcFile "actions.arc" testDirectory
