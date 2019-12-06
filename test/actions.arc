@@ -82,3 +82,35 @@ domain: Test
           unbind_ AnotherRole7 from Nested7 >> binding >> context >> ARole7
     case: NestedCase7
       thing: ARole7
+  case: TestCaseDeleteProp
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole8
+      property: Prop1 (not mandatory, not functional, String)
+    bot: for Self
+      perspective on: ARole8
+        if true then
+          delete property Prop1
+  case: TestCaseRemoveProp
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole9
+      property: Prop2 (not mandatory, not functional, String)
+    bot: for Self
+      perspective on: ARole9
+        if true then
+          Prop2 =- "aap"
+  case: TestCaseAddProp
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole10
+      property: Prop3 (not mandatory, not functional, String)
+    bot: for Self
+      perspective on: ARole10
+        if true then
+          Prop3 =+ "mies"
+  case: TestCaseSetProp
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole11
+      property: Prop4 (not mandatory, not functional, String)
+    bot: for Self
+      perspective on: ARole11
+        if true then
+          Prop4 = "mies"

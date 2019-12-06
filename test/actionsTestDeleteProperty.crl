@@ -1,0 +1,8 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCaseDeleteProp usr:MyTestCase
+	$Self -> usr:MijnSysteem$User(1)
+	$ARole8 => ()
+		$Prop1 = "aap","noot"

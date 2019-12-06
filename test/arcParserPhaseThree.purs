@@ -982,7 +982,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     case effect of
                       (Just (EF (BQD _ qf val role _ _ _))) -> do
                         assert "The queryfunction should be AddPropertyValue" (case qf of
-                          QF.AddPropertyValue -> true
+                          QF.AddPropertyValue _-> true
                           otherwise -> false )
                         assert "The value should be a Constant"
                           (case val of
@@ -1049,7 +1049,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     case effect of
                       (Just (EF (BQD _ qf val role _ _ _))) -> do
                         assert "The queryfunction should be AddPropertyValue" (case qf of
-                          QF.AddPropertyValue -> true
+                          QF.AddPropertyValue _ -> true
                           otherwise -> false )
                         assert "The value should be a Constant"
                           (case val of

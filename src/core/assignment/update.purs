@@ -269,7 +269,7 @@ removeProperty rids propertyName values = for_ rids \rid -> do
                 , value: Just val
                 }
 
--- | Modify the role instance with the new property values.
+-- | Delete all property values from the role for the EnumeratedPropertyType.
 -- | Adds PropertyDeltas to the Transaction.
 -- | Caches and saves the modified Role instance.
 deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction Unit

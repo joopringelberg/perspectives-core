@@ -36,10 +36,10 @@ import Foreign.Object (empty, values)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (areBotActionsSetUp, cacheActionInstanceDependencies, removeContextInstanceDependencies)
-import Perspectives.Assignment.Update (moveRoles, removeBinding, removeRolFromContext, setBinding)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoles, removeBinding, removeProperty, removeRolFromContext, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
-import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders, roleType, context) as OG
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, saveEntiteit_)
@@ -244,6 +244,40 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     -- is taken into account, too.
     maybe (pure unit) identity (removeBindingAndRunRules <$> binder)
 
+compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    deleteProperty roles qualifiedProperty
+    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
+
+compileAssignment (BQD _ (QF.RemovePropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
+  (valueGetter :: (ContextInstance ~~> Value)) <- context2propertyValue valueQfd
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
+    removeProperty roles qualifiedProperty values
+    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
+
+compileAssignment (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
+  (valueGetter :: (ContextInstance ~~> Value)) <- context2propertyValue valueQfd
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
+    addProperty roles qualifiedProperty values
+    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
+
+compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
+  (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
+  (valueGetter :: (ContextInstance ~~> Value)) <- context2propertyValue valueQfd
+  pure \contextId -> do
+    (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
+    (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
+    setProperty roles qualifiedProperty values
+    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
+
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.
 -- Here they will be assignments.
@@ -261,85 +295,3 @@ removeBindingAndRunRules :: Updater RoleInstance
 removeBindingAndRunRules rid = do
   removeBinding rid
   lift $ lift $ ((rid ##>> OG.context) >>= setupAndRunBotActions)
------------------------------------------------------------
--- CONSTRUCTACTIONFUNCTION
------------------------------------------------------------
-type RHS = WithAssumptions Value -> MonadPerspectivesTransaction Unit
-
-{-
--- | From the description of an assignment or effectful function, construct a function
--- | that actually assigns a value or sorts an effect for a Context, conditional on a set of given boolean values.
-constructRHS :: RoleGetter -> ActionType -> AssignmentStatement -> MonadPerspectives (ContextInstance -> RHS)
-constructRHS objectGetter actionType a = case a of
-  (SetRol rt (query :: QueryFunctionDescription)) -> do
-    (valueComputer :: RoleGetter) <- context2role query
-    pure $ f rt valueComputer setRol
-  (AddToRol rt (query :: QueryFunctionDescription)) -> do
-    valueComputer <- context2role query
-    pure $ f rt valueComputer addRol
-  (RemoveFromRol rt (query :: QueryFunctionDescription)) -> do
-    valueComputer <- context2role query
-    pure $ f rt valueComputer removeRolFromContext
-  (DeleteRol rt) -> pure $ f' rt
-  (SetProperty pt (query :: QueryFunctionDescription)) -> do
-    (valueComputer :: ContextPropertyValueGetter) <- context2propertyValue query
-    pure $ g pt valueComputer setProperty
-  (AddToProperty pt (query :: QueryFunctionDescription)) -> do
-    (valueComputer :: ContextPropertyValueGetter) <- context2propertyValue query
-    pure $ g pt valueComputer addProperty
-  (RemoveFromProperty pt (query :: QueryFunctionDescription)) -> do
-    (valueComputer :: ContextPropertyValueGetter) <- context2propertyValue query
-    pure $ g pt valueComputer removeProperty
-  (DeleteProperty pt) -> pure $ g' pt
-  (EffectFullFunction fun args) -> case fun of
-    -- TODO: vervang dit zodra de parser weer werkt.
-    "storeDomeinFile" -> pure \contextInstance bools -> pure unit
-    otherwise -> throwError (error ("Unknown EffectFullFunction in constructRHS: " <> show a))
-
-  where
-    f :: EnumeratedRoleType -> RoleGetter -> RoleUpdater -> (ContextInstance -> RHS)
-    f rt roleGetter roleUpdater contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
-        then do
-          (Tuple value a1 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId roleGetter
-          -- The Object of the Action (where the bot is the Subject).
-          -- We compute it here just for the assumptions.
-          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
-          -- Cache the association between the assumptions found for this ActionInstance.
-          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
-          void $ pure $ roleUpdater contextId rt value
-        else pure unit
-
-    -- Delete an entire role.
-    f' :: EnumeratedRoleType -> (ContextInstance -> RHS)
-    f' rt contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
-        then do
-          -- The Object of the Action (where the bot is the Subject).
-          -- We compute it here just for the assumptions.
-          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
-          -- Cache the association between the assumptions found for this ActionInstance.
-          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 a2)
-          void $ pure $ deleteRol contextId rt
-        else pure unit
-
-    g :: EnumeratedPropertyType -> ContextPropertyValueGetter -> PropertyUpdater -> (ContextInstance -> RHS)
-    g rt valueGetter propertyUpdater contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
-        then do
-          (Tuple value a1 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId valueGetter
-          -- The Object of the Action (where the bot is the Subject).
-          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
-          -- Cache the association between the assumptions found for this ActionInstance.
-          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 (union a1 a2))
-          void $ pure $ propertyUpdater object rt value
-        else pure unit
-
-    -- delete an entire property
-    g' :: EnumeratedPropertyType -> (ContextInstance -> RHS)
-    g' rt contextId (Tuple bools a0 :: WithAssumptions Value) = if (alaF Conj foldMap (eq (Value "true")) bools)
-        then do
-          -- The Object of the Action (where the bot is the Subject).
-          (Tuple object a2 :: WithAssumptions RoleInstance) <- lift $ lift $ runMonadPerspectivesQuery contextId objectGetter
-          -- Cache the association between the assumptions found for this ActionInstance.
-          pure $ cacheActionInstanceDependencies (ActionInstance contextId actionType) (union a0 a2)
-          void $ pure $ deleteProperty object rt
-        else pure unit
--}

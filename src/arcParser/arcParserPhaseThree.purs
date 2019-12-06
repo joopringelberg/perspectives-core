@@ -38,7 +38,6 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
 import Foreign.Object (Object, insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
@@ -476,9 +475,9 @@ compileRules = do
                 valueQfd <- compileStep currentDomain valueExpression
                 rangeOfProperty <- lift $ lift $ getEnumeratedProperty qualifiedProperty >>= PT.range
                 fname <- case operator of
-                  Set _ -> pure QF.SetPropertyValue
-                  AddTo _ -> pure QF.AddPropertyValue
-                  DeleteFrom _ -> pure QF.RemovePropertyValue
+                  Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
+                  AddTo _ -> pure $ QF.AddPropertyValue qualifiedProperty
+                  DeleteFrom _ -> pure $ QF.RemovePropertyValue qualifiedProperty
                 case range valueQfd of
                   (VDOM r) | r == rangeOfProperty -> pure unit
                   (VDOM r) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
