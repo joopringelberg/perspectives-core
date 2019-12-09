@@ -38,32 +38,32 @@ data FunctionName =
   ContextF
   | BindingF
   | ExternalRoleF
-  | IdentityF
+  | IdentityF           -- TODO IN QUERYCOMPILER
   | SequenceF
-  | NotF
-  | ExistsF
+  | NotF                -- TODO
+  | ExistsF             -- TODO
   | FilterF
   | ComposeF
   | DisjunctionF
   | ConjunctionF
-  | CreateContextF
-  | CreateRoleF
-  | GetRoleBindersF
+  | CreateContextF      -- TODO
+  | CreateRoleF         -- TODO
+  | GetRoleBindersF     -- TODO
   | EqualsF
   | NotEqualsF
   | LessThanF
   | LessThanEqualF
   | GreaterThanF
   | GreaterThanEqualF
-  | AddF
-  | SubtractF
-  | DivideF
-  | MultiplyF
-  | AndF
-  | OrF
-  | CountF
-  | MinimumF
-  | MaximumF
+  | AddF                -- TODO
+  | SubtractF           -- TODO
+  | DivideF             -- TODO
+  | MultiplyF           -- TODO
+  | AndF                -- TODO
+  | OrF                 -- TODO
+  | CountF              -- TODO
+  | MinimumF            -- TODO, ALSO IN DESCRIPTIONCOMPILER
+  | MaximumF            -- TODO, ALSO IN DESCRIPTIONCOMPILER
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of

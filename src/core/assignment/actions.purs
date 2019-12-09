@@ -38,7 +38,7 @@ import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.DependencyTracking (areBotActionsSetUp, cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoles, removeBinding, removeProperty, removeRolFromContext, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol)
-import Perspectives.ContextAndRole (changeContext_me, context_me, rol_isMe)
+import Perspectives.ContextAndRole (context_me, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders, roleType, context) as OG
@@ -54,7 +54,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SaveUserData (removeRoleInstance, saveRoleInstance)
+import Perspectives.SaveUserData (removeRoleInstance, saveAndConnectRoleInstance)
 
 
 -- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
@@ -157,13 +157,8 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
     ctxts <- lift $ lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
       role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing}))
-      if rol_isMe role
-        then lift $ lift $ do
-          c <- getPerspectEntiteit ctxt
-          void $ saveEntiteit_ ctxt (changeContext_me c (Just (identifier role)))
-        else pure unit
       -- save and add to context:
-      saveRoleInstance (identifier role)
+      saveAndConnectRoleInstance (identifier role)
       lift $ lift $ setupAndRunBotActions ctxt
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
@@ -204,12 +199,7 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
       for_ bindings' \bndg -> do
         role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
           (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)}))
-        saveRoleInstance (identifier role)
-        if rol_isMe role
-          then lift $ lift $ do
-            c <- getPerspectEntiteit ctxt
-            void $ saveEntiteit_ ctxt (changeContext_me c (Just (identifier role)))
-          else pure unit
+        saveAndConnectRoleInstance (identifier role)
 
 compileAssignment (BQD _ QF.Bind_ bindings binders _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -217,6 +207,7 @@ compileAssignment (BQD _ QF.Bind_ bindings binders _ _ _) = do
   pure \contextId -> do
     (binding :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingsGetter)
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
+    -- setBinding caches, saves, sets isMe and me.
     maybe (pure unit) identity (setBinding <$> binder <*> binding)
     case binder of
       Nothing -> pure unit

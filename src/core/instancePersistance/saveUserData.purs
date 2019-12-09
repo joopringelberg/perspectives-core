@@ -21,7 +21,7 @@
 
 module Perspectives.SaveUserData
   ( saveContextInstance
-  , saveRoleInstance
+  , saveAndConnectRoleInstance
   , removeContextInstance
   , removeRoleInstance)
 
@@ -62,8 +62,9 @@ saveContextInstance id = do
 
 -- | Saves a previously cached Role instance and adds it to the Transaction.
 -- | Adds the Role instance to its Context instance and adds a ContextDelta to the Transaction.
-saveRoleInstance :: Updater RoleInstance
-saveRoleInstance id = do
+-- TODO het is niet logisch om bij het saven ook de structuur te wijzigen.
+saveAndConnectRoleInstance :: Updater RoleInstance
+saveAndConnectRoleInstance id = do
   (role@(PerspectRol{_id, context, pspType}) :: PerspectRol) <- lift $ lift $ saveEntiteit id
   void $ addRol context pspType [_id]
   addRolToTransactie role

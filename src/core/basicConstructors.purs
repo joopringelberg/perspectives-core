@@ -177,7 +177,7 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
 
 -- | Construct a Role instance for an existing Context instance.
 -- | Caches the instance but does not save it, nor add it to a Transaction.
--- | User saveRoleInstance for that purpose
+-- | User saveAndConnectRoleInstance for that purpose
 -- | Does not add it to its context.
 constructAnotherRol :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectives PerspectRol
 constructAnotherRol rolType id rolSerialisation = do
