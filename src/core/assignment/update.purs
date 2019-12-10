@@ -47,7 +47,7 @@ import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, chang
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Persistent (class Persistent, getPerspectContext, getPerspectEntiteit, getPerspectRol)
+import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
@@ -168,7 +168,7 @@ type RoleUpdater = ContextInstance -> EnumeratedRoleType -> (Updater (Array Role
 -- | Notice that this function does neither cache nor save the rolInstances themselves.
 addRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 addRol contextId rolName rolInstances = do
-  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
+  (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
   changedContext <- pure (modifyContext_rolInContext pe rolName (flip union rolInstances))
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   case find rol_isMe roles of
@@ -190,7 +190,7 @@ addRol contextId rolName rolInstances = do
 -- | Instead, use removeRoleInstance.
 removeRolFromContext :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 removeRolFromContext contextId rolName rolInstances = do
-  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
+  (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
   changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference rolInstances))
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   case find rol_isMe roles of
@@ -213,7 +213,7 @@ removeRolFromContext contextId rolName rolInstances = do
 -- | Instead, use removeAllRoleInstances for that.
 deleteRol :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
 deleteRol contextId rolName = do
-  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
+  (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
   changedContext <- pure (deleteContext_rolInContext pe rolName)
   roles <- traverse (lift <<< lift <<< getPerspectRol) (context_rolInContext pe rolName)
   case find rol_isMe roles of
@@ -237,7 +237,7 @@ setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance)
 setRol contextId rolName rolInstances = do
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   me <- pure $ rol_id <$> find rol_isMe roles
-  (pe :: PerspectContext) <- lift $ lift $ getPerspectEntiteit contextId
+  (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
   saveEntiteit contextId (changeContext_me (setContext_rolInContext pe rolName (rolInstances :: Array RoleInstance)) me)
   for_ rolInstances \rolInstance ->
     addContextDelta $ ContextDelta
@@ -257,8 +257,9 @@ moveRoles :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Update
 moveRoles originContextId destinationContextId rolName rolInstances = do
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   me <- pure $ rol_id <$> find rol_isMe roles
-  origin <- lift $ lift $ getPerspectEntiteit originContextId
-  destination <- lift $ lift $ getPerspectEntiteit destinationContextId
+  -- me <- pure $ Just $ RoleInstance ""
+  origin <- lift $ lift $ getPerspectContext originContextId
+  destination <- lift $ lift $ getPerspectContext destinationContextId
   case me of
     Nothing -> do
       saveEntiteit destinationContextId (modifyContext_rolInContext destination rolName (append rolInstances))

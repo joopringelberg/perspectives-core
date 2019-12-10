@@ -27,9 +27,10 @@ import Data.Array (cons, delete) as Arr
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
-import Data.Tuple (Tuple(..))
-import Perspectives.CoreTypes (ActionInstance(..), Assumption, MP)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, ensure, keys, modify, new, peek, poke)
+import Data.Tuple (Tuple(..), snd)
+import Perspectives.Assignment.ActionCache (retrieveAction)
+import Perspectives.CoreTypes (ActionInstance(..), Assumption, MP, Updater)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, ensure, keys, modify, new, peek, poke, values)
 import Perspectives.PerspectivesState (actionAssumptionCache, actionInstanceCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..))
@@ -94,7 +95,21 @@ actionInstancesDependingOn as = do
   (r :: Array (Maybe (Array ActionInstance))) <- traverse retrieveAssumptionActionInstances as
   pure $ join (catMaybes r)
 
+-- | Given a ContextInstance, find all ActionTypes that have a rule setup for the ContextInstance.
 actionTypesForContextInstance :: ContextInstance -> MP (Maybe (Array ActionType))
 actionTypesForContextInstance c = do
   actionInstanceCache' <- actionInstanceCache
   pure $ (map ActionType) <$> (keys <$> peek actionInstanceCache' (unwrap c))
+
+actionInstancesForContextInstance :: ContextInstance -> MP (Maybe (Array ActionInstance))
+actionInstancesForContextInstance c = do
+  actionAssumptionCache' <- actionAssumptionCache
+  pure $ join <$> (values <$> peek actionAssumptionCache' (unwrap c))
+
+-- | Given a ContextInstance, return an array of compiled rules that can be run by applying them to the instance.
+rulesForContextInstance :: ContextInstance -> MP (Array (Updater ContextInstance))
+rulesForContextInstance cid = do
+  (types :: (Maybe (Array ActionType))) <- actionTypesForContextInstance cid
+  case types of
+    Nothing -> pure []
+    Just (ts :: Array ActionType) -> pure $ catMaybes $ (map snd) <<< retrieveAction <$> ts

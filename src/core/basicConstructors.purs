@@ -46,7 +46,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, (##=))
 import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.Persistent (getPerspectEntiteit, tryGetPerspectEntiteit, getPerspectRol)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (cacheInitially, removeInternally)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -86,9 +86,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externePr
           -- (m :: Array UserMessage) <- checkAContext $ Context contextInstanceId
           m <- pure []
           case length m of
-            0 -> do
-              -- setupAndRunBotActions contextInstanceId
-              pure $ Right contextInstanceId
+            0 -> pure $ Right contextInstanceId
             otherwise -> do
               -- TODO. Hier kunnen alle gecachede rollen weer verwijderd worden...
               removeFromCache contextInstanceId
@@ -128,7 +126,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externePr
     removeFromCache :: ContextInstance -> MP Unit
     removeFromCache id' = do
       -- Here we know for sure that id is in the cache, as it has been just created (but did fail the tests).
-      (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectEntiteit id'
+      (PerspectContext{rolInContext} :: PerspectContext) <- getPerspectContext id'
       (_ :: Maybe (AVar PerspectContext)) <- removeInternally id'
       (_ :: Maybe (AVar PerspectRol)) <- removeInternally $ RoleInstance $ buitenRol $ unwrap id'
       (_ :: FO.Object (Array (Maybe (AVar PerspectRol)))) <- traverse (traverse removeInternally) rolInContext

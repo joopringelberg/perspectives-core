@@ -23,21 +23,25 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (foldM, union)
+import Data.Array (catMaybes, foldM, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
+import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.Assignment.DependencyTracking (actionInstancesDependingOn)
+import Perspectives.Assignment.DependencyTracking (actionInstancesDependingOn, actionInstancesForContextInstance, rulesForContextInstance)
+import Perspectives.ContextAndRole (context_id)
 import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, Assumption)
 import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
+import Prelude (Unit, bind, discard, join, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>>=))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -47,7 +51,13 @@ import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<),
 runMonadPerspectivesTransaction :: forall o.
   MonadPerspectivesTransaction o
   -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT run)
+runMonadPerspectivesTransaction a = runMonadPerspectivesTransaction' true a
+
+runMonadPerspectivesTransaction' :: forall o.
+  Boolean ->
+  MonadPerspectivesTransaction o
+  -> (MonadPerspectives (Array o))
+runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT run)
   where
     run :: MonadPerspectivesTransaction o
     run = do
@@ -56,7 +66,7 @@ runMonadPerspectivesTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< c
       -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
       (ft :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
-      runTransactie ft
+      if share then runTransactie ft else pure unit
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
       (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
@@ -77,17 +87,31 @@ runMonadPerspectivesTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< c
 assumptionsInTransaction :: Transaction -> Array Assumption
 assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas}) = union (assumption <$> contextDeltas) (union (assumption <$> roleDeltas) (assumption <$> propertyDeltas))
 
--- | Execute every ActionInstance that is triggered by changes in the Transaction.
+-- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
+-- | Also execute ActionInstances for created contexts.
+-- | We need not trigger actions on a context instance that is deleted.
 -- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
 runActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runActions t = do
-  as <- lift $ lift $ actionInstancesDependingOn $ assumptionsInTransaction t
+runActions t@(Transaction{createdContexts}) = do
+  -- action instances deriving from Deltas.
+  (as1 :: Array ActionInstance) <- lift $ lift $ actionInstancesDependingOn $ assumptionsInTransaction t
+  -- action instances deriving from created contexts.
+  as2 <- traverse (lift <<< lift <<< actionInstancesForContextInstance <<< context_id) createdContexts >>= pure <<< join <<< catMaybes
   lift $ void $ AA.modify cloneEmptyTransaction
-  for_ as \(ActionInstance ctxt atype) ->
+  for_ (union as1 as2) \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
-        Nothing -> pure unit
         (Just (Tuple _ a)) -> a ctxt
+        Nothing -> do
+          (Tuple _ updater) <- lift $ lift $ compileBotAction atype
+          updater ctxt
+          pure unit
   nt <- lift AA.get
   if isEmptyTransaction nt
     then pure t
     else pure <<< (<>) t =<< runActions nt
+
+-- | Run the actions that have been set up before, for a context instance.
+runRulesForContextInstance :: ContextInstance -> MonadPerspectivesTransaction Unit
+runRulesForContextInstance cid = do
+  rules <- lift $ lift $ rulesForContextInstance cid
+  for_ rules \rule -> rule cid

@@ -53,32 +53,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeRoleInstance, saveAndConnectRoleInstance)
-
-
--- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
--- | Register their dependency on Assumptions in the actionAssumptionRegister in
--- | PerspectivesState. Execute the actions once.
-setupAndRunBotActions :: ContextInstance -> MonadPerspectives Unit
-setupAndRunBotActions cid = areBotActionsSetUp cid >>= if _
-  then pure unit
-  else do
-    -- For the me role, get its type.
-    maybeMe <- getPerspectContext cid >>= pure <<< context_me
-    case maybeMe of
-      Nothing -> pure unit
-      Just me -> do
-        u <- me ##>> OG.roleType
-        void $ runMonadPerspectivesTransaction do
-          perspectives <- lift $ lift $ getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
-          for_ (values perspectives) \actions ->
-            for_ actions \(a :: ActionType) -> lift $ lift $ do
-              -- Only when it is an automatic action
-              shouldRun <- getAction a >>= pure <<< isExecutedByBot
-              if shouldRun
-                then (compileBotAction a) >>= \((Tuple _ updater) :: Tuple LHS (Updater ContextInstance)) -> void $ runMonadPerspectivesTransaction $ updater cid
-                else pure unit
 
 -- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
 -- | Register their dependency on Assumptions in the actionAssumptionRegister in
@@ -147,7 +122,6 @@ compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
       Nothing -> pure unit
       Just {head, tail} -> do
         ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-        lift $ lift $ setupAndRunBotActions context
         removeRolFromContext context pspType roles
         for_ roles removeRoleInstance
 
@@ -159,7 +133,6 @@ compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDe
       role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing}))
       -- save and add to context:
       saveAndConnectRoleInstance (identifier role)
-      lift $ lift $ setupAndRunBotActions ctxt
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
@@ -173,7 +146,6 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
         Just {head, tail} -> do
           ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
           moveRoles context c pspType roles
-          lift $ lift $ setupAndRunBotActions context
     else pure \contextId -> do
       ctxt <- lift $ lift (contextId ##> contextGetter)
       case ctxt of
@@ -185,7 +157,6 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
             Just {head, tail} -> do
               ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
               moveRoles context c pspType roles
-              lift $ lift $ setupAndRunBotActions context
 
 compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
@@ -195,7 +166,6 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
     (bindings' :: Array RoleInstance) <- lift $ lift (contextId ##= bindingsGetter)
     -- TODO: handle errors when creating a new Role instance in Bind.
     for_ ctxts \ctxt -> do
-      lift $ lift $ setupAndRunBotActions ctxt
       for_ bindings' \bndg -> do
         role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
           (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)}))
@@ -209,9 +179,6 @@ compileAssignment (BQD _ QF.Bind_ bindings binders _ _ _) = do
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     -- setBinding caches, saves, sets isMe and me.
     maybe (pure unit) identity (setBinding <$> binder <*> binding)
-    case binder of
-      Nothing -> pure unit
-      Just b -> lift $ lift $ ((b ##>> OG.context) >>= setupAndRunBotActions)
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -219,11 +186,11 @@ compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
     Nothing -> pure
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
-        for_ binders removeBindingAndRunRules
+        for_ binders removeBinding
     Just roleType -> pure
       \contextId -> do
         binders <- lift $ lift (contextId ##= bindingsGetter >=> OG.getRoleBinders roleType)
-        for_ binders removeBindingAndRunRules
+        for_ binders removeBinding
 
 compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -233,14 +200,13 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     -- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so the binding argument
     -- is taken into account, too.
-    maybe (pure unit) identity (removeBindingAndRunRules <$> binder)
+    maybe (pure unit) identity (removeBinding <$> binder)
 
 compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
   pure \contextId -> do
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     deleteProperty roles qualifiedProperty
-    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
 
 compileAssignment (BQD _ (QF.RemovePropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
@@ -249,7 +215,6 @@ compileAssignment (BQD _ (QF.RemovePropertyValue qualifiedProperty) valueQfd rol
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
     removeProperty roles qualifiedProperty values
-    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
 
 compileAssignment (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
@@ -258,7 +223,6 @@ compileAssignment (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQf
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
     addProperty roles qualifiedProperty values
-    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
 
 compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
@@ -267,7 +231,6 @@ compileAssignment (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQfd roleQf
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     (values :: Array Value) <- lift $ lift (contextId ##= valueGetter)
     setProperty roles qualifiedProperty values
-    for_ roles \role -> lift $ lift $ ((role ##>> OG.context) >>= setupAndRunBotActions)
 
 -- Even though SequenceF is compiled in the QueryCompiler, we need to handle it here, too.
 -- In the QueryCompiler, the components will be variable bindings.
@@ -281,8 +244,3 @@ compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
 
 -- Catchall, remove when all cases have been covered.
 compileAssignment _ = pure \_ -> pure unit
-
-removeBindingAndRunRules :: Updater RoleInstance
-removeBindingAndRunRules rid = do
-  removeBinding rid
-  lift $ lift $ ((rid ##>> OG.context) >>= setupAndRunBotActions)

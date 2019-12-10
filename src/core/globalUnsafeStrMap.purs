@@ -32,6 +32,7 @@ module Perspectives.GlobalUnsafeStrMap
   , ensure
   , modify
   , keys
+  , values
   ) where
 
 import Data.Maybe (Maybe(..))
@@ -88,3 +89,5 @@ instance showGLStrMap :: Show a => Show (GLStrMap a) where
 foreign import clear :: forall a. GLStrMap a -> (GLStrMap a)
 
 foreign import keys :: forall a. GLStrMap a -> Array String
+
+foreign import values :: forall a. GLStrMap a -> Array a

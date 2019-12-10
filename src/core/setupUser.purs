@@ -21,7 +21,7 @@
 
 module Perspectives.SetupUser where
 
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..)) 
 import Perspectives.ContextAndRole (changeRol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.InstanceRepresentation (PerspectContext)

@@ -29,9 +29,9 @@ import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
-import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
+import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Representation.ADT (lessThanOrEqualTo)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
@@ -56,7 +56,7 @@ checkContext c = do
   case defaultPrototype c of
     Nothing -> pure unit
     (Just pt) -> do
-      (p :: PerspectContext) <- lift $ getPerspectEntiteit pt
+      (p :: PerspectContext) <- lift $ getPerspectContext pt
       if (pspType p == identifier c)
         then pure unit
         else fail $ DefaultPrototype (identifier c :: ContextType) (pspType p)

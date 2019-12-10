@@ -31,16 +31,16 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_pspType, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), assumption, type (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (LocalName)
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit)
+import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (bind, discard, join, map, pure, ($), (*>), (<<<), (<>), (==), (>=>), (>>>))
+import Prelude (bind, discard, flip, join, map, pure, ($), (*>), (<<<), (<>), (==), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -51,16 +51,12 @@ trackContextDependency roleName f c = (lift $ tell [(assumption (unwrap c) (unwr
 -- | Because we never change the ExternalRole of a Context, we have no need
 -- | to track it as a dependency.
 externalRole :: ContextInstance ~~> RoleInstance
-externalRole = lift <<< lift <<< (getPerspectContext >=> pure <<< IP.externalRole)
+externalRole = lift <<< lift <<< getContextMember IP.externalRole
 
 getRole :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getRole rn c = ArrayT do
-  ((IP.PerspectContext{rolInContext}) :: IP.PerspectContext) <- lift $ getPerspectEntiteit c
-  case (lookup (unwrap rn) rolInContext) of
-    Nothing -> pure []
-    (Just r) -> do
-      tell [assumption (unwrap c)(unwrap rn)]
-      pure r
+  tell [assumption (unwrap c)(unwrap rn)]
+  lift $ getContextMember (flip context_rolInContext rn) c
 
 -- getRole rn = trackContextDependency rn (getContextMember \(ctxt :: PerspectContext) -> (context_rolInContext ctxt rn))
 

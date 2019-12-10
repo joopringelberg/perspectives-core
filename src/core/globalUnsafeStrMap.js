@@ -42,3 +42,7 @@ exports["clear"] = function(m) {
 exports["keys"] = function(m) {
   return Object.keys(m);
 }
+
+exports["values"] = function(m) {
+  return Object.values(m);
+}

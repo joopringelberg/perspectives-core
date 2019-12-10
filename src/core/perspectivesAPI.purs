@@ -39,13 +39,12 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (setupAndRunBotActions, tearDownBotActions)
+import Perspectives.Actions (tearDownBotActions)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
-import Perspectives.ContextAndRole (rol_context, rol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
@@ -53,7 +52,6 @@ import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
-import Perspectives.Persistent (saveEntiteit_, getPerspectEntiteit)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -206,13 +204,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (Left messages) -> sendResponse (Error corrId (show messages)) setter
           (Right id) -> do
             void $ runMonadPerspectivesTransaction $ saveContextInstance id
-            setupAndRunBotActions id
             sendResponse (Result corrId [buitenRol $ unwrap id]) setter
     Api.DeleteContext -> do
       void $ runMonadPerspectivesTransaction $ removeContextInstance (ContextInstance subject)
       tearDownBotActions (ContextInstance subject)
       sendResponse (Result corrId []) setter
     Api.RemoveRol -> do
+      -- removeRolFromContext
         void $ runMonadPerspectivesTransaction $ removeRoleInstance (RoleInstance object)
         sendResponse (Result corrId []) setter
     Api.CreateRol -> do
