@@ -89,12 +89,12 @@ compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ R2R binding
 compileFunction (SQD dom Identity _ _ _) = case dom of
   CDOM _ -> pure $ C2C (pure <<< identity)
   RDOM _ -> pure $ R2R (pure <<< identity)
-  VDOM _ -> throwError (error "There is no identity function for value.")
+  VDOM _ _ -> throwError (error "There is no identity function for value.")
 
 compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   CDOM _ -> pure $ C2V (pure <<< const (Value value))
   RDOM _ -> pure $ R2V (pure <<< const (Value value))
-  VDOM _ -> throwError (error "There is no constant function for value.")
+  VDOM _ _ -> throwError (error "There is no constant function for value.")
 
 
 compileFunction (SQD _ (ComputedRoleGetter functionName) _ _ _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
@@ -103,10 +103,10 @@ compileFunction (SQD dom (VariableLookup varName) range _ _) =
   case dom, range of
     (CDOM _), (CDOM _) -> pure $ C2C (unsafeCoerce (lookup varName) :: ContextInstance ~~> ContextInstance)
     (CDOM _), (RDOM _) -> pure $ C2R (unsafeCoerce (lookup varName) :: ContextInstance ~~> RoleInstance)
-    (CDOM _), (VDOM _) -> pure $ C2V (unsafeCoerce (lookup varName) :: ContextInstance ~~> Value)
+    (CDOM _), (VDOM _ _) -> pure $ C2V (unsafeCoerce (lookup varName) :: ContextInstance ~~> Value)
     (RDOM _), (RDOM _) -> pure $ R2R (unsafeCoerce (lookup varName) :: RoleInstance ~~> RoleInstance)
     (RDOM _), (CDOM _) -> pure $ R2C (unsafeCoerce (lookup varName) :: RoleInstance ~~> ContextInstance)
-    (RDOM _), (VDOM _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
+    (RDOM _), (VDOM _ _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
     _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
 -- If the second term is a constant, we can ignore the left term. This is an optimalisation.
@@ -137,7 +137,7 @@ compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = if isValueDoma
 
   where
     isValueDomain :: Domain -> Boolean
-    isValueDomain (VDOM _) = true
+    isValueDomain (VDOM _ _) = true
     isValueDomain _ = false
 
 compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _ _ _) = do

@@ -22,6 +22,7 @@
 module Perspectives.Representation.Class.Property where
 
 import Control.Monad.Error.Class (throwError)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
@@ -54,7 +55,7 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
   range r = do
     c <- calculation r
     case QT.range c of
-      (VDOM rn) -> pure rn
+      (VDOM rn _) -> pure rn
       otherwise -> throwError (error "")
   -- Hoe bepaal je of een Calculated property mandatory is? En wat betekent het?
   -- De betekenis is praktisch: als de property mandatory is, weet je dat er altijd een waarde is (al dan niet berekend).
@@ -72,7 +73,7 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty Enu
   range r = pure (unwrap r).range
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
-  calculation r = pure $ SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
+  calculation r = pure $ SQD (RDOM (ST (role r))) (PropertyGetter (ENP (identifier r))) (VDOM (unwrap r).range (Just $ ENP (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
 
 rangeOfPropertyType :: PropertyType -> MonadPerspectives Range
 rangeOfPropertyType (ENP pt) = getEnumeratedProperty pt >>= range

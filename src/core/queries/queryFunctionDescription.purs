@@ -37,7 +37,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType)
 
 -- | A description of a calculation with its domain and range.
 -- | The last two members represent whether the described function is functional and whether it is mandatory.
@@ -91,7 +91,7 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM EP.Range
+data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM EP.Range (Maybe PropertyType)
 
 type Range = Domain
 

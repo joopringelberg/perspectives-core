@@ -479,8 +479,8 @@ compileRules = do
                   AddTo _ -> pure $ QF.AddPropertyValue qualifiedProperty
                   DeleteFrom _ -> pure $ QF.RemovePropertyValue qualifiedProperty
                 case range valueQfd of
-                  (VDOM r) | r == rangeOfProperty -> pure unit
-                  (VDOM r) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
+                  (VDOM r _) | r == rangeOfProperty -> pure unit
+                  (VDOM r _) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
                   otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
                 pure $ BQD currentDomain fname valueQfd roleQfd currentDomain True True
 

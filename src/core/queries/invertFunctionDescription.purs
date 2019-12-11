@@ -124,4 +124,4 @@ terminalStep (SQD _ _ _ _ _) = true
 terminalStep qfd = case domain qfd of
   CDOM _ -> false
   RDOM _ -> false
-  VDOM _ -> true
+  VDOM _ _ -> true

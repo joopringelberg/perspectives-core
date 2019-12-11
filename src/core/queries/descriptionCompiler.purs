@@ -84,11 +84,11 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
           isF <- lift2 $ propertyTypeIsFunctional pt
           isM <- lift2 $ propertyTypeIsMandatory pt
           (rOfpt :: Range) <- lift2 $ rangeOfPropertyType pt
-          pure $ SQD currentDomain (QF.PropertyGetter pt) (VDOM rOfpt) (bool2threeValued isF) (bool2threeValued isM)
+          pure $ SQD currentDomain (QF.PropertyGetter pt) (VDOM rOfpt (Just pt)) (bool2threeValued isF) (bool2threeValued isM)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
-  SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range) True True
+  SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range Nothing) True True
 
 compileSimpleStep currentDomain s@(Binding pos) = do
   case currentDomain of
@@ -177,17 +177,17 @@ compileSimpleStep currentDomain (Variable pos varName) = do
 
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
-  -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool) range value.
+  -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool _) range value.
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    VDOM PBool -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs (VDOM PBool) (functional descriptionOfs) (mandatory descriptionOfs)
+    VDOM PBool _ -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs currentDomain (functional descriptionOfs) (mandatory descriptionOfs)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain s
 
 compileUnaryStep currentDomain st@(Exists pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
-    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool) True True
+    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs currentDomain True True
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
@@ -197,7 +197,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       f2 <- compileStep (range f1) right
       -- f1 is the source to be filtered, f2 is the criterium.
       case range f2 of
-        VDOM PBool -> pure $ BQD currentDomain (QF.BinaryCombinator FilterF) f1 f2 (range f1) (functional f1) False
+        VDOM PBool _ -> pure $ BQD currentDomain (QF.BinaryCombinator FilterF) f1 f2 (range f1) (functional f1) False
         otherwise -> throwError $ NotABoolean (startOf right)
     Compose pos -> do
       f1 <- compileStep currentDomain left
@@ -232,7 +232,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
           -- The sequenceFunctionName is compiled as a UnaryCombinator
           -- Notice by the domain and range that we assume functions that are Monoids.
           SQD _ (QF.UnaryCombinator fname) _ _ _-> case fname of
-            CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber) True True
+            CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True
             _ -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True
           _ -> throwError $ ArgumentMustBeSequenceFunction pos
 
@@ -247,9 +247,9 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
-      (VDOM rc1), (VDOM rc2) | rc1 == rc2 ->
+      (VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
         if  allowed rc1 && allowed rc2
-          then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1) (isFunctionalFunction functionName) True
+          then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
           else throwError $ WrongTypeForOperator pos allowedRangeConstructors
       l, r -> throwError $ TypesCannotBeCompared pos l r
       where
