@@ -39,7 +39,7 @@ import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as 
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -109,23 +109,36 @@ compileFunction (SQD dom (VariableLookup varName) range _ _) =
     (RDOM _), (VDOM _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
     _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
-compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = do
-  f1' <- compileFunction f1
-  f2' <- compileFunction f2
-  case f1', f2' of
-    (C2R a), (R2C b) -> pure $ C2C (a >=> b)
-    (C2C a), (C2C b) -> pure $ C2C (a >=> b)
-    (C2R a), (R2R b) -> pure $ C2R (a >=> b)
-    (C2C a), (C2R b) -> pure $ C2R (a >=> b)
-    (C2R a), (R2V b) -> pure $ C2V (a >=> b)
-    (C2C a), (C2V b) -> pure $ C2V (a >=> b)
-    (R2C a), (C2C b) -> pure $ R2C (a >=> b)
-    (R2R a), (R2C b) -> pure $ R2C (a >=> b)
-    (R2R a), (R2R b) -> pure $ R2R (a >=> b)
-    (R2C a), (C2R b) -> pure $ R2R (a >=> b)
-    (R2C a), (C2V b) -> pure $ R2V (a >=> b)
-    (R2R a), (R2V b) -> pure $ R2V (a >=> b)
-    _,  _ -> throwError (error $  "Cannot compose '" <> show f1 <> "' with '" <> show f2 <> "'.")
+-- If the second term is a constant, we can ignore the left term. This is an optimalisation.
+compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) = compileFunction f2
+
+-- If the domain of f1 is a Value, ignore f1 and just compile f2.
+-- This is an edge case that arises when we invert queries that have a Value as range.
+-- The inverted query has a Value as domain. We then completely ignore that first step.
+compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = if isValueDomain $ domain f1
+  then compileFunction f2
+  else do
+    f1' <- compileFunction f1
+    f2' <- compileFunction f2
+    case f1', f2' of
+      (C2R a), (R2C b) -> pure $ C2C (a >=> b)
+      (C2C a), (C2C b) -> pure $ C2C (a >=> b)
+      (C2R a), (R2R b) -> pure $ C2R (a >=> b)
+      (C2C a), (C2R b) -> pure $ C2R (a >=> b)
+      (C2R a), (R2V b) -> pure $ C2V (a >=> b)
+      (C2C a), (C2V b) -> pure $ C2V (a >=> b)
+      (R2C a), (C2C b) -> pure $ R2C (a >=> b)
+      (R2R a), (R2C b) -> pure $ R2C (a >=> b)
+      (R2R a), (R2R b) -> pure $ R2R (a >=> b)
+      (R2C a), (C2R b) -> pure $ R2R (a >=> b)
+      (R2C a), (C2V b) -> pure $ R2V (a >=> b)
+      (R2R a), (R2V b) -> pure $ R2V (a >=> b)
+      _,  _ -> throwError (error $  "Cannot compose '" <> show f1 <> "' with '" <> show f2 <> "'.")
+
+  where
+    isValueDomain :: Domain -> Boolean
+    isValueDomain (VDOM _) = true
+    isValueDomain _ = false
 
 compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _ _ _) = do
   criterium' <- compileFunction criterium
