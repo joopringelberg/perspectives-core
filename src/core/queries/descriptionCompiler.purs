@@ -228,9 +228,14 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached"
 
+        -- >>= is parsed as the operator Sequence.
+        -- "sum", "product", "minimum", "maximum" and "count" are parsed as SequenceFunction
+        -- step >>= f is parsed as the BinaryStep we're dealing here with now.
         Sequence pos -> case f2 of
-          -- The sequenceFunctionName is compiled as a UnaryCombinator
+          -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
+          -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
           -- Notice by the domain and range that we assume functions that are Monoids.
+          -- Notice the strangeness of compiling a binary expression into an SQD description.
           SQD _ (QF.UnaryCombinator fname) _ _ _-> case fname of
             CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True
             _ -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True

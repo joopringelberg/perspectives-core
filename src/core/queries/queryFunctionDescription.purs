@@ -37,7 +37,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (Range) as EP
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
 
 -- | A description of a calculation with its domain and range.
 -- | The last two members represent whether the described function is functional and whether it is mandatory.
@@ -122,3 +122,36 @@ instance showDomain :: Show Domain where
 
 instance eqDomain :: Eq Domain where
   eq = genericEq
+
+-- | A string showing an indented version of the QueryFunction. Assume we are in position for the head.
+prettyPrint :: QueryFunctionDescription -> String
+prettyPrint q = newline <> prettyPrint' ind q
+  where
+    prettyPrint' :: String -> QueryFunctionDescription -> String
+    prettyPrint' tab (SQD dom qf ran man fun) = "SQD" <> newline
+      <> tab <> show dom <> newline
+      <> tab <> show qf <> newline
+      <> tab <> show ran <> newline
+      <> tab <> show man <> newline
+      <> tab <> show fun <> newline
+    prettyPrint' tab (UQD dom qf qfd ran man fun) = "UQD" <> newline
+      <> tab <> show dom <> newline
+      <> tab <> show qf <> newline
+      <> tab <> (prettyPrint' (tab <> ind) qfd)
+      <> tab <> show ran <> newline
+      <> tab <> show man <> newline
+      <> tab <> show fun <> newline
+    prettyPrint' tab (BQD dom qf qfd1 qfd2 ran man fun) = "BQD" <> newline
+      <> tab <> show dom <> newline
+      <> tab <> show qf <> newline
+      <> tab <> (prettyPrint' (tab <> ind) qfd1)
+      <> tab <> (prettyPrint' (tab <> ind) qfd2)
+      <> tab <> show ran <> newline
+      <> tab <> show man <> newline
+      <> tab <> show fun <> newline
+
+    newline :: String
+    newline = "\n"
+
+    ind :: String
+    ind = "  "

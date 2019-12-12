@@ -109,7 +109,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should have '(VDOM PBool)' as its Range"
             case calculation of
-              (Q (SQD _ _ (VDOM PBool) _ _)) -> true
+              (Q (SQD _ _ (VDOM PBool _) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(PropertyGetter \"model:Test$AnotherRole\")'"
             case calculation of
@@ -133,7 +133,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should have '(VDOM PNumber)' as its Range"
             case calculation of
-              (Q (SQD _ _ (VDOM PNumber) _ _)) -> true
+              (Q (SQD _ _ (VDOM PNumber _) _ _)) -> true
               otherwise -> false
           assert "The queryfunction of the calculation should be '(Constant PNumber \"1\")'"
             case calculation of
@@ -390,7 +390,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
         Just (CalculatedProperty{calculation}) -> do
           assert "The calculation should be (DataTypeGetter \"count\")"
             case calculation of
-              (Q (SQD _ (DataTypeGetter CountF) (VDOM PNumber) _ _)) -> true
+              (Q (SQD _ (DataTypeGetter CountF) (VDOM PNumber _) _ _)) -> true
               otherwise -> false
               )
 {-
