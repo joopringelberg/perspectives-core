@@ -170,7 +170,7 @@ theSuite = suite "Test.Query.Inversion" do
                       assert "The inversion of a property with a constant is nothing" (isNothing inv)
 
   testOnly "A filter exprssion should yield two inverse queries." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = filter context >> AnotherRole with Prop2 >> Prop2\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = filter context >> AnotherRole with Prop2 >> Prop3\n    thing: AnotherRole\n      property: Prop2 (mandatory, functional, Boolean)\n      property: Prop3 (mandatory, functional, Boolean)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
