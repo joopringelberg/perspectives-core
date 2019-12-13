@@ -161,10 +161,11 @@ filterPaths p1@(Paths mp _) p2 = let
   Paths x subs = composePaths p1 p2
   in Paths mp (cons x subs)
 
--- | Add two Paths, where we arbitrarily choose the first main path to be the main
--- | path of the result.
+-- | Add two Paths, where we choose the **second** main path to be the main
+-- | path of the result. This is not completely arbitrary, for a Let* is compiled as a
+-- | sequence of its bindings and its body. It is fitting that the body should be the main path.
 sumPaths :: Paths -> Paths -> Paths
-sumPaths (Paths mp1 subs1) (Paths mp2 subs2) = Paths mp1 (subs1 <> [mp2] <> subs2)
+sumPaths (Paths mp1 subs1) (Paths mp2 subs2) = Paths mp2 (subs1 <> [mp1] <> subs2)
 
 allPaths :: Paths -> Array Path
 allPaths (Paths mp1 subs1) = cons mp1 subs1
