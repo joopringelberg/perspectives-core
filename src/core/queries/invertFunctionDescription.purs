@@ -21,10 +21,8 @@
 
 module Perspectives.Query.Inversion where
 
-import Control.Monad.Writer (WriterT, tell)
-import Data.Array (cons, unsnoc)
-import Data.Foldable (foldr)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Array (catMaybes, cons, foldr, reverse, uncons)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (endsWithSegments)
@@ -33,97 +31,45 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
-import Prelude (class Monad, class Monoid, class Semigroup, bind, discard, pure, unit, void, ($), (<$>), (<>))
+import Prelude (class Monoid, class Semigroup, mempty, ($), (<$>), (<>))
 
--- | The `path` parameter describes a query to the root of the original query.
-invertFunctionDescription :: forall m. Monad m => Partial => QueryFunctionDescription -> Array QueryFunctionDescription -> Boolean -> WriterT (Array QueryFunctionDescription) m (Maybe QueryFunctionDescription)
+-- | Compute from the description of a query function a series of paths.
+-- | Consider the description to be a tree, then the paths run from the leaves to the root.
+-- | We use this function to compute contexts whose rules should be re-run when processing a Delta.
+invertFunctionDescription :: QueryFunctionDescription -> Array QueryFunctionDescription
+invertFunctionDescription qfd = catMaybes $ invert <$> (allPaths $ unsafePartial $ invertFunctionDescription_ qfd)
+  where
+    invert :: Array QueryFunctionDescription -> Maybe QueryFunctionDescription
+    invert path = case uncons path of
+      Nothing -> Nothing
+      Just {head, tail} -> Just $ foldr compose head (reverse tail)
 
-invertFunctionDescription (SQD dom (Constant _ _) ran _ _) path isMainPath = pure Nothing
+invertFunctionDescription_ :: Partial => QueryFunctionDescription -> Paths
 
-invertFunctionDescription (SQD dom f ran _ _) path isMainPath = do
-  minvertedF <- pure $ invertFunction dom f ran
+invertFunctionDescription_ (SQD dom (Constant _ _) ran _ _) = mempty
+
+invertFunctionDescription_ (SQD dom f ran _ _) = let
+  minvertedF = invertFunction dom f ran in
   case minvertedF of
-    Nothing -> pure Nothing
-    Just invertedF -> pure $ Just (SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))
+    Nothing -> mempty
+    Just invertedF -> mkPaths (SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))
 
-invertFunctionDescription (UQD dom f qfd1 ran _ _) path isMainPath = invertFunctionDescription qfd1 path isMainPath
+invertFunctionDescription_ (UQD dom f qfd1 ran _ _) = invertFunctionDescription_ qfd1
 
--- The right step is a Simple Query or has a Value domain. We've arrived at the end of the composition.
--- Invert both steps, add to the path, apply foldr compose to it.
--- In any composition, if the left step itself is a composition, we deal with a sub-expression in parentheses.
--- This breaks the default right-association. On the end of such a path, we should not `tell` the result.
--- If the left step is a filter, we should provide it with the path.
-invertFunctionDescription (BQD dom (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) path isMainPath | terminalStep qfd2 = do
-  -- minvertedLeft <- invertFunctionDescription qfd1 [] (if isComposition qfd1 then false else isMainPath)
-  minvertedLeft <- if isFilter qfd1
-    then invertFunctionDescription qfd1 path (if isComposition qfd1 then false else isMainPath)
-    else invertFunctionDescription qfd1 [] (if isComposition qfd1 then false else isMainPath)
-  case minvertedLeft of
-    -- Nothing means a constant expression. There is no valid composition of a constant and a step.
-    Nothing -> pure Nothing
-    Just invertedLeft -> do
-      void $ pushQuery (cons invertedLeft path) isMainPath
-      minvertedRight <- invertFunctionDescription qfd2 [] isMainPath
-      case minvertedRight of
-        -- Nothing means a constant expression. The compiler reduces the composition to that constant. There is no path.
-        Nothing -> pure Nothing
-        Just invertedRight -> pushQuery (cons invertedRight $ cons invertedLeft path) isMainPath
-
--- The non-terminal step of Compose.
--- If the left step is itself a composition, it represents a sub-path that is left-associated rather than the
--- default right-association applied to paths. The recursive call is made with isMainPath = false.
--- Push a query based on the path augmented with the left step.
-invertFunctionDescription (BQD dom (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) path isMainPath = do
-  -- minvertedLeft <- invertFunctionDescription qfd1 [] (if isComposition qfd1 then false else isMainPath)
-  if isFilter qfd1
-    then do
-      minvertedLeft <- invertFunctionDescription qfd1 path (if isComposition qfd1 then false else isMainPath)
-      case minvertedLeft of
-        Nothing -> pure Nothing
-        Just invertedLeft -> do
-          void $ pushQuery path isMainPath
-          invertFunctionDescription qfd2 [invertedLeft] isMainPath
-    else do
-      minvertedLeft <- invertFunctionDescription qfd1 [] (if isComposition qfd1 then false else isMainPath)
-      case minvertedLeft of
-        Nothing -> pure Nothing
-        Just invertedLeft -> do
-          void $ pushQuery (cons invertedLeft path) isMainPath
-          invertFunctionDescription qfd2 (cons invertedLeft path) isMainPath
+invertFunctionDescription_ (BQD dom (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _)= invertFunctionDescription_ qfd1 <> invertFunctionDescription_ qfd2
 
 -- At a filter expression, the path splits in two.
 -- One path leads through the source.
 -- The other path leads through the source **and then** through the criterium.
 -- We compose a path from source and criterium and invert that.
--- If the source is the terminal of a path, we should compose an inverted query from it and the path and `tell` it.
--- Het probleem is dat bij de aanroep het pad leeg is, omdat het filter in de linkertak van een compose zit.
--- filter geeft het pad van de source terug.
-invertFunctionDescription (BQD dom (BinaryCombinator FilterF) source criterium ran _ _) path isMainPath = do
-  void $ invertFunctionDescription (compose source criterium) path isMainPath
-  if terminalStep source
-    then do
-      minvertedSource <- invertFunctionDescription source path isMainPath
-      case minvertedSource of
-        Nothing -> pure Nothing
-        Just invertedSource -> pushQuery (cons invertedSource path) isMainPath
-    else invertFunctionDescription source path isMainPath
+invertFunctionDescription_ (BQD dom (BinaryCombinator FilterF) source criterium ran _ _) = filterPaths (invertFunctionDescription_ source) (invertFunctionDescription_ criterium)
 
--- We can ignore all other binary functions. Just trace paths back to the root from both branches.
--- The results will not be used.
-invertFunctionDescription (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) path isMainPath = do
-  void $ invertFunctionDescription qfd1 path isMainPath
-  invertFunctionDescription qfd2 path isMainPath
+-- For all other functions, we just sum their paths.
+invertFunctionDescription_ (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) = sumPaths
+  (invertFunctionDescription_ qfd1)
+  (invertFunctionDescription_ qfd2)
 
-pushQuery :: forall m. Monad m => Array QueryFunctionDescription -> Boolean -> WriterT (Array QueryFunctionDescription) m (Maybe QueryFunctionDescription)
-pushQuery path' isMainPath = do
-  {init, last} <- pure $ unsafePartial $ fromJust $ unsnoc path'
-  result <- pure $ foldr compose last init
-  if isMainPath
-    then tell [result]
-    else pure unit
-  pure $ Just result
-
-
+-- | For each type of function that appears as a single step in a query, we compute the inverse step.
 invertFunction :: Domain -> QueryFunction -> Range -> Maybe QueryFunction
 invertFunction dom qf ran = case qf of
   DataTypeGetter f -> case f of
@@ -176,14 +122,7 @@ inversionIsMandatory f = Unknown
 domain2RoleType :: Partial => Domain -> EnumeratedRoleType
 domain2RoleType (RDOM (ST e)) = e
 
-
-terminalStep :: QueryFunctionDescription -> Boolean
-terminalStep (SQD _ _ _ _ _) = true
-terminalStep qfd = case domain qfd of
-  CDOM _ -> false
-  RDOM _ -> false
-  VDOM _ _ -> true
-
+-- | Create a QueryFunctionDescription with composition.
 compose :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
 compose f1 f2 = BQD
   (domain f1)
@@ -193,14 +132,6 @@ compose f1 f2 = BQD
   (range f2)
   (and (functional f1)(functional f2))
   (and (mandatory f1)(mandatory f2))
-
-isComposition :: QueryFunctionDescription -> Boolean
-isComposition (BQD _ (BinaryCombinator ComposeF) _ _ _ _ _) = true
-isComposition _ = false
-
-isFilter :: QueryFunctionDescription -> Boolean
-isFilter (BQD _ (BinaryCombinator FilterF) _ _ _ _ _) = true
-isFilter _ = false
 
 -- | Paths is the general representation of the result of invertFunction. It holds a main path (the first member)
 -- | and an array of secondary paths.
@@ -229,3 +160,11 @@ filterPaths :: Paths -> Paths -> Paths
 filterPaths p1@(Paths mp _) p2 = let
   Paths x subs = composePaths p1 p2
   in Paths mp (cons x subs)
+
+-- | Add two Paths, where we arbitrarily choose the first main path to be the main
+-- | path of the result.
+sumPaths :: Paths -> Paths -> Paths
+sumPaths (Paths mp1 subs1) (Paths mp2 subs2) = Paths mp1 (subs1 <> [mp2] <> subs2)
+
+allPaths :: Paths -> Array Path
+allPaths (Paths mp1 subs1) = cons mp1 subs1

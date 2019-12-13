@@ -66,6 +66,11 @@ mandatory (SQD _ _ _ _ f ) = f
 mandatory (UQD _ _ _ _ _ f) = f
 mandatory (BQD _ _ _ _ _ _ f ) = f
 
+queryFunction :: QueryFunctionDescription -> QueryFunction
+queryFunction (SQD _ f _ _ _) = f
+queryFunction (UQD _ f _ _ _ _) = f
+queryFunction (BQD _ f _ _ _ _ _) = f
+
 -- | This function is partial, because we can only establish the functionality of
 -- | an RDOM.
 -- NOTE: We cannot have that function here, because it needs Perspectives.Representation.Class.Role and that introduces a cycle in modules.
