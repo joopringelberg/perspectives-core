@@ -34,7 +34,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperat
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, lowerCaseName, reserved)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition, withEntireBlock)
 import Perspectives.Parsing.Arc.Token (token)
-import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
 import Text.Parsing.Parser (fail)

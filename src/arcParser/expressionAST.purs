@@ -87,7 +87,7 @@ import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Representation.EnumeratedProperty (Range)
+import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.QueryFunction (FunctionName)
 
 -- | Step represents an Expression conforming to the grammar given above.

@@ -31,7 +31,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Assignment, LetStep, Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Action (Verb)
 import Perspectives.Representation.Context (ContextKind)
-import Perspectives.Representation.EnumeratedProperty (Range)
+import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.TypeIdentifiers (RoleKind)
 
 newtype ContextE = ContextE

@@ -34,7 +34,7 @@ import Data.Maybe (Maybe(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.EnumeratedProperty (Range) as EP
+import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
@@ -96,7 +96,7 @@ instance showQueryFunctionDescription :: Show QueryFunctionDescription where
 
 -- | The QueryCompilerEnvironment contains the domain of the queryStep. It also holds
 -- | an array of variables that have been declared.
-data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM EP.Range (Maybe PropertyType)
+data Domain = RDOM (ADT EnumeratedRoleType) | CDOM (ADT ContextType) | VDOM RAN.Range (Maybe PropertyType)
 
 type Range = Domain
 

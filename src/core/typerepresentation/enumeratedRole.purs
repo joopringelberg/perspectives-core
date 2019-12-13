@@ -28,6 +28,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
+import Perspectives.AffectedContextCalculation (AffectedContextCalculation)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -61,6 +62,11 @@ type EnumeratedRoleRecord =
   , mandatory :: Boolean
 
   , pos :: ArcPosition
+
+  , onRoleDelta :: Array AffectedContextCalculation
+
+  , onContextDelta :: Array AffectedContextCalculation
+
   }
 
 defaultEnumeratedRole :: String -> String -> RoleKind -> String -> ArcPosition -> EnumeratedRole
@@ -84,6 +90,9 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   , mandatory: false
 
   , pos: pos
+
+  , onRoleDelta: []
+  , onContextDelta: []
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

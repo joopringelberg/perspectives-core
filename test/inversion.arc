@@ -14,7 +14,7 @@ domain: Test
     user: Self
     bot: for Self
       perspective on: ARole
-        if filter ARole with Prop1 >> binding >> context >> AnotherRole >> Prop3 then
+        if (filter ARole with Prop1) >> binding >> context >> AnotherRole >> Prop3 then
           Prop4 = false
     context: ARole filledBy: NestedCase1
       property: Prop1 (mandatory, functional, Boolean)

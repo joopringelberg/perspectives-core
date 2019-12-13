@@ -22,17 +22,16 @@
 module Perspectives.Representation.EnumeratedProperty where
 
 import Data.Generic.Rep (class Generic)
-import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Kishimen (genericSumToVariant)
+import Perspectives.AffectedContextCalculation (AffectedContextCalculation)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
+import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==))
 
@@ -52,6 +51,8 @@ type EnumeratedPropertyRecord =
   , mandatory :: Boolean
 
   , pos :: ArcPosition
+
+  , onPropertyDelta :: Array AffectedContextCalculation
   }
 
 defaultEnumeratedProperty :: String -> String -> String -> Range -> ArcPosition -> EnumeratedProperty
@@ -63,7 +64,9 @@ defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
   , range: range
   , functional: true
   , mandatory: false
-  , pos: pos}
+  , pos: pos
+  , onPropertyDelta: []
+}
 
 derive instance genericRepEnumeratedProperty :: Generic EnumeratedProperty _
 
@@ -87,21 +90,3 @@ instance revisionEnumeratedProperty :: Revision EnumeratedProperty where
 
 instance identifiableEnumeratedProperty :: Identifiable EnumeratedProperty EnumeratedPropertyType where
   identifier (EnumeratedProperty{_id}) = _id
-
------------------------------------------------------------
--- RANGE
------------------------------------------------------------
-data Range = PString | PBool | PNumber | PDate
-
-derive instance genericRange :: Generic Range _
-
-instance eqRange :: Eq Range where eq = genericEq
-
-instance encodeRange :: Encode Range where
-  encode = genericEncode defaultOptions
-
-instance decodeRange :: Decode Range where
-  decode = genericDecode defaultOptions
-
-instance rangeShow :: Show Range where
-  show = genericShow

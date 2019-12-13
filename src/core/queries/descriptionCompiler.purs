@@ -44,7 +44,7 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
-import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)

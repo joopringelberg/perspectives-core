@@ -35,7 +35,7 @@ import Perspectives.Parsing.Arc.Expression.AST (LetStep(..), PureLetStep(..), St
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
-import Perspectives.Representation.EnumeratedProperty (Range) as EP
+import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedRoleType, RoleKind, RoleType)
 import Prelude (class Eq, class Show, (<>), show, (<<<))
 
@@ -73,7 +73,7 @@ data PerspectivesError
     | IncompatibleComposition ArcPosition Range Domain
     | TypesCannotBeCompared ArcPosition Range Range
     | NotABoolean ArcPosition
-    | WrongTypeForOperator ArcPosition (Array EP.Range)
+    | WrongTypeForOperator ArcPosition (Array RAN.Range)
     | MissingValueForAssignment ArcPosition ArcPosition
     | ArgumentMustBeSequenceFunction ArcPosition
     | UnknownVariable ArcPosition String
@@ -85,8 +85,8 @@ data PerspectivesError
     | NotARoleDomain Domain ArcPosition ArcPosition
     | NotFunctional ArcPosition ArcPosition Step
     | MaybeNotFunctional ArcPosition ArcPosition Step
-    | WrongPropertyRange ArcPosition ArcPosition EP.Range EP.Range
-    | NotAPropertyRange  ArcPosition ArcPosition EP.Range
+    | WrongPropertyRange ArcPosition ArcPosition RAN.Range RAN.Range
+    | NotAPropertyRange  ArcPosition ArcPosition RAN.Range
 
     | ParserError String ArcPosition
     | Custom String

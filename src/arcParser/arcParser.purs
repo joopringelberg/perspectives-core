@@ -35,7 +35,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition, IP, arcPosition2Posit
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.Action (Verb(..))
 import Perspectives.Representation.Context (ContextKind(..))
-import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (>>=), (<$>), (<*>))
 import Text.Parsing.Indent (withPos)
