@@ -30,7 +30,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, head, length, null, foldM, uncons)
+import Data.Array (cons, filter, foldM, head, length, null, uncons)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust)
@@ -40,6 +40,7 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.AffectedContextCalculation (AffectedContextCalculation(..))
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -50,6 +51,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
+import Perspectives.Query.Inversion (invertFunctionDescription)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, range)
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo, reduce)
 import Perspectives.Representation.Action (Action(..))
@@ -57,12 +59,14 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.Property (getProperty)
 import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (bindingOfRole, expansionOfADT, getCalculation, getRole)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, expandedADT_, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
@@ -329,7 +333,24 @@ compileExpressions = do
       S stp -> do
         ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
         descr <- compileStep (CDOM $ ST ctxt) stp
+        setAffectedContextCalculations descr
         pure $ Action (ar {condition = Q descr})
+
+    -- TODO. Keer descr om en breng de resulterende paden onder in EnumeratedProperty en EnumeratedRole.
+    -- gebruik modifyDF daarvoor.
+    setAffectedContextCalculations :: QueryFunctionDescription -> PhaseThree Unit
+    setAffectedContextCalculations qfd = do
+      paths <- pure $ invertFunctionDescription qfd
+      for_ paths \path -> case path of
+        (BQD _ (QF.BinaryCombinator QF.ComposeF) (SQD _ qf _ _ _) _ _ _ _) -> case qf of
+          QF.Value2Role pt -> case pt of
+            ENP p -> do
+              EnumeratedProperty propRecord@{onPropertyDelta} <- lift $ lift $ getEnumeratedProperty p
+              modifyDF \dfr@{enumeratedProperties} -> dfr {enumeratedProperties = insert (unwrap p) (EnumeratedProperty propRecord {onPropertyDelta = cons (AffectedContextCalculation {description: path, compilation: Nothing}) onPropertyDelta}) enumeratedProperties}
+
+            CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in invertFunctionDescription."
+          _ -> throwError $ Custom "Implement the other cases in setAffectedContextCalculations."
+        _ -> throwError $ Custom "The result of invertFunctionDescription should be a composition"
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
