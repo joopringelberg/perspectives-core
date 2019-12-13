@@ -30,7 +30,7 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Prelude (class Monoid, class Semigroup, mempty, ($), (<$>), (<>))
 
 -- | Compute from the description of a query function a series of paths.
@@ -86,11 +86,11 @@ invertFunction dom qf ran = case qf of
     -- sequence functions only apply to Values.
     -- In the compiled AffectedContextQuery we wish to ignore a step like this. We accomplish that by constructing
     -- a Value2Role QueryFunction.
-    CountF -> Just $ Value2Role
-    MinimumF -> Just $ Value2Role
-    MaximumF -> Just $ Value2Role
-    AddF -> Just $ Value2Role
-    MultiplyF -> Just $ Value2Role
+    CountF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    MinimumF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    MaximumF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    AddF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
+    MultiplyF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
 
     _ -> Nothing
 
@@ -100,7 +100,7 @@ invertFunction dom qf ran = case qf of
     _ -> Nothing
 
   RolGetter rt -> Just $ DataTypeGetter ContextF
-  PropertyGetter pt -> Just Value2Role
+  PropertyGetter pt -> Just $ Value2Role pt
   -- Variable lookup implies variable binding elsewhere. We've traced the path back in the binding, so we ignore it here.
   VariableLookup _ -> Nothing
 
@@ -121,6 +121,9 @@ inversionIsMandatory f = Unknown
 
 domain2RoleType :: Partial => Domain -> EnumeratedRoleType
 domain2RoleType (RDOM (ST e)) = e
+
+domain2PropertyType :: Partial => Domain -> PropertyType
+domain2PropertyType (VDOM _ (Just pt)) = pt
 
 -- | Create a QueryFunctionDescription with composition.
 compose :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
