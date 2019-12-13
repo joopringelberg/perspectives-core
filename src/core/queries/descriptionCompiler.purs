@@ -236,12 +236,29 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
           -- This was parsed as `SequenceFunction f` and is now compiled as `UnaryCombinator f` in an SQD.
           -- Notice by the domain and range that we assume functions that are Monoids.
           -- Notice the strangeness of compiling a binary expression into an SQD description.
-          SQD _ (QF.UnaryCombinator fname) _ _ _-> case fname of
+          SQD dom (QF.UnaryCombinator fname) _ _ _-> case fname of
+            -- we can count anything
             CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True
-            _ -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True
+            -- We have interpretations of AddF, SubtractF for numbers and strings only.
+            -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
+            -- For AndF and OrF we have an interpretation for Booleans only.
+            -- We also require that the VDOM should have an EnumeratedPropertyType.
+            AddF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+            SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+            MinimumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+            MaximumF -> ensureDomainIsRange dom [PNumber, PString, PBool, PDate] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+            AndF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+            OrF -> ensureDomainIsRange dom [PBool] pos (pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True)
+            _ -> throwError $ ArgumentMustBeSequenceFunction pos
           _ -> throwError $ ArgumentMustBeSequenceFunction pos
 
   where
+    ensureDomainIsRange :: Domain -> Array Range -> ArcPosition -> FD -> FD
+    ensureDomainIsRange (VDOM r p) allowedRangeConstructors pos fd = if (isJust $ elemIndex r allowedRangeConstructors) && (isJust p)
+      then fd
+      else throwError $ WrongTypeForOperator pos allowedRangeConstructors
+    ensureDomainIsRange _ allowedRangeConstructors pos _ = throwError $ WrongTypeForOperator pos allowedRangeConstructors
+
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> FunctionName -> PhaseThree QueryFunctionDescription
     comparison pos left' right' functionName = do
       -- Both ranges must be equal
