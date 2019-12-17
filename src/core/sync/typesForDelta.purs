@@ -28,21 +28,19 @@ import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
-import Foreign (Foreign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (class Show, ($))
+import Prelude (class Show)
 
 -----------------------------------------------------------
 -- CONTEXTDELTA
 -----------------------------------------------------------
 newtype ContextDelta = ContextDelta
   { id :: ContextInstance
-  , role :: EnumeratedRoleType
-  , instance :: Maybe RoleInstance
+  , roleType :: EnumeratedRoleType
+  , roleInstance :: Maybe RoleInstance
   , deltaType :: DeltaType
   }
 

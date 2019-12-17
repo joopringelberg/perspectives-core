@@ -45,7 +45,7 @@
 -- |    'not' step
 -- |  | 'createRole' ArcIdentifier
 -- |  | 'createContext' ArcIdentifier
--- |  | 'exists' ArcIdentifier
+-- |  | 'exists' step
 -- |
 -- | compoundStep =
 -- |    'filter' step 'with' step

@@ -48,7 +48,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
 
   test "Load a model file and cache it" do
     -- 1. Load and save a model.
-    messages <- runP (loadArcFile "test.arc" testDirectory)
+    messages <- runP (loadArcFile "witcoin2.arc" modelDirectory)
     case messages of
       Left m -> do
         logShow messages

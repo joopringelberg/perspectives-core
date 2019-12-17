@@ -31,7 +31,7 @@ class DeltaAssumption d where
   assumption :: d -> Assumption
 
 instance roleDeltaAssumption :: DeltaAssumption ContextDelta where
-  assumption (ContextDelta{id, role}) = Tuple (unwrap id) (unwrap role)
+  assumption (ContextDelta{id, roleType}) = Tuple (unwrap id) (unwrap roleType)
 
 instance bindingDeltaAssumption :: DeltaAssumption RoleDelta where
   assumption (RoleDelta{id, binding}) = Tuple (unwrap id) "model:Perspectives$Role$binding"

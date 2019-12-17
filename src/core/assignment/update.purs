@@ -177,9 +177,9 @@ addRol contextId rolName rolInstances = do
   for_ rolInstances \rolInstance -> do
     addContextDelta $ ContextDelta
                 { id : contextId
-                , role: rolName
+                , roleType: rolName
                 , deltaType: Add
-                , instance: Just rolInstance
+                , roleInstance: Just rolInstance
                 }
 
 -- | Modifies the context instance.
@@ -199,9 +199,9 @@ removeRolFromContext contextId rolName rolInstances = do
   for_ rolInstances \rolInstance ->
     addContextDelta $ ContextDelta
                 { id : contextId
-                , role: rolName
+                , roleType: rolName
                 , deltaType: Remove
-                , instance: Just rolInstance
+                , roleInstance: Just rolInstance
                 }
 
 -- | Modifies the context instance.
@@ -221,9 +221,9 @@ deleteRol contextId rolName = do
     Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing)
   addContextDelta $ ContextDelta
               { id : contextId
-              , role: rolName
+              , roleType: rolName
               , deltaType: Delete
-              , instance: Nothing
+              , roleInstance: Nothing
               }
 
 -- | Modifies the context instance.
@@ -242,9 +242,9 @@ setRol contextId rolName rolInstances = do
   for_ rolInstances \rolInstance ->
     addContextDelta $ ContextDelta
                 { id : contextId
-                , role: rolName
+                , roleType: rolName
                 , deltaType: Change
-                , instance: Just rolInstance
+                , roleInstance: Just rolInstance
                 }
 
 -- | Detach the role instances from their current context and attach them to the new context.
@@ -270,15 +270,15 @@ moveRoles originContextId destinationContextId rolName rolInstances = do
   for_ rolInstances \rolInstance -> do
     addContextDelta $ ContextDelta
                 { id : originContextId
-                , role: rolName
+                , roleType: rolName
                 , deltaType: Delete
-                , instance: Just rolInstance
+                , roleInstance: Just rolInstance
                 }
     addContextDelta $ ContextDelta
                 { id : destinationContextId
-                , role: rolName
+                , roleType: rolName
                 , deltaType: Add
-                , instance: Just rolInstance
+                , roleInstance: Just rolInstance
                 }
 
 -----------------------------------------------------------

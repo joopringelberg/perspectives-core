@@ -35,7 +35,7 @@ import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.EnumeratedProperty (Range(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF

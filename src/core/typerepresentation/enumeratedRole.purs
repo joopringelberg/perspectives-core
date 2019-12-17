@@ -63,9 +63,11 @@ type EnumeratedRoleRecord =
 
   , pos :: ArcPosition
 
-  , onRoleDelta :: Array AffectedContextCalculation
+  , onRoleDelta_binding :: Array AffectedContextCalculation
+  , onRoleDelta_binder :: Array AffectedContextCalculation
 
-  , onContextDelta :: Array AffectedContextCalculation
+  , onContextDelta_context :: Array AffectedContextCalculation
+  , onContextDelta_role :: Array AffectedContextCalculation
 
   }
 
@@ -91,8 +93,10 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
 
   , pos: pos
 
-  , onRoleDelta: []
-  , onContextDelta: []
+  , onRoleDelta_binding: []
+  , onRoleDelta_binder: []
+  , onContextDelta_context: []
+  , onContextDelta_role: []
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _
