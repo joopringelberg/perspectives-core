@@ -326,6 +326,12 @@ context2role qd = unsafePartial $ do
     (C2R f) <- compileFunction qd
     pure f
 
+-- | Construct a function to compute instances of a RoleType from an instance of a Context.
+role2context :: QueryFunctionDescription -> MP (RoleInstance ~~> ContextInstance)
+role2context qd = unsafePartial $ do
+    (R2C f) <- compileFunction qd
+    pure f
+
 -- | Construct a function to compute values of a Property for some RoleType from an instance of a Context.
 context2propertyValue :: QueryFunctionDescription -> MP (ContextInstance ~~> Value)
 context2propertyValue qd = unsafePartial $ do
