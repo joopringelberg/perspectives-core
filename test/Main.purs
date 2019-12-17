@@ -18,7 +18,9 @@ import Test.ContextAndRole as CAR
 import Test.ContextRoleParser as CRP
 import Test.Actions as ACT
 import Test.Query.Inversion as INV
+import Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations as SACC
 import Test.Unit.Main (runTest)
+
 
 main :: Effect Unit
 main = runTest do
@@ -35,3 +37,4 @@ main = runTest do
   CRP.theSuite
   ACT.theSuite
   INV.theSuite
+  SACC.theSuite
