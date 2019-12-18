@@ -35,7 +35,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
-import Perspectives.Instances.Combinators (exists)
+import Perspectives.Instances.Combinators (exists, not)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
@@ -243,6 +243,13 @@ compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
     (R2C a) -> pure $ R2V (exists a)
     (R2R a) -> pure $ R2V (exists a)
     (R2V a) -> pure $ R2V (exists a)
+
+compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
+  f1' <- compileFunction f1
+  case f1' of
+    (C2V a) -> pure $ C2V (not a)
+    (R2V a) -> pure $ R2V (not a)
+    _ -> throwError (error $ "Cannot negate a non-boolean value, on compiling " <> show f1)
 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> show qd <> "'.")

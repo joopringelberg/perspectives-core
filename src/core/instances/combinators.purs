@@ -26,7 +26,7 @@ import Data.Array (cons, elemIndex, null, union)
 import Data.Maybe (maybe)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
-import Prelude (class Eq, class Monad, bind, const, discard, pure, show, ($), (>=>))
+import Prelude (class Eq, class Monad, bind, const, discard, pure, show, ($), (>=>), (<$>), (<<<), (==))
 
 -- | The closure of f, not including the root argument.
 -- | The closure of f contains no double entries iff the result of
@@ -99,3 +99,10 @@ exists :: forall m s o. Eq o => Monad m =>
 exists source id = ArrayT do
   r <- runArrayT $ source id
   pure $ [Value $ show $ null r]
+
+not :: forall m s. Monad m =>
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value)
+not source id = ArrayT do
+  r <- runArrayT $ source id
+  pure $ (Value <<< show <<< ((==) (Value "false"))) <$> r
