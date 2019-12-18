@@ -23,6 +23,7 @@ module Perspectives.Instances.Combinators where
 
 import Control.MonadZero (guard)
 import Data.Array (cons, elemIndex, null, union)
+import Data.HeytingAlgebra (not) as HA
 import Data.Maybe (maybe)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
@@ -98,7 +99,7 @@ exists :: forall m s o. Eq o => Monad m =>
   (s -> ArrayT m Value)
 exists source id = ArrayT do
   r <- runArrayT $ source id
-  pure $ [Value $ show $ null r]
+  pure $ [Value $ show $ HA.not $ null r]
 
 not :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->

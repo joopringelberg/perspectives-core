@@ -41,7 +41,7 @@ import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (Unit, bind, pure, ($), (<<<), (<>), (>>=), class Eq, (&&), eq, unit)
+import Prelude (class Eq, class Show, Unit, bind, eq, pure, show, unit, ($), (&&), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -94,6 +94,9 @@ data ActionInstance = ActionInstance ContextInstance ActionType
 
 instance eqActionInstance :: Eq ActionInstance where
   eq (ActionInstance c1 a1) (ActionInstance c2 a2) = eq c1 c2 && eq a1 a2
+
+instance showActionInstance :: Show ActionInstance where
+  show (ActionInstance c1 a1) = "ActionInstance( " <> show c1 <> ", " <> show a1 <> " )"
 
 -- | Actions should be re-run as the Assumptions underlying their computation change.
 -- | We register the dependency of Actions for ContextInstances with a double registration that allows us to

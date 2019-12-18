@@ -19,6 +19,7 @@ import Test.ContextRoleParser as CRP
 import Test.Actions as ACT
 import Test.Query.Inversion as INV
 import Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations as SACC
+import Test.RunMonadPerspectivesTransaction as RMPT
 import Test.Unit.Main (runTest)
 
 
@@ -38,3 +39,4 @@ main = runTest do
   ACT.theSuite
   INV.theSuite
   SACC.theSuite
+  RMPT.theSuite

@@ -24,20 +24,20 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Writer (WriterT, execWriterT, tell)
-import Data.Array (catMaybes, foldM, singleton, union)
+import Data.Array (foldM, singleton, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid (class Semigroup)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
+import Effect.Class.Console (log)
 import Foreign.Object (values)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.AffectedContextCalculation (AffectedContextCalculation(..))
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.Assignment.DependencyTracking (actionInstancesForContextInstance, rulesForContextInstance)
+import Perspectives.Assignment.DependencyTracking (rulesForContextInstance)
 import Perspectives.ContextAndRole (context_id, context_me)
 import Perspectives.CoreTypes (ActionInstance(..), MonadPerspectives, MonadPerspectivesTransaction, Assumption, (##=), type (~~>))
 import Perspectives.Deltas (runTransactie)
@@ -47,6 +47,7 @@ import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Query.Compiler (context2context, role2context)
+import Perspectives.Query.QueryTypes (prettyPrint)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -106,15 +107,11 @@ assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas}
 -- | We need not trigger actions on a context instance that is deleted.
 -- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
 runActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runActions t@(Transaction{createdContexts}) = do
+runActions t = do
   -- action instances deriving from Deltas.
-  -- TODO. Pas hier de AffectedContextQueries toe.
-  (AISet as1) <- lift $ lift $ execWriterT $ actionsTriggeredByDeltas t
-  -- (as1 :: Array ActionInstance) <- lift $ lift $ actionInstancesDependingOn $ assumptionsInTransaction t
-  -- action instances deriving from created contexts.
-  as2 <- traverse (lift <<< lift <<< actionInstancesForContextInstance <<< context_id) createdContexts >>= pure <<< join <<< catMaybes
+  (AISet as) <- lift $ lift $ execWriterT $ actionsTriggeredByTransaction t
   lift $ void $ AA.modify cloneEmptyTransaction
-  for_ (union as1 as2) \(ActionInstance ctxt atype) ->
+  for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
         (Just (Tuple _ a)) -> a ctxt
         Nothing -> do
@@ -136,8 +133,9 @@ runRulesForContextInstance cid = do
 -- | For each Context Instance, find the perspective of the me role. For now, take all the Action types.
 -- | Filter these, collecting the automatic Actions. Create ActionInstances.
 -- | Use WriterT and a Monoid Newtype based on Array with union as append, to collect ActionInstances.
-actionsTriggeredByDeltas :: Transaction -> CollectAIs
-actionsTriggeredByDeltas (Transaction{contextDeltas, roleDeltas, propertyDeltas}) = do
+actionsTriggeredByTransaction :: Transaction -> CollectAIs
+actionsTriggeredByTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas, createdContexts}) = do
+  for_ createdContexts (addAutomaticActions <<< context_id)
   for_ contextDeltas aisInContextDelta
   for_ roleDeltas aisInRoleDelta
   for_ propertyDeltas aisInPropertyDelta
@@ -168,22 +166,21 @@ aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
     -- For each affected context,
     for_ affectedContexts addAutomaticActions
 
-  where
-    getMe :: ContextInstance ~~> RoleInstance
-    getMe ctxt = ArrayT (lift $ getPerspectContext ctxt >>= pure <<< maybe [] singleton <<< context_me)
+getMe :: ContextInstance ~~> RoleInstance
+getMe ctxt = ArrayT (lift $ getPerspectContext ctxt >>= pure <<< maybe [] singleton <<< context_me)
 
-    allActions :: EnumeratedRoleType ~~> ActionType
-    allActions rt = ArrayT (lift $ getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
+allActions :: EnumeratedRoleType ~~> ActionType
+allActions rt = ArrayT (lift $ getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
 
-    isAutomatic :: ActionType ~~> Boolean
-    isAutomatic at = ArrayT (lift $ getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
+isAutomatic :: ActionType ~~> Boolean
+isAutomatic at = ArrayT (lift $ getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
 
-    addAutomaticActions :: ContextInstance -> CollectAIs
-    addAutomaticActions affectedContext = do
-      -- find all automatic action types of the me role.
-      (automaticActions :: Array ActionType) <- lift (affectedContext ##= filter (getMe >=> OG.roleType >=> allActions) isAutomatic)
-      -- Combine them with the affected context to form an ActionInstance.
-      tell $ AISet ((ActionInstance affectedContext) <$> automaticActions)
+addAutomaticActions :: ContextInstance -> CollectAIs
+addAutomaticActions affectedContext = do
+  -- find all automatic action types of the me role.
+  (automaticActions :: Array ActionType) <- lift (affectedContext ##= filter (getMe >=> OG.roleType >=> allActions) isAutomatic)
+  -- Combine them with the affected context to form an ActionInstance.
+  tell $ AISet ((ActionInstance affectedContext) <$> automaticActions)
 
 aisInRoleDelta :: RoleDelta -> CollectAIs
 aisInRoleDelta (RoleDelta{id, binding})= pure unit

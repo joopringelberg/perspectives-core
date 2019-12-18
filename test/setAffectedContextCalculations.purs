@@ -19,7 +19,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
+theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations" do
 
   test "Constant condition: true"
     (runP do
