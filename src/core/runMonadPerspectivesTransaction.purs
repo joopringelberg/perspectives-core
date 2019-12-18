@@ -46,7 +46,7 @@ import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiv
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Persistent (getPerspectContext)
-import Perspectives.Query.Compiler (role2context)
+import Perspectives.Query.Compiler (context2context, role2context)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -144,21 +144,29 @@ actionsTriggeredByDeltas (Transaction{contextDeltas, roleDeltas, propertyDeltas}
 
 -- | From the ContextDelta, collect ActionInstances.
 aisInContextDelta :: ContextDelta -> CollectAIs
-aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = case roleInstance of
-  Just ri -> do
-    (EnumeratedRole{onContextDelta_context, onContextDelta_role}) <- lift $ getEnumeratedRole roleType
-    for_ onContextDelta_context \(AffectedContextCalculation{description, compilation}) -> do
-      -- Get the function that computes the affected contexts from the type of the roleInstance.
-      (affectedContextGetter :: RoleInstance ~~> ContextInstance) <- case compilation of
-        Just c -> pure $ unsafeCoerce c
-        Nothing -> lift $ role2context description
-      -- Find all automatic actions from the role instance of the Delta, using the affectedContextGetter.
-      affectedContexts <- lift (ri ##= affectedContextGetter)
-      for_ affectedContexts \affectedContext -> do
-        (automaticActions :: Array ActionType) <- lift (affectedContext ##= filter (getMe >=> OG.roleType >=> allActions) isAutomatic)
-        -- Combine these action types with the affected context to form an ActionInstance.
-        tell $ AISet ((ActionInstance affectedContext) <$> automaticActions)
-  Nothing -> pure unit
+aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
+  (EnumeratedRole{onContextDelta_context, onContextDelta_role}) <- lift $ getEnumeratedRole roleType
+  case roleInstance of
+    Just ri -> do
+      for_ onContextDelta_context \(AffectedContextCalculation{description, compilation}) -> do
+        -- Get the function that computes the affected contexts from the type of the roleInstance.
+        (affectedContextGetter :: RoleInstance ~~> ContextInstance) <- case compilation of
+          Just c -> pure $ unsafeCoerce c
+          Nothing -> lift $ role2context description
+        -- Find all affected contexts, starting from the role instance of the Delta.
+        affectedContexts <- lift (ri ##= affectedContextGetter)
+        -- For each affected context,
+        for_ affectedContexts addAutomaticActions
+    Nothing -> pure unit
+  for_ onContextDelta_role \(AffectedContextCalculation{description, compilation}) -> do
+    -- Get the function that computes the affected contexts from the type of the roleInstance.
+    (affectedContextGetter :: ContextInstance ~~> ContextInstance) <- case compilation of
+      Just c -> pure $ unsafeCoerce c
+      Nothing -> lift $ context2context description
+    -- Find all affected contexts, starting from the context instance of the Delta.
+    affectedContexts <- lift (id ##= affectedContextGetter)
+    -- For each affected context,
+    for_ affectedContexts addAutomaticActions
 
   where
     getMe :: ContextInstance ~~> RoleInstance
@@ -170,6 +178,12 @@ aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = case roleInstance
     isAutomatic :: ActionType ~~> Boolean
     isAutomatic at = ArrayT (lift $ getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
 
+    addAutomaticActions :: ContextInstance -> CollectAIs
+    addAutomaticActions affectedContext = do
+      -- find all automatic action types of the me role.
+      (automaticActions :: Array ActionType) <- lift (affectedContext ##= filter (getMe >=> OG.roleType >=> allActions) isAutomatic)
+      -- Combine them with the affected context to form an ActionInstance.
+      tell $ AISet ((ActionInstance affectedContext) <$> automaticActions)
 
 aisInRoleDelta :: RoleDelta -> CollectAIs
 aisInRoleDelta (RoleDelta{id, binding})= pure unit
