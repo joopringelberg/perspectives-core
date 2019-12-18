@@ -30,11 +30,12 @@ import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
-import Data.Array (elemIndex)
+import Data.Array (elemIndex, null, singleton)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
+import Perspectives.Instances.Combinators (exists)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
@@ -232,6 +233,16 @@ compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
     (R2C a) -> pure $ R2C (unsafeCoerce addBinding_ varName a)
     (R2R a) -> pure $ R2R (unsafeCoerce addBinding_ varName a)
     (R2V a) -> pure $ R2V (unsafeCoerce addBinding_ varName a)
+
+compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
+  f1' <- compileFunction f1
+  case f1' of
+    (C2C a) -> pure $ C2V (exists a)
+    (C2R a) -> pure $ C2V (exists a)
+    (C2V a) -> pure $ C2V (exists a)
+    (R2C a) -> pure $ R2V (exists a)
+    (R2R a) -> pure $ R2V (exists a)
+    (R2V a) -> pure $ R2V (exists a)
 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> show qd <> "'.")
