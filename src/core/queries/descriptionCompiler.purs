@@ -177,7 +177,7 @@ compileSimpleStep currentDomain (Variable pos varName) = do
 
 compileUnaryStep :: Domain -> UnaryStep -> FD
 compileUnaryStep currentDomain (LogicalNot pos s) = do
-  -- First compile s. Then check that the resulting QueryFunctionDescription a (VDOM PBool _) range value.
+  -- First compile s. Then check that the resulting QueryFunctionDescription is a (VDOM PBool _) range value.
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     VDOM PBool _ -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs currentDomain (functional descriptionOfs) (mandatory descriptionOfs)
@@ -187,7 +187,7 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
-    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs currentDomain True True
+    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool Nothing) True True
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
