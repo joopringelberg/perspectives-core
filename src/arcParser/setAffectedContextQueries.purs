@@ -48,20 +48,26 @@ import Prelude (Unit, discard, pure, unit, void, ($))
 setAffectedContextCalculations :: QueryFunctionDescription -> PhaseThree Unit
 setAffectedContextCalculations qfd = unsafePartial $ for_ (invertFunctionDescription qfd)
   \path -> do
-    log $ prettyPrint path
-    setPathForEachStep path
+    -- log $ prettyPrint path
+    setPathForEachSubPath path
 
   where
-    setPathForEachStep :: Partial => QueryFunctionDescription -> PhaseThree Unit
-    setPathForEachStep (BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(SQD _ _ _ _ _) _ _ _) = do
-      setPathForStep sub1
-      setPathForStep sub2
-    setPathForEachStep (BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(BQD _ (QF.BinaryCombinator QF.ComposeF) _ _ _ _ _) _ _ _) = do
-      setPathForStep sub1
-      setPathForEachStep sub2
+    setPathForEachSubPath :: Partial => QueryFunctionDescription -> PhaseThree Unit
+    -- Terminating step.
+    setPathForEachSubPath path@(BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(SQD _ _ _ _ _) _ _ _) = do
+      setPathForStep sub1 path
 
-    setPathForStep :: Partial => QueryFunctionDescription -> PhaseThree Unit
-    setPathForStep path@(SQD dom qf _ _ _) = case qf of
+    -- Recursing step.
+    setPathForEachSubPath path@(BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(BQD _ (QF.BinaryCombinator QF.ComposeF) _ _ _ _ _) _ _ _) = do
+      setPathForStep sub1 path
+      setPathForEachSubPath sub2
+
+    setPathForEachSubPath path@(SQD _ _ _ _ _) = setPathForStep path path
+
+    -- de selectie is goed, maar het moet niet voor deze stap alleen, maar het hele subpad gelden.
+    -- Ik moet dus letten op de head van de compose.
+    setPathForStep :: Partial => QueryFunctionDescription -> QueryFunctionDescription -> PhaseThree Unit
+    setPathForStep (SQD dom qf _ _ _) path = case qf of
 
       QF.Value2Role pt -> case pt of
         ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
