@@ -25,7 +25,8 @@ import Control.MonadZero (guard)
 import Data.Array (cons, elemIndex, null, union)
 import Data.Maybe (maybe)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Prelude (class Monad, class Eq, bind, const, discard, pure, ($), (>=>))
+import Perspectives.Representation.InstanceIdentifiers (Value(..))
+import Prelude (class Eq, class Monad, bind, const, discard, pure, show, ($), (>=>))
 
 -- | The closure of f, not including the root argument.
 -- | The closure of f contains no double entries iff the result of
@@ -91,3 +92,10 @@ conjunction left right id = ArrayT do
   l <- runArrayT $ left id
   r <- runArrayT $ right id
   pure $ union l r
+
+exists :: forall m s o. Eq o => Monad m =>
+  (s -> ArrayT m o) ->
+  (s -> ArrayT m Value)
+exists source id = ArrayT do
+  r <- runArrayT $ source id
+  pure $ [Value $ show $ null r]
