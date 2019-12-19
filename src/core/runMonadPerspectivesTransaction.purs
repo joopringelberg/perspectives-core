@@ -24,7 +24,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Writer (WriterT, execWriterT, tell)
-import Data.Array (elemIndex, foldM, singleton, union)
+import Data.Array (elemIndex, foldM, head, singleton, union)
 import Data.Foldable (for_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
@@ -37,6 +37,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
+import Effect.Class.Console (logShow)
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Actions (compileBotAction)
@@ -118,6 +119,7 @@ runActions :: Transaction -> MonadPerspectivesTransaction Transaction
 runActions t = do
   -- action instances deriving from Deltas.
   (AISet as) <- lift $ lift $ execWriterT $ actionsTriggeredByTransaction t
+  -- lift $ logShow as
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
@@ -198,12 +200,20 @@ compileDescriptions onX rt@(EnumeratedRoleType ert) =  do
   -- Get the AffectedContextCalculations in onContextDelta_context.
   (calculations :: Array AffectedContextCalculation) <- pure $ unsafePartial $ fromJust $ preview (onDelta rt) df
   -- Compile the descriptions.
-  compiledCalculations <- traverse compile calculations
-  -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-  modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
-  pure compiledCalculations
+  if areCompiled calculations
+    then pure calculations
+    else do
+      compiledCalculations <- traverse compile calculations
+      -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
+      modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
+      pure compiledCalculations
 
   where
+    areCompiled :: Array AffectedContextCalculation -> Boolean
+    areCompiled ar = case head ar of
+      Nothing -> true
+      Just (AffectedContextCalculation{compilation}) -> isJust compilation
+
     onDelta :: EnumeratedRoleType -> Traversal' DomeinFile (Array AffectedContextCalculation)
     onDelta (EnumeratedRoleType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedRoles") <<< at x <<< traversed <<< _Newtype <<< onX
 
