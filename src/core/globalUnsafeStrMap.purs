@@ -35,11 +35,14 @@ module Perspectives.GlobalUnsafeStrMap
   , values
   ) where
 
-import Data.Maybe (Maybe(..))
+import Data.Lens (lens, wander)
+import Data.Lens.At (class At)
+import Data.Lens.Index (class Index)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Unit (Unit)
 import Foreign (Foreign, isUndefined, unsafeFromForeign)
 import Foreign.Object (Object)
-import Prelude (class Show, show)
+import Prelude (class Show, flip, pure, show, (#), (>>>), map)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A reference to a mutable map
@@ -91,3 +94,21 @@ foreign import clear :: forall a. GLStrMap a -> (GLStrMap a)
 foreign import keys :: forall a. GLStrMap a -> Array String
 
 foreign import values :: forall a. GLStrMap a -> Array a
+
+instance indexForeignObject :: Index (GLStrMap v) String v where
+  ix k =
+    wander \coalg m ->
+      peek m k #
+        maybe
+          (pure m)
+          (coalg >>> map \v -> poke m k v)
+
+instance atForeignGLStrMap :: At (GLStrMap a) String a where
+  at k =
+    lens ((flip peek) k) \m ->
+      maybe (delete' k m) \ v -> poke m k v
+
+delete' :: forall a. String -> GLStrMap a -> GLStrMap a
+delete' k m = let
+  x = delete_ m k
+  in m
