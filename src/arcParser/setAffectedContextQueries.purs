@@ -22,31 +22,28 @@
 module Perspectives.Parsing.Arc.PhaseThree.SetAffectedContextCalculations where
 
 import Control.Monad.Except (throwError)
-import Control.Monad.State (modify)
 import Data.Array (cons)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Effect.Class.Console (log)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AffectedContextCalculation (AffectedContextCalculation(..))
-import Perspectives.DomeinFile (DomeinFileRecord)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType, invertFunctionDescription)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), prettyPrint)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (Unit, discard, pure, unit, void, ($))
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Prelude (Unit, discard, pure, unit, ($))
 
 -- Compute the inverse paths for the condition. Save each path with the type that is the origin
 -- (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
 -- when a Delta is processed for the head of a path.
-setAffectedContextCalculations :: QueryFunctionDescription -> PhaseThree Unit
-setAffectedContextCalculations qfd = unsafePartial $ for_ (invertFunctionDescription qfd)
+setAffectedContextCalculations :: ActionType -> QueryFunctionDescription -> PhaseThree Unit
+setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunctionDescription qfd)
   \path -> do
     -- log $ prettyPrint path
     setPathForEachSubPath path
@@ -64,8 +61,6 @@ setAffectedContextCalculations qfd = unsafePartial $ for_ (invertFunctionDescrip
 
     setPathForEachSubPath path@(SQD _ _ _ _ _) = setPathForStep path path
 
-    -- de selectie is goed, maar het moet niet voor deze stap alleen, maar het hele subpad gelden.
-    -- Ik moet dus letten op de head van de compose.
     setPathForStep :: Partial => QueryFunctionDescription -> QueryFunctionDescription -> PhaseThree Unit
     setPathForStep (SQD dom qf _ _ _) path = case qf of
 
@@ -111,19 +106,16 @@ setAffectedContextCalculations qfd = unsafePartial $ for_ (invertFunctionDescrip
 
       where
         addPathToProperty :: EnumeratedProperty -> QueryFunctionDescription -> EnumeratedProperty
-        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onPropertyDelta}
+        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onPropertyDelta}
 
         addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onRoleDelta_binder}
+        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onRoleDelta_binder}
 
         addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onRoleDelta_binding}
+        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onRoleDelta_binding}
 
         addPathToOnContextDelta_context :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onContextDelta_context}
+        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onContextDelta_context}
 
         addPathToOnContextDelta_role :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onContextDelta_role}
-
-        modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
-        modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
+        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onContextDelta_role}

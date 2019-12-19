@@ -28,7 +28,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 -- |
 
 import Control.Monad.Except (throwError)
-import Control.Monad.State (gets, modify)
+import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, foldM, head, length, null, uncons)
 import Data.Either (Either(..))
@@ -48,7 +48,7 @@ import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree.SetAffectedContextCalculations (setAffectedContextCalculations)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, runPhaseTwo_', withFrame)
+import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, range)
@@ -152,9 +152,6 @@ qualifyActionRoles = do
           case head types of
             Nothing -> throwError $ RoleMissingInContext pos ident (unwrap ctxtId)
             (Just t) -> pure t
-
-modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseThree Unit
-modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 
 -- | Qualifies the identifiers used in the filledBy part of an EnumeratedRole declaration.
 -- | A binding is represented as an ADT. We transform all elements of the form `ST segmentedName` in the tree
@@ -325,12 +322,12 @@ compileExpressions = do
         pure $ CalculatedProperty (cr {calculation = Q descr})
 
     compileActionCondition :: String -> Action -> PhaseThree Action
-    compileActionCondition actionName (Action ar@{subject, condition}) = case condition of
+    compileActionCondition actionName (Action ar@{_id, subject, condition}) = case condition of
       Q _ -> pure $ Action ar
       S stp -> do
         ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
         descr <- compileStep (CDOM $ ST ctxt) stp
-        setAffectedContextCalculations descr
+        setAffectedContextCalculations _id descr
         pure $ Action (ar {condition = Q descr})
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.

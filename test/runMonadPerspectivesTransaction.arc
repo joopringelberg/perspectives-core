@@ -8,7 +8,7 @@ domain: Test
     thing: FillerRole
     bot: for Self
       perspective on: Self
-        if not (exists SomeRole) then
+        if true then
           bind SourceRole >> binding to SomeRole
       perspective on: RoleToInspect
         if exists SomeRole then

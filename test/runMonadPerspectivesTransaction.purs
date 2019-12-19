@@ -44,7 +44,7 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  testOnly "contextDelta_role" (runP do
+  test "contextDelta_role" (runP do
       _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
       modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory

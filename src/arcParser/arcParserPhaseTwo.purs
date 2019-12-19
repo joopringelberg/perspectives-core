@@ -22,7 +22,7 @@
 module Perspectives.Parsing.Arc.PhaseTwo where
 
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Control.Monad.State (StateT, evalStateT, gets, modify, runStateT)
+import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
 import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Either (Either)
 import Data.Foldable (foldl)
@@ -113,7 +113,7 @@ subjectIsNotABot = lift $ void $ modify (\s -> s {bot = false})
 isSubjectBot :: PhaseTwo Boolean
 isSubjectBot = lift $ gets _.bot
 
-modifyDF :: (DomeinFileRecord -> DomeinFileRecord) -> PhaseTwo Unit
+modifyDF :: forall m. MonadState PhaseTwoState m => (DomeinFileRecord -> DomeinFileRecord) -> m Unit
 modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
 
 getDF :: PhaseTwo DomeinFileRecord

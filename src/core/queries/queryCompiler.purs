@@ -34,6 +34,7 @@ import Data.Array (elemIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.AffectedContextCalculation (HiddenFunction)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
 import Perspectives.Instances.Combinators (exists, not)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
@@ -382,3 +383,14 @@ getPropertyFunction id = unsafePartial $
     (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
     (R2V f) <- PC.calculation p >>= compileFunction
     pure f
+
+getHiddenFunction :: QueryFunctionDescription -> MP HiddenFunction
+getHiddenFunction qfd = do
+  cfunction <- compileFunction qfd
+  case cfunction of
+    C2C f -> pure $ unsafeCoerce f
+    C2R f -> pure $ unsafeCoerce f
+    C2V f -> pure $ unsafeCoerce f
+    R2C f -> pure $ unsafeCoerce f
+    R2R f -> pure $ unsafeCoerce f
+    R2V f -> pure $ unsafeCoerce f
