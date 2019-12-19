@@ -45,7 +45,7 @@ import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
 import Perspectives.Assignment.DependencyTracking (rulesForContextInstance)
 import Perspectives.ContextAndRole (context_id, context_me)
-import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MP, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>))
 import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
@@ -152,10 +152,10 @@ actionsTriggeredByTransaction (Transaction{contextDeltas, roleDeltas, propertyDe
 -- | affected context instances, first.
 aisInContextDelta :: ContextDelta -> CollectAIs
 aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
-  contextCalculations <- lift $ compileDescriptions _onContextDelta_context roleType
   roleCalculations <- lift $ compileDescriptions _onContextDelta_role roleType
   case roleInstance of
     Just ri -> do
+      contextCalculations <- lift $ compileDescriptions _onContextDelta_context roleType
       for_ contextCalculations \(AffectedContextCalculation{compilation, action}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
         affectedContexts <- lift (ri ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
@@ -167,6 +167,26 @@ aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
     affectedContexts <- lift (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance)
     -- For each affected context,
     for_ affectedContexts (addAutomaticActions action)
+
+aisInRoleDelta :: RoleDelta -> CollectAIs
+aisInRoleDelta (RoleDelta{id, binding}) = do
+  binderType <- lift (id ##>> OG.roleType)
+  bindingCalculations <- lift $ compileDescriptions _onRoleDelta_binding binderType
+  for_ bindingCalculations \(AffectedContextCalculation{compilation, action}) -> do
+    -- Find all affected contexts, starting from the role instance of the Delta.
+    affectedContexts <- lift (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+    -- For each affected context,
+    for_ affectedContexts (addAutomaticActions action)
+  case binding of
+    Just bnd -> do
+      bindingType <- lift (bnd ##>> OG.roleType)
+      binderCalculations <- lift $ compileDescriptions _onRoleDelta_binding bindingType
+      for_ binderCalculations \(AffectedContextCalculation{compilation, action}) -> do
+        -- Find all affected contexts, starting from the role instance of the Delta.
+        affectedContexts <- lift (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+        -- For each affected context,
+        for_ affectedContexts (addAutomaticActions action)
+    Nothing -> pure unit
 
 -- | Changes the model in cache (but not in Couchdb). For a given lens that retrieves one of onRoleDelta_binder,
 -- | onRoleDelta_binding, onContextDelta_role or onContextDelta_context, and an EnumeratedRoleType, compile the
@@ -200,13 +220,13 @@ _onContextDelta_context = prop (SProxy :: SProxy "onContextDelta_context")
 _onContextDelta_role :: CalculationsLens
 _onContextDelta_role = prop (SProxy :: SProxy "onContextDelta_role")
 
-type CalculationsLens = Lens' EnumeratedRoleRecord (Array AffectedContextCalculation)
+_onRoleDelta_binding :: CalculationsLens
+_onRoleDelta_binding = prop (SProxy :: SProxy "onRoleDelta_binding")
 
-aisInRoleDelta :: RoleDelta -> CollectAIs
-aisInRoleDelta (RoleDelta{id, binding}) = pure unit
-  -- do
-  -- (EnumeratedRole{onRoleDelta_binding}) <- lift (id ##>> roleType >=> getEnumeratedRole)
-  -- for_ onRoleDelta_binding \(AffectedContextCalculation{description, compilation}) -> do
+_onRoleDelta_binder :: CalculationsLens
+_onRoleDelta_binder = prop (SProxy :: SProxy "onRoleDelta_binder")
+
+type CalculationsLens = Lens' EnumeratedRoleRecord (Array AffectedContextCalculation)
 
 aisInPropertyDelta :: PropertyDelta -> CollectAIs
 aisInPropertyDelta (PropertyDelta{id})= pure unit
