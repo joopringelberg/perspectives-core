@@ -35,13 +35,13 @@ import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CouchdbState (CouchdbState)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT, runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (class Eq, class Show, Unit, bind, eq, pure, show, unit, ($), (&&), (<<<), (<>), (>>=))
+import Prelude (class Eq, class Show, Unit, bind, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -60,10 +60,6 @@ type PerspectivesState = CouchdbState
   , domeinCache :: DomeinCache
 
   , queryAssumptionRegister :: AssumptionRegister
-
-  , actionAssumptionCache :: ActionAssumptionCache
-
-  , actionInstanceCache :: ActionInstanceCache
 
   , variableBindings :: Environment String
   )
@@ -102,19 +98,6 @@ instance showActionInstance :: Show ActionInstance where
 -- | We register the dependency of Actions for ContextInstances with a double registration that allows us to
 -- | travel from Assumptions to ActionInstances and vice versa by simple lookup.
 
--- | The ActionAssumptionCache is indexed by the two elements of an Assumption, in order.
--- | It allows us to cache ActionInstances, signifying those that should be re-applied when an Assumption is touched.
-type ActionAssumptionCache = GLStrMap (GLStrMap (Array ActionInstance))
-
--- | The ActionInstanceCache is indexed by the two elements of the ActionInstance, unwrapped. So given an
--- | ActionInstance, we can look up the Assumptions used in its computations.
-type ActionInstanceCache = GLStrMap (GLStrMap (Array Assumption))
-
-actionAssumptionCache :: ActionAssumptionCache
-actionAssumptionCache = new unit
-
-actionInstanceCache :: ActionInstanceCache
-actionInstanceCache = new unit
 -----------------------------------------------------------
 -- MONADPERSPECTIVES
 -----------------------------------------------------------

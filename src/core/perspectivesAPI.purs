@@ -39,7 +39,6 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Actions (tearDownBotActions)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
@@ -207,7 +206,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             sendResponse (Result corrId [buitenRol $ unwrap id]) setter
     Api.DeleteContext -> do
       void $ runMonadPerspectivesTransaction $ removeContextInstance (ContextInstance subject)
-      tearDownBotActions (ContextInstance subject)
       sendResponse (Result corrId []) setter
     Api.RemoveRol -> do
       -- removeRolFromContext

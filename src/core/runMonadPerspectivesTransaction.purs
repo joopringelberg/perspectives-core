@@ -44,7 +44,6 @@ import Perspectives.Actions (compileBotAction)
 import Perspectives.AffectedContextCalculation (AffectedContextCalculation(..))
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
-import Perspectives.Assignment.DependencyTracking (rulesForContextInstance)
 import Perspectives.ContextAndRole (context_id, context_me)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>))
 import Perspectives.Deltas (runTransactie)
@@ -132,12 +131,6 @@ runActions t = do
   if isEmptyTransaction nt
     then pure t
     else pure <<< (<>) t =<< runActions nt
-
--- | Run the actions that have been set up before, for a context instance.
-runRulesForContextInstance :: ContextInstance -> MonadPerspectivesTransaction Unit
-runRulesForContextInstance cid = do
-  rules <- lift $ lift $ rulesForContextInstance cid
-  for_ rules \rule -> rule cid
 
 -- | For each Delta, find the associated AffectedContextQueries. Run them, collecting Context Instances.
 -- | For each Context Instance, find the perspective of the me role. For now, take all the Action types.

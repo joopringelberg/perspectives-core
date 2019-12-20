@@ -4,11 +4,10 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (length, null)
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Tuple (Tuple)
 import Effect.Class.Console (logShow)
 import Foreign.Object (Object)
-import Perspectives.Actions (setupBotActions)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
@@ -58,6 +57,3 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
     r <- runP $ loadAndSaveCrlFile "systemInstances.crl" modelDirectory
     logShow r
     assert "A CRL file should load without problems" (null r)
-
-  test "Setup bot action" do
-    runP $ setupBotActions $ ContextInstance "model:User$MyTestCase"

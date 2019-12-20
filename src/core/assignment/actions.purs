@@ -32,57 +32,26 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (empty, values)
+import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.DependencyTracking (areBotActionsSetUp, cacheActionInstanceDependencies, removeContextInstanceDependencies)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoles, removeBinding, removeProperty, removeRolFromContext, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol)
-import Perspectives.ContextAndRole (context_me)
-import Perspectives.CoreTypes (type (~~>), ActionInstance(..), MP, MonadPerspectives, Updater, WithAssumptions, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders, roleType) as OG
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.Class.Action (condition, effect, isExecutedByBot)
+import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.PersistentType (ActionType, getAction, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.SaveUserData (removeRoleInstance, saveAndConnectRoleInstance)
-
--- | For a Context, set up the automtic Actions of the me role. Register these Actions in the ActionRegister.
--- | Register their dependency on Assumptions in the actionAssumptionRegister in
--- | PerspectivesState. Does **not** execute the actions.
-setupBotActions :: ContextInstance -> MonadPerspectives Unit
-setupBotActions cid = areBotActionsSetUp cid >>= if _
-  then pure unit
-  else do
-    -- For the me role, get its type.
-    maybeMe <- getPerspectContext cid >>= pure <<< context_me
-    case maybeMe of
-      Nothing -> pure unit
-      Just me -> do
-        u <- me ##>> OG.roleType
-        perspectives <- getEnumeratedRole u >>= pure <<< _.perspectives <<< unwrap
-        for_ (values perspectives) \actions ->
-          for_ actions \(a :: ActionType) -> do
-            -- Only when it is an automatic action
-            shouldRun <- getAction a >>= pure <<< isExecutedByBot
-            if shouldRun
-              then (compileBotAction a) >>= \((Tuple lhs _) :: Tuple LHS (Updater ContextInstance)) -> do
-                  -- Evaluate the lhs to set up the dependency administration.
-                  (Tuple bools ass :: WithAssumptions Value) <- runMonadPerspectivesQuery cid lhs
-                  cacheActionInstanceDependencies (ActionInstance cid a) ass
-              else pure unit
-
--- | Remove all actions associated with this context.
-tearDownBotActions :: ContextInstance -> MonadPerspectives Unit
-tearDownBotActions = removeContextInstanceDependencies
 
 -- | Compile the action to an Updater. Cache for later use.
 compileBotAction :: ActionType -> MP (Tuple LHS (Updater ContextInstance))
@@ -107,10 +76,7 @@ compileBotAction actionType = do
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
       if (alaF Conj foldMap (eq (Value "true")) bools)
-          then do
-            -- Cache the association between the assumptions found for this ActionInstance.
-            lift $ lift $ cacheActionInstanceDependencies (ActionInstance contextId actionType) a0
-            effectFullFunction contextId
+          then effectFullFunction contextId
           else pure unit
 
 compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
