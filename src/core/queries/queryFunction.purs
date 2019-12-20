@@ -55,10 +55,10 @@ data FunctionName =
   | LessThanEqualF
   | GreaterThanF
   | GreaterThanEqualF
-  | AddF                -- TODO
-  | SubtractF           -- TODO
-  | DivideF             -- TODO
-  | MultiplyF           -- TODO
+  | AddF
+  | SubtractF
+  | DivideF
+  | MultiplyF
   | AndF
   | OrF
   | CountF              -- TODO

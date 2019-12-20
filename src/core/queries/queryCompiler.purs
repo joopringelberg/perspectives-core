@@ -32,6 +32,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
 import Data.Array (elemIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.String (Pattern(..), stripSuffix)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AffectedContextCalculation (HiddenFunction)
@@ -39,6 +40,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
 import Perspectives.Instances.Combinators (exists, not)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
+import Perspectives.Instances.Values (parseInt)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, prettyPrint)
@@ -51,8 +53,9 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (<), (<=), (>), (>=), (==), (&&), (||))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (<), (<=), (>), (>=), (==), (&&), (||), (+), (*), (/), (-))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -229,10 +232,24 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
-    (C2V a), (C2V b) -> pure $ C2V $ \c -> wrapLogicalOperator (&&) <$> a c <*> b c
-    (R2V a), (R2V b) -> pure $ R2V $ \c -> wrapLogicalOperator (||) <$> a c <*> b c
+    (C2V a), (C2V b) -> pure $ C2V $ \c -> unsafePartial $ mapLogicalOperator g <$> a c <*> b c
+    (R2V a), (R2V b) -> pure $ R2V $ \c -> unsafePartial $ mapLogicalOperator g <$> a c <*> b c
     _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
+-- Add and subtract for numbers and strings. Divide and multiply just for numbers.
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2V a), (C2V b) -> pure $ C2V $ \c -> do
+      a' <- a c
+      b' <- b c
+      (unsafePartial $ (mapNumericOperator g ran)) a' b'
+    (R2V a), (R2V b) -> pure $ R2V $ \c -> do
+      a' <- a c
+      b' <- b c
+      (unsafePartial $ (mapNumericOperator g ran)) a' b'
+    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -285,6 +302,24 @@ compareFunction fname = case fname of
 
 wrapLogicalOperator :: (Boolean -> Boolean -> Boolean) -> (Value -> Value -> Value)
 wrapLogicalOperator g (Value p) (Value q) = Value $ show (g (p == "true") (q == "true"))
+
+mapLogicalOperator :: Partial => FunctionName -> (Value -> Value -> Value)
+mapLogicalOperator AndF = wrapLogicalOperator (&&)
+mapLogicalOperator OrF = wrapLogicalOperator (||)
+
+mapNumericOperator :: Partial => FunctionName -> Domain -> (Value -> Value ~~> Value)
+mapNumericOperator AddF (VDOM PNumber _) = wrapNumericOperator (+)
+mapNumericOperator AddF (VDOM PString _) = \(Value s1) (Value s2) -> pure (Value $ s1 <> s2)
+mapNumericOperator SubtractF (VDOM PNumber _) = wrapNumericOperator (-)
+mapNumericOperator SubtractF (VDOM PString _) = \v1@(Value s1) (Value s2) -> case (Pattern s1) `stripSuffix` s2 of
+  Nothing -> pure v1
+  Just r -> pure $ Value r
+mapNumericOperator DivideF (VDOM PNumber _) = wrapNumericOperator (/)
+mapNumericOperator MultiplyF (VDOM PNumber _) = wrapNumericOperator (*)
+
+wrapNumericOperator :: (Int -> Int -> Int) -> (Value -> Value ~~> Value)
+wrapNumericOperator g (Value p) (Value q) = (Value <<< show) <$> (g <$> (lift $ parseInt p) <*> (lift $ parseInt q))
+
 
 orderContexts :: forall a. Ord a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
 orderContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
