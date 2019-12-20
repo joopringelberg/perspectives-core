@@ -41,7 +41,7 @@ import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as 
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, prettyPrint)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -52,7 +52,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (<), (<=), (>), (>=))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (<), (<=), (>), (>=), (==), (&&), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -225,6 +225,15 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
     (R2V a), (R2V b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
     _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
+compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [AndF, OrF] = do
+  f1' <- compileFunction f1
+  f2' <- compileFunction f2
+  case f1', f2' of
+    (C2V a), (C2V b) -> pure $ C2V $ \c -> wrapLogicalOperator (&&) <$> a c <*> b c
+    (R2V a), (R2V b) -> pure $ R2V $ \c -> wrapLogicalOperator (||) <$> a c <*> b c
+    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+
+
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
   case f1' of
@@ -261,7 +270,7 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
     _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
 
 -- Catch all
-compileFunction qd = throwError (error $ "Cannot create a function out of '" <> show qd <> "'.")
+compileFunction qd = throwError (error $ "Cannot create a function out of '" <> prettyPrint qd <> "'.")
 
 compareContexts :: forall a. Eq a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
 compareContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
@@ -273,6 +282,12 @@ compareFunction :: forall a. Eq a => Partial => FunctionName -> (a -> a -> Boole
 compareFunction fname = case fname of
   EqualsF -> eq
   NotEqualsF -> notEq
+
+logicalOperationOnContexts :: (ContextInstance ~~> Value) -> (ContextInstance ~~> Value) -> (Boolean -> Boolean -> Boolean) -> (ContextInstance ~~> Value)
+logicalOperationOnContexts a b f c = (wrapLogicalOperator f <$> a c <*> b c)
+
+wrapLogicalOperator :: (Boolean -> Boolean -> Boolean) -> (Value -> Value -> Value)
+wrapLogicalOperator g (Value p) (Value q) = Value $ show (g (p == "true") (q == "true"))
 
 orderContexts :: forall a. Ord a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
 orderContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
