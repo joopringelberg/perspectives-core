@@ -78,7 +78,7 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  testOnly "roleDelta_binder" (runP do
+  test "roleDelta_binder" (runP do
     _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
     setupUser
     modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
@@ -88,6 +88,21 @@ theSuite = suite "Perspectives.Actions" do
         if null instanceErrors
           then do
             n1 <- ((ContextInstance "model:User$MySubcase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect$Flag"))
+            liftAff $ assert "Flag should be true." (n1 == [Value "true"])
+          else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+      else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+      )
+
+  testOnly "propertyDelta" (runP do
+    _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+    setupUser
+    modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+    if null modelErrors
+      then do
+        instanceErrors <- loadCrlFile_ "onPropertyDelta.crl" testDirectory
+        if null instanceErrors
+          then do
+            n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCasePropertyDelta$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCasePropertyDelta$RoleToInspect$Flag"))
             liftAff $ assert "Flag should be true." (n1 == [Value "true"])
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false

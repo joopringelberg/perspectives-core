@@ -66,3 +66,17 @@ domain: Test
             Flag = true
       thing: RoleToInspect
         property: Flag (not mandatory, functional, Boolean)
+
+  case: TestCasePropertyDelta
+    user: Self filledBy: sys:PerspectivesSystem$User
+    bot: for Self
+      perspective on: ARole
+        if true then
+          Prop4 = true
+      perspective on: RoleToInspect
+        if ARole >> Prop4 then
+          Flag = true
+    thing: ARole (not mandatory, functional)
+      property: Prop4 (not mandatory, functional, Boolean)
+    thing: RoleToInspect
+      property: Flag (not mandatory, functional, Boolean)

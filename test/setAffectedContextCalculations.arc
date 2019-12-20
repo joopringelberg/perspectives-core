@@ -7,6 +7,7 @@ domain: Test
           Prop1 = false
     thing: ARole
       property: Prop1 (mandatory, functional, Boolean)
+
   case: TestCase2
     user: Self
     bot: for Self
@@ -27,6 +28,7 @@ domain: Test
     case: SubCase1
       external:
         property: Prop2 (mandatory, functional, Boolean)
+        
   case: TestCase4
     user: Self
     bot: for Self

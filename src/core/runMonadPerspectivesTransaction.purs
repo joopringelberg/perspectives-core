@@ -60,7 +60,7 @@ import Perspectives.Query.Compiler (getHiddenFunction)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.TypesForDeltas (ContextDelta(..), PropertyDelta(..), RoleDelta(..))
@@ -190,6 +190,33 @@ aisInRoleDelta (RoleDelta{id, binding}) = do
         for_ affectedContexts (addAutomaticActions action)
     Nothing -> pure unit
 
+aisInPropertyDelta :: PropertyDelta -> CollectAIs
+aisInPropertyDelta (PropertyDelta{id, property})= do
+  calculations <- lift $ compileDescriptions' property
+  for_ calculations \(AffectedContextCalculation{compilation, action}) -> do
+    -- Find all affected contexts, starting from the role instance of the Delta.
+    affectedContexts <- lift (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+    -- For each affected context,
+    for_ affectedContexts (addAutomaticActions action)
+  where
+    compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array AffectedContextCalculation)
+    compileDescriptions' rt@(EnumeratedPropertyType ert) =  do
+      modelName <- pure $ (unsafePartial $ fromJust $ deconstructModelName ert)
+      (df :: DomeinFile) <- retrieveDomeinFile modelName
+      -- Get the AffectedContextCalculations in onPropertyDelta.
+      (calculations :: Array AffectedContextCalculation) <- pure $ unsafePartial $ fromJust $ preview (onPropertyDelta rt) df
+      -- Compile the descriptions.
+      if areCompiled calculations
+        then pure calculations
+        else do
+          compiledCalculations <- traverse compile calculations
+          -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
+          modifyDomeinFileInCache (over (onPropertyDelta rt) (const compiledCalculations)) modelName
+          pure compiledCalculations
+      where
+        onPropertyDelta :: EnumeratedPropertyType -> Traversal' DomeinFile (Array AffectedContextCalculation)
+        onPropertyDelta (EnumeratedPropertyType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedProperties") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "onPropertyDelta")
+
 -- | Changes the model in cache (but not in Couchdb). For a given lens that retrieves one of onRoleDelta_binder,
 -- | onRoleDelta_binding, onContextDelta_role or onContextDelta_context, and an EnumeratedRoleType, compile the
 -- | description in the AffectedContextCalculations.
@@ -207,22 +234,21 @@ compileDescriptions onX rt@(EnumeratedRoleType ert) =  do
       -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
       modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
       pure compiledCalculations
-
   where
-    areCompiled :: Array AffectedContextCalculation -> Boolean
-    areCompiled ar = case head ar of
-      Nothing -> true
-      Just (AffectedContextCalculation{compilation}) -> isJust compilation
-
     onDelta :: EnumeratedRoleType -> Traversal' DomeinFile (Array AffectedContextCalculation)
     onDelta (EnumeratedRoleType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedRoles") <<< at x <<< traversed <<< _Newtype <<< onX
 
-    compile :: AffectedContextCalculation -> MP AffectedContextCalculation
-    compile ac@(AffectedContextCalculation{description, compilation, action}) = case compilation of
-      Just c -> pure ac
-      Nothing -> do
-        c <- getHiddenFunction description
-        pure $ AffectedContextCalculation{description, compilation: Just (unsafeCoerce c), action}
+areCompiled :: Array AffectedContextCalculation -> Boolean
+areCompiled ar = case head ar of
+  Nothing -> true
+  Just (AffectedContextCalculation{compilation}) -> isJust compilation
+
+compile :: AffectedContextCalculation -> MP AffectedContextCalculation
+compile ac@(AffectedContextCalculation{description, compilation, action}) = case compilation of
+  Just c -> pure ac
+  Nothing -> do
+    c <- getHiddenFunction description
+    pure $ AffectedContextCalculation{description, compilation: Just (unsafeCoerce c), action}
 
 _onContextDelta_context :: CalculationsLens
 _onContextDelta_context = prop (SProxy :: SProxy "onContextDelta_context")
@@ -237,9 +263,6 @@ _onRoleDelta_binder :: CalculationsLens
 _onRoleDelta_binder = prop (SProxy :: SProxy "onRoleDelta_binder")
 
 type CalculationsLens = Lens' EnumeratedRoleRecord (Array AffectedContextCalculation)
-
-aisInPropertyDelta :: PropertyDelta -> CollectAIs
-aisInPropertyDelta (PropertyDelta{id})= pure unit
 
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT (lift $ getPerspectContext ctxt >>= pure <<< maybe [] singleton <<< context_me)
