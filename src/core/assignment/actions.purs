@@ -26,7 +26,7 @@ module Perspectives.Actions where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldMap, uncons)
+import Data.Array (foldMap, null, uncons)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -75,7 +75,7 @@ compileBotAction actionType = do
       (Updater ContextInstance)
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
-      if (alaF Conj foldMap (eq (Value "true")) bools)
+      if not null bools && (alaF Conj foldMap (eq (Value "true")) bools)
           then effectFullFunction contextId
           else pure unit
 
