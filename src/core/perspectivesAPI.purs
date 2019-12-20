@@ -40,17 +40,19 @@ import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Api
-import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (addRol, removeBinding, setBinding, setProperty)
+import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, RolSerialization(..), mkApiEffect, showRequestRecord)
+import Perspectives.Assignment.Update (addRol, removeBinding, saveEntiteit, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.InstanceRepresentation (PerspectRol)
+import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -213,7 +215,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         sendResponse (Result corrId []) setter
     Api.CreateRol -> do
       (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction do
-        role <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+        desc@(RolSerialization{binding}) <- pure (unsafePartial $ fromJust rolDescription)
+        role@(PerspectRol{_id}) <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject desc
+        case binding of
+          Just bndg -> do
+            b <- lift $ lift $ getPerspectRol (RoleInstance bndg)
+            saveEntiteit (RoleInstance bndg) (addRol_gevuldeRollen b (EnumeratedRoleType predicate) _id)
+          Nothing -> pure unit
+
         saveAndConnectRoleInstance (identifier role)
         pure (identifier role)
       sendResponse (Result corrId (unwrap <$> rolInsts)) setter
@@ -228,7 +237,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (CR ctype) -> sendResponse (Error corrId ("Cannot construct an instance of CalculatedRole '" <> unwrap ctype <> "'!")) setter
           (ENR eroltype) -> do
             rol <- runMonadPerspectivesTransaction do
-              role <- lift $ lift $ constructAnotherRol eroltype subject (unsafePartial $ fromJust rolDescription)
+              desc@(RolSerialization{binding}) <- pure (unsafePartial $ fromJust rolDescription)
+              role@(PerspectRol{_id}) <- lift $ lift $ constructAnotherRol eroltype subject desc
+              -- TODO. Set the inverse administration.
+              case binding of
+                Just bndg -> do
+                  b <- lift $ lift $ getPerspectRol (RoleInstance bndg)
+                  saveEntiteit (RoleInstance bndg) (addRol_gevuldeRollen b (EnumeratedRoleType predicate) _id)
+                Nothing -> pure unit
               saveAndConnectRoleInstance (identifier role)
               pure $ (identifier :: PerspectRol -> RoleInstance) role
             sendResponse (Result corrId (unwrap <$> rol)) setter
@@ -259,7 +275,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.BindInNewRol -> catchError
       do
         void $ runMonadPerspectivesTransaction do
-          role <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+          desc@(RolSerialization{binding}) <- pure (unsafePartial $ fromJust rolDescription)
+          role@(PerspectRol{_id}) <- lift $ lift $ constructAnotherRol (EnumeratedRoleType predicate) subject desc
+          -- TODO. Set the inverse administration.
+          case binding of
+            Just bndg -> do
+              b <- lift $ lift $ getPerspectRol (RoleInstance bndg)
+              saveEntiteit (RoleInstance bndg) (addRol_gevuldeRollen b (EnumeratedRoleType predicate) _id)
+            Nothing -> pure unit
           saveAndConnectRoleInstance (identifier role)
           setBinding (identifier role) (RoleInstance object)
         sendResponse (Result corrId ["ok"]) setter

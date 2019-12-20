@@ -283,9 +283,6 @@ compareFunction fname = case fname of
   EqualsF -> eq
   NotEqualsF -> notEq
 
-logicalOperationOnContexts :: (ContextInstance ~~> Value) -> (ContextInstance ~~> Value) -> (Boolean -> Boolean -> Boolean) -> (ContextInstance ~~> Value)
-logicalOperationOnContexts a b f c = (wrapLogicalOperator f <$> a c <*> b c)
-
 wrapLogicalOperator :: (Boolean -> Boolean -> Boolean) -> (Value -> Value -> Value)
 wrapLogicalOperator g (Value p) (Value q) = Value $ show (g (p == "true") (q == "true"))
 

@@ -5,7 +5,7 @@ import model:Test als tst:
 tst:TestCaseRoleDelta_binder usr:MyTestCase
 	$UberSelf -> usr:MijnSysteem$User(1)
 	$AnotherRole => ()
-		$Prop3 = true
+		$Prop4 = true
 	$NestedContext2 => ()
 	$SourceRole2 =>
 		$SubCase2 usr:MySubcase

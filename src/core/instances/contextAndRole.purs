@@ -183,6 +183,8 @@ changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = EnumeratedRoleT
 rol_binding :: PerspectRol -> Maybe RoleInstance
 rol_binding (PerspectRol{binding}) = binding
 
+-- | The first argument is the new binding;
+-- | the second argument is the role instance that receives the binding.
 changeRol_binding :: RoleInstance -> PerspectRol -> PerspectRol
 changeRol_binding b (PerspectRol cr) = PerspectRol $ cr {binding = (Just b)}
 
@@ -243,6 +245,8 @@ setRol_gevuldeRollen (PerspectRol r) grollen = PerspectRol (r {gevuldeRollen = g
 rol_gevuldeRol :: PerspectRol -> EnumeratedRoleType -> Array RoleInstance
 rol_gevuldeRol  (PerspectRol{gevuldeRollen}) rn = maybe [] identity (lookup (unwrap rn) gevuldeRollen)
 
+-- | The first argument is the role instance that receives a new inverse link to a role that binds it.
+-- | The third argument represents the role instance that binds the role of the first argument.
 addRol_gevuldeRollen :: PerspectRol -> EnumeratedRoleType -> RoleInstance -> PerspectRol
 addRol_gevuldeRollen ct@(PerspectRol cr@{gevuldeRollen}) rolName rolID =
   case lookup (unwrap rolName) gevuldeRollen of

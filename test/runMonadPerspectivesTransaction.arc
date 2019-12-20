@@ -30,6 +30,7 @@ domain: Test
       user: Self filledBy: sys:PerspectivesSystem$User
       bot: for Self
         perspective on: RoleToInspect
+          -- geeft een leeg resultaat! Vermoedelijk leggen 'bind' en 'bind_' de omgekeerde administratie niet aan.
           if extern >> binder NestedContext >> context >> AnotherRole >> Prop3 then
             Flag = true
       thing: RoleToInspect
@@ -55,14 +56,14 @@ domain: Test
         if (not exists NestedContext2 >> binding) and (exists SourceRole2 >> binding) then
           bind_ SourceRole2 >> binding to NestedContext2
     thing: AnotherRole
-      property: Prop3 (mandatory, functional, Boolean)
-    context: NestedContext2 filledBy: SubCase2
-    context: SourceRole2 filledBy: SubCase2
+      property: Prop4 (mandatory, functional, Boolean)
+    context: NestedContext2 (not mandatory, functional) filledBy: SubCase2
+    context: SourceRole2 (not mandatory, functional) filledBy: SubCase2
     case: SubCase2
       user: Self filledBy: sys:PerspectivesSystem$User
       bot: for Self
         perspective on: RoleToInspect
-          if extern >> binder NestedContext2 >> context >> AnotherRole >> Prop3 then
+          if extern >> binder NestedContext2 >> context >> AnotherRole >> Prop4 then
             Flag = true
       thing: RoleToInspect
         property: Flag (not mandatory, functional, Boolean)

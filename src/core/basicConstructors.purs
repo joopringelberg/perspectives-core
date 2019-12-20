@@ -46,7 +46,7 @@ import Perspectives.CoreTypes (MP, MonadPerspectives, (##=))
 import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, tryGetPerspectEntiteit)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (cacheInitially, removeInternally)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -70,6 +70,7 @@ constructContext' c = do
 -- | If there are no problems, returns the ID.
 -- | Caches the result but does not save it to Couchdb, neither adds it to a Transaction.
 -- | Instead, use saveContextInstance to do so.
+-- | Does **not** set any inverse binding!
 constructContext :: ContextSerialization -> MonadPerspectives (Either (Array UserMessage) ContextInstance)
 constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externeProperties}) = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
@@ -155,6 +156,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externePr
 
 -- | Constructs a rol and caches it.
 -- | Does not add it to its context.
+-- | Does **not** set the inverse binding!
 constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> MonadPerspectives PerspectRol
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
   isMe <- case bnd of
@@ -177,6 +179,7 @@ constructRol rolType contextId localName i (RolSerialization {properties, bindin
 -- | Caches the instance but does not save it, nor add it to a Transaction.
 -- | User saveAndConnectRoleInstance for that purpose
 -- | Does not add it to its context.
+-- | Does **not** set the inverse binding!
 constructAnotherRol :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectives PerspectRol
 constructAnotherRol rolType id rolSerialisation = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id

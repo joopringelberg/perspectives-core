@@ -40,15 +40,15 @@ data FunctionName =
   | ExternalRoleF
   | IdentityF           -- TODO IN QUERYCOMPILER
   | SequenceF
-  | NotF                -- TODO
-  | ExistsF             -- TODO
+  | NotF
+  | ExistsF
   | FilterF
   | ComposeF
   | DisjunctionF
   | ConjunctionF
   | CreateContextF      -- TODO
   | CreateRoleF         -- TODO
-  | GetRoleBindersF     -- TODO
+  | GetRoleBindersF
   | EqualsF
   | NotEqualsF
   | LessThanF
@@ -59,8 +59,8 @@ data FunctionName =
   | SubtractF           -- TODO
   | DivideF             -- TODO
   | MultiplyF           -- TODO
-  | AndF                -- TODO
-  | OrF                 -- TODO
+  | AndF
+  | OrF
   | CountF              -- TODO
   | MinimumF            -- TODO, ALSO IN DESCRIPTIONCOMPILER
   | MaximumF            -- TODO, ALSO IN DESCRIPTIONCOMPILER
