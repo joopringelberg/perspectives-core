@@ -60,3 +60,35 @@ theSuite = suite "Perspectives.Actions" do
             else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
+
+  test "roleDelta_binding" (runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      if null modelErrors
+        then do
+          -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
+          -- logShow eff
+          instanceErrors <- loadCrlFile_ "onRoleDelta_binding.crl" testDirectory
+          if null instanceErrors
+            then do
+              n1 <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binding$BinderRole") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binding$BinderRole$Flag"))
+              liftAff $ assert "Flag should be true." (n1 == [Value "true"])
+            else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
+
+  testOnly "roleDelta_binder" (runP do
+    _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+    setupUser
+    modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+    if null modelErrors
+      then do
+        instanceErrors <- loadCrlFile_ "onRoleDelta_binder.crl" testDirectory
+        if null instanceErrors
+          then do
+            n1 <- ((ContextInstance "model:User$MySubcase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseRoleDelta_binder$SubCase2$RoleToInspect$Flag"))
+            liftAff $ assert "Flag should be true." (n1 == [Value "true"])
+          else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+      else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+      )

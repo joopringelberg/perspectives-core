@@ -119,7 +119,7 @@ runActions :: Transaction -> MonadPerspectivesTransaction Transaction
 runActions t = do
   -- action instances deriving from Deltas.
   (AISet as) <- lift $ lift $ execWriterT $ actionsTriggeredByTransaction t
-  -- lift $ logShow as
+  lift $ logShow as
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
@@ -185,7 +185,7 @@ aisInRoleDelta (RoleDelta{id, binding}) = do
       binderCalculations <- lift $ compileDescriptions _onRoleDelta_binding bindingType
       for_ binderCalculations \(AffectedContextCalculation{compilation, action}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
-        affectedContexts <- lift (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+        affectedContexts <- lift (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
         -- For each affected context,
         for_ affectedContexts (addAutomaticActions action)
     Nothing -> pure unit

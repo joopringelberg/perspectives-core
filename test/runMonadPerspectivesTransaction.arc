@@ -34,3 +34,35 @@ domain: Test
             Flag = true
       thing: RoleToInspect
         property: Flag (not mandatory, functional, Boolean)
+
+  case: TestCaseRoleDelta_binding
+    user: Self filledBy: sys:PerspectivesSystem$User
+    bot: for Self
+      perspective on: Self
+        if true then
+          bind_ BindingRole to BinderRole
+      perspective on: BinderRole
+        if exists (BinderRole >> binding) then
+          Flag = true
+    thing: BindingRole (not mandatory, functional)
+    thing: BinderRole (not mandatory, functional) filledBy: BindingRole
+      property: Flag (not mandatory, functional, Boolean)
+
+  case: TestCaseRoleDelta_binder
+    user: UberSelf filledBy: sys:PerspectivesSystem$User
+    bot: for UberSelf
+      perspective on: UberSelf
+        if (not exists NestedContext2 >> binding) and (exists SourceRole2 >> binding) then
+          bind_ SourceRole2 >> binding to NestedContext2
+    thing: AnotherRole
+      property: Prop3 (mandatory, functional, Boolean)
+    context: NestedContext2 filledBy: SubCase2
+    context: SourceRole2 filledBy: SubCase2
+    case: SubCase2
+      user: Self filledBy: sys:PerspectivesSystem$User
+      bot: for Self
+        perspective on: RoleToInspect
+          if extern >> binder NestedContext2 >> context >> AnotherRole >> Prop3 then
+            Flag = true
+      thing: RoleToInspect
+        property: Flag (not mandatory, functional, Boolean)

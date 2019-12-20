@@ -1,0 +1,8 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:TestCaseRoleDelta_binding usr:MyTestCase
+	$Self -> usr:MijnSysteem$User(1)
+	$BindingRole => ()
+	$BinderRole => ()
