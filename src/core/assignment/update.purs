@@ -83,7 +83,9 @@ Om een door een andere gebruiker aangebrachte wijziging door te voeren, moet je:
 -----------------------------------------------------------
 -- UPDATE A BINDING
 -----------------------------------------------------------
--- | Changes the binding.
+-- | Changes the binding, and the inverse binding.
+-- | The first argument represents the role instance that receives the new binding.
+-- | The second argument represents the new binding.
 -- | Modifies the Role instance.
 -- | Caches and saves the Role instance.
 -- | Adds a RoleDelta to the transaction.
@@ -122,8 +124,8 @@ setBinding roleId (newBindingId :: RoleInstance) = do
           setMe (rol_context modifiedRole) Nothing
         else pure unit
 
-      -- Add this roleinstance as a binding role for the new binding.
-      saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
+  -- Add this roleinstance as a binding role for the new binding.
+  saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
 -- | Removes the binding R of the rol, if any.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
