@@ -80,3 +80,23 @@ domain: Test
       property: Prop4 (not mandatory, functional, Boolean)
     thing: RoleToInspect
       property: Flag (not mandatory, functional, Boolean)
+
+  case: TestCaseInCouchdb
+    user: Self filledBy: sys:PerspectivesSystem$User
+    thing: ARole
+      -- In the test, we will load the example in Couchdb and then unload.
+      -- After that, we will set Prop to true 'by hand'.
+      -- This causes the instance usr:MyTestCase to be loaded, but not the subcontext     
+      -- usr:MySubcase (to which the rule of SubCase3 applies)
+      -- The PropertyDelta must 'finger' the trigger for the bot on AnotherRole
+      -- in SubCase3, causing usr:MySubcase to be loaded in memory.
+      property: Prop (not mandatory, functional, Boolean)
+    context: NestedContext3 filledBy: SubCase3
+    case: SubCase3
+      user: Self filledBy: sys:PerspectivesSystem$User
+      bot: for Self
+        perspective on: RoleToInspect
+          if extern >> binder NestedContext3 >> context >> ARole >> Prop then
+            Flag = true
+      thing: RoleToInspect
+        property: Flag (not mandatory, functional, Boolean)

@@ -6,13 +6,15 @@ import Control.Monad.Free (Free)
 import Data.Array (length, null)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
+import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (getProperty, getRole)
-import Perspectives.LoadCRL (loadCrlFile_)
+import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile)
-import Test.Perspectives.Utils (runP, setupUser)
+import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -93,7 +95,7 @@ theSuite = suite "Perspectives.Actions" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testOnly "propertyDelta" (runP do
+  test "propertyDelta" (runP do
     _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
     setupUser
     modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
@@ -107,3 +109,32 @@ theSuite = suite "Perspectives.Actions" do
           else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
+
+  testOnly "TestCaseInCouchdb" do
+    (runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      if null modelErrors
+        then do
+          instanceErrors <- loadAndSaveCrlFile "TestCaseInCouchdb.crl" testDirectory
+          if null instanceErrors
+            then pure unit
+            else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
+    (runP do
+      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      setupUser
+      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      if null modelErrors
+        then do
+          -- Now set Prop on ARole to be true
+          aRoleInstance <- (ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseInCouchdb$ARole")
+          _ <- runMonadPerspectivesTransaction (setProperty aRoleInstance (EnumeratedPropertyType "model:Test$TestCaseInCouchdb$ARole$Prop") [(Value "true")])
+          -- NOTE: on inspecting Couchdb we see the Flag hoisted even if we comment out the lines below.
+          n1 <- ((ContextInstance "model:User$MySubcase") ##= getRole (EnumeratedRoleType "model:Test$TestCaseInCouchdb$SubCase3$RoleToInspect") >=> getProperty (EnumeratedPropertyType "model:Test$TestCaseInCouchdb$SubCase3$RoleToInspect$Flag"))
+          liftAff $ assert "Flag should be true." (n1 == [Value "true"])
+          clearUserDatabase
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
