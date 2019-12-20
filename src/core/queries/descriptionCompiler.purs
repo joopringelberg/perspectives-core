@@ -180,7 +180,7 @@ compileUnaryStep currentDomain (LogicalNot pos s) = do
   -- First compile s. Then check that the resulting QueryFunctionDescription is a (VDOM PBool _) range value.
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    VDOM PBool _ -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs currentDomain (functional descriptionOfs) (mandatory descriptionOfs)
+    VDOM PBool _ -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs (VDOM PBool Nothing) (functional descriptionOfs) (mandatory descriptionOfs)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain s
 
 compileUnaryStep currentDomain st@(Exists pos s) = do
