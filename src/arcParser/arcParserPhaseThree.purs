@@ -301,11 +301,13 @@ compileExpressions = do
     (compileExpressions' df)
   where
     compileExpressions' :: DomeinFileRecord -> PhaseThree Unit
-    compileExpressions' {calculatedRoles, calculatedProperties, actions} = do
+    compileExpressions' {calculatedRoles, calculatedProperties} = do
+      -- TODO. Collect references to Calculated Properties from the QueryFunctionDescriptions and sort
+      -- the calculatedRoles accordingly before compiling the descriptions. That will detect cycles
+      -- (throw an error) and prevent forward reference errors.
       compRoles <- traverseWithIndex compileRolExpr calculatedRoles
       compProps <- traverseWithIndex compilePropertyExpr calculatedProperties
-      compActions <- traverseWithIndex compileActionCondition actions
-      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps, actions = compActions}
+      modifyDF \dfr -> dfr {calculatedRoles = compRoles, calculatedProperties = compProps}
 
     compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
     compileRolExpr roleName (CalculatedRole cr@{calculation, context}) = case calculation of
@@ -320,15 +322,6 @@ compileExpressions = do
       S stp -> do
         descr <- compileStep (RDOM $ ST role) stp
         pure $ CalculatedProperty (cr {calculation = Q descr})
-
-    compileActionCondition :: String -> Action -> PhaseThree Action
-    compileActionCondition actionName (Action ar@{_id, subject, condition}) = case condition of
-      Q _ -> pure $ Action ar
-      S stp -> do
-        ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
-        descr <- compileStep (CDOM $ ST ctxt) stp
-        setAffectedContextCalculations _id descr
-        pure $ Action (ar {condition = Q descr})
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
@@ -346,7 +339,9 @@ compileRules = do
       modifyDF \dfr -> dfr {actions = compActions}
       where
         compileRule :: String -> Action -> PhaseThree Action
-        compileRule actionName a@(Action ar@{subject, effect, object}) = do
+        compileRule actionName a@(Action ar@{_id, subject, condition, effect, object}) = do
+          -- Compileer hier de conditie ook.
+          conditionDescription <- compileActionCondition
           ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
           currentDomain <- pure (CDOM $ ST ctxt)
           -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
@@ -355,7 +350,7 @@ compileRules = do
             -- Compile a series of Assignments into a QueryDescription.
             (Just (A assignments)) -> do
               (aStatements :: QueryFunctionDescription) <- sequenceOfAssignments currentDomain assignments
-              pure $ Action ar {effect = Just $ EF aStatements}
+              pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
               -- Compile the LetStep into a QueryDescription.
             (Just (L (LetStep {bindings, assignments}))) -> withFrame
               case uncons bindings of
@@ -365,14 +360,23 @@ compileRules = do
                 -- variable bindings.
                 Nothing -> do
                   (aStatements :: QueryFunctionDescription) <- sequenceOfAssignments currentDomain assignments
-                  pure $ Action ar {effect = Just $ EF aStatements}
+                  pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
                 (Just {head: bnd, tail}) -> do
                   head_ <- compileVarBinding currentDomain bnd
                   compiledLet <- makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments currentDomain assignments
-                  pure $ Action ar {effect = Just $ EF compiledLet}
+                  pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF compiledLet}
             otherwise -> pure a
 
           where
+            compileActionCondition :: PhaseThree QueryFunctionDescription
+            compileActionCondition = case condition of
+              Q d -> pure d
+              S stp -> do
+                ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
+                descr <- compileStep (CDOM $ ST ctxt) stp
+                setAffectedContextCalculations _id descr
+                pure descr
+
             -- This will return a QueryFunctionDescription that describes either a single assignment, or
             -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
             sequenceOfAssignments :: Domain -> Array Assignment -> PhaseThree QueryFunctionDescription
@@ -512,7 +516,7 @@ compileRules = do
                 qualifyBinderType (Just ident) bindings start end = if isQualifiedWithDomein ident
                   then pure $ Just $ EnumeratedRoleType ident
                   else do
-                    (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id}) -> (unwrap _id) `endsWithSegments` ident) (values enumeratedRoles))
+                    (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
                     (candidates :: Array String) <- pure (map (unwrap <<< _._id <<< unwrap) (filter (\(EnumeratedRole{binding}) -> binding `lessThanOrEqualTo` bindings) nameMatches))
                     case head candidates of
                       Nothing -> if null nameMatches
@@ -522,7 +526,7 @@ compileRules = do
                       otherwise -> throwError $ NotUniquelyIdentifying start ident candidates
                   where
                     f :: EnumeratedRole -> Boolean
-                    f (EnumeratedRole {_id, binding}) = (unwrap _id `endsWithSegments` ident) && (binding `lessThanOrEqualTo` bindings)
+                    f (EnumeratedRole {_id:roleId, binding}) = (unwrap roleId `endsWithSegments` ident) && (binding `lessThanOrEqualTo` bindings)
 
 
 ensureContext :: Domain -> Step -> PhaseThree QueryFunctionDescription
