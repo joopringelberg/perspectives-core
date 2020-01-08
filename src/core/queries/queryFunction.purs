@@ -62,8 +62,9 @@ data FunctionName =
   | AndF
   | OrF
   | CountF              -- TODO
-  | MinimumF            -- TODO, ALSO IN DESCRIPTIONCOMPILER
-  | MaximumF            -- TODO, ALSO IN DESCRIPTIONCOMPILER
+  | MinimumF            -- TODO
+  | MaximumF            -- TODO
+  | AvailableF           -- TODO
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
@@ -96,6 +97,7 @@ isFunctionalFunction fn = case fn of
   CountF -> True
   MinimumF -> True
   MaximumF -> True
+  AvailableF -> True
 
 
 data QueryFunction
@@ -183,5 +185,6 @@ instance showFunctionName :: Show FunctionName where
     show CountF = "count"
     show MinimumF = "minimum"
     show MaximumF = "maximum"
+    show AvailableF = "available"
 
 instance eqFunctionName :: Eq FunctionName where eq = genericEq

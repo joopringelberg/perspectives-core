@@ -83,7 +83,7 @@ loadAndPersistArcFile persist fileName directoryName = do
   where
     addModelInstances :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelInstances df@{_id} = do
-      r <- loadCrlFile (fileName <> ".arc") directoryName
+      r <- loadCrlFile (fileName <> ".crl") directoryName
       case r of
         Left e -> pure $ Left e
         Right (Tuple contexts roles) -> do

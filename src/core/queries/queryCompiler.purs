@@ -37,7 +37,7 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AffectedContextCalculation (HiddenFunction)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
-import Perspectives.Instances.Combinators (exists, not)
+import Perspectives.Instances.Combinators (exists, not, available)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
@@ -270,6 +270,16 @@ compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
     (R2C a) -> pure $ R2V (exists a)
     (R2R a) -> pure $ R2V (exists a)
     (R2V a) -> pure $ R2V (exists a)
+
+compileFunction (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) = do
+  f1' <- compileFunction f1
+  case f1' of
+    (C2C a) -> pure $ C2V (available a)
+    (C2R a) -> pure $ C2V (available a)
+    (C2V a) -> pure $ C2V (available a)
+    (R2C a) -> pure $ R2V (available a)
+    (R2R a) -> pure $ R2V (available a)
+    (R2V a) -> pure $ R2V (available a)
 
 compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   f1' <- compileFunction f1

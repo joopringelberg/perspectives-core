@@ -21,12 +21,16 @@
 
 module Perspectives.Instances.Combinators where
 
+import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (guard)
-import Data.Array (cons, elemIndex, null, union)
-import Data.HeytingAlgebra (not) as HA
-import Data.Maybe (maybe)
+import Data.Array (cons, elemIndex, foldM, null, union)
+import Data.HeytingAlgebra (not, (&&)) as HA
+import Data.Maybe (Maybe(..), maybe)
+import Data.Newtype (class Newtype, unwrap)
+import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Representation.InstanceIdentifiers (Value(..))
+import Perspectives.Persistent (tryGetPerspectEntiteit)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Prelude (class Eq, class Monad, bind, const, discard, pure, show, ($), (>=>), (<$>), (<<<), (==))
 
 -- | The closure of f, not including the root argument.
@@ -100,6 +104,25 @@ exists :: forall m s o. Eq o => Monad m =>
 exists source id = ArrayT do
   r <- runArrayT $ source id
   pure $ [Value $ show $ HA.not $ null r]
+
+available :: forall s o. Eq o => Newtype o String =>
+  (s -> MonadPerspectivesQuery o) ->
+  (s -> MonadPerspectivesQuery Value)
+available source id = ArrayT do
+  r <- runArrayT $ source id
+  result <- foldM
+    (\allAvailable resId -> lift do
+      mr <- tryGetPerspectEntiteit (RoleInstance $ unwrap resId)
+      case mr of
+        Nothing -> do
+          mc <- tryGetPerspectEntiteit (ContextInstance $ unwrap resId)
+          case mc of
+            Nothing -> pure false
+            otherwise -> pure allAvailable
+        otherwise -> pure allAvailable)
+    true
+    r
+  pure $ [Value $ show (result HA.&& (HA.not (null r)))]
 
 not :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->

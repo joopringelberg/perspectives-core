@@ -187,6 +187,12 @@ compileUnaryStep currentDomain st@(Exists pos s) = do
     CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
     otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool Nothing) True True
 
+compileUnaryStep currentDomain st@(Available pos s) = do
+  descriptionOfs <- compileStep currentDomain s
+  case range descriptionOfs of
+    VDOM _ _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator AvailableF) descriptionOfs (VDOM PBool Nothing) True True
+
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
   case operator of

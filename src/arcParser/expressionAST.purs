@@ -109,6 +109,7 @@ data SimpleStep =
 data UnaryStep =
   LogicalNot ArcPosition Step
   | Exists ArcPosition Step
+  | Available ArcPosition Step
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step}
 

@@ -121,7 +121,9 @@ unaryStep :: IP Step
 unaryStep = try
   (Unary <$> (LogicalNot <$> getPosition <*> (reserved "not" *> (defer \_ -> step)))
   <|>
-  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))) <?> "not <expr> or exists <step>."
+  Unary <$> (Exists <$> getPosition <*> (reserved "exists" *> (defer \_ -> step)))
+  <|>
+  Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))) <?> "not <expr>, exists <step> or available <step>."
 
 operator :: IP Operator
 operator =
@@ -196,6 +198,7 @@ startOf stp = case stp of
 
     startOfUnary (LogicalNot p _) = p
     startOfUnary (Exists p _) = p
+    startOfUnary (Available p _) = p
 
 endOf :: Step -> ArcPosition
 endOf stp = case stp of
@@ -221,6 +224,7 @@ endOf stp = case stp of
     -- Note that this assumes a single whitespace between 'not' and the step.
     endOfUnary (LogicalNot (ArcPosition{line, column}) step') = ArcPosition{line: line_(endOf step'), column: col_(endOf step') + 4}
     endOfUnary (Exists (ArcPosition{line, column}) step') = endOf step'
+    endOfUnary (Available (ArcPosition{line, column}) step') = endOf step'
 
     col_ :: ArcPosition -> Int
     col_ (ArcPosition{column}) = column
