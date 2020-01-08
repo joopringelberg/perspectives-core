@@ -49,29 +49,26 @@ import Prelude
 
 import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
-import Affjax.ResponseHeader (ResponseHeader, name, value)
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.Except (class MonadError, catchError, runExcept, throwError)
+import Control.Monad.Except (catchError, throwError)
 import Data.Either (Either(..))
-import Data.Foldable (find)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Data.String (toLower)
 import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error, Error)
+import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (decodeJSON, defaultOptions, genericEncodeJSON)
+import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
-import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
+import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse, version)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, Revision_, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase, getCouchdbBaseURL)
 
@@ -206,10 +203,3 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
           -- We **must** use cacheOverwritingRevision because we want to overwrite the version number.
           void $ cacheOverwritingRevision entId (changeRevision v entiteit)))
       pure entiteit
-
-version :: forall m. MonadError Error m => Array ResponseHeader -> m Revision_
-version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
-  Nothing -> throwError $ error ("Perspectives.Instances.version: retrieveDocumentVersion: couchdb returns no ETag header holding a document version number")
-  (Just h) -> case runExcept $ decodeJSON (value h) of
-    Left e -> pure Nothing
-    Right v -> pure $ Just v
