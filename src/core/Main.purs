@@ -24,36 +24,36 @@ import Effect (Effect)
 import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
 import Effect.Console (log)
--- import Perspectives.Api (setupApi, setupTcpApi)
-import Perspectives.ParseFromCommandLine (parseFromCommandLine)
+import Perspectives.Api (setupApi, setupTcpApi)
+import Perspectives.Instances.ComputedGetters (addComputedTripleGetters)
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)
 import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
 
 main :: Effect Unit
--- main = runPDR
-main = parseFromCommandLine
+main = runPDR
+-- main = parseFromCommandLine
 
 -- NOTE: For release v0.1.0, I've commented out the original main function because it requires the perspectivesproxy
 -- While this is available, it is webpacked for usage in the browser and will not run from the command line
 -- (The PDR is not meant for command line usage).
 
--- runPDR :: Effect Unit
--- runPDR = void $ runAff handleError do
---   -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
---   usr <- pure "cor"
---   pwd <- pure "geheim"
---   url <- pure "http://127.0.0.1:5984/"
---   (av :: AVar String) <- new "This value will be removed on first authentication!"
---   state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
---   void $ forkAff $ runPerspectivesWithState f state
---   void $ forkAff $ runPerspectivesWithState setupTcpApi state
---   where
---     f = do
---       void $ setupUser
---       -- addComputedTripleGetters
---       setupApi
+runPDR :: Effect Unit
+runPDR = void $ runAff handleError do
+  -- TODO: retrieve the couchdb credentials from the trusted cluster or through the user interface.
+  usr <- pure "cor"
+  pwd <- pure "geheim"
+  url <- pure "http://127.0.0.1:5984/"
+  (av :: AVar String) <- new "This value will be removed on first authentication!"
+  state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
+  void $ forkAff $ runPerspectivesWithState f state
+  void $ forkAff $ runPerspectivesWithState setupTcpApi state
+  where
+    f = do
+      void $ setupUser
+      addComputedTripleGetters
+      setupApi
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = log $ "An error condition: " <> (show e)
