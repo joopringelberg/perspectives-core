@@ -15,7 +15,7 @@ import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -46,9 +46,9 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
 
   test "Load a file with a context instance, setup bot action" do
     r <- runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      _ <- loadAndCacheArcFile "contextRoleParser.arc" testDirectory
+      _ <- loadCompileAndCacheArcFile "contextRoleParser.arc" testDirectory
       _ <- loadCrlFile "contextAndRole2.crl" testDirectory
       ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
     assert "There should be an instance of SomeRole." (length r == 1)

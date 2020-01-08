@@ -29,6 +29,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -52,6 +53,9 @@ type DomeinFileRecord =
   , calculatedProperties :: Object CalculatedProperty
   , views :: Object View
   , actions :: Object Action
+  , roleInstances :: Object PerspectRol
+  , contextInstances :: Object PerspectContext
+  , modelDescription :: Maybe PerspectRol
   }
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -90,7 +94,19 @@ instance ordDomeinFileId :: Ord DomeinFileId where
   compare (DomeinFileId a) (DomeinFileId b) = compare a b
 
 defaultDomeinFileRecord :: DomeinFileRecord
-defaultDomeinFileRecord = { _rev: Nothing, _id: "", contexts: empty, enumeratedRoles: empty, calculatedRoles: empty, enumeratedProperties: empty, calculatedProperties: empty, views: empty, actions: empty}
+defaultDomeinFileRecord =
+  { _rev: Nothing
+  , _id: ""
+  , contexts: empty
+  , enumeratedRoles: empty
+  , calculatedRoles: empty
+  , enumeratedProperties: empty
+  , calculatedProperties: empty
+  , views: empty
+  , actions: empty
+  , roleInstances: empty
+  , contextInstances: empty
+  , modelDescription: Nothing}
 
 defaultDomeinFile :: DomeinFile
 defaultDomeinFile = DomeinFile defaultDomeinFileRecord

@@ -13,7 +13,7 @@ import Node.Yargs.Applicative (runY, yarg)
 import Node.Yargs.Setup (example, usage)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.TypePersistence.LoadArc (loadArcFile)
+import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile)
 
 parseFromCommandLine :: Effect Unit
 parseFromCommandLine = do
@@ -27,7 +27,7 @@ app relativePath = void $ runAff handleError ((runPerspectives "cor" "geheim" (p
 
 parse :: String -> MonadPerspectives String
 parse relativePath = do
-  result <- loadArcFile relativePath ""
+  result <- loadAndCompileArcFile relativePath ""
   case result of
     Left errors -> pure $ show errors
     Right model -> pure $ genericEncodeJSON defaultOptions model

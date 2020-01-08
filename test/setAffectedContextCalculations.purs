@@ -10,7 +10,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, 
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -23,7 +23,7 @@ theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations
 
   test "Constant condition: true"
     (runP do
-      modelErrors <- loadAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
       if null modelErrors
         then
           do
@@ -34,7 +34,7 @@ theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations
 
   test "Constant condition: RoleName >> PropName"
     (runP do
-      modelErrors <- loadAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
       if null modelErrors
         then
           do
@@ -47,7 +47,7 @@ theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations
 
   test "Nested context condition: RoleName >> binding >> PropName"
     (runP do
-      modelErrors <- loadAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
       if null modelErrors
         then
           do
@@ -59,7 +59,7 @@ theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations
       )
   test "Nested context condition: RoleName >> binding >> context >> RoleName >> PropName"
     (runP do
-      modelErrors <- loadAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
       if null modelErrors
         then
           do
@@ -75,7 +75,7 @@ theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations
       )
   test "On the external role of the current context: extern >> PropName"
     (runP do
-      modelErrors <- loadAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
       if null modelErrors
         then
           do
@@ -87,7 +87,7 @@ theSuite = suiteSkip "Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations
       )
   test "On a role of the enclosing context: extern >> binder XX >> context >> RoleName >> PropName"
     (runP do
-      modelErrors <- loadAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "setAffectedContextCalculations.arc" testDirectory
       if null modelErrors
         then
           do

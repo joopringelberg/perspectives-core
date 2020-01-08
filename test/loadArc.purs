@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Effect.Class.Console (logShow)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, retrieveDomeinFile)
 import Perspectives.Representation.Class.Revision (changeRevision)
-import Perspectives.TypePersistence.LoadArc (loadAndSaveArcFile, loadArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadAndCompileArcFile)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -22,10 +22,10 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.loadArc" do
+theSuite = suite "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
-    messages <- runP $ loadAndSaveArcFile "contextAndRole.arc" testDirectory
+    messages <- runP $ loadCompileAndSaveArcFile "contextAndRole.arc" testDirectory
     if null messages
       then pure unit
       else do
@@ -36,7 +36,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
     -- 3. Reload it from the database into the cache.
     retrievedModel <- runP $ retrieveDomeinFile "model:ContextAndRole"
     -- 4. Reload the file without caching or saving.
-    r <- runP $ loadArcFile "contextAndRole.arc" testDirectory
+    r <- runP $ loadAndCompileArcFile "contextAndRole.arc" testDirectory
     -- 5. Compare the model in cache with the model from the file.
     -- logShow retrievedModel
     case r of
@@ -48,16 +48,16 @@ theSuite = suiteSkip "Perspectives.loadArc" do
 
   test "Load a model file and cache it" do
     -- 1. Load and save a model.
-    messages <- runP (loadArcFile "witcoin2.arc" modelDirectory)
+    messages <- runP (loadAndCompileArcFile "perspectivesSysteem.arc" modelDirectory)
     case messages of
       Left m -> do
         logShow messages
         assert "The file could not be parsed or compiled" false
       _ -> pure unit
 
-  test "Load a model file and store it in Couchdb" do
+  testOnly "Load a model file and store it in Couchdb" do
     -- 1. Load and save a model.
-    messages <- runP $ catchError (loadAndSaveArcFile "perspectivesSysteem.arc" modelDirectory)
+    messages <- runP $ catchError (loadCompileAndSaveArcFile "perspectivesSysteem.arc" modelDirectory)
       \e -> logShow e *> pure []
     if null messages
       then pure unit

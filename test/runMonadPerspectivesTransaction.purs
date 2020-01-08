@@ -13,7 +13,7 @@ import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -25,12 +25,12 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Actions" do
+theSuite = suiteSkip "Perspectives.Actions" do
 
   test "contextDelta_context" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -47,9 +47,9 @@ theSuite = suite "Perspectives.Actions" do
         )
 
   testOnly "contextDelta_role" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -64,9 +64,9 @@ theSuite = suite "Perspectives.Actions" do
         )
 
   test "roleDelta_binding" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -81,9 +81,9 @@ theSuite = suite "Perspectives.Actions" do
         )
 
   test "roleDelta_binder" (runP do
-    _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
     setupUser
-    modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+    modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
     if null modelErrors
       then do
         instanceErrors <- loadCrlFile_ "onRoleDelta_binder.crl" testDirectory
@@ -96,9 +96,9 @@ theSuite = suite "Perspectives.Actions" do
       )
 
   test "propertyDelta" (runP do
-    _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
     setupUser
-    modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+    modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
     if null modelErrors
       then do
         instanceErrors <- loadCrlFile_ "onPropertyDelta.crl" testDirectory
@@ -112,9 +112,9 @@ theSuite = suite "Perspectives.Actions" do
 
   test "TestCaseInCouchdb" do
     (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
       if null modelErrors
         then do
           instanceErrors <- loadAndSaveCrlFile "TestCaseInCouchdb.crl" testDirectory
@@ -124,9 +124,9 @@ theSuite = suite "Perspectives.Actions" do
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
     (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "runMonadPerspectivesTransaction.arc" testDirectory
       if null modelErrors
         then do
           -- Now set Prop on ARole to be true

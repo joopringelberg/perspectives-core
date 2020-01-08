@@ -18,7 +18,7 @@ import Perspectives.Representation.Class.Action (effect)
 import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadAndCacheArcFile, loadAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndSaveArcFile)
 import Test.Perspectives.Utils (runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -34,9 +34,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
 
   test "compileAssignment: Remove" do
     r <- runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- logShow "No model errors"
@@ -51,9 +51,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
 
   test "compileAssignment: CreateRole" do
     r <- runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- logShow "No model errors"
@@ -67,9 +67,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
       Right instances -> assert "There should be a single (new) instance of ARole." (length instances == 1)
 
   test "compileAssignment: Move" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           instanceErrors <- loadCrlFile_ "actionsTestcase3.crl" testDirectory
@@ -84,9 +84,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: Bind" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -103,9 +103,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: Bind_" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -122,9 +122,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: Unbind" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -139,9 +139,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: UnbindQualified" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -156,9 +156,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: Unbind_" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -173,9 +173,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: DeleteProperty" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -190,9 +190,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: RemoveProperty" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -208,9 +208,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: AddProperty" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -226,9 +226,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   test "compileAssignment: SetProperty" (runP do
-      _ <- loadAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      modelErrors <- loadAndCacheArcFile "actions.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile "actions.arc" testDirectory
       if null modelErrors
         then do
           -- eff <- (getAction $ ActionType "model:Test$TestCaseBind$Self_bot$ChangeSelf") >>= effect
@@ -244,9 +244,9 @@ theSuite = suiteSkip "Perspectives.Actions" do
         )
 
   testSkip "Load files into couchdb" (runP do
-      _ <- loadAndSaveArcFile "perspectivesSysteem.arc" modelDirectory
+      _ <- loadCompileAndSaveArcFile "perspectivesSysteem.arc" modelDirectory
       setupUser
-      _ <- loadAndSaveArcFile "actions.arc" testDirectory
+      _ <- loadCompileAndSaveArcFile "actions.arc" testDirectory
       _ <- loadAndSaveCrlFile "actionsTestBind.crl" testDirectory
       pure unit
       )
