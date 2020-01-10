@@ -46,7 +46,6 @@ import Perspectives.Query.Compiler (context2context, context2propertyValue, cont
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
-import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))

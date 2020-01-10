@@ -1,3 +1,4 @@
+-- Copyright Joop Ringelberg and Cor Baars 2019
 domain: System
   use: sys for model:System
 
@@ -22,8 +23,19 @@ domain: System
     context: Modellen = apicall "ModellenM" returns: Model$External
     thing: IndexedContexts (not mandatory, not functional)
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
+    context: UnloadedModel = filter ModelsInUse with not available binding >> context
+    context: UnBoundModel = filter (filter ModelsInUse with available binding >> context) with not exists filter (binding >> context >> IndexedContext >> binding) with exists binder IndexedContexts
+    bot: for User
+      perspective on: UnloadedModel
+        if exists UnloadedModel then loadModel UnloadedModel >> Url
+      perspective on: IndexedContexts
+        if exists UnBoundModel then
+          bind UnBoundModel >> binding >> context >> IndexedContext >> binding to IndexedContexts
 
   case: Model
     external:
-      property: Auteur (mandatory, functional, String)
-    thing: IndexContextTypes (not mandatory, not functional)
+      property: Name (mandatory, functional, String)
+      property: Description (mandatory, functional, String)
+      property: Url (mandatory, functional, String)
+    user: Author (not mandatory, functional) filledBy: User
+    thing: IndexedContext (mandatory, functional)

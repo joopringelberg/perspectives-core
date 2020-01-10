@@ -29,7 +29,7 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
-    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "contextAndRole.crl" testDirectory
+    (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "combinators.crl" testDirectory
     -- logShow r
     pure unit
 

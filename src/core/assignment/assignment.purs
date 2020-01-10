@@ -19,6 +19,8 @@
 
 -- END LICENSE
 
+-- THIS MODULE IS OBSOLETE
+
 module Perspectives.Representation.Assignment where
 
 import Data.Array (cons)

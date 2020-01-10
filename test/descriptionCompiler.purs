@@ -8,7 +8,7 @@ import Data.List (length)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff (Aff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
@@ -21,16 +21,16 @@ import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (evalPhaseTwo', traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), prettyPrint)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Assignment (LetWithAssignment(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Calculation (Calculation(..))
-import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Test.Perspectives.Utils (runP)
@@ -297,11 +297,35 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
               )
 
   makeTest "compileUnaryStep: exists, wrong argument type"
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = not Prop1\n"
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = exists context\n"
     (\e -> case e of
       (IncompatibleQueryArgument _ _ _) -> pure unit
       e' -> assert (show e') false)
-    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that extern cannot be applied to a Role" false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that exists cannot be usefully applied to a Context" false)
+
+  makeTest "compileUnaryStep: available."
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: HasBinding = available binding\n"
+    (\e -> assert (show e) false)
+    (\(correctedDFR@{calculatedProperties}) -> do
+      -- logShow correctedDFR
+      case lookup "model:Test$Role1$HasBinding" calculatedProperties of
+        Nothing -> assert "There should be a property 'HasBinding'" false
+        Just (CalculatedProperty{calculation}) -> do
+          case calculation of
+            (Q c) -> log $ prettyPrint c
+            otherwise -> pure unit
+          assert "The calculation should be a Unary combination, the queryFunction of which should be '(UnaryCombinator \"available\")'"
+            case calculation of
+              (Q c@(UQD _ (UnaryCombinator AvailableF) _ _ _ _)) -> true
+              otherwise -> false
+              )
+
+  makeTest "compileUnaryStep: available, wrong argument type"
+    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, String)\n    property: Prop2 = available Prop1\n"
+    (\e -> case e of
+      (IncompatibleQueryArgument _ _ _) -> pure unit
+      e' -> assert (show e') false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that available cannot be applied to a Value" false)
 
   makeTest "compileBinaryStep: compose."
     "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 (mandatory, functional, Boolean)\n  thing: Role3 (mandatory, functional)\n    property: Prop2 = context >> Role1 >> Prop1\n"

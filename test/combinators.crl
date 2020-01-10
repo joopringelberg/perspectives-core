@@ -1,0 +1,7 @@
+GebruikerGegevens
+
+import model:Combinators als tst:
+
+tst:TestCase usr:MyTestCase
+  $SomeRole => ()
+  $AnotherRole -> $SomeRole(1)

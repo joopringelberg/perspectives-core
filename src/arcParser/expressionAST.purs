@@ -157,6 +157,8 @@ data Assignment =
   | DeleteRole (WithTextRange (roleExpression :: Step))
   | DeleteProperty (WithTextRange (propertyIdentifier :: String, roleExpression :: Maybe Step))
   | PropertyAssignment (WithTextRange (propertyIdentifier :: String, operator :: AssignmentOperator, valueExpression :: Step, roleExpression :: Maybe Step ))
+  -- | EffectFullFunction FunctionName (Array String)
+
 
 
 derive instance genericStep :: Generic Step _
