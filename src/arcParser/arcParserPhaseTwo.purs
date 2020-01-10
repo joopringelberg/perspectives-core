@@ -24,6 +24,7 @@ module Perspectives.Parsing.Arc.PhaseTwo where
 import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
 import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
 import Data.Array (cons, elemIndex, fromFoldable)
+import Data.Char.Unicode (toLower)
 import Data.Either (Either)
 import Data.Foldable (foldl)
 import Data.Identity (Identity)
@@ -32,6 +33,8 @@ import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..), replace, split, take)
+import Data.String.CodeUnits (fromCharArray, uncons)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -40,7 +43,7 @@ import Foreign.Object (fromFoldable) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructLocalNameFromCurie, deconstructNamespace_, deconstructPrefix, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, defaultNamespaces, expandNamespaces, isQualifiedWithDomein)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.ObjectGetterLookup (isRoleGetterFunctional, isRoleGetterMandatory)
@@ -86,7 +89,7 @@ runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError 
 runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord
 
 runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: empty, variableBindings: ENV.empty}
+runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: defaultNamespaces, variableBindings: ENV.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
@@ -147,19 +150,10 @@ withNamespaces pairs pt = do
   void $ modify \s -> s {namespaces = ns}
   pure ctxt
 
--- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
--- | Useful for expanding local names used in bindings, property- and view references.
 expandNamespace :: String -> PhaseTwo String
-expandNamespace s = if isQualifiedWithDomein s then pure s else
-  case deconstructPrefix s of
-    (Just pre) -> do
-      namespaces <- lift $ gets _.namespaces
-      case lookup pre namespaces of
-        (Just modelName) -> case deconstructLocalNameFromCurie s of
-          (Just ln) -> pure (modelName <> "$" <> ln )
-          Nothing -> pure s
-        Nothing -> pure s
-    Nothing -> pure s
+expandNamespace s = do
+  namespaces <- lift $ gets _.namespaces
+  pure $ expandNamespaces namespaces s
 
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
@@ -260,7 +254,7 @@ traverseRoleE r ns = if isCalculatedRole r
     isComputedRole :: RoleE -> Boolean
     -- isCalculatedRole _ = true
     isComputedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
-      (Computation _ _) -> true
+      (Computation _ _ _) -> true
       otherwise -> false) roleParts))
 
 -- | Traverse a RoleE that results in an EnumeratedRole.
@@ -426,10 +420,17 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   pure (C role')
 
   where
+    -- TODO behandel de arguments.
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
-    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName computedType) = let
+    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) = let
+      mappedFunctionName = mapName functionName
       calculation = Q $ SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
       in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
+
+    mapName :: String -> String
+    mapName s = case uncons (replace (Pattern "$") (Replacement "_") (replace (Pattern "model:") (Replacement "") s)) of
+      (Just {head, tail}) -> fromCharArray [toLower head] <> tail
+      Nothing -> s
 
 -- | Traverse the members of the PropertyE AST type to construct a new Property type
 -- | and insert it into a DomeinFileRecord.

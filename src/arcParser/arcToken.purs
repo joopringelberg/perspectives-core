@@ -69,7 +69,7 @@ perspectDef = LanguageDef
                   , "properties"
                   , "filledBy"
                   , "for"
-                  , "apicall"
+                  , "callExternal"
 
                   -- Properties
                   , "property"

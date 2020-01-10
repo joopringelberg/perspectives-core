@@ -25,11 +25,13 @@ where
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Array.NonEmpty (NonEmptyArray, index)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.String (Pattern(..), Replacement(..), indexOf, replace, replaceAll, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.Tuple (Tuple(..))
 import Effect.Exception (Error, error)
+import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
 import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||))
@@ -270,21 +272,27 @@ getSecondMatch regex s = case match regex s of
 -----------------------------------------------------------
 -- EXPAND DEFAULT NAMESPACES
 -----------------------------------------------------------
--- | Expand:
--- |  - psp: to model:Perspectives$,
--- |  - q: to model:QueryAst$,
--- |  - u: to model:User$.
+-- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
+-- | Useful for expanding local names used in bindings, property- and view references.
 expandDefaultNamespaces :: String -> String
-expandDefaultNamespaces s = if (indexOf (Pattern "psp:") s) == Just 0 then
-  replace (Pattern "psp:") (Replacement "model:Perspectives$") s
-  else if (indexOf (Pattern "q:") s) == Just 0 then
-    replace (Pattern "q:") (Replacement "model:QueryAst$") s
-    else if (indexOf (Pattern "u:") s) == Just 0 then
-      replace (Pattern "u:") (Replacement "model:User$") s
-      else if (indexOf (Pattern "usr:") s) == Just 0 then
-        replace (Pattern "usr:") (Replacement "model:User$") s
-        else s
+expandDefaultNamespaces = expandNamespaces defaultNamespaces
 
+expandNamespaces :: OBJ.Object String -> String -> String
+expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
+  case deconstructPrefix s of
+    (Just pre) -> do
+      case OBJ.lookup pre namespaces of
+        (Just modelName) -> case deconstructLocalNameFromCurie s of
+          (Just ln) -> (modelName <> "$" <> ln )
+          Nothing -> s
+        Nothing -> s
+    Nothing -> s
+
+defaultNamespaces :: OBJ.Object String
+defaultNamespaces = OBJ.fromFoldable
+  [ Tuple "cbd" "model:Couchdb"
+  , Tuple "sys" "model:System"
+  ]
 -----------------------------------------------------------
 -- CONVENIENCE NAMESPACE PREFIX FUNCIONS
 -----------------------------------------------------------

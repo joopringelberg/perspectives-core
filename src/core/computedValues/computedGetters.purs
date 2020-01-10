@@ -19,7 +19,9 @@
 
 -- END LICENSE
 
-module Perspectives.Instances.ComputedGetters where
+-- | This module defines External Core functions for model:Couchdb.
+
+module Perspectives.Extern.Couchdb where
 
 import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
@@ -33,8 +35,8 @@ import Perspectives.ObjectGetterLookup (ComputedFunction, roleGetterCacheInsert)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Prelude (Unit, discard, map, pure, ($), (<<<), (<>), (>>=))
 
-modellenM :: ContextInstance ~~> RoleInstance
-modellenM c = ArrayT do
+models :: ContextInstance ~~> RoleInstance
+models c = ArrayT do
   tell [assumption "model:User$MijnSysteem" ophaalTellerName]
   lift $ getListOfModels
 
@@ -49,7 +51,7 @@ modellenM c = ArrayT do
 -- | with `Perspectives.ObjectGetterLookup.lookupRoleGetterByName`.
 computedRoleGetters :: Array (Tuple String (ComputedFunction RoleGetter))
 computedRoleGetters = [
-  Tuple "modellenM" {func: modellenM, functional: false, mandatory: true}
+  Tuple "couchdb_models" {func: models, functional: false, mandatory: true}
 ]
 
 addComputedTripleGetters :: MP Unit

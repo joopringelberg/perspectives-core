@@ -20,7 +20,7 @@ domain: System
       property: Voornaam (mandatory, not functional, String)
       view: VolledigeNaam (Voornaam, Achternaam)
     -- Het type van ModellenM bepalen we met de clause 'returns:'
-    context: Modellen = apicall "ModellenM" returns: Model$External
+    context: Modellen = callExternal cdb:ModellenM() returns: Model$External
     thing: IndexedContexts (not mandatory, not functional)
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
     context: UnloadedModel = filter ModelsInUse with not available binding >> context

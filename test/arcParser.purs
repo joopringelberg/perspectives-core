@@ -119,7 +119,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
           otherwise -> assert "Parsed an unexpected type" false
 
   test "Domain with a computed role" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = apicall \"ModellenM\" returns : sys:Modellen" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal \"ModellenM\" returns : sys:Modellen" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{contextParts})) -> do
