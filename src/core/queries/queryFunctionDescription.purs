@@ -33,9 +33,10 @@ import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.QueryFunction (QueryFunction)
+import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
 
@@ -44,32 +45,38 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleT
 data QueryFunctionDescription =
   SQD Domain QueryFunction Range ThreeValuedLogic ThreeValuedLogic |
   UQD Domain QueryFunction QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic|
-  BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic
+  BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic |
+  MQD Domain QueryFunction (Array Calculation) Range ThreeValuedLogic ThreeValuedLogic
 
 range :: QueryFunctionDescription -> Range
 range (SQD _ _ r _ _) = r
 range (UQD _ _ _ r _ _) = r
 range (BQD _ _ _ _ r _ _) = r
+range (MQD _ _ _ r _ _) = r
 
 domain :: QueryFunctionDescription -> Range
 domain (SQD d _ _ _ _) = d
 domain (UQD d _ _ _ _ _) = d
 domain (BQD d _ _ _ _ _ _) = d
+domain (MQD d _ _ _ _ _) = d
 
 functional :: QueryFunctionDescription -> ThreeValuedLogic
 functional (SQD _ _ _ f _) = f
 functional (UQD _ _ _ _ f _) = f
 functional (BQD _ _ _ _ _ f _) = f
+functional (MQD _ _ _ _ f _) = f
 
 mandatory :: QueryFunctionDescription -> ThreeValuedLogic
 mandatory (SQD _ _ _ _ f ) = f
 mandatory (UQD _ _ _ _ _ f) = f
 mandatory (BQD _ _ _ _ _ _ f ) = f
+mandatory (MQD _ _ _ _ _ f) = f
 
 queryFunction :: QueryFunctionDescription -> QueryFunction
 queryFunction (SQD _ f _ _ _) = f
 queryFunction (UQD _ f _ _ _ _) = f
 queryFunction (BQD _ f _ _ _ _ _) = f
+queryFunction (MQD _ f _ _ _ _) = f
 
 -- | This function is partial, because we can only establish the functionality of
 -- | an RDOM.
@@ -126,7 +133,8 @@ instance showDomain :: Show Domain where
   show = genericShow
 
 instance eqDomain :: Eq Domain where
-  eq = genericEq
+  eq (VDOM r1 _) (VDOM r2 _) = eq r1 r2
+  eq d1 d2 = genericEq d1 d2
 
 -- | A string showing an indented version of the QueryFunction. Assume we are in position for the head.
 prettyPrint :: QueryFunctionDescription -> String
@@ -154,9 +162,29 @@ prettyPrint q = newline <> prettyPrint' ind q
       <> tab <> show ran <> newline
       <> tab <> show man <> newline
       <> tab <> show fun <> newline
+    prettyPrint' tab (MQD dom qf qfds ran man fun) = "MQD" <> newline
+      <> tab <> show dom <> newline
+      <> tab <> show qf <> newline
+      <> tab <> show qfds <> newline
+      <> tab <> show ran <> newline
+      <> tab <> show man <> newline
+      <> tab <> show fun <> newline
 
     newline :: String
     newline = "\n"
 
     ind :: String
     ind = "  "
+
+-----------------------
+data Calculation = S Step | Q QueryFunctionDescription
+
+derive instance genericRepCalculation :: Generic Calculation _
+instance encodeCalculation :: Encode Calculation where
+  encode = genericEncode defaultOptions
+instance decodeCalculation :: Decode Calculation where
+  decode = genericDecode defaultOptions
+instance showCalculation :: Show Calculation where
+  show = genericShow
+instance eqCalculation :: Eq Calculation where
+  eq = genericEq

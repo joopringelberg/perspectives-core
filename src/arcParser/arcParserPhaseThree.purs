@@ -48,15 +48,14 @@ import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree.SetAffectedContextCalculations (setAffectedContextCalculations)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, lift2, modifyDF, runPhaseTwo_', withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, range, Calculation(..))
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo, reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (bindingOfRole, expansionOfADT, getCalculation, getRole)
@@ -282,12 +281,12 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
     qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
-          Q (SQD dom (QF.ComputedRoleGetter f) (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
+          Q (MQD dom (QF.ComputedRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
             qComputedType <- qualifyRoleType pos computedType enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
-                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ SQD dom (QF.ComputedRoleGetter f) (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
+                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ComputedRoleGetter f) args (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
           otherwise -> pure unit)
 
 -- | The calculation of a CalculatedRole or CalculatedProperty, and the condition of an Action are all expressions. This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.
@@ -311,10 +310,17 @@ compileExpressions = do
 
     compileRolExpr :: String -> CalculatedRole -> PhaseThree CalculatedRole
     compileRolExpr roleName (CalculatedRole cr@{calculation, context}) = case calculation of
+      Q (MQD dom function arguments ran isF isM) -> do
+        compiledArguments <- traverse (compileArg dom) arguments
+        pure $ CalculatedRole (cr {calculation = Q $ MQD dom function compiledArguments ran isF isM})
       Q _ -> pure $ CalculatedRole cr
       S stp -> do
         descr <- compileStep (CDOM $ ST context) stp
         pure $ CalculatedRole (cr {calculation = Q descr})
+      where
+        compileArg :: Domain -> Calculation -> PhaseThree Calculation
+        compileArg dom (S s) = compileStep dom s >>= pure <<< Q
+        compileArg dom x = pure x
 
     compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
     compilePropertyExpr propertyName (CalculatedProperty cr@{calculation, role}) = case calculation of
@@ -365,7 +371,7 @@ compileRules = do
                   head_ <- compileVarBinding currentDomain bnd
                   compiledLet <- makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments currentDomain assignments
                   pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF compiledLet}
-            otherwise -> pure a
+            otherwise -> pure $ Action ar {condition = Q conditionDescription}
 
           where
             compileActionCondition :: PhaseThree QueryFunctionDescription

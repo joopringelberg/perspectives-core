@@ -26,15 +26,15 @@ import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseTwo, evalPhaseTwo', expandNamespace, traverseDomain, withNamespaces)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, evalPhaseTwo', expandNamespace, withNamespaces)
+import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..), Verb(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -108,7 +108,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
               (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext" dr'.calculatedRoles))
 
   test "A Context with a Computed Role." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal \"ModellenM\" returns : sys:Modellen" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal cbd:Models() returns : sys:Modellen" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -120,13 +120,13 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
             case lookup "model:MyTestDomain$MyRole" calculatedRoles of
               Nothing -> assert "There should be a role 'MyRole'" false
               Just (CalculatedRole{calculation}) -> do
-                assert "The calculation should '(RDOM (ST EnumeratedRoleType sys:Modellen))' as its Range"
+                assert "The calculation should have '(RDOM (ST EnumeratedRoleType sys:Modellen))' as its Range"
                   case calculation of
-                    (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))) _ _)) -> true
+                    (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))) _ _)) -> true
                     otherwise -> false
                 assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
                   case calculation of
-                    (Q (SQD _ (ComputedRoleGetter "ModellenM") _ _ _)) -> true
+                    (Q (MQD _ (ComputedRoleGetter "cbd:Models") _ _ _ _)) -> true
                     otherwise -> false
 
   test "A Context with an external property and role." do

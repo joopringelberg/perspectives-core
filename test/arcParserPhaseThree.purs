@@ -23,15 +23,15 @@ import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, evalPhaseTwo', lift2, traverseDomain)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, evalPhaseTwo', lift2)
+import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.Assignment (AssignmentStatement(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
@@ -56,7 +56,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -417,7 +417,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     otherwise -> assert "" true
 
   test "A Context with a Computed Role." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole = callExternal \"ModellenM\" returns : Modellen\n  case: SubContext\n    thing: Modellen (mandatory, functional)\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole = callExternal cbd:Models() returns : Modellen\n  case : SubContext\n    thing: Modellen (mandatory, functional)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -436,11 +436,11 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                   Just (CalculatedRole{calculation}) -> do
                     assert "The calculation should have '(RDOM (ST EnumeratedRoleType model:MyTestDomain$SubContext$Modellen))' as its Range"
                       case calculation of
-                        (Q (SQD _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))) _ _)) -> true
+                        (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))) _ _)) -> true
                         otherwise -> false
-                    assert "The queryfunction of the calculation should be '(ComputedRoleGetter \"ModellenM\")'"
+                    assert "The queryfunction of the calculation should be '(ComputedRoleGetter cbd:Models)'"
                       case calculation of
-                        (Q (SQD _ (ComputedRoleGetter "ModellenM") _ _ _)) -> true
+                        (Q (MQD _ (ComputedRoleGetter "cbd:Models") _ _ _ _)) -> true
                         otherwise -> false
 
   test "Action with Condition" do
@@ -680,7 +680,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                 assert "Expected the error NotAContextDomain" false
 
   test "Bind: in-clause does selects non-functional context" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  context: AParty (mandatory, not functional) filledBy: Party\n  case: Party\n    user: EreGast filledBy: Gast\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        bind Gast to EreGast in AParty >> binding >> context\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, not functional, Number)\n  context: AParty (mandatory, not functional) filledBy: Party\n  case: Party\n    user: EreGast (not mandatory, functional) filledBy: Gast\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        bind Gast to EreGast in AParty >> binding >> context\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -693,7 +693,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (NotFunctional _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error NotFunctional" false
 
   test "Bind: bind to calculated role" do

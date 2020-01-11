@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
-import Data.List (filter, findIndex, head, length)
+import Data.List (List(..), filter, findIndex, head, length)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Class (liftEffect)
@@ -130,7 +130,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
           Nothing -> assert "The Domain should have a role." false
           (Just (RE (RoleE{roleParts}))) -> do
             case (head (filter (case _ of
-                (Computation "ModellenM" "sys:Modellen") -> true
+                (Computation "ModellenM" Nil "sys:Modellen") -> true
                 otherwise -> false) roleParts)) of
               Nothing -> assert "There should be a computation RolePart" false
               otherwise -> assert "" true

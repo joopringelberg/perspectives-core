@@ -38,7 +38,7 @@ import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
-import Perspectives.Parsing.Arc.PhaseTwo (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
@@ -241,8 +241,8 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
           -- Notice by the domain and range that we assume functions that are Monoids.
           -- Notice the strangeness of compiling a binary expression into an SQD description.
           SQD dom (QF.UnaryCombinator fname) _ _ _-> case fname of
-            -- we can count anything
-            CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) currentDomain True True
+            -- we can count anything and the result is a number.
+            CountF -> pure $ SQD currentDomain (QF.DataTypeGetter fname) (VDOM PNumber Nothing) True True
             -- We have interpretations of AddF, SubtractF for numbers and strings only.
             -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
             -- For AndF and OrF we have an interpretation for Booleans only.

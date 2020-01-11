@@ -66,7 +66,11 @@ stringUntilNewline = do
   pure $ fromCharArray chars
 
 lowerCaseName :: IP String
-lowerCaseName = many lower <* token.whiteSpace >>= pure <<< fromCharArray
+lowerCaseName = try do
+  f <- lower
+  r <- many lower
+  void token.whiteSpace
+  pure $ fromCharArray (cons f r)
 
 lower ::  IP Char
 lower = satisfy isLower <?> "lowercase letter"

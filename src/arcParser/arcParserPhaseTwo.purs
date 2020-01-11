@@ -21,43 +21,36 @@
 
 module Perspectives.Parsing.Arc.PhaseTwo where
 
-import Control.Monad.Except (ExceptT, lift, runExceptT, throwError)
-import Control.Monad.State (class MonadState, StateT, evalStateT, gets, modify, runStateT)
+import Control.Monad.Except (throwError)
 import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Char.Unicode (toLower)
-import Data.Either (Either)
 import Data.Foldable (foldl)
-import Data.Identity (Identity)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
-import Data.String (Pattern(..), Replacement(..), replace, split, take)
+import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, empty, insert, lookup)
-import Foreign.Object (fromFoldable) as OBJ
+import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, defaultNamespaces, expandNamespaces, isQualifiedWithDomein)
-import Perspectives.Instances.Environment (Environment, _pushFrame)
-import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.ObjectGetterLookup (isRoleGetterFunctional, isRoleGetterMandatory)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
+import Perspectives.Parsing.Arc.PhaseTwoDefs
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..), defaultCalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..), defaultCalculatedRole)
-import Perspectives.Representation.Calculation (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Property (Property(..)) as Property
 import Perspectives.Representation.Class.Role (Role(..))
@@ -70,91 +63,9 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, void, ($), (<>), (==), (<<<), (&&), not, (>>=))
+import Prelude (bind, discard, map, pure, show, ($), (<>), (==), (&&), not, (<$>))
 
--- TODO
--- (1) In a view, we need to indicate whether the property is calculated or enumerated.
--- However, we don't know when traversing the Arc AST.
--- (2) We need a way to indicate PRODUCT types for bindings.
-
-type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String, variableBindings :: Environment QueryFunctionDescription}
-
--- | A Monad with state that indicates whether the Subject of an Action is a Bot,
--- | and allows exceptions.
--- | It allows for a variable bottom of the monadic stack.
-type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
-
--- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
-runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord
-
-runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: defaultNamespaces, variableBindings: ENV.empty}
-
--- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
-evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
-evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord
-
-evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> m (Either PerspectivesError a)
-evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, variableBindings: ENV.empty}
-
-type PhaseTwo a = PhaseTwo' a Identity
-
--- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
--- | an Action is a Bot, and allows exceptions.
-type PhaseThree a = PhaseTwo' a MonadPerspectives
-
-lift2 :: forall a. MonadPerspectives a -> PhaseThree a
-lift2 = lift <<< lift
-
-subjectIsBot :: PhaseTwo Unit
-subjectIsBot = lift $ void $ modify (\s -> s {bot = true})
-
-subjectIsNotABot :: PhaseTwo Unit
-subjectIsNotABot = lift $ void $ modify (\s -> s {bot = false})
-
-isSubjectBot :: PhaseTwo Boolean
-isSubjectBot = lift $ gets _.bot
-
-modifyDF :: forall m. MonadState PhaseTwoState m => (DomeinFileRecord -> DomeinFileRecord) -> m Unit
-modifyDF f = void $ modify \s@{dfr} -> s {dfr = f dfr}
-
-getDF :: PhaseTwo DomeinFileRecord
-getDF = lift $ gets _.dfr
-
-getVariableBindings :: forall m. Monad m => PhaseTwo' (Environment QueryFunctionDescription) m
-getVariableBindings = lift $ gets _.variableBindings
-
-addBinding :: forall m. Monad m => String -> QueryFunctionDescription -> PhaseTwo' Unit m
-addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = ENV.addVariable varName qfd variableBindings}
-
-lookupVariableBinding :: forall m. Monad m => String -> PhaseTwo' (Maybe QueryFunctionDescription) m
-lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup varName)
-
-withFrame :: forall a m. Monad m => PhaseTwo' a m -> PhaseTwo' a m
-withFrame computation = do
-  old <- getVariableBindings
-  void $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
-  r <- computation
-  void $ modify \s@{variableBindings} -> s {variableBindings = old}
-  pure r
-
--- | withNamespaces only handles the `PREFIX` element of the `ContextPart` Sum.
-withNamespaces :: forall a. Partial => List ContextPart -> PhaseTwo a -> PhaseTwo a
-withNamespaces pairs pt = do
-  x <- pure $ OBJ.fromFoldable $ map (\(PREFIX pre mod) -> Tuple pre mod) pairs
-  ns <- lift $ gets _.namespaces
-  -- TODO: gebruik een andere vorm van samenvoegen, zodat namen worden geschaduwd.
-  void $ modify \s -> s {namespaces = x <> ns}
-  ctxt <- pt
-  void $ modify \s -> s {namespaces = ns}
-  pure ctxt
-
-expandNamespace :: String -> PhaseTwo String
-expandNamespace s = do
-  namespaces <- lift $ gets _.namespaces
-  pure $ expandNamespaces namespaces s
-
+-------------------
 traverseDomain :: ContextE -> Namespace -> PhaseTwo DomeinFile
 traverseDomain c ns = do
   (Context {_id}) <- traverseContextE c ns
@@ -420,11 +331,10 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   pure (C role')
 
   where
-    -- TODO behandel de arguments.
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) = let
       mappedFunctionName = mapName functionName
-      calculation = Q $ SQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
+      calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
       in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
     mapName :: String -> String
