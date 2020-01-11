@@ -44,9 +44,9 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
-import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
@@ -95,7 +95,9 @@ compileSimpleStep currentDomain s@(Binding pos) = do
     (RDOM (r :: ADT EnumeratedRoleType)) -> do
       -- The binding of a role is always an ADT EnumeratedRoleType.
       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
-      pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding) True False
+      case typeOfBinding of
+        EMPTY -> throwError $ RoleHasNoBinding pos r
+        otherwise -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding) True False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(Binder pos binderName) = do

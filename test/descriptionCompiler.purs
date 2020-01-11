@@ -4,8 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
-import Data.List (length)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff (Aff)
 import Effect.Class.Console (log, logShow)
@@ -14,7 +13,6 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (Namespace)
-import Perspectives.Instances.Environment (lookup) as ENV
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
@@ -22,22 +20,17 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), prettyPrint)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), prettyPrint, Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Assignment (LetWithAssignment(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError(..))
+import Text.Parsing.Parser (ParseError)
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
@@ -305,7 +298,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that exists cannot be usefully applied to a Context" false)
 
   makeTest "compileUnaryStep: available."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: HasBinding = available binding\n"
+    "domain: Test\n  thing: SomeOtherRole\n  thing: Role1 (mandatory, functional) filledBy: SomeOtherRole\n    property: HasBinding = available binding\n"
     (\e -> assert (show e) false)
     (\(correctedDFR@{calculatedProperties}) -> do
       -- logShow correctedDFR
