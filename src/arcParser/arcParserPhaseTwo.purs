@@ -258,13 +258,13 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
     -- We assume we add roleName as another disjunct of a sum type.
     -- `roleName` should be qualified.
-    -- TODO (augmentADT) Handle PROD types.
     augmentADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
     augmentADT adt roleName = case adt of
       EMPTY -> ST $ EnumeratedRoleType roleName
       SUM terms -> SUM $ cons (ST $ EnumeratedRoleType roleName) terms
       p@(PROD _) -> SUM [p, ST $ EnumeratedRoleType roleName]
       s@(ST _) -> SUM [s, ST $ EnumeratedRoleType roleName]
+      UNIVERSAL -> UNIVERSAL
 
     -- Insert a Property type into a Role type.
     insertPropertyInto :: Property.Property -> EnumeratedRole -> EnumeratedRole

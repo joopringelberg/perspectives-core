@@ -126,6 +126,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
       EMPTY -> (ST $ identifier r)
       st@(ST _) -> PROD [(ST $ identifier r), st]
       sum@(SUM _) -> PROD [(ST $ identifier r), sum]
+      UNIVERSAL -> UNIVERSAL
   expandedADT r = expansionOfADT (ST $ identifier r)
   views r = includeBinding (\r' -> (unwrap r).views) viewsOfADT r
 
@@ -152,6 +153,7 @@ contextOfADT (ST et) = (getEnumeratedRole >=> context) et
 contextOfADT (SUM adts) = map SUM (traverse contextOfADT adts)
 contextOfADT (PROD adts) = map PROD (traverse contextOfADT adts)
 contextOfADT EMPTY = pure EMPTY
+contextOfADT UNIVERSAL = pure UNIVERSAL
 
 -- | The binding of an ADT.
 bindingOfADT :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
@@ -160,6 +162,7 @@ bindingOfADT (ST a) = getEnumeratedRole a >>= binding
 bindingOfADT (SUM adts) = map SUM (traverse bindingOfADT adts)
 bindingOfADT (PROD adts) = map PROD (traverse bindingOfADT adts)
 bindingOfADT EMPTY = pure EMPTY
+bindingOfADT UNIVERSAL = pure UNIVERSAL
 
 -- | A functional role can be filled with a relational role (but then we need to select). E.g.:
 -- | one of the party-goers was the driver.

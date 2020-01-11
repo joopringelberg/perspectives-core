@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Effect.Class.Console (logShow)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, retrieveDomeinFile)
 import Perspectives.Representation.Class.Revision (changeRevision)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadAndCompileArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadCompileAndSaveArcFile', loadAndCompileArcFile)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -48,7 +48,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
 
   test "Load a model file and cache it" do
     -- 1. Load and save a model.
-    messages <- runP (loadAndCompileArcFile "perspectivesSysteem.arc" modelDirectory)
+    messages <- runP (loadAndCompileArcFile "perspectivesSysteem" modelDirectory)
     case messages of
       Left m -> do
         logShow messages
@@ -57,7 +57,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
 
   test "Load a model file and store it in Couchdb" do
     -- 1. Load and save a model.
-    messages <- runP $ catchError (loadCompileAndSaveArcFile "perspectivesSysteem.arc" modelDirectory)
+    messages <- runP $ catchError (loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory)
       \e -> logShow e *> pure []
     if null messages
       then pure unit

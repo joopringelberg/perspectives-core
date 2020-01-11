@@ -71,16 +71,18 @@ loadAndCompileArcFile fileName directoryName = do
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)
 
-loadAndPersistArcFile :: Persister -> String -> String -> MonadPerspectives (Array PerspectivesError)
-loadAndPersistArcFile persist fileName directoryName = do
+loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives (Array PerspectivesError)
+loadAndPersistArcFile loadCRL persist fileName directoryName = do
   r <- loadAndCompileArcFile fileName directoryName
   case r of
     Left m -> pure m
-    Right df@(DomeinFile drf@{_id}) -> do
-      x <- addModelInstances drf
-      case x of
-        (Left e) -> pure e
-        (Right withInstances) -> persist _id (DomeinFile withInstances) *> pure []
+    Right df@(DomeinFile drf@{_id}) -> if loadCRL
+      then do
+        x <- addModelInstances drf
+        case x of
+          (Left e) -> pure e
+          (Right withInstances) -> persist _id (DomeinFile withInstances) *> pure []
+      else persist _id df *> pure []
   where
     addModelInstances :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelInstances df@{_id} = do
@@ -94,12 +96,20 @@ loadAndPersistArcFile persist fileName directoryName = do
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.
 loadCompileAndCacheArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
-loadCompileAndCacheArcFile = loadAndPersistArcFile \id df -> storeDomeinFileInCache id df *> pure []
+loadCompileAndCacheArcFile = loadAndPersistArcFile true \id df -> storeDomeinFileInCache id df *> pure []
+
+-- | Load an Arc file from a directory. Parse the file completely. Cache it.
+loadCompileAndCacheArcFile' :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadCompileAndCacheArcFile' = loadAndPersistArcFile false \id df -> storeDomeinFileInCache id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Store in Couchdb.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.
 loadCompileAndSaveArcFile :: String -> String -> MonadPerspectives (Array PerspectivesError)
-loadCompileAndSaveArcFile = loadAndPersistArcFile \_ df -> storeDomeinFileInCouchdb df *> pure []
+loadCompileAndSaveArcFile = loadAndPersistArcFile true \_ df -> storeDomeinFileInCouchdb df *> pure []
+
+-- | Load an Arc file from a directory. Parse the file completely. Store in Couchdb.
+loadCompileAndSaveArcFile' :: String -> String -> MonadPerspectives (Array PerspectivesError)
+loadCompileAndSaveArcFile' = loadAndPersistArcFile false \_ df -> storeDomeinFileInCouchdb df *> pure []
 
 parseError2PerspectivesError :: ParseError -> PerspectivesError
 parseError2PerspectivesError (ParseError message pos) = ParserError message (position2ArcPosition pos)

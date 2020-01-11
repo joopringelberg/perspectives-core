@@ -96,7 +96,7 @@ compileSimpleStep currentDomain s@(Binding pos) = do
       -- The binding of a role is always an ADT EnumeratedRoleType.
       (typeOfBinding :: (ADT EnumeratedRoleType)) <- lift2 $ bindingOfADT r
       case typeOfBinding of
-        EMPTY -> throwError $ RoleHasNoBinding pos r
+        UNIVERSAL -> throwError $ RoleHasNoBinding pos r
         otherwise -> pure $ SQD currentDomain (QF.DataTypeGetter BindingF) (RDOM typeOfBinding) True False
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 

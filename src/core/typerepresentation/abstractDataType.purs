@@ -41,13 +41,12 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
-import Foreign (unsafeFromForeign, unsafeToForeign)
-import Foreign.Class (class Decode, class Encode, decode)
+import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, show, unit, ($), (<>), (==))
+import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, show, ($), (<>), (==))
 
-data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a))
+data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
 
 derive instance genericRepBinding :: Generic (ADT a) _
 
@@ -56,6 +55,7 @@ instance showADT :: (Show a) => Show (ADT a) where
   show EMPTY = "EMPTY"
   show (SUM adts) = "(" <> "SUM" <> show adts <> ")"
   show (PROD adts) = "(" <> "PROD" <> show adts <> ")"
+  show UNIVERSAL = "UNIVERSAL"
 
 instance eqADT :: (Eq a) => Eq (ADT a) where
   eq b1 b2 = genericEq b1 b2
@@ -81,6 +81,7 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
     (bools :: Array Boolean) <- traverse (reduce f) adts
     pure $ unwrap $ foldMap Disj bools
   reduce f EMPTY = pure false
+  reduce f UNIVERSAL = pure true
 
 -- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
 -- | Includes the binding of a role: this means that the computation recurses on the binding.
@@ -94,6 +95,8 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
     (arrays :: Array (Array b)) <- traverse (reduce f) adts
     pure $ foldl union [] arrays
   reduce f EMPTY = pure []
+  -- not quite sure about this...
+  reduce f UNIVERSAL = pure []
 
 -- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.
 -- | `reduce f` then has type `ADT a` -> MP (ADT b)`.
@@ -117,6 +120,7 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
         Nothing -> pure hd
         otherwise -> pure $ PROD r
   reduce f EMPTY = pure EMPTY
+  reduce f UNIVERSAL = pure UNIVERSAL
 
 -- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
 -- | If you use `less specific` instead of `more specific`, flip the arguments.
@@ -141,6 +145,8 @@ lessThanOrEqualTo p@(ST _) (PROD adts) = let
   in unwrap $ foldMap Disj bools
 -- EMPTY is less specific than any other type.
 lessThanOrEqualTo (ST _) EMPTY = false
+-- UNIVERSAL is more specific than any other type.
+lessThanOrEqualTo (ST _) UNIVERSAL = true
 -- A sum is less than or equal to a type if that type is greater than or equal to any of its members.
 lessThanOrEqualTo (SUM adts) q = let
   (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
@@ -157,3 +163,4 @@ lessThanOrEqualTo (PROD adts) q = let
 -- not (q <= p) = true
 -- not (q <= p) ==> q > p ==> p <= q
 lessThanOrEqualTo EMPTY _ = true
+lessThanOrEqualTo UNIVERSAL _ = false
