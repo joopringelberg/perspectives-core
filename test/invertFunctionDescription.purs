@@ -30,7 +30,7 @@ import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -156,7 +156,7 @@ theSuite = suiteSkip "Test.Query.Inversion" do
                       assert "The inversion of an expression with a filter should yield two inverse queries" (length paths == 2)
 
   test "Invert a rule condition" (runP do
-      modelErrors <- loadCompileAndCacheArcFile "inversion.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
       if null modelErrors
         then do
           (Action{condition}) <- getAction (ActionType "model:Test$TestCase1$Self_bot$ChangeARole")
@@ -167,12 +167,12 @@ theSuite = suiteSkip "Test.Query.Inversion" do
               affectedContextQueries <- pure $ invertFunctionDescription qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- logShow $ paths2functions <$> affectedContextQueries
-              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [[Value2Role $ ENP $ EnumeratedPropertyType "",(DataTypeGetter ContextF)],[Value2Role $ ENP $ EnumeratedPropertyType "",(DataTypeGetter ContextF)]])
+              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3",(DataTypeGetter ContextF)],[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2",(DataTypeGetter ContextF)]])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  test "Invert a rule condition that reaches into a subcontext" (runP do
-      modelErrors <- loadCompileAndCacheArcFile "inversion.arc" testDirectory
+  test "Invert a rule condition that reaches into a subcontext 1" (runP do
+      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
       if null modelErrors
         then do
           (Action{condition}) <- getAction (ActionType "model:Test$TestCase2$Self_bot$ChangeARole")
@@ -184,18 +184,18 @@ theSuite = suiteSkip "Test.Query.Inversion" do
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
               liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [
-                [ Value2Role $ ENP $ EnumeratedPropertyType ""
+                [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$NestedCase1$AnotherRole$Prop3"
                 , (DataTypeGetter ContextF)
                 , (DataTypeGetter ExternalRoleF)
                 , (DataTypeGetterWithParameter GetRoleBindersF "model:Test$TestCase2$ARole")
                 , (DataTypeGetter ContextF)],
-                [ Value2Role $ ENP $ EnumeratedPropertyType ""
+                [ Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase2$ARole$Prop1"
                 , (DataTypeGetter ContextF)]])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 
-  test "Invert a rule condition that reaches into a subcontext" (runP do
-      modelErrors <- loadCompileAndCacheArcFile "inversion.arc" testDirectory
+  test "Invert a rule condition that reaches into a subcontext 2" (runP do
+      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
       if null modelErrors
         then do
           (Action{condition}) <- getAction (ActionType "model:Test$TestCase3$Self_bot$ChangeARole")
@@ -211,7 +211,7 @@ theSuite = suiteSkip "Test.Query.Inversion" do
         )
 
   test "Invert a rule condition with a filter criterium that reaches into a subcontext" (runP do
-      modelErrors <- loadCompileAndCacheArcFile "inversion.arc" testDirectory
+      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
       if null modelErrors
         then do
           (Action{condition}) <- getAction (ActionType "model:Test$TestCase4$Self_bot$ChangeARole")

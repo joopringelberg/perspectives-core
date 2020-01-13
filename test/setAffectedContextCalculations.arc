@@ -28,7 +28,7 @@ domain: Test
     case: SubCase1
       external:
         property: Prop2 (mandatory, functional, Boolean)
-        
+
   case: TestCase4
     user: Self
     bot: for Self
@@ -41,6 +41,7 @@ domain: Test
     case: SubCase2
       thing: SubCaseRole1
         property: Prop2 (mandatory, functional, Boolean)
+        
   case: TestCase5
     context: NestedContext filledBy: SubCase3
     case: SubCase3

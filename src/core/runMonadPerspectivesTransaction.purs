@@ -118,7 +118,6 @@ runActions :: Transaction -> MonadPerspectivesTransaction Transaction
 runActions t = do
   -- action instances deriving from Deltas.
   (AISet as) <- lift $ lift $ execWriterT $ actionsTriggeredByTransaction t
-  lift $ logShow as
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of

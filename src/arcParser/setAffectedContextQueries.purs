@@ -53,6 +53,7 @@ setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunction
     -- Terminating step.
     setPathForEachSubPath path@(BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(SQD _ _ _ _ _) _ _ _) = do
       setPathForStep sub1 path
+      setPathForStep sub2 path
 
     -- Recursing step.
     setPathForEachSubPath path@(BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(BQD _ (QF.BinaryCombinator QF.ComposeF) _ _ _ _ _) _ _ _) = do
@@ -82,14 +83,6 @@ setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunction
           Nothing -> dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en path) enumeratedRoles}
 
-      -- Ignore ExternalRoleF and IdentityF in an inverse path. We do not
-      -- establish queries to gather affected contexts on them. For IdentityF this is
-      -- because we will establish a query on the next step (or have done so at the
-      -- previous step). For ExternalRoleF this is because there cannot be ContextDeltas
-      -- for the External role.
-      QF.DataTypeGetter QF.ExternalRoleF -> pure unit
-      QF.DataTypeGetter QF.IdentityF -> pure unit
-
       QF.RolGetter roleType -> case roleType of
         ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> case lookup roleName enumeratedRoles of
           Nothing -> dfr
@@ -101,6 +94,14 @@ setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunction
         in case lookup roleName  enumeratedRoles of
           Nothing -> dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en path) enumeratedRoles}
+
+      -- Ignore ExternalRoleF and IdentityF in an inverse path. We do not
+      -- establish queries to gather affected contexts on them. For IdentityF this is
+      -- because we will establish a query on the next step (or have done so at the
+      -- previous step). For ExternalRoleF this is because there cannot be ContextDeltas
+      -- for the External role.
+      QF.DataTypeGetter QF.ExternalRoleF -> pure unit
+      QF.DataTypeGetter QF.IdentityF -> pure unit
 
       _ -> throwError $ Custom "setAffectedContextCalculations: there should be no other cases. This is a system programming error."
 

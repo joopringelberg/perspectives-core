@@ -36,6 +36,7 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.AVar (AVar)
 import Effect.Aff (error, throwError)
+import Effect.Class.Console (logShow)
 import Foreign.Object (Object, fromFoldable, toUnfoldable) as FO
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
@@ -99,7 +100,7 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externePr
     constructContext_ = do
       contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
       localName <- maybe (throwError [(NotAValidIdentifier $ unwrap contextInstanceId)]) pure (deconstructLocalName $ unwrap contextInstanceId)
-      (roles :: FO.Object (Array PerspectRol)) <-constructRollen
+      (roles :: FO.Object (Array PerspectRol)) <- constructRollen
 
       externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
       _ <- lift $ cacheInitially contextInstanceId

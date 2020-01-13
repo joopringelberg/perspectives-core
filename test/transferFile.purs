@@ -176,10 +176,11 @@ theSuite = suiteSkip "Perspectives.Parsing.TransferFile" do
       otherwise -> assert "Parsed an unexpected type" false
 
   test "Action without parts" do
-    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Action : Consults : MyAction\n" actionE
+    (r :: Either ParseError PerspectivePart) <- pure $ unwrap $ runIndentParser "Action : Consult : MyAction\n" actionE
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(Act (ActionE{id, verb}))) -> do
+        -- logShow ctxt
         assert "The Action should have the id 'MyAction'" (id == "MyAction")
         assert "The Action should have the verb 'Consults''" (verb == Consult)
       otherwise -> assert "Parsed an unexpected type" false
@@ -199,7 +200,7 @@ theSuite = suiteSkip "Perspectives.Parsing.TransferFile" do
             otherwise -> false) actionParts)))
       otherwise -> assert "Parsed an unexpected type" false
 
-  test "Parse a file" do
+  testSkip "Parse a file" do
     fileName <- pure "parsecontextAndRole.arc"
     text <- liftEffect (readTextFile UTF8 (Path.concat [testDirectory, fileName]))
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser text domain
