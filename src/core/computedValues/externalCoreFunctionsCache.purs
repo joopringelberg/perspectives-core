@@ -22,22 +22,22 @@
 module Perspectives.External.CoreFunctionsCache where
 
 import Data.Maybe (Maybe)
-import Foreign.Object (Object, empty, insert, lookup)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, peek, poke, new)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Prelude ((<$>))
+import Prelude ((<$>), unit)
 
 type ExternalFunction = {func :: HiddenFunction, nArgs :: Int}
 
-type ExternalFunctionCache = Object ExternalFunction
+type ExternalFunctionCache = GLStrMap ExternalFunction
 
 externalFunctionCache :: ExternalFunctionCache
-externalFunctionCache = empty
+externalFunctionCache = new unit
 
 lookupExternalFunction :: String -> Maybe HiddenFunction
-lookupExternalFunction name = _.func <$> lookup name externalFunctionCache
+lookupExternalFunction name = _.func <$> peek externalFunctionCache name
 
 lookupExternalFunctionNArgs :: String -> Maybe Int
-lookupExternalFunctionNArgs name = _.nArgs <$> lookup name externalFunctionCache
+lookupExternalFunctionNArgs name = _.nArgs <$> peek externalFunctionCache name
 
 externalFunctionInsert :: String -> HiddenFunction -> Int -> ExternalFunctionCache
-externalFunctionInsert name func nArgs = insert name {func, nArgs} externalFunctionCache
+externalFunctionInsert name func nArgs = poke externalFunctionCache name {func, nArgs}

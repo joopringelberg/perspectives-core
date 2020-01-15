@@ -33,7 +33,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.External.CoreFunctionsCache (ExternalFunction, externalFunctionInsert)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Prelude (Unit, discard, map, pure, ($), (<<<), (<>), (>>=))
+import Prelude (class Monad, Unit, discard, map, pure, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 models :: MPQ RoleInstance
@@ -52,8 +52,8 @@ models = ArrayT do
 -- | with `Perspectives.External.CoreFunctionsCache.lookupExternalFunction`.
 externalFunctions :: Array (Tuple String ExternalFunction)
 externalFunctions = [
-  Tuple "couchdb_models" {func: unsafeCoerce models, nArgs: 0}
+  Tuple "couchdb_Models" {func: unsafeCoerce models, nArgs: 0}
 ]
 
-addExternalFunctions :: MP Unit
+addExternalFunctions :: forall m. Monad m => m Unit
 addExternalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ externalFunctionInsert n f.func f.nArgs

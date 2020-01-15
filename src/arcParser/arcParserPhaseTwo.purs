@@ -37,12 +37,13 @@ import Data.String.CodeUnits (fromCharArray, uncons)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (logShow)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.External.CoreFunctionsCache (lookupExternalFunctionNArgs)
 import Perspectives.External.CoreModules (isExternalCoreModule)
-import Perspectives.Identifiers (Namespace, deconstructNamespace, deconstructNamespace_, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace, deconstructNamespace_, expandDefaultNamespaces, isQualifiedWithDomein)
 import Perspectives.ObjectGetterLookup (isRoleGetterFunctional, isRoleGetterMandatory)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
@@ -336,15 +337,15 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
     handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) =
-      case (deconstructNamespace functionName) of
+      case (deconstructModelName (expandDefaultNamespaces functionName)) of
         Nothing -> throwError (NotWellFormedName pos functionName)
         Just modelName -> if isExternalCoreModule modelName
           then let
-            mappedFunctionName = mapName functionName
+            mappedFunctionName = mapName (expandDefaultNamespaces functionName)
             mexpectedNrOfArgs = lookupExternalFunctionNArgs mappedFunctionName
             calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
             in case mexpectedNrOfArgs of
-              Nothing -> throwError (UnknownExternalFunction pos pos functionName)
+              Nothing -> throwError (UnknownExternalFunction pos pos mappedFunctionName)
               Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
                 then pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
                 else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments))
