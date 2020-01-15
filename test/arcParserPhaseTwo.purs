@@ -3,7 +3,6 @@ module Test.Parsing.Arc.PhaseTwo where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Control.Monad.Trans.Class (lift)
 import Data.Array (elemIndex, head, length)
 import Data.Either (Either(..))
 import Data.Lens (_Just, preview, traversed)
@@ -24,7 +23,6 @@ import Node.Path as Path
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions)
-import Perspectives.External.CoreFunctionsCache (lookupExternalFunctionNArgs)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Step(..))
@@ -57,7 +55,7 @@ evalPhaseTwo :: forall a. PhaseTwo a -> (Either PerspectivesError a)
 evalPhaseTwo = unwrap <<< evalPhaseTwo'
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
   test "Representing the Domain and a context with subcontext and role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Context : Case : MyCase\n    Role : RoleInContext : MyRoleInContext" domain
     case r of
@@ -110,7 +108,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
             assert "The role MyRoleInContext should be a calculated role."
               (isJust (lookup "model:MyTestDomain$MyCase$MyRoleInContext" dr'.calculatedRoles))
 
-  testOnly "A Context with a Computed Role." do
+  test "A Context with a Computed Role." do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal cdb:Models() returns : sys:Modellen" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -129,7 +127,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                   case calculation of
                     (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "sys:Modellen"))) _ _)) -> true
                     otherwise -> false
-                logShow calculation
+                -- logShow calculation
                 assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"cbd:Models\")'"
                   case calculation of
                     (Q (MQD _ (ExternalCoreRoleGetter "cdb:Models") _ _ _ _)) -> true

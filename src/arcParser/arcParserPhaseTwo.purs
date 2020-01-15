@@ -37,7 +37,6 @@ import Data.String.CodeUnits (fromCharArray, uncons)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (logShow)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -343,7 +342,7 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
           then let
             mappedFunctionName = mapName (expandDefaultNamespaces functionName)
             mexpectedNrOfArgs = lookupExternalFunctionNArgs mappedFunctionName
-            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
+            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter mappedFunctionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
             in case mexpectedNrOfArgs of
               Nothing -> throwError (UnknownExternalFunction pos pos mappedFunctionName)
               Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
@@ -351,7 +350,7 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
                 else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments))
           else let
             -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
+            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
             in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
     mapName :: String -> String

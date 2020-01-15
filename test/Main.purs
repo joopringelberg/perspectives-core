@@ -21,6 +21,7 @@ import Test.Query.Inversion as INV
 import Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations as SACC
 import Test.RunMonadPerspectivesTransaction as RMPT
 import Test.Combinators as COMB
+import Test.Extern.Couchdb as CDB
 import Test.Unit.Main (runTest)
 
 
@@ -42,3 +43,4 @@ main = runTest do
   SACC.theSuite
   RMPT.theSuite
   COMB.theSuite
+  CDB.theSuite

@@ -3,8 +3,7 @@ module Test.Parsing.Arc.PhaseThree where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Control.Monad.Trans.Class (lift)
-import Data.Array (elemIndex, filter, findIndex, head, length)
+import Data.Array (elemIndex, filter, head, length)
 import Data.Either (Either(..))
 import Data.Lens (_Just, preview, traversed)
 import Data.Lens.At (at)
@@ -18,31 +17,31 @@ import Foreign.Object (lookup)
 import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf)
+import Perspectives.Extern.Couchdb (addExternalFunctions)
+import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, evalPhaseTwo', lift2)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
-import Perspectives.Representation.Assignment (AssignmentStatement(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (propertiesOfADT)
 import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForContextRole, lookForRoleInContext, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -422,7 +421,9 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
-        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+        case unwrap $ evalPhaseTwo' do
+          addExternalFunctions
+          (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
             -- logShow dr'
