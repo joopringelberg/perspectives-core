@@ -119,7 +119,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
           otherwise -> assert "Parsed an unexpected type" false
 
   test "Domain with a computed role" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal cbd:Models() returns : sys:Modellen" domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  use: sys for model:MyTestDomain\n  thing : MyRole = callExternal cdb:Models() returns : sys:Modellen" domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{contextParts})) -> do
@@ -130,7 +130,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc" do
           Nothing -> assert "The Domain should have a role." false
           (Just (RE (RoleE{roleParts}))) -> do
             case (head (filter (case _ of
-                (Computation "cbd:Models" Nil "sys:Modellen") -> true
+                (Computation "cdb:Models" Nil "sys:Modellen") -> true
                 otherwise -> false) roleParts)) of
               Nothing -> assert "There should be a computation RolePart" false
               otherwise -> assert "" true

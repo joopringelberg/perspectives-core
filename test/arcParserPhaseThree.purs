@@ -417,7 +417,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     otherwise -> assert "" true
 
   test "A Context with a Computed Role." do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole = callExternal cbd:Models() returns : Modellen\n  case : SubContext\n    thing: Modellen (mandatory, functional)\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain : MyTestDomain\n  thing : MyRole = callExternal cdb:Models() returns : Modellen\n  case : SubContext\n    thing: Modellen (mandatory, functional)\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -438,9 +438,9 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                       case calculation of
                         (Q (MQD _ _ _ (RDOM (ST (EnumeratedRoleType "model:MyTestDomain$SubContext$Modellen"))) _ _)) -> true
                         otherwise -> false
-                    assert "The queryfunction of the calculation should be '(ComputedRoleGetter cbd:Models)'"
+                    assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter cdb:Models)'"
                       case calculation of
-                        (Q (MQD _ (ComputedRoleGetter "cbd:Models") _ _ _ _)) -> true
+                        (Q (MQD _ (ExternalCoreRoleGetter "cdb:Models") _ _ _ _)) -> true
                         otherwise -> false
 
   test "Action with Condition" do

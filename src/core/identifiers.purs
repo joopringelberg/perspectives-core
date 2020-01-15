@@ -290,7 +290,7 @@ expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
 
 defaultNamespaces :: OBJ.Object String
 defaultNamespaces = OBJ.fromFoldable
-  [ Tuple "cbd" "model:Couchdb"
+  [ Tuple "cdb" "model:Couchdb"
   , Tuple "sys" "model:System"
   ]
 -----------------------------------------------------------
