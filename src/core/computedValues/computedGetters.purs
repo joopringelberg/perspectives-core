@@ -28,15 +28,16 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Foldable (for_)
 import Data.Tuple (Tuple(..))
-import Perspectives.CoreTypes (type (~~>), MP, RoleGetter, assumption)
+import Perspectives.CoreTypes (MP, assumption, MPQ)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
-import Perspectives.ObjectGetterLookup (ComputedFunction, roleGetterCacheInsert)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
+import Perspectives.External.CoreFunctionsCache (ExternalFunction, externalFunctionInsert)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (Unit, discard, map, pure, ($), (<<<), (<>), (>>=))
+import Unsafe.Coerce (unsafeCoerce)
 
-models :: ContextInstance ~~> RoleInstance
-models c = ArrayT do
+models :: MPQ RoleInstance
+models = ArrayT do
   tell [assumption "model:User$MijnSysteem" ophaalTellerName]
   lift $ getListOfModels
 
@@ -47,12 +48,12 @@ models c = ArrayT do
     ophaalTellerName :: String
     ophaalTellerName = "model:System$PerspectivesSystem$External$ModelOphaalTeller"
 
--- | An Array of RoleGetters. Each RoleGetter is inserted into the RoleGetterCache and can be retrieved
--- | with `Perspectives.ObjectGetterLookup.lookupRoleGetterByName`.
-computedRoleGetters :: Array (Tuple String (ComputedFunction RoleGetter))
-computedRoleGetters = [
-  Tuple "couchdb_models" {func: models, functional: false, mandatory: true}
+-- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
+-- | with `Perspectives.External.CoreFunctionsCache.lookupExternalFunction`.
+externalFunctions :: Array (Tuple String ExternalFunction)
+externalFunctions = [
+  Tuple "couchdb_models" {func: unsafeCoerce models, nArgs: 0}
 ]
 
-addComputedTripleGetters :: MP Unit
-addComputedTripleGetters = for_ computedRoleGetters \(Tuple n f) -> pure $ roleGetterCacheInsert n f.func f.functional f.mandatory
+addExternalFunctions :: MP Unit
+addExternalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ externalFunctionInsert n f.func f.nArgs

@@ -87,6 +87,8 @@ data PerspectivesError
     | MaybeNotFunctional ArcPosition ArcPosition Step
     | WrongPropertyRange ArcPosition ArcPosition RAN.Range RAN.Range
     | NotAPropertyRange  ArcPosition ArcPosition RAN.Range
+    | WrongNumberOfArguments ArcPosition ArcPosition String Int Int
+    | UnknownExternalFunction ArcPosition ArcPosition String
 
     | ParserError String ArcPosition
     | Custom String
@@ -134,6 +136,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (MaybeNotFunctional start end qfd) = "(MaybeNotFunctional) This expression might not be a single value, between " <> show start <> " and " <> show end
   show (WrongPropertyRange start end expected received) = "(WrongPropertyRange) Expected the range '" <> show expected <> "', got '" <> show received <> "', between " <> show start <> " and " <> show end
   show (NotAPropertyRange start end expected) = "(NotAPropertyRange) Expression does not yield a property value. Expected the range '" <> show expected <> "', between " <> show start <> " and " <> show end
+  show (WrongNumberOfArguments start end functionName nrExpected nrGiven) = "(WrongNumberOfArguments) The function '" <> functionName <> "' expects " <> show nrExpected <> " arguments but received " <> show nrGiven <> ", between " <> show start <> " and " <> show end
+  show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
 
 
 -- | A type for accumulating multiple `PerspectivesErrors`s.

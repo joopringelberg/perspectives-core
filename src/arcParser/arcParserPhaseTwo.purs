@@ -21,13 +21,15 @@
 
 module Perspectives.Parsing.Arc.PhaseTwo where
 
+import Perspectives.Parsing.Arc.PhaseTwoDefs
+
 import Control.Monad.Except (throwError)
 import Data.Array (cons, elemIndex, fromFoldable)
 import Data.Char.Unicode (toLower)
 import Data.Foldable (foldl)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
-import Data.List (List(..), filter, findIndex, foldM, head, null, (:))
+import Data.List (List(..), filter, findIndex, foldM, head, null, (:), length)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
@@ -38,10 +40,11 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, deconstructNamespace_, isQualifiedWithDomein)
+import Perspectives.External.CoreFunctionsCache (lookupExternalFunctionNArgs)
+import Perspectives.External.CoreModules (isExternalCoreModule)
+import Perspectives.Identifiers (Namespace, deconstructNamespace, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.ObjectGetterLookup (isRoleGetterFunctional, isRoleGetterMandatory)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
-import Perspectives.Parsing.Arc.PhaseTwoDefs
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -332,10 +335,23 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
-    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) = let
-      mappedFunctionName = mapName functionName
-      calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ComputedRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
-      in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
+    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) =
+      case (deconstructNamespace functionName) of
+        Nothing -> throwError (NotWellFormedName pos functionName)
+        Just modelName -> if isExternalCoreModule modelName
+          then let
+            mappedFunctionName = mapName functionName
+            mexpectedNrOfArgs = lookupExternalFunctionNArgs mappedFunctionName
+            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
+            in case mexpectedNrOfArgs of
+              Nothing -> throwError (UnknownExternalFunction pos pos functionName)
+              Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+                then pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
+                else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments))
+          else let
+            -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
+            calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ForeignRoleGetter functionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) (maybe Unknown bool2threeValued (isRoleGetterFunctional functionName)) (maybe Unknown bool2threeValued (isRoleGetterMandatory functionName))
+            in pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
 
     mapName :: String -> String
     mapName s = case uncons (replace (Pattern "$") (Replacement "_") (replace (Pattern "model:") (Replacement "") s)) of

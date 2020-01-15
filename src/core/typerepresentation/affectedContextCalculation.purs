@@ -34,26 +34,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
-import Foreign (unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
-import Unsafe.Coerce (unsafeCoerce)
-
-foreign import data HiddenFunction :: Type
-
-instance showHiddenFunction :: Show HiddenFunction where
-  show _ = "HiddenFunction"
-
-instance eqHiddenFunction :: Eq HiddenFunction where
-  eq _ _ = true
-
-instance encodeHiddenFunction :: Encode HiddenFunction where
-  encode _ = unsafeToForeign "HiddenFunction"
-
-instance decodeHiddenFunction :: Decode HiddenFunction where
-  decode _ = unsafeCoerce unit
 
 newtype AffectedContextCalculation = AffectedContextCalculation {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), action :: ActionType}
 

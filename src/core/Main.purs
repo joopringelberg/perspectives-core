@@ -25,7 +25,7 @@ import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
 import Effect.Console (log)
 import Perspectives.Api (setupApi, setupTcpApi)
-import Perspectives.Extern.Couchdb (addComputedTripleGetters)
+import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupUser (setupUser)
@@ -52,7 +52,7 @@ runPDR = void $ runAff handleError do
   where
     f = do
       void $ setupUser
-      addComputedTripleGetters
+      ExternalCouchdb.addExternalFunctions
       setupApi
 
 handleError :: forall a. (Either Error a -> Effect Unit)

@@ -30,20 +30,22 @@ import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
-import Data.Array (elemIndex)
+import Data.Array (elemIndex, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.String (Pattern(..), stripSuffix)
+import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.AffectedContextCalculation (HiddenFunction)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
+import Perspectives.External.CoreFunctionsCache (lookupExternalFunction, lookupExternalFunctionNArgs)
+import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Instances.Combinators (exists, not, available)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, prettyPrint)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, prettyPrint, Calculation(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -101,8 +103,31 @@ compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   RDOM _ -> pure $ R2V (pure <<< const (Value value))
   VDOM _ _ -> throwError (error "There is no constant function for value.")
 
-
-compileFunction (SQD _ (ComputedRoleGetter functionName) _ _ _) = pure $ C2R $ unsafePartial $ fromJust $ lookupRoleGetterByName functionName
+compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
+  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupExternalFunction functionName
+  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
+      Q descr -> context2string descr
+      S s -> throwError (error $ "Argument to ExternalCoreFunction not compiled: " <> show s))
+    args
+  pure $ C2R (\c -> do
+    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    case unsafePartial $ fromJust $ lookupExternalFunctionNArgs functionName of
+      0 -> (unsafeCoerce f :: MPQ RoleInstance)
+      1 -> (unsafeCoerce f :: (Array String -> MPQ RoleInstance)) (unsafePartial (unsafeIndex values 0))
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> MPQ RoleInstance))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> MPQ RoleInstance))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> MPQ RoleInstance))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+    )
 
 compileFunction (SQD dom (VariableLookup varName) range _ _) =
   case dom, range of
@@ -409,6 +434,15 @@ context2role :: QueryFunctionDescription -> MP (ContextInstance ~~> RoleInstance
 context2role qd = unsafePartial $ do
     (C2R f) <- compileFunction qd
     pure f
+
+-- | Construct a function to compute instances of a ContextType from an instance of a Context.
+context2string :: QueryFunctionDescription -> MP (ContextInstance ~~> String)
+context2string qd = unsafeCoerce $ unsafePartial $ do
+  cf <- compileFunction qd
+  case cf of
+    (C2C f) -> pure $ unsafeCoerce f
+    (C2R f) -> pure $ unsafeCoerce f
+    (C2V f) -> pure $ unsafeCoerce f
 
 -- | Construct a function to compute instances of a RoleType from an instance of a Context.
 role2context :: QueryFunctionDescription -> MP (RoleInstance ~~> ContextInstance)

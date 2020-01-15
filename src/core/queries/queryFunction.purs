@@ -107,8 +107,10 @@ data QueryFunction
   | Value2Role PropertyType
   | RolGetter RoleType
   -- 'Computed' is not 'calculated': call a Purescript function here.
-  | ComputedRoleGetter String
-  | ComputedPropertyGetter String
+  | ExternalCoreRoleGetter String
+  | ExternalCorePropertyGetter String
+  | ForeignRoleGetter String
+  | ForeignPropertyGetter String
   | VariableLookup VariableName
   | BindVariable VariableName
   | AssignmentOperator FunctionName

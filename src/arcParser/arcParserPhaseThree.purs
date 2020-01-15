@@ -281,12 +281,13 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
     qualifyReturnsClause' {calculatedRoles:roles, enumeratedRoles} = for_ roles
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
-          Q (MQD dom (QF.ComputedRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
+          Q (MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
             qComputedType <- qualifyRoleType pos computedType enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
-                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ComputedRoleGetter f) args (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
+                modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
+          -- Add cases for ExternalCorePropertyGetter, ForeignRoleGetter, ForeignPropertyGetter.
           otherwise -> pure unit)
 
 -- | The calculation of a CalculatedRole or CalculatedProperty, and the condition of an Action are all expressions. This function compiles the parser AST output that represents these expressions to QueryFunctionDescriptions.

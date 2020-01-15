@@ -47,7 +47,7 @@ lookupRoleGetterByName = lookupGetterByName roleGetterCache
 lookupPropertyValueGetterByName :: String -> Maybe PropertyValueGetter
 lookupPropertyValueGetterByName = lookupGetterByName propertyValueGetterCache
 
-getterCacheInsert :: forall f. Object (ComputedFunction f) -> String -> f -> Boolean -> Boolean ->  Object(ComputedFunction f)
+getterCacheInsert :: forall f. Object (ComputedFunction f) -> String -> f -> Boolean -> Boolean -> Object(ComputedFunction f)
 getterCacheInsert cache name getter functional mandatory = insert name {func: getter, functional, mandatory} cache
 
 roleGetterCacheInsert :: String -> RoleGetter -> Boolean -> Boolean -> RoleGetterCache
