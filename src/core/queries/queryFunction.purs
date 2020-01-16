@@ -106,9 +106,10 @@ data QueryFunction
   | PropertyGetter PropertyType
   | Value2Role PropertyType
   | RolGetter RoleType
-  -- 'Computed' is not 'calculated': call a Purescript function here.
+  -- 'External': call a Purescript function here.
   | ExternalCoreRoleGetter String
   | ExternalCorePropertyGetter String
+  -- 'Foreign': call a Javascript function here.
   | ForeignRoleGetter String
   | ForeignPropertyGetter String
   | VariableLookup VariableName
@@ -134,7 +135,8 @@ data QueryFunction
   | AddPropertyValue EnumeratedPropertyType
   | RemovePropertyValue EnumeratedPropertyType
   | SetPropertyValue EnumeratedPropertyType
-  -- | EffectFullFunction
+  | ExternalEffectFullFunction String
+  | ForeignEffectFullFunction String
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _
 

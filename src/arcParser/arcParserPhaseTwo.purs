@@ -30,7 +30,7 @@ import Data.Foldable (foldl)
 import Data.Lens (over)
 import Data.Lens.Record (prop)
 import Data.List (List(..), filter, findIndex, foldM, head, null, (:), length)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.String.CodeUnits (fromCharArray, uncons)
@@ -40,10 +40,9 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.External.CoreFunctionsCache (lookupExternalFunctionNArgs)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.External.CoreModules (isExternalCoreModule)
-import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace, deconstructNamespace_, expandDefaultNamespaces, isQualifiedWithDomein)
-import Perspectives.ObjectGetterLookup (isRoleGetterFunctional, isRoleGetterMandatory)
+import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace_, expandDefaultNamespaces, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
@@ -63,7 +62,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), defaultEn
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..))
 import Perspectives.Representation.View (View(..))
 import Prelude (bind, discard, map, pure, show, ($), (<>), (==), (&&), not, (<$>))
@@ -341,7 +340,7 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
         Just modelName -> if isExternalCoreModule modelName
           then let
             mappedFunctionName = mapName (expandDefaultNamespaces functionName)
-            mexpectedNrOfArgs = lookupExternalFunctionNArgs mappedFunctionName
+            mexpectedNrOfArgs = lookupHiddenFunctionNArgs mappedFunctionName
             calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter mappedFunctionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
             in case mexpectedNrOfArgs of
               Nothing -> throwError (UnknownExternalFunction pos pos mappedFunctionName)

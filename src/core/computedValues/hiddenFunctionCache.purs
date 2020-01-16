@@ -19,25 +19,25 @@
 
 -- END LICENSE
 
-module Perspectives.External.CoreFunctionsCache where
+module Perspectives.External.HiddenFunctionCache where
 
 import Data.Maybe (Maybe)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, peek, poke, new)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Prelude ((<$>), unit)
 
-type ExternalFunction = {func :: HiddenFunction, nArgs :: Int}
+type HiddenFunctionDescription = {func :: HiddenFunction, nArgs :: Int}
 
-type ExternalFunctionCache = GLStrMap ExternalFunction
+type HiddenFunctionCache = GLStrMap HiddenFunctionDescription
 
-externalFunctionCache :: ExternalFunctionCache
-externalFunctionCache = new unit
+hiddenFunctionCache :: HiddenFunctionCache
+hiddenFunctionCache = new unit
 
-lookupExternalFunction :: String -> Maybe HiddenFunction
-lookupExternalFunction name = _.func <$> peek externalFunctionCache name
+lookupHiddenFunction :: String -> Maybe HiddenFunction
+lookupHiddenFunction name = _.func <$> peek hiddenFunctionCache name
 
-lookupExternalFunctionNArgs :: String -> Maybe Int
-lookupExternalFunctionNArgs name = _.nArgs <$> peek externalFunctionCache name
+lookupHiddenFunctionNArgs :: String -> Maybe Int
+lookupHiddenFunctionNArgs name = _.nArgs <$> peek hiddenFunctionCache name
 
-externalFunctionInsert :: String -> HiddenFunction -> Int -> ExternalFunctionCache
-externalFunctionInsert name func nArgs = poke externalFunctionCache name {func, nArgs}
+hiddenFunctionInsert :: String -> HiddenFunction -> Int -> HiddenFunctionCache
+hiddenFunctionInsert name func nArgs = poke hiddenFunctionCache name {func, nArgs}

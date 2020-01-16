@@ -468,3 +468,13 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
       (Right a@(PropertyAssignment {roleExpression})) -> do
         assert "There should be a roleExpression" (isJust roleExpression)
       otherwise -> assert ("'MyProp = 10 for AnotherRole' should be parsed as a PropertyAssignment assignment, instead this was returned: " <> show otherwise) false
+
+  test "Assignment: callEffect" do
+    (r :: Either ParseError Assignment) <- pure $ unwrap $ runIndentParser "callEffect cdb:LoadModel()" assignment
+    case r of
+      (Left e) -> assert (show e) false
+      (Right a@(ExternalEffect {effectName, arguments})) -> do
+        -- logShow a
+        assert "functionName should be 'cbd:LoadModel'" (effectName == "cdb:LoadModel")
+        assert "no arguments" (arguments == [])
+      otherwise -> assert ("'callEffect cdb:LoadModel()' should be parsed as an ExternalEffect assignment, instead this was returned: " <> show otherwise) false

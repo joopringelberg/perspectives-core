@@ -25,25 +25,31 @@ module Perspectives.Actions where
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (foldMap, null, uncons)
+import Data.Array (foldMap, null, uncons, unsafeIndex)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Exception (error)
 import Foreign.Object (empty)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
 import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoles, removeBinding, removeProperty, removeRolFromContext, saveEntiteit, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
-import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
+import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
-import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
+import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string)
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
 import Perspectives.Representation.Class.Identifiable (identifier)
@@ -53,6 +59,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.SaveUserData (removeRoleInstance, saveAndConnectRoleInstance)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | Compile the action to an Updater. Cache for later use.
 compileBotAction :: ActionType -> MP (Tuple LHS (Updater ContextInstance))
@@ -211,7 +218,31 @@ compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   f2' <- compileAssignment f2
   pure \c -> (f1' c *> f2' c)
 
--- Vergeet EffectFullFunction niet!
+compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
+  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
+  (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
+      Q descr -> context2string descr
+      S s -> throwError (error $ "Argument to ExternalEffectFullFunction not compiled: " <> show s))
+    args
+  pure (\c -> do
+    (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
+    case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
+      0 -> (unsafeCoerce f :: MonadPerspectivesTransaction Unit)
+      1 -> (unsafeCoerce f :: (Array String -> MonadPerspectivesTransaction Unit)) (unsafePartial (unsafeIndex values 0))
+      2 -> (unsafeCoerce f :: (Array String -> Array String -> MonadPerspectivesTransaction Unit))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+      3 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> MonadPerspectivesTransaction Unit))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+      4 -> (unsafeCoerce f :: (Array String -> Array String -> Array String -> Array String -> MonadPerspectivesTransaction Unit))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+        (unsafePartial (unsafeIndex values 0))
+      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+    )
 
 -- Catchall, remove when all cases have been covered.
 compileAssignment _ = pure \_ -> pure unit

@@ -17,7 +17,7 @@ import Foreign.Object (lookup)
 import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Extern.Couchdb (addExternalFunctions)
+import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.Identifiers (Namespace)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
@@ -422,7 +422,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
       (Right ctxt@(ContextE{id})) -> do
         -- logShow ctxt
         case unwrap $ evalPhaseTwo' do
-          addExternalFunctions
+          ExternalCouchdb.addExternalFunctions
           (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
@@ -1062,6 +1062,34 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                           otherwise -> assert "The binding should be a rolgetter" false
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false
+
+  test "Bot Action with callEffect" do
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  thing: AModel\n    property: Name (mandatory, functional, String)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        callEffect cdb:AddModelToLocalStore( AModel >> Name )\n" ARC.domain
+    case r of
+      (Left e) -> assert (show e) false
+      (Right ctxt@(ContextE{id})) -> do
+        -- logShow ctxt
+        case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          (Left e) -> assert (show e) false
+          (Right (DomeinFile dr')) -> do
+            -- logShow dr'
+            x' <- runP do
+              ExternalCouchdb.addExternalFunctions
+              phaseThree dr'
+            case x' of
+              (Left e) -> assert (show e) false
+              (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
+                case lookup "model:Test$Gast_bot$ChangeGast" actions of
+                  Just (Action{effect}) -> do
+                    -- logShow effect
+                    case effect of
+                      (Just (EF (MQD _ qf args _ _ _))) -> do
+                        assert "The queryfunction should be ExternalEffectFullFunction" (eq qf (ExternalEffectFullFunction "couchdb_AddModelToLocalStore") )
+                        assert "There should be one argument" (length args == 1)
+                      otherwise -> assert "Side effect expected" false
+                  Nothing -> assert "The effect should compile to a binary query function" false
+
 
 x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
 x correctedDFR = withDomeinFile "model:MyTestDomain"

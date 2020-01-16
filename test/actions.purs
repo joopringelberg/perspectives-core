@@ -6,9 +6,11 @@ import Control.Monad.Free (Free)
 import Data.Array (length, null)
 import Data.Either (Either(..))
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, binding, getProperty, getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile_)
+import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
@@ -23,7 +25,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Actions" do
+theSuite = suite "Perspectives.Actions" do
 
   test "compileAssignment: Remove" do
     r <- runP do
@@ -242,4 +244,23 @@ theSuite = suiteSkip "Perspectives.Actions" do
       _ <- loadCompileAndSaveArcFile "actions" testDirectory
       _ <- loadAndSaveCrlFile "actionsTestBind.crl" testDirectory
       pure unit
+      )
+
+  testOnly "compileAssignment: ExternalEffectFullFunction" (runP do
+    modelErrors <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    if null modelErrors
+      then do
+        instanceErrors <- loadCrlFile_ "systemInstances.crl" modelDirectory
+        if null instanceErrors
+          then do
+
+            n1 <- ((ContextInstance "model:User$MijnSysteem") ##= getRole (EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"))
+            -- logShow n1
+            liftAff $ assert "There should be a computed instance of ModelsInUse." (length n1 == 1)
+            getUnloadedModel <- getRoleFunction "model:System$PerspectivesSystem$UnloadedModel"
+            n2 <- ((ContextInstance "model:User$MijnSysteem") ##= getUnloadedModel)
+            logShow n2
+            liftAff $ assert "There should be a computed instance of UnloadedModel." (length n2 == 1)
+          else liftAff $ assert ("There are instance errors: " <> show instanceErrors) false
+      else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )

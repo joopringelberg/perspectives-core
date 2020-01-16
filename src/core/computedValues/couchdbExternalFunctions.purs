@@ -28,12 +28,13 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Foldable (for_)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes (MP, assumption, MPQ)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
-import Perspectives.External.CoreFunctionsCache (ExternalFunction, externalFunctionInsert)
+import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Prelude (class Monad, Unit, discard, map, pure, ($), (<<<), (<>), (>>=))
+import Prelude (class Monad, Unit, discard, map, pure, unit, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 models :: MPQ RoleInstance
@@ -48,12 +49,18 @@ models = ArrayT do
     ophaalTellerName :: String
     ophaalTellerName = "model:System$PerspectivesSystem$External$ModelOphaalTeller"
 
+addModelToLocalStore :: Array String -> MPQ Unit
+addModelToLocalStore modelNames = do
+  lift $ logShow modelNames
+  pure unit
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
--- | with `Perspectives.External.CoreFunctionsCache.lookupExternalFunction`.
-externalFunctions :: Array (Tuple String ExternalFunction)
-externalFunctions = [
-  Tuple "couchdb_Models" {func: unsafeCoerce models, nArgs: 0}
+-- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
+externalFunctions :: Array (Tuple String HiddenFunctionDescription)
+externalFunctions =
+  [ Tuple "couchdb_Models" {func: unsafeCoerce models, nArgs: 0}
+  , Tuple "couchdb_AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
 ]
 
 addExternalFunctions :: forall m. Monad m => m Unit
-addExternalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ externalFunctionInsert n f.func f.nArgs
+addExternalFunctions = for_ externalFunctions \(Tuple n f) -> pure $ hiddenFunctionInsert n f.func f.nArgs

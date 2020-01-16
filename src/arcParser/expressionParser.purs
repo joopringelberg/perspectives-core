@@ -244,6 +244,7 @@ roleAssignment = defer \_-> removal
   <|> unbind
   <|> unbind_
   <|> roleDeletion
+  <|> callEffect
 
 removal :: IP Assignment
 removal = do
@@ -341,6 +342,14 @@ roleDeletion = try do
   roleExpression <- step
   end <- getPosition
   pure $ DeleteRole {start, end, roleExpression}
+
+callEffect :: IP Assignment
+callEffect = try do
+  start <- getPosition
+  effectName <- reserved "callEffect" *> arcIdentifier
+  arguments <- token.parens (token.commaSep step)
+  end <- getPosition
+  pure $ ExternalEffect {start, end, effectName, arguments: (fromFoldable arguments)}
 
 -- | Parse between single quotes.
 dateTimeLiteral :: IP String

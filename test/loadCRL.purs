@@ -6,6 +6,7 @@ import Control.Monad.Free (Free)
 import Data.Array (length, null)
 import Data.Either (Either)
 import Data.Tuple (Tuple)
+import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Foreign.Object (Object)
 import Perspectives.CoreTypes ((##=))
@@ -15,7 +16,7 @@ import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile')
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -53,7 +54,12 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
       ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
     assert "There should be an instance of SomeRole." (length r == 1)
 
-  test "Load a file with a context instance in couchdb" do
-    r <- runP $ loadAndSaveCrlFile "systemInstances.crl" modelDirectory
-    logShow r
-    assert "A CRL file should load without problems" (null r)
+  test "Load a file with a context instance in couchdb" (runP do
+    _ <- loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory
+    r <- loadAndSaveCrlFile "systemInstances.crl" modelDirectory
+    if null r
+      then liftAff $ assert "OK" true
+      else do
+        logShow r
+        liftAff $ assert "A CRL file should load without problems" false
+)

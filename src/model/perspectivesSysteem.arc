@@ -23,14 +23,14 @@ domain: System
     context: Modellen = callExternal cdb:Models() returns: Model$External
     thing: IndexedContexts (not mandatory, not functional)
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
-    context: UnloadedModel = filter ModelsInUse with not available binding >> context
+    context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     context: UnBoundModel = filter (filter ModelsInUse with available binding >> context) with not exists filter (binding >> context >> IndexedContext >> binding) with exists binder IndexedContexts
-    --bot: for User
-      --perspective on: UnloadedModel
-        --if exists UnloadedModel then loadModel UnloadedModel >> Url
-      --perspective on: IndexedContexts
-        --if exists UnBoundModel then
-          --bind UnBoundModel >> binding >> context >> IndexedContext >> binding to IndexedContexts
+    bot: for User
+      perspective on: UnloadedModel
+        if exists UnloadedModel then callEffect cdb:AddModelToLocalStore( UnloadedModel >> Url )
+      perspective on: IndexedContexts
+        if exists UnBoundModel then
+          bind UnBoundModel >> binding >> context >> IndexedContext >> binding to IndexedContexts
 
   case: Model
     external:

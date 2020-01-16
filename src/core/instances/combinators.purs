@@ -27,11 +27,12 @@ import Data.Array (cons, elemIndex, foldM, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
+import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Prelude (class Eq, class Monad, bind, const, discard, pure, show, ($), (>=>), (<$>), (<<<), (==))
+import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (<$>), (<<<), (==), (>=>))
 
 -- | The closure of f, not including the root argument.
 -- | The closure of f contains no double entries iff the result of
@@ -105,7 +106,7 @@ exists source id = ArrayT do
   r <- runArrayT $ source id
   pure $ [Value $ show $ HA.not $ null r]
 
-available :: forall s o. Eq o => Newtype o String =>
+available :: forall s o. Eq o => Newtype o String => Show o =>
   (s -> MonadPerspectivesQuery o) ->
   (s -> MonadPerspectivesQuery Value)
 available source id = ArrayT do

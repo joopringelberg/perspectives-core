@@ -31,10 +31,13 @@ import Control.Monad.Except (throwError)
 import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, foldM, head, length, null, uncons)
+import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..), replace)
+import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
@@ -43,7 +46,9 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (Namespace, endsWithSegments, isQualifiedWithDomein)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
+import Perspectives.External.CoreModules (isExternalCoreModule)
+import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, expandDefaultNamespaces, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
@@ -318,10 +323,6 @@ compileExpressions = do
       S stp -> do
         descr <- compileStep (CDOM $ ST context) stp
         pure $ CalculatedRole (cr {calculation = Q descr})
-      where
-        compileArg :: Domain -> Calculation -> PhaseThree Calculation
-        compileArg dom (S s) = compileStep dom s >>= pure <<< Q
-        compileArg dom x = pure x
 
     compilePropertyExpr :: String -> CalculatedProperty -> PhaseThree CalculatedProperty
     compilePropertyExpr propertyName (CalculatedProperty cr@{calculation, role}) = case calculation of
@@ -329,6 +330,10 @@ compileExpressions = do
       S stp -> do
         descr <- compileStep (RDOM $ ST role) stp
         pure $ CalculatedProperty (cr {calculation = Q descr})
+
+compileArg :: Domain -> Calculation -> PhaseThree Calculation
+compileArg dom (S s) = compileStep dom s >>= pure <<< Q
+compileArg dom x = pure x
 
 -- | For each Action that has a SideEffect for its `effect` member, compile the List of Assignments, or the Let* expression in it to a `QueryFunctionDescription`.
 -- | All names are qualified in the process.
@@ -493,8 +498,28 @@ compileRules = do
                   (VDOM r _) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r
                   otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
                 pure $ BQD currentDomain fname valueQfd roleQfd currentDomain True True
-
+              ExternalEffect f@{start, end, effectName, arguments} -> do
+                case (deconstructModelName (expandDefaultNamespaces effectName)) of
+                  Nothing -> throwError (NotWellFormedName start effectName)
+                  Just modelName -> if isExternalCoreModule modelName
+                    then do
+                      mappedFunctionName <- pure $ mapName (expandDefaultNamespaces effectName)
+                      mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs mappedFunctionName
+                      case mexpectedNrOfArgs of
+                        Nothing -> throwError (UnknownExternalFunction start end mappedFunctionName)
+                        Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
+                          then do
+                            compiledArguments <- traverse (\s -> compileStep currentDomain s >>= pure <<< Q) arguments
+                            pure $ MQD currentDomain (QF.ExternalEffectFullFunction mappedFunctionName) compiledArguments currentDomain Unknown Unknown
+                          else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
+                    -- TODO: behandel hier Foreign functions.
+                    else throwError (UnknownExternalFunction start end effectName)
               where
+                mapName :: String -> String
+                mapName s = case CU.uncons (replace (Pattern "$") (Replacement "_") (replace (Pattern "model:") (Replacement "") s)) of
+                  (Just {head, tail}) -> CU.fromCharArray [toLower head] <> tail
+                  Nothing -> s
+
                 qualifyWithRespectTo :: String -> QueryFunctionDescription -> ArcPosition -> ArcPosition -> PhaseThree EnumeratedRoleType
                 qualifyWithRespectTo roleIdentifier contextFunctionDescription start end = do
                   (ct :: ADT ContextType) <- case range contextFunctionDescription of

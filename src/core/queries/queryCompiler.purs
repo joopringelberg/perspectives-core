@@ -37,7 +37,7 @@ import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
-import Perspectives.External.CoreFunctionsCache (lookupExternalFunction, lookupExternalFunctionNArgs)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Instances.Combinators (exists, not, available)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
@@ -57,7 +57,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (*>), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (<), (<=), (>), (>=), (==), (&&), (||), (+), (*), (/), (-))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -104,14 +104,14 @@ compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   VDOM _ _ -> throwError (error "There is no constant function for value.")
 
 compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
-  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupExternalFunction functionName
+  (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
       Q descr -> context2string descr
       S s -> throwError (error $ "Argument to ExternalCoreFunction not compiled: " <> show s))
     args
   pure $ C2R (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
-    case unsafePartial $ fromJust $ lookupExternalFunctionNArgs functionName of
+    case unsafePartial $ fromJust $ lookupHiddenFunctionNArgs functionName of
       0 -> (unsafeCoerce f :: MPQ RoleInstance)
       1 -> (unsafeCoerce f :: (Array String -> MPQ RoleInstance)) (unsafePartial (unsafeIndex values 0))
       2 -> (unsafeCoerce f :: (Array String -> Array String -> MPQ RoleInstance))
@@ -170,7 +170,7 @@ compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = if isValueDoma
     isValueDomain (VDOM _ _) = true
     isValueDomain _ = false
 
-compileFunction (BQD _ (BinaryCombinator FilterF) criterium source _ _ _) = do
+compileFunction (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = do
   criterium' <- compileFunction criterium
   source' <- compileFunction source
   case criterium', source' of
