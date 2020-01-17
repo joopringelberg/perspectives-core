@@ -39,6 +39,8 @@ import Data.Array (concat, singleton)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
+import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Class (class MonadEffect, liftEffect)
 
 ------------------------------------------------------------------------------------------------------------
 ---- THE ArrayT MONAD TRANSFORMER
@@ -122,3 +124,9 @@ instance monadThrowArrayT :: MonadThrow e m => MonadThrow e (ArrayT m) where
 instance monadErrorArrayT :: MonadError e m => MonadError e (ArrayT m) where
   catchError (ArrayT ma) h =
     ArrayT (catchError ma (\e -> unwrap $ h e))
+
+instance monadEffectArrayT :: MonadEffect m => MonadEffect (ArrayT m) where
+  liftEffect = lift <<< liftEffect
+
+instance monadAffArrayT ∷ MonadAff m => MonadAff (ArrayT m) where
+  liftAff = lift <<< liftAff
