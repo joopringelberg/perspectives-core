@@ -39,7 +39,7 @@ import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.View (View)
-import Prelude (class Eq, class Ord, class Show, compare, ($), (==), (<<<), show)
+import Prelude (class Eq, class Ord, class Show, compare, ($), (==), (<<<))
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
@@ -87,7 +87,7 @@ derive instance genericRepDomeinFileId :: Generic DomeinFileId _
 derive newtype instance encodeDomeinFileId :: Encode DomeinFileId
 derive newtype instance decodeDomeinFileId :: Decode DomeinFileId
 instance showDomeinFileId :: Show DomeinFileId where
-  show = show <<< unwrap
+  show = unwrap
 instance eqDomeinFileId :: Eq DomeinFileId where
   eq (DomeinFileId id1) (DomeinFileId id2) = id1 == id2
 instance ordDomeinFileId :: Ord DomeinFileId where

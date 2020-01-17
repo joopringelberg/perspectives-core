@@ -48,6 +48,16 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Prelude (bind, pure, show, ($), (*>), (<>), (==))
 import Text.Parsing.Parser (ParseError(..))
 
+-- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
+-- | Some functions expect a CRL file with the same name and add the instances found in them
+-- | to the DomeinFile.
+-- | Notice that these functions are more about creating DomeinFiles than about using them.
+-- | A function to start using a particular model, by
+-- |  * downloading the DomeinFile
+-- |  * installing it in the local Couchdb installation
+-- |  * and adding the Domain instances to the local Couchdb installation,
+-- |  * can be found in the module Perspectives.Extern.Couchdb.
+
 -- | Load an Arc file from a directory relative to the active process. Parse the file completely.
 -- | Does neither cache nor save the model.
 loadAndCompileArcFile :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
@@ -71,6 +81,8 @@ loadAndCompileArcFile fileName directoryName = do
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)
 
+-- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
+-- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
 loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives (Array PerspectivesError)
 loadAndPersistArcFile loadCRL persist fileName directoryName = do
   r <- loadAndCompileArcFile fileName directoryName
@@ -90,7 +102,7 @@ loadAndPersistArcFile loadCRL persist fileName directoryName = do
       case r of
         Left e -> pure $ Left e
         Right (Tuple contexts roles) -> do
-          modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model") roles
+          modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roles
           pure $ Right (df {roleInstances = roles, contextInstances = contexts, modelDescription = modelDescription})
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.

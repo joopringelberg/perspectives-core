@@ -246,7 +246,9 @@ theSuite = suite "Perspectives.Actions" do
       pure unit
       )
 
-  testOnly "compileAssignment: ExternalEffectFullFunction" (runP do
+  -- This test is flawed. By including a binding for ModelsInUse in the .crl file, we actually
+  -- create the instance.
+  testSkip "compileAssignment: ExternalEffectFullFunction" (runP do
     modelErrors <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     if null modelErrors
       then do

@@ -1,0 +1,8 @@
+GebruikerGegevens
+
+import model:System als sys:
+
+sys:Model usr:PerspectivesSystemModel
+  extern $Name = "Perspectives System"
+  extern $Description = "The base model of Perspectives."
+  extern $Url = "http://127.0.0.1:5984/repository/model%3ASystem"

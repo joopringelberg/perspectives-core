@@ -21,19 +21,18 @@
 
 module Perspectives.SetupCouchdb where
 
-import Effect.Aff.Class (liftAff)
+import Affjax (request, put, Request)
+import Affjax.RequestBody as RequestBody
+import Affjax.ResponseFormat as ResponseFormat
 import Data.Argonaut (fromString)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Affjax (request, put, Request)
-import Affjax.ResponseFormat as ResponseFormat
-import Affjax.RequestBody as RequestBody
+import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (Password, User, onAccepted)
-import Perspectives.Couchdb.Databases (createDatabase, defaultPerspectRequest, ensureAuthentication, allDbs)
-
+import Perspectives.Couchdb (Password, User, View(..), onAccepted)
+import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, defaultPerspectRequest, ensureAuthentication)
 import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
 import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (<>), (>>=))
 
@@ -50,6 +49,8 @@ setupCouchdb = do
   createSystemDatabases
   createUserDatabases usr
   createDatabase "perspect_models"
+  -- For now, we initialise the database with a repository, too.
+  createDatabase "repository"
 
 -----------------------------------------------------------
 -- CREATEFIRSTADMIN
@@ -99,3 +100,14 @@ createUserDatabases user = do
 -- | PartyMode operationalized as Couchdb having no databases.
 partyMode :: MonadPerspectives Boolean
 partyMode = allDbs >>= pure <<< null
+
+-----------------------------------------------------------
+-- THE VIEW 'MODELDESCRIPTIONS'
+-----------------------------------------------------------
+-- | Add a view to the couchdb installation in the 'repository' db.
+-- | Notice that the .json file must be available runtime, in the "views" directory of cwd.
+setModelDescriptionsView :: MonadPerspectives Unit
+setModelDescriptionsView = do
+  addViewToDatabase "repository" "defaultViews" "modeldescriptions" (View {map: modelDescriptions, reduce: Nothing})
+
+foreign import modelDescriptions :: String
