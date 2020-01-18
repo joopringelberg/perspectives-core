@@ -49,7 +49,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, saveEntiteit_)
-import Perspectives.Representation.Class.Cacheable (cacheInitially, cachePreservingRevision)
+import Perspectives.Representation.Class.Cacheable (cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -106,9 +106,14 @@ addModelToLocalStore urls = for_ urls addModelToLocalStore'
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do
 -- | not assume anything about that name here.
 uploadToRepository :: DomeinFileId -> URL -> MPQ Unit
-uploadToRepository dfId url = lift $ lift $ do
+uploadToRepository dfId url = do
+  df <- lift $ lift $ getPerspectEntiteit dfId
+  uploadToRepository_ dfId url df
+
+-- | As uploadToRepository, but provide the DomeinFile as argument.
+uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
+uploadToRepository_ dfId url df = lift $ lift $ do
   docUrl <- pure (url <> "/" <> (show dfId))
-  df <- getPerspectEntiteit dfId
   (rq :: (Request String)) <- defaultPerspectRequest
   -- Try to get the revision
   mVersion <- retrieveDocumentVersion docUrl
