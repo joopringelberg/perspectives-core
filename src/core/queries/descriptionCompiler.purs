@@ -270,7 +270,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
       -- Both ranges must be equal
       gt <- lift2 $ pure ((range left') `eq` (range right'))
       if gt
-        then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (range right') (isFunctionalFunction functionName) True
+        then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM PBool Nothing) (isFunctionalFunction functionName) True
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
