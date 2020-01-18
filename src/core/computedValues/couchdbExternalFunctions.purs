@@ -40,7 +40,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Perspectives.CoreTypes (MP, assumption, MPQ)
+import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, assumption)
 import Perspectives.Couchdb (PutCouchdbDocument, ViewResult(..), onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -48,8 +48,8 @@ import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Persistent (class Persistent, getPerspectEntiteit, saveEntiteit_)
-import Perspectives.Representation.Class.Cacheable (cachePreservingRevision)
+import Perspectives.Persistent (class Persistent, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
+import Perspectives.Representation.Class.Cacheable (cacheInitially, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -82,10 +82,11 @@ models = ArrayT do
 -- | Load the acompanying instances, too.
 -- | Notice that the urls should be the full path to the relevant documents.
 -- TODO. Authentication at the repository urls.
-addModelToLocalStore :: Array String -> MPQ Unit
-addModelToLocalStore urls = for_ urls addModelToLocalStore'
+addModelToLocalStore :: Array String -> MonadPerspectivesTransaction Unit
+addModelToLocalStore urls = do
+  for_ urls addModelToLocalStore'
   where
-    addModelToLocalStore' :: String -> MPQ Unit
+    addModelToLocalStore' :: String -> MonadPerspectivesTransaction Unit
     addModelToLocalStore' url = do
         -- Retrieve the DomeinFile from the URL.
       (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
@@ -93,14 +94,18 @@ addModelToLocalStore urls = for_ urls addModelToLocalStore'
       (df@(DomeinFile{contextInstances, roleInstances}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
       rev <- version res.headers
-      -- Store it in Couchdb.
-      save (identifier df) (changeRevision rev df)
+      -- Store it in Couchdb. Remove the revision: it belongs to the repository,
+      -- not the local perspect_models.
+      save (identifier df :: DomeinFileId) (changeRevision Nothing df)
       -- Take the role- and contextinstances from it and add them to the user (instances) database.
       forWithIndex_ contextInstances \i a -> save (ContextInstance i) a
-      forWithIndex_ roleInstances \i a -> save (RoleInstance i) a
+      -- TODO. Dit gaat niet op voor alle rollen, maar wel voor de model representatie.
+      forWithIndex_ roleInstances \i a -> void $ lift $ lift $ saveEntiteit_ (RoleInstance i) a
 
-    save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MPQ Unit
-    save i a = void $ lift $ lift $ saveEntiteit_ i a
+    save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
+    save i a = do
+      void $ lift $ lift $ cacheInitially i a
+      void $ lift $ lift $ saveEntiteit i
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do
