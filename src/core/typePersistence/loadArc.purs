@@ -83,18 +83,16 @@ type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesEr
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
 -- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
-loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives (Array PerspectivesError)
-loadAndPersistArcFile loadCRL persist fileName directoryName = do
+loadArcAndCrl :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
+loadArcAndCrl fileName directoryName = do
   r <- loadAndCompileArcFile fileName directoryName
   case r of
-    Left m -> pure m
-    Right df@(DomeinFile drf@{_id}) -> if loadCRL
-      then do
-        x <- addModelInstances drf
-        case x of
-          (Left e) -> pure e
-          (Right withInstances) -> persist _id (DomeinFile withInstances) *> pure []
-      else persist _id df *> pure []
+    Left m -> pure $ Left m
+    Right df@(DomeinFile drf@{_id}) -> do
+      x <- addModelInstances drf
+      case x of
+        (Left e) -> pure $ Left e
+        (Right withInstances) -> pure $ Right (DomeinFile withInstances)
   where
     addModelInstances :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
     addModelInstances df@{_id} = do
@@ -104,6 +102,17 @@ loadAndPersistArcFile loadCRL persist fileName directoryName = do
         Right (Tuple contexts roles) -> do
           modelDescription <- pure $ find (\(PerspectRol{pspType}) -> pspType == EnumeratedRoleType "model:System$Model$External") roles
           pure $ Right (df {roleInstances = roles, contextInstances = contexts, modelDescription = modelDescription})
+
+-- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
+-- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
+loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives (Array PerspectivesError)
+loadAndPersistArcFile loadCRL persist fileName directoryName = do
+  r <- if loadCRL
+    then loadArcAndCrl fileName directoryName
+    else loadAndCompileArcFile fileName directoryName
+  case r of
+    Left m -> pure m
+    Right df@(DomeinFile drf@{_id}) -> persist _id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.
