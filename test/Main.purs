@@ -22,6 +22,7 @@ import Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations as SACC
 import Test.RunMonadPerspectivesTransaction as RMPT
 import Test.Combinators as COMB
 import Test.Extern.Couchdb as CDB
+import Test.Model.System as TMS
 import Test.Unit.Main (runTest)
 
 
@@ -44,3 +45,4 @@ main = runTest do
   RMPT.theSuite
   COMB.theSuite
   CDB.theSuite
+  TMS.theSuite

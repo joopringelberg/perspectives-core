@@ -3,15 +3,17 @@ module Test.Perspectives.Utils where
 import Prelude
 
 import Control.Monad.AvarMonadAsk as AA
+import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
-import Perspectives.ContextAndRole (changeRol_isMe)
+import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadCrlFile)
-import Perspectives.Persistent (getPerspectRol)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheOverwritingRevision)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives)
 import Test.Unit.Assert as Assert
 
@@ -59,6 +61,9 @@ setupUser :: MonadPerspectives Unit
 setupUser = do
   void $ loadCrlFile "systemInstances.crl" "./src/model"
   -- now set isMe of "model:User$MijnSysteem$User_0001" to true.
-  user <- ContextInstance "model:User$MijnSysteem" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
-  userRol <- getPerspectRol user
+  (user :: RoleInstance) <- ContextInstance "model:User$MijnSysteem" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
+  (userRol :: PerspectRol) <- getPerspectRol user
   void $ cacheOverwritingRevision user (changeRol_isMe userRol true)
+  -- And set 'me' of "model:User$MijnSysteem"
+  (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance "model:User$MijnSysteem")
+  void $ cacheOverwritingRevision (ContextInstance "model:User$MijnSysteem") (changeContext_me mijnSysteem (Just user))

@@ -1,0 +1,93 @@
+Context model:TestBotActie als tba:
+
+import model:Perspectives als psp:
+import model:QueryAst als q:
+
+Section psp:Model$indexedContextTypes
+
+psp:Zaak tba:Test
+	?binnenRolBeschrijving =>
+		psp:Rol $binnenRolBeschrijving
+			extern $isFunctioneel = true
+			extern $isVerplicht = true
+			$mogelijkeBinding => psp:Rol
+			$rolProperty =>
+				psp:Property $v1
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $v2
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:String
+			$rolProperty =>
+				psp:Property $trigger
+					extern $isFunctioneel = true
+					extern $isVerplicht = false
+					$range => psp:Boolean
+			$rolProperty =>
+				q:nAryCombinator $propsEqual
+					extern $functionName = "equal"
+					$operand (1) =>
+						q:PropertyGetter _
+							extern $functionName = "searchProperty"
+							$property => tba:Test$binnenRolBeschrijving$v1
+							?result => psp:String -- matcht met psp:SimpleValue.
+					$operand (2) =>
+						q:PropertyGetter $n2
+							extern $functionName = "searchProperty"
+							$property => tba:Test$binnenRolBeschrijving$v2
+							?result => psp:String
+					?result => psp:Boolean
+			$viewInRol =>
+				psp:View $allProps
+					$propertyReferentie => $$v1
+						$volgNummer = 1
+					$propertyReferentie => $$v2
+						$volgNummer = 2
+					$propertyReferentie => $$trigger
+						$volgNummer = 3
+					$propertyReferentie => $$propsEqual
+						$volgNummer = 4
+	---?gebruikerRol -> usr:MijnSysteem$gebruiker(1) -- overbodig hier, maar een goede test.
+	-- ?contextBot syntax geeft de rol de id "model:TestBotActie$Test$contextBot_1"
+	-- psp:Context$contextBot geeft de rol de id "model:TestBotActie$Test$Context$contextBot_1"
+	-- Dat verschil wordt nog niet gecorrigeerd.
+	---?contextBot => () -- Niet langer nodig.
+	$actie =>
+		psp:Actie $botCopiesV1ToV2
+			--$subject -> $$Context$contextBot(1) -- Dit werkt voor psp:Context$contextBot
+			--$subject -> $$contextBot(1) -- Dit werkt voor ?contextBot
+			$subject => psp:Context$contextBot
+			$werkwoord => psp:Beheert
+			$object => -- deze query wordt toegepast op de context en MOET de binnenrol opleveren.
+				q:DataTypeGetter $self
+					extern $functionName = "binnenRol"
+					?result => tba:Test
+			$condition => -- deze query wordt toegepast op de context.
+				q:nAryCombinator _
+					extern $functionName = "conj"
+					$operand (1) =>
+						q:UnaryCombinator _
+							extern $functionName = "not"
+							$query =>
+								q:PropertyGetter _
+									extern $functionName = "getInternalPropery"
+									$property => tba:Test$binnenRolBeschrijving$propsEqual
+									$result => psp:Boolean
+					$operand (2) =>
+						q:PropertyGetter _
+							extern $functionName = "getInternalPropery"
+							$property => tba:Test$binnenRolBeschrijving$trigger
+							?result => psp:Boolean
+					?result => psp:Boolean
+			$effect =>
+				psp:assignToProperty _
+					extern $operation = "set"
+					$property => tba:Test$binnenRolBeschrijving$v2
+					$value => -- deze query wordt toegepast op de context.
+						q:PropertyGetter $GetterOfV1
+							extern $functionName = "getInternalPropery"
+							$property => tba:Test$binnenRolBeschrijving$v1
+							?result => psp:String

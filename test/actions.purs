@@ -25,7 +25,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Actions" do
+theSuite = suiteSkip "Perspectives.Actions" do
 
   test "compileAssignment: Remove" do
     r <- runP do

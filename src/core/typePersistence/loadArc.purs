@@ -82,7 +82,8 @@ loadAndCompileArcFile fileName directoryName = do
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
--- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
+-- | file to the DomeinFile. Adds the model description instance to the DomeinFile.
+-- | NOTICE that the model instances are added to cache!
 loadArcAndCrl :: String -> String -> MonadPerspectives (Either (Array PerspectivesError) DomeinFile)
 loadArcAndCrl fileName directoryName = do
   r <- loadAndCompileArcFile fileName directoryName
