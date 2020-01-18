@@ -21,7 +21,7 @@
 
 module Perspectives.Parsing.Arc.PhaseThree.SetAffectedContextCalculations where
 
-import Control.Monad.Except (throwError)
+import Control.Monad.Except (lift, throwError)
 import Data.Array (cons)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
@@ -32,21 +32,24 @@ import Perspectives.AffectedContextCalculation (AffectedContextCalculation(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType, invertFunctionDescription)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (Unit, discard, pure, unit, ($))
+import Prelude (Unit, discard, pure, unit, ($), bind)
 
 -- Compute the inverse paths for the condition. Save each path with the type that is the origin
 -- (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
 -- when a Delta is processed for the head of a path.
 setAffectedContextCalculations :: ActionType -> QueryFunctionDescription -> PhaseThree Unit
-setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunctionDescription qfd)
-  \path -> do
-    -- log $ prettyPrint path
-    setPathForEachSubPath path
+setAffectedContextCalculations action qfd = do
+  paths <- lift $ lift $ unsafePartial $ invertFunctionDescription qfd
+  for_ paths
+    \path -> do
+      -- log $ prettyPrint path
+      unsafePartial $ setPathForEachSubPath path
 
   where
     setPathForEachSubPath :: Partial => QueryFunctionDescription -> PhaseThree Unit
@@ -63,13 +66,13 @@ setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunction
     setPathForEachSubPath path@(SQD _ _ _ _ _) = setPathForStep path path
 
     setPathForStep :: Partial => QueryFunctionDescription -> QueryFunctionDescription -> PhaseThree Unit
-    setPathForStep (SQD dom qf _ _ _) path = case qf of
-
+    setPathForStep (SQD dom qf ran _ _) path = case qf of
       QF.Value2Role pt -> case pt of
         ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
           Nothing -> dfr
           Just ep -> dfr {enumeratedProperties = insert (unwrap p) (addPathToProperty ep path) enumeratedProperties}
-        CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in invertFunctionDescription."
+        -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in invertFunctionDescription."
+        CP _ -> pure unit
 
       QF.DataTypeGetterWithParameter QF.GetRoleBindersF enr -> modifyDF \dfr@{enumeratedRoles} -> let
         roleName = unwrap $ unsafePartial $ domain2RoleType dom
@@ -77,11 +80,13 @@ setAffectedContextCalculations action qfd = unsafePartial $ for_ (invertFunction
           Nothing -> dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binder en path) enumeratedRoles}
 
-      QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> let
-        roleName = unwrap $ unsafePartial $ domain2RoleType dom
-        in case lookup roleName  enumeratedRoles of
-          Nothing -> dfr
-          Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en path) enumeratedRoles}
+      QF.DataTypeGetter QF.BindingF -> modifyDF \dfr@{enumeratedRoles} -> case dom of
+        (RDOM EMPTY) -> dfr
+        otherwise -> let
+          roleName = unwrap $ unsafePartial $ domain2RoleType dom
+          in case lookup roleName  enumeratedRoles of
+            Nothing -> dfr
+            Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnRoleDelta_binding en path) enumeratedRoles}
 
       QF.RolGetter roleType -> case roleType of
         ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{enumeratedRoles} -> case lookup roleName enumeratedRoles of

@@ -25,49 +25,57 @@ import Data.Array (catMaybes, cons, foldr, reverse, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MP)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.Role (getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
-import Prelude (class Monoid, class Semigroup, mempty, ($), (<$>), (<>))
+import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>))
 
 -- | Compute from the description of a query function a series of paths.
 -- | Consider the description to be a tree, then the paths run from the leaves to the root.
--- | We use this function to compute contexts whose rules should be re-run when processing a Delta.
-invertFunctionDescription :: QueryFunctionDescription -> Array QueryFunctionDescription
-invertFunctionDescription qfd = catMaybes $ invert <$> (allPaths $ unsafePartial $ invertFunctionDescription_ qfd)
+-- | We use this function to compute contexts whose rules should be re-run when processing a Delta.MonadPerspectives
+invertFunctionDescription :: QueryFunctionDescription -> MP (Array QueryFunctionDescription)
+invertFunctionDescription qfd = do
+  paths <- unsafePartial $ invertFunctionDescription_ qfd
+  pure $ catMaybes $ invert <$> (allPaths paths)
   where
     invert :: Array QueryFunctionDescription -> Maybe QueryFunctionDescription
     invert path = case uncons path of
       Nothing -> Nothing
       Just {head, tail} -> Just $ foldr compose head (reverse tail)
 
-invertFunctionDescription_ :: Partial => QueryFunctionDescription -> Paths
+invertFunctionDescription_ :: Partial => QueryFunctionDescription -> MP Paths
 
-invertFunctionDescription_ (SQD dom (Constant _ _) ran _ _) = mempty
+invertFunctionDescription_ (SQD dom (Constant _ _) ran _ _) = pure mempty
 
-invertFunctionDescription_ (SQD dom f ran _ _) = let
-  minvertedF = invertFunction dom f ran in
+invertFunctionDescription_ (SQD dom (RolGetter rt) ran _ _) = case rt of
+  ENR _ -> pure $ mkPaths (SQD ran (DataTypeGetter ContextF) dom (inversionIsFunctional (RolGetter rt)) (inversionIsMandatory (RolGetter rt)))
+  CR r -> do
+    calc <- (getRole >=> getCalculation) rt
+    invertFunctionDescription_ calc
+
+invertFunctionDescription_ (SQD dom f ran _ _) = do
+  minvertedF <- pure $ invertFunction dom f ran
   case minvertedF of
-    Nothing -> mempty
-    Just invertedF -> mkPaths (SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))
+    Nothing -> pure mempty
+    Just invertedF -> pure $ mkPaths (SQD ran invertedF dom (inversionIsFunctional f) (inversionIsMandatory f))
 
 invertFunctionDescription_ (UQD dom f qfd1 ran _ _) = invertFunctionDescription_ qfd1
 
-invertFunctionDescription_ (BQD dom (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _)= invertFunctionDescription_ qfd1 <> invertFunctionDescription_ qfd2
+invertFunctionDescription_ (BQD dom (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _)= append <$> invertFunctionDescription_ qfd1 <*> invertFunctionDescription_ qfd2
 
 -- At a filter expression, the path splits in two.
 -- One path leads through the source.
 -- The other path leads through the source **and then** through the criterium.
 -- We compose a path from source and criterium and invert that.
-invertFunctionDescription_ (BQD dom (BinaryCombinator FilterF) source criterium ran _ _) = filterPaths (invertFunctionDescription_ source) (invertFunctionDescription_ criterium)
+invertFunctionDescription_ (BQD dom (BinaryCombinator FilterF) source criterium ran _ _) = filterPaths <$> (invertFunctionDescription_ source) <*> (invertFunctionDescription_ criterium)
 
 -- For all other functions, we just sum their paths.
-invertFunctionDescription_ (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) = sumPaths
-  (invertFunctionDescription_ qfd1)
-  (invertFunctionDescription_ qfd2)
+invertFunctionDescription_ (BQD dom (BinaryCombinator f) qfd1 qfd2 ran _ _) = sumPaths <$> (invertFunctionDescription_ qfd1) <*> (invertFunctionDescription_ qfd2)
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
 invertFunction :: Domain -> QueryFunction -> Range -> Maybe QueryFunction
@@ -77,7 +85,9 @@ invertFunction dom qf ran = case qf of
     ContextF -> if isExternalRole dom
       then Just $ DataTypeGetter ExternalRoleF
       else Just $ RolGetter $ ENR (unsafePartial $ domain2RoleType dom)
-    BindingF -> Just $ DataTypeGetterWithParameter GetRoleBindersF (unwrap $ unsafePartial $ domain2RoleType dom)
+    BindingF -> case ran of
+      (RDOM EMPTY) -> Nothing
+      otherwise -> Just $ DataTypeGetterWithParameter GetRoleBindersF (unwrap $ unsafePartial $ domain2RoleType dom)
     ExternalRoleF -> Just $ DataTypeGetter ContextF
     IdentityF -> Just $ DataTypeGetter IdentityF
 
@@ -99,6 +109,7 @@ invertFunction dom qf ran = case qf of
     -- A lot of cases will never be seen in a regular query.
     _ -> Nothing
 
+  -- TODO: Is overbodig, nu?
   RolGetter rt -> Just $ DataTypeGetter ContextF
   PropertyGetter pt -> Just $ Value2Role pt
   -- Variable lookup implies variable binding elsewhere. We've traced the path back in the binding, so we ignore it here.
