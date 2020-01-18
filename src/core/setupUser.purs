@@ -21,13 +21,13 @@
 
 module Perspectives.SetupUser where
 
-import Data.Maybe (Maybe(..)) 
-import Perspectives.ContextAndRole (changeRol_isMe)
+import Data.Maybe (Maybe(..))
+import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
-import Perspectives.Persistent (saveEntiteit_, tryGetPerspectEntiteit, getPerspectRol)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, saveEntiteit_, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Prelude (Unit, bind, pure, unit, void, ($), discard)
@@ -45,5 +45,8 @@ setupUser = do
       user <- ContextInstance "model:User$MijnSysteem" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
       userRol <- getPerspectRol user
       void $ saveEntiteit_ user (changeRol_isMe userRol true)
+      -- And set 'me' of "model:User$MijnSysteem"
+      (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance "model:User$MijnSysteem")
+      void $ saveEntiteit_ (ContextInstance "model:User$MijnSysteem") (changeContext_me mijnSysteem (Just user))
 
     otherwise -> pure unit
