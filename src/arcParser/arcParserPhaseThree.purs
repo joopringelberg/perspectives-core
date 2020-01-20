@@ -30,7 +30,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, foldM, head, length, null, uncons)
+import Data.Array (filter, foldM, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -372,7 +372,7 @@ compileRules = do
             (Just (L (LetStep {bindings, assignments}))) -> do
               let_ <- withFrame do
                 addBinding "object" objectCalculation
-                (makeSequence <$> foldM addVarBindingToSequence objectVar bindings <*> sequenceOfAssignments currentDomain assignments)
+                (makeSequence <$> foldM addVarBindingToSequence objectVar (reverse bindings) <*> sequenceOfAssignments currentDomain assignments)
               -- Add the runtime frame.
               aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
               pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
@@ -392,11 +392,14 @@ compileRules = do
             -- This will return a QueryFunctionDescription that describes either a single assignment, or
             -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF)
             sequenceOfAssignments :: Domain -> Array Assignment -> PhaseThree QueryFunctionDescription
-            sequenceOfAssignments currentDomain assignments = case uncons assignments of
-              Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
-              (Just {head, tail}) -> do
-                head_ <- describeAssignmentStatement currentDomain head
-                foldM (addAssignmentToSequence currentDomain) head_ tail
+            sequenceOfAssignments currentDomain assignments' = sequenceOfAssignments_ (reverse assignments')
+              where
+                sequenceOfAssignments_ :: Array Assignment -> PhaseThree QueryFunctionDescription
+                sequenceOfAssignments_ assignments = case uncons assignments of
+                  Nothing -> throwError $ Custom "There must be at least one assignment in a let*"
+                  (Just {head, tail}) -> do
+                    head_ <- describeAssignmentStatement currentDomain head
+                    foldM (addAssignmentToSequence currentDomain) head_ tail
 
             -- Returns a BQD with QueryFunction (BinaryCombinator SequenceF)
             addAssignmentToSequence :: Domain -> QueryFunctionDescription -> Assignment -> PhaseThree QueryFunctionDescription

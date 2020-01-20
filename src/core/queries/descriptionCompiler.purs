@@ -29,7 +29,7 @@ module Perspectives.Query.DescriptionCompiler where
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, head, length, uncons, foldM)
+import Data.Array (elemIndex, foldM, head, length, reverse, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
@@ -44,8 +44,8 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
-import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
+import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
@@ -294,7 +294,8 @@ compileLetStep currentDomain (PureLetStep{bindings, body}) = do
   where
     compileLetStep_ :: FD
     compileLetStep_ = withFrame
-      case uncons bindings of
+      -- We have to reverse the bindings, because foldM associates the wrong way.
+      case uncons (reverse bindings) of
         -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
         Nothing -> compileStep currentDomain body
         (Just {head: bnd, tail}) -> do

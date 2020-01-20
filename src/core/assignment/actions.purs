@@ -35,7 +35,6 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log, logShow)
 import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
@@ -52,7 +51,7 @@ import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
-import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string, withFrame_)
+import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
@@ -95,7 +94,6 @@ compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
 compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
   roleGetter <- context2role rle
   pure \contextId -> do
-    logShow "In compileAssignment Remove"
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     case uncons roles of
       Nothing -> pure unit
