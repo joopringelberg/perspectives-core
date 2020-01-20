@@ -68,7 +68,7 @@ import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndRes
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (entitiesDatabase, getCouchdbBaseURL)
 
@@ -151,6 +151,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
 
 -- | Save an entity, whether it has been saved before or not. It must be present in the cache.
 -- | On success it will have the same version in cache as in Couchdb.
+-- TODO. Dit steekt niet goed in elkaar. Als hij in cache is, slaagt tryGetPerspectEntiteit altijd en dus komen we altijd in de tweede case.
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = do
   (pe :: Maybe a) <- tryGetPerspectEntiteit id
@@ -163,7 +164,13 @@ saveEntiteit id = do
 saveEntiteit_ :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 saveEntiteit_ id pe = do
   case rev pe of
-    Nothing -> saveUnversionedEntiteit id
+    Nothing -> do
+      (av :: Maybe (AVar a)) <- retrieveInternally id
+      case av of
+        (Just avar) -> saveUnversionedEntiteit id
+        Nothing -> do
+          void $ cacheInitially id pe
+          saveUnversionedEntiteit id
     otherwise -> saveVersionedEntiteit id pe
 
 -- | A Resource may be created and stored locally, but not sent to the couchdb. Send such resources to

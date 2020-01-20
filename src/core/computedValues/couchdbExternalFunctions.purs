@@ -94,7 +94,7 @@ addModelToLocalStore urls = do
       (df@(DomeinFile{contextInstances, roleInstances}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
       rev <- version res.headers
-      -- Store it in Couchdb. Remove the revision: it belongs to the repository,
+      -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
       -- not the local perspect_models.
       save (identifier df :: DomeinFileId) (changeRevision Nothing df)
       -- Take the role- and contextinstances from it and add them to the user (instances) database.
