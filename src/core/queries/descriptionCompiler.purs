@@ -44,8 +44,8 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
 import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
-import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
@@ -287,13 +287,19 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 -- | Compile a PureLetStep into a sequence of QueryFunctionDescriptions that ends with the body.
 -- | Each binding compiles to a description of a function that will add a name-value pair to the runtime environment.
 compileLetStep :: Domain -> PureLetStep -> FD
-compileLetStep currentDomain (PureLetStep{bindings, body}) = withFrame
-  case uncons bindings of
-    -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
-    Nothing -> compileStep currentDomain body
-    (Just {head: bnd, tail}) -> do
-      head_ <- compileVarBinding currentDomain bnd
-      makeSequence <$> foldM addVarBindingToSequence head_ tail <*> compileStep currentDomain body
+compileLetStep currentDomain (PureLetStep{bindings, body}) = do
+  let_ <- compileLetStep_
+  pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+
+  where
+    compileLetStep_ :: FD
+    compileLetStep_ = withFrame
+      case uncons bindings of
+        -- no bindings at all. Just the body. This will probably never occur as the parser breaks on it.
+        Nothing -> compileStep currentDomain body
+        (Just {head: bnd, tail}) -> do
+          head_ <- compileVarBinding currentDomain bnd
+          makeSequence <$> foldM addVarBindingToSequence head_ tail <*> compileStep currentDomain body
 
 -- The range of a sequence equals that of its second term.
 -- The fold is left associative: ((binding1 *> binding2) *> binding3). The compiler handles that ok.

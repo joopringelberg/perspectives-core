@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (null)
+import Data.Array (length, null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (liftAff)
@@ -65,6 +65,9 @@ theSuite = suite "Model:System" do
         -- Now remove the model instances from cache!
         void $ removeInternally (RoleInstance "model:User$TestBotActieModel_External")
         void $ removeInternally (ContextInstance "model:User$TestBotActieModel")
+        void $ removeInternally (RoleInstance "model:User$MyTest_External")
+        void $ removeInternally (ContextInstance "model:User$MyTest")
+        void $ removeInternally (ContextInstance "model:User$TestBotActieModel$IndexedContext_0000")
 
         -- Get the model descriptions from the repository into cache.
         getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
@@ -83,6 +86,12 @@ theSuite = suite "Model:System" do
         -- Check if model:TestBotActie is in perspect_models
         succes <- documentExists (cdburl <> "perspect_models/model:TestBotActie")
         liftAff $ assert "model:TestBotActie should be in perspect_models" succes
+
+        -- Check if ModelsInUse has two instances.
+        getIndexedContexts <- getRoleFunction "model:System$PerspectivesSystem$IndexedContexts"
+        n2 <- ((ContextInstance "model:User$MijnSysteem") ##= getIndexedContexts)
+        logShow n2
+        liftAff $ assert "There should be two instances of IndexedContexts." (length n2 == 2)
 
         -- remove model:TestBotActie from the repository and from perspect_models
   )

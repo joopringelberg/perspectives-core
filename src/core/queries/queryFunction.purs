@@ -116,6 +116,7 @@ data QueryFunction
   | BindVariable VariableName
   | AssignmentOperator FunctionName
   | Identity
+  | WithFrame
 
   | UnaryCombinator FunctionName
   -- | NaryCombinator FunctionName (Array QueryFunction)

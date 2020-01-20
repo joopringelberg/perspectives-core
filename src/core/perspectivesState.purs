@@ -26,7 +26,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Foreign.Object (empty)
-import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState)
+import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, type (~~>), MPQ)
 import Perspectives.CouchdbState (UserInfo)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
@@ -91,13 +91,13 @@ queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister}) -> s {qu
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS
 -----------------------------------------------------------
-getVariableBindings :: MonadPerspectives (ENV.Environment String)
+getVariableBindings :: MonadPerspectives (ENV.Environment (Array String))
 getVariableBindings = gets _.variableBindings
 
-addBinding :: String -> String -> MonadPerspectives Unit
+addBinding :: String -> Array String -> MonadPerspectives Unit
 addBinding varName qfd = void $ modify \s@{variableBindings} -> s {variableBindings = ENV.addVariable varName qfd variableBindings}
 
-lookupVariableBinding :: String -> MonadPerspectives (Maybe String)
+lookupVariableBinding :: String -> MonadPerspectives (Maybe (Array String))
 lookupVariableBinding varName = getVariableBindings >>= pure <<< (ENV.lookup varName)
 
 withFrame :: forall a. MonadPerspectives a -> MonadPerspectives a

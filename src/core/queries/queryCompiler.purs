@@ -26,7 +26,8 @@
 
 module Perspectives.Query.Compiler where
 
-import Control.Alt ((<|>))
+import Control.Alt (void, (<|>))
+import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
@@ -37,14 +38,16 @@ import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Instances.Combinators (exists, not, available)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
+import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
-import Perspectives.PerspectivesState (addBinding, lookupVariableBinding)
+import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, prettyPrint, Calculation(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -279,12 +282,22 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
   case f1' of
-    (C2C a) -> pure $ C2C (unsafeCoerce addBinding_ varName a)
-    (C2R a) -> pure $ C2R (unsafeCoerce addBinding_ varName a)
-    (C2V a) -> pure $ C2V (unsafeCoerce addBinding_ varName a)
-    (R2C a) -> pure $ R2C (unsafeCoerce addBinding_ varName a)
-    (R2R a) -> pure $ R2R (unsafeCoerce addBinding_ varName a)
-    (R2V a) -> pure $ R2V (unsafeCoerce addBinding_ varName a)
+    (C2C a) -> pure $ C2C (addBinding_ varName a)
+    (C2R a) -> pure $ C2R (addBinding_ varName a)
+    (C2V a) -> pure $ C2V (addBinding_ varName a)
+    (R2C a) -> pure $ R2C (addBinding_ varName a)
+    (R2R a) -> pure $ R2R (addBinding_ varName a)
+    (R2V a) -> pure $ R2V (addBinding_ varName a)
+
+compileFunction (UQD _ WithFrame f1 _ _ _) = do
+  f1' <- compileFunction f1
+  case f1' of
+    (C2C a) -> pure $ C2C \c -> withFrame_ a c
+    (C2R a) -> pure $ C2R \c -> withFrame_ a c
+    (C2V a) -> pure $ C2V \c -> withFrame_ a c
+    (R2C a) -> pure $ R2C \c -> withFrame_ a c
+    (R2R a) -> pure $ R2R \c -> withFrame_ a c
+    (R2V a) -> pure $ R2V \c -> withFrame_ a c
 
 compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -390,15 +403,23 @@ operators =
   , OrF
   ]
 
-addBinding_ :: String -> (String ~~> String) -> String ~~> String
+addBinding_ :: forall a b. String -> (a ~~> b) -> a ~~> b
 addBinding_ varName computation ctxt  = do
   v <- computation ctxt
-  lift $ lift $ addBinding varName v
+  lift $ lift $ addBinding varName (unsafeCoerce v)
   pure v
 
+withFrame_ :: forall a b. (a ~~> b) -> a ~~> b
+withFrame_ computation ctxt = do
+  old <- lift $ lift $ getVariableBindings
+  void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
+  r <- computation ctxt
+  void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
+  pure r
+
 lookup :: String -> String ~~> String
-lookup varName _ = do
-    mv <- lift $ lift (lookupVariableBinding varName)
+lookup varName _ = ArrayT do
+    mv <- lift (lookupVariableBinding varName)
     pure $ (unsafePartial (fromJust mv))
 
 ---------------------------------------------------------------------------------------------------

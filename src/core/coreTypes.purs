@@ -61,7 +61,7 @@ type PerspectivesState = CouchdbState
 
   , queryAssumptionRegister :: AssumptionRegister
 
-  , variableBindings :: Environment String
+  , variableBindings :: Environment (Array String)
   )
 
 -----------------------------------------------------------

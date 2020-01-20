@@ -45,7 +45,14 @@ import Prelude (class Monad, Unit, bind, discard, map, pure, void, ($), (<>), (<
 -- However, we don't know when traversing the Arc AST.
 -- (2) We need a way to indicate PRODUCT types for bindings.
 
-type PhaseTwoState = {bot :: Boolean, dfr :: DomeinFileRecord, namespaces :: Object String, variableBindings :: Environment QueryFunctionDescription}
+type PhaseTwoState =
+  { bot :: Boolean
+  , dfr :: DomeinFileRecord
+  , namespaces :: Object String
+  -- In PhaseTwoState, variables are bound to QueryFunctionDescriptions.
+  -- In PerspectivesState, variables are bound to Strings.
+  , variableBindings :: Environment QueryFunctionDescription
+}
 
 -- | A Monad with state that indicates whether the Subject of an Action is a Bot,
 -- | and allows exceptions.
