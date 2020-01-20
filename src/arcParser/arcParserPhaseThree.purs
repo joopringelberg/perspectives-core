@@ -41,22 +41,23 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Foreign.Object (Object, insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.External.CoreModules (isExternalCoreModule)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, expandDefaultNamespaces, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree.SetAffectedContextCalculations (setAffectedContextCalculations)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, lift2, modifyDF, runPhaseTwo_', withFrame)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, compileVarBinding, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2roleType, functional, range, Calculation(..))
+import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo, reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -352,34 +353,33 @@ compileRules = do
       where
         compileRule :: String -> Action -> PhaseThree Action
         compileRule actionName a@(Action ar@{_id, subject, condition, effect, object}) = do
-          -- Compileer hier de conditie ook.
           conditionDescription <- compileActionCondition
           ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
           currentDomain <- pure (CDOM $ ST ctxt)
+          objectCalculation <- lift $ lift $ getRole object >>= getCalculation
+          objectVar <- pure (UQD (domain objectCalculation) (QF.BindVariable "object") objectCalculation (range objectCalculation) (functional objectCalculation) (mandatory objectCalculation))
           -- The expression below returns a QueryFunctionDescription that describes either a single assignment, or
           -- a BQD with QueryFunction equal to (BinaryCombinator SequenceF).
           case effect of
             -- Compile a series of Assignments into a QueryDescription.
             (Just (A assignments)) -> do
-              (aStatements :: QueryFunctionDescription) <- sequenceOfAssignments currentDomain assignments
+              let_ <- withFrame do
+                addBinding "object" objectCalculation
+                makeSequence <$> pure objectVar <*> (sequenceOfAssignments currentDomain assignments)
+              (aStatements :: QueryFunctionDescription) <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
               pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
               -- Compile the LetStep into a QueryDescription.
-            (Just (L (LetStep {bindings, assignments}))) -> withFrame
-              case uncons bindings of
-                -- no variableBindings at all. Just the body. This will probably never occur as the parser breaks on it.
-                -- Note we cannot factor sequenceOfAssignments out, even though it occurs
-                -- in both cases. In the second case, we first need to build up the
-                -- variable bindings.
-                Nothing -> do
-                  (aStatements :: QueryFunctionDescription) <- sequenceOfAssignments currentDomain assignments
-                  pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
-                (Just {head: bnd, tail}) -> do
-                  head_ <- compileVarBinding currentDomain bnd
-                  compiledLet <- makeSequence <$> foldM addVarBindingToSequence head_ tail <*> sequenceOfAssignments currentDomain assignments
-                  pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF compiledLet}
+            (Just (L (LetStep {bindings, assignments}))) -> do
+              let_ <- withFrame do
+                addBinding "object" objectCalculation
+                (makeSequence <$> foldM addVarBindingToSequence objectVar bindings <*> sequenceOfAssignments currentDomain assignments)
+              -- Add the runtime frame.
+              aStatements <- pure (UQD currentDomain QF.WithFrame let_ (range let_) (functional let_) (mandatory let_))
+              pure $ Action ar {condition = Q conditionDescription, effect = Just $ EF aStatements}
             otherwise -> pure $ Action ar {condition = Q conditionDescription}
 
           where
+
             compileActionCondition :: PhaseThree QueryFunctionDescription
             compileActionCondition = case condition of
               Q d -> pure d

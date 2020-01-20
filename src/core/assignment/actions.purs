@@ -25,6 +25,7 @@ module Perspectives.Actions where
 -- | that actually assigns a value or sorts an effect.
 import Prelude
 
+import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (foldMap, null, uncons, unsafeIndex)
@@ -34,6 +35,7 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log, logShow)
 import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
@@ -46,9 +48,11 @@ import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPe
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
-import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string)
+import Perspectives.PerspectivesState (addBinding, getVariableBindings)
+import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string, withFrame_)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
@@ -91,6 +95,7 @@ compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
 compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
   roleGetter <- context2role rle
   pure \contextId -> do
+    logShow "In compileAssignment Remove"
     (roles :: Array RoleInstance) <- lift $ lift (contextId ##= roleGetter)
     case uncons roles of
       Nothing -> pure unit
@@ -218,6 +223,22 @@ compileAssignment (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   f2' <- compileAssignment f2
   pure \c -> (f1' c *> f2' c)
 
+compileAssignment (UQD _ WithFrame f1 _ _ _) = do
+  f1' <- compileAssignment f1
+  pure \c -> do
+    old <- lift $ lift $ getVariableBindings
+    void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = (_pushFrame old)}
+    r <- f1' c
+    void $ lift $ lift $ modify \s@{variableBindings} -> s {variableBindings = old}
+    pure unit
+
+compileAssignment (UQD _ (BindVariable varName) f1 _ _ _) = do
+  f1' <- context2string f1
+  pure \contextId -> do
+    v <- lift $ lift (contextId ##= f1')
+    lift $ lift $ addBinding varName (unsafeCoerce v)
+    pure unit
+
 compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
@@ -245,4 +266,4 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
     )
 
 -- Catchall, remove when all cases have been covered.
-compileAssignment _ = pure \_ -> pure unit
+compileAssignment otherwise = throwError (error ("Found unknown case for compileAssignment: " <> show otherwise))

@@ -29,7 +29,7 @@ domain: System
       perspective on: UnloadedModel
         if exists UnloadedModel then
           callEffect cdb:AddModelToLocalStore( UnloadedModel >> binding >> Url )
-          bind UnBoundModel >> binding >> context >> IndexedContext >> binding to IndexedContexts
+          bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
       --perspective on: IndexedContexts
         --if exists UnBoundModel then
           --bind UnBoundModel >> binding >> context >> IndexedContext >> binding to IndexedContexts
