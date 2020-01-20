@@ -14,13 +14,13 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
 import Perspectives.CoreTypes ((##=))
-import Perspectives.Couchdb.Databases (documentExists)
+import Perspectives.Couchdb.Databases (deleteDocument, documentExists)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
-import Perspectives.DomeinFile (DomeinFileId(..))
+import Perspectives.DomeinFile (DomeinFile, DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.Extern.Couchdb (uploadToRepository_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Persistent (getPerspectRol, saveEntiteit)
+import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -29,7 +29,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.SaveUserData (saveAndConnectRoleInstance)
 import Perspectives.TypePersistence.LoadArc (loadArcAndCrl, loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (runP, setupUser)
+import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -94,4 +94,9 @@ theSuite = suite "Model:System" do
         liftAff $ assert "There should be two instances of IndexedContexts." (length n2 == 2)
 
         -- remove model:TestBotActie from the repository and from perspect_models
+        (_ :: DomeinFile) <- removeEntiteit (DomeinFileId "model:TestBotActie")
+        void $ deleteDocument (cdburl <> "repository/model:TestBotActie") Nothing
+
+        -- remove all user instances
+        clearUserDatabase
   )
