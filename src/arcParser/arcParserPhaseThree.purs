@@ -41,7 +41,6 @@ import Data.String.CodeUnits (fromCharArray, uncons) as CU
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Class.Console (log)
 import Foreign.Object (Object, insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes ((###=), MP, (###>))

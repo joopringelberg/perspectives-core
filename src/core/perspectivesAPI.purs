@@ -27,7 +27,7 @@ import Control.Coroutine.Aff (Step(..), produce')
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (head)
+import Data.Array (head, null)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust)
@@ -45,7 +45,7 @@ import Perspectives.Assignment.Update (addRol, removeBinding, saveEntiteit, setB
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
-import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), MP)
+import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), (##=), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
@@ -58,9 +58,9 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Role (rangeOfRoleCalculation')
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View, propertyReferences)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
+import Perspectives.RunMonadPerspectivesTransaction (getMe, runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance, saveContextInstance, saveAndConnectRoleInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
@@ -195,8 +195,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           Nothing -> sendResponse (Error corrId ("View '" <> predicate <> "' is available for role '" <> subject <> "'.")) setter
           -- NOTE: we arbitrarily take the first matching View.
           (Just (v :: ViewType)) -> do
-            props <- ((getPerspectType v) :: MP View) >>= pure <<< propertyReferences
-            sendResponse (Result corrId []) setter
+            (props :: Array PropertyType) <- ((getPerspectType v) :: MP View) >>= pure <<< propertyReferences
+            sendResponse (Result corrId (propertytype2string <$> props)) setter
+    Api.GetMeForContext -> do
+      me <- (RoleInstance subject) ##= context >=> getMe
+      if null me
+        then sendResponse (Error corrId ("No role for user in context instance '" <> subject <> "'!")) setter
+        else sendResponse (Result corrId (unwrap <$> me)) setter
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
