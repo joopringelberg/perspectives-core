@@ -23,7 +23,7 @@ module Perspectives.Representation.Class.Identifiable where
 
 import Data.Newtype (class Newtype, unwrap)
 
-class Newtype i String <= Identifiable e i | i -> e, e -> i where
+class Newtype i String <= Identifiable e i where
   identifier :: e -> i
 
 identifier_ :: forall e i. Identifiable e i => e -> String
