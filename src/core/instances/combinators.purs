@@ -21,13 +21,13 @@
 
 module Perspectives.Instances.Combinators where
 
+import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Trans.Class (lift)
 import Control.MonadZero (guard)
 import Data.Array (cons, elemIndex, foldM, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
@@ -50,7 +50,7 @@ closure_ f a = ArrayT $ do
   r <- runArrayT $ closure f a
   pure $ maybe (cons a r) (const r) (elemIndex a r)
 
-filter :: forall m a o. Monad m =>
+filter :: forall e m a o. Monad m => MonadError e m =>
   (a -> ArrayT m o) ->
   (o -> ArrayT m Boolean) ->
   (a -> ArrayT m o)
@@ -60,7 +60,7 @@ filter source criterium a = do
   guard passes
   pure r
 
-filter' :: forall m a o. Monad m =>
+filter' :: forall e m a o. Monad m => MonadError e m =>
   (a -> ArrayT m o) ->
   (o -> Boolean) ->
   (a -> ArrayT m o)

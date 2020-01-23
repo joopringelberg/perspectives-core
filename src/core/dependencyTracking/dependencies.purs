@@ -35,7 +35,7 @@ import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, ResponseRecord(..))
+import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (Assumption, AssumptionRegister, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
@@ -97,7 +97,7 @@ registerSupportedEffect corrId ef q arg = do
       {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
       for_ vanished (deregisterDependency corrId)
       -- Re-run the effect
-      liftEffect $ ef (ResponseRecord {corrId: corrId, result: Just (unsafeCoerce result), error: Nothing})
+      liftEffect $ ef (Result corrId (unsafeCoerce result))
       pure unit
 
 unregisterSupportedEffect :: CorrelationIdentifier -> MP Unit
