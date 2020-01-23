@@ -30,12 +30,13 @@ module Perspectives.DependencyTracking.Array.Trans where
 -- | This monad transformer extends the base monad.
 import Prelude
 
-import Control.Monad.Error.Class (class MonadError, class MonadThrow, catchError, throwError)
+import Control.Monad.Error.Class (class MonadError, class MonadThrow, catchError, throwError, try)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
 import Control.MonadZero (class Alternative, class MonadZero)
 import Control.Plus (class Alt, class Plus)
 import Data.Array (catMaybes) as Arr
-import Data.Array (concat, singleton)
+import Data.Array (concat, null, singleton)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
@@ -105,18 +106,21 @@ instance monadTransArrayT :: MonadTrans ArrayT where
 liftArrayFunction :: forall m a b. Monad m => (Array a -> Array b) -> ArrayT m a -> ArrayT m b
 liftArrayFunction f as = ArrayT $ runArrayT as >>= (pure <<< f)
 
-instance altArrayT :: Monad m => Alt (ArrayT m) where
+instance altArrayT :: (Monad m, MonadError e m) => Alt (ArrayT m) where
   alt a1 a2 = ArrayT $ do
-    a1' <- runArrayT a1
-    a2' <- runArrayT a2
-    pure (append a1' a2')
+    a1' <- try (runArrayT a1)
+    case a1' of
+      Left _ -> runArrayT a2
+      Right candidates -> if null candidates
+          then runArrayT a2
+          else pure candidates
 
-instance plusArrayT :: Monad m => Plus (ArrayT m)  where
+instance plusArrayT :: (Monad m, MonadError e m) => Plus (ArrayT m)  where
   empty = ArrayT $ pure []
 
-instance alternativeArrayT :: Monad m => Alternative (ArrayT m)
+instance alternativeArrayT :: (Monad m, MonadError e m) => Alternative (ArrayT m)
 
-instance monadZeroArrayT :: Monad m => MonadZero (ArrayT m)
+instance monadZeroArrayT :: (Monad m, MonadError e m) => MonadZero (ArrayT m)
 
 instance monadThrowArrayT :: MonadThrow e m => MonadThrow e (ArrayT m) where
   throwError = lift <<< throwError
