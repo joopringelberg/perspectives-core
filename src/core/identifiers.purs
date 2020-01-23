@@ -139,9 +139,9 @@ namespaceRegex = unsafeRegex "^(model:\\w*)" noFlags
 deconstructModelName :: String -> Maybe Namespace
 deconstructModelName = getFirstMatch namespaceRegex
 
--- | Matches the last segment of the name (the word after the last "$")
+-- | Matches all segments of the name (the string after the first "$")
 localPartsRegEx :: Regex
-localPartsRegEx = unsafeRegex "^model:\\w*(.*)$" noFlags
+localPartsRegEx = unsafeRegex "^model:\\w*\\$(.*)$" noFlags
 
 -- | Returns "Context$localName" from "model:ModelName$Context$localName" or Nothing if it does
 -- | not start with model:ModelName

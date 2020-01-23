@@ -81,7 +81,7 @@ binding r = ArrayT do
   case rol_binding role of
     Nothing -> pure []
     (Just b) -> do
-      tell [assumption (unwrap r) "model:Perspectives$Role$binding"]
+      tell [assumption (unwrap r) "model:System$Role$binding"]
       pure [b]
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
