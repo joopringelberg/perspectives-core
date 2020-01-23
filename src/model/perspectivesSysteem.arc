@@ -13,7 +13,9 @@ domain: System
 
   case: PerspectivesSystem
     external:
+      aspect: sys:NamedContext$External
       property: ModelOphaalTeller (mandatory, functional, Number)
+    aspect: sys:NamedContext
     context: TheTrustedCluster (not mandatory, functional) filledBy: TrustedCluster
     user: User (mandatory, functional)
       property: Achternaam (mandatory, not functional, String)
@@ -21,7 +23,8 @@ domain: System
       view: VolledigeNaam (Voornaam, Achternaam)
     -- Het type van ModellenM bepalen we met de clause 'returns:'
     context: Modellen = callExternal cdb:Models() returns: Model$External
-    thing: IndexedContexts (not mandatory, not functional)
+    -- IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
+    context: IndexedContexts (not mandatory, not functional) filledBy: sys:NamedContext
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     context: UnBoundModel = filter (filter ModelsInUse with available binding >> context) with not exists filter (binding >> context >> IndexedContext >> binding) with exists binder IndexedContexts
@@ -37,4 +40,8 @@ domain: System
       property: Description (mandatory, functional, String)
       property: Url (mandatory, functional, String)
     user: Author (not mandatory, functional) filledBy: User
-    thing: IndexedContext (mandatory, functional)
+    context: IndexedContext (mandatory, functional) filledBy: sys:NamedContext
+
+  case: NamedContext
+    external:
+      property: Name (mandatory, functional, String)

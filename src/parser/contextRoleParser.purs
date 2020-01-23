@@ -292,7 +292,7 @@ enclosingContextDeclaration ::  IP EnclosingContextDeclaration
 enclosingContextDeclaration = (do
   cname <- (reserved "Context" *> perspectEntiteitIdentifier)
   _ <- setNamespace $ cname
-  _ <- setTypeNamespace $ "model:Perspectives$Context"
+  _ <- setTypeNamespace $ "model:System$Context"
   prfx <- (optionMaybe (reserved "als" *> prefix <* whiteSpace))
   cmt <- inLineComment
   case prfx of

@@ -58,14 +58,14 @@ type ContextRoleParserState =
 }
 
 defaultPrefixes :: F.Object String
-defaultPrefixes = F.fromFoldable [Tuple "psp:" "model:Perspectives", Tuple "usr:" "model:User"]
+defaultPrefixes = F.fromFoldable [Tuple "sys:" "model:System", Tuple "usr:" "model:User"]
 
 initialContextRoleParserMonadState :: ContextRoleParserState
 initialContextRoleParserMonadState =
   { rolOccurrences: F.empty
-  , namespace: "model:Perspectives"
-  , typeNamespace: "model:Perspectives"
-  , section: (QualifiedName "model:Perspectives" "rolInContext")
+  , namespace: "model:System"
+  , typeNamespace: "model:System"
+  , section: (QualifiedName "model:System" "rolInContext")
   , prefixes: defaultPrefixes
   , nameCounter: 0
   , contextInstances: F.empty

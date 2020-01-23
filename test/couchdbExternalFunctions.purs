@@ -64,6 +64,13 @@ theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
+  test "upload file in perspect_models" (runP do
+    cdburl <- getCouchdbBaseURL
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
+    -- now run the query that retrieves the modelDescription field of all models in repository.
+    -- The result must include "model:System$Model$External"
+      )
+
   test "setModelDescriptionsView" do
     assertEqual "The retrieved document should equal the sent document"
       (do
