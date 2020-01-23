@@ -39,8 +39,8 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Foreign (Foreign, ForeignError, MultipleErrors, unsafeToForeign)
 import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (ApiEffect, RequestType(..), convertResponse) as Api
-import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), ResponseRecord, RolSerialization(..), mkApiEffect, showRequestRecord)
+import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
+import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (addRol, removeBinding, saveEntiteit, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
@@ -64,7 +64,6 @@ import Perspectives.RunMonadPerspectivesTransaction (getMe, runMonadPerspectives
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance, saveContextInstance, saveAndConnectRoleInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
-import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
@@ -131,7 +130,7 @@ setupTcpApi = runProcess server
             , rolDescription: Nothing }
 
         setter :: Foreign
-        setter = unsafeToForeign (launchAff_ <<< (writeData connection :: ResponseRecord -> Aff Boolean))
+        setter = unsafeToForeign (launchAff_ <<< (writeData connection :: Response -> Aff Boolean))
 
         -- marshallRequest (Left e) = WrongRequest ("Perspectives does not recognise this request: '" <> show e <> "'") (launchAff_ <<< writeData connection) "universalErrorHandler"
 
@@ -167,15 +166,21 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetRolContext -> registerSupportedEffect corrId setter context (RoleInstance subject)
     Api.GetContextType -> registerSupportedEffect corrId setter contextType (ContextInstance subject)
     Api.GetRolType -> registerSupportedEffect corrId setter roleType (RoleInstance subject)
+    -- {request: "GetUnqualifiedRolType", subject: contextType, predicate: localRolName}
     Api.GetUnqualifiedRolType -> do
-      mctype <- (ContextInstance subject) ##> contextType
-      case mctype of
-        Nothing -> sendResponse (Error corrId ("No contexttype found for '" <> subject <> "'")) setter
-        (Just (ctype :: ContextType)) -> do
-          rtypes <- runArrayT $ lookForUnqualifiedRoleType predicate ctype
-          case head rtypes of
-            Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
-            (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
+      rtypes <- runArrayT $ lookForUnqualifiedRoleType predicate (ContextType subject)
+      case head rtypes of
+        Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
+        (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
+    -- Api.GetUnqualifiedRolType -> do
+    --   mctype <- (ContextInstance subject) ##> contextType
+    --   case mctype of
+    --     Nothing -> sendResponse (Error corrId ("No contexttype found for '" <> subject <> "'")) setter
+    --     (Just (ctype :: ContextType)) -> do
+    --       rtypes <- runArrayT $ lookForUnqualifiedRoleType predicate ctype
+    --       case head rtypes of
+    --         Nothing -> sendResponse (Error corrId ("No roletype found for '" <> predicate <> "' on '" <> subject <> "'")) setter
+    --         (Just rtype) -> sendResponse (Result corrId [roletype2string rtype]) setter
     Api.GetProperty -> do
       (f :: PropertyValueGetter) <- (getPropertyFunction predicate)
       registerSupportedEffect corrId setter f (RoleInstance subject)
@@ -198,7 +203,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             (props :: Array PropertyType) <- ((getPerspectType v) :: MP View) >>= pure <<< propertyReferences
             sendResponse (Result corrId (propertytype2string <$> props)) setter
     Api.GetMeForContext -> do
-      me <- (RoleInstance subject) ##= context >=> getMe
+      me <- (RoleInstance subject) ##= context >=> getMe >=> roleType
       if null me
         then sendResponse (Error corrId ("No role for user in context instance '" <> subject <> "'!")) setter
         else sendResponse (Result corrId (unwrap <$> me)) setter
@@ -316,4 +321,4 @@ type QueryUnsubscriber e = Effect Unit
 
 -- | Apply an ApiEffect to a Response, in effect sending it through the API to the caller.
 sendResponse :: Response -> Api.ApiEffect -> MonadPerspectives Unit
-sendResponse r ae = liftEffect $ (unsafeCoerce ae) (Api.convertResponse r)
+sendResponse r ae = liftEffect $ ae r
