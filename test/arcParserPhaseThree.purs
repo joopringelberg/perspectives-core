@@ -332,7 +332,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
             -- logShow dr'
             x' <- runP $ phaseThree dr'
             case x' of
-              (Left (UnknownProperty _ _)) -> assert "" true
+              (Left (UnknownProperty _ _ _)) -> assert "" true
               otherwise -> assert "The view refers to a non-existing property 'Datu' and that should be detected." false
 
   test "Testing qualifyPropertyReferences: reference to property on binding." do

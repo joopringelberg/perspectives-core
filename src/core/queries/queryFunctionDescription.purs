@@ -78,12 +78,6 @@ queryFunction (UQD _ f _ _ _ _) = f
 queryFunction (BQD _ f _ _ _ _ _) = f
 queryFunction (MQD _ f _ _ _ _) = f
 
--- | This function is partial, because we can only establish the functionality of
--- | an RDOM.
--- NOTE: We cannot have that function here, because it needs Perspectives.Representation.Class.Role and that introduces a cycle in modules.
--- isFunctional :: Partial => QueryFunctionDescription -> MP Boolean
--- isFunctional (RDOM adt) = functional' adt
-
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 
 instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where

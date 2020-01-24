@@ -84,8 +84,7 @@ instance reducibleToBool :: Reducible EnumeratedRoleType Boolean where
   reduce f UNIVERSAL = pure true
 
 -- | Reduce an `ADT a` with `f :: a -> MP (Array b)`
--- | Includes the binding of a role: this means that the computation recurses on the binding.
--- | This is expected behaviour for functions like `propertiesOfADT`, `viewsOfADT` and `roleAspectsOfADT`.
+-- | `reduce f` then has type `ADT a -> MP (Array b)`
 instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f (ST a) = f a
   reduce f (SUM adts) = do
@@ -99,7 +98,7 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f UNIVERSAL = pure []
 
 -- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.
--- | `reduce f` then has type `ADT a` -> MP (ADT b)`.
+-- | `reduce f` then has type `ADT a -> MP (ADT b)`.
 instance reducibletoADT :: Eq b => Reducible a (ADT b) where
   reduce f (ST et) = f et
   reduce f (SUM adts) = do

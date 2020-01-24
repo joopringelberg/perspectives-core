@@ -23,6 +23,7 @@ import Test.RunMonadPerspectivesTransaction as RMPT
 import Test.Combinators as COMB
 import Test.Extern.Couchdb as CDB
 import Test.Model.System as TMS
+import Test.Types.ObjectGetters as TTO
 import Test.Unit.Main (runTest)
 
 
@@ -46,3 +47,4 @@ main = runTest do
   COMB.theSuite
   CDB.theSuite
   TMS.theSuite
+  TTO.theSuite

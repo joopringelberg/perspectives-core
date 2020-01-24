@@ -223,7 +223,7 @@ qualifyPropertyReferences = do
             else do
               (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
               case head candidates of
-                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType)
+                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) erole 
                 (Just t) | length candidates == 1 -> pure t
                 otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
 
