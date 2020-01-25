@@ -80,6 +80,9 @@ newtype ArcPosition = ArcPosition
   , column :: Int
   }
 
+upperLeft :: ArcPosition
+upperLeft = ArcPosition{line: 0, column: 0}
+
 arcPosition2Position :: ArcPosition -> Position
 arcPosition2Position = unsafeCoerce
 

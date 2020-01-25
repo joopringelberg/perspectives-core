@@ -32,11 +32,11 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (elemIndex, filter, head, intersect, uncons, union)
+import Data.Array (delete, elemIndex, filter, head, intersect, uncons, union)
 import Data.Foldable (foldMap, foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
@@ -44,7 +44,7 @@ import Data.Traversable (traverse)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (class Eq, class Monad, class Show, bind, flip, map, notEq, pure, show, ($), (<>), (==))
+import Prelude (class Eq, class Monad, class Show, bind, notEq, pure, show, ($), (<>))
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
 
@@ -65,6 +65,16 @@ instance encodeADT :: (Encode a) => Encode (ADT a) where
 
 instance decodeADT :: (Decode a) => Decode (ADT a) where
   decode q = genericDecode defaultOptions q
+
+sum :: forall a. Eq a => Array (ADT a) -> ADT a
+sum terms = if isJust (elemIndex EMPTY terms)
+  then EMPTY
+  else SUM $ delete UNIVERSAL terms
+
+product :: forall a. Eq a => Array (ADT a) -> ADT a
+product terms = if isJust (elemIndex UNIVERSAL terms)
+  then UNIVERSAL
+  else PROD $ delete EMPTY terms
 
 -- | The `Reducible` class implements a pattern to recursively process an ADT.
 class Reducible a b where
@@ -120,46 +130,3 @@ instance reducibletoADT :: Eq b => Reducible a (ADT b) where
         otherwise -> pure $ PROD r
   reduce f EMPTY = pure EMPTY
   reduce f UNIVERSAL = pure UNIVERSAL
-
--- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
--- | If you use `less specific` instead of `more specific`, flip the arguments.
--- | If you use `more general` instead of `more specific`, flip them, too.
--- | So `less specific` instead of `more general` means flipping twice and is a no-op.
--- | Therefore `less specific` equals `more general`.
-greaterThanOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
-greaterThanOrEqualTo = flip lessThanOrEqualTo
-
--- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
--- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
--- | This function is semantically correct only on a fully expanded type: use `Perspectives.Representation.Class.Role.expandedADT`.
-lessThanOrEqualTo :: forall a. Eq a => ADT a -> ADT a -> Boolean
-lessThanOrEqualTo (ST x) (ST y) = x == y
--- p must be less than or equal to every member of q.
-lessThanOrEqualTo p@(ST _) (SUM adts) = let
-  (bools :: Array Boolean) = map (lessThanOrEqualTo p) adts
-  in unwrap $ foldMap Conj bools
--- p must be less than or equal to one of the members of q.
-lessThanOrEqualTo p@(ST _) (PROD adts) = let
-  (bools :: Array Boolean) = map (lessThanOrEqualTo p) adts
-  in unwrap $ foldMap Disj bools
--- EMPTY is less specific than any other type.
-lessThanOrEqualTo (ST _) EMPTY = false
--- UNIVERSAL is more specific than any other type.
-lessThanOrEqualTo (ST _) UNIVERSAL = true
--- A sum is less than or equal to a type if that type is greater than or equal to any of its members.
-lessThanOrEqualTo (SUM adts) q = let
-  (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
-  in unwrap $ foldMap Conj bools
--- A product is less than or equal to a type if that type is greater than or equal to one of its members.
-lessThanOrEqualTo (PROD adts) q = let
-  (bools :: Array Boolean) = map (greaterThanOrEqualTo q) adts
-  in unwrap $ foldMap Disj bools
-
--- p = EMPTY
--- q = _
--- lessThanOrEqualTo _ EMPTY = false
--- (q <= p) = false
--- not (q <= p) = true
--- not (q <= p) ==> q > p ==> p <= q
-lessThanOrEqualTo EMPTY _ = true
-lessThanOrEqualTo UNIVERSAL _ = false

@@ -54,6 +54,10 @@ range (UQD _ _ _ r _ _) = r
 range (BQD _ _ _ _ r _ _) = r
 range (MQD _ _ _ r _ _) = r
 
+roleRange :: Partial => QueryFunctionDescription -> ADT EnumeratedRoleType
+roleRange r = case range r of
+  RDOM et -> et
+
 domain :: QueryFunctionDescription -> Range
 domain (SQD d _ _ _ _) = d
 domain (UQD d _ _ _ _ _) = d

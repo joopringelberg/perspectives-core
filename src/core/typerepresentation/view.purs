@@ -30,7 +30,7 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, ViewType)
-import Prelude (class Eq, class Show, (<<<), (==))
+import Prelude (class Eq, class Ord, class Show, compare, (<<<), (==))
 
 -----------------------------------------------------------
 -- VIEW TYPE CLASS
@@ -79,3 +79,6 @@ instance revisionView :: Revision View where
 
 instance identifiableView :: Identifiable View ViewType where
   identifier (View{_id}) = _id
+
+instance ordView :: Ord View where
+  compare (View{_id:id1}) (View{_id:id2}) = compare id1 id2

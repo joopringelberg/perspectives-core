@@ -41,6 +41,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Ord (genericCompare)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Newtype (class Newtype, unwrap)
 import Foreign.Class (class Decode, class Encode)
@@ -65,6 +66,8 @@ instance showEnumeratedRolType :: Show EnumeratedRoleType where
   show i = "EnumeratedRoleType " <> (unwrap i)
 instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
   eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
+instance ordEnumeratedRoleType :: Ord EnumeratedRoleType where
+  compare (EnumeratedRoleType p1) (EnumeratedRoleType p2) = compare p1 p2
 
 newtype CalculatedRoleType = CalculatedRoleType String
 derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
@@ -75,6 +78,8 @@ instance showComputedRolType :: Show CalculatedRoleType where
   show i = "CalculatedRoleType " <> (unwrap i)
 instance eqComputedRolType :: Eq CalculatedRoleType where
   eq (CalculatedRoleType id1) (CalculatedRoleType id2) = id1 == id2
+instance ordCalculatedRoleType :: Ord CalculatedRoleType where
+  compare (CalculatedRoleType p1) (CalculatedRoleType p2) = compare p1 p2
 
 data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
@@ -90,6 +95,8 @@ instance eqRoleType :: Eq RoleType where
   eq (CR _) (ENR _) = false
   eq (CR r1) (CR r2) = r1 == r2
   eq (ENR r1) (ENR r2) = r1 == r2
+instance ordRoleType :: Ord RoleType where
+  compare = genericCompare
 
 -- | Get the string representation of a RoleType.
 roletype2string :: RoleType -> String
@@ -117,6 +124,8 @@ instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
   show i = "EnumeratedPropertyType " <> (unwrap i)
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
   eq (EnumeratedPropertyType id1) (EnumeratedPropertyType id2) = id1 == id2
+instance ordEnumeratedPropertyType :: Ord EnumeratedPropertyType where
+  compare (EnumeratedPropertyType p1) (EnumeratedPropertyType p2) = compare p1 p2
 
 newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
@@ -127,8 +136,13 @@ instance showCalculatedPropertyType :: Show CalculatedPropertyType where
   show i = "CalculatedPropertyType " <> (unwrap i)
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
   eq (CalculatedPropertyType id1) (CalculatedPropertyType id2) = id1 == id2
+instance ordCalculatedPropertyType :: Ord CalculatedPropertyType where
+  compare (CalculatedPropertyType p1) (CalculatedPropertyType p2) = compare p1 p2
 
 data PropertyType = ENP EnumeratedPropertyType | CP CalculatedPropertyType
+
+instance ordPropertyType :: Ord PropertyType where
+  compare = genericCompare
 
 propertytype2string :: PropertyType -> String
 propertytype2string (ENP s) = unwrap s
@@ -157,6 +171,8 @@ instance showViewType :: Show ViewType where
   show i = "ViewType " <> (unwrap i)
 instance eqViewType :: Eq ViewType where
   eq (ViewType id1) (ViewType id2) = id1 == id2
+instance ordViewType :: Ord ViewType where
+  compare (ViewType p1) (ViewType p2) = compare p1 p2
 
 newtype ActionType = ActionType String
 derive instance newtypeActionType :: Newtype ActionType _

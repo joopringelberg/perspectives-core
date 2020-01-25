@@ -29,9 +29,8 @@ module Perspectives.Query.DescriptionCompiler where
 
 import Control.Monad.Except (lift, throwError)
 import Control.Monad.State (gets)
-import Data.Array (elemIndex, foldM, head, length, reverse, uncons)
+import Data.Array (elemIndex, foldM, head, length, null, reverse, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
-import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
@@ -40,18 +39,19 @@ import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), Operator(..), Pu
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range)
-import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range, roleRange)
+import Perspectives.Representation.ADT (ADT(..), product)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, expandedADT_, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
+import Perspectives.Representation.Class.Role (bindingOfADT, contextOfADT, lessThanOrEqualTo, roleADT, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
-import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
+import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
 import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
-import Prelude (bind, eq, map, pure, ($), (==), (&&), discard, (<$>), (<*>))
+import Prelude (bind, eq, map, pure, ($), (==), (&&), discard, (<$>), (<*>), (>>=))
 
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
@@ -60,6 +60,20 @@ compileStep currentDomain (Binary st) = compileBinaryStep currentDomain st
 compileStep currentDomain (PureLet st) = compileLetStep currentDomain st
 compileStep currentDomain (Let st) = throwError $ NotAPureLet st
 
+-- Describe a conjunction of rolegetters.
+makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
+makeConjunction currentDomain left rt2 = do
+  right <- makeRoleGetter currentDomain rt2
+  (rightADT :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt2
+  pure $ BQD currentDomain (QF.BinaryCombinator ConjunctionF) left right (RDOM (product [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
+
+makeRoleGetter :: Domain -> RoleType -> PhaseThree QueryFunctionDescription
+makeRoleGetter currentDomain rt = do
+  (adt :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt
+  isF <- lift2 $ roleTypeIsFunctional rt
+  isM <- lift2 $ roleTypeIsMandatory rt
+  pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
+
 compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
   case currentDomain of
@@ -67,13 +81,14 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
       (rts :: Array RoleType) <- if isQualifiedWithDomein ident
         then lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
         else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
-      case head rts of
+      case uncons rts of
         Nothing -> throwError $ ContextHasNoRole c ident
-        (Just (rt :: RoleType)) -> do
-          (typeExcludingBinding :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt
-          isF <- lift2 $ roleTypeIsFunctional rt
-          isM <- lift2 $ roleTypeIsMandatory rt
-          pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ typeExcludingBinding) (bool2threeValued isF) (bool2threeValued isM)
+        Just {head, tail} -> if null tail
+          then makeRoleGetter currentDomain head
+          else do
+            head' <- makeRoleGetter currentDomain head
+            foldM (makeConjunction currentDomain) head' tail
+
     (RDOM r) -> do
       (pts :: Array PropertyType) <- if isQualifiedWithDomein ident
         then  lift2 $ runArrayT $ lookForPropertyType ident r
@@ -116,8 +131,9 @@ compileSimpleStep currentDomain s@(Binder pos binderName) = do
 
       -- Now we have a qualified Rolename for the binder, check if it indeed binds the role that is the currentDomain.
       -- That is, its binding (an ADT) must be more general than the currentDomain.
-      (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ expandedADT_ (ENR qBinderType)
-      if r `lessThanOrEqualTo` bindingOfBinder
+      (bindingOfBinder :: (ADT EnumeratedRoleType)) <- lift2 $ getEnumeratedRole qBinderType >>= roleADT
+      lessEq <- lift2 $ lessThanOrEqualTo r bindingOfBinder
+      if lessEq
         then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter GetRoleBindersF (unwrap qBinderType)) (RDOM $ ST qBinderType) False False
         else throwError $ RoleDoesNotBind pos (ENR qBinderType) r
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)

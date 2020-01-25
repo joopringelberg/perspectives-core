@@ -21,22 +21,30 @@
 
 module Perspectives.Types.ObjectGetters where
 
+import Control.Monad.Error.Class (throwError)
+import Control.Monad.Trans.Class (lift)
 import Control.Plus (map, (<|>))
-import Data.Array (filter, singleton)
+import Data.Array (filter, find, singleton)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Effect.Exception (error)
 import Foreign.Object (keys)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>), MP)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
-import Perspectives.Instances.Combinators (closure_, conjunction, disjunction, filter')
+import Perspectives.Instances.Combinators (closure_, filter')
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
-import Perspectives.Representation.Class.Role (class RoleClass, getRole', properties, propertiesOfADT, views, viewsOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, properties, propertiesOfADT, roleSet, views, viewsOfADT)
 import Perspectives.Representation.Context (Context, aspects, roleInContext, externalRole, contextRole, userRole) as Context
+import Perspectives.Representation.Context (contextADT)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
-import Prelude (pure, (==), (>>>), (<<<), (>=>), bind, ($), (<>))
+import Perspectives.Representation.View (propertyReferences)
+import Prelude (bind, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 externalRoleOfADT_ :: ADT ContextType ~~~> EnumeratedRoleType
 externalRoleOfADT_ = ArrayT <<< reduce eRole where
@@ -50,39 +58,26 @@ externalRoleOfADT = reduce eRole where
 
 -- | If a role with the given qualified name is available, return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
-lookForRoleType s = disjunction
-  (lookForRoleInContext (roletype2string >>> ((==) s)))
-  (lookForContextRole (roletype2string >>> ((==) s)))
+lookForRoleType s c = (lift $ getContext c) >>= pure <<< contextADT >>= lookForRoleTypeOfADT s
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
-lookForUnqualifiedRoleType s = conjunction
-  (lookForRoleInContext (roletype2string >>> areLastSegmentsOf s))
-  (conjunction (lookForContextRole (roletype2string >>> areLastSegmentsOf s))
-    (lookForUserRole (roletype2string >>> areLastSegmentsOf s)))
-
--- TODO. sluit Aspecten in via ADT. Kunnen we Context een ADT geven?
-lookForRoleInContext :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
-lookForRoleInContext criterium = filter' (contextAspectsClosure >=> roleInContext) criterium
-
-lookForContextRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
-lookForContextRole criterium = filter' (contextAspectsClosure >=> contextRole) criterium
-
-lookForUserRole :: (RoleType -> Boolean) -> ContextType ~~~> RoleType
-lookForUserRole criterium = filter' (contextAspectsClosure >=> userRole) criterium
+lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< contextADT >>= lookForUnqualifiedRoleTypeOfADT s
 
 lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
-lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s))
+lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s)) s
 
 -- | We simply require the Pattern to match the end of the string.
 lookForUnqualifiedRoleTypeOfADT :: String -> ADT ContextType ~~~> RoleType
-lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLastSegmentsOf s)
+lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLastSegmentsOf s) s
 
-lookForRoleOfADT :: (RoleType -> Boolean) -> ADT ContextType ~~~> RoleType
-lookForRoleOfADT criterium = ArrayT <<< reduce f
-  where
-    f :: ContextType -> MonadPerspectives (Array RoleType)
-    f = unwrap <<< conjunction (lookForRoleInContext criterium) (conjunction (lookForUserRole criterium) (lookForContextRole criterium))
+lookForRoleOfADT :: (RoleType -> Boolean) -> String -> ADT ContextType ~~~> RoleType
+lookForRoleOfADT criterium rname adt = ArrayT $ roleSet adt >>= case _ of
+  Empty -> pure []
+  PSet rs -> case find criterium rs of
+    Nothing -> pure []
+    Just r -> pure [r]
+  Universal -> throwError (error $ show (ContextHasNoRole adt rname))
 
 roleInContext :: ContextType ~~~> RoleType
 roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.roleInContext)
@@ -127,7 +122,10 @@ propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRo
 viewsOfRole :: String ~~~> ViewType
 viewsOfRole s = f (EnumeratedRoleType s) <|> f (CalculatedRoleType s) where
   f :: forall i r. RoleClass r i => i ~~~> ViewType
-  f = ArrayT <<< (getRole' >=> views)
+  f = ArrayT <<< (getPerspectType >=> views)
+
+propertiesOfView :: ViewType ~~~> PropertyType
+propertiesOfView = ArrayT <<< (getPerspectType >=> pure <<< propertyReferences)
 
 lookForUnqualifiedViewType_ :: String -> (EnumeratedRoleType ~~~> ViewType)
 lookForUnqualifiedViewType_ s i = lookForView (unwrap >>> areLastSegmentsOf s) (ST i)

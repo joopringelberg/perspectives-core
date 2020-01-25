@@ -27,13 +27,13 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Kishimen (genericSumToVariant)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType)
-import Prelude (class Eq, class Show, map, (<<<), (<>), (==))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), RoleType(..))
+import Prelude (class Eq, class Show, map, (<<<), (<>), (==), (<$>))
 
 -----------------------------------------------------------
 -- CONTEXT TYPE CLASS
@@ -49,6 +49,8 @@ class ContextClass c where
   aspects :: c -> Array ContextType
   nestedContexts :: c -> Array ContextType
   position :: c -> ArcPosition
+  roles :: c -> Array RoleType
+  contextADT :: c -> ADT ContextType
 
 instance contextContextClass :: ContextClass Context where
   contextAspects = _.contextAspects <<< unwrap
@@ -61,6 +63,8 @@ instance contextContextClass :: ContextClass Context where
   aspects = _.contextAspects <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
   position = _.pos <<< unwrap
+  roles r = roleInContext r <> contextRole r <> (ENR <$> userRole r)
+  contextADT = ST <<< _._id <<< unwrap
 
 -----------------------------------------------------------
 -- CONTEXT
