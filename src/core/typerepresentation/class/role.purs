@@ -286,6 +286,10 @@ getCalculation :: Role -> MonadPerspectives QueryFunctionDescription
 getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
 
+adtOfRole :: Role -> MP (ADT EnumeratedRoleType)
+adtOfRole (E e) = roleADT e
+adtOfRole (C c) = roleADT c
+
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE
 -----------------------------------------------------------

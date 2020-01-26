@@ -40,8 +40,8 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.External.CoreModules (isExternalCoreModule)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace_, expandDefaultNamespaces, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
@@ -229,12 +229,15 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
     -- FILLEDBYATTRIBUTE
     handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd) = do
-      -- If the RoleKind is ContextRole, we should construct the name of the External
-      -- Role of the binding (which then is a Context)
-      expandedBnd <- if kindOfRole == ContextRole
-        then expandNamespace (bnd <> "$External")
-        else expandNamespace bnd
-      pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding expandedBnd})
+      if bnd == "None"
+        then pure (EnumeratedRole $ roleUnderConstruction {binding = UNIVERSAL})
+        else do
+          -- If the RoleKind is ContextRole, we should construct the name of the External
+          -- Role of the binding (which then is a Context)
+          expandedBnd <- if kindOfRole == ContextRole
+            then expandNamespace (bnd <> "$External")
+            else expandNamespace bnd
+          pure (EnumeratedRole $ roleUnderConstruction {binding = augmentADT binding expandedBnd})
 
     -- FORUSER
     handleParts roleName (EnumeratedRole roleUnderConstruction) (ForUser _) = pure (EnumeratedRole $ roleUnderConstruction)

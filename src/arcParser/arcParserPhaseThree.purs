@@ -30,7 +30,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, foldM, head, length, null, reverse, uncons)
+import Data.Array (filter, foldM, head, length, null, reverse, uncons, filterA)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -57,14 +57,15 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, mod
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range)
-import Perspectives.Representation.ADT (ADT(..), lessThanOrEqualTo, reduce)
+import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (bindingOfRole, expansionOfADT, getCalculation, getRole)
-import Perspectives.Representation.Class.Role (contextOfRepresentation, expandedADT_, roleTypeIsFunctional) as ROLE
+import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, lessThanOrEqualTo)
+import Perspectives.Representation.Class.Role (contextOfRepresentation, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
@@ -73,7 +74,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, lookForUnqualifiedViewType)
-import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (&&), (>=>))
+import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>>=), (>=>))
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
@@ -223,7 +224,7 @@ qualifyPropertyReferences = do
             else do
               (candidates :: Array PropertyType) <- lift2 (erole ###= lookForUnqualifiedPropertyType_ (propertytype2string propType))
               case head candidates of
-                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) erole 
+                Nothing -> throwError $ UnknownProperty pos (propertytype2string propType) erole
                 (Just t) | length candidates == 1 -> pure t
                 otherwise -> throwError $ NotUniquelyIdentifying pos (propertytype2string propType) (map propertytype2string candidates)
 
@@ -264,7 +265,7 @@ qualifyViewReferences = do
                 Nothing -> pure Nothing
                 (Just rqp) -> do
                   viewCandidates <- lift2 do
-                    adt <- ROLE.expandedADT_ role
+                    adt <- getRole role >>= adtOfRole
                     (adt ###= lookForUnqualifiedViewType (unwrap rqp))
                   case head viewCandidates of
                     Nothing -> throwError $ UnknownView pos (unwrap rqp)
@@ -442,9 +443,9 @@ compileRules = do
                   else pure unit
                 -- the possible bindings of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (bindings).
                 qualifies <- do
-                  possibleBinding <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier) >>= expansionOfADT)
+                  possibleBinding <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
                   bindings' <- pure (unsafePartial $ domain2roleType (range bindings))
-                  pure (possibleBinding `lessThanOrEqualTo` bindings')
+                  lift2 $ lessThanOrEqualTo possibleBinding bindings'
                 if qualifies
                   -- Create a function description that describes the actual role creating and binding.
                   then pure $ BQD currentDomain (QF.Bind qualifiedRoleIdentifier) bindings cte currentDomain True True
@@ -551,17 +552,13 @@ compileRules = do
                   then pure $ Just $ EnumeratedRoleType ident
                   else do
                     (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
-                    (candidates :: Array String) <- pure (map (unwrap <<< _._id <<< unwrap) (filter (\(EnumeratedRole{binding}) -> binding `lessThanOrEqualTo` bindings) nameMatches))
+                    (candidates :: Array EnumeratedRole) <-(filterA (\(EnumeratedRole{binding}) -> lift2 $ lessThanOrEqualTo binding bindings) nameMatches)
                     case head candidates of
                       Nothing -> if null nameMatches
                         then throwError $ UnknownRole start ident
                         else throwError $ LocalRoleDoesNotBind start end ident bindings
-                      (Just qname) | length candidates == 1 -> pure $ Just $ EnumeratedRoleType qname
-                      otherwise -> throwError $ NotUniquelyIdentifying start ident candidates
-                  where
-                    f :: EnumeratedRole -> Boolean
-                    f (EnumeratedRole {_id:roleId, binding}) = (unwrap roleId `endsWithSegments` ident) && (binding `lessThanOrEqualTo` bindings)
-
+                      (Just (EnumeratedRole {_id:candidate})) | length candidates == 1 -> pure $ Just candidate
+                      otherwise -> throwError $ NotUniquelyIdentifying start ident (identifier_ <$> candidates)
 
 ensureContext :: Domain -> Step -> PhaseThree QueryFunctionDescription
 ensureContext currentDomain stp = do

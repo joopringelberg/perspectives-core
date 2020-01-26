@@ -24,7 +24,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "ContextAndRole" do
+theSuite = suiteSkip"ContextAndRole" do
   test "Access a Role" do
     ra <- runP do
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextAndRole.crl" testDirectory

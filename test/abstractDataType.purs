@@ -48,7 +48,7 @@ import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Representation.ADT" do
+theSuite = suiteSkip"Perspectives.Representation.ADT" do
   test "bindingOfADT" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: MyTestDomain\n  bot: for MySelf\n    perspective on: AnotherRole\n      Consult\n        indirectObject: AnotherRole \n  thing: Role (mandatory, functional) filledBy: YetAnotherRole\n  thing: AnotherRole = Role >> binding\n  thing: YetAnotherRole (mandatory, functional)\n" ARC.domain
     case r of

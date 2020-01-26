@@ -21,7 +21,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Combinators" do
+theSuite = suiteSkip"Combinators" do
 
   test "available" (runP do
       modelErrors <- loadCompileAndCacheArcFile "combinators" testDirectory

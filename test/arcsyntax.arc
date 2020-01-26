@@ -39,9 +39,9 @@ domain: Feest
       -- Should generate an Action with a Condition and an Assignment.
       if Wens >> Bedrag > 10 then
         let*
-          a <- createRole Gast
+            a <- createRole Gast
         in
-          a$SomeProp = false
+          Bedrag = 10
   context: Partijtje (not mandatory, functional) filledBy: VoetbalWedstrijd
     property: VoorBigBrother = Datum > '1995-12-17'
     -- comment

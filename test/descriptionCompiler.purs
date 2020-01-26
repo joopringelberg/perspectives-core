@@ -149,11 +149,11 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
               )
 
   makeTest "compileSimpleStep: Binding, missing binding."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n    property: Prop1 = binding >> Prop2\n"
+    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: None\n    property: Prop1 = binding >> Prop2\n"
     (\e -> case e of
       (RoleHasNoBinding _ _) -> pure unit
       e' -> assert (show e') false)
-    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no binding for Role1" false)
+    (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there can be no binding for Role1" false)
 
   makeTest "compileSimpleStep: Binder."
     "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: Role2\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
@@ -170,7 +170,7 @@ theSuite = suiteSkip "Perspectives.Query.DescriptionCompiler" do
               )
 
   makeTest "compileSimpleStep: Binder, missing binding."
-    "domain: Test\n  thing: Role1 (mandatory, functional)\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
+    "domain: Test\n  thing: Role1 (mandatory, functional) filledBy: None\n  thing: Role2 (mandatory, functional)\n  thing: Role3 = Role2 >> binder Role1\n"
     (\e -> case e of
       (RoleDoesNotBind _ _ _) -> pure unit
       e' -> assert (show e') false)

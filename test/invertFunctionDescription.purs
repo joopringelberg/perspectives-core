@@ -34,7 +34,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Test.Query.Inversion" do
+theSuite = suiteSkip"Test.Query.Inversion" do
 
   test "Constant" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = true" ARC.domain

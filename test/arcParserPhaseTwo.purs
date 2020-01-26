@@ -130,7 +130,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseTwo" do
                 -- logShow calculation
                 assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"cbd:Models\")'"
                   case calculation of
-                    (Q (MQD _ (ExternalCoreRoleGetter "cdb:Models") _ _ _ _)) -> true
+                    (Q (MQD _ (ExternalCoreRoleGetter "couchdb_Models") _ _ _ _)) -> true
                     otherwise -> false
 
   test "A Context with an external property and role." do

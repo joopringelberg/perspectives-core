@@ -12,7 +12,7 @@ import Perspectives.CoreTypes ((###=))
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (typeIncludingBinding)
+import Perspectives.Representation.Class.Role (roleADT)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), PropertyType(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile)
 import Perspectives.Types.ObjectGetters (propertiesOfRole)
@@ -27,7 +27,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Types.ObjectGetters" do
+theSuite = suiteSkip"Perspectives.Types.ObjectGetters" do
   test "propertiesOfRole" (runP do
     -- messages <- loadAndCompileArcFile "perspectivesSysteem" modelDirectory
     -- case messages of
@@ -37,7 +37,7 @@ theSuite = suite "Perspectives.Types.ObjectGetters" do
     --   _ -> do
     do
         -- r <- getEnumeratedRole (EnumeratedRoleType "model:System$PerspectivesSystem$External")
-        -- theType <- typeIncludingBinding r
+        -- theType <- roleADT r
         -- liftAff $ logShow theType
 
         -- props <- "model:System$PerspectivesSystem$External" ###= propertiesOfRole

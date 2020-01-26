@@ -25,7 +25,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Actions" do
+theSuite = suiteSkip"Perspectives.Actions" do
 
   test "contextDelta_context" (runP do
       _ <- loadCompileAndCacheArcFile "perspectivesSysteem.arc" modelDirectory

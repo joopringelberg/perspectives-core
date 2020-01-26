@@ -31,7 +31,7 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "ContextRoleParser" do
+theSuite = suiteSkip"ContextRoleParser" do
   test "inverse binding" do
     ra <- runP do
       _ <- setupUser

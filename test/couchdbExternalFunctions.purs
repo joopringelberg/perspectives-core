@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
+theSuite = suiteSkip"Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
