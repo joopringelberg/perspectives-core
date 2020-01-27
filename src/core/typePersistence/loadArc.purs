@@ -33,7 +33,7 @@ import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Node.Process (cwd)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.DomeinCache (storeDomeinFileInCache, storeDomeinFileInCouchdb)
+import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.LoadCRL (loadCrlFile)
@@ -41,11 +41,11 @@ import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Prelude (bind, pure, show, ($), (*>), (<>), (==))
+import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -90,7 +90,9 @@ loadArcAndCrl fileName directoryName = do
   case r of
     Left m -> pure $ Left m
     Right df@(DomeinFile drf@{_id}) -> do
+      void $ storeDomeinFileInCache _id df
       x <- addModelInstances drf
+      removeDomeinFileFromCache _id
       case x of
         (Left e) -> pure $ Left e
         (Right withInstances) -> pure $ Right (DomeinFile withInstances)
