@@ -238,9 +238,9 @@ bindingOfADT a@UNIVERSAL = throwError (error $ show (RoleCannotHaveBinding upper
 -- | Properties of a role's binding count as properties of the role itself.
 propertiesOfADT :: ADT EnumeratedRoleType -> MP (Array PropertyType)
 propertiesOfADT adt = propertySet adt >>= case _ of
-  PSet ps -> pure ps
-  Empty -> pure []
-  Universal -> throwError (error $ show UniversalRoleHasNoParts)
+    PSet ps -> pure ps
+    Empty -> pure []
+    Universal -> throwError (error $ show UniversalRoleHasNoParts)
 
 -----------------------------------------------------------
 -- VIEWSOFADT
@@ -257,7 +257,7 @@ viewsOfADT adt@(SUM terms) = do
   where
     propertiesOfView :: ViewType -> MP (Set PropertyType)
     propertiesOfView = (getPerspectType >=> pure <<< fromFoldable <<< propertyReferences)
-viewsOfADT (PROD terms) = traverse viewsOfADT terms >>= pure <<< intersectionOfArrays
+viewsOfADT (PROD terms) = traverse viewsOfADT terms >>= pure <<< unionOfArrays
 viewsOfADT EMPTY = pure []
 viewsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
 
