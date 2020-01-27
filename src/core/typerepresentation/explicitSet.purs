@@ -58,3 +58,8 @@ instance eqExplicitSet :: Eq a => Eq (ExplicitSet a) where
   eq Universal Universal = true
   eq Empty Empty = true
   eq _ _ = false
+
+instance showExplicitSet :: Show a => Show (ExplicitSet a) where
+  show Universal = "Universal"
+  show Empty = "Empty"
+  show (PSet s) = "PSet " <> show s
