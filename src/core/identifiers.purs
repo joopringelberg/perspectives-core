@@ -34,7 +34,7 @@ import Effect.Exception (Error, error)
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
-import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||))
+import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||), class Eq, (&&), eq)
 
 -----------------------------------------------------------
 -- NAMESPACE, MODELNAME
@@ -73,6 +73,9 @@ data QualifiedName = QualifiedName Namespace LocalName
 
 instance showQualifiedName :: Show QualifiedName where
   show (QualifiedName mn ln) = mn <> "$" <> ln
+
+instance eqQualifiedName :: Eq QualifiedName where
+  eq (QualifiedName ns1 ln1) (QualifiedName ns2 ln2) = eq ns1 ns2 && eq ln1 ln2
 
 -----------------------------------------------------------
 -- CLASS PERSPECTENTITEITIDENTIFIER
