@@ -42,7 +42,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
-import Perspectives.Types.ObjectGetters (contextAspectsClosure, lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
+import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -82,22 +82,6 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                 ((ContextType "model:MyTestDomain") ###= roleInContext)
             assert "roleInContext should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
               case head roles of
-                (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
-                otherwise -> false
-
-            contexts <- runP $
-              withDomeinFile "model:MyTestDomain" df
-                ((ContextType "model:MyTestDomain") ###= contextAspectsClosure)
-            assert "contextAspectsClosure applied to model:MyTestDomain should return a set containing model:MyTestDomain"
-              case head contexts of
-                (Just (ContextType "model:MyTestDomain")) -> true
-                otherwise -> false
-
-            roles' <- runP $
-              withDomeinFile "model:MyTestDomain" df
-                ((ContextType "model:MyTestDomain") ###= (contextAspectsClosure >=> roleInContext))
-            assert "(contextAspectsClosure >=> roleInContext) should be able to retrieve the role AnotherRole from the context model:MyTestDomain."
-              case head roles' of
                 (Just (CR (CalculatedRoleType "model:MyTestDomain$AnotherRole"))) -> true
                 otherwise -> false
 
