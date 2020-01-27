@@ -23,7 +23,7 @@ module Perspectives.Types.ObjectGetters where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
-import Control.Plus (map, (<|>))
+import Control.Plus (empty, map, (<|>))
 import Data.Array (filter, find)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -37,7 +37,7 @@ import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
 import Perspectives.Instances.Combinators (filter')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT)
-import Perspectives.Representation.Class.PersistentType (getPerspectType, getContext)
+import Perspectives.Representation.Class.PersistentType (getContext, getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, adtOfRole, getRole, propertiesOfADT, roleADT, roleSet, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextADT)
@@ -108,7 +108,7 @@ lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> Prop
 lookForProperty criterium = filter' (ArrayT <<< propertiesOfADT) criterium
 
 propertiesOfRole :: String ~~~> PropertyType
-propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRole_ (CalculatedRoleType s)
+propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRole_ (CalculatedRoleType s) <|> empty
   where
     propertiesOfRole_ :: forall r i. RoleClass r i => i ~~~> PropertyType
     propertiesOfRole_ = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> roleADT >=> propertiesOfADT)
