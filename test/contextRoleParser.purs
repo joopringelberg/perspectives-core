@@ -4,17 +4,22 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Data.Array (length)
-import Data.Either (Either, isRight)
+import Data.Either (Either(..), isRight)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..))
+import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Foreign.Object (Object, fromFoldable, lookup, empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (removeBinding, setBinding)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.ContextAndRole (context_me, rol_gevuldeRollen, rol_isMe)
+import Perspectives.ContextRoleParser (expandedName, roleBindingByReference)
 import Perspectives.CoreTypes ((##>>))
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.EntiteitAndRDFAliases (RolName)
+import Perspectives.Identifiers (QualifiedName(..))
+import Perspectives.IndentParser (runIndentParser)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
@@ -26,12 +31,13 @@ import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Test.Perspectives.Utils (runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
+import Text.Parsing.Parser (ParseError(..))
 
 testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip"ContextRoleParser" do
+theSuite = suiteSkip "ContextRoleParser" do
   test "inverse binding" do
     ra <- runP do
       _ <- setupUser
@@ -132,3 +138,22 @@ theSuite = suiteSkip"ContextRoleParser" do
             , binding: Just "model:User$MijnSysteem$User_0001"})
     -- logShow ra
     assert "The constructed Role should have 'isMe' == true" (rol_isMe ra)
+
+  test "expandedName on role instance name" do
+    (r :: Either ParseError QualifiedName) <- runP $ runIndentParser "model:User$MijnSysteem$User_0001" expandedName
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        assert "'model:User$MijnSysteem$User_0001' should be parsed as a valid identifier" (id == QualifiedName "model:User" "MijnSysteem$User_0001")
+
+  test "roleBindingByReference on role instance name" (runP (do
+    (r :: Either ParseError ((Tuple RolName RoleInstance))) <- runIndentParser "$Tester -> model:User$MijnSysteem$User(1)" (roleBindingByReference (QualifiedName "model:User" "MyTests"))
+    case r of
+      (Left e) -> liftAff $ assert (show e) false
+      (Right (Tuple rn ri)) -> do
+        (PerspectRol{binding}) <- getPerspectRol ri
+        logShow rn -- "model:System$Tester"
+        logShow ri -- "model:User$MyTests$Tester_0001"
+        logShow binding
+        liftAff $ assert "In '$Tester -> model:User$MijnSysteem$User_0001' the parser should recognise a role instance" (binding == Just (RoleInstance "model:User$MijnSysteem$User_0001"))
+))

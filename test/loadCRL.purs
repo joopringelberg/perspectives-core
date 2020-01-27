@@ -18,6 +18,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
+import Perspectives.SetupUser (setupUser) as SU
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -55,8 +56,8 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
     assert "There should be an instance of SomeRole." (length r == 1)
 
   test "Load a file with a context instance in couchdb" (runP do
-    _ <- loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory
-    r <- loadAndSaveCrlFile "systemInstances.crl" modelDirectory
+    _ <- loadCompileAndSaveArcFile' "testBotActie" modelDirectory
+    r <- loadAndSaveCrlFile "testBotActie.crl" modelDirectory
     if null r
       then liftAff $ assert "OK" true
       else do

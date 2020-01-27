@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (length, null)
+import Data.Array (elemIndex, length, null)
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip"Perspectives.Extern.Couchdb" do
+theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -59,12 +59,12 @@ theSuite = suiteSkip"Perspectives.Extern.Couchdb" do
         -- now run the query that retrieves the modelDescription field of all models in repository.
         -- The result must include "model:System$Model$External"
         (descriptions :: Array RoleInstance) <- evalMonadPerspectivesQuery "" \_ -> models
-        -- logShow descriptions
-        liftAff $ assert "There must be the model:System description" (descriptions == [RoleInstance "model:User$PerspectivesSystemModel_External"])
+        logShow descriptions
+        liftAff $ assert "There must be the model:System description" (isJust $ elemIndex (RoleInstance "model:User$PerspectivesSystemModel_External") descriptions)
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  test "upload file in perspect_models" (runP do
+  testSkip "upload file in perspect_models" (runP do
     cdburl <- getCouchdbBaseURL
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.

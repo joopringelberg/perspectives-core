@@ -14,6 +14,7 @@ import Data.Newtype (unwrap)
 import Data.Symbol (SProxy(..))
 import Effect.Class.Console (logShow, log)
 import Foreign.Object (lookup)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, runTypeLevelToArray, (###=))
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
@@ -27,7 +28,7 @@ import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Parsing.TransferFile (domain)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..))
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -55,7 +56,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -441,7 +442,7 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                         otherwise -> false
                     assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter cdb:Models)'"
                       case calculation of
-                        (Q (MQD _ (ExternalCoreRoleGetter "cdb:Models") _ _ _ _)) -> true
+                        (Q (MQD _ (ExternalCoreRoleGetter "couchdb_Models") _ _ _ _)) -> true
                         otherwise -> false
 
   test "Action with Condition" do
@@ -487,8 +488,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                       (case condition of
                         (Q (BQD _ (BinaryCombinator GreaterThanF) _ _ _ _ _)) -> true
                         otherwise -> false)
-                    case effect of
-                      (Just (EF (BQD _ (BinaryCombinator SequenceF) rem crea _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ (BinaryCombinator SequenceF) crea rem _ _ _) -> do
                           assert "There should be a CreateRole on Gast" (case crea of
                             (UQD _ (CreateRole (EnumeratedRoleType "model:Test$Gast")) (SQD _ Identity _ _ _) _ _ _) -> true
                             otherwise -> false)
@@ -515,8 +516,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf rle cte _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf rle cte _ _ _) -> do
                         assert "The queryfunction should be move" (eq qf QF.Move )
                         assert "The binding should be a rolgetter for model:Test$Company$Employee"
                           case rle of
@@ -547,8 +548,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Company$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf rle cte _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf rle cte _ _ _) -> do
                         assert "The queryfunction should be move" (eq qf QF.Move )
                         logShow rle
                         assert "The role to move should come from the current context, an instance of Company"
@@ -575,8 +576,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf bndg _ _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf bndg _ _ _ _) -> do
                         assert "The queryfunction should be bind" (eq qf (Bind $ EnumeratedRoleType "model:Test$EreGast") )
                         case bndg of
                           (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast")))_ _ _) ->
@@ -586,7 +587,7 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                   Nothing -> assert "The effect should compile to a binary query function" false
 
   test "Bind to role without non-matching possible bindings" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  user: Organisator\n  user: EreGast filledBy: Organisator\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        bind Gast to EreGast\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, functional)\n    property: Prop1 (mandatory, functional, Number)\n  user: Organisator\n    property: Prop2\n  user: EreGast filledBy: Organisator\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        bind Gast to EreGast\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -653,8 +654,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf bndg _ _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf bndg _ _ _ _) -> do
                         assert "The queryfunction should be bind" (eq qf (Bind $ EnumeratedRoleType "model:Test$Party$EreGast") )
                         case bndg of
                           (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast")))_ _ _) ->
@@ -750,8 +751,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf bndg _ _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf bndg _ _ _ _) -> do
                         assert "The queryfunction should be bind_" (eq qf Bind_ )
                         case bndg of
                           (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast")))_ _ _) ->
@@ -795,8 +796,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (UQD _ qf bndg _ _ _))) -> do
+                    case extractEffect effect of
+                      (UQD _ qf bndg _ _ _) -> do
                         assert "The queryfunction should be unbind" (case qf of
                           Unbind Nothing -> true
                           otherwise -> false )
@@ -824,8 +825,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (UQD _ qf bndg _ _ _))) -> do
+                    case extractEffect effect of
+                      (UQD _ qf bndg _ _ _) -> do
                         assert "The queryfunction should be unbind" (case qf of
                           Unbind (Just (EnumeratedRoleType "model:Test$EreGast")) -> true
                           otherwise -> false )
@@ -855,7 +856,7 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 assert "Expected the error UnknownRole" false
 
   test "Unbind: binder does not bind" do
-    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  user: EreGast (mandatory, functional) filledBy: Organisator\n  user: Organisator\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        unbind Gast from EreGast\n" ARC.domain
+    (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  user: EreGast (mandatory, functional) filledBy: Organisator\n  user: Organisator\n    property: Prop2\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        unbind Gast from EreGast\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
       (Right ctxt@(ContextE{id})) -> do
@@ -868,7 +869,7 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (LocalRoleDoesNotBind _ _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error LocalRoleDoesNotBind" false
 
   test "Bot Action with delete role" do
@@ -888,8 +889,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (UQD _ qf bndg _ _ _))) -> do
+                    case extractEffect effect of
+                      (UQD _ qf bndg _ _ _) -> do
                         assert "The queryfunction should be DeleteRole" (case qf of
                           DeleteRole -> true
                           otherwise -> false )
@@ -917,8 +918,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (UQD _ qf bndg _ _ _))) -> do
+                    case extractEffect effect of
+                      (UQD _ qf bndg _ _ _) -> do
                         assert "The queryfunction should be DeleteProperty" (case qf of
                           QF.DeleteProperty (EnumeratedPropertyType "model:Test$Gast$Prop1") -> true
                           otherwise -> false )
@@ -980,8 +981,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf val role _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf val role _ _ _) -> do
                         assert "The queryfunction should be AddPropertyValue" (case qf of
                           QF.AddPropertyValue _-> true
                           otherwise -> false )
@@ -1047,8 +1048,8 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    case effect of
-                      (Just (EF (BQD _ qf val role _ _ _))) -> do
+                    case extractEffect effect of
+                      (BQD _ qf val role _ _ _) -> do
                         assert "The queryfunction should be AddPropertyValue" (case qf of
                           QF.AddPropertyValue _ -> true
                           otherwise -> false )
@@ -1082,14 +1083,18 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeGast" actions of
                   Just (Action{effect}) -> do
-                    -- logShow effect
-                    case effect of
-                      (Just (EF (MQD _ qf args _ _ _))) -> do
+                    case extractEffect effect of
+                      (MQD _ qf args _ _ _) -> do
                         assert "The queryfunction should be ExternalEffectFullFunction" (eq qf (ExternalEffectFullFunction "couchdb_AddModelToLocalStore") )
                         assert "There should be one argument" (length args == 1)
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false
 
+extractEffect :: Maybe SideEffect -> QueryFunctionDescription
+extractEffect = unsafePartial extractEffect_
+  where
+    extractEffect_ :: Partial => Maybe SideEffect -> QueryFunctionDescription
+    extractEffect_ (Just (EF (UQD _ _ (BQD _ _ _ mqd _ _ _) _ _ _))) = mqd
 
 x :: DomeinFileRecord -> MonadPerspectives (Array RoleType)
 x correctedDFR = withDomeinFile "model:MyTestDomain"

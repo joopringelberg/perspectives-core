@@ -8,7 +8,7 @@ import Data.Array (length, null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (empty)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.BasicConstructors (constructAnotherRol)
@@ -27,7 +27,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (saveAndConnectRoleInstance)
-import Perspectives.TypePersistence.LoadArc (loadArcAndCrl, loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadArcAndCrl, loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -40,7 +40,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip"Model:System" do
+theSuite = suiteSkip "Model:System" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -61,14 +61,14 @@ theSuite = suiteSkip"Model:System" do
         -- Send the model to the repository.
         cdburl <- getCouchdbBaseURL
         void $ runWriterT $ runArrayT (uploadToRepository_ (DomeinFileId "model:TestBotActie") (cdburl <> "repository") df)
-
         -- Now remove the model instances from cache!
         void $ removeInternally (RoleInstance "model:User$TestBotActieModel_External")
         void $ removeInternally (ContextInstance "model:User$TestBotActieModel")
         void $ removeInternally (RoleInstance "model:User$MyTest_External")
         void $ removeInternally (ContextInstance "model:User$MyTest")
         void $ removeInternally (ContextInstance "model:User$TestBotActieModel$IndexedContext_0000")
-
+        void $ removeInternally (ContextInstance "model:User$MyTests")
+        void $ removeInternally (RoleInstance "model:User$MyTests_External")
         -- Get the model descriptions from the repository into cache.
         getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
         models <- ((ContextInstance "model:User$MijnSysteem") ##= getModels)
@@ -90,7 +90,7 @@ theSuite = suiteSkip"Model:System" do
         -- Check if ModelsInUse has two instances.
         getIndexedContexts <- getRoleFunction "model:System$PerspectivesSystem$IndexedContexts"
         n2 <- ((ContextInstance "model:User$MijnSysteem") ##= getIndexedContexts)
-        logShow n2
+        -- logShow n2
         liftAff $ assert "There should be two instances of IndexedContexts." (length n2 == 2)
 
         -- remove model:TestBotActie from the repository and from perspect_models
