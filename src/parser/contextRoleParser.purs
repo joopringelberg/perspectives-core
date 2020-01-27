@@ -433,7 +433,7 @@ contextBindingByReference cName = roleBinding' cName ContextBinding do
 roleBindingByReference ::  QualifiedName
   -> IP (Tuple RolName RoleInstance)
 roleBindingByReference cName = roleBinding' cName RoleBinding do
-  ident <- (sameLine *> relativeRolInstanceID <|> rolReference)
+  ident <- (sameLine *> rolReference)
   occurrence <- sameLine *> optionMaybe roleOccurrence -- The sequence number in text
   cmt <- inLineComment
   pure $ Tuple cmt (Just $ RoleInstance (ident <> "_" <> (rol_padOccurrence (maybe 1 identity occurrence))))
@@ -442,20 +442,6 @@ roleBindingByReference cName = roleBinding' cName RoleBinding do
     rolReference = do
       qn <- (expandedName <|> prefixedContextName <|> relativeInstanceID)
       pure (show qn)
-
-    relativeRolInstanceID :: IP RolName
-    relativeRolInstanceID = try do
-      qn <- rolInHigherContext
-      -- i <- roleOccurrence
-      pure $ show qn
-
-    rolInHigherContext :: IP QualifiedName
-    rolInHigherContext = try $ lexeme do
-      namespace <- getNamespace -- not $-terminated!
-      namespaceLevels <- AR.length <$> AR.many (STRING.string "$")
-      localName <- segmentedName
-      namespace' <- (butLastNNamespaceLevels namespace (namespaceLevels - 1))
-      pure $ QualifiedName namespace' localName
 
 relativeInstanceID ::  IP QualifiedName
 relativeInstanceID = lexeme do
