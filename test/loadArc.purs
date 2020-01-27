@@ -57,7 +57,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
 
   test "Load a model file and store it in Couchdb" do
     -- 1. Load and save a model.
-    messages <- runP $ catchError (loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory)
+    messages <- runP $ catchError (loadCompileAndSaveArcFile "TestBotActie" modelDirectory)
       \e -> logShow e *> pure []
     if null messages
       then pure unit

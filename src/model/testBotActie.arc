@@ -3,6 +3,9 @@ domain: TestBotActie
   use: sys for model:System
 
   case: Tests
+    external:
+      aspect: sys:NamedContext$External
+    aspect: sys:NamedContext
     user: Tester filledBy: sys:PerspectivesSystem$User
     context: TestInstances (not mandatory, not functional) filledBy: Test
 

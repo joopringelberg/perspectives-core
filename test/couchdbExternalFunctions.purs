@@ -64,7 +64,7 @@ theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testSkip "upload file in perspect_models" (runP do
+  test "upload file in perspect_models" (runP do
     cdburl <- getCouchdbBaseURL
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
