@@ -44,14 +44,14 @@ import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), 
 import Perspectives.Representation.ADT (ADT(..), product)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, lessThanOrEqualTo, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_)
+import Perspectives.Representation.Class.Role (binding, bindingOfADT, contextOfADT, lessThanOrEqualTo, roleTypeIsFunctional, roleTypeIsMandatory, typeExcludingBinding_, externalRoleOfADT)
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.ThreeValuedLogic (and, or, ThreeValuedLogic(..)) as THREE
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..))
-import Perspectives.Types.ObjectGetters (externalRoleOfADT, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
+import Perspectives.Types.ObjectGetters (lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain)
 import Prelude (bind, eq, map, pure, ($), (==), (&&), discard, (<$>), (<*>), (>>=))
 
 compileStep :: Domain -> Step -> FD

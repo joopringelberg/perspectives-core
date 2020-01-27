@@ -38,7 +38,7 @@ import Perspectives.Representation.ADT (ADT(..), product, sum)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Context (roles)
+import Perspectives.Representation.Context (roles, externalRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), elements, intersectionOfArrays, intersectionPset, unionOfArrays, unionPset)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
@@ -220,6 +220,18 @@ contextOfADT (SUM adts) = map sum (traverse contextOfADT adts)
 contextOfADT (PROD adts) = map product (traverse contextOfADT adts)
 contextOfADT EMPTY = pure EMPTY
 contextOfADT UNIVERSAL = pure UNIVERSAL
+
+-----------------------------------------------------------
+-- EXTERNALROLEOFADT
+-----------------------------------------------------------
+-- | The external role of an ADT ContextType
+externalRoleOfADT :: ADT ContextType -> MP (ADT EnumeratedRoleType)
+-- TODO: handle CalculatedRole.
+externalRoleOfADT (ST ct) = getContext ct >>= pure <<< ST <<< externalRole
+externalRoleOfADT (SUM adts) = map sum (traverse externalRoleOfADT adts)
+externalRoleOfADT (PROD adts) = map product (traverse externalRoleOfADT adts)
+externalRoleOfADT EMPTY = pure EMPTY
+externalRoleOfADT UNIVERSAL = pure UNIVERSAL
 
 -----------------------------------------------------------
 -- BINDINGOFADT
