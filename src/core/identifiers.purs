@@ -278,7 +278,11 @@ getSecondMatch regex s = case match regex s of
 -- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
 -- | Useful for expanding local names used in bindings, property- and view references.
 expandDefaultNamespaces :: String -> String
-expandDefaultNamespaces = expandNamespaces defaultNamespaces
+expandDefaultNamespaces n = let
+  expandedName = expandNamespaces defaultNamespaces n in
+  case OBJ.lookup expandedName defaultIndexedNames of
+    (Just ind) -> ind
+    Nothing -> expandedName
 
 expandNamespaces :: OBJ.Object String -> String -> String
 expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
@@ -295,6 +299,13 @@ defaultNamespaces :: OBJ.Object String
 defaultNamespaces = OBJ.fromFoldable
   [ Tuple "cdb" "model:Couchdb"
   , Tuple "sys" "model:System"
+  , Tuple "usr" "model:User"
+  ]
+
+defaultIndexedNames :: OBJ.Object String
+defaultIndexedNames = OBJ.fromFoldable
+  [ Tuple "model:User$Me" "model:User$MijnSysteem$User_0001"
+
   ]
 -----------------------------------------------------------
 -- CONVENIENCE NAMESPACE PREFIX FUNCIONS

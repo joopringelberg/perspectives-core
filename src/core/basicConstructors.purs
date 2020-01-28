@@ -160,15 +160,16 @@ constructContext c@(ContextSerialization{id, prototype, ctype, rollen, externePr
 -- | Does **not** set the inverse binding!
 constructRol :: EnumeratedRoleType -> ContextInstance -> String -> Int -> RolSerialization -> MonadPerspectives PerspectRol
 constructRol rolType contextId localName i (RolSerialization {properties, binding: bnd}) = do
-  isMe <- case bnd of
+  (expandedBinding :: Maybe RoleInstance) <- pure $ maybe Nothing (Just <<< RoleInstance <<< expandDefaultNamespaces) bnd
+  isMe <- case expandedBinding of
     Nothing -> pure false
-    Just id -> getPerspectRol (RoleInstance id) >>= pure <<< (\(PerspectRol{isMe}) -> isMe)
+    Just id -> getPerspectRol id >>= pure <<< (\(PerspectRol{isMe}) -> isMe)
   rolInstanceId <- pure $ RoleInstance (localName <> "_" <> (rol_padOccurrence i))
   role <- pure (PerspectRol defaultRolRecord
         { _id = rolInstanceId
         , pspType = rolType
         , context = contextId
-        , binding = maybe Nothing (Just <<< RoleInstance <<< expandDefaultNamespaces) bnd
+        , binding = expandedBinding
         , properties = constructProperties properties
         , occurrence = i
         , isMe = isMe
