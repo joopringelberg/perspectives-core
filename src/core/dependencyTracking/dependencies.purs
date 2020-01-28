@@ -26,17 +26,15 @@ module Perspectives.DependencyTracking.Dependency where
 -- | However, in the dependency administration we omit these newtypes.
 import Prelude
 
-import Data.Array (cons, delete, elemIndex, partition)
+import Data.Array (delete, elemIndex, partition, (:))
 import Data.Foldable (for_)
-import Data.Lens (_Just, firstOf, over, set, traversed, view)
-import Data.Lens.At (at)
-import Data.Lens.Traversal (Traversal')
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Foreign.Object (Object, insert, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
-import Perspectives.CoreTypes (Assumption, AssumptionRegister, MP, type (~~>), runMonadPerspectivesQuery)
+import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Unsafe.Coerce (unsafeCoerce)
@@ -97,29 +95,37 @@ registerSupportedEffect corrId ef q arg = do
       {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
       for_ vanished (deregisterDependency corrId)
       -- Re-run the effect
+      r <- queryAssumptionRegister
       liftEffect $ ef (Result corrId (unsafeCoerce result))
       pure unit
 
 unregisterSupportedEffect :: CorrelationIdentifier -> MP Unit
 unregisterSupportedEffect corrId = pure unit
 
-_assumptionDependencies :: Assumption -> Traversal' AssumptionRegister (Array CorrelationIdentifier)
-_assumptionDependencies (Tuple rid pid) = at rid <<< traversed <<< at pid <<< _Just
-
 findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
-findDependencies a = queryAssumptionRegister >>= pure <<< firstOf (_assumptionDependencies a)
+findDependencies (Tuple resource tpe) = do
+  r <- queryAssumptionRegister
+  case lookup resource r of
+    Nothing -> pure Nothing
+    Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
 
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<
   (maybe false (maybe false (const true) <<< (elemIndex corrId)) )
 
+-- TODO. Implementeer zonder lens. Ik denk dat de dubbele at hier fout gaat.
 registerDependency :: CorrelationIdentifier -> Assumption -> MP Unit
-registerDependency corrId a = queryAssumptionRegisterModify \r -> case view (_assumptionDependencies' a) r of
-  Nothing -> set (_assumptionDependencies' a) (Just [corrId]) r
-  Just deps -> set (_assumptionDependencies' a) (Just (cons corrId deps)) r
-  where
-    _assumptionDependencies' :: Assumption -> Traversal' AssumptionRegister (Maybe (Array CorrelationIdentifier))
-    _assumptionDependencies' (Tuple rid pid) = at rid <<< traversed <<< at pid
+registerDependency corrId (Tuple resource tpe) = queryAssumptionRegisterModify \r ->
+  case lookup resource r of
+    Nothing -> insert resource (singleton tpe [corrId]) r
+    Just (typesForResource :: Object (Array CorrelationIdentifier)) -> case lookup tpe typesForResource of
+      Nothing -> insert resource (insert tpe [corrId] typesForResource) r
+      Just (correlationIdentifiers :: Array CorrelationIdentifier) -> insert resource (insert tpe (corrId : correlationIdentifiers) typesForResource) r
 
 deregisterDependency :: CorrelationIdentifier -> Assumption -> MP Unit
-deregisterDependency corrId a = queryAssumptionRegisterModify (over (_assumptionDependencies a) (delete corrId))
+deregisterDependency corrId (Tuple resource tpe) = queryAssumptionRegisterModify \r ->
+  case lookup resource r of
+    Nothing -> r
+    Just (typesForResource :: Object (Array CorrelationIdentifier)) -> case lookup tpe typesForResource of
+      Nothing -> r
+      Just correlationIdentifiers -> insert resource (insert tpe (delete corrId correlationIdentifiers) typesForResource) r
