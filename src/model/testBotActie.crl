@@ -9,4 +9,5 @@ sys:Model usr:TestBotActieModel
   extern $Url = "http://127.0.0.1:5984/repository/model%3ATestBotActie"
   $IndexedContext =>
     tba:Tests usr:MyTests
+      extern sys:NamedContext$External$Name = "Test bot action"
       $Tester -> model:User$MijnSysteem$User(1)

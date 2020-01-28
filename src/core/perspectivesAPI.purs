@@ -197,7 +197,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         adt <- rangeOfRoleCalculation' subject
         views <- runArrayT $ lookForUnqualifiedViewType predicate adt
         case head views of
-          Nothing -> sendResponse (Error corrId ("View '" <> predicate <> "' is available for role '" <> subject <> "'.")) setter
+          Nothing -> sendResponse (Error corrId ("View '" <> predicate <> "' is not available for role '" <> subject <> "'.")) setter
           -- NOTE: we arbitrarily take the first matching View.
           (Just (v :: ViewType)) -> do
             (props :: Array PropertyType) <- ((getPerspectType v) :: MP View) >>= pure <<< propertyReferences

@@ -18,4 +18,4 @@ domain: TestBotActie
     user: Tester filledBy: sys:PerspectivesSystem$User
     bot: for Tester
       perspective on: External
-        if not extern >> PropsEqual and extern >> Trigger then V2 = extern >> V1
+        if not extern >> PropsEqual and extern >> Trigger then V2 = extern >> V1 for extern

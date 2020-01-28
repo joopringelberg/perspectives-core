@@ -31,14 +31,14 @@ import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
-import Data.Array (elemIndex, unsafeIndex)
+import Data.Array (elemIndex, null, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.String (Pattern(..), stripSuffix)
 import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Instances.Combinators (exists, not, available)
@@ -260,8 +260,8 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
-    (C2V a), (C2V b) -> pure $ C2V $ \c -> unsafePartial $ mapLogicalOperator g <$> a c <*> b c
-    (R2V a), (R2V b) -> pure $ R2V $ \c -> unsafePartial $ mapLogicalOperator g <$> a c <*> b c
+    (C2V a), (C2V b) -> pure $ C2V $ \c -> logicalOperation a b (unsafePartial $ mapLogicalOperator g) c
+    (R2V a), (R2V b) -> pure $ R2V $ \c -> (unsafeCoerce $ logicalOperation) a b (unsafePartial $ mapLogicalOperator g) c
     _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 -- Add and subtract for numbers and strings. Divide and multiply just for numbers.
@@ -337,11 +337,37 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
 -- Catch all
 compileFunction qd = throwError (error $ "Cannot create a function out of '" <> prettyPrint qd <> "'.")
 
+-- We handle no results for the two ObjectGetters as follows:
+--  * if both are empty, the result is true
+--  * if one of them is empty, the result is false.
 compareContexts :: forall a. Eq a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
-compareContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+-- compareContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+compareContexts a b f c = ArrayT do
+  (as :: Array a) <- runArrayT (a c)
+  (bs :: Array a) <- runArrayT (b c)
+  (rs :: Array Boolean) <- pure $ f <$> as <*> bs
+  if null rs
+    then pure [Value "false"]
+    else pure (Value <<< show <$> rs)
 
 compareRoles :: forall a. Eq a => (RoleInstance ~~> a) -> (RoleInstance ~~> a) -> (a -> a -> Boolean) -> RoleInstance ~~> Value
-compareRoles a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+-- compareRoles a b f c = Value <$> (show <$> (f <$> a c <*> b c))
+compareRoles a b f c = ArrayT do
+  (as :: Array a) <- runArrayT (a c)
+  (bs :: Array a) <- runArrayT (b c)
+  (rs :: Array Boolean) <- pure $ f <$> as <*> bs
+  if null rs
+    then pure [Value "false"]
+    else pure (Value <<< show <$> rs)
+
+logicalOperation :: (ContextInstance ~~> Value) -> (ContextInstance ~~> Value) -> (Value -> Value -> Value) -> ContextInstance ~~> Value
+logicalOperation a b f c = ArrayT do
+  (as :: Array Value) <- runArrayT (a c)
+  (bs :: Array Value) <- runArrayT (b c)
+  (rs :: Array Value) <- pure $ f <$> as <*> bs
+  if null rs
+    then pure [Value "false"]
+    else pure rs
 
 compareFunction :: forall a. Eq a => Partial => FunctionName -> (a -> a -> Boolean)
 compareFunction fname = case fname of
@@ -367,7 +393,6 @@ mapNumericOperator MultiplyF (VDOM PNumber _) = wrapNumericOperator (*)
 
 wrapNumericOperator :: (Int -> Int -> Int) -> (Value -> Value ~~> Value)
 wrapNumericOperator g (Value p) (Value q) = (Value <<< show) <$> (g <$> (lift $ parseInt p) <*> (lift $ parseInt q))
-
 
 orderContexts :: forall a. Ord a => (ContextInstance ~~> a) -> (ContextInstance ~~> a) -> (a -> a -> Boolean) -> ContextInstance ~~> Value
 orderContexts a b f c = Value <$> (show <$> (f <$> a c <*> b c))
