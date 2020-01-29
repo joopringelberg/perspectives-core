@@ -35,7 +35,7 @@ import Foreign.Object (Object, insert, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -51,15 +51,15 @@ type SupportedEffect = {runner :: ApiEffectRunner, assumptions:: Array Assumptio
 -- | for as long as it is not retracted. As soon as an Assumption changes, the active SupportedEffects that
 -- | rely on it, are re-executed.
 -- | A SupportedEffect is stored under the CorrelationIdentifier that identifies the ApiEffect.
-type ActiveSupportedEffects = GLStrMap SupportedEffect
+type ActiveSupportedEffects = GLS.GLStrMap SupportedEffect
 
 lookupActiveSupportedEffect :: CorrelationIdentifier -> Maybe SupportedEffect
-lookupActiveSupportedEffect = show >>> peek activeSupportedEffects
+lookupActiveSupportedEffect = show >>> GLS.peek activeSupportedEffects
 
 -- | A global store of SupportedEffect-s
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 activeSupportedEffects :: ActiveSupportedEffects
-activeSupportedEffects = new unit
+activeSupportedEffects = GLS.new unit
 
 -- | Register the ApiEffect and the TrackedObjectsGetter with the CorrelationIdentifier and run it once.
 -- | Running means: compute the result of the TrackedObjectsGetter, add the computed Assumptions to
@@ -74,8 +74,8 @@ registerSupportedEffect :: forall a b.
   a ->
   MP Unit
 registerSupportedEffect corrId ef q arg = do
-  -- Add a new supported effect, for now with zero assumptions.
-  _ <- pure $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
+  -- Add a new effect to activeSupportedEffects, for now with zero assumptions.
+  _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
   -- then execute the SupportedEffect once
   apiEffectRunner unit
   pure unit
@@ -84,10 +84,10 @@ registerSupportedEffect corrId ef q arg = do
     apiEffectRunner _ = do
       (Tuple result (assumptions :: Array Assumption)) <- runMonadPerspectivesQuery arg q
       -- destructively set the assumptions in the ActiveSupportedEffects
-      (moldSupports :: Maybe SupportedEffect) <- pure $ peek activeSupportedEffects (show corrId)
+      (moldSupports :: Maybe SupportedEffect) <- pure $ GLS.peek activeSupportedEffects (show corrId)
       -- We have ensured a registration above, hence we can use unsafePartial.
       (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
-      _ <- pure $ poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
+      _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
       -- destructively register the correlationIdentifier with new assumptions
       {no: new} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
       for_ new (registerDependency corrId)
@@ -100,7 +100,12 @@ registerSupportedEffect corrId ef q arg = do
       pure unit
 
 unregisterSupportedEffect :: CorrelationIdentifier -> MP Unit
-unregisterSupportedEffect corrId = pure unit
+unregisterSupportedEffect corrId = do
+  case GLS.peek activeSupportedEffects (show corrId) of
+    Nothing -> pure unit
+    Just {assumptions} -> do
+      void <- pure $ GLS.delete activeSupportedEffects (show corrId)
+      for_ assumptions (deregisterDependency corrId)
 
 findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
 findDependencies (Tuple resource tpe) = do
