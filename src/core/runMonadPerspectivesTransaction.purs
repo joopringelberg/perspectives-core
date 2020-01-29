@@ -62,7 +62,7 @@ import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedProper
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.TypesForDeltas (ContextDelta(..), PropertyDelta(..), RoleDelta(..))
-import Prelude (class Monoid, Unit, bind, const, discard, join, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>))
+import Prelude (class Monoid, Unit, bind, const, discard, join, pure, show, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------

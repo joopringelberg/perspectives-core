@@ -37,7 +37,7 @@ testDirectory = "test"
 theSuite :: Free TestF Unit
 theSuite = suiteSkip "Test.Query.Inversion" do
 
-  testOnly "Invert a rule condition on a CalculatedProperty" (runP do
+  test "Invert a rule condition on a CalculatedProperty" (runP do
       modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
       if null modelErrors
         then do

@@ -35,6 +35,7 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
@@ -86,6 +87,7 @@ compileBotAction actionType = do
       (Updater ContextInstance)
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
+      log ("In ruleRunner with bools=" <> show bools)
       if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
           then effectFullFunction contextId
           else pure unit
