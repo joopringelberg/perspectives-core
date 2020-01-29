@@ -51,3 +51,15 @@ domain: Test
         property: Prop3 (mandatory, functional, Boolean)
       thing: YetAnotherRole
         property: Prop5 (mandatory, functional, Boolean)
+
+  case: TestCase5
+    user: Self
+    bot: for Self
+      perspective on: ARole
+        if ARole >> CalculatedCondition then
+          Prop5 = false
+    thing: ARole
+      property: Prop5 (mandatory, functional, Boolean)
+      property: Prop6 (mandatory, functional, Boolean)
+      property: Prop7 (mandatory, functional, Boolean)
+      property: CalculatedCondition = Prop6 and Prop7

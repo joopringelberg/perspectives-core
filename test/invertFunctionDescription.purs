@@ -3,27 +3,28 @@ module Test.Query.Inversion where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (cons, head, length, null)
+import Data.Array (cons, head, intercalate, length, null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Query.Inversion (invertFunctionDescription)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), queryFunction, domain, Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, prettyPrint, queryFunction)
 import Perspectives.Representation.Action (Action(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.Class.PersistentType (getAction)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType(..))
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -34,7 +35,26 @@ testDirectory :: String
 testDirectory = "test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip"Test.Query.Inversion" do
+theSuite = suiteSkip "Test.Query.Inversion" do
+
+  testOnly "Invert a rule condition on a CalculatedProperty" (runP do
+      modelErrors <- loadCompileAndCacheArcFile' "inversion" testDirectory
+      if null modelErrors
+        then do
+          (Action{condition}) <- getAction (ActionType "model:Test$TestCase5$Self_bot$ChangeARole")
+          case condition of
+            S _ -> liftAff $ assert "Condition should have been compiled." false
+            Q qfd -> do
+              -- log $ prettyPrint qfd
+              affectedContextQueries <- invertFunctionDescription qfd
+              -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
+              -- log $ "\n" <> intercalate "\n" (show <<< paths2functions <$> affectedContextQueries)
+              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) ==
+                [ [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop7")),(DataTypeGetter ContextF)]
+                , [(Value2Role (ENP $ EnumeratedPropertyType "model:Test$TestCase5$ARole$Prop6")),(DataTypeGetter ContextF)]
+                ])
+        else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+        )
 
   test "Constant" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  case: TestCase1\n    thing: ARole\n      property: Prop1 = true" ARC.domain
@@ -161,7 +181,7 @@ theSuite = suiteSkip"Test.Query.Inversion" do
               affectedContextQueries <- invertFunctionDescription qfd
               -- log $ intercalate "\n" (prettyPrint <$> affectedContextQueries)
               -- logShow $ paths2functions <$> affectedContextQueries
-              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3",(DataTypeGetter ContextF)],[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2",(DataTypeGetter ContextF)]])
+              liftAff $ assert "There should be two AffectedContextQueries." ((paths2functions <$> affectedContextQueries) == [[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop3", (DataTypeGetter ContextF)],[Value2Role $ ENP $ EnumeratedPropertyType "model:Test$TestCase1$AnotherRole$Prop2",(DataTypeGetter ContextF)]])
         else liftAff $ assert ("There are model errors: " <> show modelErrors) false
         )
 

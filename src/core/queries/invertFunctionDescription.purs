@@ -29,10 +29,12 @@ import Perspectives.CoreTypes (MP)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
+import Perspectives.Representation.Class.Property (calculation)
 import Perspectives.Representation.Class.Role (getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType, RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>))
 
 -- | Compute from the description of a query function a series of paths.
@@ -57,6 +59,10 @@ invertFunctionDescription_ (SQD dom (RolGetter rt) ran _ _) = case rt of
   CR r -> do
     calc <- (getRole >=> getCalculation) rt
     invertFunctionDescription_ calc
+
+invertFunctionDescription_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = do
+  calc <- (getCalculatedProperty >=> calculation) prop
+  invertFunctionDescription_ calc
 
 invertFunctionDescription_ (SQD dom f ran _ _) = do
   minvertedF <- pure $ invertFunction dom f ran
@@ -111,6 +117,7 @@ invertFunction dom qf ran = case qf of
 
   -- TODO: Is overbodig, nu?
   RolGetter rt -> Just $ DataTypeGetter ContextF
+  PropertyGetter (CP _) -> Nothing
   PropertyGetter pt -> Just $ Value2Role pt
   -- Variable lookup implies variable binding elsewhere. We've traced the path back in the binding, so we ignore it here.
   VariableLookup _ -> Nothing
