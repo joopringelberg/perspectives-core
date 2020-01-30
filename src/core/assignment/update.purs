@@ -51,6 +51,7 @@ import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspe
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.CollectAffectedContexts (aisInRoleDelta, aisInContextDelta, aisInPropertyDelta)
 import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), PropertyDelta(..), RoleDelta(..))
 
 {-
@@ -95,11 +96,6 @@ setBinding :: RoleInstance -> (Updater RoleInstance)
 setBinding roleId (newBindingId :: RoleInstance) = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
   saveEntiteit roleId (changeRol_binding newBindingId originalRole)
-  addRoleDelta $ RoleDelta
-              { id : roleId
-              , binding: Just newBindingId
-              , deltaType: Change
-              }
 
   newBinding@(PerspectRol{isMe}) <- lift $ lift $ getPerspectEntiteit newBindingId
   if isMe
@@ -114,6 +110,10 @@ setBinding roleId (newBindingId :: RoleInstance) = do
   case rol_binding originalRole of
     Nothing -> pure unit
     (Just (oldBindingId :: RoleInstance)) -> do
+      -- TODO. It is no longer possible to move from the old binding to this roleInstance.
+      -- That means that some query results might be affected.
+      -- That is not yet captured in aisInRoleDelta, because it does not know of the old binding.
+
       -- Remove this roleinstance as a binding role from the old binding.
       (oldBinding@(PerspectRol{isMe:oldIsMe}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit oldBindingId
       saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
@@ -127,6 +127,14 @@ setBinding roleId (newBindingId :: RoleInstance) = do
   -- Add this roleinstance as a binding role for the new binding.
   saveEntiteit newBindingId (addRol_gevuldeRollen newBinding (rol_pspType originalRole) roleId)
 
+  delta <- pure $ RoleDelta
+                { id : roleId
+                , binding: Just newBindingId
+                , deltaType: Change
+                }
+  aisInRoleDelta delta
+  addRoleDelta delta
+
 -- | Removes the binding R of the rol, if any.
 -- | Removes the rol as value of 'gevuldeRollen' for psp:Rol$binding from the binding R.
 -- | Modifies the Role instance.
@@ -136,19 +144,23 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 -- | Removes me from the context of the Role instance if the binding we removed represents the user.
 -- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so a binding argument
 -- is taken into account, too (we then only remove that binding, not all of them).
+-- REFACTOR. Roep om te beginnen aisInRoleDelta aan op de RoleDelta. Dat voegt de geraakte contexten toe.
+-- Verwijder pas daarna de binding.
 removeBinding :: (Updater RoleInstance)
 removeBinding roleId = do
   (originalRole :: PerspectRol) <- lift $ lift $ getPerspectEntiteit roleId
+  delta <- pure $ RoleDelta
+              { id : roleId
+              , binding: (rol_binding originalRole)
+              , deltaType: Remove
+              }
+  aisInRoleDelta delta
   saveEntiteit roleId (changeRol_isMe (removeRol_binding originalRole) false)
   ctxt <- lift $ lift $ getPerspectContext $ rol_context originalRole
   if (context_me ctxt == (Just roleId))
     then setMe (rol_context originalRole) Nothing
     else pure unit
-  addRoleDelta $ RoleDelta
-              { id : roleId
-              , binding: (rol_binding originalRole)
-              , deltaType: Remove
-              }
+  addRoleDelta delta
 
   -- Handle inverse binding.
   case rol_binding originalRole of
@@ -177,12 +189,14 @@ addRol contextId rolName rolInstances = do
     Nothing -> saveEntiteit contextId changedContext
     Just me -> saveEntiteit contextId (changeContext_me changedContext (Just (rol_id me)))
   for_ rolInstances \rolInstance -> do
-    addContextDelta $ ContextDelta
+    delta <- pure $ ContextDelta
                 { id : contextId
                 , roleType: rolName
                 , deltaType: Add
                 , roleInstance: Just rolInstance
                 }
+    aisInContextDelta delta
+    addContextDelta delta
 
 -- | Modifies the context instance.
 -- | Recomputes the `me` role.
@@ -192,19 +206,21 @@ addRol contextId rolName rolInstances = do
 -- | Instead, use removeRoleInstance.
 removeRolFromContext :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 removeRolFromContext contextId rolName rolInstances = do
+  for_ rolInstances \rolInstance -> do
+    delta <- pure $ ContextDelta
+                { id : contextId
+                , roleType: rolName
+                , deltaType: Remove
+                , roleInstance: Just rolInstance
+                }
+    aisInContextDelta delta
+    addContextDelta delta
   (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
   changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference rolInstances))
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   case find rol_isMe roles of
     Nothing -> saveEntiteit contextId changedContext
     Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing)
-  for_ rolInstances \rolInstance ->
-    addContextDelta $ ContextDelta
-                { id : contextId
-                , roleType: rolName
-                , deltaType: Remove
-                , roleInstance: Just rolInstance
-                }
 
 -- | Modifies the context instance.
 -- | Recomputes the `me` role.
@@ -215,18 +231,20 @@ removeRolFromContext contextId rolName rolInstances = do
 -- | Instead, use removeAllRoleInstances for that.
 deleteRol :: ContextInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction Unit
 deleteRol contextId rolName = do
+  delta <- pure $ ContextDelta
+              { id : contextId
+              , roleType: rolName
+              , deltaType: Delete
+              , roleInstance: Nothing
+              }
+  aisInContextDelta delta
+  addContextDelta delta
   (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
   changedContext <- pure (deleteContext_rolInContext pe rolName)
   roles <- traverse (lift <<< lift <<< getPerspectRol) (context_rolInContext pe rolName)
   case find rol_isMe roles of
     Nothing -> saveEntiteit contextId changedContext
     Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing)
-  addContextDelta $ ContextDelta
-              { id : contextId
-              , roleType: rolName
-              , deltaType: Delete
-              , roleInstance: Nothing
-              }
 
 -- | Modifies the context instance.
 -- | Recomputes the `me` role.
@@ -237,17 +255,28 @@ deleteRol contextId rolName = do
 -- | Instead, use removeAllRoleInstances for that.
 setRol :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 setRol contextId rolName rolInstances = do
-  roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
-  me <- pure $ rol_id <$> find rol_isMe roles
   (pe :: PerspectContext) <- lift $ lift $ getPerspectContext contextId
-  saveEntiteit contextId (changeContext_me (setContext_rolInContext pe rolName (rolInstances :: Array RoleInstance)) me)
-  for_ rolInstances \rolInstance ->
-    addContextDelta $ ContextDelta
+  for_ (context_rolInContext pe rolName) \rolInstance -> do
+    delta <- pure $ ContextDelta
                 { id : contextId
                 , roleType: rolName
-                , deltaType: Change
+                , deltaType: Remove
                 , roleInstance: Just rolInstance
                 }
+    aisInContextDelta delta
+    addContextDelta delta
+  roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
+  me <- pure $ rol_id <$> find rol_isMe roles
+  saveEntiteit contextId (changeContext_me (setContext_rolInContext pe rolName (rolInstances :: Array RoleInstance)) me)
+  for_ rolInstances \rolInstance -> do
+    delta <- pure $ ContextDelta
+                { id : contextId
+                , roleType: rolName
+                , deltaType: Add
+                , roleInstance: Just rolInstance
+                }
+    aisInContextDelta delta
+    addContextDelta delta
 
 -- | Detach the role instances from their current context and attach them to the new context.
 -- | Modifies both context instances.
@@ -255,6 +284,7 @@ setRol contextId rolName rolInstances = do
 -- | Adds Context deltas to the Transaction.
 -- | Caches and saves the context instances.
 -- | Nothing else is changed.
+-- TODO: verzamel de affected contexts.
 moveRoles :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
 moveRoles originContextId destinationContextId rolName rolInstances = do
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
@@ -335,17 +365,20 @@ deleteProperty rids propertyName = for_ rids \rid -> do
 -- | Modify the role instance with the new property values.
 -- | Adds PropertyDeltas to the Transaction.
 -- | Caches and saves the modified Role instance.
+-- TODO. Dit kan efficienter, als je alle waarden ineens zet.
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = for_ rids \rid -> do
   (pe :: PerspectRol) <- lift $ lift $ getPerspectEntiteit rid
   saveEntiteit rid (setRol_property pe propertyName values)
-  for_ values \value ->
-    addPropertyDelta $ PropertyDelta
+  for_ values \value -> do
+    delta <- pure $ PropertyDelta
                 { id : rid
                 , property: propertyName
                 , deltaType: Change
                 , value: Just value
                 }
+    aisInPropertyDelta delta
+    addPropertyDelta delta
 
 -----------------------------------------------------------
 -- LOCAL SAVENTITEIT

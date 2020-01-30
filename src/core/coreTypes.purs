@@ -26,6 +26,7 @@ import Control.Monad.Reader (ReaderT)
 import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
+import Data.Ordering (Ordering(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
 import Effect.Aff.AVar (AVar)
@@ -41,7 +42,7 @@ import Perspectives.Instances.Environment (Environment)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.Transaction (Transaction)
-import Prelude (class Eq, class Show, Unit, bind, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
+import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -93,6 +94,12 @@ instance eqActionInstance :: Eq ActionInstance where
 
 instance showActionInstance :: Show ActionInstance where
   show (ActionInstance c1 a1) = "ActionInstance( " <> show c1 <> ", " <> show a1 <> " )"
+
+instance ordActionInstance :: Ord ActionInstance where
+  compare (ActionInstance c1 a1) (ActionInstance c2 a2) = case compare c1 c2 of
+    EQ -> compare a1 a2
+    otherwise -> otherwise
+
 
 -- | Actions should be re-run as the Assumptions underlying their computation change.
 -- | We register the dependency of Actions for ContextInstances with a double registration that allows us to

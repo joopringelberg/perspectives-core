@@ -21,7 +21,7 @@ import Perspectives.Extern.Couchdb (models, uploadToRepository)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.SetupCouchdb (setModelDescriptionsView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (assertEqual, runP, setupUser)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
+theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -64,8 +64,10 @@ theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  test "upload file in perspect_models" (runP do
+  testOnly "upload model to repository from files" (runP do
     cdburl <- getCouchdbBaseURL
+    errors <- loadCompileAndCacheArcFile "testBotActie" modelDirectory
+    liftAff $ assert "There should be no errors" (null errors)
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"

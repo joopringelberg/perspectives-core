@@ -32,6 +32,7 @@ import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head, uni
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (over, unwrap)
+import Data.Set (insert) as SET
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff (error, throwError)
@@ -76,7 +77,7 @@ distributeTransactie t = do
 
 addContextToTransactie :: PerspectContext ->
   MonadPerspectivesTransaction Unit
-addContextToTransactie c = lift $ AA.modify (over Transaction \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
+addContextToTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transaction \(t@{createdContexts, affectedContexts}) -> t {createdContexts = cons c createdContexts, affectedContexts = SET.insert _id affectedContexts})
 
 addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
 addRolToTransactie c = lift $ AA.modify (over Transaction \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})

@@ -37,6 +37,7 @@ import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
+import Perspectives.Utilities (prettyPrint)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
@@ -108,7 +109,7 @@ unregisterSupportedEffect corrId = do
       for_ assumptions (deregisterDependency corrId)
 
 findDependencies :: Assumption -> MP (Maybe (Array CorrelationIdentifier))
-findDependencies (Tuple resource tpe) = do
+findDependencies a@(Tuple resource tpe) = do
   r <- queryAssumptionRegister
   case lookup resource r of
     Nothing -> pure Nothing

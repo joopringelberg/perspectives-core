@@ -22,8 +22,10 @@
 module Perspectives.Utilities where
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
+import Data.Foldable (fold)
 import Data.Maybe (Maybe(..), maybe)
-import Prelude (class Monad, type (~>), pure, (>>=), bind)
+import Foreign.Object (Object, foldMap)
+import Prelude (class Monad, class Show, type (~>), bind, pure, show, (<$>), (<<<), (<>), (>>=))
 
 onNothing :: forall m a e. MonadThrow e m => e -> m (Maybe a) -> m a
 onNothing s ma = ma >>= (maybe (throwError s) pure)
@@ -40,3 +42,27 @@ maybeM default fromJust monadicValue = do
 
 ifNothing :: forall a b m. Monad m => m (Maybe b) -> m a -> (b -> m a) -> m a
 ifNothing monadicValue default fromJust = maybeM default fromJust monadicValue
+
+prettyPrint :: forall a. PrettyPrint a => a -> String
+prettyPrint a = prettyPrint' "  " a
+
+class PrettyPrint d where
+  prettyPrint' :: String -> d -> String
+
+instance intPrettyPrint :: PrettyPrint Int where
+  prettyPrint' indent = (<>) indent <<< show
+
+instance stringPrettyPrint :: PrettyPrint String where
+  prettyPrint' indent = (<>) indent
+
+instance boolPrettyPrint :: PrettyPrint Boolean where
+  prettyPrint' indent = (<>) indent <<< show
+
+instance objectPrettyPrint :: PrettyPrint v => PrettyPrint (Object v) where
+  prettyPrint' tab o = "{ " <> (foldMap (\(s :: String) (v :: v) -> newline <> tab <> s <> ": " <> (prettyPrint' (tab <> "  ") v)) o) <> " }"
+
+instance arrayPrettyPrint :: (Show v, PrettyPrint v) => PrettyPrint (Array v) where
+  prettyPrint' tab a = "[" <> fold (((<>) newline <<< (prettyPrint' (tab <> "  "))) <$> a) <> newline <> "]"
+
+newline :: String
+newline = "\n"

@@ -48,7 +48,7 @@ import Perspectives.Instances.ObjectGetters (binding, context, externalRole, get
 import Perspectives.Instances.Values (parseInt)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, prettyPrint, Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -60,6 +60,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 

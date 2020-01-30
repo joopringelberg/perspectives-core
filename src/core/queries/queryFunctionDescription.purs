@@ -39,6 +39,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction)
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 -- | A description of a calculation with its domain and range.
 -- | The last two members represent whether the described function is functional and whether it is mandatory.
@@ -134,45 +135,41 @@ instance eqDomain :: Eq Domain where
   eq (VDOM r1 _) (VDOM r2 _) = eq r1 r2
   eq d1 d2 = genericEq d1 d2
 
--- | A string showing an indented version of the QueryFunction. Assume we are in position for the head.
-prettyPrint :: QueryFunctionDescription -> String
-prettyPrint q = newline <> prettyPrint' ind q
-  where
-    prettyPrint' :: String -> QueryFunctionDescription -> String
-    prettyPrint' tab (SQD dom qf ran man fun) = "SQD" <> newline
-      <> tab <> show dom <> newline
-      <> tab <> show qf <> newline
-      <> tab <> show ran <> newline
-      <> tab <> show man <> newline
-      <> tab <> show fun <> newline
-    prettyPrint' tab (UQD dom qf qfd ran man fun) = "UQD" <> newline
-      <> tab <> show dom <> newline
-      <> tab <> show qf <> newline
-      <> tab <> (prettyPrint' (tab <> ind) qfd)
-      <> tab <> show ran <> newline
-      <> tab <> show man <> newline
-      <> tab <> show fun <> newline
-    prettyPrint' tab (BQD dom qf qfd1 qfd2 ran man fun) = "BQD" <> newline
-      <> tab <> show dom <> newline
-      <> tab <> show qf <> newline
-      <> tab <> (prettyPrint' (tab <> ind) qfd1)
-      <> tab <> (prettyPrint' (tab <> ind) qfd2)
-      <> tab <> show ran <> newline
-      <> tab <> show man <> newline
-      <> tab <> show fun <> newline
-    prettyPrint' tab (MQD dom qf qfds ran man fun) = "MQD" <> newline
-      <> tab <> show dom <> newline
-      <> tab <> show qf <> newline
-      <> tab <> show qfds <> newline
-      <> tab <> show ran <> newline
-      <> tab <> show man <> newline
-      <> tab <> show fun <> newline
+instance qfdPrettyPrint :: PrettyPrint QueryFunctionDescription where
+  prettyPrint' tab (SQD dom qf ran man fun) = "SQD" <> newline
+    <> tab <> show dom <> newline
+    <> tab <> show qf <> newline
+    <> tab <> show ran <> newline
+    <> tab <> show man <> newline
+    <> tab <> show fun <> newline
+  prettyPrint' tab (UQD dom qf qfd ran man fun) = "UQD" <> newline
+    <> tab <> show dom <> newline
+    <> tab <> show qf <> newline
+    <> tab <> (prettyPrint' (tab <> ind) qfd)
+    <> tab <> show ran <> newline
+    <> tab <> show man <> newline
+    <> tab <> show fun <> newline
+  prettyPrint' tab (BQD dom qf qfd1 qfd2 ran man fun) = "BQD" <> newline
+    <> tab <> show dom <> newline
+    <> tab <> show qf <> newline
+    <> tab <> (prettyPrint' (tab <> ind) qfd1)
+    <> tab <> (prettyPrint' (tab <> ind) qfd2)
+    <> tab <> show ran <> newline
+    <> tab <> show man <> newline
+    <> tab <> show fun <> newline
+  prettyPrint' tab (MQD dom qf qfds ran man fun) = "MQD" <> newline
+    <> tab <> show dom <> newline
+    <> tab <> show qf <> newline
+    <> tab <> show qfds <> newline
+    <> tab <> show ran <> newline
+    <> tab <> show man <> newline
+    <> tab <> show fun <> newline
 
-    newline :: String
-    newline = "\n"
+newline :: String
+newline = "\n"
 
-    ind :: String
-    ind = "  "
+ind :: String
+ind = "  "
 
 -----------------------
 data Calculation = S Step | Q QueryFunctionDescription

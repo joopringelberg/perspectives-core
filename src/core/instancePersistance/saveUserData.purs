@@ -33,6 +33,7 @@ import Data.Array (nub)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (values)
 import Perspectives.Assignment.Update (addRol, removeBinding)
@@ -42,7 +43,7 @@ import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTran
 import Perspectives.Deltas (addContextToTransactie, addRolToTransactie, deleteContextFromTransactie, deleteRolFromTransactie)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, removeEntiteit, saveEntiteit)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 import Prelude (bind, discard, join, pure, show, unit, void, ($))
@@ -76,7 +77,7 @@ saveAndConnectRoleInstance id = do
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
--- | Remove the ContextInstance both from the cache and from the database and adds it to the Transaction.
+-- | Removes the ContextInstance both from the cache and from the database and adds it to the Transaction.
 -- | We do not add the removed role instances to the Transaction, as the receiving PDR's will recompute
 -- | them themselves.
 removeContextInstance :: Updater ContextInstance
@@ -92,11 +93,9 @@ removeContextInstance id = do
 -- Removes the rol from the cache and from the database.
 -- Removes the rol from the inverse administration of its binding.
 -- Removes the rol as binding from all its binders.
--- Activates the rules for the contexts of the role that have it as their binding.
 removeRoleInstance_ :: RoleInstance -> MonadPerspectivesTransaction PerspectRol
 removeRoleInstance_ roleId = do
-  -- Remove from couchdb, remove from the cache.
-  originalRole@(PerspectRol{context, gevuldeRollen, binding, pspType}) <- lift $ lift $ removeEntiteit roleId :: MonadPerspectives PerspectRol
+  originalRole@(PerspectRol{context, gevuldeRollen, binding, pspType}) <- lift $ lift $ (getPerspectRol roleId)
 
   -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
   forWithIndex_ gevuldeRollen \_ filledRollen ->
@@ -107,14 +106,11 @@ removeRoleInstance_ roleId = do
     Nothing -> pure unit
     (Just oldBindingId) -> do -- TODO: push a Delta for the change on removeRol_gevuldeRollen?
       (oldBinding :: PerspectRol) <- lift $ lift $ getPerspectEntiteit oldBindingId
-      -- Activate the context of this binding:
-      -- runRulesForContextInstance (rol_context oldBinding)
-
       -- Only then remove the removed role instance as a binding role from the binding.
       Update.saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
 
-  pure originalRole
-
+  -- Remove from couchdb, remove from the cache.
+  lift $ lift $ (removeEntiteit roleId :: MonadPerspectives PerspectRol)
 
 -- | Removes the role instance from the cache and from the database.
 -- | Removes the role instance from the inverse administration of its binding.
@@ -123,7 +119,6 @@ removeRoleInstance_ roleId = do
 -- | Adds the Role to the Transaction in deletedRoles. We do not push a ContextDelta, as the
 -- | receiving PDR's will recompute the effect of destroying this instance on their context
 -- | instances themselves.
--- MAAR... we moeten ook regels runnen.
 removeRoleInstance :: Updater RoleInstance
 removeRoleInstance pr = do
   r@(PerspectRol{pspType, context}) <- removeRoleInstance_ pr
