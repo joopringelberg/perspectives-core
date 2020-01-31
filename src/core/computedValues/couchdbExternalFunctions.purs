@@ -23,9 +23,9 @@
 
 module Perspectives.Extern.Couchdb where
 
-import Affjax (Request, URL, request)
-import Affjax.RequestBody as RequestBody
-import Control.Monad.Error.Class (catchError)
+import Affjax (Request, URL, printResponseFormatError, request)
+import Affjax.RequestBody (string) as RequestBody
+import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Either (Either(..))
@@ -34,15 +34,18 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log)
+import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, assumption)
 import Perspectives.Couchdb (PutCouchdbDocument, ViewResult(..), onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
+import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
@@ -91,21 +94,34 @@ addModelToLocalStore urls = do
         -- Retrieve the DomeinFile from the URL.
       (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
       res <- liftAff $ request $ rq {url = url}
-      (df@(DomeinFile{contextInstances, roleInstances}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
+      (df@(DomeinFile{_id, contextInstances, roleInstances}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
       rev <- version res.headers
       -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
       -- not the local perspect_models.
       save (identifier df :: DomeinFileId) (changeRevision Nothing df)
+      -- Copy the attachment
+      lift $ lift $ addA url _id
       -- Take the role- and contextinstances from it and add them to the user (instances) database.
       forWithIndex_ contextInstances \i a -> save (ContextInstance i) a
-      -- TODO. Dit gaat niet op voor alle rollen, maar wel voor de model representatie.
       forWithIndex_ roleInstances \i a -> void $ lift $ lift $ saveEntiteit_ (RoleInstance i) a
 
     save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
     save i a = do
       void $ lift $ lift $ cacheInitially i a
       void $ lift $ lift $ saveEntiteit i
+
+    -- url is the path to the document in the repository.
+    addA :: String -> String -> MP Unit
+    addA url modelName = do
+      log "Just before adding the attachment."
+      (rq :: (Request String)) <-  defaultPerspectRequest
+      res <- liftAff $ request $ rq {url = url <> "/screens.js"}
+      -- res <- liftAff $ request $ rq {url = docUrl <> (maybe "" ((<>) "?rev=") rev) <> "/screens.js"}
+      result <- onAccepted res.status [200, 304] "uploadToRepository_" (pure res.body)
+      void $ case result of
+        Left e -> throwError $ error ("uploadToRepository: Errors on retrieving attachment: " <> (printResponseFormatError e))
+        Right attachment -> void $ addAttachment ("perspect_models/" <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do
@@ -120,7 +136,7 @@ uploadToRepository_ :: DomeinFileId -> URL -> DomeinFile -> MPQ Unit
 uploadToRepository_ dfId url df = lift $ lift $ do
   docUrl <- pure (url <> "/" <> (show dfId))
   (rq :: (Request String)) <- defaultPerspectRequest
-  -- Try to get the revision
+  -- Try to get the revision, so we can overwrite.
   mVersion <- retrieveDocumentVersion docUrl
   case mVersion of
     Nothing -> do
@@ -128,6 +144,7 @@ uploadToRepository_ dfId url df = lift $ lift $ do
       res <- liftAff $ request $ rq {method = Left PUT, url = docUrl, content = Just $ RequestBody.string (genericEncodeJSON defaultOptions df)}
       void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
         (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+      -- Now add the attachment.
     -- If available, store with revision
     Just rev -> do
       res <- liftAff $ request $ rq {method = Left PUT, url = (docUrl <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions df)}
