@@ -24,13 +24,15 @@ module Perspectives.SetupUser where
 import Data.Maybe (Maybe(..))
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>))
+import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, saveEntiteit_, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
-import Prelude (Unit, bind, pure, unit, void, ($), discard)
+import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
+import Perspectives.User (getCouchdbBaseURL)
+import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>))
 
 modelDirectory :: String
 modelDirectory = "./src/model"
@@ -40,7 +42,9 @@ setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit (ContextInstance "model:User$MijnSysteem")
   case mu of
     Nothing -> do
-      void $ loadAndSaveCrlFile "systemInstances.crl" modelDirectory
+      -- First, upload model:System to perspect_models.
+      cdbUrl <- getCouchdbBaseURL
+      void $ runSterileTransaction (addModelToLocalStore [cdbUrl <> "/repository/model:System"])
       -- now set isMe of "model:User$MijnSysteem$User_0001" to true.
       user <- ContextInstance "model:User$MijnSysteem" ##>> getRole (EnumeratedRoleType "model:System$PerspectivesSystem$User")
       userRol <- getPerspectRol user

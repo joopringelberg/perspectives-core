@@ -14,4 +14,3 @@ sys:PerspectivesSystem usr:MijnSysteem
 			extern $Naam = "Het cluster van Joop"
 			$ClusterGenoot -> $$User(1)
 				$Url = "http://localhost"
-	$IndexedContexts => usr:MijnSysteem

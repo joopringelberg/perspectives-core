@@ -90,6 +90,9 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
           (Just {runner}) -> runner unit
       pure r
 
+runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
+runSterileTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
+
 -- | Derive Assumptions from the Deltas in a Transaction. Each Assumption in the result is unique.
 assumptionsInTransaction :: Transaction -> Array Assumption
 assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas}) = union (assumption <$> contextDeltas) (union (assumption <$> roleDeltas) (assumption <$> propertyDeltas))
