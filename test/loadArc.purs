@@ -46,7 +46,7 @@ theSuite = suiteSkip "Perspectives.loadArc" do
         assert "The model reloaded from couchdb should equal the model loaded from file."
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))
 
-  test "Load a model file and cache it" do
+  testOnly "Load a model file and cache it" do
     -- 1. Load and save a model.
     messages <- runP (loadAndCompileArcFile "perspectivesSysteem" modelDirectory)
     case messages of

@@ -40,7 +40,7 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoles, removeBinding, removeProperty, removeRolFromContext, saveEntiteit, setBinding, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, deleteRol, moveRoles, removeBinding, removeProperty, removeRolFromContext, saveEntiteit, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
 import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
@@ -61,7 +61,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.SaveUserData (removeRoleInstance, saveAndConnectRoleInstance)
+import Perspectives.SaveUserData (removeAllRoleInstances, removeRoleInstance, saveAndConnectRoleInstance)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Compile the action to an Updater. Cache for later use.
@@ -101,6 +101,15 @@ compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
         ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
         removeRolFromContext context pspType roles
         for_ roles removeRoleInstance
+
+-- Delete all instances of the role. Model
+compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDeleteFrom _ _ _) = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextsToDeleteFrom
+  pure \contextId -> do
+    ctxts <- lift $ lift (contextId ##= contextGetter)
+    for_ ctxts \ctxt -> do
+      removeAllRoleInstances qualifiedRoleIdentifier ctxt
+      deleteRol ctxt qualifiedRoleIdentifier
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription

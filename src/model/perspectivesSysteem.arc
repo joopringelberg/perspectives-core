@@ -28,11 +28,15 @@ domain: System
     context: ModelsInUse (not mandatory, not functional) filledBy: Model
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     context: UnBoundModel = filter (filter ModelsInUse with available binding >> context) with not exists filter (binding >> context >> IndexedContext >> binding) with exists binder IndexedContexts
+    context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
     bot: for User
       perspective on: UnloadedModel
         if exists UnloadedModel then
           callEffect cdb:AddModelToLocalStore( UnloadedModel >> binding >> Url )
           bind object >> binding >> context >> IndexedContext >> binding to IndexedContexts
+      perspective on: DanglingIndexedContext
+        if exists DanglingIndexedContext then
+          remove object
 
   case: Model
     external:

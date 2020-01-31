@@ -473,9 +473,12 @@ compileRules = do
                 -- Now create a function description.
                 pure $ BQD currentDomain QF.Unbind_ bindings binders currentDomain True True
 
-              DeleteRole {roleExpression} -> do
-                roleQfd <- ensureRole currentDomain roleExpression
-                pure $ UQD currentDomain QF.DeleteRole roleQfd currentDomain True True
+              DeleteRole f@{roleIdentifier, contextExpression} -> do
+                (contextQfd :: QueryFunctionDescription) <- case contextExpression of
+                  Nothing -> pure $ (SQD currentDomain QF.Identity currentDomain True True)
+                  (Just stp) -> ensureContext currentDomain stp
+                (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyWithRespectTo roleIdentifier contextQfd f.start f.end
+                pure $ UQD currentDomain (QF.DeleteRole qualifiedRoleIdentifier) contextQfd currentDomain True True
 
               DeleteProperty f@{propertyIdentifier, roleExpression} -> do
                 (roleQfd :: QueryFunctionDescription) <- case roleExpression of

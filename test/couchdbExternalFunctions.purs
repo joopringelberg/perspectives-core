@@ -49,8 +49,9 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  test "uploadToRepository" (runP do
+  testOnly "upload model to repository and to perspect_models from files" (runP do
     ExternalCouchdb.addExternalFunctions
+    setupUser
     modelErrors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
     if null modelErrors
       then do
@@ -64,9 +65,9 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testOnly "upload model to repository from files" (runP do
+  test "upload model to repository from files" (runP do
     cdburl <- getCouchdbBaseURL
-    errors <- loadCompileAndCacheArcFile "testBotActie" modelDirectory
+    errors <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     liftAff $ assert "There should be no errors" (null errors)
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.

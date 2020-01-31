@@ -41,7 +41,7 @@ import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (addRol, removeBinding, saveEntiteit, setBinding, setProperty)
+import Perspectives.Assignment.Update (addRol, removeBinding, removeRolFromContext, saveEntiteit, setBinding, setProperty)
 import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
@@ -219,10 +219,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.DeleteContext -> do
       void $ runMonadPerspectivesTransaction $ removeContextInstance (ContextInstance subject)
       sendResponse (Result corrId []) setter
+    -- {request: "RemoveRol", subject: contextID, predicate: rolName, object: rolID}
     Api.RemoveRol -> do
-      -- removeRolFromContext
-        void $ runMonadPerspectivesTransaction $ removeRoleInstance (RoleInstance object)
+        void $ runMonadPerspectivesTransaction do
+          removeRolFromContext (ContextInstance subject) (EnumeratedRoleType predicate) [(RoleInstance object)]
+          removeRoleInstance (RoleInstance object)
         sendResponse (Result corrId []) setter
+    -- TODO: DeleteRol
     Api.CreateRol -> do
       (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction do
         desc@(RolSerialization{binding}) <- pure (unsafePartial $ fromJust rolDescription)

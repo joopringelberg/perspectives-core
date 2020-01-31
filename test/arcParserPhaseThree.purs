@@ -876,7 +876,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                     case extractEffect effect of
                       (UQD _ qf bndg _ _ _) -> do
                         assert "The queryfunction should be DeleteRole" (case qf of
-                          DeleteRole -> true
+                          (DeleteRole _) -> true
                           otherwise -> false )
                         case bndg of
                           (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast")))_ _ _) ->

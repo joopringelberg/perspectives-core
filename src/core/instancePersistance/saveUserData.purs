@@ -23,7 +23,8 @@ module Perspectives.SaveUserData
   ( saveContextInstance
   , saveAndConnectRoleInstance
   , removeContextInstance
-  , removeRoleInstance)
+  , removeRoleInstance
+  , removeAllRoleInstances)
 
   where
 

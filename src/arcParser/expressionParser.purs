@@ -339,9 +339,10 @@ roleDeletion :: IP Assignment
 roleDeletion = try do
   start <- getPosition
   reserved "delete"
-  roleExpression <- step
+  roleIdentifier <- arcIdentifier
+  contextExpression <- optionMaybe (reserved "from" *> step)
   end <- getPosition
-  pure $ DeleteRole {start, end, roleExpression}
+  pure $ DeleteRole {start, end, roleIdentifier, contextExpression}
 
 callEffect :: IP Assignment
 callEffect = try do
