@@ -1,6 +1,6 @@
 {
   "name": "perspectives-core",
-  "set": "psc-12.6-perspectives",
+  "set": "psc-12.7-perspectives",
   "source": "https://github.com/joopringelberg/package-sets.git",
   "depends": [
     "aff",
