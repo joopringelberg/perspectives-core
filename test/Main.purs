@@ -24,6 +24,7 @@ import Test.Combinators as COMB
 import Test.Extern.Couchdb as CDB
 import Test.Model.System as TMS
 import Test.Types.ObjectGetters as TTO
+import Test.Queries as QR
 import Test.Unit.Main (runTest)
 
 
@@ -48,3 +49,4 @@ main = runTest do
   CDB.theSuite
   TMS.theSuite
   TTO.theSuite
+  QR.theSuite

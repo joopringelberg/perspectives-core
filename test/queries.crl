@@ -1,0 +1,30 @@
+GebruikerGegevens
+
+import model:Test als tst:
+
+tst:Case1 usr:TC1
+  $RoleB(1) => ()
+  $RoleB(2) => ()
+  $RoleA(1) -> $RoleB(1)
+  $RoleA(2) -> $RoleB(2)
+
+tst:Case2 usr:TC2
+  $RoleD(1) => ()
+  $RoleD(2) => ()
+  $RoleC(1) -> $RoleD(1)
+  $RoleC(2) -> $RoleD(1)
+  $RoleC(3) -> $RoleD(2)
+
+tst:Case3 usr:TC3
+  $RoleE(1) => ()
+    $Prop1 = true
+  $RoleE(2) => ()
+    $Prop1 = false
+
+tst:Case4 usr:TC4
+  $RoleF(1) -> $RoleG(1)
+  $RoleF(2) -> $RoleG(2)
+  $RoleG(1) => ()
+    $Prop1 = true
+  $RoleG(2) => ()
+    $Prop1 = false

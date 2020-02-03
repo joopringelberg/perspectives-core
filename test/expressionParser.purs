@@ -3,22 +3,23 @@ module Test.Parsing.Arc.Expression where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Either (Either(..))
 import Data.Array (length)
+import Data.Either (Either(..))
 import Data.Maybe (isJust, isNothing)
 import Data.Newtype (unwrap)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Perspectives.Parsing.Arc.Expression (assignment, letStep, operator, simpleStep, step, unaryStep)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), BinaryStep(..), LetStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), runIndentParser)
-import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..))
+import Perspectives.Representation.Range (Range(..))
+import Perspectives.Utilities (prettyPrint)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError(..))
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip"Perspectives.Parsing.Arc.Expression" do
+theSuite = suiteSkip "Perspectives.Parsing.Arc.Expression" do
   test "SimpleStep: ArcIdentifier" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "MyRole" simpleStep
     case r of
@@ -150,6 +151,20 @@ theSuite = suiteSkip"Perspectives.Parsing.Arc.Expression" do
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
               (Equals _) -> true
+              otherwise -> false
+            otherwise -> false
+
+  test "Filter with compound criterium" do
+    (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser "filter MyRole with (MyOtherRole >> Criterium)" step
+    case r of
+      (Left e) -> assert (show e) false
+      (Right id) -> do
+        logShow id
+        log $ prettyPrint id
+        assert "'filter MyRole with (MyOtherRole >> Criterium)' should be parsed as a a binary step with operator 'Filter'"
+          case id of
+            (Binary (BinaryStep {operator})) -> case operator of
+              (Filter _) -> true
               otherwise -> false
             otherwise -> false
 

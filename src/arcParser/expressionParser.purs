@@ -36,16 +36,19 @@ import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..), IP, getPosition, 
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
-import Prelude ((<$>), (<*>), ($), pure, (*>), bind, discard, (<*), (>), (+), (>>=), (<<<), show)
+import Prelude (bind, discard, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=))
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (between, lookAhead, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
 import Text.Parsing.Parser.Token (alphaNum)
 
 step :: IP Step
-step = do
+step = defer \_ -> step_ false
+
+step_ :: Boolean -> IP Step
+step_ parenthesised = do
   start <- getPosition
-  left <- token.parens step <|> leftSide
+  left <- (token.parens (step_ true)) <|> leftSide
   mop <- optionMaybe (try operator)
   case mop of
     Nothing -> pure left
@@ -53,16 +56,17 @@ step = do
       right <- step
       end <- getPosition
       case right of
-        (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight})) -> if (operatorPrecedence op) > (operatorPrecedence opOfRight)
+        (Binary (BinaryStep {left: leftOfRight, operator:opOfRight, right: rightOfRight, end: endOfRight, parenthesised: protected})) -> if not protected && ((operatorPrecedence op) > (operatorPrecedence opOfRight))
           then pure $ Binary $ BinaryStep
             { start
             , end -- equals endOfRight.
-            , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight})
+            , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight, parenthesised: false})
             , operator: opOfRight
             , right: rightOfRight
+            , parenthesised: false
           }
-          else pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
-        otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right}
+          else pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised: parenthesised}
+        otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
   where
     leftSide :: IP Step
     leftSide = defer \_ -> reserved "filter" *> step <|> letStep <|> unaryStep <|> simpleStep
