@@ -256,7 +256,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
               case binding of
                 Just bndg -> do
                   b <- lift $ lift $ getPerspectRol (RoleInstance bndg)
-                  saveEntiteit (RoleInstance bndg) (addRol_gevuldeRollen b (EnumeratedRoleType predicate) _id)
+                  saveEntiteit (RoleInstance bndg) (addRol_gevuldeRollen b eroltype _id)
                 Nothing -> pure unit
               saveAndConnectRoleInstance (identifier role)
               pure $ (identifier :: PerspectRol -> RoleInstance) role
