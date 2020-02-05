@@ -62,11 +62,11 @@ instance objectPrettyPrint :: PrettyPrint v => PrettyPrint (Object v) where
   prettyPrint' tab o = "{ " <> (foldMap (\(s :: String) (v :: v) -> newline <> tab <> s <> ": " <> (prettyPrint' (tab <> "  ") v)) o) <> " }"
 
 instance arrayPrettyPrint :: (Show v, PrettyPrint v) => PrettyPrint (Array v) where
-  prettyPrint' tab a = "[" <> fold (((<>) newline <<< (prettyPrint' (tab <> "  "))) <$> a) <> newline <> "]"
+  prettyPrint' tab a = "[" <> fold (((<>) newline <<< (prettyPrint' (tab <> "  "))) <$> a) <> newline <> tab <> "]"
 
 instance maybePrettyPrint :: (PrettyPrint v) => PrettyPrint (Maybe v) where
   prettyPrint' tab Nothing = "Nothing"
-  prettyPrint' tab (Just v) = "Just " <> prettyPrint' tab v 
+  prettyPrint' tab (Just v) = "Just " <> prettyPrint' tab v
 
 newline :: String
 newline = "\n"

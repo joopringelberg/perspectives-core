@@ -78,20 +78,46 @@ context rid = ArrayT do
 binding :: RoleInstance ~~> RoleInstance
 binding r = ArrayT do
   (role :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+  tell [assumption (unwrap r) "model:System$Role$binding"]
   case rol_binding role of
     Nothing -> pure []
-    (Just b) -> do
-      tell [assumption (unwrap r) "model:System$Role$binding"]
-      pure [b]
+    (Just b) -> pure [b]
+
+-- | From the instance of a Rol of any kind, find the instances of the Rol of the given
+-- | type that bind it (that have it as their binding). The type of rname (RolDef) may
+-- | be psp:Context$externalRole.
+getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
+getRoleBinders rname r = ArrayT do
+  ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+  case (lookup (unwrap rname) gevuldeRollen) of
+    Nothing -> pure []
+    (Just bs) -> do
+      for_ bs \b -> tell [assumption (unwrap b) "model:System$Role$binding"]
+      pure bs
+
+-- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
+-- | that bind it (that have it as their binding). The type of ln can be 'externalRole'.
+-- Test.Perspectives.ObjectGetterConstructors
+getUnqualifiedRoleBinders :: LocalName -> (RoleInstance ~~> RoleInstance)
+getUnqualifiedRoleBinders ln r = ArrayT do
+    (role@(IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+    case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys gevuldeRollen) of
+      Nothing -> pure []
+      (Just i) -> do
+        rn <- pure (unsafePartial $ fromJust (index (keys gevuldeRollen) i))
+        case lookup rn gevuldeRollen of
+          Nothing -> pure []
+          (Just bs) -> do
+            for_ bs \b -> tell [assumption (unwrap b) "model:System$Role$binding"]
+            pure bs
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT do
   ((IP.PerspectRol{properties}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+  tell [assumption (unwrap r)(unwrap pn)]
   case (lookup (unwrap pn) properties) of
     Nothing -> pure []
-    (Just p) -> do
-      tell [assumption (unwrap r)(unwrap pn)]
-      pure p
+    (Just p) -> pure p
 
 -- | Turn a function that returns strings into one that returns Booleans.
 makeBoolean :: forall a. (a ~~> Value) -> (a ~~> Boolean)
@@ -106,11 +132,10 @@ getUnqualifiedProperty ln r = ArrayT do
     Nothing -> pure []
     (Just i) -> do
       pn <- pure (unsafePartial $ fromJust (index (keys $ rol_properties role) i))
+      tell [assumption (unwrap r) pn]
       case (lookup pn properties) of
         Nothing -> pure []
-        (Just p) -> do
-          tell [assumption (unwrap r) pn]
-          pure p
+        (Just p) -> pure p
 
 -- | Because we never change the type of a Role, we have no real need
 -- | to track it as a dependency.
@@ -126,31 +151,3 @@ allRoleBinders r = ArrayT do
   ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
   for_ (keys gevuldeRollen) (\key -> tell [assumption (unwrap r) key])
   pure $ join $ values gevuldeRollen
-
--- | From the instance of a Rol of any kind, find the instances of the Rol of the given
--- | type that bind it (that have it as their binding). The type of rname (RolDef) may
--- | be psp:Context$externalRole.
-getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
-getRoleBinders rname r = ArrayT do
-  ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
-  case (lookup (unwrap rname) gevuldeRollen) of
-    Nothing -> pure []
-    (Just g) -> do
-      tell [assumption (unwrap r) (unwrap rname)]
-      pure g
-
--- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
--- | that bind it (that have it as their binding). The type of ln can be 'externalRole'.
--- Test.Perspectives.ObjectGetterConstructors
-getUnqualifiedRoleBinders :: LocalName -> (RoleInstance ~~> RoleInstance)
-getUnqualifiedRoleBinders ln r = ArrayT do
-    (role@(IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
-    case findIndex (test (unsafeRegex (ln <> "$") noFlags)) (keys gevuldeRollen) of
-      Nothing -> pure []
-      (Just i) -> do
-        rn <- pure (unsafePartial $ fromJust (index (keys gevuldeRollen) i))
-        case lookup rn gevuldeRollen of
-          Nothing -> pure []
-          (Just b) -> do
-            tell [assumption (unwrap r) rn]
-            pure b
