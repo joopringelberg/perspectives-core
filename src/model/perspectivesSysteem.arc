@@ -34,9 +34,13 @@ domain: System
       perspective on: DanglingIndexedContext
         if exists DanglingIndexedContext then
           remove object
-          --remove object >> binding >> context
+      perspective on: UnconnectedIndexedContext
+        if exists UnconnectedIndexedContext then
+          bind object to IndexedContexts
     context: UnloadedModel = filter ModelsInUse with not available (binding >> context)
     context: DanglingIndexedContext = filter IndexedContexts with not exists binding >> binder IndexedContext >> context >> extern >> binder ModelsInUse
+    -- On moving a model to ModelsInUse for the second time, the bot with the perspective on UnloadedModel will not work. We need a third rule for that.
+    context: UnconnectedIndexedContext = filter (ModelsInUse >> binding >> context >> IndexedContext >> binding) with not exists binder IndexedContexts
 
   case: Model
     external:
