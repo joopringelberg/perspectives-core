@@ -71,13 +71,25 @@ theSuite = suiteSkip "Queries" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testOnly "One result over filter RoleF with binding >> Prop1" (runP do
+  test "One result over filter RoleF with binding >> Prop1" (runP do
     -- Load the test Arc file from the testDirectory. Parse the file completely. Cache it.
     modelErrors <- loadCompileAndCacheArcFile "queries" testDirectory
     if null modelErrors
       then do
         getComputed <- getRoleFunction "model:Test$Case4$Computed"
         cs <- ((ContextInstance "model:User$TC4") ##= getComputed)
+        logShow cs
+        liftAff $ assert "There should be one role instance for Computed" (length cs == 1)
+      else liftAff $ assert ("There are model errors: " <> show modelErrors) false
+      )
+
+  testOnly "One result over filter RoleF with not binding >> Prop1" (runP do
+    -- Load the test Arc file from the testDirectory. Parse the file completely. Cache it.
+    modelErrors <- loadCompileAndCacheArcFile "queries" testDirectory
+    if null modelErrors
+      then do
+        getComputed <- getRoleFunction "model:Test$Case5$Computed"
+        cs <- ((ContextInstance "model:User$TC5") ##= getComputed)
         logShow cs
         liftAff $ assert "There should be one role instance for Computed" (length cs == 1)
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false

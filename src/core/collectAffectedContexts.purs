@@ -45,7 +45,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (ContextDelta(..), PropertyDelta(..), RoleDelta(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), RolePropertyDelta(..), RoleBindingDelta(..))
 import Prelude (Unit, bind, const, discard, pure, unit, ($), (<<<))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -70,8 +70,8 @@ aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
 addAffectedContexts :: Array ContextInstance -> MonadPerspectivesTransaction Unit
 addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = SET.union affectedContexts (SET.fromFoldable as)})
 
-aisInRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
-aisInRoleDelta (RoleDelta{id, binding}) = do
+aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
+aisInRoleDelta (RoleBindingDelta{id, binding}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions _onRoleDelta_binding binderType
   for_ bindingCalculations \(AffectedContextCalculation{compilation, action}) -> do
@@ -88,8 +88,8 @@ aisInRoleDelta (RoleDelta{id, binding}) = do
         addAffectedContexts affectedContexts
     Nothing -> pure unit
 
-aisInPropertyDelta :: PropertyDelta -> MonadPerspectivesTransaction Unit
-aisInPropertyDelta (PropertyDelta{id, property})= do
+aisInPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
+aisInPropertyDelta (RolePropertyDelta{id, property})= do
   calculations <- lift2 $ compileDescriptions' property
   for_ calculations \(AffectedContextCalculation{compilation, action}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.

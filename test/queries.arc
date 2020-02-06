@@ -20,3 +20,9 @@ domain: Test
     thing: RoleG
       property: Prop1 (mandatory, functional, Boolean)
     thing: Computed = filter RoleF with (binding >> Prop1)
+
+  case: Case5
+    thing: RoleH filledBy: RoleI
+    thing: RoleI
+      property: Prop1 (mandatory, functional, Boolean)
+    thing: Computed = filter RoleH with not binding >> Prop1

@@ -23,7 +23,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (foldM, singleton, union)
+import Data.Array (foldM, singleton, sort, union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
@@ -71,7 +71,7 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
       -- 1. Execute the value that accumulates Deltas in a Transaction.
       r <- a
       -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
-      (ft :: Transaction) <- lift AA.get >>= runActions
+      (ft@(Transaction{correlationIdentifiers}) :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
       if share then runTransactie ft else pure unit
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
@@ -83,7 +83,8 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
           (Just ids) -> pure (union bottom ids))
         []
         (assumptionsInTransaction ft)
-      lift $ lift $ for_ corrIds \corrId -> do
+      -- Sort from low to high, so we can never actualise a client side component after it has been removed.
+      lift $ lift $ for_ (sort $ correlationIdentifiers <> corrIds) \corrId -> do
         me <- pure $ lookupActiveSupportedEffect corrId
         case me of
           Nothing -> pure unit

@@ -33,21 +33,22 @@ import Control.Monad.State (lift)
 import Data.Array (nub)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.Traversable (for_)
-import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Object (values)
 import Perspectives.Assignment.Update (addRol, removeBinding)
 import Perspectives.Assignment.Update (saveEntiteit) as Update
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, removeRol_gevuldeRollen, rol_pspType)
-import Perspectives.CoreTypes (MonadPerspectives, Updater, MonadPerspectivesTransaction)
-import Perspectives.Deltas (addContextToTransactie, addRolToTransactie, deleteContextFromTransactie, deleteRolFromTransactie)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Updater, assumption)
+import Perspectives.Deltas (addContextToTransactie, addCorrelationIdentifiersToTransactie, addRolToTransactie, deleteContextFromTransactie, deleteRolFromTransactie)
+import Perspectives.DependencyTracking.Dependency (findBindingRequests, findBinderRequests, findDependencies)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Prelude (bind, discard, join, pure, show, unit, void, ($))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Prelude (bind, discard, join, pure, show, unit, void, ($), (>>=))
 
 -- | These functions are Updaters, too. They do not push deltas like the Updaters that change PerspectEntities, but
 -- | they modify other members of Transaction (createdContexts, deletedContexts, createdRoles, deletedRoles).
@@ -85,7 +86,11 @@ removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
   deleteContextFromTransactie id
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectContext id
-  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> removeRoleInstance_ rol
+  forWithIndex_ (context_iedereRolInContext ctxt) \rolTypeId instances -> let rolType = (EnumeratedRoleType rolTypeId) in
+    for_ instances \rol -> do
+      (lift $ lift $ findBinderRequests rol rolType) >>= addCorrelationIdentifiersToTransactie
+      (lift $ lift $ findBindingRequests rol) >>= addCorrelationIdentifiersToTransactie
+      removeRoleInstance_ rol
   void $ removeRoleInstance_ (context_buitenRol ctxt)
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   pure unit
@@ -122,8 +127,18 @@ removeRoleInstance_ roleId = do
 -- | instances themselves.
 removeRoleInstance :: Updater RoleInstance
 removeRoleInstance pr = do
-  r@(PerspectRol{pspType, context}) <- removeRoleInstance_ pr
+  r@(PerspectRol{pspType, context, binding}) <- removeRoleInstance_ pr
   deleteRolFromTransactie pr
+  -- Find all queries that should be re-run.
+  -- All requests for the pspType binder of the binding
+  case binding of
+    Nothing -> pure unit
+    Just bnd -> (lift $ lift $ findBinderRequests bnd pspType) >>= addCorrelationIdentifiersToTransactie
+  -- All requests for instances of the roletype of pr for its context.
+  mrr <- lift $ lift $ findDependencies (assumption (unwrap context)(unwrap pr))
+  case mrr of
+    Nothing -> pure unit
+    Just rr -> addCorrelationIdentifiersToTransactie rr
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.

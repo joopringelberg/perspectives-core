@@ -31,13 +31,14 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
-import Foreign.Object (Object, insert, lookup, singleton)
+import Foreign.Object (Object, insert, lookup, singleton, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
-import Perspectives.Utilities (prettyPrint)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
@@ -114,6 +115,27 @@ findDependencies a@(Tuple resource tpe) = do
   case lookup resource r of
     Nothing -> pure Nothing
     Just (typesForResource :: Object (Array CorrelationIdentifier)) -> pure $ lookup tpe typesForResource
+
+findResourceDependencies :: String -> MP (Array CorrelationIdentifier)
+findResourceDependencies resource = do
+  r <- queryAssumptionRegister
+  case lookup resource r of
+    Nothing -> pure []
+    Just typesForResource -> pure $ join $ values typesForResource
+
+findBindingRequests :: RoleInstance -> MP (Array CorrelationIdentifier)
+findBindingRequests (RoleInstance roleId) = do
+  r <- queryAssumptionRegister
+  case lookup roleId r of
+    Nothing -> pure []
+    Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Role$binding" typesForResource)
+
+findBinderRequests :: RoleInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
+findBinderRequests (RoleInstance roleId) (EnumeratedRoleType typeId) = do
+  r <- queryAssumptionRegister
+  case lookup roleId r of
+    Nothing -> pure []
+    Just typesForResource -> pure $ maybe [] identity (lookup typeId typesForResource)
 
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<

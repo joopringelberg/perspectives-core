@@ -28,3 +28,11 @@ tst:Case4 usr:TC4
     $Prop1 = true
   $RoleG(2) => ()
     $Prop1 = false
+
+tst:Case5 usr:TC5
+  $RoleH(1) -> $RoleI(1)
+  $RoleH(2) -> $RoleI(2)
+  $RoleI(1) => ()
+    $Prop1 = true
+  $RoleI(2) => ()
+    $Prop1 = false

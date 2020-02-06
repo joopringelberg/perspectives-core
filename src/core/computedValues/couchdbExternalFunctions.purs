@@ -39,7 +39,6 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
@@ -114,7 +113,6 @@ addModelToLocalStore urls = do
     -- url is the path to the document in the repository.
     addA :: String -> String -> MP Unit
     addA url modelName = do
-      log "Just before adding the attachment."
       (rq :: (Request String)) <-  defaultPerspectRequest
       res <- liftAff $ request $ rq {url = url <> "/screens.js"}
       -- res <- liftAff $ request $ rq {url = docUrl <> (maybe "" ((<>) "?rev=") rev) <> "/screens.js"}

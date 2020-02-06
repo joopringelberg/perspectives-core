@@ -92,7 +92,7 @@ getRoleBinders rname r = ArrayT do
   case (lookup (unwrap rname) gevuldeRollen) of
     Nothing -> pure []
     (Just bs) -> do
-      for_ bs \b -> tell [assumption (unwrap b) "model:System$Role$binding"]
+      for_ bs \b -> tell [assumption (unwrap r) (unwrap rname)]
       pure bs
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name

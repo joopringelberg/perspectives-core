@@ -40,6 +40,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
@@ -53,7 +54,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleDelta(..), DeltaType(..), PropertyDelta(..), ContextDelta(..))
+import Perspectives.TypesForDeltas (RoleBindingDelta(..), DeltaType(..), RolePropertyDelta(..), ContextDelta(..))
 import Perspectives.User (getUser)
 import Perspectives.Utilities (maybeM, onNothing')
 import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
@@ -101,11 +102,14 @@ addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changed
 addContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
 addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas} -> t {contextDeltas = cons d contextDeltas})
 
-addRoleDelta :: RoleDelta -> MonadPerspectivesTransaction Unit
+addRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
 addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
 
-addPropertyDelta :: PropertyDelta -> MonadPerspectivesTransaction Unit
+addPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
 addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
+
+addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
+addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})
 
 -- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.
@@ -126,7 +130,7 @@ addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas} -> t
 -- | Delta's that affect the same Role or Property.
 -- | Modify a Triple that represents a basic fact in the TripleAdministration.
 -- | Add that Triple to the TripleQueue.
--- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke ContextDelta, RoleDelta, enz.
+-- TODO. Dit werkt voor de generieke Delta, maar niet voor de specifieke ContextDelta, RoleBindingDelta, enz.
 -- addDelta :: Delta -> MonadPerspectives Unit
 -- addDelta newCD@(Delta{id: id', memberName, deltaType, value, isContext}) = do
 --   t@(Transaction tf@{deltas}) <- transactie

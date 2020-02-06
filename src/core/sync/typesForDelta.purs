@@ -41,6 +41,7 @@ newtype ContextDelta = ContextDelta
   { id :: ContextInstance
   , roleType :: EnumeratedRoleType
   , roleInstance :: Maybe RoleInstance
+  -- Add, Remove, Delete,
   , deltaType :: DeltaType
   }
 
@@ -57,46 +58,48 @@ instance decodeContextDelta :: Decode ContextDelta where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
--- ROLEDELTA
+-- ROLEBINDINGDELTA
 -----------------------------------------------------------
-newtype RoleDelta = RoleDelta
+newtype RoleBindingDelta = RoleBindingDelta
   { id :: RoleInstance
   , binding :: Maybe RoleInstance
+  -- Remove, Change
   , deltaType :: DeltaType
   }
 
-derive instance genericRoleDelta :: Generic RoleDelta _
+derive instance genericRoleDelta :: Generic RoleBindingDelta _
 
-instance showRoleDelta :: Show RoleDelta where
+instance showRoleDelta :: Show RoleBindingDelta where
   show = genericShow
 
-derive instance eqRoleDelta :: Eq RoleDelta
+derive instance eqRoleDelta :: Eq RoleBindingDelta
 
-instance encodeRoleDelta :: Encode RoleDelta where
+instance encodeRoleDelta :: Encode RoleBindingDelta where
   encode = genericEncode defaultOptions
-instance decodeRoleDelta :: Decode RoleDelta where
+instance decodeRoleDelta :: Decode RoleBindingDelta where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
--- PROPERTYDELTA
+-- ROLEPROPERTYDELTA
 -----------------------------------------------------------
-newtype PropertyDelta = PropertyDelta
+newtype RolePropertyDelta = RolePropertyDelta
   { id :: RoleInstance
   , property :: EnumeratedPropertyType
   , value :: Maybe Value
+  -- Add, Remove, Delete, Change
   , deltaType :: DeltaType
   }
 
-derive instance genericPropertyDelta :: Generic PropertyDelta _
+derive instance genericPropertyDelta :: Generic RolePropertyDelta _
 
-instance showPropertyDelta :: Show PropertyDelta where
+instance showPropertyDelta :: Show RolePropertyDelta where
   show = genericShow
 
-derive instance eqPropertyDelta :: Eq PropertyDelta
+derive instance eqPropertyDelta :: Eq RolePropertyDelta
 
-instance encodePropertyDelta :: Encode PropertyDelta where
+instance encodePropertyDelta :: Encode RolePropertyDelta where
   encode = genericEncode defaultOptions
-instance decodePropertyDelta :: Decode PropertyDelta where
+instance decodePropertyDelta :: Decode RolePropertyDelta where
   decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
