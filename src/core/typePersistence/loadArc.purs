@@ -123,6 +123,7 @@ loadCompileAndCacheArcFile :: String -> String -> MonadPerspectives (Array Persp
 loadCompileAndCacheArcFile = loadAndPersistArcFile true \id df -> storeDomeinFileInCache id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
+-- | Does not try to load an instance file.
 loadCompileAndCacheArcFile' :: String -> String -> MonadPerspectives (Array PerspectivesError)
 loadCompileAndCacheArcFile' = loadAndPersistArcFile false \id df -> storeDomeinFileInCache id df *> pure []
 
@@ -132,6 +133,7 @@ loadCompileAndSaveArcFile :: String -> String -> MonadPerspectives (Array Perspe
 loadCompileAndSaveArcFile = loadAndPersistArcFile true \_ df -> storeDomeinFileInCouchdb df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Store in Couchdb.
+-- | Does not try to load an instance file.
 loadCompileAndSaveArcFile' :: String -> String -> MonadPerspectives (Array PerspectivesError)
 loadCompileAndSaveArcFile' = loadAndPersistArcFile false \_ df -> storeDomeinFileInCouchdb df *> pure []
 

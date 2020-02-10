@@ -140,14 +140,14 @@ uploadToRepository_ dfId url df = lift $ lift $ do
     Nothing -> do
     -- If not available, store without revision
       res <- liftAff $ request $ rq {method = Left PUT, url = docUrl, content = Just $ RequestBody.string (genericEncodeJSON defaultOptions df)}
-      void $ onAccepted res.status [200, 201] "saveUnversionedEntiteit"
-        (onCorrectCallAndResponse "saveUnversionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+      void $ onAccepted res.status [200, 201] "uploadToRepository_"
+        (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
       -- Now add the attachment.
     -- If available, store with revision
     Just rev -> do
       res <- liftAff $ request $ rq {method = Left PUT, url = (docUrl <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions df)}
-      void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
-        (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+      void $ onAccepted res.status [200, 201] "uploadToRepository_"
+        (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
