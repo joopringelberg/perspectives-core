@@ -8,11 +8,11 @@ import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Class.Console (logShow)
-import Perspectives.DomeinCache (removeDomeinFileFromCache, retrieveDomeinFile)
+import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadCompileAndSaveArcFile', loadAndCompileArcFile)
 import Test.Perspectives.Utils (runP)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -22,22 +22,20 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.loadArc" do
+theSuite = suite  "Perspectives.loadArc" do
   test "Load a model file and store it in Couchdb: reload and compare with original" do
     -- 1. Load and save a model.
-    messages <- runP $ loadCompileAndSaveArcFile "contextAndRole.arc" testDirectory
+    messages <- runP $ loadCompileAndSaveArcFile' "contextAndRole" testDirectory
     if null messages
       then pure unit
       else do
         logShow messages
         assert "The file could not be saved" false
-    -- 2. Clear it from the cache. NOTE: because we re-run perspectives, this is unnecessary.
-    runP $ removeDomeinFileFromCache "model:ContextAndRole"
-    -- 3. Reload it from the database into the cache.
+    -- 2. Reload it from the database into the cache.
     retrievedModel <- runP $ retrieveDomeinFile "model:ContextAndRole"
-    -- 4. Reload the file without caching or saving.
-    r <- runP $ loadAndCompileArcFile "contextAndRole.arc" testDirectory
-    -- 5. Compare the model in cache with the model from the file.
+    -- 3. Reload the file without caching or saving.
+    r <- runP $ loadAndCompileArcFile "contextAndRole" testDirectory
+    -- 4. Compare the model in cache with the model from the file.
     -- logShow retrievedModel
     case r of
       Left e -> assert "The same file loaded the second time fails" false

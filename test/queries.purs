@@ -34,7 +34,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Queries" do
+theSuite = suite  "Queries" do
 
   test "Two results over: RoleA >> binding" (runP do
     -- Load the test Arc file from the testDirectory. Parse the file completely. Cache it.
@@ -83,7 +83,7 @@ theSuite = suiteSkip "Queries" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testOnly "One result over filter RoleF with not binding >> Prop1" (runP do
+  test "One result over filter RoleF with not binding >> Prop1" (runP do
     -- Load the test Arc file from the testDirectory. Parse the file completely. Cache it.
     modelErrors <- loadCompileAndCacheArcFile "queries" testDirectory
     if null modelErrors

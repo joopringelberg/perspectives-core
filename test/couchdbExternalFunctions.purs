@@ -65,7 +65,7 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  testOnly "upload model to repository from files" (runP do
+  test "upload model to repository from files" (runP do
     cdburl <- getCouchdbBaseURL
     errors <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     liftAff $ assert ("There should be no errors" <> show errors) (null errors)

@@ -16,10 +16,10 @@ import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.SetupUser (setupUser) as SU
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
-import Perspectives.SetupUser (setupUser) as SU
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -29,7 +29,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.loadCRL" do
+theSuite = suite  "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "combinators.crl" testDirectory
     -- logShow r
@@ -56,6 +56,7 @@ theSuite = suiteSkip "Perspectives.loadCRL" do
     assert "There should be an instance of SomeRole." (length r == 1)
 
   test "Load a file with a context instance in couchdb" (runP do
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     _ <- loadCompileAndSaveArcFile' "testBotActie" modelDirectory
     r <- loadAndSaveCrlFile "testBotActie.crl" modelDirectory
     if null r

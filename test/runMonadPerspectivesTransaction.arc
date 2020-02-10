@@ -8,7 +8,7 @@ domain: Test
     thing: FillerRole
     bot: for Self
       perspective on: Self
-        if true then
+        if not exists SomeRole then
           bind SourceRole >> binding to SomeRole
       perspective on: RoleToInspect
         if exists SomeRole then
@@ -72,7 +72,7 @@ domain: Test
     user: Self filledBy: sys:PerspectivesSystem$User
     bot: for Self
       perspective on: ARole
-        if true then
+        if not exists ARole >> Prop4 then
           Prop4 = true
       perspective on: RoleToInspect
         if ARole >> Prop4 then

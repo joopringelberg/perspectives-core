@@ -27,10 +27,10 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (saveAndConnectRoleInstance)
-import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadArcAndCrl, loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadArcAndCrl, loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -39,12 +39,14 @@ testDirectory = "test"
 modelDirectory :: String
 modelDirectory = "src/model"
 
+-- WE SKIP THIS SUITE because model:System now includes rules that automatically upload a model file.
+-- This interferes with this test.
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Model:System" do
+theSuite = suiteSkip  "Model:System" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
-    ar <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
+    ar <- loadCompileAndSaveArcFile' "perspectivesSysteem" modelDirectory
     if not null ar
       then do
         logShow ar

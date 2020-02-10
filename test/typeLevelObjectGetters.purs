@@ -27,7 +27,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Types.ObjectGetters" do
+theSuite = suite  "Perspectives.Types.ObjectGetters" do
 
   test "propertiesOfRole" (runP do
     -- messages <- loadAndCompileArcFile "perspectivesSysteem" modelDirectory

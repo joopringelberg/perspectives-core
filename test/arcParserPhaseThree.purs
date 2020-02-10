@@ -43,8 +43,9 @@ import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType(..), propertytype2string)
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_, lookForUnqualifiedRoleType, lookForUnqualifiedRoleTypeOfADT, roleInContext)
+import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
 
@@ -56,7 +57,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -856,7 +857,7 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow otherwise
                 assert "Expected the error LocalRoleDoesNotBind" false
 
-  test "Bot Action with delete role" do
+  testOnly "Bot Action with delete role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        delete Gast\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -879,8 +880,8 @@ theSuite = suiteSkip "Perspectives.Parsing.Arc.PhaseThree" do
                           (DeleteRole _) -> true
                           otherwise -> false )
                         case bndg of
-                          (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$Gast")))_ _ _) ->
-                            assert "The binding should be a rolgetter for Gast" true
+                          (SQD _ Identity _ _ _) ->
+                            assert "The binding should be Identity" true
                           otherwise -> assert "The binding should be a rolgetter" false
                       otherwise -> assert "Side effect expected" false
                   Nothing -> assert "The effect should compile to a binary query function" false
