@@ -72,7 +72,8 @@ contextType = ArrayT <<< lift <<< (getContextMember \c -> [context_pspType c])
 context :: RoleInstance ~~> ContextInstance
 context rid = ArrayT do
   (r :: IP.PerspectRol) <- lift $ getPerspectEntiteit rid
-  tell [(assumption (unwrap $ rol_context r) (unwrap $ rol_pspType r))]
+  -- See: Implementing the Functional Reactive Pattern for a justification of commenting this line out.
+  -- tell [(assumption (unwrap $ rol_context r) (unwrap $ rol_pspType r))]
   pure $ [rol_context r]
 
 binding :: RoleInstance ~~> RoleInstance
@@ -89,11 +90,10 @@ binding r = ArrayT do
 getRoleBinders :: EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getRoleBinders rname r = ArrayT do
   ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
+  tell [assumption (unwrap r) (unwrap rname)]
   case (lookup (unwrap rname) gevuldeRollen) of
     Nothing -> pure []
-    (Just bs) -> do
-      for_ bs \b -> tell [assumption (unwrap r) (unwrap rname)]
-      pure bs
+    (Just bs) -> pure bs
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol with the given local name
 -- | that bind it (that have it as their binding). The type of ln can be 'externalRole'.

@@ -86,11 +86,7 @@ removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
   deleteContextFromTransactie id
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectContext id
-  forWithIndex_ (context_iedereRolInContext ctxt) \rolTypeId instances -> let rolType = (EnumeratedRoleType rolTypeId) in
-    for_ instances \rol -> do
-      (lift $ lift $ findBinderRequests rol rolType) >>= addCorrelationIdentifiersToTransactie
-      (lift $ lift $ findBindingRequests rol) >>= addCorrelationIdentifiersToTransactie
-      removeRoleInstance_ rol
+  for_ (iedereRolInContext ctxt) removeRoleInstance_
   void $ removeRoleInstance_ (context_buitenRol ctxt)
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   pure unit
@@ -105,13 +101,17 @@ removeRoleInstance_ roleId = do
 
   -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
   forWithIndex_ gevuldeRollen \_ filledRollen ->
-    for_ filledRollen \filledRolId -> removeBinding filledRolId
+    for_ filledRollen \filledRolId -> do
+      -- removeBinding pushes a RoleBindingDelta. From that we find the queries that move from the filledRole
+      -- to the removed role with the binding step. So we need not call findBindingRequests here.
+      removeBinding filledRolId
 
   -- If the removed role instance has a binding, remove the inverse administration from it.
   case binding of
     Nothing -> pure unit
-    (Just oldBindingId) -> do -- TODO: push a Delta for the change on removeRol_gevuldeRollen?
+    (Just oldBindingId) -> do
       (oldBinding :: PerspectRol) <- lift $ lift $ getPerspectEntiteit oldBindingId
+      (lift $ lift $ findBinderRequests oldBindingId pspType) >>= addCorrelationIdentifiersToTransactie
       -- Only then remove the removed role instance as a binding role from the binding.
       Update.saveEntiteit oldBindingId (removeRol_gevuldeRollen oldBinding (rol_pspType originalRole) roleId)
 
@@ -128,17 +128,9 @@ removeRoleInstance_ roleId = do
 removeRoleInstance :: Updater RoleInstance
 removeRoleInstance pr = do
   r@(PerspectRol{pspType, context, binding}) <- removeRoleInstance_ pr
+  -- We need not look for queries with the role step with pspType from context, because removeRoleInstance is always
+  -- used in conjunction with removeRolFromContext. That will push a ContextDelta, from which we find such queries.
   deleteRolFromTransactie pr
-  -- Find all queries that should be re-run.
-  -- All requests for the pspType binder of the binding
-  case binding of
-    Nothing -> pure unit
-    Just bnd -> (lift $ lift $ findBinderRequests bnd pspType) >>= addCorrelationIdentifiersToTransactie
-  -- All requests for instances of the roletype of pr for its context.
-  mrr <- lift $ lift $ findDependencies (assumption (unwrap context)(unwrap pr))
-  case mrr of
-    Nothing -> pure unit
-    Just rr -> addCorrelationIdentifiersToTransactie rr
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.

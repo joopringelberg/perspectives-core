@@ -43,15 +43,16 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Foreign.Generic.Class (class GenericEncode)
+import Perspectives.CollectAffectedContexts (aisInRoleDelta, aisInContextDelta, aisInPropertyDelta)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeContext_me, changeRol_binding, changeRol_isMe, context_me, context_rolInContext, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_context, rol_id, rol_isMe, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
-import Perspectives.Deltas (addRoleDelta, addContextDelta, addPropertyDelta)
+import Perspectives.Deltas (addContextDelta, addCorrelationIdentifiersToTransactie, addPropertyDelta, addRoleDelta)
+import Perspectives.DependencyTracking.Dependency (findBinderRequests)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.CollectAffectedContexts (aisInRoleDelta, aisInContextDelta, aisInPropertyDelta)
 import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RolePropertyDelta(..), RoleBindingDelta(..))
 
 {-
@@ -154,6 +155,9 @@ removeBinding roleId = do
               , binding: (rol_binding originalRole)
               , deltaType: Remove
               }
+  case rol_binding originalRole of
+    Nothing -> pure unit
+    Just oldBindingId -> (lift $ lift $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
   aisInRoleDelta delta
   saveEntiteit roleId (changeRol_isMe (removeRol_binding originalRole) false)
   ctxt <- lift $ lift $ getPerspectContext $ rol_context originalRole
