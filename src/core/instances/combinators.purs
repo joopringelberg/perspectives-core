@@ -32,7 +32,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (<$>), (<<<), (==), (>=>))
+import Prelude (class Eq, class Monad, class Show, bind, const, discard, pure, show, ($), (<$>), (<<<), (==), (>=>), (<*>), (&&), (||))
 
 -- | The closure of f, not including the root argument.
 -- | The closure of f contains no double entries iff the result of
@@ -98,6 +98,34 @@ conjunction left right id = ArrayT do
   l <- runArrayT $ left id
   r <- runArrayT $ right id
   pure $ union l r
+
+logicalOperation :: forall m s. Monad m =>
+  (Value -> Value -> Value) ->
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value)
+logicalOperation f a b c = ArrayT do
+  (as :: Array Value) <- runArrayT (a c)
+  (bs :: Array Value) <- runArrayT (b c)
+  (rs :: Array Value) <- pure $ f <$> as <*> bs
+  if null rs
+    then pure [Value "false"]
+    else pure rs
+
+wrapLogicalOperator :: (Boolean -> Boolean -> Boolean) -> (Value -> Value -> Value)
+wrapLogicalOperator g (Value p) (Value q) = Value $ show (g (p == "true") (q == "true"))
+
+logicalAnd :: forall m s. Monad m =>
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value)
+logicalAnd = logicalOperation (wrapLogicalOperator (&&))
+
+logicalOr :: forall m s. Monad m =>
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value) ->
+  (s -> ArrayT m Value)
+logicalOr = logicalOperation (wrapLogicalOperator (||))
 
 exists :: forall m s o. Eq o => Monad m =>
   (s -> ArrayT m o) ->

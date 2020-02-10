@@ -41,7 +41,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Instances.Combinators (exists, not, available)
+import Perspectives.Instances.Combinators (available, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getProperty, getRole, getRoleBinders, makeBoolean)
@@ -61,7 +61,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, identity, notEq, pure, show, ($), (&&), (*), (*>), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | A Sum to hold the six types of functions that can be computed.
@@ -261,8 +261,8 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
   f1' <- compileFunction f1
   f2' <- compileFunction f2
   case f1', f2' of
-    (C2V a), (C2V b) -> pure $ C2V $ \c -> logicalOperation a b (unsafePartial $ mapLogicalOperator g) c
-    (R2V a), (R2V b) -> pure $ R2V $ \c -> (unsafeCoerce $ logicalOperation) a b (unsafePartial $ mapLogicalOperator g) c
+    (C2V a), (C2V b) -> pure $ C2V $ \c -> logicalOperation (unsafePartial $ mapLogicalOperator g) a b c
+    (R2V a), (R2V b) -> pure $ R2V $ \c -> logicalOperation (unsafePartial $ mapLogicalOperator g) a b c
     _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 -- Add and subtract for numbers and strings. Divide and multiply just for numbers.
@@ -361,22 +361,10 @@ compareRoles a b f c = ArrayT do
     then pure [Value "false"]
     else pure (Value <<< show <$> rs)
 
-logicalOperation :: (ContextInstance ~~> Value) -> (ContextInstance ~~> Value) -> (Value -> Value -> Value) -> ContextInstance ~~> Value
-logicalOperation a b f c = ArrayT do
-  (as :: Array Value) <- runArrayT (a c)
-  (bs :: Array Value) <- runArrayT (b c)
-  (rs :: Array Value) <- pure $ f <$> as <*> bs
-  if null rs
-    then pure [Value "false"]
-    else pure rs
-
 compareFunction :: forall a. Eq a => Partial => FunctionName -> (a -> a -> Boolean)
 compareFunction fname = case fname of
   EqualsF -> eq
   NotEqualsF -> notEq
-
-wrapLogicalOperator :: (Boolean -> Boolean -> Boolean) -> (Value -> Value -> Value)
-wrapLogicalOperator g (Value p) (Value q) = Value $ show (g (p == "true") (q == "true"))
 
 mapLogicalOperator :: Partial => FunctionName -> (Value -> Value -> Value)
 mapLogicalOperator AndF = wrapLogicalOperator (&&)
