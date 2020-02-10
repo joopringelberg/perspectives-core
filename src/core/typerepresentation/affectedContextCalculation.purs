@@ -38,9 +38,8 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Representation.TypeIdentifiers (ActionType)
 
-newtype AffectedContextCalculation = AffectedContextCalculation {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), action :: ActionType}
+newtype AffectedContextCalculation = AffectedContextCalculation {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction)}
 
 derive instance genericAffectedContextCalculation :: Generic AffectedContextCalculation _
 
@@ -51,7 +50,7 @@ instance eqAffectedContextCalculation :: Eq AffectedContextCalculation where
   eq = genericEq
 
 instance encodeAffectedContextCalculation :: Encode AffectedContextCalculation where
-  encode (AffectedContextCalculation {description, action}) = genericEncode defaultOptions (AffectedContextCalculation {description, compilation: Nothing, action})
+  encode (AffectedContextCalculation {description}) = genericEncode defaultOptions (AffectedContextCalculation {description, compilation: Nothing})
 
 instance decodeAffectedContextCalculation :: Decode AffectedContextCalculation where
   decode = genericDecode defaultOptions

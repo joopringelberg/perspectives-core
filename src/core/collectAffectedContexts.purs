@@ -56,13 +56,13 @@ aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
   case roleInstance of
     Just ri -> do
       contextCalculations <- lift2 $ compileDescriptions _onContextDelta_context roleType
-      for_ contextCalculations \(AffectedContextCalculation{compilation, action}) -> do
+      for_ contextCalculations \(AffectedContextCalculation{compilation}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
         (affectedContexts :: Array ContextInstance) <- lift2 (ri ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
         addAffectedContexts affectedContexts
     Nothing -> pure unit
   roleCalculations <- lift2 $ compileDescriptions _onContextDelta_role roleType
-  for_ roleCalculations \(AffectedContextCalculation{compilation, action}) -> do
+  for_ roleCalculations \(AffectedContextCalculation{compilation}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance)
     addAffectedContexts affectedContexts
@@ -74,7 +74,7 @@ aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
 aisInRoleDelta (RoleBindingDelta{id, binding}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions _onRoleDelta_binding binderType
-  for_ bindingCalculations \(AffectedContextCalculation{compilation, action}) -> do
+  for_ bindingCalculations \(AffectedContextCalculation{compilation}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
     addAffectedContexts affectedContexts
@@ -82,7 +82,7 @@ aisInRoleDelta (RoleBindingDelta{id, binding}) = do
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binding bindingType
-      for_ binderCalculations \(AffectedContextCalculation{compilation, action}) -> do
+      for_ binderCalculations \(AffectedContextCalculation{compilation}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
         affectedContexts <- lift2 (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
         addAffectedContexts affectedContexts
@@ -91,7 +91,7 @@ aisInRoleDelta (RoleBindingDelta{id, binding}) = do
 aisInPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
 aisInPropertyDelta (RolePropertyDelta{id, property})= do
   calculations <- lift2 $ compileDescriptions' property
-  for_ calculations \(AffectedContextCalculation{compilation, action}) -> do
+  for_ calculations \(AffectedContextCalculation{compilation}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
     addAffectedContexts affectedContexts
@@ -141,11 +141,11 @@ areCompiled ar = case head ar of
   Just (AffectedContextCalculation{compilation}) -> isJust compilation
 
 compile :: AffectedContextCalculation -> MP AffectedContextCalculation
-compile ac@(AffectedContextCalculation{description, compilation, action}) = case compilation of
+compile ac@(AffectedContextCalculation{description, compilation}) = case compilation of
   Just c -> pure ac
   Nothing -> do
     c <- getHiddenFunction description
-    pure $ AffectedContextCalculation{description, compilation: Just (unsafeCoerce c), action}
+    pure $ AffectedContextCalculation{description, compilation: Just (unsafeCoerce c)}
 
 _onContextDelta_context :: CalculationsLens
 _onContextDelta_context = prop (SProxy :: SProxy "onContextDelta_context")

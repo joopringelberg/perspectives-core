@@ -194,21 +194,20 @@ addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transacti
 --     remove i (Transaction tf@{deltas}) = Transaction tf {deltas = (delete i deltas)}
 
 
+-- sendTransactieToUser :: ID -> Transaction -> MonadPerspectives Unit
+-- sendTransactieToUser userId t = do
+--   tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
+--   (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
+--   -- TODO controleer of hier authentication nodig is!
+--   res  <- liftAff $ AJ.put ResponseFormat.string (userIP <> "/" <> userId <> "_post/" <> transactieID t) (RequestBody.string (writeJSON t))
+--   (StatusCode n) <- pure res.status
+--   case n == 200 || n == 201 of
+--     true -> pure unit
+--     false -> case res.body of
+--       (Left e) -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> printResponseFormatError e <> ")")
+--       _ -> pure unit
+--   pure unit
 {-
-sendTransactieToUser :: ID -> Transaction -> MonadPerspectives Unit
-sendTransactieToUser userId t = do
-  tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
-  (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
-  -- TODO controleer of hier authentication nodig is!
-  res  <- liftAff $ AJ.put ResponseFormat.string (userIP <> "/" <> userId <> "_post/" <> transactieID t) (RequestBody.string (writeJSON t))
-  (StatusCode n) <- pure res.status
-  case n == 200 || n == 201 of
-    true -> pure unit
-    false -> case res.body of
-      (Left e) -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> printResponseFormatError e <> ")")
-      _ -> pure unit
-  pure unit
-
 -- TODO. De verbinding tussen Actie en Rol is omgekeerd en is niet
 -- langer geregistreerd als een rol van de Actie, maar als rol van de Rol (objectRol en subjectRol).
 -- | The (IDs of the) users that play a role in, and have a relevant perspective on, the Context that is modified;

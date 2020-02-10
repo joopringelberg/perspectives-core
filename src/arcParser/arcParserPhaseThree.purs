@@ -386,7 +386,7 @@ compileRules = do
               S stp -> do
                 ctxt <- lift2 (getEnumeratedRole subject >>= pure <<< ROLE.contextOfRepresentation)
                 descr <- compileStep (CDOM $ ST ctxt) stp
-                setAffectedContextCalculations _id descr
+                setAffectedContextCalculations descr
                 pure descr
 
             -- This will return a QueryFunctionDescription that describes either a single assignment, or

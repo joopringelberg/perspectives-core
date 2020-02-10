@@ -37,14 +37,14 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (Unit, discard, pure, unit, ($), bind)
 
 -- Compute the inverse paths for the condition. Save each path with the type that is the origin
 -- (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
 -- when a Delta is processed for the head of a path.
-setAffectedContextCalculations :: ActionType -> QueryFunctionDescription -> PhaseThree Unit
-setAffectedContextCalculations action qfd = do
+setAffectedContextCalculations :: QueryFunctionDescription -> PhaseThree Unit
+setAffectedContextCalculations qfd = do
   paths <- lift $ lift $ unsafePartial $ invertFunctionDescription qfd
   for_ paths
     \path -> do
@@ -112,16 +112,16 @@ setAffectedContextCalculations action qfd = do
 
       where
         addPathToProperty :: EnumeratedProperty -> QueryFunctionDescription -> EnumeratedProperty
-        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onPropertyDelta}
+        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onPropertyDelta}
 
         addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onRoleDelta_binder}
+        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onRoleDelta_binder}
 
         addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onRoleDelta_binding}
+        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onRoleDelta_binding}
 
         addPathToOnContextDelta_context :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onContextDelta_context}
+        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onContextDelta_context}
 
         addPathToOnContextDelta_role :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing, action: action}) onContextDelta_role}
+        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onContextDelta_role}
