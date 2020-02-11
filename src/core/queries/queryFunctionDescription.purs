@@ -86,9 +86,9 @@ queryFunction (MQD _ f _ _ _ _) = f
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 
 instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
-  eq d1@(SQD _ _ _ _ _ ) d2@(SQD _ _ _ _ _ ) = eq d1 d2
-  eq d1@(UQD _ _ _ _ _ _) d2@(UQD _ _ _ _ _ _) = eq d1 d2
-  eq d1@(BQD _ _ _ _ _ _ _) d2@(BQD _ _ _ _ _ _ _) = eq d1 d2
+  eq d1@(SQD _ _ _ _ _ ) d2@(SQD _ _ _ _ _ ) = genericEq d1 d2
+  eq d1@(UQD _ _ _ _ _ _) d2@(UQD _ _ _ _ _ _) = genericEq d1 d2
+  eq d1@(BQD _ _ _ _ _ _ _) d2@(BQD _ _ _ _ _ _ _) = genericEq d1 d2
   eq _ _ = false
 
 instance encodeQueryFunctionDescription :: Encode QueryFunctionDescription where
