@@ -373,6 +373,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
+                -- logShow correctedDFR
                 case lookup "model:MyTestDomain$Guest$ConsultFeest" actions of
                   Nothing -> assert "There should be an Action 'model:MyTestDomain$Guest$ConsultFeest'." false
                   (Just (Action{requiredObjectProperties})) -> case requiredObjectProperties of

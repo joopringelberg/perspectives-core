@@ -30,7 +30,7 @@ module Perspectives.Parsing.Arc.PhaseThree where
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (filter, foldM, head, length, null, reverse, uncons, filterA)
+import Data.Array (cons, filter, filterA, foldM, head, length, null, reverse, uncons)
 import Data.Char.Unicode (toLower)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -49,13 +49,14 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, expandDefaultNamespaces, isQualifiedWithDomein)
+import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
+import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeComposition, makeSequence)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
@@ -68,7 +69,7 @@ import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalc
 import Perspectives.Representation.Class.Role (contextOfRepresentation, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), ViewType, propertytype2string, roletype2string)
@@ -86,6 +87,7 @@ phaseThree df@{_id} = do
         qualifyViewReferences
         -- inverseBindings  -- not yet implemented, probably unnecessary.
         qualifyReturnsClause
+        invertedQueriesForLocalRolesAndProperties
         compileExpressions
         compileRules
         )
@@ -295,6 +297,42 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
                 modifyDF (\df@{calculatedRoles} -> df {calculatedRoles = insert (unwrap _id) (CalculatedRole rr {calculation = Q $ MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST qComputedType)) isF isM}) calculatedRoles})
           -- Add cases for ExternalCorePropertyGetter, ForeignRoleGetter, ForeignPropertyGetter.
           otherwise -> pure unit)
+
+-- | For each EnumeratedRole R in the model, add three InvertedQueries to make deltas
+-- | available for User Roles in the context of R that have a Perspective on R.
+-- | The query is tailored to add InvertedQueries for ContextDeltas,
+-- | RoleBindingDeltas and PropertyDeltas.
+invertedQueriesForLocalRolesAndProperties :: PhaseThree Unit
+invertedQueriesForLocalRolesAndProperties = do
+  df@{_id} <- lift $ gets _.dfr
+  withDomeinFile
+    _id
+    (DomeinFile df)
+    (invertedQueriesForLocalRolesAndProperties' df)
+  where
+    invertedQueriesForLocalRolesAndProperties' :: DomeinFileRecord -> PhaseThree Unit
+    invertedQueriesForLocalRolesAndProperties' {enumeratedRoles} = for_ enumeratedRoles
+      (\(EnumeratedRole rr@{_id, context, binding, properties, onContextDelta_context}) -> do
+        userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
+        if null userTypes
+          then pure unit
+          else do
+            contextQuery <- pure $
+              InvertedQuery
+                { description: (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown)
+                , compilation: Nothing
+                , userTypes
+                }
+            bindingQuery <- pure $
+              InvertedQuery
+                { description: (makeComposition
+                  (SQD (RDOM binding) (QF.DataTypeGetterWithParameter QF.GetRoleBindersF (unwrap _id)) (RDOM (ST _id)) Unknown Unknown)
+                  (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown))
+                , compilation: Nothing
+                , userTypes }
+            -- TODO: PROPERTIES
+            modifyDF (\df@{enumeratedRoles:roles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {onContextDelta_context = cons contextQuery onContextDelta_context}) roles})
+        )
 
 -- | The calculation of a CalculatedRole or a CalculatedProperty are both expressions. This function compiles the
 -- | parser AST output that represents these expressions to QueryFunctionDescriptions.

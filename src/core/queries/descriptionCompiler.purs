@@ -327,6 +327,16 @@ addVarBindingToSequence seq v = makeSequence <$> pure seq <*> (compileVarBinding
 makeSequence :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
 makeSequence left right = BQD (domain left) (QF.BinaryCombinator SequenceF) left right (range right) (THREE.and (functional left) (functional right)) (THREE.or (functional left) (functional right))
 
+makeComposition :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
+makeComposition left right = BQD
+  (domain left)
+  (QF.BinaryCombinator ComposeF)
+  left
+  right
+  (range right)
+  (THREE.and (functional left) (functional right))
+  (THREE.or (functional left) (functional right))
+
 -- | Make a QueryFunctionDescription of a runtime function that evaluates the step of the binding and
 -- | adds a name-value pair to the runtime environment. Add the name-QueryFunctionDescription pair to the
 -- | compile time environment (PhaseThree).

@@ -22,7 +22,7 @@
 module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (lift, throwError)
-import Data.Array (cons)
+import Data.Array (union)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -31,13 +31,14 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.Inversion (domain2RoleType, invertFunctionDescription)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Role (contextOfADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
@@ -60,15 +61,8 @@ setInvertedQueries userTypes qfd = do
   where
     ensureContextDomain :: PhaseThree QueryFunctionDescription
     ensureContextDomain = case domain qfd of
-      (RDOM dom@(ST et)) -> (lift $ lift $ contextOfADT dom) >>= \c -> pure
-        (BQD
-          (CDOM c)
-          (BinaryCombinator ComposeF)
-          (SQD (CDOM c) (RolGetter (ENR et)) (RDOM dom) Unknown Unknown)
-          qfd
-          (range qfd)
-          (functional qfd)
-          (mandatory qfd))
+      (RDOM dom@(ST et)) -> (lift $ lift $ contextOfADT dom) >>= \c -> pure $
+        makeComposition (SQD (CDOM c) (RolGetter (ENR et)) (RDOM dom) Unknown Unknown) qfd
       otherwise -> pure qfd
 
     setPathForEachSubPath :: Partial => QueryFunctionDescription -> PhaseThree Unit
@@ -131,16 +125,16 @@ setInvertedQueries userTypes qfd = do
 
       where
         addPathToProperty :: EnumeratedProperty -> QueryFunctionDescription -> EnumeratedProperty
-        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onPropertyDelta}
+        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = union onPropertyDelta [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
 
         addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onRoleDelta_binder}
+        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = union onRoleDelta_binder [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})] }
 
         addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onRoleDelta_binding}
+        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = union onRoleDelta_binding [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
 
         addPathToOnContextDelta_context :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onContextDelta_context}
+        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = union onContextDelta_context [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
 
         addPathToOnContextDelta_role :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onContextDelta_role}
+        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = union onContextDelta_role [(InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes})]}
