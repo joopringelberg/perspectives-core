@@ -24,27 +24,29 @@ module Perspectives.Types.ObjectGetters where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (filter, find)
+import Data.Array (filter, find, foldM)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
-import Foreign.Object (keys)
+import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (areLastSegmentsOf, endsWithSegments)
-import Perspectives.Instances.Combinators (filter')
+import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT)
-import Perspectives.Representation.Class.PersistentType (getContext, getPerspectType)
+import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
+import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (class RoleClass, adtOfRole, getRole, propertiesOfADT, roleADT, roleSet, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextADT)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ActionType, CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.View (propertyReferences)
-import Prelude (bind, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (bind, flip, join, pure, show, ($), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -81,8 +83,8 @@ roleInContext = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives
 contextRole :: ContextType ~~~> RoleType
 contextRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.contextRole)
 
-userRole :: ContextType ~~~> RoleType
-userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< map ENR <<< Context.userRole)
+userRole :: ContextType ~~~> EnumeratedRoleType
+userRole = ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspectives Context.Context) >=> pure <<< Context.userRole)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND AN ENUMERATEDPROPERTY WORKING FROM STRINGS OR ADT'S
@@ -105,7 +107,7 @@ lookForUnqualifiedPropertyType s = lookForProperty (propertytype2string >>> areL
 
 -- | Look for a Property on a given ADT, using a criterium.
 lookForProperty :: (PropertyType -> Boolean) -> ADT EnumeratedRoleType ~~~> PropertyType
-lookForProperty criterium = filter' (ArrayT <<< propertiesOfADT) criterium
+lookForProperty criterium = COMB.filter' (ArrayT <<< propertiesOfADT) criterium
 
 propertiesOfRole :: String ~~~> PropertyType
 propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRole_ (CalculatedRoleType s) <|> empty
@@ -131,7 +133,7 @@ lookForUnqualifiedViewType :: String -> (ADT EnumeratedRoleType ~~~> ViewType)
 lookForUnqualifiedViewType s = lookForView (unwrap >>> areLastSegmentsOf s)
 
 lookForView :: (ViewType -> Boolean) -> ADT EnumeratedRoleType ~~~> ViewType
-lookForView criterium = filter' (ArrayT <<< viewsOfADT) criterium
+lookForView criterium = COMB.filter' (ArrayT <<< viewsOfADT) criterium
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO QUALIFY ROLES AND CONTEXTS
@@ -157,3 +159,37 @@ qualifyContextInDomain :: String -> String ~~~> ContextType
 qualifyContextInDomain localName namespace = ArrayT do
   DomeinFile {contexts} <- retrieveDomeinFile namespace
   pure $ map ContextType (filter (\_id -> _id `endsWithSegments` localName) (keys contexts))
+
+----------------------------------------------------------------------------------------
+------- ROLES WITH A PERSPECTIVE ON ANOTHER TYPE
+----------------------------------------------------------------------------------------
+-- | <userRole> `hasPerspectiveOnRole` <RoleType>
+hasPerspectiveOnRole :: EnumeratedRoleType -> RoleType ~~~> Boolean
+hasPerspectiveOnRole userRole' rt = lift $ getEnumeratedRole userRole' >>= \(EnumeratedRole{perspectives}) -> foldM (\(found :: Boolean) (next :: ActionType) -> if found
+    then pure found
+    else getAction next >>= pure <<< providesPerspectiveOnRole rt)
+  false
+  (join $ values perspectives)
+
+-- | <RoleType> `roleIsInPerspectiveOf` <userRole>
+roleIsInPerspectiveOf :: RoleType -> EnumeratedRoleType ~~~> Boolean
+roleIsInPerspectiveOf = flip hasPerspectiveOnRole
+
+-- | In a Context type, find all user roles that have a perspective on a given RoleType.
+rolesWithPerspectiveOnRole :: RoleType -> ContextType ~~~> EnumeratedRoleType
+rolesWithPerspectiveOnRole rt = COMB.filter userRole (roleIsInPerspectiveOf rt)
+
+-- | <userRole> `hasPerspectiveOnProperty` <RoleType>
+hasPerspectiveOnProperty :: EnumeratedRoleType -> PropertyType ~~~> Boolean
+hasPerspectiveOnProperty userRole' pt = lift $ getEnumeratedRole userRole' >>= \(EnumeratedRole{perspectives}) -> foldM (\(found :: Boolean) (next :: ActionType) -> if found
+    then pure found
+    else getAction next >>= providesPerspectiveOnProperty pt)
+  false
+  (join $ values perspectives)
+
+-- | <RoleType> `roleIsInPerspectiveOf` <userRole>
+propertyIsInPerspectiveOf :: PropertyType -> EnumeratedRoleType ~~~> Boolean
+propertyIsInPerspectiveOf = flip hasPerspectiveOnProperty
+
+rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> EnumeratedRoleType
+rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiveOf pt)

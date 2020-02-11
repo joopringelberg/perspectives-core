@@ -64,6 +64,8 @@ invertFunctionDescription_ (SQD dom (PropertyGetter (CP prop)) ran _ _) = do
   calc <- (getCalculatedProperty >=> calculation) prop
   invertFunctionDescription_ calc
 
+invertFunctionDescription_ (SQD dom (DataTypeGetter CountF) ran _ _) = pure mempty
+
 invertFunctionDescription_ (SQD dom f ran _ _) = do
   minvertedF <- pure $ invertFunction dom f ran
   case minvertedF of
@@ -98,11 +100,10 @@ invertFunction dom qf ran = case qf of
     IdentityF -> Just $ DataTypeGetter IdentityF
 
     -- An expression like `step >>= sum` is compiled as an SQD with DataTypeGetter as constructor for QueryFunction.
-    -- These function descriptions have the same domain as range. Invariably, the domain will be a VDOM, as the
-    -- sequence functions only apply to Values.
+    -- These function descriptions have the same domain as range. In general, the domain will be a VDOM, as the
+    -- sequence functions apply to Values, EXCEPT for CountF. We can count anything.
     -- In the compiled AffectedContextQuery we wish to ignore a step like this. We accomplish that by constructing
     -- a Value2Role QueryFunction.
-    CountF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
     MinimumF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
     MaximumF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)
     AddF -> Just $ Value2Role (unsafePartial $ domain2PropertyType dom)

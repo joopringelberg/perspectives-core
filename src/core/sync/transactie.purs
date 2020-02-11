@@ -32,7 +32,6 @@ import Data.Lens (Lens')
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Set (Set, empty) as SET
 import Data.Symbol (SProxy(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
@@ -42,6 +41,7 @@ import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Sync.AffectedContext (AffectedContext)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta)
 import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<), (&&))
@@ -49,7 +49,7 @@ import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<),
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-newtype Transaction = Transaction (TransactionRecord( affectedContexts :: SET.Set ContextInstance, correlationIdentifiers :: Array CorrelationIdentifier ))
+newtype Transaction = Transaction (TransactionRecord( affectedContexts :: Array AffectedContext, correlationIdentifiers :: Array CorrelationIdentifier ))
 
 type TransactionRecord f =
   { author :: String
@@ -84,7 +84,7 @@ instance encodeTransactie' :: Encode Transaction' where
 instance decodeTransactie :: Decode Transaction where
   decode f = do
     ((Transaction' {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles, affectedContexts: SET.empty, correlationIdentifiers: []}
+    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: []}
 
 
 instance decodeTransactie' :: Decode Transaction' where
@@ -103,7 +103,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , deletedContexts: union deletedContexts dc
       , deletedRoles: union deletedRoles dr
       , changedDomeinFiles: union changedDomeinFiles cd
-      , affectedContexts: SET.empty
+      , affectedContexts: []
       , correlationIdentifiers: []
     }
 
@@ -122,7 +122,7 @@ createTransactie author =
       , deletedContexts: []
       , deletedRoles: []
       , changedDomeinFiles: []
-      , affectedContexts: SET.empty
+      , affectedContexts: []
       , correlationIdentifiers: []}
 
 cloneEmptyTransaction :: Transaction -> Transaction
@@ -137,7 +137,7 @@ cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
   , deletedContexts: []
   , deletedRoles: []
   , changedDomeinFiles: []
-  , affectedContexts: SET.empty
+  , affectedContexts: []
   , correlationIdentifiers: []}
 
 isEmptyTransaction :: Transaction -> Boolean

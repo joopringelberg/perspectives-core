@@ -29,6 +29,7 @@ import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.AvarMonadAsk (modify, get) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head, union)
+import Data.Array.NonEmpty (singleton)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (over, unwrap)
@@ -41,18 +42,20 @@ import Effect.Class (liftEffect)
 import Foreign.Object (Object, empty, insert, lookup) as FO
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (context)
+import Perspectives.Instances.ObjectGetters (context, roleType)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (functional) as P
 import Perspectives.Representation.Class.Role (functional) as R
+import Perspectives.Representation.Class.Role (getRoleType)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), DeltaType(..), RolePropertyDelta(..), ContextDelta(..))
 import Perspectives.User (getUser)
@@ -78,7 +81,12 @@ distributeTransactie t = do
 
 addContextToTransactie :: PerspectContext ->
   MonadPerspectivesTransaction Unit
-addContextToTransactie c@(PerspectContext{_id}) = lift $ AA.modify (over Transaction \(t@{createdContexts, affectedContexts}) -> t {createdContexts = cons c createdContexts, affectedContexts = SET.insert _id affectedContexts})
+addContextToTransactie c@(PerspectContext{_id, me}) = do
+  case me of
+    Nothing -> lift $ AA.modify (over Transaction \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
+    Just me' -> do
+      myType <- lift $ lift $ (me' ##= roleType)
+      lift $ AA.modify (over Transaction \(t@{createdContexts, affectedContexts}) -> t {createdContexts = cons c createdContexts, affectedContexts = cons (AffectedContext {contextInstances: singleton _id, userTypes: myType}) affectedContexts})
 
 addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
 addRolToTransactie c = lift $ AA.modify (over Transaction \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})

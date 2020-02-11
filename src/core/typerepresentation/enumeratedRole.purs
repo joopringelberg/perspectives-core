@@ -28,7 +28,7 @@ import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
-import Perspectives.AffectedContextCalculation (AffectedContextCalculation)
+import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -63,11 +63,11 @@ type EnumeratedRoleRecord =
 
   , pos :: ArcPosition
 
-  , onRoleDelta_binding :: Array AffectedContextCalculation
-  , onRoleDelta_binder :: Array AffectedContextCalculation
+  , onRoleDelta_binding :: Array InvertedQuery
+  , onRoleDelta_binder :: Array InvertedQuery
 
-  , onContextDelta_context :: Array AffectedContextCalculation
-  , onContextDelta_role :: Array AffectedContextCalculation
+  , onContextDelta_context :: Array InvertedQuery
+  , onContextDelta_role :: Array InvertedQuery
 
   }
 

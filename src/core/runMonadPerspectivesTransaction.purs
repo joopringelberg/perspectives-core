@@ -23,11 +23,11 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (foldM, singleton, sort, union)
+import Data.Array (foldM, singleton, sort, union, elemIndex)
+import Data.Array.NonEmpty (head, toArray)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
-import Data.Set (toUnfoldable) as SET
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
@@ -36,7 +36,7 @@ import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
 import Perspectives.ContextAndRole (context_me)
-import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>))
 import Perspectives.Deltas (runTransactie)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
@@ -46,6 +46,7 @@ import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType)
+import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Prelude (bind, discard, join, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>))
@@ -104,7 +105,9 @@ assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas}
 -- | Repeat this recursively, accumulating Deltas in a single Transaction that is the final result of the process.
 runActions :: Transaction -> MonadPerspectivesTransaction Transaction
 runActions t = do
-  -- action instances deriving from Deltas.
+  -- Collect all combinations of context instances and user types.
+  -- Check if the type of 'me' is among them.
+  -- If so, execute the automatic actions for 'me'.
   (as :: Array ActionInstance) <- contextsAffectedByTransaction >>= traverse getAllAutomaticActions >>= pure <<< join
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
@@ -120,8 +123,8 @@ runActions t = do
     else pure <<< (<>) t =<< runActions nt
 
 -- | Get all ContextInstances collected in the Transaction.
-contextsAffectedByTransaction :: MonadPerspectivesTransaction (Array ContextInstance)
-contextsAffectedByTransaction = lift AA.get >>= pure <<< SET.toUnfoldable <<< _.affectedContexts <<< unwrap
+contextsAffectedByTransaction :: MonadPerspectivesTransaction (Array AffectedContext)
+contextsAffectedByTransaction = lift AA.get >>= pure <<< _.affectedContexts <<< unwrap
 
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT (lift $ getPerspectContext ctxt >>= pure <<< maybe [] singleton <<< context_me)
@@ -132,11 +135,16 @@ allActions rt = ArrayT (lift $ getEnumeratedRole rt >>= unwrap >>> _.perspective
 isAutomatic :: ActionType ~~> Boolean
 isAutomatic at = ArrayT (lift $ getAction at >>= unwrap >>> _.executedByBot >>> singleton >>> pure)
 
-getAllAutomaticActions :: ContextInstance -> MonadPerspectivesTransaction (Array ActionInstance)
-getAllAutomaticActions affectedContext = do
-  -- find all automatic action types of the me role.
-  (automaticActions :: Array ActionType) <- lift2 (affectedContext ##= filter (getMe >=> OG.roleType >=> allActions) isAutomatic)
-  pure ((ActionInstance affectedContext) <$> automaticActions)
+getAllAutomaticActions :: AffectedContext -> MonadPerspectivesTransaction (Array ActionInstance)
+getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
+  mmyType <- lift2 (head contextInstances ##> getMe >=> OG.roleType)
+  case mmyType of
+    Nothing -> pure []
+    Just myType -> if isJust $ elemIndex myType userTypes
+      then do
+        (automaticActions :: Array ActionType) <- lift2 (myType ##= filter allActions isAutomatic)
+        pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
+      else pure []
 
 lift2 :: forall a. MonadPerspectives a -> MonadPerspectivesTransaction a
 lift2 = lift <<< lift

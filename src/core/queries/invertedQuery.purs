@@ -19,14 +19,15 @@
 
 -- END LICENSE
 
--- | An AffectedContextCalculation is the combination of a QueryFunctionDescription and Maybe the compilation
--- | of that description. However, the Purescript type compiler cannot handle the full type of such functions
+-- | An InvertedQuery is the combination of a QueryFunctionDescription, Maybe the compilation
+-- | of that description and the UserRole types that have a perspective on the query end result.
+-- | However, the Purescript type compiler cannot handle the full type of such functions
 -- | in the places where we want to use it (CalculatedProperty, CalculatedRole).
 -- | For that reason, we use a type HiddenFunction. We will unsafely coerce that type to the function we like
 -- | when we feel we can do it.
 -- | Notice that we will actually never encode such values: we replace them with Nothing in the act.
 
-module Perspectives.AffectedContextCalculation where
+module Perspectives.InvertedQuery where
 
 import Prelude
 
@@ -38,19 +39,20 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 
-newtype AffectedContextCalculation = AffectedContextCalculation {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction)}
+newtype InvertedQuery = InvertedQuery {description :: QueryFunctionDescription, compilation :: (Maybe HiddenFunction), userTypes :: Array EnumeratedRoleType}
 
-derive instance genericAffectedContextCalculation :: Generic AffectedContextCalculation _
+derive instance genericInvertedQuery :: Generic InvertedQuery _
 
-instance showAffectedContextCalculation :: Show AffectedContextCalculation where
+instance showInvertedQuery :: Show InvertedQuery where
   show = genericShow
 
-instance eqAffectedContextCalculation :: Eq AffectedContextCalculation where
+instance eqInvertedQuery :: Eq InvertedQuery where
   eq = genericEq
 
-instance encodeAffectedContextCalculation :: Encode AffectedContextCalculation where
-  encode (AffectedContextCalculation {description}) = genericEncode defaultOptions (AffectedContextCalculation {description, compilation: Nothing})
+instance encodeInvertedQuery :: Encode InvertedQuery where
+  encode (InvertedQuery {description, userTypes}) = genericEncode defaultOptions (InvertedQuery {description, compilation: Nothing, userTypes})
 
-instance decodeAffectedContextCalculation :: Decode AffectedContextCalculation where
+instance decodeInvertedQuery :: Decode InvertedQuery where
   decode = genericDecode defaultOptions

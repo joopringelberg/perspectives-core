@@ -27,7 +27,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Perspectives.AffectedContextCalculation (AffectedContextCalculation)
+import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Class.Revision (class Revision, Revision_)
@@ -52,7 +52,7 @@ type EnumeratedPropertyRecord =
 
   , pos :: ArcPosition
 
-  , onPropertyDelta :: Array AffectedContextCalculation
+  , onPropertyDelta :: Array InvertedQuery
   }
 
 defaultEnumeratedProperty :: String -> String -> String -> Range -> ArcPosition -> EnumeratedProperty

@@ -22,16 +22,19 @@
 module Perspectives.Representation.Class.Action where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Maybe (Maybe(..))
+import Data.Array (elemIndex)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, Calculation(..))
 import Perspectives.Representation.Action (Action(..), Verb)
 import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.Class.PersistentType (getView)
 import Perspectives.Representation.SideEffect (SideEffect(..))
-import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, RoleType, ViewType)
-import Prelude (pure, ($), (<<<), (<>))
+import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleType, PropertyType, RoleType, ViewType)
+import Perspectives.Representation.View (propertyReferences)
+import Prelude (pure, ($), (<<<), (<>), (==), (||), (>>=), (<$>), (<*>))
 
 -----------------------------------------------------------
 -- ACTION TYPE CLASS
@@ -47,6 +50,10 @@ class ActionClass c where
   condition :: c -> MonadPerspectives QueryFunctionDescription
   effect :: c -> MonadPerspectives QueryFunctionDescription
   isExecutedByBot :: c -> Boolean
+  -- Either the object, or the indirect object of the action must equal the given RoleType.
+  providesPerspectiveOnRole :: RoleType -> c -> Boolean
+  -- One of the views must contain PropertyType
+  providesPerspectiveOnProperty :: PropertyType -> c -> MonadPerspectives Boolean
 
 instance actionActionClass :: ActionClass Action where
   subject = _.subject <<< unwrap
@@ -63,3 +70,8 @@ instance actionActionClass :: ActionClass Action where
     (Just (EF ar)) -> pure ar
     otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
   isExecutedByBot r = (unwrap r).executedByBot
+  providesPerspectiveOnRole rt r = rt == (unwrap r).object || (Just rt) == (unwrap r).indirectObject
+  providesPerspectiveOnProperty pt r = (||) <$> maybe (pure false) isInView (requiredObjectProperties r) <*> ((||) <$> maybe (pure false) isInView (requiredObjectProperties r) <*> maybe (pure false) isInView (requiredSubjectProperties r))
+    where
+      isInView :: ViewType -> MonadPerspectives Boolean
+      isInView vt = getView vt >>= \v -> pure $ isJust $ elemIndex pt (propertyReferences v)

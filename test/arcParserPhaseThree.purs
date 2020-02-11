@@ -57,7 +57,7 @@ withDomeinFile ns df mpa = do
   pure r
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
+theSuite = suite  "Perspectives.Parsing.Arc.PhaseThree" do
   test "TypeLevelObjectGetters" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "Context : Domain : MyTestDomain\n  Agent : BotRole : MyBot\n    ForUser : MySelf\n    Perspective : Perspective : BotPerspective\n      ObjectRef : AnotherRole\n      Action : Consult : ConsultAnotherRole\n        IndirectObjectRef : AnotherRole\n  Role : RoleInContext : AnotherRole\n    Calculation : context >> Role" domain
     case r of
@@ -466,7 +466,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left e) -> assert (show e) false
               (Right correctedDFR@{actions}) -> do
-                logShow correctedDFR
+                -- logShow correctedDFR
                 case lookup "model:Test$Gast_bot$ChangeParty" actions of
                   (Just (Action{condition, effect})) -> do
                     assert "The condition should have operator '>'"
@@ -508,7 +508,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
                           case rle of
                             (BQD _ _ _ _ (RDOM (ST (EnumeratedRoleType "model:Test$Company$Employee"))) _ _) -> true
                             otherwise -> false
-                        logShow cte
+                        -- logShow cte
                         assert "The role to move should come from C2"
                           case cte of
                             (BQD _ _ (SQD _ (RolGetter (ENR (EnumeratedRoleType "model:Test$C2"))) _ _ _) _ _ _ _) -> true
@@ -536,7 +536,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
                     case extractEffect effect of
                       (BQD _ qf rle cte _ _ _) -> do
                         assert "The queryfunction should be move" (eq qf QF.Move )
-                        logShow rle
+                        -- logShow rle
                         assert "The role to move should come from the current context, an instance of Company"
                           case cte of
                             (SQD (CDOM (ST (ContextType "model:Test$Company"))) Identity _ _ _) -> true
@@ -619,7 +619,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (ContextHasNoRole _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error ContextHasNoRole" false
 
   test "Bot Action with bind in another context" do
@@ -663,7 +663,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (NotAContextDomain _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error NotAContextDomain" false
 
   test "Bind: in-clause does selects non-functional context" do
@@ -698,7 +698,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
               (Left (ContextHasNoRole _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error CannotCreateCalculatedRole" false
 
   test "Bind: bind non-functional to functional role" do
@@ -716,7 +716,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
               (Left (NotFunctional _ _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error NotFunctional" false
 
   test "Bot Action with bind_" do
@@ -761,7 +761,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
               (Left (NotFunctional _ _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error NotFunctional" false
 
   test "Bot Action with unqualified unbind" do
@@ -837,7 +837,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
               (Left (UnknownRole _ _)) -> assert "ok" true
               -- (Left (CannotCreateCalculatedRole _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error UnknownRole" false
 
   test "Unbind: binder does not bind" do
@@ -857,7 +857,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
                 -- logShow otherwise
                 assert "Expected the error LocalRoleDoesNotBind" false
 
-  testOnly "Bot Action with delete role" do
+  test "Bot Action with delete role" do
     (r :: Either ParseError ContextE) <- pure $ unwrap $ runIndentParser "domain: Test\n  user: Gast (mandatory, not functional)\n    property: Prop1 (mandatory, functional, Number)\n  bot: for Gast\n    perspective on: Gast\n      if Gast >> Prop1 > 10 then\n        delete Gast\n" ARC.domain
     case r of
       (Left e) -> assert (show e) false
@@ -929,7 +929,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (RoleHasNoProperty _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error RoleHasNoProperty" false
 
   test "Bot Action with delete property, property is calculated." do
@@ -946,7 +946,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (CannotCreateCalculatedProperty _ _ _)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error CannotCreateCalculatedProperty" false
 
   test "Bot Action with property assignment and default object" do
@@ -996,7 +996,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (WrongPropertyRange _ _ PNumber PBool)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error WrongPropertyRange" false
 
   test "Bot Action with property assignment and not even a property range." do
@@ -1013,7 +1013,7 @@ theSuite = suiteOnly  "Perspectives.Parsing.Arc.PhaseThree" do
             case x' of
               (Left (NotAPropertyRange _ _ PNumber)) -> assert "ok" true
               otherwise -> do
-                logShow otherwise
+                -- logShow otherwise
                 assert "Expected the error NotAPropertyRange" false
 
   test "Bot Action with property assignment on another role" do

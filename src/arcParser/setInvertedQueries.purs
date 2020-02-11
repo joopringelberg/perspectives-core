@@ -19,7 +19,7 @@
 
 -- END LICENSE
 
-module Perspectives.Parsing.Arc.PhaseThree.SetAffectedContextCalculations where
+module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (lift, throwError)
 import Data.Array (cons)
@@ -28,30 +28,49 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.AffectedContextCalculation (AffectedContextCalculation(..))
+import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (domain2RoleType, invertFunctionDescription)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.Class.Role (contextOfADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (Unit, discard, pure, unit, ($), bind)
+import Prelude (Unit, discard, pure, unit, ($), bind, (>>=))
 
--- Compute the inverse paths for the condition. Save each path with the type that is the origin
+-- Compute the inverse paths for the queryfunction description. Save each path with the type that is the origin
 -- (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
--- when a Delta is processed for the head of a path.
-setAffectedContextCalculations :: QueryFunctionDescription -> PhaseThree Unit
-setAffectedContextCalculations qfd = do
-  paths <- lift $ lift $ unsafePartial $ invertFunctionDescription qfd
+-- when a Delta is processed for the head of a path. They are also used to find users who need to be informed
+-- of a change.
+-- If the first step of descr is ContextF, omit that step. This can only happen for a Property query.
+-- However, we want the inverted queries to end in a context.
+setInvertedQueries :: Array EnumeratedRoleType -> QueryFunctionDescription -> PhaseThree Unit
+setInvertedQueries userTypes qfd = do
+  paths <- ensureContextDomain >>= \q -> lift $ lift $ unsafePartial $ invertFunctionDescription q
   for_ paths
     \path -> do
       -- log $ prettyPrint path
       unsafePartial $ setPathForEachSubPath path
 
   where
+    ensureContextDomain :: PhaseThree QueryFunctionDescription
+    ensureContextDomain = case domain qfd of
+      (RDOM dom@(ST et)) -> (lift $ lift $ contextOfADT dom) >>= \c -> pure
+        (BQD
+          (CDOM c)
+          (BinaryCombinator ComposeF)
+          (SQD (CDOM c) (RolGetter (ENR et)) (RDOM dom) Unknown Unknown)
+          qfd
+          (range qfd)
+          (functional qfd)
+          (mandatory qfd))
+      otherwise -> pure qfd
+
     setPathForEachSubPath :: Partial => QueryFunctionDescription -> PhaseThree Unit
     -- Terminating step.
     setPathForEachSubPath path@(BQD _ (QF.BinaryCombinator QF.ComposeF) sub1@(SQD _ _ _ _ _) sub2@(SQD _ _ _ _ _) _ _ _) = do
@@ -108,20 +127,20 @@ setAffectedContextCalculations qfd = do
       QF.DataTypeGetter QF.ExternalRoleF -> pure unit
       QF.DataTypeGetter QF.IdentityF -> pure unit
 
-      _ -> throwError $ Custom "setAffectedContextCalculations: there should be no other cases. This is a system programming error."
+      _ -> throwError $ Custom "setInvertedQueries: there should be no other cases. This is a system programming error."
 
       where
         addPathToProperty :: EnumeratedProperty -> QueryFunctionDescription -> EnumeratedProperty
-        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onPropertyDelta}
+        addPathToProperty (EnumeratedProperty propRecord@{onPropertyDelta}) inverseQuery = EnumeratedProperty propRecord {onPropertyDelta = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onPropertyDelta}
 
         addPathToOnRoleDelta_binder :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onRoleDelta_binder}
+        addPathToOnRoleDelta_binder (EnumeratedRole rolRecord@{onRoleDelta_binder}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binder = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onRoleDelta_binder}
 
         addPathToOnRoleDelta_binding :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onRoleDelta_binding}
+        addPathToOnRoleDelta_binding (EnumeratedRole rolRecord@{onRoleDelta_binding}) inverseQuery = EnumeratedRole rolRecord {onRoleDelta_binding = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onRoleDelta_binding}
 
         addPathToOnContextDelta_context :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onContextDelta_context}
+        addPathToOnContextDelta_context (EnumeratedRole rolRecord@{onContextDelta_context}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_context = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onContextDelta_context}
 
         addPathToOnContextDelta_role :: EnumeratedRole -> QueryFunctionDescription -> EnumeratedRole
-        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (AffectedContextCalculation {description: inverseQuery, compilation: Nothing}) onContextDelta_role}
+        addPathToOnContextDelta_role (EnumeratedRole rolRecord@{onContextDelta_role}) inverseQuery = EnumeratedRole rolRecord {onContextDelta_role = cons (InvertedQuery {description: inverseQuery, compilation: Nothing, userTypes}) onContextDelta_role}
