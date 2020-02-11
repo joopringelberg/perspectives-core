@@ -23,21 +23,21 @@ module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Reader (lift)
-import Data.Array (cons, head)
-import Data.Array.NonEmpty (fromArray)
-import Data.Foldable (for_)
+import Data.Array (cons, head, union)
+import Data.Array.NonEmpty (fromArray, toArray)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Symbol (SProxy(..))
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Identifiers (deconstructModelName)
+import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Query.Compiler (getHiddenFunction)
@@ -47,67 +47,66 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), RolePropertyDelta(..), RoleBindingDelta(..))
-import Prelude (Unit, bind, const, discard, pure, unit, ($), (<<<))
+import Prelude (Unit, bind, const, discard, join, pure, ($), (<<<), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | From the ContextDelta, collect affected contexts. Compile all queries that are used to collect
 -- | affected context instances, first. Add the contexts to the Transaction.
--- TODO PAS de andere functies aan zoals aisInContextDelta.
-aisInContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
-aisInContextDelta (ContextDelta{id, roleType, roleInstance}) = do
-  case roleInstance of
+aisInContextDelta :: ContextDelta -> MonadPerspectivesTransaction ContextDelta
+aisInContextDelta (ContextDelta dr@{id, roleType, roleInstance}) = do
+  users1 <- case roleInstance of
     Just ri -> do
       contextCalculations <- lift2 $ compileDescriptions _onContextDelta_context roleType
-      for_ contextCalculations \(InvertedQuery{compilation, userTypes}) -> do
+      (for contextCalculations \(InvertedQuery{compilation, userTypes}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
         (affectedContexts :: Array ContextInstance) <- lift2 (ri ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
-        case fromArray affectedContexts of
-          Nothing -> pure unit
-          Just contextInstances -> addAffectedContexts $ AffectedContext {contextInstances, userTypes}
-    Nothing -> pure unit
+        handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+    Nothing -> pure []
   roleCalculations <- lift2 $ compileDescriptions _onContextDelta_role roleType
-  for_ roleCalculations \(InvertedQuery{compilation, userTypes}) -> do
+  users2 <- for roleCalculations (\(InvertedQuery{compilation, userTypes}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance)
-    case fromArray affectedContexts of
-      Nothing -> pure unit
-      Just contextInstances -> addAffectedContexts $ AffectedContext {contextInstances, userTypes}
+    handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+  pure $ ContextDelta dr {users = union users1 users2}
+
+handleAffectedContexts :: Array ContextInstance -> Array EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
+handleAffectedContexts affectedContexts userTypes = case fromArray affectedContexts of
+  Nothing -> pure []
+  Just contextInstances -> do
+    addAffectedContexts $ AffectedContext {contextInstances, userTypes}
+    (for userTypes \er -> for (toArray contextInstances) \ci -> lift $ lift $ (ci ##= getRole er)) >>= pure <<< join <<< join
 
 addAffectedContexts :: AffectedContext -> MonadPerspectivesTransaction Unit
 addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = cons as affectedContexts})
 
-aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-aisInRoleDelta (RoleBindingDelta{id, binding}) = do
+aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction RoleBindingDelta
+aisInRoleDelta (RoleBindingDelta dr@{id, binding}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions _onRoleDelta_binding binderType
-  for_ bindingCalculations \(InvertedQuery{compilation, userTypes}) -> do
+  users1 <- for bindingCalculations (\(InvertedQuery{compilation, userTypes}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
-    case fromArray affectedContexts of
-      Nothing -> pure unit
-      Just contextInstances -> addAffectedContexts $ AffectedContext {contextInstances, userTypes}
+    handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
 
-  case binding of
+  users2 <- case binding of
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binding bindingType
-      for_ binderCalculations \(InvertedQuery{compilation, userTypes}) -> do
+      for binderCalculations (\(InvertedQuery{compilation, userTypes}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
         affectedContexts <- lift2 (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
-        case fromArray affectedContexts of
-          Nothing -> pure unit
-          Just contextInstances -> addAffectedContexts $ AffectedContext {contextInstances, userTypes}
-    Nothing -> pure unit
+        handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+    Nothing -> pure []
+  pure $ RoleBindingDelta dr {users = union users1 users2}
 
-aisInPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-aisInPropertyDelta (RolePropertyDelta{id, property})= do
+aisInPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction RolePropertyDelta
+aisInPropertyDelta (RolePropertyDelta dr@{id, property})= do
   calculations <- lift2 $ compileDescriptions' property
-  for_ calculations \(InvertedQuery{compilation, userTypes}) -> do
+  users <- for calculations (\(InvertedQuery{compilation, userTypes}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
-    case fromArray affectedContexts of
-      Nothing -> pure unit
-      Just contextInstances -> addAffectedContexts $ AffectedContext {contextInstances, userTypes}
+    handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
+  pure $ RolePropertyDelta dr {users = users}
   where
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array InvertedQuery)
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do

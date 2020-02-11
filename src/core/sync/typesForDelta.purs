@@ -43,6 +43,7 @@ newtype ContextDelta = ContextDelta
   , roleInstance :: Maybe RoleInstance
   -- Add, Remove, Delete,
   , deltaType :: DeltaType
+  , users :: Array RoleInstance
   }
 
 derive instance genericContextDelta :: Generic ContextDelta _
@@ -65,6 +66,7 @@ newtype RoleBindingDelta = RoleBindingDelta
   , binding :: Maybe RoleInstance
   -- Remove, Change
   , deltaType :: DeltaType
+  , users :: Array RoleInstance
   }
 
 derive instance genericRoleDelta :: Generic RoleBindingDelta _
@@ -88,6 +90,7 @@ newtype RolePropertyDelta = RolePropertyDelta
   , value :: Maybe Value
   -- Add, Remove, Delete, Change
   , deltaType :: DeltaType
+  , users :: Array RoleInstance
   }
 
 derive instance genericPropertyDelta :: Generic RolePropertyDelta _
