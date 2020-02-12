@@ -117,7 +117,7 @@ invertFunction dom qf ran = case qf of
     _ -> Nothing
 
   -- TODO: Is overbodig, nu?
-  RolGetter rt -> Just $ DataTypeGetter ContextF
+  -- RolGetter rt -> Just $ DataTypeGetter ContextF
   PropertyGetter (CP _) -> Nothing
   PropertyGetter pt -> Just $ Value2Role pt
   -- Variable lookup implies variable binding elsewhere. We've traced the path back in the binding, so we ignore it here.

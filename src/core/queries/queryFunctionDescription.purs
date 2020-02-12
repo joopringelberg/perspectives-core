@@ -126,6 +126,9 @@ productOfDomains _ _ = Nothing
 domain2roleType :: Partial => Domain -> ADT EnumeratedRoleType
 domain2roleType (RDOM r) = r
 
+domain2contextType :: Partial => Domain -> ADT ContextType
+domain2contextType (CDOM c) = c
+
 derive instance genericDomain :: Generic Domain _
 
 instance showDomain :: Show Domain where

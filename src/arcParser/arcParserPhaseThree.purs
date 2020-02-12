@@ -68,6 +68,7 @@ import Perspectives.Representation.Class.Property (range) as PT
 import Perspectives.Representation.Class.Role (adtOfRole, bindingOfRole, getCalculation, getRole, lessThanOrEqualTo)
 import Perspectives.Representation.Class.Role (contextOfRepresentation, roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.Context (Context(..))
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.SideEffect (SideEffect(..))
@@ -311,27 +312,43 @@ invertedQueriesForLocalRolesAndProperties = do
     (invertedQueriesForLocalRolesAndProperties' df)
   where
     invertedQueriesForLocalRolesAndProperties' :: DomeinFileRecord -> PhaseThree Unit
-    invertedQueriesForLocalRolesAndProperties' {enumeratedRoles} = for_ enumeratedRoles
-      (\(EnumeratedRole rr@{_id, context, binding, properties, onContextDelta_context}) -> do
-        userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
-        if null userTypes
-          then pure unit
-          else do
-            contextQuery <- pure $
-              InvertedQuery
-                { description: (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown)
-                , compilation: Nothing
-                , userTypes
-                }
-            bindingQuery <- pure $
-              InvertedQuery
-                { description: (makeComposition
-                  (SQD (RDOM binding) (QF.DataTypeGetterWithParameter QF.GetRoleBindersF (unwrap _id)) (RDOM (ST _id)) Unknown Unknown)
-                  (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown))
-                , compilation: Nothing
-                , userTypes }
-            -- TODO: PROPERTIES
-            modifyDF (\df@{enumeratedRoles:roles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {onContextDelta_context = cons contextQuery onContextDelta_context}) roles})
+    invertedQueriesForLocalRolesAndProperties' {enumeratedRoles, enumeratedProperties} = do
+      for_ enumeratedRoles
+        (\(EnumeratedRole rr@{_id, context, binding, onContextDelta_context}) -> do
+          userTypes <- lift $ lift (context ###= rolesWithPerspectiveOnRole (ENR _id))
+          if null userTypes
+            then pure unit
+            else do
+              contextQuery <- pure $
+                InvertedQuery
+                  { description: (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown)
+                  , compilation: Nothing
+                  , userTypes
+                  }
+              bindingQuery <- pure $
+                InvertedQuery
+                  { description: (makeComposition
+                    (SQD (RDOM binding) (QF.DataTypeGetterWithParameter QF.GetRoleBindersF (unwrap _id)) (RDOM (ST _id)) Unknown Unknown)
+                    (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) Unknown Unknown))
+                  , compilation: Nothing
+                  , userTypes }
+              modifyDF (\df@{enumeratedRoles:roles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {onContextDelta_context = cons contextQuery onContextDelta_context}) roles})
+        )
+      for_ enumeratedProperties
+        (\(EnumeratedProperty pr@{_id, role, onPropertyDelta, range}) -> do
+          roleContext <- (lift $ lift $ getEnumeratedRole role) >>= pure <<< _.context <<< unwrap
+          userTypes <- lift $ lift (roleContext ###= rolesWithPerspectiveOnProperty (ENP _id))
+          if null userTypes
+            then pure unit
+            else do
+              propertyQuery <- pure
+                (InvertedQuery
+                  { description: (makeComposition
+                    (SQD (VDOM range (Just (ENP _id))) (QF.Value2Role (ENP _id)) (RDOM (ST role)) Unknown Unknown)
+                    (SQD (RDOM (ST role)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST roleContext)) Unknown Unknown))
+                  , compilation: Nothing
+                  , userTypes})
+              modifyDF (\df@{enumeratedProperties:properties} -> df {enumeratedProperties = insert (unwrap _id) (EnumeratedProperty pr {onPropertyDelta = cons propertyQuery onPropertyDelta}) properties})
         )
 
 -- | The calculation of a CalculatedRole or a CalculatedProperty are both expressions. This function compiles the

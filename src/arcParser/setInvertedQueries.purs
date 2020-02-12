@@ -28,20 +28,21 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.DescriptionCompiler (makeComposition)
 import Perspectives.Query.Inversion (domain2RoleType, invertFunctionDescription)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, domain2contextType)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Role (contextOfADT)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (Unit, discard, pure, unit, ($), bind, (>>=))
 
 -- Compute the inverse paths for the queryfunction description. Save each path with the type that is the origin
@@ -113,12 +114,17 @@ setInvertedQueries userTypes qfd = do
           Nothing -> dfr
           Just en -> dfr {enumeratedRoles = insert roleName (addPathToOnContextDelta_context en path) enumeratedRoles}
 
+      -- Apply addPathToOnContextDelta_role to the external role of the context.
+      QF.DataTypeGetter QF.ExternalRoleF -> case unsafePartial (domain2contextType dom) of
+        ST (ContextType id) -> modifyDF \dfr@{enumeratedRoles} -> case lookup (buitenRol id) enumeratedRoles of
+          Nothing -> dfr
+          Just er -> dfr {enumeratedRoles = insert (buitenRol id) (addPathToOnContextDelta_role er path) enumeratedRoles}
+
       -- Ignore ExternalRoleF and IdentityF in an inverse path. We do not
       -- establish queries to gather affected contexts on them. For IdentityF this is
       -- because we will establish a query on the next step (or have done so at the
       -- previous step). For ExternalRoleF this is because there cannot be ContextDeltas
       -- for the External role.
-      QF.DataTypeGetter QF.ExternalRoleF -> pure unit
       QF.DataTypeGetter QF.IdentityF -> pure unit
 
       _ -> throwError $ Custom "setInvertedQueries: there should be no other cases. This is a system programming error."
