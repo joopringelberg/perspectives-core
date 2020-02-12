@@ -8,7 +8,7 @@ import Data.Either (Either(..), isRight)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, fromFoldable, lookup, empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (removeBinding, setBinding)
@@ -36,8 +36,11 @@ import Text.Parsing.Parser (ParseError(..))
 testDirectory :: String
 testDirectory = "test"
 
+modelDirectory :: String
+modelDirectory = "src/model"
+
 theSuite :: Free TestF Unit
-theSuite = suite  "ContextRoleParser" do
+theSuite = suite "ContextRoleParser" do
   test "inverse binding" do
     ra <- runP do
       _ <- setupUser
@@ -77,6 +80,7 @@ theSuite = suite  "ContextRoleParser" do
     ra <- runP do
       _ <- setupUser
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
       void $ runMonadPerspectivesTransaction $ setBinding
         (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
@@ -88,6 +92,7 @@ theSuite = suite  "ContextRoleParser" do
     c <- runP do
       _ <- setupUser
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
       void $ runMonadPerspectivesTransaction $ setBinding
         (RoleInstance "model:User$MyTestCase$MyNestedCase3$NestedSelf_0001")
@@ -100,6 +105,7 @@ theSuite = suite  "ContextRoleParser" do
     c <- runP do
       _ <- setupUser
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
+      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
       void $ runMonadPerspectivesTransaction $ removeBinding
         (RoleInstance "model:User$MyTestCase$MyNestedCase2$NestedSelf_0001")
@@ -152,8 +158,8 @@ theSuite = suite  "ContextRoleParser" do
       (Left e) -> liftAff $ assert (show e) false
       (Right (Tuple rn ri)) -> do
         (PerspectRol{binding}) <- getPerspectRol ri
-        logShow rn -- "model:System$Tester"
-        logShow ri -- "model:User$MyTests$Tester_0001"
-        logShow binding
+        -- logShow rn -- "model:System$Tester"
+        -- logShow ri -- "model:User$MyTests$Tester_0001"
+        -- logShow binding
         liftAff $ assert "In '$Tester -> model:User$MijnSysteem$User_0001' the parser should recognise a role instance" (binding == Just (RoleInstance "model:User$MijnSysteem$User_0001"))
 ))

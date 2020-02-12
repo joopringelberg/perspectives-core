@@ -46,7 +46,7 @@ theSuite = suite  "Perspectives.Representation.ADT" do
                   -- otherwise -> assert "" true
                   Just rl -> do
                     b <- runP $ binding rl
-                    logShow b
+                    -- logShow b
                     assert "binding of 'model:MyTestDomain$Role' is '(ST (EnumeratedRoleType \"model:MyTestDomain$YetAnotherRole\"))'"
                       -- (b == NOTYPE)
                       (b == (ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")))

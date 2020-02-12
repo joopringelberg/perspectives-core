@@ -49,7 +49,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) true
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'MyTestDomain$Context' should be parsed as a valid identifier" (id == "MyTestDomain$Context")
 
   test "arcIdentifier on prefixed name" do
@@ -64,7 +64,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) true
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'pre:MyTestDomain$Context' should be parsed as a valid identifier" (id == "pre:MyTestDomain$Context")
 
   test "arcIdentifier on prefixed double segmented name" do
@@ -72,7 +72,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) true
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'pre:MyTestDomain$Context$Role' should be parsed as a valid identifier" (id == "pre:MyTestDomain$Context$Role")
 
   test "arcIdentifier on fully qualified name" do
@@ -80,7 +80,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) true
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'model:MyTestDomain$Context' should be parsed as a valid identifier" (id == "model:MyTestDomain$Context")
 
   test "Representing the Domain" do
@@ -416,7 +416,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       (Right pre@(Act (ActionE{verb, actionParts}))) -> do
-        logShow pre
+        -- logShow pre
         assert "The Action should have the Verb 'Consult'" (verb == Consult)
         (assert "The Action should have a view with name 'ViewOnGuest'"
           (isJust (findIndex (case _ of
@@ -520,7 +520,7 @@ theSuite = suite  "Perspectives.Parsing.Arc" do
     case r of
       (Left e) -> assert (show e) false
       (Right dom) -> do
-        logShow dom
+        -- logShow dom
         assert ("The file '" <> fileName <> "' does not parse") true
 
   test "Context with an aspect" do

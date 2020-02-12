@@ -307,7 +307,8 @@ theSuite = suite  "Perspectives.Query.DescriptionCompiler" do
         Nothing -> assert "There should be a property 'HasBinding'" false
         Just (CalculatedProperty{calculation}) -> do
           case calculation of
-            (Q c) -> log $ prettyPrint c
+            -- (Q c) -> log $ prettyPrint c
+            (Q c) -> pure unit
             otherwise -> pure unit
           assert "The calculation should be a Unary combination, the queryFunction of which should be '(UnaryCombinator \"available\")'"
             case calculation of

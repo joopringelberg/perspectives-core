@@ -225,7 +225,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
         case evalPhaseTwo (traverseDomain ctxt "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
-            logShow dr'
+            -- logShow dr'
             assert "The DomeinFile should have the role 'model:MyTestDomain$MyUser' that is\
             \ filled with 'ST EnumeratedRoleType model:System$PerspectivesSystem$User'"
               case (lookup "model:MyTestDomain$MyUser" dr'.enumeratedRoles) of
@@ -357,7 +357,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.PhaseTwo" do
         case evalPhaseTwo (traverseDomain dom "model:") of
           (Left e) -> assert (show e) false
           (Right (DomeinFile dr')) -> do
-            logShow dr'
+            -- logShow dr'
             assert ("The file '" <> fileName <> "' does not parse") true
 
   test "An Agent role for a Bot without a ForUser clause" do

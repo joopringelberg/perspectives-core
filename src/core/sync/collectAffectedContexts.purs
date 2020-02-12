@@ -23,7 +23,7 @@ module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Reader (lift)
-import Data.Array (cons, head, union)
+import Data.Array (filterA, cons, head, union)
 import Data.Array.NonEmpty (fromArray, toArray)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
@@ -33,6 +33,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, traverse)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextAndRole (rol_isMe)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MonadPerspectivesTransaction, (##=), (##>>))
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile)
@@ -40,6 +41,7 @@ import Perspectives.Identifiers (deconstructModelName)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..))
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.Query.Compiler (getHiddenFunction)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRoleRecord)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -47,7 +49,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), RolePropertyDelta(..), RoleBindingDelta(..))
-import Prelude (Unit, bind, const, discard, join, pure, ($), (<<<), (>>=))
+import Prelude (Unit, bind, const, discard, join, not, pure, ($), (<<<), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | From the ContextDelta, collect affected contexts. Compile all queries that are used to collect
@@ -67,7 +69,9 @@ aisInContextDelta (ContextDelta dr@{id, roleType, roleInstance}) = do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: ContextInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
-  pure $ ContextDelta dr {users = union users1 users2}
+  -- Remove 'me'
+  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (union users1 users2)
+  pure $ ContextDelta dr {users = otherUsers}
 
 handleAffectedContexts :: Array ContextInstance -> Array EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
 handleAffectedContexts affectedContexts userTypes = case fromArray affectedContexts of
@@ -97,7 +101,9 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding}) = do
         affectedContexts <- lift2 (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
         handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     Nothing -> pure []
-  pure $ RoleBindingDelta dr {users = union users1 users2}
+  -- remove 'me'.
+  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) (union users1 users2)
+  pure $ RoleBindingDelta dr {users = otherUsers}
 
 aisInPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction RolePropertyDelta
 aisInPropertyDelta (RolePropertyDelta dr@{id, property})= do
@@ -106,7 +112,8 @@ aisInPropertyDelta (RolePropertyDelta dr@{id, property})= do
     -- Find all affected contexts, starting from the role instance of the Delta.
     affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
-  pure $ RolePropertyDelta dr {users = users}
+  otherUsers <- lift $ lift $ filterA (getPerspectRol >=> pure <<< not <<< rol_isMe) users
+  pure $ RolePropertyDelta dr {users = otherUsers}
   where
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Array InvertedQuery)
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do

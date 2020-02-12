@@ -23,9 +23,11 @@ module Perspectives.Sync.AffectedContext where
 
 import Prelude
 
-import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty (NonEmptyArray, toArray)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
+import Foreign.Class (class Encode, encode)
+import Foreign.Generic (defaultOptions, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 
@@ -36,3 +38,13 @@ derive instance genericAffectedContext :: Generic AffectedContext _
 
 instance showAffectedContext :: Show AffectedContext where
   show = genericShow
+
+newtype AffectedContext' = AffectedContext' {contextInstances :: Array ContextInstance, userTypes :: Array EnumeratedRoleType}
+
+derive instance genericAffectedContext' :: Generic AffectedContext' _
+
+instance encodeAffectedContext' :: Encode AffectedContext' where
+  encode = genericEncode defaultOptions
+
+instance encodeAffectedContext :: Encode AffectedContext where
+  encode (AffectedContext {contextInstances, userTypes}) = encode (AffectedContext' {contextInstances: toArray contextInstances, userTypes})

@@ -48,7 +48,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
         -- logShow v
         assert "A lowercase name should be parsed as a variable" true
       otherwise -> do
-        logShow otherwise
+        -- logShow otherwise
         assert "A lowercase name should be parsed as a variable" false
 
   test "UnaryStep: LogicalNot" do
@@ -146,7 +146,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'(filter MyRole with ItsBooleanProp) == MyOtherRole' should be parsed as a a binary step with operator 'Equals'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -159,8 +159,8 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
-        log $ prettyPrint id
+        -- logShow id
+        -- log $ prettyPrint id
         assert "'filter MyRole with (MyOtherRole >> Criterium)' should be parsed as a a binary step with operator 'Filter'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -225,7 +225,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do
-        logShow id
+        -- logShow id
         assert "'(MyRole) >> (MyProp)' should be parsed as a a binary step with operator 'Multiply'"
           case id of
             (Binary (BinaryStep {operator})) -> case operator of
@@ -340,7 +340,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Step) <- pure $ unwrap $ runIndentParser " this >>= fantasy" step
     case r of
       (Left (ParseError m _)) -> do
-        logShow m
+        -- logShow m
         assert "bla" true
       (Right id) -> do
         -- logShow id
@@ -384,11 +384,11 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Let (LetStep {bindings, assignments}))) -> do
-        logShow a
+        -- logShow a
         assert "There should be two bindings" (length bindings == 2)
         assert "There should be two statements" (length assignments == 2)
       x -> do
-        logShow x
+        -- logShow x
         assert "'let*\n  a <- MyProp\n  b <- SecondProp\nin\n  AnotherProp = a' should be parsed as a LetStep" false
 -----------------------------------------------------------------------------------
 ---- ASSIGNMENT
@@ -434,7 +434,7 @@ theSuite = suite  "Perspectives.Parsing.Arc.Expression" do
     case r of
       (Left e) -> assert (show e) false
       (Right a@(Move {contextExpression})) -> do
-        logShow a
+        -- logShow a
         assert "There should be a contextExpression" (isJust contextExpression)
       otherwise -> assert ("'move MyRole to SomeContextRole >> binding >> context' should be parsed as a Move assignment, instead this was returned: " <> show otherwise) false
 

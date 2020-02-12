@@ -21,63 +21,85 @@
 
 module Perspectives.Deltas where
 
-import Affjax (printResponseFormatError)
-import Affjax (put) as AJ
+import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
-import Affjax.ResponseFormat as ResponseFormat
-import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.AvarMonadAsk (modify, get) as AA
+import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (cons, delete, deleteAt, elemIndex, find, findIndex, head, union)
+import Data.Array (cons, deleteAt, findIndex, union)
 import Data.Array.NonEmpty (singleton)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.HTTP.Method (Method(..))
+import Data.Map (Map, lookup, insert, empty)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (over, unwrap)
-import Data.Set (insert) as SET
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
-import Effect.Aff (error, throwError)
 import Effect.Aff.Class (liftAff)
-import Effect.Class (liftEffect)
-import Foreign.Object (Object, empty, insert, lookup) as FO
+import Effect.Class.Console (log)
+import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
+import Perspectives.Couchdb.Databases (defaultPerspectRequest)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (context, roleType)
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Property (functional) as P
-import Perspectives.Representation.Class.Role (functional) as R
-import Perspectives.Representation.Class.Role (getRoleType)
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Instances.ObjectGetters (roleType)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
-import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), DeltaType(..), RolePropertyDelta(..), ContextDelta(..))
-import Perspectives.User (getUser)
-import Perspectives.Utilities (maybeM, onNothing')
-import Prelude (Unit, bind, discard, identity, pure, show, unit, ($), (&&), (<<<), (<>), (==), (>>=), (||))
+import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
+import Perspectives.Sync.Transaction (Transaction(..), transactieID)
+import Perspectives.TypesForDeltas (RoleBindingDelta, RolePropertyDelta, ContextDelta)
+import Perspectives.User (getCouchdbBaseURL)
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (==))
 
--- TODO: doe ook wat met de andere modificaties in de transactie?
--- Waarschijnlijk niet. De update functies (Perspectives.Assignment.Update) slaan op in cache en in couchdb.
-runTransactie :: Transaction -> MonadPerspectivesTransaction Unit
+runTransactie :: Transaction -> MonadPerspectives Unit
 runTransactie t@(Transaction{changedDomeinFiles}) = do
-  lift $ lift $ for_ changedDomeinFiles saveCachedDomeinFile
+  for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
-  -- distributeTransactie t
+  distributeTransactie t
   pure unit
 
 distributeTransactie :: Transaction -> MonadPerspectives Unit
 distributeTransactie t = do
-  -- TODO: SLUIT DIT AAN NA REFACTOREN VAN transactieForEachUser
-  -- (customizedTransacties :: FO.Object Transaction) <- transactieForEachUser t
-  -- (customizedTransacties :: FO.Object Transaction) <- pure []
-  -- _ <- forWithIndex customizedTransacties sendTransactieToUser
+  (customizedTransacties :: TransactionPerUser) <- transactieForEachUser t
+  _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
+
+sendTransactieToUser :: RoleInstance -> Transaction -> MonadPerspectives Unit
+sendTransactieToUser userId t = do
+  log ("In sendTransactieToUser with " <> show userId <> " and transaction " <> show t)
+  -- The connection database that we should put the transaction in, is identified by the userId.
+  -- TODO controleer of hier authentication nodig is!
+  cdbUrl <- getCouchdbBaseURL
+  (rq :: (Request String)) <- defaultPerspectRequest
+  res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> "/" <> (unwrap userId) <> "/" <> transactieID t), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions t)}
+  void $ onAccepted res.status [200, 201] "sendTransactieToUser"
+    (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+
+type TransactionPerUser = Map RoleInstance Transaction
+
+-- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
+-- | This function builds a custom version of the Transaction for each such user.
+transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
+transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas}) = do
+  execStateT (do
+    (for_ contextDeltas \d -> (transactieForEachUser' d (users d)))
+    (for_ roleDeltas \d -> (transactieForEachUser' d (users d)))
+    (for_ propertyDeltas \d -> (transactieForEachUser' d (users d)))
+    )
+    empty
+  where
+    transactieForEachUser' :: forall d. DeltaUsers d => d -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
+    transactieForEachUser' d users = do
+      trs <- get
+      for_
+        users
+        (\(user :: RoleInstance) -> case lookup user trs of
+          Nothing -> put $ insert user (transactionCloneWithDelta d t) trs
+          Just tr -> put $ insert user (addToTransaction d tr) trs
+        )
 
 addContextToTransactie :: PerspectContext ->
   MonadPerspectivesTransaction Unit
@@ -200,89 +222,3 @@ addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transacti
 --     replace i delta (Transaction tf@{deltas}) = Transaction tf {deltas = cons newCD (maybe deltas identity (deleteAt i deltas))}
 --     remove :: Delta -> Transaction -> Transaction
 --     remove i (Transaction tf@{deltas}) = Transaction tf {deltas = (delete i deltas)}
-
-
--- sendTransactieToUser :: ID -> Transaction -> MonadPerspectives Unit
--- sendTransactieToUser userId t = do
---   tripleUserIP <- userId ##> DTG.identity -- TODO. Het lijkt erop dat hier een getter toegepast moet worden die het IP adres van de user oplevert!
---   (userIP :: String) <- (onNothing' <<< error) ("sendTransactieToUser: user has no IP: " <> userId) tripleUserIP
---   -- TODO controleer of hier authentication nodig is!
---   res  <- liftAff $ AJ.put ResponseFormat.string (userIP <> "/" <> userId <> "_post/" <> transactieID t) (RequestBody.string (writeJSON t))
---   (StatusCode n) <- pure res.status
---   case n == 200 || n == 201 of
---     true -> pure unit
---     false -> case res.body of
---       (Left e) -> throwError $ error ("sendTransactieToUser " <> transactieID t <> " fails: " <> (show res.status) <> "(" <> printResponseFormatError e <> ")")
---       _ -> pure unit
---   pure unit
-{-
--- TODO. De verbinding tussen Actie en Rol is omgekeerd en is niet
--- langer geregistreerd als een rol van de Actie, maar als rol van de Rol (objectRol en subjectRol).
--- | The (IDs of the) users that play a role in, and have a relevant perspective on, the Context that is modified;
--- | or the users that play a role in the context of the Role that is modified and have a relevant perspective on that Role.
-usersInvolvedInDelta :: Delta -> MonadPerspectives (Array RolInContext)
-usersInvolvedInDelta dlt@(Delta{isContext}) = if isContext then usersInvolvedInContext dlt else usersInvolvedInRol dlt
-  where
-
-  -- From the instance of a Rol, retrieve the instances of users that play another Rol
-  -- in the same context, such that they have an Actie with an objectView that has the
-  -- changed property (as identified by memberName).
-  usersInvolvedInRol :: Delta -> MonadPerspectives (Array RolInContext)
-  usersInvolvedInRol (Delta{id, memberName}) =
-    do
-      (contextId :: AnyContext) <- (RolInContext id) %%>> context
-      ((Triple {object}) :: Triple RolInContext RolInContext) <-
-        (RolInContext id) ## DTG.rolType >-> subjectsOfRelevantActies >-> (rolesOf contextId) >-> rolUser
-      pure $ object
-    where
-      -- roles in context that play the subjectRol in the relevant acties
-      subjectsOfRelevantActies :: (RolDef **> UserRolDef)
-      subjectsOfRelevantActies = unwrap `before` filter (notEmpty (intersect actiesOfRol relevantActies)) (enclosingDefinition `followedBy` ContextDef >-> searchUnqualifiedRolDefinition "gebruikerRol")
-
-      -- acties that have an objectView with the memberName
-      relevantActies :: (RolDef **> ActieDef)
-      relevantActies = unwrap `before` filter (hasRelevantView (PropertyDef memberName)) (enclosingDefinition `followedBy` ContextDef >-> actiesInContextDef)
-
-  -- From the instance of the context, retrieve the instances of the users that play
-  -- a Rol in this context that have a subjectRol bound to an Actie that is bound as the
-  -- objectRol of the Rol of which memberName is an instance.
-
-  -- From the instance of the context, retrieve the instances of the users that play
-  -- a Rol in this context who fill the $subject Rol of an Actie that has its $object Rol filled
-  -- with the Rol of which memberName is an instance.
-  usersInvolvedInContext :: Delta -> MonadPerspectives (Array RolInContext)
-  usersInvolvedInContext (Delta{id, memberName}) =
-    do
-      (Triple {object}) <- (RolInContext id) ## DTG.rolType >-> actorsForObject >-> (rolesOf id) >-> rolUser
-      pure object
-    where
-      -- All Rollen that are the subject of Acties that have the Rol as object.
-      actorsForObject :: (RolDef **> UserRolDef)
-      actorsForObject = objectRollenDef >-> inverse_subjectRollenDef
-
-  -- Tests an Actie for having memberName in the view that is its objectView.
-  -- psp:Actie -> psp:Boolean
-  hasRelevantView :: PropertyDef -> (ActieDef **> PBool)
-  hasRelevantView id = id `containedIn` (objectViewDef >-> propertyReferenties >-> DTG.rolBindingDef `followedBy` PropertyDef)
-
-
--- Bouw een transactie eerst op, splits hem dan in versies voor elke gebruiker.
--- Doorloop de verzameling deltas en bepaal per delta welke gebruikers betrokken zijn.
--- Bouw al doende een FO.Object van userId en gespecialiseerde transacties op, waarbij je een transactie toevoegt voor een gebruiker die nog niet in de FO.Object voorkomt.
-transactieForEachUser :: Transaction -> MonadPerspectives(FO.Object Transaction)
-transactieForEachUser t@(Transaction{deltas}) = do
-  execStateT
-    (for_ deltas (\d -> (lift $ usersInvolvedInDelta d) >>= (\(users :: Array RolInContext) -> transactieForEachUser' d users)))
-    FO.empty
-  where
-    transactieForEachUser' :: Delta -> (Array RolInContext) -> StateT (FO.Object Transaction) (MonadPerspectives) Unit
-    transactieForEachUser' d users = do
-      trs <- get
-      for_
-        users
-        (\(user :: RolInContext) -> case FO.lookup (unwrap user) trs of
-          Nothing -> put $ FO.insert (unwrap user) (transactieCloneWithJustDelta t d) trs
-          (Just (Transaction tr@{deltas: ds})) -> put $ FO.insert (unwrap user) (Transaction tr {deltas = cons d ds}) trs)
-    transactieCloneWithJustDelta :: Transaction -> Delta -> Transaction
-    transactieCloneWithJustDelta (Transaction tr) d = Transaction tr {deltas = [d]}
--}

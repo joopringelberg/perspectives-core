@@ -11,7 +11,7 @@ import Effect.Class.Console (logShow)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndSaveArcFile, loadCompileAndSaveArcFile', loadAndCompileArcFile)
-import Test.Perspectives.Utils (runP)
+import Test.Perspectives.Utils (runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -55,8 +55,10 @@ theSuite = suite  "Perspectives.loadArc" do
 
   test "Load a model file and store it in Couchdb" do
     -- 1. Load and save a model.
-    messages <- runP $ catchError (loadCompileAndSaveArcFile "TestBotActie" modelDirectory)
-      \e -> logShow e *> pure []
+    messages <- runP do
+      setupUser
+      catchError (loadCompileAndSaveArcFile "TestBotActie" modelDirectory)
+        \e -> logShow e *> pure []
     if null messages
       then pure unit
       else do
