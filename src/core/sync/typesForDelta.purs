@@ -21,9 +21,6 @@
 
 module Perspectives.TypesForDeltas where
 
------------------------------------------------------------
--- DELTA
------------------------------------------------------------
 import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -31,8 +28,54 @@ import Data.Maybe (Maybe)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Prelude (class Show)
+
+-----------------------------------------------------------
+-- UNIVERSECONTEXTDELTA
+-----------------------------------------------------------
+newtype UniverseContextDelta = UniverseContextDelta
+  { id :: ContextInstance
+  , contextType :: ContextType
+  -- Add, Remove
+  , deltaType :: DeltaType
+  , users :: Array RoleInstance
+  }
+
+derive instance genericUniverseContextDelta :: Generic UniverseContextDelta _
+
+instance showUniverseContextDelta :: Show UniverseContextDelta where
+  show = genericShow
+
+derive instance eqUniverseContextDelta :: Eq UniverseContextDelta
+
+instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
+  encode = genericEncode defaultOptions
+instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
+  decode = genericDecode defaultOptions
+
+-----------------------------------------------------------
+-- UNIVERSEROLEDELTA
+-----------------------------------------------------------
+newtype UniverseRoleDelta = UniverseRoleDelta
+  { id :: RoleInstance
+  , roleType :: EnumeratedRoleType
+  -- Add, Remove
+  , deltaType :: DeltaType
+  , users :: Array RoleInstance
+  }
+
+derive instance genericUniverseRoleDelta :: Generic UniverseRoleDelta _
+
+instance showUniverseRoleDelta :: Show UniverseRoleDelta where
+  show = genericShow
+
+derive instance eqUniverseRoleDelta :: Eq UniverseRoleDelta
+
+instance encodeUniverseRoleDelta :: Encode UniverseRoleDelta where
+  encode = genericEncode defaultOptions
+instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
+  decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
 -- CONTEXTDELTA
@@ -40,7 +83,7 @@ import Prelude (class Show)
 newtype ContextDelta = ContextDelta
   { id :: ContextInstance
   , roleType :: EnumeratedRoleType
-  , roleInstance :: Maybe RoleInstance
+  , roleInstance :: RoleInstance
   -- Add, Remove, Delete,
   , deltaType :: DeltaType
   , users :: Array RoleInstance
@@ -64,6 +107,7 @@ instance decodeContextDelta :: Decode ContextDelta where
 newtype RoleBindingDelta = RoleBindingDelta
   { id :: RoleInstance
   , binding :: Maybe RoleInstance
+  , oldBinding :: Maybe RoleInstance
   -- Remove, Change
   , deltaType :: DeltaType
   , users :: Array RoleInstance

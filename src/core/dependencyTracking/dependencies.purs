@@ -29,6 +29,7 @@ import Prelude
 import Data.Array (delete, elemIndex, partition, (:))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
@@ -37,8 +38,8 @@ import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
@@ -123,6 +124,16 @@ findResourceDependencies resource = do
     Nothing -> pure []
     Just typesForResource -> pure $ join $ values typesForResource
 
+-- Find all correlation identifiers for requests of the form `role <TypeOfRole>`.
+findRoleRequests :: ContextInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
+findRoleRequests resource tpe = findDependencies (Tuple (unwrap resource) (unwrap tpe)) >>= \ma -> pure $ maybe [] identity ma
+
+-- Find all correlation identifiers for requests of the form `property <TypeOfProperty`
+findPropertyRequests :: RoleInstance -> EnumeratedPropertyType -> MP (Array CorrelationIdentifier)
+findPropertyRequests resource tpe = findDependencies (Tuple (unwrap resource) (unwrap tpe)) >>= \ma -> pure $ maybe [] identity ma
+
+-- | Returns CorrelationIdentifiers for requests through the API that have
+-- | the `binding <roleId>` step.
 findBindingRequests :: RoleInstance -> MP (Array CorrelationIdentifier)
 findBindingRequests (RoleInstance roleId) = do
   r <- queryAssumptionRegister
@@ -130,6 +141,8 @@ findBindingRequests (RoleInstance roleId) = do
     Nothing -> pure []
     Just typesForResource -> pure $ maybe [] identity (lookup "model:System$Role$binding" typesForResource)
 
+-- | Returns CorrelationIdentifiers for requests through the API that have
+-- | the `binder <typeId>` step on the `roleId`.
 findBinderRequests :: RoleInstance -> EnumeratedRoleType -> MP (Array CorrelationIdentifier)
 findBinderRequests (RoleInstance roleId) (EnumeratedRoleType typeId) = do
   r <- queryAssumptionRegister
@@ -141,7 +154,6 @@ isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<
   (maybe false (maybe false (const true) <<< (elemIndex corrId)) )
 
--- TODO. Implementeer zonder lens. Ik denk dat de dubbele at hier fout gaat.
 registerDependency :: CorrelationIdentifier -> Assumption -> MP Unit
 registerDependency corrId (Tuple resource tpe) = queryAssumptionRegisterModify \r ->
   case lookup resource r of

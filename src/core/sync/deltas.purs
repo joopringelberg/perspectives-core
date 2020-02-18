@@ -25,44 +25,39 @@ import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (cons, deleteAt, findIndex, union)
-import Data.Array.NonEmpty (singleton)
+import Data.Array (cons, union)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Map (Map, lookup, insert, empty)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Sync.AffectedContext (AffectedContext(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
-import Perspectives.TypesForDeltas (RoleBindingDelta, RolePropertyDelta, ContextDelta)
+import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>), (==))
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>))
 
-runTransactie :: Transaction -> MonadPerspectives Unit
-runTransactie t@(Transaction{changedDomeinFiles}) = do
+distributeTransaction :: Transaction -> MonadPerspectives Unit
+distributeTransaction t@(Transaction{changedDomeinFiles}) = do
   for_ changedDomeinFiles saveCachedDomeinFile
   -- Send the Transaction to all involved.
-  distributeTransactie t
+  distributeTransactie' t
   pure unit
 
-distributeTransactie :: Transaction -> MonadPerspectives Unit
-distributeTransactie t = do
+distributeTransactie' :: Transaction -> MonadPerspectives Unit
+distributeTransactie' t = do
   (customizedTransacties :: TransactionPerUser) <- transactieForEachUser t
   _ <- forWithIndex customizedTransacties sendTransactieToUser
   pure unit
@@ -83,16 +78,18 @@ type TransactionPerUser = Map RoleInstance Transaction
 -- | The Transaction holds Deltas and each Delta names user instances who should receive that Delta.
 -- | This function builds a custom version of the Transaction for each such user.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
-transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas}) = do
+transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas, universeRoleDeltas, universeContextDeltas}) = do
   execStateT (do
-    (for_ contextDeltas \d -> (transactieForEachUser' d (users d)))
-    (for_ roleDeltas \d -> (transactieForEachUser' d (users d)))
-    (for_ propertyDeltas \d -> (transactieForEachUser' d (users d)))
+    for_ contextDeltas \d -> addDeltaToCustomisedTransactie d (users d)
+    for_ roleDeltas \d -> addDeltaToCustomisedTransactie d (users d)
+    for_ propertyDeltas \d -> addDeltaToCustomisedTransactie d (users d)
+    for_ universeRoleDeltas \d -> addDeltaToCustomisedTransactie d (users d)
+    for_ universeContextDeltas \d -> addDeltaToCustomisedTransactie d (users d)
     )
     empty
   where
-    transactieForEachUser' :: forall d. DeltaUsers d => d -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
-    transactieForEachUser' d users = do
+    addDeltaToCustomisedTransactie :: forall d. DeltaUsers d => d -> (Array RoleInstance) -> StateT TransactionPerUser (MonadPerspectives) Unit
+    addDeltaToCustomisedTransactie d users = do
       trs <- get
       for_
         users
@@ -100,30 +97,6 @@ transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas})
           Nothing -> put $ insert user (transactionCloneWithDelta d t) trs
           Just tr -> put $ insert user (addToTransaction d tr) trs
         )
-
-addContextToTransactie :: PerspectContext ->
-  MonadPerspectivesTransaction Unit
-addContextToTransactie c@(PerspectContext{_id, me}) = do
-  case me of
-    Nothing -> lift $ AA.modify (over Transaction \(t@{createdContexts}) -> t {createdContexts = cons c createdContexts})
-    Just me' -> do
-      myType <- lift $ lift $ (me' ##= roleType)
-      lift $ AA.modify (over Transaction \(t@{createdContexts, affectedContexts}) -> t {createdContexts = cons c createdContexts, affectedContexts = cons (AffectedContext {contextInstances: singleton _id, userTypes: myType}) affectedContexts})
-
-addRolToTransactie :: PerspectRol -> MonadPerspectivesTransaction Unit
-addRolToTransactie c = lift $ AA.modify (over Transaction \(t@{createdRoles}) -> t {createdRoles = cons c createdRoles})
-
-deleteContextFromTransactie :: ContextInstance -> MonadPerspectivesTransaction Unit
-deleteContextFromTransactie contextId = lift $ AA.modify (over Transaction \(t@{createdContexts, deletedContexts}) ->
-  case findIndex (\(PerspectContext{_id: i}) -> contextId == i) createdContexts of
-    Nothing -> t {deletedContexts = cons contextId deletedContexts}
-    (Just i) -> t {createdContexts = unsafePartial $ fromJust $ deleteAt i createdContexts})
-
-deleteRolFromTransactie :: RoleInstance -> MonadPerspectivesTransaction Unit
-deleteRolFromTransactie rolId = lift $ AA.modify (over Transaction \(t@{createdRoles, deletedRoles}) ->
-  case findIndex (\(PerspectRol{_id: i}) -> rolId == i) createdRoles of
-    Nothing -> t {deletedRoles = cons rolId deletedRoles}
-    (Just i) -> t {createdRoles = unsafePartial $ fromJust $ deleteAt i createdRoles})
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
 addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
@@ -137,6 +110,12 @@ addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas} -> t {roleDe
 
 addPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
 addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
+
+addUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
+addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas} -> t {universeContextDeltas = cons d universeContextDeltas})
+
+addUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
+addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas} -> t {universeRoleDeltas = cons d universeRoleDeltas})
 
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})

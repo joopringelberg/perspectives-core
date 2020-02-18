@@ -28,23 +28,17 @@ import Data.Array (null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
-import Data.Lens (Lens')
-import Data.Lens.Iso.Newtype (_Newtype)
-import Data.Lens.Record (prop)
 import Data.Newtype (class Newtype)
-import Data.Symbol (SProxy(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Sync.AffectedContext (AffectedContext)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
-import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta)
-import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<<<), (&&))
+import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
+import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (&&))
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -57,10 +51,8 @@ type TransactionRecord f =
   , contextDeltas :: Array ContextDelta
   , roleDeltas :: Array RoleBindingDelta
   , propertyDeltas :: Array RolePropertyDelta
-  , createdContexts :: Array PerspectContext
-  , createdRoles :: Array PerspectRol
-  , deletedContexts :: Array ContextInstance
-  , deletedRoles :: Array RoleInstance
+  , universeContextDeltas :: Array UniverseContextDelta
+  , universeRoleDeltas :: Array UniverseRoleDelta
   , changedDomeinFiles :: Array String
   | f
   }
@@ -76,32 +68,30 @@ instance showTransactie :: Show Transaction where
   show = genericShow
 
 instance encodeTransactie :: Encode Transaction where
-  encode (Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
+  encode (Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles})
 
 instance encodeTransactie' :: Encode Transaction' where
   encode = genericEncode defaultOptions
 
 instance decodeTransactie :: Decode Transaction where
   decode f = do
-    ((Transaction' {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: []}
+    ((Transaction' {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles}) :: Transaction') <- decode f
+    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: []}
 
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, createdContexts, createdRoles, deletedContexts, deletedRoles, changedDomeinFiles})
-    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, createdContexts: cc, createdRoles: cr, deletedContexts: dc, deletedRoles: dr, changedDomeinFiles: cd}) = Transaction
+  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles})
+    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, universeContextDeltas: uc, universeRoleDeltas: ur, changedDomeinFiles: cd}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , contextDeltas: union contextDeltas r
       , roleDeltas: union roleDeltas b
       , propertyDeltas: union propertyDeltas p
-      , createdContexts: union createdContexts cc
-      , createdRoles: union createdRoles cr
-      , deletedContexts: union deletedContexts dc
-      , deletedRoles: union deletedRoles dr
+      , universeContextDeltas: union universeContextDeltas uc
+      , universeRoleDeltas: union universeRoleDeltas ur
       , changedDomeinFiles: union changedDomeinFiles cd
       , affectedContexts: []
       , correlationIdentifiers: []
@@ -117,10 +107,8 @@ createTransactie author =
       , contextDeltas: []
       , roleDeltas: []
       , propertyDeltas: []
-      , createdContexts: []
-      , createdRoles: []
-      , deletedContexts: []
-      , deletedRoles: []
+      , universeContextDeltas: []
+      , universeRoleDeltas: []
       , changedDomeinFiles: []
       , affectedContexts: []
       , correlationIdentifiers: []}
@@ -132,10 +120,8 @@ cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
   , contextDeltas: []
   , roleDeltas: []
   , propertyDeltas: []
-  , createdContexts: []
-  , createdRoles: []
-  , deletedContexts: []
-  , deletedRoles: []
+  , universeContextDeltas: []
+  , universeRoleDeltas: []
   , changedDomeinFiles: []
   , affectedContexts: []
   , correlationIdentifiers: []}
@@ -145,23 +131,9 @@ isEmptyTransaction (Transaction t) =
   null t.contextDeltas
   && null t.roleDeltas
   && null t.propertyDeltas
-  && null t.createdContexts
-  && null t.createdRoles
-  && null t.deletedContexts
-  && null t.deletedRoles
+  && null t.universeContextDeltas
+  && null t.universeRoleDeltas
   && null t.changedDomeinFiles
 
 transactieID :: Transaction -> String
 transactieID (Transaction{author, timeStamp}) = author <> "_" <> show timeStamp
-
-_createdContexts :: Lens' Transaction (Array PerspectContext)
-_createdContexts = _Newtype <<< (prop (SProxy :: SProxy "createdContexts"))
-
-_createdRoles :: Lens' Transaction (Array PerspectRol)
-_createdRoles = _Newtype <<< (prop (SProxy :: SProxy "createdRoles"))
-
-_deletedContexts :: Lens' Transaction (Array ContextInstance)
-_deletedContexts = _Newtype <<< (prop (SProxy :: SProxy "deletedContexts"))
-
-_deletedRoles :: Lens' Transaction (Array RoleInstance)
-_deletedRoles = _Newtype <<< (prop (SProxy :: SProxy "deletedRoles"))

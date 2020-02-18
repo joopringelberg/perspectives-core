@@ -31,14 +31,13 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
-import Effect.Class.Console (log)
 import Foreign.Object (values)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Assignment.ActionCache (retrieveAction)
 import Perspectives.ContextAndRole (context_me)
 import Perspectives.CoreTypes (type (~~>), ActionInstance(..), Assumption, MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>))
-import Perspectives.Deltas (runTransactie)
+import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
 import Perspectives.Instances.Combinators (filter)
@@ -75,7 +74,7 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
       -- 2. Now run actions, collecting further Deltas in a new Transaction. Locally, side effects are cached and saved to Couchdb already.
       (ft@(Transaction{correlationIdentifiers}) :: Transaction) <- lift AA.get >>= runActions
       -- 3. Send deltas to other participants, save changed domeinfiles.
-      if share then lift $ lift $ runTransactie ft else pure unit
+      if share then lift $ lift $ distributeTransaction ft else pure unit
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
       (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
@@ -143,6 +142,10 @@ getAllAutomaticActions (AffectedContext{contextInstances, userTypes}) = do
     Nothing -> pure []
     Just myType -> if isJust $ elemIndex myType userTypes
       then do
+        -- TODO. Notice that this test does not exclude contexts that are affected
+        -- because a Calculated Role or Property changes. As a consequence, we may
+        -- trigger rules (actions) for which the condition value does not change.
+        -- For example, a rule with the constant condition 'true' will then fire.
         (automaticActions :: Array ActionType) <- lift2 (myType ##= filter allActions isAutomatic)
         pure $ join $ ((\affectedContext -> (ActionInstance affectedContext) <$> automaticActions) <$> toArray contextInstances)
       else pure []

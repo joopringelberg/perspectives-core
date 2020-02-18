@@ -40,13 +40,13 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.ActionCache (LHS, cacheAction, retrieveAction)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, deleteRol, moveRoles, removeBinding, removeProperty, removeRolFromContext, saveEntiteit, setBinding, setProperty)
-import Perspectives.BasicConstructors (constructAnotherRol)
-import Perspectives.ContextAndRole (addRol_gevuldeRollen)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, deleteRoleFromContextInstance, moveRoles, removeBinding, removeProperty, setBinding, setProperty)
+import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (type (~~>), MP, Updater, WithAssumptions, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs, lookupHiddenFunction)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
@@ -55,13 +55,12 @@ import Perspectives.Query.Compiler (context2context, context2propertyValue, cont
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Action (condition, effect)
-import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ActionType, getPerspectType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
-import Perspectives.SaveUserData (removeAllRoleInstances, removeRoleInstance, saveAndConnectRoleInstance)
+import Perspectives.SaveUserData (removeAllRoleInstances, removeRoleInstance)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Compile the action to an Updater. Cache for later use.
@@ -99,7 +98,6 @@ compileAssignment (UQD _ QF.Remove rle _ _ mry) = do
       Nothing -> pure unit
       Just {head, tail} -> do
         ((PerspectRol{context, pspType}) :: PerspectRol) <- lift $ lift $ getPerspectEntiteit head
-        removeRolFromContext context pspType roles
         for_ roles removeRoleInstance
 
 -- Delete all instances of the role. Model
@@ -109,16 +107,15 @@ compileAssignment (UQD _ (QF.DeleteRole qualifiedRoleIdentifier) contextsToDelet
     ctxts <- lift $ lift (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
       removeAllRoleInstances qualifiedRoleIdentifier ctxt
-      deleteRol ctxt qualifiedRoleIdentifier
+      deleteRoleFromContextInstance ctxt qualifiedRoleIdentifier
 
 compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
   pure \contextId -> do
-    ctxts <- lift $ lift (contextId ##= contextGetter)
+    ctxts <- lift2 (contextId ##= contextGetter)
     for_ ctxts \ctxt -> do
-      role <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing}))
-      -- save and add to context:
-      saveAndConnectRoleInstance (identifier role)
+      roleIdentifier <- createAndAddRoleInstance qualifiedRoleIdentifier (unwrap ctxt) (RolSerialization {properties: PropertySerialization empty, binding: Nothing})
+      lift2 $ getPerspectRol roleIdentifier
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
@@ -148,18 +145,13 @@ compileAssignment (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBin
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToBindIn
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
   pure \contextId -> do
-    ctxts <- lift $ lift (contextId ##= contextGetter)
-    (bindings' :: Array RoleInstance) <- lift $ lift (contextId ##= bindingsGetter)
-    -- TODO: handle errors when creating a new Role instance in Bind.
+    ctxts <- lift2 (contextId ##= contextGetter)
+    (bindings' :: Array RoleInstance) <- lift2 (contextId ##= bindingsGetter)
     for_ ctxts \ctxt -> do
-      for_ bindings' \bndg -> do
-        role@(PerspectRol{_id}) <- (lift $ lift $ constructAnotherRol qualifiedRoleIdentifier (unwrap ctxt)
-          (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)}))
-
-        b <- lift $ lift $ getPerspectRol bndg
-        saveEntiteit bndg (addRol_gevuldeRollen b qualifiedRoleIdentifier _id)
-
-        saveAndConnectRoleInstance (identifier role)
+      for_ bindings' \bndg -> createAndAddRoleInstance
+        qualifiedRoleIdentifier
+        (unwrap ctxt)
+        (RolSerialization{ properties: PropertySerialization empty, binding: Just (unwrap bndg)})
 
 compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
   (bindingGetter :: (ContextInstance ~~> RoleInstance)) <- context2role binding
@@ -168,7 +160,7 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
     (binding' :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingGetter)
     (binder' :: Maybe RoleInstance) <- lift $ lift (contextId ##> binderGetter)
     -- setBinding caches, saves, sets isMe and me.
-    maybe (pure unit) identity (setBinding <$> binder' <*> binding')
+    maybe (pure unit) (pure <<< const unit) (setBinding <$> binder' <*> binding')
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
@@ -190,7 +182,7 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     -- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so the binding argument
     -- is taken into account, too.
-    maybe (pure unit) identity (removeBinding <$> binder)
+    maybe (pure unit) (pure <<< const unit) (removeBinding <$> binder)
 
 compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd

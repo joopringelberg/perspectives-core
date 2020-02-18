@@ -72,8 +72,12 @@ contextType = ArrayT <<< lift <<< (getContextMember \c -> [context_pspType c])
 context :: RoleInstance ~~> ContextInstance
 context rid = ArrayT do
   (r :: IP.PerspectRol) <- lift $ getPerspectEntiteit rid
-  -- See: Implementing the Functional Reactive Pattern for a justification of commenting this line out.
-  -- tell [(assumption (unwrap $ rol_context r) (unwrap $ rol_pspType r))]
+  -- See: Implementing the Functional Reactive Pattern for a full justification of not
+  -- recording an assumption.
+  -- In short: a client who requests the context of rid, must have another request
+  -- that yields rid in the first place. This request is dependent on that other
+  -- request, client side. This means that, if rid is removed, the client is notified
+  -- of that change and consequently is no longer interested in its context.
   pure $ [rol_context r]
 
 binding :: RoleInstance ~~> RoleInstance

@@ -24,7 +24,7 @@ module Perspectives.Sync.Class.DeltaUsers where
 import Data.Array (cons)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
 
 class DeltaUsers d where
   users :: d -> Array RoleInstance
@@ -34,14 +34,24 @@ class DeltaUsers d where
 instance contextDeltaDeltaUsers :: DeltaUsers ContextDelta where
   users (ContextDelta{users:u}) = u
   addToTransaction d (Transaction tr@{contextDeltas}) = Transaction tr {contextDeltas = cons d contextDeltas}
-  transactionCloneWithDelta d (Transaction tr) = Transaction tr {contextDeltas = [d], roleDeltas = [], propertyDeltas = []}
+  transactionCloneWithDelta d (Transaction tr) = Transaction tr {contextDeltas = [d], roleDeltas = [], propertyDeltas = [], universeContextDeltas = [], universeRoleDeltas = []}
 
 instance roleBindingDeltaDeltaUsers :: DeltaUsers RoleBindingDelta where
   users (RoleBindingDelta{users:u}) = u
   addToTransaction d (Transaction tr@{roleDeltas}) = Transaction tr {roleDeltas = cons d roleDeltas}
-  transactionCloneWithDelta d (Transaction tr) = Transaction tr {roleDeltas = [d], contextDeltas = [], propertyDeltas = []}
+  transactionCloneWithDelta d (Transaction tr) = Transaction tr {roleDeltas = [d], contextDeltas = [], propertyDeltas = [], universeContextDeltas = [], universeRoleDeltas = []}
 
 instance rolePropertyDeltaDeltaUsers :: DeltaUsers RolePropertyDelta where
   users (RolePropertyDelta{users:u}) = u
   addToTransaction d (Transaction tr@{propertyDeltas}) = Transaction tr {propertyDeltas = cons d propertyDeltas}
-  transactionCloneWithDelta d (Transaction tr) = Transaction tr {propertyDeltas = [d], roleDeltas = [], contextDeltas = []}
+  transactionCloneWithDelta d (Transaction tr) = Transaction tr {propertyDeltas = [d], roleDeltas = [], contextDeltas = [], universeContextDeltas = [], universeRoleDeltas = []}
+
+instance deltaUsersUniverseContextDelta :: DeltaUsers UniverseContextDelta where
+  users (UniverseContextDelta{users:u}) = u
+  addToTransaction d (Transaction tr@{universeContextDeltas}) = Transaction tr {universeContextDeltas = cons d universeContextDeltas}
+  transactionCloneWithDelta d (Transaction tr) = Transaction tr {universeContextDeltas = [d], roleDeltas = [], contextDeltas = [], propertyDeltas = [], universeRoleDeltas = []}
+
+instance deltaUsersUniverseRoleDelta :: DeltaUsers UniverseRoleDelta where
+  users (UniverseRoleDelta{users:u}) = u
+  addToTransaction d (Transaction tr@{universeRoleDeltas}) = Transaction tr {universeRoleDeltas = cons d universeRoleDeltas}
+  transactionCloneWithDelta d (Transaction tr) = Transaction tr {universeRoleDeltas = [d], roleDeltas = [], contextDeltas = [], propertyDeltas = [], universeContextDeltas = []}
