@@ -71,6 +71,7 @@ domain: Test
           unbind AnotherRole6 from TestCaseUnbindQualified$ARole6
     case: NestedCase6
       thing: ARole6
+      
   case: TestCaseUnbind_
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole7 filledBy: AnotherRole7
@@ -82,6 +83,7 @@ domain: Test
           unbind_ AnotherRole7 from Nested7 >> binding >> context >> ARole7
     case: NestedCase7
       thing: ARole7
+
   case: TestCaseDeleteProp
     user: Self filledBy: sys:PerspectivesSystem$User
     thing: ARole8

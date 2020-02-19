@@ -25,7 +25,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "RunMonadPerspectivesTransaction" do
+theSuite = suite "RunMonadPerspectivesTransaction" do
 
   test "contextDelta_context" (runP do
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
