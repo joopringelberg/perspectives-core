@@ -29,7 +29,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile')
-import Test.Perspectives.Utils (runP, setupUser)
+import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 import Text.Parsing.Parser (ParseError)
@@ -113,7 +113,7 @@ theSuite = suiteOnly "ContextRoleParser" do
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
 
-  testOnly "me for a constructed context (isMe by implication)." do
+  test "me for a constructed context (isMe by implication)." do
     c <- runP do
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       _ <- setupUser
@@ -129,13 +129,16 @@ theSuite = suiteOnly "ContextRoleParser" do
         , externeProperties: PropertySerialization empty
 
       }
-      getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase4")
-    logShow c
+      c' <- getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase4")
+      clearUserDatabase
+      pure c'
+    -- logShow c
     assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$MyNestedCase4$NestedSelf_0000" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
     \$NestedSelf_0000"))
 
   test "isMe for a constructed role." do
     ra <- runP do
+      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       _ <- setupUser
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
@@ -144,7 +147,9 @@ theSuite = suiteOnly "ContextRoleParser" do
         (RolSerialization
             { properties: PropertySerialization empty
             , binding: Just "model:User$MijnSysteem$User_0001"})
-      traverse getPerspectRol roleIdArray
+      r' <- traverse getPerspectRol roleIdArray
+      clearUserDatabase
+      pure r'
     -- logShow ra
     case head ra of
       Nothing -> assert "No role created" false
