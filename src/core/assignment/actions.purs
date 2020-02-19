@@ -160,7 +160,11 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
     (binding' :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindingGetter)
     (binder' :: Maybe RoleInstance) <- lift $ lift (contextId ##> binderGetter)
     -- setBinding caches, saves, sets isMe and me.
-    maybe (pure unit) (pure <<< const unit) (setBinding <$> binder' <*> binding')
+    void $ case binding' of
+      Nothing -> pure []
+      Just binding'' -> case binder' of
+        Nothing -> pure []
+        Just binder'' -> setBinding binder'' binding''
 
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
