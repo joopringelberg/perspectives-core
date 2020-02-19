@@ -29,14 +29,16 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite  "Perspectives.loadCRL" do
+theSuite = suite "Perspectives.loadCRL" do
   test "Load a file with a context instance in cache" do
     (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- runP $ loadCrlFile "combinators.crl" testDirectory
     -- logShow r
     pure unit
 
   test "Load a file with a context instance in couchdb with a light check" do
-    r <- runP $ loadAndSaveCrlFile "contextAndRole.crl" testDirectory
+    r <- runP do
+      void $ loadCompileAndCacheArcFile' "contextAndRole" modelDirectory
+      loadAndSaveCrlFile "contextAndRole.crl" testDirectory
     if null r
       then do
         srole <- runP ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
@@ -51,8 +53,10 @@ theSuite = suite  "Perspectives.loadCRL" do
       _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       setupUser
       _ <- loadCompileAndCacheArcFile' "contextAndRole" testDirectory
-      _ <- loadCrlFile "contextAndRole2.crl" testDirectory
-      ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
+      _ <- loadAndSaveCrlFile "contextAndRole2.crl" testDirectory
+      r' <- ((ContextInstance "model:User$MyTestCase") ##= getRole (EnumeratedRoleType "model:ContextAndRole$TestCase$SomeRole"))
+      clearUserDatabase
+      pure r'
     assert "There should be an instance of SomeRole." (length r == 1)
 
   test "Load a file with a context instance in couchdb" (runP do
