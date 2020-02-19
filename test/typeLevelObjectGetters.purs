@@ -17,7 +17,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile)
 import Perspectives.Types.ObjectGetters (propertiesOfRole)
 import Test.Perspectives.Utils (runP)
-import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
+import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
 testDirectory :: String
@@ -29,7 +29,7 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite  "Perspectives.Types.ObjectGetters" do
 
-  test "propertiesOfRole" (runP do
+  test "propertiesOfRole 1" (runP do
     -- messages <- loadAndCompileArcFile "perspectivesSysteem" modelDirectory
     -- case messages of
     --   Left m -> do
@@ -47,7 +47,7 @@ theSuite = suite  "Perspectives.Types.ObjectGetters" do
         -- liftAff $ assert "There should be two properties for model:System$PerspectivesSystem$External" (length props == 2)
         -- liftAff $ assert "The properties of 'odel:System$PerspectivesSystem$External' should include 'model:System$NamedContext$External$Name'" (isJust $ elemIndex (ENP (EnumeratedPropertyType "model:System$NamedContext$External$Name")) props)
         )
-  test "propertiesOfRole" (runP do
+  test "propertiesOfRole 2" (runP do
         props <- "model:TestBotActie$Tests$External" ###= propertiesOfRole
         logShow props
         )

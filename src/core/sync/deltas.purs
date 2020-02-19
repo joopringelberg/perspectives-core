@@ -34,7 +34,6 @@ import Data.Newtype (over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
@@ -47,7 +46,7 @@ import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, t
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -64,7 +63,6 @@ distributeTransactie' t = do
 
 sendTransactieToUser :: RoleInstance -> Transaction -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
-  log ("In sendTransactieToUser with " <> show userId <> " and transaction " <> show t)
   -- The connection database that we should put the transaction in, is identified by the userId.
   -- TODO controleer of hier authentication nodig is!
   cdbUrl <- getCouchdbBaseURL

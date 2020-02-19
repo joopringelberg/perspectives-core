@@ -4,14 +4,14 @@ import Prelude
 
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (length, null)
+import Data.Array (head, length, null)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (empty)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
-import Perspectives.BasicConstructors (constructAnotherRol)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen)
 import Perspectives.CoreTypes ((##=))
 import Perspectives.Couchdb.Databases (deleteDocument, documentExists)
@@ -20,13 +20,13 @@ import Perspectives.DomeinFile (DomeinFile, DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.Extern.Couchdb (uploadToRepository_)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SaveUserData (saveAndConnectRoleInstance)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile, loadArcAndCrl, loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
@@ -78,12 +78,12 @@ theSuite = suiteSkip  "Model:System" do
         -- Bind the description of Model:TestBotActie to an instance of ModelsInUse
         descriptionId <- pure "model:User$TestBotActieModel_External"
         binder <- pure $ EnumeratedRoleType "model:System$PerspectivesSystem$ModelsInUse"
-        role@(PerspectRol{_id}) <- constructAnotherRol binder "model:User$MijnSysteem"
+        roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$MijnSysteem"
           (RolSerialization{ properties: PropertySerialization empty, binding: Just descriptionId})
+        role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head roleIds)
         b <- getPerspectRol (RoleInstance descriptionId)
         void $ cacheOverwritingRevision (RoleInstance descriptionId) (addRol_gevuldeRollen b binder _id)
         void $ saveEntiteit (RoleInstance descriptionId)
-        void $ runMonadPerspectivesTransaction (saveAndConnectRoleInstance _id)
 
         -- Check if model:TestBotActie is in perspect_models
         succes <- documentExists (cdburl <> "perspect_models/model:TestBotActie")

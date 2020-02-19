@@ -3,16 +3,16 @@ module Test.ContextRoleParser where
 import Prelude
 
 import Control.Monad.Free (Free)
-import Data.Array (length)
+import Data.Array (head, length)
 import Data.Either (Either(..), isRight)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
 import Foreign.Object (Object, fromFoldable, lookup, empty)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (removeBinding, setBinding)
-import Perspectives.BasicConstructors (constructAnotherRol, constructContext)
 import Perspectives.ContextAndRole (context_me, rol_gevuldeRollen, rol_isMe)
 import Perspectives.ContextRoleParser (expandedName, roleBindingByReference)
 import Perspectives.CoreTypes ((##>>))
@@ -20,6 +20,7 @@ import Perspectives.EntiteitAndRDFAliases (RolName)
 import Perspectives.Identifiers (QualifiedName(..))
 import Perspectives.IndentParser (runIndentParser)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadCrlFile)
 import Perspectives.Parsing.Messages (PerspectivesError)
@@ -27,11 +28,11 @@ import Perspectives.Persistent (getPerspectRol, getPerspectContext)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile')
 import Test.Perspectives.Utils (runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError(..))
+import Text.Parsing.Parser (ParseError)
 
 testDirectory :: String
 testDirectory = "test"
@@ -40,7 +41,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "ContextRoleParser" do
+theSuite = suiteOnly "ContextRoleParser" do
   test "inverse binding" do
     ra <- runP do
       _ <- setupUser
@@ -112,11 +113,12 @@ theSuite = suite "ContextRoleParser" do
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase3")
     assert "MyNestedCase2 should have 'me' equal to Nothing" (context_me c == Nothing)
 
-  test "me for a constructed context (isMe by implication)." do
+  testOnly "me for a constructed context (isMe by implication)." do
     c <- runP do
+      _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
       _ <- setupUser
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
-      _ <- constructContext $ ContextSerialization
+      _ <- runMonadPerspectivesTransaction $ constructContext $ ContextSerialization
         { id: "model:User$MyTestCase$MyNestedCase4"
         , prototype: Nothing
         , ctype: "model:Test$TestCase$NestedCase"
@@ -128,8 +130,8 @@ theSuite = suite "ContextRoleParser" do
 
       }
       getPerspectContext (ContextInstance "model:User$MyTestCase$MyNestedCase4")
-    -- logShow c
-    assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$Self_0001" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
+    logShow c
+    assert "MyNestedCase4 should have 'me' equal to model:User$MyTestCase$MyNestedCase4$NestedSelf_0000" (context_me c == Just (RoleInstance "model:User$MyTestCase$MyNestedCase4\
     \$NestedSelf_0000"))
 
   test "isMe for a constructed role." do
@@ -137,13 +139,16 @@ theSuite = suite "ContextRoleParser" do
       _ <- setupUser
       _ <- loadCompileAndCacheArcFile' "contextRoleParser" testDirectory
       (r :: Either (Array PerspectivesError) (Tuple (Object PerspectContext)(Object PerspectRol))) <- loadCrlFile "contextRoleParser.crl" testDirectory
-      constructAnotherRol (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")
+      roleIdArray <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType "model:Test$TestCase$NestedCase$NestedSelf")
         "model:User$MyTestCase$MyNestedCase4"
         (RolSerialization
             { properties: PropertySerialization empty
             , binding: Just "model:User$MijnSysteem$User_0001"})
+      traverse getPerspectRol roleIdArray
     -- logShow ra
-    assert "The constructed Role should have 'isMe' == true" (rol_isMe ra)
+    case head ra of
+      Nothing -> assert "No role created" false
+      Just role -> assert "The constructed Role should have 'isMe' == true" (rol_isMe role)
 
   test "expandedName on role instance name" do
     (r :: Either ParseError QualifiedName) <- runP $ runIndentParser "model:User$MijnSysteem$User_0001" expandedName
