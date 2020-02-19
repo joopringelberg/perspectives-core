@@ -24,23 +24,23 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Writer (lift, tell)
 import Data.Array (findIndex, index)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Foreign.Object (keys, lookup, values)
+import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), assumption, type (##>), MP)
+import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (LocalName)
-import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole) as IP
-import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (bind, discard, flip, join, map, pure, ($), (*>), (<<<), (<>), (==), (>>>))
+import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -64,6 +64,14 @@ getRole rn c = ArrayT do
 -- | to track it as a dependency.
 contextType :: ContextInstance ~~> ContextType
 contextType = ArrayT <<< lift <<< (getContextMember \c -> [context_pspType c])
+
+getConditionState :: ActionType -> ContextInstance -> MonadPerspectives Boolean
+getConditionState a c = getPerspectContext c >>= \(IP.PerspectContext{actionConditionState}) -> pure $ maybe false identity (lookup (unwrap a) actionConditionState)
+
+setConditionState :: ActionType -> ContextInstance -> Boolean -> MonadPerspectives Unit
+setConditionState a c b = do
+  (IP.PerspectContext r@{actionConditionState}) <- getPerspectContext c
+  void $ saveEntiteit_ c (IP.PerspectContext r {actionConditionState = insert (unwrap a) b actionConditionState})
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE

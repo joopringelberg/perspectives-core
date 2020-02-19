@@ -60,6 +60,8 @@ type ContextRecord =
   , buitenRol :: RoleInstance
   , rolInContext :: F.Object (Array RoleInstance)
   , me :: Maybe RoleInstance
+  -- A map of
+  , actionConditionState :: F.Object Boolean
   }
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _

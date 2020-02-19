@@ -139,6 +139,7 @@ defaultContextRecord =
   , buitenRol: RoleInstance ""
   , rolInContext: empty
   , me: Nothing
+  , actionConditionState: empty
   }
 
 defaultRolRecord :: RolRecord

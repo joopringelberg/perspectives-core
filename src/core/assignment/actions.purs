@@ -49,6 +49,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, getRoleBinders) as OG
+import Perspectives.Instances.ObjectGetters (getConditionState, setConditionState)
 import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.Compiler (context2context, context2propertyValue, context2role, context2string)
@@ -84,9 +85,16 @@ compileBotAction actionType = do
       (Updater ContextInstance) ->
       (Updater ContextInstance)
     ruleRunner lhs effectFullFunction (contextId :: ContextInstance) = do
+      conditionWasTrue <- lift2 $ getConditionState actionType contextId
       (Tuple bools a0 :: WithAssumptions Value) <- lift $ lift $ runMonadPerspectivesQuery contextId lhs
       if (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
-          then effectFullFunction contextId
+        then if conditionWasTrue
+          then pure unit
+          else do
+            lift2 $ setConditionState actionType contextId true
+            effectFullFunction contextId
+        else if conditionWasTrue
+          then lift2 $ setConditionState actionType contextId false
           else pure unit
 
 compileAssignment :: QueryFunctionDescription -> MP (Updater ContextInstance)
