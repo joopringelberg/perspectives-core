@@ -86,7 +86,7 @@ handleAffectedContexts affectedContexts userTypes = case fromArray affectedConte
     (for userTypes \er -> for (toArray contextInstances) \ci -> lift $ lift $ (ci ##= getRole er)) >>= pure <<< join <<< join
 
 addAffectedContexts :: AffectedContext -> MonadPerspectivesTransaction Unit
-addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = cons as affectedContexts})
+addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) -> Transaction (r {affectedContexts = union [as] affectedContexts})
 
 -- | Computes the AffectedContexts and adds them to the Transaction.
 -- | Adds the users that should receive it, to the Delta.

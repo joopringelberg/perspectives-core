@@ -23,7 +23,8 @@ module Perspectives.Sync.AffectedContext where
 
 import Prelude
 
-import Data.Array.NonEmpty (NonEmptyArray, toArray)
+import Data.Array (null, difference) as ARR
+import Data.Array.NonEmpty (NonEmptyArray, toArray, difference)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Foreign.Class (class Encode, encode)
@@ -48,3 +49,7 @@ instance encodeAffectedContext' :: Encode AffectedContext' where
 
 instance encodeAffectedContext :: Encode AffectedContext where
   encode (AffectedContext {contextInstances, userTypes}) = encode (AffectedContext' {contextInstances: toArray contextInstances, userTypes})
+
+instance eqAffectedContext :: Eq AffectedContext where
+  eq (AffectedContext {contextInstances: c1, userTypes: u1}) (AffectedContext {contextInstances: c2, userTypes: u2}) =
+    ARR.null (difference c1 c2) && ARR.null (ARR.difference u1 u2)
