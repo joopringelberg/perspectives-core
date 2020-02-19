@@ -42,14 +42,14 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), Request(..), RequestRecord, Response(..), mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (removeBinding, setBinding, setProperty)
-import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectives, PropertyValueGetter, RoleGetter, (##>), (##=), MP)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.Guid (guid)
-import Perspectives.Identifiers (buitenRol)
+import Perspectives.Identifiers (buitenRol, isQualifiedName)
+import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, roleType)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -220,8 +220,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         sendResponse (Result corrId []) setter
     -- TODO: DeleteRol
     Api.CreateRol -> do
-      (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
-      sendResponse (Result corrId (unwrap <$> rolInsts)) setter
+      if isQualifiedName predicate
+        then do
+          (rolInsts :: Array RoleInstance) <- runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
+          sendResponse (Result corrId (unwrap <$> rolInsts)) setter
+        else sendResponse (Error corrId ("Not a value identifier: " <> predicate)) setter
     -- Check whether a role exists for ContextDef with the localRolName and then create a new instance of it according to the rolDescription.
     -- subject :: Context, predicate :: localRolName, object :: ContextDef. rolDescription must be present!
     Api.CreateRolWithLocalName -> do
@@ -231,9 +234,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         (Just (qrolname :: RoleType)) -> case qrolname of
           -- (CR ctype) -> pure unit
           (CR ctype) -> sendResponse (Error corrId ("Cannot construct an instance of CalculatedRole '" <> unwrap ctype <> "'!")) setter
-          (ENR eroltype) -> do
-            rol <- runMonadPerspectivesTransaction $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
-            sendResponse (Result corrId (unwrap <$> rol)) setter
+          (ENR eroltype) -> if isQualifiedName predicate
+            then do
+              rol <- runMonadPerspectivesTransaction $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+              sendResponse (Result corrId (unwrap <$> rol)) setter
+            else sendResponse (Error corrId ("Not a value identifier: " <> predicate)) setter
     Api.SetProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
@@ -253,11 +258,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Create a new instance of the roletype RolDef in Context and fill the role with RolID.
     -- subject :: Context, predicate :: RolDef, object :: RolID
-    Api.BindInNewRol -> catchError
-      do
+    Api.BindInNewRol -> if isQualifiedName predicate
+      then do
         void $ runMonadPerspectivesTransaction $ createAndAddRoleInstance (EnumeratedRoleType predicate) subject (unsafePartial $ fromJust rolDescription)
         sendResponse (Result corrId ["ok"]) setter
-      (\e -> sendResponse (Error corrId (show e)) setter)
+      else sendResponse (Error corrId ("Not a value identifier: " <> predicate)) setter
     -- Check whether a role exists for ContextDef with the localRolName and whether it allows RolID as binding.
     -- subject :: ContextDef, predicate :: localRolName, object :: RolID
     Api.CheckBinding -> do

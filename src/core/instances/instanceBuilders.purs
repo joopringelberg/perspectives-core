@@ -59,7 +59,7 @@ import Perspectives.Persistent (tryGetPerspectEntiteit, saveEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheInitially)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..))
-import Prelude (bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>))
+import Prelude (bind, discard, pure, unit, void, ($), (*>), (<$>), (<>))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
 -- | Calls setBinding on each role.
@@ -80,12 +80,9 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
           -- We now have an empty context. Add each role to it.
           r <- try $ runWriterT $ forWithIndex_ rollen \rolTypeId rolDescriptions -> do
             -- Construct the role instances first, then add to the context.
-            case (deconstructLocalName rolTypeId) of
-              Nothing -> throwError $ error "not a valid identifier"
-              Just localRoleName -> do
-                rolInstances <- forWithIndex rolDescriptions (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId) localRoleName)
-                -- Add the completed Role instance to the context.
-                lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) rolInstances
+            rolInstances <- forWithIndex rolDescriptions (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId))
+            -- Add the completed Role instance to the context.
+            lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) rolInstances
           case r of
             -- We assume just a single type of error from the block above.
             Left e -> pure $ Left [(NotAValidIdentifier $ unwrap contextInstanceId)]
@@ -99,24 +96,27 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
                   , users}
               pure $ Right contextInstanceId
   where
-    constructSingleRoleInstance :: ContextInstance -> EnumeratedRoleType -> String -> Int -> RolSerialization -> WriterT (Array RoleInstance)  MonadPerspectivesTransaction RoleInstance
-    constructSingleRoleInstance contextInstanceId roleType localName i (RolSerialization{properties, binding}) = do
+    constructSingleRoleInstance :: ContextInstance -> EnumeratedRoleType -> Int -> RolSerialization -> WriterT (Array RoleInstance)  MonadPerspectivesTransaction RoleInstance
+    constructSingleRoleInstance contextInstanceId roleType i (RolSerialization{properties, binding}) = do
       -- create an empty role
-      roleInstance <- lift $ constructEmptyRole roleType contextInstanceId localName i
-      -- then add the binding
-      users <- case binding of
-        -- the roleInstance is only in cache, save it.
-        Nothing -> lift $ lift2 $ saveEntiteit roleInstance *> pure []
-        Just bnd -> do
-          expandedBinding <- pure $ RoleInstance $ expandDefaultNamespaces bnd
-          -- setBinding saves, too.
-          lift $ setBinding roleInstance expandedBinding
-      tell users
-      -- then add the properties
-      case properties of
-        (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
-          lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-      pure roleInstance
+      case (deconstructLocalName $unwrap roleType) of
+        Nothing -> throwError $ error "not a valid identifier"
+        Just localRoleName -> do
+          roleInstance <- lift $ constructEmptyRole roleType contextInstanceId i localRoleName
+          -- then add the binding
+          users <- case binding of
+            -- the roleInstance is only in cache, save it.
+            Nothing -> lift $ lift2 $ saveEntiteit roleInstance *> pure []
+            Just bnd -> do
+              expandedBinding <- pure $ RoleInstance $ expandDefaultNamespaces bnd
+              -- setBinding saves, too.
+              lift $ setBinding roleInstance expandedBinding
+          tell users
+          -- then add the properties
+          case properties of
+            (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
+              lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+          pure roleInstance
 
 -- | Constructs an empty role, caches it.
 constructEmptyContext :: ContextInstance -> String -> String -> MonadPerspectivesTransaction ContextInstance
@@ -139,10 +139,10 @@ constructEmptyContext contextInstanceId ctype localName = do
       })
   pure contextInstanceId
 
--- | Constructs an empty role and caches it.
-constructEmptyRole :: EnumeratedRoleType -> ContextInstance -> String -> Int -> MonadPerspectivesTransaction RoleInstance
-constructEmptyRole roleType contextInstance localName i = do
-  rolInstanceId <- pure $ RoleInstance (unwrap contextInstance <> "$" <> localName <> "_" <> (rol_padOccurrence i))
+-- | Constructs an empty role and caches it. `localName` should be the local name of the roleType.
+constructEmptyRole :: EnumeratedRoleType -> ContextInstance -> Int -> String -> MonadPerspectivesTransaction RoleInstance
+constructEmptyRole roleType contextInstance i localRoleName = do
+  rolInstanceId <- pure $ RoleInstance (unwrap contextInstance <> "$" <> localRoleName <> "_" <> (rol_padOccurrence i))
   role <- pure (PerspectRol defaultRolRecord
         { _id = rolInstanceId
         , pspType = roleType
@@ -154,14 +154,13 @@ constructEmptyRole roleType contextInstance localName i = do
 
 -- | Construct a Role instance for an existing Context instance.
 -- | This function is complete w.r.t. the five responsibilities.
+-- | Notice that roleType must be a well-formed identifier!
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance roleType id (RolSerialization{properties, binding}) = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
-  rolInstanceId <- pure $ (unwrap contextInstanceId  <> "$" <> (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType)))
   rolInstances <- lift2 (contextInstanceId ##= getRole roleType)
-
   -- create an empty role
-  roleInstance <- constructEmptyRole roleType contextInstanceId rolInstanceId (getNextRolIndex rolInstances)
+  roleInstance <- constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))
   -- then add the binding
   case binding of
     Nothing -> pure unit

@@ -110,6 +110,13 @@ guardWellFormedNess f a = onNothing' (error $ "This identifier is not well forme
 -- |  * a namespace: everything but the last segment, and
 -- |  * the localName: the last segment.
 
+qualifiedNameRegex :: Regex
+qualifiedNameRegex = unsafeRegex "^model:(\\w*)\\$(.*)$" noFlags
+
+-- | Is the identifier of the form `model:Domain$atLeastOneSegment`?
+isQualifiedName :: String -> Boolean
+isQualifiedName s = test qualifiedNameRegex s
+
 domeinURIQualifiedRegex :: Regex
 domeinURIQualifiedRegex = unsafeRegex "^model:(\\w*)(.*)$" noFlags
 
