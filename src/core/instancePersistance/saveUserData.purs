@@ -47,7 +47,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Object (values)
 import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext)
-import Perspectives.CollectAffectedContexts (aisInRoleDelta, lift2)
+import Perspectives.CollectAffectedContexts (aisInContextDelta, aisInRoleDelta, lift2)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Updater)
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addUniverseContextDelta)
@@ -57,7 +57,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
-import Perspectives.TypesForDeltas (DeltaType(..), RoleBindingDelta(..), UniverseContextDelta(..))
+import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), UniverseContextDelta(..))
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (>>=))
 
 -- | This function takes care of
@@ -72,16 +72,23 @@ saveContextInstance id = do
     (PerspectRol{_id, binding, pspType, gevuldeRollen}) <- lift2 $ saveEntiteit rol
     case binding of
       Nothing -> pure unit
-      Just b -> do
-        (lift2 $ findBinderRequests b pspType) >>= addCorrelationIdentifiersToTransactie
-        forWithIndex_ gevuldeRollen \_ instances -> for_ instances \binder ->
-          (lift2 $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
-        void $ aisInRoleDelta $ RoleBindingDelta
-          { id: rol
-          , binding: Just b
-          , oldBinding: Nothing
-          , deltaType: Add
-          , users: []}
+      Just b -> (lift2 $ findBinderRequests b pspType) >>= addCorrelationIdentifiersToTransactie
+    forWithIndex_ gevuldeRollen \_ instances -> for_ instances \binder ->
+      (lift2 $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
+    -- Users from other contexts:
+    void $ aisInRoleDelta $ RoleBindingDelta
+      { id: rol
+      , binding: binding
+      , oldBinding: Nothing
+      , deltaType: Add
+      , users: []}
+    -- Users from this context (let's trigger all rules).
+    void $ aisInContextDelta $ ContextDelta
+      { id
+      , roleType: pspType
+      , roleInstance: _id
+      , deltaType: Add
+      , users: []}
 
   (_ :: PerspectRol) <- lift2 $ saveEntiteit (context_buitenRol ctxt)
   -- For roles with a binding equal to R: detect the binder <RoleType> requests for R
