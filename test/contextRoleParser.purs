@@ -28,7 +28,7 @@ import Perspectives.Persistent (getPerspectRol, getPerspectContext)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile')
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -41,7 +41,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "ContextRoleParser" do
+theSuite = suite "ContextRoleParser" do
   test "inverse binding" do
     ra <- runP do
       _ <- setupUser
