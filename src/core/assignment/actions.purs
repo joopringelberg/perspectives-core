@@ -194,7 +194,9 @@ compileAssignment (BQD _ QF.Unbind_ bindings binders _ _ _) = do
     (binder :: Maybe RoleInstance) <- lift $ lift (contextId ##> bindersGetter)
     -- TODO. As soon as we introduce multiple values for a binding, we have to adapt this so the binding argument
     -- is taken into account, too.
-    maybe (pure unit) (pure <<< const unit) (removeBinding <$> binder)
+    void $ case binder of
+      Nothing -> pure []
+      Just binder' -> removeBinding binder'
 
 compileAssignment (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _ _ _) = do
   (roleGetter :: (ContextInstance ~~> RoleInstance)) <- context2role roleQfd
