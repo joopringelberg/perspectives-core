@@ -33,6 +33,7 @@ import Data.Array (elemIndex, foldM, head, length, null, reverse, uncons)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Identifiers (deconstructModelName, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc.Expression (startOf)
@@ -64,15 +65,15 @@ compileStep currentDomain (Let st) = throwError $ NotAPureLet st
 -- Describe a conjunction of rolegetters.
 makeConjunction :: Domain -> QueryFunctionDescription -> RoleType -> FD
 makeConjunction currentDomain left rt2 = do
-  right <- makeRoleGetter currentDomain rt2
+  right <- lift2 $ makeRoleGetter currentDomain rt2
   (rightADT :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt2
   pure $ BQD currentDomain (QF.BinaryCombinator ConjunctionF) left right (RDOM (product [unsafePartial roleRange left, rightADT])) THREE.False (THREE.or (mandatory left) (mandatory right))
 
-makeRoleGetter :: Domain -> RoleType -> PhaseThree QueryFunctionDescription
+makeRoleGetter :: Domain -> RoleType -> MonadPerspectives QueryFunctionDescription
 makeRoleGetter currentDomain rt = do
-  (adt :: ADT EnumeratedRoleType) <- lift $ lift $ typeExcludingBinding_ rt
-  isF <- lift2 $ roleTypeIsFunctional rt
-  isM <- lift2 $ roleTypeIsMandatory rt
+  (adt :: ADT EnumeratedRoleType) <- typeExcludingBinding_ rt
+  isF <- roleTypeIsFunctional rt
+  isM <- roleTypeIsMandatory rt
   pure $ SQD currentDomain (QF.RolGetter rt) (RDOM $ adt) (bool2threeValued isF) (bool2threeValued isM)
 
 compileSimpleStep :: Domain -> SimpleStep -> FD
@@ -85,9 +86,9 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) =
       case uncons rts of
         Nothing -> throwError $ ContextHasNoRole c ident
         Just {head, tail} -> if null tail
-          then makeRoleGetter currentDomain head
+          then lift2 $ makeRoleGetter currentDomain head
           else do
-            head' <- makeRoleGetter currentDomain head
+            head' <- lift2 $ makeRoleGetter currentDomain head
             foldM (makeConjunction currentDomain) head' tail
 
     (RDOM r) -> do
