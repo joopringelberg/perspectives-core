@@ -340,6 +340,10 @@ bindingOfRole = getRole >=> binding'
     binding' (E r) = binding r
     binding' (C r) = binding r
 
+contextOfRole :: RoleType -> MonadPerspectives (ADT ContextType)
+contextOfRole (ENR e) = getPerspectType e >>= context
+contextOfRole (CR c) = getPerspectType c >>= context
+
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------

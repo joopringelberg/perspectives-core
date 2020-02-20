@@ -21,21 +21,22 @@
 
 module Perspectives.Query.Inversion where
 
-import Data.Array (catMaybes, cons, foldr, reverse, uncons)
+import Data.Array (catMaybes, cons, foldr, last, reverse, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP)
+import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, domain, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
-import Perspectives.Representation.Class.Role (getCalculation, getRole)
+import Perspectives.Representation.Class.Role (contextOfADT, getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), (<$>), (<*>), (<>), (>=>), (>>=), (<<<))
 
 -- | Compute from the description of a query function a series of paths.
 -- | Consider the description to be a tree, then the paths run from the leaves to the root.
@@ -43,13 +44,33 @@ import Prelude (class Monoid, class Semigroup, append, bind, mempty, pure, ($), 
 invertFunctionDescription :: QueryFunctionDescription -> MP (Array QueryFunctionDescription)
 invertFunctionDescription qfd = do
   paths <- unsafePartial $ invertFunctionDescription_ qfd
-  pure $ catMaybes $ invert <$> (allPaths paths)
+  traverse invert (allPaths paths) >>= pure <<< catMaybes
   where
-    invert :: Array QueryFunctionDescription -> Maybe QueryFunctionDescription
-    invert path = case uncons path of
-      Nothing -> Nothing
-      Just {head, tail} -> Just $ foldr compose head (reverse tail)
+    invert :: Array QueryFunctionDescription -> MonadPerspectives (Maybe QueryFunctionDescription)
+    invert path = do
+      mPath <- addContextToPropertyQuery path
+      case mPath of
+        Nothing -> pure Nothing
+        Just augmentedPath -> case uncons augmentedPath of
+          Nothing -> pure Nothing
+          Just {head, tail} -> pure $ Just $ foldr compose head (reverse tail)
 
+-- | If the array of steps ends with Value2Role, and does not start with context, prepend context before inverting.
+addContextToPropertyQuery :: Path -> MonadPerspectives (Maybe Path)
+addContextToPropertyQuery path = case last path of
+  Nothing -> pure Nothing
+  Just (SQD _ (Value2Role _) _ _ _) -> case uncons path of
+    Nothing -> pure Nothing
+    Just {head: (SQD _ (DataTypeGetter ContextF) _ _ _), tail} -> pure $ Just path
+    Just {head, tail} -> case domain head of
+      (RDOM adt) -> do
+        -- The first step has a domain that is a role. Compute the context of that role.
+        (contextAdt :: ADT ContextType) <- contextOfADT adt
+        pure $ Just $ cons (SQD (domain head) (DataTypeGetter ContextF) (CDOM contextAdt) True True) path
+      otherwise -> pure $ Just path
+  otherwise -> pure $ Just path
+
+-- | Invert each step, but keep the same order of steps.
 invertFunctionDescription_ :: Partial => QueryFunctionDescription -> MP Paths
 
 invertFunctionDescription_ (SQD dom (Constant _ _) ran _ _) = pure mempty
