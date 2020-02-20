@@ -22,8 +22,9 @@
 module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
+import Control.Monad.Error.Class (catchError)
 import Control.Monad.Reader (lift)
-import Data.Array (filterA, cons, head, union)
+import Data.Array (filterA, head, union)
 import Data.Array.NonEmpty (fromArray, toArray)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
 import Data.Lens.At (at)
@@ -49,7 +50,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..))
-import Prelude (Unit, bind, const, discard, join, not, pure, ($), (<<<), (>=>), (>>=), (==))
+import Prelude (Unit, bind, const, discard, join, not, pure, ($), (<<<), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | From the ContextDelta, collect affected contexts. Compile all queries that are used to collect
@@ -94,22 +95,23 @@ addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) ->
 -- | A binding represents two types of step: `binding` and `binder <TypeOfBinder>`
 -- | This function finds all queries recorded on the types of the roles represented
 -- | by id, the new binding and the old binding, that have such steps.
+-- Implementation note: because we accept 'dangling' roles (roles with no context) we catch
+-- errors when computing affected contexts. 
 aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction RoleBindingDelta
 aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   binderType <- lift2 (id ##>> OG.roleType)
   bindingCalculations <- lift2 $ compileDescriptions _onRoleDelta_binding binderType
   users1 <- for bindingCalculations (\(InvertedQuery{compilation, userTypes}) -> do
     -- Find all affected contexts, starting from the role instance of the Delta.
-    affectedContexts <- lift2 (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+    affectedContexts <- lift2 $ catchError (id ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
     handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
-
   users2 <- case binding of
     Just bnd -> do
       bindingType <- lift2 (bnd ##>> OG.roleType)
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
-      for binderCalculations (\(InvertedQuery{compilation, userTypes}) -> do
+      for binderCalculations (\(InvertedQuery{compilation, userTypes, description}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
-        affectedContexts <- lift2 (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+        affectedContexts <- lift2 $ catchError (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
         handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     Nothing -> pure []
 
@@ -119,7 +121,7 @@ aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
       binderCalculations <- lift2 $ compileDescriptions _onRoleDelta_binder bindingType
       for binderCalculations (\(InvertedQuery{compilation, userTypes}) -> do
         -- Find all affected contexts, starting from the role instance of the Delta.
-        affectedContexts <- lift2 (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance)
+        affectedContexts <- lift2 $ catchError (bnd ##= (unsafeCoerce $ unsafePartial $ fromJust compilation) :: RoleInstance ~~> ContextInstance) (pure <<< const [])
         handleAffectedContexts affectedContexts userTypes) >>= pure <<< join
     otherwise -> pure []
 
