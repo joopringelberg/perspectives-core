@@ -234,11 +234,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         (Just (qrolname :: RoleType)) -> case qrolname of
           -- (CR ctype) -> pure unit
           (CR ctype) -> sendResponse (Error corrId ("Cannot construct an instance of CalculatedRole '" <> unwrap ctype <> "'!")) setter
-          (ENR eroltype) -> if isQualifiedName predicate
-            then do
-              rol <- runMonadPerspectivesTransaction $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
-              sendResponse (Result corrId (unwrap <$> rol)) setter
-            else sendResponse (Error corrId ("Not a value identifier: " <> predicate)) setter
+          (ENR eroltype) -> do
+            rol <- runMonadPerspectivesTransaction $ createAndAddRoleInstance eroltype subject (unsafePartial $ fromJust rolDescription)
+            sendResponse (Result corrId (unwrap <$> rol)) setter
     Api.SetProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
