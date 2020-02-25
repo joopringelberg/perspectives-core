@@ -37,7 +37,7 @@ theSuite = suite "Perspectives.loadCRL" do
 
   test "Load a file with a context instance in couchdb with a light check" do
     r <- runP do
-      void $ loadCompileAndCacheArcFile' "contextAndRole" modelDirectory
+      void $ loadCompileAndCacheArcFile' "contextAndRole" testDirectory
       loadAndSaveCrlFile "contextAndRole.crl" testDirectory
     if null r
       then do
