@@ -56,7 +56,7 @@ import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Effect.Aff.AVar (AVar, put, read, take)
+import Effect.Aff.AVar (AVar, kill, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Class (class Decode, class Encode)
@@ -104,9 +104,7 @@ getPerspectRol = getPerspectEntiteit
 
 tryGetPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives (Maybe a)
 tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
-  \_ -> do
-    (_ :: Maybe (AVar a)) <- removeInternally id
-    pure Nothing
+  \_ -> pure Nothing
 
 getAVarRepresentingPerspectEntiteit :: forall a i. Persistent a i  => i -> MonadPerspectives (AVar a)
 getAVarRepresentingPerspectEntiteit id =
@@ -147,7 +145,12 @@ fetchEntiteit id = ensureAuthentication $ catchError
         rev <- version res.headers
         put (changeRevision rev a) v)
     liftAff $ read v
-  \e -> throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
+  \e -> do
+    (mav :: Maybe (AVar a)) <- removeInternally id
+    case mav of
+      Nothing -> pure unit
+      Just av -> liftAff $ kill (error ("Cound not find " <> unwrap id)) av
+    throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
 -- | Save an entity, whether it has been saved before or not. It must be present in the cache.
 -- | On success it will have the same version in cache as in Couchdb.
