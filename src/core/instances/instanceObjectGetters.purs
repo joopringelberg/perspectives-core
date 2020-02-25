@@ -22,6 +22,7 @@
 module Perspectives.Instances.ObjectGetters where
 
 import Control.Monad.Writer (lift, tell)
+import Control.Alt ((<|>))
 import Data.Array (findIndex, index)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
@@ -31,16 +32,16 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_pspType, context_rolInContext, rol_binding, rol_context, rol_isMe, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, saveEntiteit_)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType(..), ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType)
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>), (>=>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -163,3 +164,12 @@ allRoleBinders r = ArrayT do
   ((IP.PerspectRol{gevuldeRollen}) :: IP.PerspectRol) <- lift $ getPerspectEntiteit r
   for_ (keys gevuldeRollen) (\key -> tell [assumption (unwrap r) key])
   pure $ join $ values gevuldeRollen
+
+isMe :: RoleInstance -> MP Boolean
+isMe ri = do
+  (IP.PerspectRol{isMe: me, binding: bnd}) <- getPerspectRol ri
+  if me
+    then pure true
+    else case bnd of
+      Nothing -> pure false
+      Just b -> isMe b

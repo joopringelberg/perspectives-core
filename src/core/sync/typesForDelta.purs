@@ -25,6 +25,7 @@ import Data.Eq (class Eq)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe)
+import Data.Newtype (class Newtype)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
@@ -66,6 +67,8 @@ newtype UniverseRoleDelta = UniverseRoleDelta
   }
 
 derive instance genericUniverseRoleDelta :: Generic UniverseRoleDelta _
+
+derive instance newTypeUniverseRoleDelta :: Newtype UniverseRoleDelta _
 
 instance showUniverseRoleDelta :: Show UniverseRoleDelta where
   show = genericShow
