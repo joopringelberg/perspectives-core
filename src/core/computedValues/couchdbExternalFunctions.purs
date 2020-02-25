@@ -26,6 +26,7 @@ module Perspectives.Extern.Couchdb where
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
 import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Either (Either(..))
@@ -42,16 +43,20 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, assumption)
+import Foreign.Object (Object, insert, lookup)
+import Perspectives.CollectAffectedContexts (lift2)
+import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
+import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
 import Perspectives.Couchdb (PutCouchdbDocument, ViewResult(..), onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
-import Perspectives.InstanceRepresentation (PerspectRol(..))
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
-import Perspectives.Representation.Class.Cacheable (cacheInitially, cachePreservingRevision)
+import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -102,8 +107,24 @@ addModelToLocalStore urls = do
       -- Copy the attachment
       lift $ lift $ addA url _id
       -- Take the role- and contextinstances from it and add them to the user (instances) database.
-      forWithIndex_ contextInstances \i a -> save (ContextInstance i) a
-      forWithIndex_ roleInstances \i a -> void $ lift $ lift $ saveEntiteit_ (RoleInstance i) a
+
+      -- We have to cache all roleInstances (except the external role of the modeldescription) first,
+      -- otherwise we cannot see what its `isMe` must be.
+      forWithIndex_ roleInstances \i a -> void $ lift $ lift $ cacheOverwritingRevision (RoleInstance i) a
+      cis <- lift2 $ execStateT (saveRoleInstances roleInstances) contextInstances
+      forWithIndex_ cis \i a -> save (ContextInstance i) a
+
+    saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit
+    saveRoleInstances ris = forWithIndex_ ris \i a@(PerspectRol{context}) -> do
+      me <- lift $ isMe (RoleInstance i)
+      if me
+        then do
+          void $ lift $ saveEntiteit_ (RoleInstance i) (changeRol_isMe a true)
+          void $ modify \cis -> case lookup (unwrap context) cis of
+            Nothing -> cis
+            Just c -> insert (unwrap context) (changeContext_me c (Just (RoleInstance i))) cis
+        else pure unit
+
 
     save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
     save i a = do
