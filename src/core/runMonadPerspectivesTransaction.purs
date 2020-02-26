@@ -23,8 +23,8 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
+import Data.Array (cons, elemIndex, foldM, foldr, singleton, sort, union)
 import Data.Array (filter) as ARR
-import Data.Array (foldM, singleton, sort, union, elemIndex)
 import Data.Array.NonEmpty (head, toArray)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
@@ -32,6 +32,7 @@ import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
+import Effect.Class.Console (logShow)
 import Foreign.Object (values)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
@@ -50,7 +51,7 @@ import Perspectives.Representation.TypeIdentifiers (ActionType, EnumeratedRoleTy
 import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
-import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseRoleDelta(..))
+import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..), UniverseRoleDelta(..))
 import Prelude (bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
@@ -80,7 +81,7 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
       (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
-        -- logShow ass
+        logShow ass
         mcorrIds <- findDependencies ass
         case mcorrIds of
           Nothing -> pure bottom
@@ -104,12 +105,16 @@ assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas,
   where
     filterRemovedRoles :: Array UniverseRoleDelta -> Array Assumption -> Array Assumption
     filterRemovedRoles udeltas ass = let
-      (removedRoleInstances :: Array String) = (\(UniverseRoleDelta{id}) -> unwrap id) <$> (udeltas :: Array UniverseRoleDelta)
+      (removedRoleInstances :: Array String) = foldr (\(UniverseRoleDelta{id, deltaType}) cumulator -> case deltaType of
+        Remove -> cons (unwrap id) cumulator
+        _ -> cumulator) [] (udeltas :: Array UniverseRoleDelta)
       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
     filterRemovedContexts :: Array UniverseContextDelta -> Array Assumption -> Array Assumption
     filterRemovedContexts cdeltas ass = let
-      (removedRoleInstances :: Array String) = (\(UniverseContextDelta{id}) -> unwrap id) <$> (cdeltas :: Array UniverseContextDelta)
-      in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
+      (removedContextInstances :: Array String) = foldr (\(UniverseContextDelta{id, deltaType}) cumulator -> case deltaType of
+        Remove -> cons (unwrap id) cumulator
+        _ -> cumulator) [] (cdeltas :: Array UniverseContextDelta)
+      in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedContextInstances) ass
 
 -- | Execute every ActionInstance that is triggered by Deltas in the Transaction.
 -- | Also execute ActionInstances for created contexts.
