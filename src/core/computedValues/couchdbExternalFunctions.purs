@@ -25,7 +25,7 @@ module Perspectives.Extern.Couchdb where
 
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
-import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
@@ -34,7 +34,7 @@ import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
@@ -43,7 +43,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Foreign.Object (Object, insert, lookup)
+import Foreign.Object (Object, filter, insert, lookup)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
 import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
@@ -60,7 +60,7 @@ import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwri
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<<<), (<>), (>>=), (<$>))
+import Prelude (class Monad, Unit, bind, discard, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>>=), (==))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -98,7 +98,7 @@ addModelToLocalStore urls = do
         -- Retrieve the DomeinFile from the URL.
       (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
       res <- liftAff $ request $ rq {url = url}
-      (df@(DomeinFile{_id, contextInstances, roleInstances}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
+      (df@(DomeinFile{_id, contextInstances, roleInstances, modelDescription}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
       rev <- version res.headers
       -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
@@ -110,7 +110,7 @@ addModelToLocalStore urls = do
 
       -- We have to cache all roleInstances (except the external role of the modeldescription) first,
       -- otherwise we cannot see what its `isMe` must be.
-      forWithIndex_ roleInstances \i a -> void $ lift $ lift $ cacheOverwritingRevision (RoleInstance i) a
+      forWithIndex_ roleInstances \i a -> void $ lift $ lift $ try (cacheInitially (RoleInstance i) a)
       cis <- lift2 $ execStateT (saveRoleInstances roleInstances) contextInstances
       forWithIndex_ cis \i a -> save (ContextInstance i) a
 
@@ -123,8 +123,7 @@ addModelToLocalStore urls = do
           void $ modify \cis -> case lookup (unwrap context) cis of
             Nothing -> cis
             Just c -> insert (unwrap context) (changeContext_me c (Just (RoleInstance i))) cis
-        else pure unit
-
+        else void $ lift $ saveEntiteit_ (RoleInstance i) a
 
     save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
     save i a = do
