@@ -23,16 +23,17 @@ module Perspectives.RunMonadPerspectivesTransaction where
 
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (cons, elemIndex, foldM, foldr, singleton, sort, union)
+import Control.Monad.Writer (Writer, execWriter, tell)
+import Data.Array (cons, elemIndex, find, foldM, foldr, singleton, sort, union)
 import Data.Array (filter) as ARR
-import Data.Array.NonEmpty (head, toArray)
+import Data.Array.NonEmpty (fromArray, head, toArray)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (new)
-import Effect.Class.Console (logShow)
+import Effect.Class.Console (log, logShow)
 import Foreign.Object (values)
 import Perspectives.Actions (compileBotAction)
 import Perspectives.ApiTypes (CorrelationIdentifier)
@@ -52,7 +53,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..), UniverseRoleDelta(..))
-import Prelude (bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>))
+import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>), (==), (&&))
 
 -----------------------------------------------------------
 -- RUN MONADPERSPECTIVESTRANSACTION
@@ -80,6 +81,7 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
+      log "==========ASSUMPTIONS============"
       (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
         logShow ass
         mcorrIds <- findDependencies ass
@@ -89,11 +91,14 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
         []
         (assumptionsInTransaction ft)
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
+      log "==========RUNNING EFFECTS============"
       lift $ lift $ for_ (sort $ correlationIdentifiers <> corrIds) \corrId -> do
         me <- pure $ lookupActiveSupportedEffect corrId
         case me of
           Nothing -> pure unit
-          (Just {runner}) -> runner unit
+          (Just {runner}) -> do
+            logShow corrId
+            runner unit
       pure r
 
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
@@ -107,12 +112,14 @@ assumptionsInTransaction (Transaction{contextDeltas, roleDeltas, propertyDeltas,
     filterRemovedRoles udeltas ass = let
       (removedRoleInstances :: Array String) = foldr (\(UniverseRoleDelta{id, deltaType}) cumulator -> case deltaType of
         Remove -> cons (unwrap id) cumulator
+        Delete -> cons (unwrap id) cumulator
         _ -> cumulator) [] (udeltas :: Array UniverseRoleDelta)
       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedRoleInstances) ass
     filterRemovedContexts :: Array UniverseContextDelta -> Array Assumption -> Array Assumption
     filterRemovedContexts cdeltas ass = let
       (removedContextInstances :: Array String) = foldr (\(UniverseContextDelta{id, deltaType}) cumulator -> case deltaType of
         Remove -> cons (unwrap id) cumulator
+        Delete -> cons (unwrap id) cumulator
         _ -> cumulator) [] (cdeltas :: Array UniverseContextDelta)
       in ARR.filter (\(Tuple r _) -> not $ isJust $ elemIndex r removedContextInstances) ass
 
@@ -125,17 +132,17 @@ runActions t = do
   -- Collect all combinations of context instances and user types.
   -- Check if the type of 'me' is among them.
   -- If so, execute the automatic actions for 'me'.
-  -- log "======================"
+  log "==========RUNNING ACTIONS============"
   (as :: Array ActionInstance) <- contextsAffectedByTransaction >>= traverse getAllAutomaticActions >>= pure <<< join
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
-        (Just (Tuple _ a)) -> do
-          -- log ("Evaluating " <> unwrap atype)
-          a ctxt
+        (Just (Tuple _ updater)) -> do
+          log ("Evaluating " <> unwrap atype)
+          updater ctxt
         Nothing -> do
           (Tuple _ updater) <- lift2 $ compileBotAction atype
-          -- log ("Evaluating " <> unwrap atype)
+          log ("Evaluating " <> unwrap atype)
           updater ctxt
           pure unit
   nt <- lift AA.get
@@ -144,8 +151,21 @@ runActions t = do
     else pure <<< (<>) t =<< runActions nt
 
 -- | Get all ContextInstances collected in the Transaction.
+-- | If a context instance is removed, we run no actions in it.
 contextsAffectedByTransaction :: MonadPerspectivesTransaction (Array AffectedContext)
-contextsAffectedByTransaction = lift AA.get >>= pure <<< _.affectedContexts <<< unwrap
+contextsAffectedByTransaction = do
+  (Transaction{affectedContexts, universeContextDeltas}) <- lift AA.get
+  pure $ execWriter (for_ affectedContexts (skipRemovedContexts universeContextDeltas))
+  where
+    skipRemovedContexts :: Array UniverseContextDelta -> AffectedContext -> Writer (Array AffectedContext) Unit
+    skipRemovedContexts universeContextDeltas (AffectedContext acr@{contextInstances}) = let
+      remainingInstances = ARR.filter
+        (\ci -> not $ isJust $ find (\(UniverseContextDelta{id, deltaType}) -> id == ci && deltaType == Remove) universeContextDeltas)
+        (toArray contextInstances)
+      in
+        case fromArray remainingInstances of
+          Nothing -> pure unit
+          Just ri -> tell [(AffectedContext acr {contextInstances = ri})]
 
 getMe :: ContextInstance ~~> RoleInstance
 getMe ctxt = ArrayT (lift $ getPerspectContext ctxt >>= pure <<< maybe [] singleton <<< context_me)
