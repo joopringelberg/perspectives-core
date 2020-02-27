@@ -246,6 +246,7 @@ removeRoleInstancesFromContext_ contextWillBeRemoved contextId rolName rolInstan
       , roleInstance
       , users: []
       }
+    -- TODO. Ik denk dat de ContextDelta overbodig is als de context zelf weggegooid wordt.
     addContextDelta delta
     addUniverseRoleDelta $ UniverseRoleDelta
         { id: roleInstance
@@ -254,12 +255,13 @@ removeRoleInstancesFromContext_ contextWillBeRemoved contextId rolName rolInstan
         , users}
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
-  changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference rolInstances))
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   when (not contextWillBeRemoved)
-    (case find rol_isMe roles of
-      Nothing -> saveEntiteit contextId changedContext
-      Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing))
+    (do
+      changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference rolInstances))
+      case find rol_isMe roles of
+        Nothing -> saveEntiteit contextId changedContext
+        Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing))
 
 -- | Modifies the context instance by removing all instances of the role.
 -- | Notice that this function does NOT handle PERSISTENCE or SYNCHRONISATION for the

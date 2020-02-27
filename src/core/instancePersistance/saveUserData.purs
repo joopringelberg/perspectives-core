@@ -104,8 +104,8 @@ removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectContext id
   (Tuple _ users) <- runWriterT $ do
-     for_ (iedereRolInContext ctxt) (removeRoleInstance_ true)
-     removeRoleInstance_ true (context_buitenRol ctxt)
+     for_ (iedereRolInContext ctxt) (removeRoleInstance_ false)
+     removeRoleInstance_ false (context_buitenRol ctxt)
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   addUniverseContextDelta $ UniverseContextDelta
     { id
