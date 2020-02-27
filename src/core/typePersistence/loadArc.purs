@@ -98,7 +98,7 @@ loadArcAndCrl fileName directoryName = do
         (Right withInstances) -> pure $ Right (DomeinFile withInstances)
   where
     addModelInstances :: DomeinFileRecord -> MonadPerspectives (Either (Array PerspectivesError) DomeinFileRecord)
-    addModelInstances df@{_id} = do
+    addModelInstances df = do
       r <- loadCrlFile (fileName <> ".crl") directoryName
       case r of
         Left e -> pure $ Left e

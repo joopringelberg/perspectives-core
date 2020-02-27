@@ -154,7 +154,6 @@ fetchEntiteit id = ensureAuthentication $ catchError
 
 -- | Save an entity, whether it has been saved before or not. It must be present in the cache.
 -- | On success it will have the same version in cache as in Couchdb.
--- TODO. Dit steekt niet goed in elkaar. Als hij in cache is, slaagt tryGetPerspectEntiteit altijd en dus komen we altijd in de tweede case.
 saveEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = do
   (pe :: Maybe a) <- tryGetPerspectEntiteit id

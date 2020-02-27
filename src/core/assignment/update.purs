@@ -151,13 +151,15 @@ setBinding roleId (newBindingId :: RoleInstance) = do
 -- | SYNCHRONISATION by RoleBindingDelta.
 -- | CURRENTUSER for roleId and its context.
 removeBinding :: (RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance))
-removeBinding roleId = do
+removeBinding = removeBinding_ false
+
+removeBinding_ :: Boolean -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+removeBinding_ roleWillBeRemoved roleId = do
   (originalRole :: PerspectRol) <- lift2 $ getPerspectEntiteit roleId
   users' <- case rol_binding originalRole of
     Nothing -> pure []
     Just oldBindingId -> do
       (lift2 $ findBinderRequests oldBindingId (rol_pspType originalRole)) >>= addCorrelationIdentifiersToTransactie
-      (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
       delta@(RoleBindingDelta{users}) <- aisInRoleDelta $ RoleBindingDelta
                   { id : roleId
                   , binding: (rol_binding originalRole)
@@ -165,7 +167,10 @@ removeBinding roleId = do
                   , deltaType: Remove
                   , users: []
                   }
-      saveEntiteit roleId (changeRol_isMe (removeRol_binding originalRole) false)
+      when (not roleWillBeRemoved)
+        (do
+          (lift2 $ findBindingRequests roleId) >>= addCorrelationIdentifiersToTransactie
+          saveEntiteit roleId (changeRol_isMe (removeRol_binding originalRole) false))
       ctxt <- lift2 $ getPerspectContext $ rol_context originalRole
       if (context_me ctxt == (Just roleId))
         then setMe (rol_context originalRole) Nothing
@@ -228,7 +233,10 @@ addRoleInstancesToContext contextId rolName rolInstances = do
 -- | QUERY UPDATES
 -- | CURRENTUSER for contextId and one of rolInstances.
 removeRoleInstancesFromContext :: ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
-removeRoleInstancesFromContext contextId rolName rolInstances = do
+removeRoleInstancesFromContext = removeRoleInstancesFromContext_ false
+
+removeRoleInstancesFromContext_ :: Boolean -> ContextInstance -> EnumeratedRoleType -> (Updater (Array RoleInstance))
+removeRoleInstancesFromContext_ contextWillBeRemoved contextId rolName rolInstances = do
   for_ rolInstances \roleInstance -> do
     -- TODO. Waarschijnlijk is de volgorde van de deltas hier verkeerd.
     delta@(ContextDelta{users}) <- aisInContextDelta $ ContextDelta
@@ -248,9 +256,10 @@ removeRoleInstancesFromContext contextId rolName rolInstances = do
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
   changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference rolInstances))
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
-  case find rol_isMe roles of
-    Nothing -> saveEntiteit contextId changedContext
-    Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing)
+  when (not contextWillBeRemoved)
+    (case find rol_isMe roles of
+      Nothing -> saveEntiteit contextId changedContext
+      Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing))
 
 -- | Modifies the context instance by removing all instances of the role.
 -- | Notice that this function does NOT handle PERSISTENCE or SYNCHRONISATION for the

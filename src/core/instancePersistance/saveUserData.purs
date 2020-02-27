@@ -46,7 +46,7 @@ import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Object (values)
-import Perspectives.Assignment.Update (removeBinding, removeRoleInstancesFromContext)
+import Perspectives.Assignment.Update (removeBinding, removeBinding_, removeRoleInstancesFromContext_)
 import Perspectives.CollectAffectedContexts (aisInContextDelta, aisInRoleDelta, lift2)
 import Perspectives.ContextAndRole (context_buitenRol, context_iedereRolInContext, context_pspType)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, Updater)
@@ -104,8 +104,8 @@ removeContextInstance :: Updater ContextInstance
 removeContextInstance id = do
   (ctxt :: PerspectContext) <- lift $ lift $ getPerspectContext id
   (Tuple _ users) <- runWriterT $ do
-     for_ (iedereRolInContext ctxt) removeRoleInstance_
-     removeRoleInstance_ (context_buitenRol ctxt)
+     for_ (iedereRolInContext ctxt) (removeRoleInstance_ true)
+     removeRoleInstance_ true (context_buitenRol ctxt)
   (_ :: PerspectContext) <- lift $ lift $ removeEntiteit id
   addUniverseContextDelta $ UniverseContextDelta
     { id
@@ -115,18 +115,17 @@ removeContextInstance id = do
   pure unit
 
 -- | Collects the union of the user role instances that occurr in the bindings.
-removeRoleInstance_ :: RoleInstance -> WriterT (Array RoleInstance) MonadPerspectivesTransaction Unit
-removeRoleInstance_ roleId = do
+removeRoleInstance_ :: Boolean -> RoleInstance -> WriterT (Array RoleInstance) MonadPerspectivesTransaction Unit
+removeRoleInstance_ contextWillBeRemoved roleId = do
   originalRole@(PerspectRol{context, gevuldeRollen, binding, pspType}) <- lift $ lift2 $ (getPerspectRol roleId)
-  lift $ removeRoleInstancesFromContext context pspType [roleId]
+  lift $ removeRoleInstancesFromContext_ contextWillBeRemoved  context pspType [roleId]
 
   -- Remove the role instance from all roles that have it as their binding. This will push Deltas.
   forWithIndex_ gevuldeRollen \_ filledRollen ->
     for_ filledRollen \filledRolId -> do
       (lift $ removeBinding filledRolId) >>= tell
-  -- Remove the binding. Sadly, that will save the role instance, too, which is not
-  -- necessary because we will remove it anyway.
-  (lift $ removeBinding roleId) >>= tell
+  -- Remove the binding.
+  (lift $ removeBinding_ true roleId) >>= tell
   -- Remove from couchdb, remove from the cache.
   void $ lift $ lift2 $ (removeEntiteit roleId :: MonadPerspectives PerspectRol)
 
@@ -136,7 +135,7 @@ removeRoleInstance_ roleId = do
 -- | This function is complete w.r.t. the five responsibilities.
 -- | The opposite of this function creates a role instance first and then adds it to a context: [createAndAddRoleInstance](Perspectives.Instances.Builders.html#t:createAndAddRoleInstance).
 removeRoleInstance :: RoleInstance -> MonadPerspectivesTransaction Unit
-removeRoleInstance roleId = void $ runWriterT $ removeRoleInstance_ roleId
+removeRoleInstance roleId = void $ runWriterT $ removeRoleInstance_ false roleId
 
 -- | Remove all instances of EnumeratedRoleType from the context instance.
 -- | Removes all instances from cache, from the database and adds then to deletedRoles in the Transaction.
