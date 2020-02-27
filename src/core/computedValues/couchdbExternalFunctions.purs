@@ -34,7 +34,7 @@ import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
@@ -43,9 +43,9 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Foreign.Object (Object, filter, insert, lookup)
+import Foreign.Object (Object, insert, lookup)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
+import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
 import Perspectives.Couchdb (PutCouchdbDocument, ViewResult(..), onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
@@ -60,7 +60,7 @@ import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwri
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Prelude (class Monad, Unit, bind, discard, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>>=), (==))
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -113,6 +113,19 @@ addModelToLocalStore urls = do
       forWithIndex_ roleInstances \i a -> void $ lift $ lift $ try (cacheInitially (RoleInstance i) a)
       cis <- lift2 $ execStateT (saveRoleInstances roleInstances) contextInstances
       forWithIndex_ cis \i a -> save (ContextInstance i) a
+      -- For each role instance with a binding that is not one of the other imported role instances,
+      -- set the inverse binding administration on that binding.
+      forWithIndex_ roleInstances \i a -> case rol_binding a of
+        Nothing -> pure unit
+        Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances)
+          then pure unit
+          else do
+            -- set the inverse binding
+            newBinding <- lift2 $ getPerspectEntiteit newBindingId
+            lift2 $ void $ cacheOverwritingRevision newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
+            lift2 $ void $ saveEntiteit newBindingId
+            -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
+            -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
 
     saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit
     saveRoleInstances ris = forWithIndex_ ris \i a@(PerspectRol{context}) -> do
