@@ -25,6 +25,7 @@ import Test.Extern.Couchdb as CDB
 import Test.Model.System as TMS
 import Test.Types.ObjectGetters as TTO
 import Test.Queries as QR
+import Test.SetupCouchdb as SCDB
 import Test.Unit.Main (runTest)
 
 
@@ -50,3 +51,4 @@ main = runTest do
   TMS.theSuite
   TTO.theSuite
   QR.theSuite
+  SCDB.theSuite

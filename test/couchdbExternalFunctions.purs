@@ -21,7 +21,7 @@ import Perspectives.Extern.Couchdb (models, uploadToRepository)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.SetupCouchdb (setModelDescriptionsView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (assertEqual, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -34,14 +34,13 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
-  test "models" (runP do
+  testOnly "models" (runP do
     ExternalCouchdb.addExternalFunctions
-    modelErrors <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    modelErrors <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
     if null modelErrors
       then do
-        setupUser
         getModels <- getRoleFunction "model:System$PerspectivesSystem$Modellen"
         models <- ((ContextInstance "model:User$MijnSysteem") ##= getModels)
         logShow models
@@ -68,7 +67,9 @@ theSuite = suiteSkip "Perspectives.Extern.Couchdb" do
   test "upload model to repository from files" (runP do
     -- setupUser
     cdburl <- getCouchdbBaseURL
-    errors <- loadCompileAndSaveArcFile "testBotActie" modelDirectory
+    -- _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    -- errors <- loadCompileAndSaveArcFile "testBotActie" modelDirectory
+    errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
     liftAff $ assert ("There should be no errors" <> show errors) (null errors)
     void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.

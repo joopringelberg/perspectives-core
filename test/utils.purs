@@ -2,7 +2,6 @@ module Test.Perspectives.Utils where
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk as AA
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Perspectives.ContextAndRole (changeContext_me, changeRol_isMe)
@@ -15,6 +14,7 @@ import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives)
+import Perspectives.User (entitiesDatabaseName)
 import Test.Unit.Assert as Assert
 
 
@@ -53,9 +53,9 @@ assertEqual message test result = do
 
 clearUserDatabase :: MonadPerspectives Unit
 clearUserDatabase = do
-  uname <- (AA.gets _.userInfo.userName)
-  deleteDatabase $ "user_" <> uname <> "_entities"
-  createDatabase $ "user_" <> uname <> "_entities"
+  userDatabaseName <- entitiesDatabaseName
+  deleteDatabase userDatabaseName
+  createDatabase userDatabaseName
 
 setupUser :: MonadPerspectives Unit
 setupUser = do
