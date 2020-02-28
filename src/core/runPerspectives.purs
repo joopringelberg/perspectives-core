@@ -31,9 +31,9 @@ import Perspectives.PerspectivesState (newPerspectivesState)
 import Prelude (bind, ($))
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a. String -> String -> MonadPerspectives a
+runPerspectives :: forall a. String -> String -> String -> MonadPerspectives a
   -> Aff a
-runPerspectives userName password mp = do
+runPerspectives userName password userId mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
     newPerspectivesState (CouchdbUser

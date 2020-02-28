@@ -21,7 +21,7 @@ import Test.Unit.Assert as Assert
 runP :: forall a.
   MonadPerspectives a ->
   Aff a
-runP t = runPerspectives "cor" "geheim" t
+runP t = runPerspectives "cor" "geheim" "cor" t
 
 p :: String -> String
 p s = "model:Perspectives$" <> s

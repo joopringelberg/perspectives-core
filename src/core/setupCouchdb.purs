@@ -25,6 +25,7 @@ import Affjax (request, put, Request)
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Control.Monad.AvarMonadAsk (gets)
+import Control.Monad.Trans.Class (lift)
 import Data.Argonaut (fromString)
 import Data.Array (null)
 import Data.Either (Either(..))
@@ -64,8 +65,6 @@ setupCouchdbForFirstUser :: String -> String -> Aff Unit
 setupCouchdbForFirstUser usr pwd = do
   runMonadCouchdb usr pwd usr do
     -- TODO: genereer userIdentifier als Guid!
-    -- TODO: sla de credentials usr, pwd en userIdentifier op.
-    createDatabase "localusers"
     createFirstAdmin usr pwd
     -- Now authenticate
     ensureAuthentication do
@@ -73,8 +72,24 @@ setupCouchdbForFirstUser usr pwd = do
       getUserIdentifier >>= createUserDatabases
       -- For now, we initialise the repository, too.
       initRepository
-  runPerspectives usr pwd addUserToLocalUsers
+  runPerspectives usr pwd usr do
+    createDatabase "localusers"
+    addUserToLocalUsers
 
+-----------------------------------------------------------
+-- SETUPCOUCHDBFORANOTHERUSER
+-- Notice: Requires Couchdb to be in partymode.
+-----------------------------------------------------------
+setupCouchdbForAnotherUser :: String -> String -> MonadPerspectives Unit
+setupCouchdbForAnotherUser usr pwd = do
+  createAnotherAdmin usr pwd
+  lift $ runPerspectives usr pwd usr do
+    getUserIdentifier >>= createUserDatabases
+    addUserToLocalUsers
+
+-----------------------------------------------------------
+-- INITREPOSITORY
+-----------------------------------------------------------
 -- | Create a database "repository" and add a view to it to retrive the external roles of the ModelDescription instances.
 initRepository :: forall f. MonadCouchdb f Unit
 initRepository = do
