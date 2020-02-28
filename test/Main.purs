@@ -26,6 +26,7 @@ import Test.Model.System as TMS
 import Test.Types.ObjectGetters as TTO
 import Test.Queries as QR
 import Test.SetupCouchdb as SCDB
+import Test.LocalAuthentication as LA
 import Test.Unit.Main (runTest)
 
 
@@ -52,3 +53,4 @@ main = runTest do
   TTO.theSuite
   QR.theSuite
   SCDB.theSuite
+  LA.theSuite

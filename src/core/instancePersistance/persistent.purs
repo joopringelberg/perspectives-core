@@ -42,6 +42,7 @@ module Perspectives.Persistent
 , tryGetPerspectEntiteit
 , class Persistent
 , database
+, entitiesDatabaseName
   )
 where
 
@@ -71,19 +72,28 @@ import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (entitiesDatabase, getCouchdbBaseURL, modelsDatabase)
+import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   database :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
-  database _ = entitiesDatabase
+  database _ = do
+    userIdentifier <- getUserIdentifier
+    cdbUrl <- getCouchdbBaseURL
+    pure $ cdbUrl <> userIdentifier <> "_entities/"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
-  database _ = entitiesDatabase
+  database _ = do
+    userIdentifier <- getUserIdentifier
+    cdbUrl <- getCouchdbBaseURL
+    pure $ cdbUrl <> userIdentifier <> "_entities/"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
-  database _ = modelsDatabase
+  database _ = do
+    userIdentifier <- getUserIdentifier
+    cdbUrl <- getCouchdbBaseURL
+    pure $ cdbUrl <> userIdentifier <> "_models/"
 
 instance persistentCouchdbUser :: Persistent CouchdbUser UserName where
   database _ = do
@@ -99,6 +109,9 @@ getPerspectEntiteit id =
         pe <- liftAff $ read avar
         pure pe
       Nothing -> fetchEntiteit id
+
+entitiesDatabaseName :: MonadPerspectives String
+entitiesDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_entities/")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit

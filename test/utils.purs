@@ -10,11 +10,10 @@ import Perspectives.Couchdb.Databases (createDatabase, deleteDatabase)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.LoadCRL (loadCrlFile)
-import Perspectives.Persistent (getPerspectContext, getPerspectRol)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.User (entitiesDatabaseName)
 import Test.Unit.Assert as Assert
 
 

@@ -22,9 +22,8 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
-import Effect.Aff.AVar (AVar, put, read, take, tryRead)
+import Effect.Aff.AVar (AVar)
 import Foreign.Object (empty)
 import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState)
 import Perspectives.CouchdbState (CouchdbUser)
@@ -43,7 +42,6 @@ newPerspectivesState uinfo av =
   -- CouchdbState
   , userInfo: uinfo
   , couchdbSessionStarted: false
-  , sessionCookie: av
   }
 
 -----------------------------------------------------------
@@ -54,21 +52,6 @@ couchdbSessionStarted = gets _.couchdbSessionStarted
 
 setCouchdbSessionStarted :: Boolean -> MonadPerspectives Unit
 setCouchdbSessionStarted b = modify \ps -> ps {couchdbSessionStarted = b}
-
-sessionCookie :: MonadPerspectives (AVar String)
-sessionCookie = gets _.sessionCookie
-
-takeSessionCookieValue :: MonadPerspectives String
-takeSessionCookieValue = gets _.sessionCookie >>= lift <<< take
-
-readSessionCookieValue :: MonadPerspectives String
-readSessionCookieValue = gets _.sessionCookie >>= lift <<< read
-
-tryReadSessionCookieValue :: MonadPerspectives (Maybe String)
-tryReadSessionCookieValue = gets _.sessionCookie >>= lift <<< tryRead
-
-setSessionCookie :: String -> MonadPerspectives Unit
-setSessionCookie c = sessionCookie >>= (lift <<< put c)
 
 domeinCache :: MonadPerspectives DomeinCache
 domeinCache = gets _.domeinCache

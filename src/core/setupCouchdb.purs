@@ -34,28 +34,13 @@ import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (Password, User, View(..), onAccepted)
-import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, defaultPerspectRequest, ensureAuthentication)
+import Perspectives.Couchdb (Password, SecurityDocument(..), User, View(..), onAccepted)
+import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, createUser, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
 import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
 import Perspectives.Persistent (saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
-
------------------------------------------------------------
--- SETUPCOUCHDB
--- Notice: Requires Couchdb to be in partymode.
------------------------------------------------------------
--- setupCouchdb :: MonadPerspectives Unit
--- setupCouchdb = do
---   usr <- getUser
---   pwd <- getCouchdbPassword
---   createFirstAdmin usr pwd
---   createSystemDatabases
---   createUserDatabases usr
---   createDatabase "perspect_models"
---   -- For now, we initialise the database with a repository, too.
---   createDatabase "repository"
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORFIRSTUSER
@@ -75,10 +60,12 @@ setupCouchdbForFirstUser usr pwd = do
   runPerspectives usr pwd usr do
     createDatabase "localusers"
     addUserToLocalUsers
+    createAuthenticatorAccount
+    setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: ["authenticator"], roles: []}})
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORANOTHERUSER
--- Notice: Requires Couchdb to be in partymode.
+-- Notice: Requires authentication.
 -----------------------------------------------------------
 setupCouchdbForAnotherUser :: String -> String -> MonadPerspectives Unit
 setupCouchdbForAnotherUser usr pwd = do
@@ -125,6 +112,13 @@ createAnotherAdmin user password = ensureAuthentication do
   (rq :: (Request String)) <- defaultPerspectRequest
   res <- liftAff $ request $ rq {method = Left PUT, url = (base <> "_node/couchdb@localhost/_config/admins/" <> user), content = Just $ RequestBody.json (fromString password)}
   liftAff $ onAccepted res.status [200] "createAnotherAdmin" $ pure unit
+
+-----------------------------------------------------------
+-- CREATEAUTHENTICATORACCOUNT
+-- Notice: authentication required!
+-----------------------------------------------------------
+createAuthenticatorAccount :: MonadPerspectives Unit
+createAuthenticatorAccount = createUser "authenticator" "secret" []
 
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES

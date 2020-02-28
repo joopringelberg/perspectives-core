@@ -60,7 +60,7 @@ import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwri
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.User (modelsDatabaseName)
+import Perspectives.User (getUserIdentifier)
 import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -85,6 +85,9 @@ models = ArrayT do
       for (_.value <<< unwrap <$> rows) \r@(PerspectRol{_id}) -> do
         void $ cachePreservingRevision _id r
         pure _id
+
+modelsDatabaseName :: MonadPerspectives String
+modelsDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_models/")
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the acompanying instances, too.
