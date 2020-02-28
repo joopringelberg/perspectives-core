@@ -22,9 +22,13 @@
 module Perspectives.Representation.Class.Identifiable where
 
 import Data.Newtype (class Newtype, unwrap)
+import Perspectives.CouchdbState (CouchdbUser(..), UserName)
 
 class Newtype i String <= Identifiable e i | e -> i where
   identifier :: e -> i
 
 identifier_ :: forall e i. Identifiable e i => e -> String
 identifier_ x = unwrap (identifier x :: i)
+
+instance identifiableCouchdbUser :: Identifiable CouchdbUser UserName where
+  identifier (CouchdbUser{userName}) = userName

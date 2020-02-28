@@ -40,8 +40,9 @@ import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
-import Perspectives.GlobalUnsafeStrMap (GLStrMap)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.PerspectivesState (insert, lookup, remove)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
@@ -153,6 +154,14 @@ instance cacheablePerspectRol :: Cacheable PerspectRol RoleInstance where
 
 instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
   cache = gets _.domeinCache
+  representInternally c = do
+    av <- liftAff empty
+    insert cache (unwrap c) av
+  retrieveInternally i = lookup cache (unwrap i)
+  removeInternally i = remove cache (unwrap i)
+
+instance cacheableCouchdbUser :: Cacheable CouchdbUser UserName where
+  cache = pure $ new unit
   representInternally c = do
     av <- liftAff empty
     insert cache (unwrap c) av

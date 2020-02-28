@@ -21,7 +21,7 @@
 
 module Perspectives.RunMonadPerspectivesTransaction where
 
-import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
+import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Reader (lift, runReaderT)
 import Control.Monad.Writer (Writer, execWriter, tell)
 import Data.Array (cons, elemIndex, find, foldM, foldr, singleton, sort, union)
@@ -53,6 +53,7 @@ import Perspectives.Sync.AffectedContext (AffectedContext(..))
 import Perspectives.Sync.Class.Assumption (assumption)
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransactie, isEmptyTransaction)
 import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..), UniverseRoleDelta(..))
+import Perspectives.User (getUserIdentifier)
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (<$>), (<<<), (<>), (=<<), (>=>), (>>=), (>>>), (==), (&&))
 
 -----------------------------------------------------------
@@ -69,7 +70,7 @@ runMonadPerspectivesTransaction' :: forall o.
   Boolean ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives (Array o))
-runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT run)
+runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT run)
   where
     run :: MonadPerspectivesTransaction o
     run = do
@@ -102,7 +103,7 @@ runMonadPerspectivesTransaction' share a = (AA.gets _.userInfo.userName) >>= lif
       pure r
 
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives (Array o))
-runSterileTransaction a = (AA.gets _.userInfo.userName) >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
+runSterileTransaction a = getUserIdentifier >>= lift <<< createTransactie >>= lift <<< new >>= runReaderT (runArrayT a)
 
 -- | Derive Assumptions from the Deltas in a Transaction. Each Assumption in the result is unique.
 assumptionsInTransaction :: Transaction -> Array Assumption

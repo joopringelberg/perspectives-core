@@ -22,9 +22,11 @@
 module Perspectives.RunPerspectives where
 
 import Control.Monad.Reader (runReaderT)
+import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, new)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
+import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Prelude (bind, ($))
 
@@ -34,10 +36,12 @@ runPerspectives :: forall a. String -> String -> MonadPerspectives a
 runPerspectives userName password mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
-    newPerspectivesState
-      { userName: userName
+    newPerspectivesState (CouchdbUser
+      { userName: UserName userName
       , couchdbPassword: password
-      , couchdbBaseURL: "http://127.0.0.1:5984/"}
+      , couchdbBaseURL: "http://127.0.0.1:5984/"
+      , userIdentifier: userName
+      , _rev: Nothing})
       av
   runReaderT mp rf
 

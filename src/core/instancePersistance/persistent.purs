@@ -66,11 +66,12 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse, version)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthentication, retrieveDocumentVersion)
+import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (entitiesDatabase, getCouchdbBaseURL)
+import Perspectives.User (entitiesDatabase, getCouchdbBaseURL, modelsDatabase)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   database :: i -> MP String
@@ -82,9 +83,12 @@ instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance wh
   database _ = entitiesDatabase
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
+  database _ = modelsDatabase
+
+instance persistentCouchdbUser :: Persistent CouchdbUser UserName where
   database _ = do
     cdbUrl <- getCouchdbBaseURL
-    pure $ cdbUrl <> "perspect_models/"
+    pure $ cdbUrl <> "localusers/"
 
 getPerspectEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =

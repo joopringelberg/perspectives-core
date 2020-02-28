@@ -60,6 +60,7 @@ import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwri
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.User (modelsDatabaseName)
 import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -73,7 +74,7 @@ models = ArrayT do
 
   where
     getListOfModels :: MP (Array RoleInstance)
-    getListOfModels = catchError ((documentNamesInDatabase "perspect_models") >>= pure <<< map (RoleInstance <<< (_ <> "$External"))) \_ -> pure []
+    getListOfModels = catchError (modelsDatabaseName >>= documentNamesInDatabase >>= pure <<< map (RoleInstance <<< (_ <> "$External"))) \_ -> pure []
 
     ophaalTellerName :: String
     ophaalTellerName = "model:System$PerspectivesSystem$External$ModelOphaalTeller"

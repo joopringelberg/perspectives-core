@@ -22,6 +22,9 @@
 module Perspectives.Representation.Class.Revision where
 
 import Data.Maybe (Maybe(..))
+import Data.Newtype (over, unwrap)
+import Perspectives.CouchdbState (CouchdbUser(..))
+import Prelude ((<<<))
 
 class Revision v where
   rev :: v -> Revision_
@@ -31,3 +34,7 @@ type Revision_ = Maybe String
 
 revision :: String -> Revision_
 revision = Just
+
+instance revisionCouchdbUser :: Revision CouchdbUser where
+  rev = _._rev <<< unwrap
+  changeRevision s = over CouchdbUser (\vr -> vr {_rev = s})

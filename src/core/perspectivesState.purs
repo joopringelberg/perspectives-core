@@ -26,14 +26,14 @@ import Control.Monad.Trans.Class (lift)
 import Data.Maybe (Maybe)
 import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Foreign.Object (empty)
-import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState, type (~~>), MPQ)
-import Perspectives.CouchdbState (UserInfo)
+import Perspectives.CoreTypes (AssumptionRegister, DomeinCache, MonadPerspectives, PerspectivesState)
+import Perspectives.CouchdbState (CouchdbUser)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, delete, new, peek, poke)
 import Perspectives.Instances.Environment (Environment, empty, lookup, addVariable, _pushFrame) as ENV
 import Prelude (Unit, bind, pure, unit, ($), (<<<), (>>=), discard, void)
 
-newPerspectivesState :: UserInfo -> AVar String -> PerspectivesState
+newPerspectivesState :: CouchdbUser -> AVar String -> PerspectivesState
 newPerspectivesState uinfo av =
   { rolInstances: new unit
   , contextInstances: new unit
@@ -86,7 +86,7 @@ queryAssumptionRegister :: MonadPerspectives AssumptionRegister
 queryAssumptionRegister = gets _.queryAssumptionRegister
 
 queryAssumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
-queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister}) -> s {queryAssumptionRegister = f queryAssumptionRegister}
+queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister: q}) -> s {queryAssumptionRegister = f q}
 
 -----------------------------------------------------------
 -- FUNCTIONS TO HANDLE VARIABLE BINDINGS

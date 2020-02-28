@@ -20,11 +20,13 @@
 
 module Main where
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Error, forkAff, runAff)
 import Effect.Aff.AVar (AVar, new)
 import Effect.Console (log)
 import Perspectives.Api (setupApi, setupTcpApi)
+import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
@@ -46,7 +48,7 @@ runPDR = void $ runAff handleError do
   pwd <- pure "geheim"
   url <- pure "http://127.0.0.1:5984/"
   (av :: AVar String) <- new "This value will be removed on first authentication!"
-  state <- new $ newPerspectivesState {userName: usr, couchdbPassword: pwd, couchdbBaseURL: url} av
+  state <- new $ newPerspectivesState (CouchdbUser {userName: UserName usr, couchdbPassword: pwd, couchdbBaseURL: url, userIdentifier: usr, _rev: Nothing}) av
   void $ forkAff $ runPerspectivesWithState f state
   void $ forkAff $ runPerspectivesWithState setupTcpApi state
   where

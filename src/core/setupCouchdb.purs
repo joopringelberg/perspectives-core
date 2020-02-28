@@ -24,39 +24,75 @@ module Perspectives.SetupCouchdb where
 import Affjax (request, put, Request)
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
+import Control.Monad.AvarMonadAsk (gets)
 import Data.Argonaut (fromString)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, User, View(..), onAccepted)
 import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, defaultPerspectRequest, ensureAuthentication)
-import Perspectives.User (getCouchdbBaseURL, getCouchdbPassword, getUser)
-import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (<>), (>>=))
+import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
+import Perspectives.Persistent (saveEntiteit_)
+import Perspectives.RunPerspectives (runPerspectives)
+import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- SETUPCOUCHDB
--- Notice: Requires Couchdb to have a server admin user "admin" whose password is "admin"
--- and the "_users" database available.
+-- Notice: Requires Couchdb to be in partymode.
 -----------------------------------------------------------
-setupCouchdb :: MonadPerspectives Unit
-setupCouchdb = do
-  usr <- getUser
-  pwd <- getCouchdbPassword
-  createFirstAdmin usr pwd
-  createSystemDatabases
-  createUserDatabases usr
-  createDatabase "perspect_models"
-  -- For now, we initialise the database with a repository, too.
+-- setupCouchdb :: MonadPerspectives Unit
+-- setupCouchdb = do
+--   usr <- getUser
+--   pwd <- getCouchdbPassword
+--   createFirstAdmin usr pwd
+--   createSystemDatabases
+--   createUserDatabases usr
+--   createDatabase "perspect_models"
+--   -- For now, we initialise the database with a repository, too.
+--   createDatabase "repository"
+
+-----------------------------------------------------------
+-- SETUPCOUCHDBFORFIRSTUSER
+-- Notice: Requires Couchdb to be in partymode.
+-----------------------------------------------------------
+setupCouchdbForFirstUser :: String -> String -> Aff Unit
+setupCouchdbForFirstUser usr pwd = do
+  runMonadCouchdb usr pwd usr do
+    -- TODO: genereer userIdentifier als Guid!
+    -- TODO: sla de credentials usr, pwd en userIdentifier op.
+    createDatabase "localusers"
+    createFirstAdmin usr pwd
+    -- Now authenticate
+    ensureAuthentication do
+      createSystemDatabases
+      getUserIdentifier >>= createUserDatabases
+      -- For now, we initialise the repository, too.
+      initRepository
+  runPerspectives usr pwd addUserToLocalUsers
+
+-- | Create a database "repository" and add a view to it to retrive the external roles of the ModelDescription instances.
+initRepository :: forall f. MonadCouchdb f Unit
+initRepository = do
   createDatabase "repository"
+  setModelDescriptionsView
+
+-----------------------------------------------------------
+-- ADDUSERTOLOCALUSERS
+-----------------------------------------------------------
+addUserToLocalUsers :: MonadPerspectives Unit
+addUserToLocalUsers = (gets _.userInfo) >>= \u@(CouchdbUser{userName}) -> void $ saveEntiteit_ userName u
 
 -----------------------------------------------------------
 -- CREATEFIRSTADMIN
 -- Notice: no authentication. Requires Couchdb to be in party mode.
+-- Assumes Couchdb to run on http://127.0.0.1:5984.
 -----------------------------------------------------------
-createFirstAdmin :: User -> Password -> MonadPerspectives Unit
+createFirstAdmin :: forall f. User -> Password -> MonadCouchdb f Unit
 createFirstAdmin user password = do
   base <- getCouchdbBaseURL
   -- See http://docs.couchdb.org/en/2.1.1/api/server/configuration.html#api-config
@@ -79,7 +115,7 @@ createAnotherAdmin user password = ensureAuthentication do
 -- CREATESYSTEMDATABASES
 -- Notice: authentication required!
 -----------------------------------------------------------
-createSystemDatabases :: MonadPerspectives Unit
+createSystemDatabases :: forall f. MonadCouchdb f Unit
 createSystemDatabases = do
   createDatabase "_users"
   createDatabase "_replicator"
@@ -89,10 +125,11 @@ createSystemDatabases = do
 -- CREATEUSERDATABASES
 -- Notice: authentication required!
 -----------------------------------------------------------
-createUserDatabases :: User -> MonadPerspectives Unit
+createUserDatabases :: forall f. User -> MonadCouchdb f Unit
 createUserDatabases user = do
-  createDatabase $ "user_" <> user <> "_entities"
-  createDatabase $ "user_" <> user <> "_post"
+  createDatabase $ user <> "_entities"
+  createDatabase $ user <> "_post"
+  createDatabase $ user <> "_models/"
 
 -----------------------------------------------------------
 -- PARTYMODE
@@ -105,9 +142,9 @@ partyMode = allDbs >>= pure <<< null
 -- THE VIEW 'MODELDESCRIPTIONS'
 -----------------------------------------------------------
 -- | Add a view to the couchdb installation in the 'repository' db.
--- | Notice that the .json file must be available runtime, in the "views" directory of cwd.
-setModelDescriptionsView :: MonadPerspectives Unit
+setModelDescriptionsView :: forall f. MonadCouchdb f Unit
 setModelDescriptionsView = do
   addViewToDatabase "repository" "defaultViews" "modeldescriptions" (View {map: modelDescriptions, reduce: Nothing})
 
+-- | Import the view definition as a String.
 foreign import modelDescriptions :: String
