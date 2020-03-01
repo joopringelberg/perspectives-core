@@ -67,11 +67,11 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
   test "upload model to repository from files" (runP do
     -- setupUser
     cdburl <- getCouchdbBaseURL
-    -- _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    -- errors <- loadCompileAndSaveArcFile "testBotActie" modelDirectory
-    errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    errors <- loadCompileAndSaveArcFile "testBotActie" modelDirectory
+    -- errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
     liftAff $ assert ("There should be no errors" <> show errors) (null errors)
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"
       )

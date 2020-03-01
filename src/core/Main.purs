@@ -45,6 +45,7 @@ main = runPDR "cor" "geheim" "cor"
 -- (The PDR is not meant for command line usage).
 
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
+  -- TODO. Bewaar de fiber in state en kill om uit te loggen?
 runPDR :: String -> String -> String -> Effect Unit
 runPDR usr pwd ident = void $ runAff handleError do
   url <- pure "http://127.0.0.1:5984/"

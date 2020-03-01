@@ -14,7 +14,9 @@ theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.LocalAuthentication" do
   test "authenticate" do
     r <- authenticate "cor" "geheim"
-    assert "'authenticate cor geheim' should return OK" (r == OK)
+    assert "'authenticate cor geheim' should return OK" case r of
+      OK _ -> true
+      otherwise -> false
     r1 <- authenticate "onbekend" "geheim"
     assert "'authenticate onbekend geheim' should return UnknownUser" (r1 == UnknownUser)
     r2 <- authenticate "cor" "fout"
