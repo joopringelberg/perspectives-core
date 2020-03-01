@@ -156,7 +156,9 @@ addModelToLocalStore urls = do
       result <- onAccepted res.status [200, 304] "uploadToRepository_" (pure res.body)
       void $ case result of
         Left e -> throwError $ error ("uploadToRepository: Errors on retrieving attachment: " <> (printResponseFormatError e))
-        Right attachment -> void $ addAttachment ("perspect_models/" <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
+        Right attachment -> do
+          perspect_models <- modelsDatabaseName
+          void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")
 
 -- | Take a DomeinFile from the local perspect_models database and upload it to the repository database at url.
 -- | Notice that url should include the name of the repository database within the couchdb installation. We do

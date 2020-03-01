@@ -31,7 +31,7 @@ import Perspectives.Persistent (tryGetPerspectEntiteit)
 import Perspectives.RunPerspectives (runPerspectives)
 import Prelude (pure, bind, ($), (==), class Eq, class Show)
 
-data AuthenticationResult = UnknownUser | WrongPassword | OK
+data AuthenticationResult = UnknownUser | WrongPassword | OK CouchdbUser
 
 derive instance genericRepAuthenticationResult :: Generic AuthenticationResult _
 
@@ -51,6 +51,6 @@ authenticate usr pwd = do
   muser <- runPerspectives "authenticator" "secret" "authenticator" (tryGetPerspectEntiteit $ UserName usr)
   case muser of
     Nothing -> pure UnknownUser
-    Just (CouchdbUser{couchdbPassword, userIdentifier}) -> if pwd == couchdbPassword
-      then pure OK
+    Just cdbu@(CouchdbUser{couchdbPassword, userIdentifier}) -> if pwd == couchdbPassword
+      then pure $ OK cdbu
       else pure WrongPassword

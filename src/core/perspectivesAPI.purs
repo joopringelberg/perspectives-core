@@ -60,6 +60,7 @@ import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (getMe, runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
+import Perspectives.User (getUserIdentifier)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
 
 -----------------------------------------------------------
@@ -204,6 +205,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       if null me
         then sendResponse (Error corrId ("No role for user in context instance '" <> subject <> "'!")) setter
         else sendResponse (Result corrId (unwrap <$> me)) setter
+    Api.GetUserIdentifier -> do
+      userIdentifier <- getUserIdentifier
+      sendResponse (Result corrId [userIdentifier]) setter
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do
