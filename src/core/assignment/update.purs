@@ -51,7 +51,7 @@ import Perspectives.DependencyTracking.Dependency (findBinderRequests, findBindi
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
-import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType, cacheOverwritingRevision)
+import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheOverwritingRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseRoleDelta(..))
 
@@ -206,7 +206,9 @@ addRoleInstancesToContext contextId rolName rolInstances = do
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   case find rol_isMe roles of
     Nothing -> saveEntiteit contextId changedContext
-    Just me -> saveEntiteit contextId (changeContext_me changedContext (Just (rol_id me)))
+    Just me -> do
+      (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+      saveEntiteit contextId (changeContext_me changedContext (Just (rol_id me)))
   for_ rolInstances \roleInstance -> do
     delta@(ContextDelta{users}) <- aisInContextDelta $ ContextDelta
                 { id : contextId
@@ -261,7 +263,9 @@ removeRoleInstancesFromContext_ contextWillBeRemoved contextId rolName rolInstan
       changedContext <- pure (modifyContext_rolInContext pe rolName (flip difference rolInstances))
       case find rol_isMe roles of
         Nothing -> saveEntiteit contextId changedContext
-        Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing))
+        Just me -> do
+          (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+          saveEntiteit contextId (changeContext_me changedContext Nothing))
 
 -- | Modifies the context instance by removing all instances of the role.
 -- | Notice that this function does NOT handle PERSISTENCE or SYNCHRONISATION for the
@@ -295,7 +299,9 @@ deleteRoleFromContextInstance contextId rolName = do
   roles <- traverse (lift <<< lift <<< getPerspectRol) (context_rolInContext pe rolName)
   case find rol_isMe roles of
     Nothing -> saveEntiteit contextId changedContext
-    Just me -> saveEntiteit contextId (changeContext_me changedContext Nothing)
+    Just me -> do
+      (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+      saveEntiteit contextId (changeContext_me changedContext Nothing)
 
 -- | Modifies the context instance by replacing the role's instances by the given instances.
 -- | Notice that this function does not remove the rolInstances themselves, nor
@@ -326,6 +332,8 @@ setRoleInstancesInContext contextId rolName rolInstances = do
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   me <- pure $ rol_id <$> find rol_isMe roles
   saveEntiteit contextId (changeContext_me (setContext_rolInContext pe rolName (rolInstances :: Array RoleInstance)) me)
+  (lift2 $ findRoleRequests contextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
+
   for_ rolInstances \roleInstance -> do
     delta@(ContextDelta{users}) <- aisInContextDelta $ ContextDelta
                 { id : contextId
@@ -361,7 +369,9 @@ moveRoles originContextId destinationContextId rolName rolInstances = do
       saveEntiteit originContextId (modifyContext_rolInContext origin rolName (flip difference rolInstances))
     Just m -> do
       saveEntiteit destinationContextId (changeContext_me (modifyContext_rolInContext destination rolName (append rolInstances)) me)
+      (lift2 $ findRoleRequests destinationContextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
       saveEntiteit originContextId (changeContext_me (modifyContext_rolInContext origin rolName (flip difference rolInstances)) Nothing)
+      (lift2 $ findRoleRequests originContextId (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie
   for_ rolInstances \rolInstance -> do
     (aisInContextDelta $ ContextDelta
                 { id : originContextId
@@ -486,3 +496,4 @@ setMe :: ContextInstance -> Maybe RoleInstance -> MonadPerspectivesTransaction U
 setMe cid me = do
   ctxt <- lift2 $ getPerspectContext cid
   saveEntiteit cid (changeContext_me ctxt me)
+  (lift2 $ findRoleRequests cid (EnumeratedRoleType "model:System$Context$Me")) >>= addCorrelationIdentifiersToTransactie

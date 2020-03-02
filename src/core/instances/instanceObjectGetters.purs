@@ -21,9 +21,9 @@
 
 module Perspectives.Instances.ObjectGetters where
 
-import Control.Monad.Writer (lift, tell)
 import Control.Alt ((<|>))
-import Data.Array (findIndex, index)
+import Control.Monad.Writer (lift, tell)
+import Data.Array (findIndex, index, singleton)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
@@ -32,7 +32,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_pspType, context_rolInContext, rol_binding, rol_context, rol_isMe, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_isMe, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -41,7 +41,7 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>), (>=>))
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -73,6 +73,12 @@ setConditionState :: ActionType -> ContextInstance -> Boolean -> MonadPerspectiv
 setConditionState a c b = do
   (IP.PerspectContext r@{actionConditionState}) <- getPerspectContext c
   void $ saveEntiteit_ c (IP.PerspectContext r {actionConditionState = insert (unwrap a) b actionConditionState})
+
+getMe :: ContextInstance ~~> RoleInstance
+getMe ctxt = ArrayT do
+  c <- lift $ getPerspectContext ctxt
+  tell [assumption (unwrap ctxt) "model:System$Context$Me"]
+  pure $ maybe [] singleton (context_me c)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM ROLE

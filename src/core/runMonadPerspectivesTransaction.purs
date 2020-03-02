@@ -44,6 +44,7 @@ import Perspectives.Deltas (distributeTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DependencyTracking.Dependency (findDependencies, lookupActiveSupportedEffect)
 import Perspectives.Instances.Combinators (filter)
+import Perspectives.Instances.ObjectGetters (getMe)
 import Perspectives.Instances.ObjectGetters (roleType) as OG
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Representation.Class.PersistentType (getAction, getEnumeratedRole)
@@ -167,9 +168,6 @@ contextsAffectedByTransaction = do
         case fromArray remainingInstances of
           Nothing -> pure unit
           Just ri -> tell [(AffectedContext acr {contextInstances = ri})]
-
-getMe :: ContextInstance ~~> RoleInstance
-getMe ctxt = ArrayT (lift $ getPerspectContext ctxt >>= pure <<< maybe [] singleton <<< context_me)
 
 allActions :: EnumeratedRoleType ~~> ActionType
 allActions rt = ArrayT (lift $ getEnumeratedRole rt >>= unwrap >>> _.perspectives >>> values >>> join >>> pure)
