@@ -29,6 +29,7 @@ import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
+import Data.Array (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -55,7 +56,7 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (isMe)
-import Perspectives.Persistent (class Persistent, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
+import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
 import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Revision (changeRevision)
@@ -81,13 +82,23 @@ models = ArrayT do
 
     getExternalRoles :: MP (Array RoleInstance)
     getExternalRoles = do
-      (ViewResult{rows} :: ViewResult PerspectRol) <- getViewOnDatabase "repository" "defaultViews" "modeldescriptions"
+      (ViewResult{rows} :: ViewResult PerspectRol) <- getViewOnDatabase "repository" "defaultViews" "modeldescriptions" Nothing
       for (_.value <<< unwrap <$> rows) \r@(PerspectRol{_id}) -> do
         void $ cachePreservingRevision _id r
         pure _id
 
 modelsDatabaseName :: MonadPerspectives String
 modelsDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_models/")
+
+-- | Retrieves all instances of a particular role type from Couchdb.
+-- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
+-- | Notice that only the first element of the array argument is actually used.
+roleInstances :: Array String -> MP (Array RoleInstance)
+roleInstances roleTypes = do
+  (ViewResult{rows} :: ViewResult PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
+  for (_.value <<< unwrap <$> rows) \r@(PerspectRol{_id}) -> do
+    void $ cachePreservingRevision _id r
+    pure _id
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
 -- | Load the acompanying instances, too.
@@ -102,7 +113,7 @@ addModelToLocalStore urls = do
         -- Retrieve the DomeinFile from the URL.
       (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
       res <- liftAff $ request $ rq {url = url}
-      (df@(DomeinFile{_id, contextInstances, roleInstances, modelDescription}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
+      (df@(DomeinFile{_id, contextInstances, roleInstances: roleInstances', modelDescription}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
       rev <- version res.headers
       -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
@@ -114,14 +125,14 @@ addModelToLocalStore urls = do
 
       -- We have to cache all roleInstances (except the external role of the modeldescription) first,
       -- otherwise we cannot see what its `isMe` must be.
-      forWithIndex_ roleInstances \i a -> void $ lift $ lift $ try (cacheInitially (RoleInstance i) a)
-      cis <- lift2 $ execStateT (saveRoleInstances roleInstances) contextInstances
+      forWithIndex_ roleInstances' \i a -> void $ lift $ lift $ try (cacheInitially (RoleInstance i) a)
+      cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
       forWithIndex_ cis \i a -> save (ContextInstance i) a
       -- For each role instance with a binding that is not one of the other imported role instances,
       -- set the inverse binding administration on that binding.
-      forWithIndex_ roleInstances \i a -> case rol_binding a of
+      forWithIndex_ roleInstances' \i a -> case rol_binding a of
         Nothing -> pure unit
-        Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances)
+        Just newBindingId -> if (isJust $ lookup (unwrap newBindingId) roleInstances')
           then pure unit
           else do
             -- set the inverse binding
@@ -195,6 +206,7 @@ externalFunctions =
   [ Tuple "couchdb_Models" {func: unsafeCoerce models, nArgs: 0}
   , Tuple "couchdb_AddModelToLocalStore" {func: unsafeCoerce addModelToLocalStore, nArgs: 1}
   , Tuple "couchdb_UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2}
+  , Tuple "couchdb_RoleInstances" {func: unsafeCoerce roleInstances, nArgs: 1}
 ]
 
 addExternalFunctions :: forall m. Monad m => m Unit

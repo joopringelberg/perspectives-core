@@ -61,8 +61,7 @@ theSuite = suite "Perspectives.loadCRL" do
 
   test "Load a file with a context instance in couchdb" (runP do
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    _ <- loadCompileAndSaveArcFile' "testBotActie" modelDirectory
-    r <- loadAndSaveCrlFile "testBotActie.crl" modelDirectory
+    r <- loadAndSaveCrlFile "userJoop.crl" testDirectory
     if null r
       then liftAff $ assert "OK" true
       else do

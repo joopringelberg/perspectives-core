@@ -32,8 +32,9 @@ import Perspectives.LocalAuthentication (AuthenticationResult(..))
 import Perspectives.LocalAuthentication (authenticate) as LA
 import Perspectives.PerspectivesState (newPerspectivesState)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
+import Perspectives.SetupCouchdb (partyMode, setupCouchdbForFirstUser)
 import Perspectives.SetupUser (setupUser)
-import Prelude (Unit, bind, pure, ($), (<>), show, void, discard)
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<>))
 
 -- | Runs the PDR with default credentials. Used for testing clients without authentication.
 main :: Effect Unit
@@ -64,8 +65,14 @@ handleError (Left e) = log $ "An error condition: " <> (show e)
 handleError (Right a) = log $ "Perspectives-core has started!"
 
 -- | The main entrance to the PDR for client programs. Runs the PDR on succesfull login.
+-- | When Couchdb is in Party Mode, initialises the first admin.
 authenticate :: String -> String -> (Int -> Effect Unit) -> Effect Unit
-authenticate usr pwd callback = void $ runAff handler (LA.authenticate usr pwd)
+authenticate usr pwd callback = void $ runAff handler do
+  pm <- partyMode
+  if pm
+    then setupCouchdbForFirstUser usr pwd
+    else pure unit
+  (LA.authenticate usr pwd)
   where
     handler :: Either Error AuthenticationResult -> Effect Unit
     handler (Left e) = log $ "An error condition: " <> (show e)

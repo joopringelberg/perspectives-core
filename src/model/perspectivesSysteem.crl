@@ -6,11 +6,11 @@ sys:PerspectivesSystem usr:MijnSysteem
 	extern $ModelOphaalTeller = 0
 	extern sys:NamedContext$External$Name = "Mijn Systeem"
 	$User(1) => ()
-		$Voornaam = "Joop"
-		$Achternaam = "Ringelberg"
+		$Voornaam = "Cor"
+		$Achternaam = "Baars"
 	$TheTrustedCluster =>
 		sys:TrustedCluster $MijnCluster
-			extern $Naam = "Het cluster van Joop"
+			extern $Naam = "Het cluster van Cor"
 			$ClusterGenoot -> $$User(1)
 				$Url = "http://localhost"
 	$IndexedContexts => usr:MijnSysteem

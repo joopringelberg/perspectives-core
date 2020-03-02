@@ -1,0 +1,10 @@
+GebruikerGegevens
+
+import model:System als sys:
+
+-- Note: this description is meant for use in the PDR of others!
+sys:PerspectivesSystem usr:JoopsSysteem
+  extern sys:NamedContext$External$Name = "Mijn Systeem"
+  $User(1) => ()
+    $Voornaam = "Joop"
+    $Achternaam = "Ringelberg"

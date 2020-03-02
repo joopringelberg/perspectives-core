@@ -37,7 +37,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, SecurityDocument(..), User, View(..), onAccepted)
 import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase, createUser, defaultPerspectRequest, ensureAuthentication, setSecurityDocument)
 import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
-import Perspectives.Persistent (saveEntiteit_)
+import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
 import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
@@ -62,6 +62,7 @@ setupCouchdbForFirstUser usr pwd = do
     addUserToLocalUsers
     createAuthenticatorAccount
     setSecurityDocument "localusers" (SecurityDocument {admins: {names: [], roles: []}, members: {names: ["authenticator"], roles: []}})
+    entitiesDatabaseName >>= setRoleView
 
 -----------------------------------------------------------
 -- SETUPCOUCHDBFORANOTHERUSER
@@ -73,6 +74,7 @@ setupCouchdbForAnotherUser usr pwd = do
   lift $ runPerspectives usr pwd usr do
     getUserIdentifier >>= createUserDatabases
     addUserToLocalUsers
+    entitiesDatabaseName >>= setRoleView
 
 -----------------------------------------------------------
 -- INITREPOSITORY
@@ -144,8 +146,9 @@ createUserDatabases user = do
 -- PARTYMODE
 -----------------------------------------------------------
 -- | PartyMode operationalized as Couchdb having no databases.
-partyMode :: MonadPerspectives Boolean
-partyMode = allDbs >>= pure <<< null
+partyMode :: Aff Boolean
+partyMode = runMonadCouchdb "authenticator" "secret" "authenticator"
+  (allDbs >>= pure <<< null)
 
 -----------------------------------------------------------
 -- THE VIEW 'MODELDESCRIPTIONS'
@@ -157,3 +160,15 @@ setModelDescriptionsView = do
 
 -- | Import the view definition as a String.
 foreign import modelDescriptions :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'ROLE'
+-- This view collects instances of a particular role type.
+-----------------------------------------------------------
+-- | Add a view to the couchdb installation in the 'repository' db.
+setRoleView :: forall f. String -> MonadCouchdb f Unit
+setRoleView dbname = do
+  addViewToDatabase dbname "defaultViews" "roleView" (View {map: roleView, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import roleView :: String

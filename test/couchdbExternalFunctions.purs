@@ -17,10 +17,11 @@ import Perspectives.Couchdb.Databases (getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
-import Perspectives.Extern.Couchdb (models, uploadToRepository)
+import Perspectives.Extern.Couchdb (models, roleInstances, uploadToRepository)
+import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.SetupCouchdb (setModelDescriptionsView)
+import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
 import Test.Perspectives.Utils (assertEqual, runP, setupUser)
@@ -34,7 +35,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suite "Perspectives.Extern.Couchdb" do
+theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -87,3 +88,21 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
             views <- pure $ designDocumentViews ddoc
             pure $ isJust $ lookup "modeldescriptions" views)
       true
+
+  test "setRoleView" do
+    assertEqual "The retrieved document should equal the sent document"
+      (do
+        entitiesDatabaseName >>= setRoleView
+        mddoc <- entitiesDatabaseName >>= \db -> getDesignDocument db "defaultViews"
+        case mddoc of
+          Nothing -> throwError (error "No design doc, impossible!")
+          Just ddoc -> do
+            views <- pure $ designDocumentViews ddoc
+            pure $ isJust $ lookup "roleView" views)
+      true
+
+  testOnly "setRoleView" (runP do
+    users <- roleInstances ["model:System$PerspectivesSystem$User"]
+    logShow users
+    liftAff $ assert "There should be two users" (length users == 2)
+)
