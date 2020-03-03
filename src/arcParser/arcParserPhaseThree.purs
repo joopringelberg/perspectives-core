@@ -291,7 +291,7 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
           Q (MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
-            qComputedType <- qualifyRoleType pos computedType enumeratedRoles
+            qComputedType <- qualifyRoleType pos (expandDefaultNamespaces computedType) enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
