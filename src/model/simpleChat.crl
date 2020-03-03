@@ -1,0 +1,13 @@
+GebruikerGegevens
+
+import model:System als sys:
+import model:SimpleChat als chat:
+
+sys:Model usr:SimpleChatModel
+  extern $Name = "Simple Chat"
+  extern $Description = "A (very) simple chat application."
+  extern $Url = "http://127.0.0.1:5984/repository/model%3ASimpleChat"
+  $IndexedContext =>
+    chat:ChatApp usr:MyChatApp
+      extern sys:NamedContext$External$Name = "Simple Chat"
+      $Chatter -> model:User$MijnSysteem$User(1)

@@ -65,14 +65,14 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       else liftAff $ assert ("There are model errors: " <> show modelErrors) false
       )
 
-  test "upload model to repository from files" (runP do
+  testOnly "upload model to repository from files" (runP do
     -- setupUser
     cdburl <- getCouchdbBaseURL
     _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    errors <- loadCompileAndSaveArcFile "testBotActie" modelDirectory
+    errors <- loadCompileAndSaveArcFile "simpleChat" modelDirectory
     -- errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
     liftAff $ assert ("There should be no errors" <> show errors) (null errors)
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:TestBotActie") (cdburl <> "repository"))
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"
       )
@@ -101,7 +101,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
             pure $ isJust $ lookup "roleView" views)
       true
 
-  testOnly "setRoleView" (runP do
+  test "setRoleView" (runP do
     users <- roleInstances ["model:System$PerspectivesSystem$User"]
     logShow users
     liftAff $ assert "There should be two users" (length users == 2)
