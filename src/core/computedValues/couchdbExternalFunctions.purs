@@ -93,8 +93,8 @@ modelsDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_models/")
 -- | Retrieves all instances of a particular role type from Couchdb.
 -- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
-roleInstances :: Array String -> MPQ (Array RoleInstance)
-roleInstances roleTypes = lift $ lift $ do
+roleInstances :: Array String -> MPQ RoleInstance
+roleInstances roleTypes = ArrayT $ lift $ do
   (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
   for roles \r@(PerspectRol{_id}) -> do
     void $ cachePreservingRevision _id r

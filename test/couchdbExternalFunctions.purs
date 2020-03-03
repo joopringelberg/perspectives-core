@@ -101,8 +101,8 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
             pure $ isJust $ lookup "roleView" views)
       true
 
-  test "setRoleView" (runP do
-    users <- roleInstances ["model:System$PerspectivesSystem$User"]
-    logShow users
-    liftAff $ assert "There should be two users" (length users == 2)
-)
+--   test "setRoleView" (runP do
+--     users <- roleInstances ["model:System$PerspectivesSystem$User"]
+--     logShow users
+--     liftAff $ assert "There should be two users" (length users == 2)
+-- )
