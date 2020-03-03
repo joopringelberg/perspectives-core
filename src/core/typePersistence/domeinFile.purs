@@ -26,20 +26,21 @@ import Data.Generic.Rep.Eq (genericEq)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
+import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty)
+import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.View (View)
-import Prelude (class Eq, class Ord, class Show, compare, ($), (==), (<<<))
+import Prelude (class Eq, class Ord, class Show, bind, compare, pure, ($), (<<<), (==))
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
@@ -66,7 +67,10 @@ instance encodeDomeinFile :: Encode DomeinFile where
   encode = genericEncode $ defaultOptions --{unwrapSingleConstructors = true}
 
 instance decodeDomeinFile :: Decode DomeinFile where
-  decode = genericDecode $ defaultOptions --{unwrapSingleConstructors = true}
+  decode (json :: Foreign) = do
+    rev <- getRev json
+    a <- genericDecode defaultOptions json
+    pure (changeRevision rev a)
 
 instance showDomeinFile :: Show DomeinFile where
   show = genericShow

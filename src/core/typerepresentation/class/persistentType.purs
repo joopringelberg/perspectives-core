@@ -22,10 +22,10 @@
 module Perspectives.Representation.Class.PersistentType
   ( module Perspectives.Representation.Class.PersistentType
   , module Perspectives.Representation.Class.Cacheable
-  , module Perspectives.Representation.Class.Revision
+  , module Perspectives.Couchdb.Revision
   , module Perspectives.Representation.TypeIdentifiers) where
 
-import Perspectives.Representation.Class.Revision
+import Perspectives.Couchdb.Revision
 
 import Control.Monad.Except (catchError, throwError)
 import Data.Maybe (Maybe(..), maybe)

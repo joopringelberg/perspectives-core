@@ -25,14 +25,15 @@ import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, over)
+import Foreign (Foreign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object) as F
+import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision, Revision_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (class Show, class Eq, (==), (<<<), eq)
+import Prelude (class Show, class Eq, (==), (<<<), eq, bind, pure)
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT TYPE CLASS
@@ -73,7 +74,10 @@ instance encodePerspectContext :: Encode PerspectContext where
   encode = genericEncode defaultOptions
 
 instance decodePerspectContext :: Decode PerspectContext where
-  decode = genericDecode defaultOptions
+  decode (json :: Foreign) = do
+    rev <- getRev json
+    a <- genericDecode defaultOptions json
+    pure (changeRevision rev a)
 
 instance eqPerspectContext :: Eq PerspectContext where
   eq (PerspectContext {_id : id1}) (PerspectContext {_id : id2}) = id1 == id2
@@ -120,7 +124,11 @@ instance encodePerspectRol :: Encode PerspectRol where
   encode = genericEncode defaultOptions
 
 instance decodePerspectRol :: Decode PerspectRol where
-  decode = genericDecode defaultOptions
+  -- decode = genericDecode defaultOptions
+  decode (json :: Foreign) = do
+    rev <- getRev json
+    a <- genericDecode defaultOptions json
+    pure (changeRevision rev a)
 
 instance revisionPerspectRol :: Revision PerspectRol where
   rev = _._rev <<< unwrap

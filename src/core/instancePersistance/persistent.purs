@@ -158,9 +158,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
     (rq :: (Request String)) <- defaultPerspectRequest
     res <- liftAff $ request $ rq {url = ebase <> unwrap id}
     void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
-      (onCorrectCallAndResponse "fetchEntiteit" res.body \a -> do
-        rev <- version res.headers
-        put (changeRevision rev a) v)
+      (onCorrectCallAndResponse "fetchEntiteit" res.body \a -> put a v)
     liftAff $ read v
   \e -> do
     (mav :: Maybe (AVar a)) <- removeInternally id

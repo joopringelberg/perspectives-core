@@ -21,7 +21,7 @@
 
 module Perspectives.Representation.Class.Cacheable
   ( module Perspectives.Representation.Class.Cacheable
-  , module Perspectives.Representation.Class.Revision
+  , module Perspectives.Couchdb.Revision
   , module Perspectives.Representation.TypeIdentifiers
   , cachePreservingRevision
   , cacheInitially
@@ -46,7 +46,7 @@ import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.PerspectivesState (insert, lookup, remove)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision, Revision_, changeRevision, rev)
+import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
 

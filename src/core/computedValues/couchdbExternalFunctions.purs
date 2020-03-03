@@ -48,7 +48,7 @@ import Foreign.Object (Object, insert, lookup)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
-import Perspectives.Couchdb (PutCouchdbDocument, ViewResult(..), onAccepted, onCorrectCallAndResponse)
+import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
@@ -59,10 +59,10 @@ import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
 import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Class.Revision (changeRevision)
+import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getUserIdentifier)
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<$>), (<<<), (<>), (>>=))
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<<<), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -82,8 +82,8 @@ models = ArrayT do
 
     getExternalRoles :: MP (Array RoleInstance)
     getExternalRoles = do
-      (ViewResult{rows} :: ViewResult PerspectRol) <- getViewOnDatabase "repository" "defaultViews" "modeldescriptions" Nothing
-      for (_.value <<< unwrap <$> rows) \r@(PerspectRol{_id}) -> do
+      (roles :: Array PerspectRol) <- getViewOnDatabase "repository" "defaultViews" "modeldescriptions" Nothing
+      for roles \r@(PerspectRol{_id}) -> do
         void $ cachePreservingRevision _id r
         pure _id
 
@@ -95,8 +95,8 @@ modelsDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_models/")
 -- | Notice that only the first element of the array argument is actually used.
 roleInstances :: Array String -> MPQ (Array RoleInstance)
 roleInstances roleTypes = lift $ lift $ do
-  (ViewResult{rows} :: ViewResult PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
-  for (_.value <<< unwrap <$> rows) \r@(PerspectRol{_id}) -> do
+  (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
+  for roles \r@(PerspectRol{_id}) -> do
     void $ cachePreservingRevision _id r
     pure _id
 

@@ -31,7 +31,7 @@ import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision, Revision_)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==), ($))
 

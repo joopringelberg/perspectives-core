@@ -27,18 +27,19 @@ import Perspectives.CoreTypes (MonadPerspectives, (##>>))
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.Persistent (getPerspectContext, getPerspectRol, saveEntiteit_, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, saveEntiteit_, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
+import Perspectives.SetupCouchdb (setRoleView)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>))
+import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 
 modelDirectory :: String
 modelDirectory = "./src/model"
 
 -- | Set up by adding model:System to the users' models database. This will add the model instances, too.
--- | This function also ensures CURRENTUSER. 
+-- | This function also ensures CURRENTUSER.
 setupUser :: MonadPerspectives Unit
 setupUser = do
   (mu :: Maybe PerspectContext) <- tryGetPerspectEntiteit (ContextInstance "model:User$MijnSysteem")
@@ -54,5 +55,6 @@ setupUser = do
       -- And set 'me' of "model:User$MijnSysteem"
       (mijnSysteem :: PerspectContext) <- getPerspectContext (ContextInstance "model:User$MijnSysteem")
       void $ saveEntiteit_ (ContextInstance "model:User$MijnSysteem") (changeContext_me mijnSysteem (Just user))
+      entitiesDatabaseName >>= setRoleView
 
     otherwise -> pure unit

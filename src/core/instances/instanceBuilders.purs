@@ -47,7 +47,6 @@ import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding, setProperty)
-import Perspectives.Checking.PerspectivesTypeChecker.Messages (UserMessage(..))
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
@@ -55,22 +54,24 @@ import Perspectives.Deltas (addUniverseContextDelta)
 import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (getRole)
-import Perspectives.Persistent (getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Parsing.Arc.IndentParser (upperLeft)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheInitially)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..))
-import Prelude (bind, discard, pure, unit, void, ($), (*>), (<$>), (<>))
+import Prelude (bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>))
 
--- | Construct a context from the serialization. If a context with the given id exists, returns a UserMessage.
+-- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setBinding on each role.
 -- | Calls setProperty for each property value.
 -- | calls addRoleInstancesToContext on the role instances.
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
-constructContext :: ContextSerialization -> MonadPerspectivesTransaction (Either (Array UserMessage) ContextInstance)
+constructContext :: ContextSerialization -> MonadPerspectivesTransaction (Either (Array PerspectivesError) ContextInstance)
 constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
   contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
   case (deconstructLocalName $ unwrap contextInstanceId) of
-    Nothing -> pure $ Left [(NotAValidIdentifier $ unwrap contextInstanceId)]
+    Nothing -> pure $ Left [(NotWellFormedName upperLeft (unwrap contextInstanceId))]
     Just localName -> do
       (mc :: Maybe PerspectContext) <- lift2 $ tryGetPerspectEntiteit contextInstanceId
       case mc of
@@ -84,8 +85,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
             -- Add the completed Role instance to the context.
             lift $ addRoleInstancesToContext contextInstanceId (EnumeratedRoleType rolTypeId) rolInstances
           case r of
-            -- We assume just a single type of error from the block above.
-            Left e -> pure $ Left [(NotAValidIdentifier $ unwrap contextInstanceId)]
+            Left e -> pure $ Left [Custom (show e)]
             Right (Tuple _ users) -> do
               -- Add a UniverseContextDelta with the union of the users of the RoleBindingDeltas.
               -- TODO: de volgorde van deltas is misschien niet goed.

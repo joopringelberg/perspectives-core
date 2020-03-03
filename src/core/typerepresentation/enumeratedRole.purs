@@ -32,7 +32,7 @@ import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.Class.Revision (class Revision, Revision_)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType(..), EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==))
 

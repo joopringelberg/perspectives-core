@@ -36,7 +36,7 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest)
 import Perspectives.DomeinCache (storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Persistent (saveEntiteit_)
-import Perspectives.Representation.Class.Revision (changeRevision)
+import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>))
 
