@@ -5,20 +5,22 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (lift, runWriterT)
-import Data.Array (elemIndex, length, null)
+import Data.Array (elemIndex, head, length, null)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Object (lookup)
+import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=), (##>))
 import Perspectives.Couchdb (designDocumentViews)
 import Perspectives.Couchdb.Databases (deleteDatabase, getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
-import Perspectives.Extern.Couchdb (createChannel, models, roleInstances, uploadToRepository)
+import Perspectives.Extern.Couchdb (addUserToChannel, createChannel, models, roleInstances, uploadToRepository)
+import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -109,7 +111,8 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
 --     liftAff $ assert "There should be two users" (length users == 2)
 -- )
 
-  testOnly "createChannel" (runP do
+  test "createChannel" (runP do
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     setupUser
     void $ runMonadPerspectivesTransaction createChannel
 
@@ -123,4 +126,29 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
       Nothing -> pure unit
       Just dbname -> deleteDatabase (unwrap dbname)
     clearUserDatabase
+    )
+
+  testOnly "create channel, add user" (runP do
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    setupUser
+    achannel <- runMonadPerspectivesTransaction createChannel
+    case head achannel of
+      Nothing -> liftAff $ assert "Failed to create a channel" false
+      Just channel -> do
+        -- load a second user
+        void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$JoopsSysteem$User_0001") channel
+
+    getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
+    mdbname <- RoleInstance "model:User$JoopsSysteem$User_0001" ##> getter
+    lift $ logShow mdbname
+
+    liftAff $ assert "We should be able to calculate the value of the Channel property for `model:User$JoopsSysteem$User_0001`" (isJust mdbname)
+
+    -- Comment out to prepare for a test of Transaction distribution.
+    case mdbname of
+      Nothing -> pure unit
+      Just dbname -> deleteDatabase (unwrap dbname)
+    clearUserDatabase
+
     )

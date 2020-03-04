@@ -208,7 +208,7 @@ uploadToRepository_ dfId url df = lift $ lift $ do
 -- | Create an instance of sys:Channel. Bind `me` in the role ConnectedPartner. Set the value of ChannelDatabaseName to
 -- | that of the new database.
 -- | Bind the new Channel to usr:MijnSysteem in the role Channels.
-createChannel :: MonadPerspectivesTransaction Unit
+createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
   channelName <- pure ("channel_" <> (show $ guid unit))
   log ("Will create " <> channelName)
@@ -225,12 +225,21 @@ createChannel = do
     , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
     }
   case eChannel of
-    Left e -> log (show e)
-    Right (channel :: ContextInstance) -> void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
-      "model:User$MijnSysteem"
-      (RolSerialization
-        { properties: PropertySerialization empty,
-        binding: Just (buitenRol $ unwrap channel)})
+    Left e -> throwError (error ("createChannel could not create channel: " <> show e))
+    Right (channel :: ContextInstance) -> do
+      void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
+        "model:User$MijnSysteem"
+        (RolSerialization
+          { properties: PropertySerialization empty,
+          binding: Just (buitenRol $ unwrap channel)})
+      pure channel
+
+addUserToChannel :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
+addUserToChannel (RoleInstance usr) (ContextInstance channel) = void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$Channel$ConnectedPartner")
+  channel
+  (RolSerialization
+    { properties: PropertySerialization empty,
+    binding: Just usr})
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
