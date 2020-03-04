@@ -35,7 +35,7 @@ import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, EnumeratedRoleType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (adtOfRole, getRole, kindOfRole, lessThanOrEqualTo, roleADT)
+import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, lessThanOrEqualTo, roleADT)
 import Perspectives.Representation.Context (Context, contextAspects, contextRole, defaultPrototype, externalRole, roleInContext, userRole, position)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -104,6 +104,8 @@ checkContext c = do
 -----------------------------------------------------------
 checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding roletype instanceToBind = do
-  eit <- (roleType_ >=> getEnumeratedRole >=> roleADT) instanceToBind
-  ert <- (getRole roletype) >>= adtOfRole
-  lessThanOrEqualTo ert eit
+  instanceType' <- (roleType_ >=> getEnumeratedRole >=> roleADT) instanceToBind
+  -- TODO. Voor de rol moet ik alleen de binding ophalen.
+  -- roleType' <- (getRole roletype) >>= adtOfRole
+  roleType' <- bindingOfRole roletype
+  roleType' `lessThanOrEqualTo` instanceType'
