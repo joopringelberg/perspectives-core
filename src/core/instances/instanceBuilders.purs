@@ -77,7 +77,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
       case mc of
         Just _ -> pure $ Right contextInstanceId
         Nothing -> do
-          contextInstance <- Right <$> constructEmptyContext contextInstanceId ctype localName
+          contextInstance <- Right <$> constructEmptyContext contextInstanceId ctype localName externeProperties
           -- We now have an empty context. Add each role to it.
           r <- try $ runWriterT $ forWithIndex_ rollen \rolTypeId rolDescriptions -> do
             -- Construct the role instances first, then add to the context.
@@ -118,9 +118,9 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
               lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
           pure roleInstance
 
--- | Constructs an empty role, caches it.
-constructEmptyContext :: ContextInstance -> String -> String -> MonadPerspectivesTransaction ContextInstance
-constructEmptyContext contextInstanceId ctype localName = do
+-- | Constructs an empty context, caches it.
+constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> MonadPerspectivesTransaction ContextInstance
+constructEmptyContext contextInstanceId ctype localName externeProperties = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
   pspType <- pure $ ContextType $ expandDefaultNamespaces ctype
   _ <- lift2 $ cacheInitially contextInstanceId
@@ -137,6 +137,9 @@ constructEmptyContext contextInstanceId ctype localName = do
       , context = contextInstanceId
       , binding = Nothing
       })
+  case externeProperties of
+    (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
+      setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
   pure contextInstanceId
 
 -- | Constructs an empty role and caches it. `localName` should be the local name of the roleType.
