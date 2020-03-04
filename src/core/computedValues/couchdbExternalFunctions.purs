@@ -41,25 +41,30 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
-import Foreign.Object (Object, insert, lookup)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup)
+import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, changeContext_me, changeRol_isMe, rol_binding, rol_pspType)
 import Perspectives.CoreTypes (MP, MPQ, MonadPerspectivesTransaction, MonadPerspectives, assumption)
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
-import Perspectives.Couchdb.Databases (addAttachment, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
+import Perspectives.Couchdb.Databases (addAttachment, createDatabase, defaultPerspectRequest, getViewOnDatabase, retrieveDocumentVersion, version)
+import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (documentNamesInDatabase)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
+import Perspectives.Guid (guid)
+import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
-import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getUserIdentifier)
 import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<<<), (<>), (>>=))
@@ -198,6 +203,34 @@ uploadToRepository_ dfId url df = lift $ lift $ do
       res <- liftAff $ request $ rq {method = Left PUT, url = (docUrl <> "?rev=" <> rev), content = Just $ RequestBody.string  (genericEncodeJSON defaultOptions df)}
       void $ onAccepted res.status [200, 201] "uploadToRepository_"
         (onCorrectCallAndResponse "uploadToRepository_" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+
+-- | Create a new database for the communication between `me` and another user.
+-- | Create an instance of sys:Channel. Bind `me` in the role ConnectedPartner. Set the value of ChannelDatabaseName to
+-- | that of the new database.
+-- | Bind the new Channel to usr:MijnSysteem in the role Channels.
+createChannel :: MonadPerspectivesTransaction Unit
+createChannel = do
+  channelName <- pure ("channel_" <> (show $ guid unit))
+  log ("Will create " <> channelName)
+  lift2 $ createDatabase channelName
+  eChannel <- constructContext $ ContextSerialization
+    { id: "model:User$" <> channelName
+    , prototype: Nothing
+    , ctype: "sys:Channel"
+    , rollen: fromFoldable [(Tuple "model:System$Channel$ConnectedPartner"
+      [ RolSerialization
+        { properties: PropertySerialization empty,
+        binding: Just "usr:Me" }
+       ])]
+    , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
+    }
+  case eChannel of
+    Left e -> log (show e)
+    Right (channel :: ContextInstance) -> void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
+      "model:User$MijnSysteem"
+      (RolSerialization
+        { properties: PropertySerialization empty,
+        binding: Just (buitenRol $ unwrap channel)})
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
