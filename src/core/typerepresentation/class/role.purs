@@ -62,9 +62,13 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   properties :: r -> MonadPerspectives (Array PropertyType)
   -- | The type of the Role. For an EnumeratedRole this is just `ST EnumeratedRoleType`.
   -- | For a CalculatedRole it is the range of its calculation.
-  typeExcludingBinding :: r -> MonadPerspectives (ADT EnumeratedRoleType)
-  -- | The type of the Role, including its binding and aspects.
   roleADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
+  -- | The type of the Role, including its aspects.
+  -- | For a CalculatedRole it is the range of its calculation.
+  roleAspectsADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
+  -- | The type of the Role, including its aspects and its binding.
+  -- | For a CalculatedRole it is the range of its calculation.
+  roleAspectsBindingADT :: r -> MonadPerspectives (ADT EnumeratedRoleType)
   views :: r -> MonadPerspectives (Array ViewType)
 
 rangeOfRoleCalculation' :: String -> MonadPerspectives (ADT EnumeratedRoleType)
@@ -92,8 +96,9 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
     Q qd -> pure qd
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   properties = rangeOfCalculatedRole >=> propertiesOfADT
-  typeExcludingBinding = rangeOfCalculatedRole
   roleADT = rangeOfCalculatedRole
+  roleAspectsADT = rangeOfCalculatedRole
+  roleAspectsBindingADT = rangeOfCalculatedRole
   views =  rangeOfCalculatedRole >=> viewsOfADT
 
 rangeOfCalculatedRole :: CalculatedRole -> MonadPerspectives (ADT EnumeratedRoleType)
@@ -109,17 +114,21 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
 -----------------------------------------------------------
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
   kindOfRole r = (unwrap r).kindOfRole
-  roleAspects r = roleADT r >>= roleAspectsOfADT
+  roleAspects r = roleAspectsBindingADT r >>= roleAspectsOfADT
   context r = pure $ ST $ contextOfRepresentation r
   contextOfRepresentation r = (unwrap r).context
   binding r = pure (unwrap r).binding
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   calculation r = pure $ SQD (CDOM $ ST $ contextOfRepresentation r) (RolGetter (ENR (identifier r))) (RDOM (ST (identifier r))) (bool2threeValued (unwrap r).functional) (bool2threeValued (unwrap r).mandatory)
-  -- properties r = includeBinding (\r' -> (unwrap r').properties) propertiesOfADT r
-  properties r = roleADT r >>= propertiesOfADT
-  typeExcludingBinding r = pure (ST $ identifier r)
-  roleADT r@(EnumeratedRole{roleAspects}) = do
+  properties r = roleAspectsBindingADT r >>= propertiesOfADT
+  roleADT r = pure (ST $ identifier r)
+  roleAspectsADT r@(EnumeratedRole{roleAspects}) = do
+    aspects <- pure $ ST <$> roleAspects
+    if null aspects
+      then pure (ST $ identifier r)
+      else pure $ PROD (cons (ST $ identifier r) aspects)
+  roleAspectsBindingADT r@(EnumeratedRole{roleAspects}) = do
     aspects <- pure $ ST <$> roleAspects
     if null aspects
       then pure $ case (unwrap r).binding of
@@ -134,7 +143,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
         st@(ST _) -> PROD ([(ST $ identifier r), st] <> aspects)
         sum@(SUM _) -> PROD (sum : (ST $ identifier r) : aspects)
         UNIVERSAL -> UNIVERSAL
-  views r = roleADT r >>= viewsOfADT
+  views r = roleAspectsBindingADT r >>= viewsOfADT
 
 -- | A pattern of computation shared in the recursive computation of roleAspects, properties and views of a role.
 -- | It computes the local value for an EnumeratedRole and then the value of the binding of the role, returning
@@ -299,8 +308,8 @@ getCalculation (E r) = calculation r
 getCalculation (C r) = calculation r
 
 adtOfRole :: Role -> MP (ADT EnumeratedRoleType)
-adtOfRole (E e) = roleADT e
-adtOfRole (C c) = roleADT c
+adtOfRole (E e) = roleAspectsBindingADT e
+adtOfRole (C c) = roleAspectsBindingADT c
 
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE
@@ -320,8 +329,8 @@ rangeOfRoleCalculation = getRole >=> getCalculation >=> case _ of
 
 typeExcludingBinding_ :: RoleType -> MonadPerspectives (ADT EnumeratedRoleType)
 typeExcludingBinding_ = getRole >=> (case _ of
-  E r -> typeExcludingBinding r
-  C r -> typeExcludingBinding r)
+  E r -> roleADT r
+  C r -> roleADT r)
 
 roleTypeIsFunctional :: RoleType -> MonadPerspectives Boolean
 roleTypeIsFunctional = getRole >=> (case _ of

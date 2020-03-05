@@ -39,7 +39,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.Action (providesPerspectiveOnProperty, providesPerspectiveOnRole)
 import Perspectives.Representation.Class.PersistentType (getAction, getContext, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (class RoleClass, adtOfRole, getRole, propertiesOfADT, roleADT, roleSet, viewsOfADT)
+import Perspectives.Representation.Class.Role (class RoleClass, adtOfRole, getRole, propertiesOfADT, roleAspectsBindingADT, roleSet, viewsOfADT)
 import Perspectives.Representation.Context (Context, roleInContext, contextRole, userRole) as Context
 import Perspectives.Representation.Context (contextADT)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -113,7 +113,7 @@ propertiesOfRole :: String ~~~> PropertyType
 propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRole_ (CalculatedRoleType s) <|> empty
   where
     propertiesOfRole_ :: forall r i. RoleClass r i => i ~~~> PropertyType
-    propertiesOfRole_ = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> roleADT >=> propertiesOfADT)
+    propertiesOfRole_ = ArrayT <<< ((getPerspectType :: i -> MonadPerspectives r) >=> roleAspectsBindingADT >=> propertiesOfADT)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS
@@ -121,7 +121,7 @@ propertiesOfRole s = propertiesOfRole_ (EnumeratedRoleType s) <|> propertiesOfRo
 viewsOfRole :: String ~~~> ViewType
 viewsOfRole s = f (EnumeratedRoleType s) <|> f (CalculatedRoleType s) where
   f :: forall i r. RoleClass r i => i ~~~> ViewType
-  f = ArrayT <<< (getPerspectType >=> roleADT >=> viewsOfADT)
+  f = ArrayT <<< (getPerspectType >=> roleAspectsBindingADT >=> viewsOfADT)
 
 propertiesOfView :: ViewType ~~~> PropertyType
 propertiesOfView = ArrayT <<< (getPerspectType >=> pure <<< propertyReferences)
