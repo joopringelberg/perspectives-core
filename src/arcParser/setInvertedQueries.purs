@@ -45,12 +45,12 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Prelude (Unit, discard, pure, unit, ($), bind, (>>=))
 
--- Compute the inverse paths for the queryfunction description. Save each path with the type that is the origin
--- (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
--- when a Delta is processed for the head of a path. They are also used to find users who need to be informed
--- of a change.
--- If the first step of descr is ContextF, omit that step. This can only happen for a Property query.
--- However, we want the inverted queries to end in a context.
+-- | Compute the inverse paths for the queryfunction description. Save each path with the type that is the origin
+-- | (Domain) of the inverse path. These paths are used to detect contexts whose rules need to be (re)run
+-- | when a Delta is processed for the head of a path. They are also used to find users who need to be informed
+-- | of a change.
+-- | If the first step of descr is ContextF, omit that step. This can only happen for a Property query.
+-- | However, we want the inverted queries to end in a context.
 setInvertedQueries :: Array EnumeratedRoleType -> QueryFunctionDescription -> PhaseThree Unit
 setInvertedQueries userTypes qfd = do
   paths <- ensureContextDomain >>= \q -> lift $ lift $ unsafePartial $ invertFunctionDescription q
