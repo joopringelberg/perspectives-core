@@ -21,13 +21,14 @@
 
 module Perspectives.Sync.DateTime where
 
-import Data.DateTime (DateTime)
-import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)
-import Data.Maybe (fromJust)
+import Data.DateTime (DateTime(..), Time(..), day, month, year)
+import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)import Data.Interval (millisecond)
+import Data.Maybe (fromJust)import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Time.Duration (Milliseconds(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Show, ($), (>>=), pure)
+import Prelude (class Show, pure, show, ($), (>>=), (<>))
 
 -----------------------------------------------------------
 -- DATETIME
@@ -40,7 +41,9 @@ instance encodeSerializableDateTime :: Encode SerializableDateTime where
     (Milliseconds n) -> encode n
 
 instance showSerializableDateTime :: Show SerializableDateTime where
-  show (SerializableDateTime d) = "todo"
+  -- show (SerializableDateTime d) = replace (Pattern " ") (Replacement "_") (show d)
+
+  show (SerializableDateTime (DateTime d (Time hour minute second millisecond))) = replace (Pattern " ") (Replacement "_") ((show $ year d) <> (show $ month d) <> (show $ day d) <> "T" <> (show hour) <> (show minute) <> (show second) <> (show millisecond))
 
 instance decodeSerializableDateTime :: Decode SerializableDateTime where
   decode d = decode d >>= \m -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds m)

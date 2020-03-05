@@ -22,8 +22,8 @@ domain: System
       property: Voornaam (mandatory, not functional, String)
       property: Channel = binder ConnectedPartner >> context >> extern >> ChannelDatabaseName
       view: VolledigeNaam (Voornaam, Achternaam)
-    -- Het type van ModellenM bepalen we met de clause 'returns:'
     context: Channels filledBy: Channel
+    -- Het type van ModellenM bepalen we met de clause 'returns:'
     context: Modellen = callExternal cdb:Models() returns: Model$External
     --IndexedContexts should be bound to Contexts that share an Aspect and that Aspect should have a name on the External role.
     context: IndexedContexts (not mandatory, not functional) filledBy: sys:NamedContext

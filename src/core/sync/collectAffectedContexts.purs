@@ -96,7 +96,7 @@ addAffectedContexts as = lift $ AA.modify \(Transaction r@{affectedContexts}) ->
 -- | This function finds all queries recorded on the types of the roles represented
 -- | by id, the new binding and the old binding, that have such steps.
 -- Implementation note: because we accept 'dangling' roles (roles with no context) we catch
--- errors when computing affected contexts. 
+-- errors when computing affected contexts.
 aisInRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction RoleBindingDelta
 aisInRoleDelta (RoleBindingDelta dr@{id, binding, oldBinding, deltaType}) = do
   binderType <- lift2 (id ##>> OG.roleType)

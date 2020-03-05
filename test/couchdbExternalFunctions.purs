@@ -72,11 +72,11 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
   test "upload model to repository from files" (runP do
     -- setupUser
     cdburl <- getCouchdbBaseURL
-    -- _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
-    -- errors <- loadCompileAndSaveArcFile "simpleChat" modelDirectory
-    errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
+    _ <- loadCompileAndCacheArcFile "perspectivesSysteem" modelDirectory
+    errors <- loadCompileAndSaveArcFile "simpleChat" modelDirectory
+    -- errors <- loadCompileAndSaveArcFile "perspectivesSysteem" modelDirectory
     liftAff $ assert ("There should be no errors" <> show errors) (null errors)
-    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:System") (cdburl <> "repository"))
+    void $ runWriterT $ runArrayT (uploadToRepository (DomeinFileId "model:SimpleChat") (cdburl <> "repository"))
     -- now run the query that retrieves the modelDescription field of all models in repository.
     -- The result must include "model:System$Model$External"
       )
@@ -129,8 +129,8 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     )
 
   testOnly "create channel, add user" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
+    -- _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    -- setupUser
     achannel <- runMonadPerspectivesTransaction createChannel
     case head achannel of
       Nothing -> liftAff $ assert "Failed to create a channel" false
@@ -146,9 +146,9 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     liftAff $ assert "We should be able to calculate the value of the Channel property for `model:User$JoopsSysteem$User_0001`" (isJust mdbname)
 
     -- Comment out to prepare for a test of Transaction distribution.
-    case mdbname of
-      Nothing -> pure unit
-      Just dbname -> deleteDatabase (unwrap dbname)
-    clearUserDatabase
+    -- case mdbname of
+    --   Nothing -> pure unit
+    --   Just dbname -> deleteDatabase (unwrap dbname)
+    -- clearUserDatabase
 
     )

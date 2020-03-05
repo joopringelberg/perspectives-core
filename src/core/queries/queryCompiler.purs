@@ -491,8 +491,8 @@ context2propertyValue qd = unsafePartial $ do
     (C2V f) <- compileFunction qd
     pure f
 
--- From a string that maybe identifies a Role, retrieve or construct a function to get that role from
--- a Context instance. Notice that this function may fail.
+-- From a string that maybe identifies a Property(Enumerated or Calculated), retrieve or construct a function to
+-- get values for that Property from a Role instance. Notice that this function may fail.
 getPropertyFunction ::
   String -> MonadPerspectives (RoleInstance ~~> Value)
 getPropertyFunction id = unsafePartial $

@@ -28,7 +28,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Plus (empty)
 import Data.Array (elemIndex, uncons)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
@@ -40,29 +39,31 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (binding, propertiesOfADT, roleAspectsADT)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, propertytype2string)
 
--- | True iff the values of the property are represented on instances of the roletype.
--- | This is the case if the property is in the namespace of the roletype, or in one of its aspects.
-isLocallyRepresentedOn :: EnumeratedPropertyType -> EnumeratedRoleType -> MP Boolean
-isLocallyRepresentedOn pt rt = do
-  localProps <- getEnumeratedRole rt >>= roleAspectsADT >>= propertiesOfADT
-  pure $ isJust $ elemIndex (ENP pt) localProps
-
-getPropertyGetter :: EnumeratedPropertyType -> EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+-- From a string that maybe identifies a Property (Enumerated or Calculated), construct a function to get values
+-- for that Property from a Role instance. Notice that this function may fail.
+getPropertyGetter :: String -> EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 getPropertyGetter pt rt = do
   isLocal <- pt `isLocallyRepresentedOn` rt
   if isLocal
-    then getPropertyFunction (unwrap pt)
+    then getPropertyFunction pt
     else do
       g <- (getEnumeratedRole rt >>= binding) >>= dispatchOnBindingType pt
       pure (OG.binding >=> g)
 
-dispatchOnBindingType :: EnumeratedPropertyType -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+-- | True iff the values of the property are represented on instances of the roletype.
+-- | This is the case if the property is in the namespace of the roletype, or in one of its aspects.
+isLocallyRepresentedOn :: String -> EnumeratedRoleType -> MP Boolean
+isLocallyRepresentedOn pt rt = do
+  localProps <- getEnumeratedRole rt >>= roleAspectsADT >>= propertiesOfADT >>= pure <<< map propertytype2string
+  pure $ isJust $ elemIndex pt localProps
+
+dispatchOnBindingType :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 dispatchOnBindingType pt (ST r) = getPropertyGetter pt r
-dispatchOnBindingType pt EMPTY = throwError (error ("dispatchOnBindingType: cannot handle EMPTY for " <> (unwrap pt)))
-dispatchOnBindingType pt UNIVERSAL = throwError (error ("dispatchOnBindingType: cannot handle UNIVERSAL for " <> (unwrap pt)))
-dispatchOnBindingType pt (PROD _) = throwError (error ("dispatchOnBindingType: cannot handle PRODUCT for " <> (unwrap pt)))
+dispatchOnBindingType pt EMPTY = throwError (error ("dispatchOnBindingType: cannot handle EMPTY for " <> pt))
+dispatchOnBindingType pt UNIVERSAL = throwError (error ("dispatchOnBindingType: cannot handle UNIVERSAL for " <> pt))
+dispatchOnBindingType pt (PROD _) = throwError (error ("dispatchOnBindingType: cannot handle PRODUCT for " <> pt))
 dispatchOnBindingType pt (SUM roles) = do
   (dispatchers :: Array Dispatcher) <- unsafePartial $ traverse dispatchOn roles
   pure $ untilOneSucceeds dispatchers

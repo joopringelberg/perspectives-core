@@ -24,6 +24,7 @@ module Perspectives.Deltas where
 import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
 import Control.Monad.AvarMonadAsk (modify) as AA
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, union)
 import Data.Either (Either(..))
@@ -34,14 +35,18 @@ import Data.Newtype (over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.Class (liftAff)
+import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
+import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
@@ -63,13 +68,18 @@ distributeTransactie' t = do
 
 sendTransactieToUser :: RoleInstance -> Transaction -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
-  -- The connection database that we should put the transaction in, is identified by the userId.
   -- TODO controleer of hier authentication nodig is!
-  cdbUrl <- getCouchdbBaseURL
-  (rq :: (Request String)) <- defaultPerspectRequest
-  res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> "/" <> (unwrap userId) <> "/" <> transactieID t), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions t)}
-  void $ onAccepted res.status [200, 201] "sendTransactieToUser"
-    (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
+  userType <- roleType_ userId
+  getChannel <- getPropertyGetter (EnumeratedPropertyType "model:System$PerspectivesSystem$User$Channel") userType
+  mchannel <- userId ##> getChannel
+  case mchannel of
+    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> (unwrap userId)))
+    Just (Value channel) -> do
+      cdbUrl <- getCouchdbBaseURL
+      (rq :: (Request String)) <- defaultPerspectRequest
+      res <- liftAff $ request $ rq {method = Left PUT, url = (cdbUrl <> channel <> "/" <> transactieID t), content = Just $ RequestBody.string (genericEncodeJSON defaultOptions t)}
+      void $ onAccepted res.status [200, 201] "sendTransactieToUser"
+        (onCorrectCallAndResponse "sendTransactieToUser" res.body (\(a :: PutCouchdbDocument) -> pure unit))
 
 type TransactionPerUser = Map RoleInstance Transaction
 

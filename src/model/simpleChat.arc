@@ -15,5 +15,7 @@ domain: SimpleChat
       property: WithPartner = context >> Partner >> binding >> Voornaam
     user: Initiator (mandatory, functional) filledBy: Chatter
       property: MyText (not mandatory, functional, String)
+      perspective on: Partner
     user: Partner (not mandatory, functional) filledBy: sys:PerspectivesSystem$User
       property: MyText (not mandatory, functional, String)
+      perspective on: Initiator
