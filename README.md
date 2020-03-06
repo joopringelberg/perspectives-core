@@ -15,17 +15,27 @@ The PDR is work in progress. It is not yet in a state that it can be used. Hence
 The PDR is being intensively developed by the core team. We appreciate feedback on the code you can find in this repository
 
 ### Dependencies
-#### On packages belonging to the Perspectives Project
+#### On Purescript packages belonging to the Perspectives Project
 * perspectives-couchdb
 * purescript-avar-monadask
 * purescript-aff-sockets
 * perspectives-apitypes
 * package-sets
 
-#### On cloned packages
+#### On cloned Purescript packages
 * purescript-affjax
 * purescript-parsing
 
-#### Belonging to the project but no core dependencies
+#### On Node packages belonging to the Perspectives Project
+* perspectives-proxy
+
+#### On third party Node packages
+* xhr2-cookies
+
+### Packages belonging to the project but no core dependencies
 * perspectives-proxy
 * perspectives-react
+* perspectives-react-integrated-client
+* perspectives-documentation
+* perspectives-screens
+* screenuploader

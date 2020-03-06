@@ -6,7 +6,7 @@
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "dependencies": {
     "xhr2-cookies": "^1.1.0",
-    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git"
+    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.3.0"
   },
   "repository": {
     "type": "git",

@@ -22,6 +22,7 @@ domain: System
       property: Voornaam (mandatory, not functional, String)
       property: Channel = binder ConnectedPartner >> context >> extern >> ChannelDatabaseName
       view: VolledigeNaam (Voornaam, Achternaam)
+    -- TODO: dit is eigenlijk overbodig
     context: Channels filledBy: Channel
     -- Het type van ModellenM bepalen we met de clause 'returns:'
     context: Modellen = callExternal cdb:Models() returns: Model$External

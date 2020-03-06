@@ -224,6 +224,7 @@ createChannel = do
        ])]
     , externeProperties: PropertySerialization $ fromFoldable [Tuple "model:System$Channel$External$ChannelDatabaseName" [channelName]]
     }
+  -- TODO: dit is eigenlijk niet nodig.
   case eChannel of
     Left e -> throwError (error ("createChannel could not create channel: " <> show e))
     Right (channel :: ContextInstance) -> do
