@@ -24,7 +24,7 @@ module Perspectives.Sync.Transaction where
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-import Data.Array (null, union)
+import Data.Array (union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
@@ -36,14 +36,15 @@ import Foreign.Class (class Decode, class Encode, decode, encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Sync.AffectedContext (AffectedContext)
+import Perspectives.Sync.Class.DeltaClass (addBase)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
-import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (&&))
+import Prelude (class Semigroup, class Show, bind, ($), (<>), show, pure, (<$>), (==), (+))
 
 -----------------------------------------------------------
 -- TRANSACTIE
 -----------------------------------------------------------
-newtype Transaction = Transaction (TransactionRecord( affectedContexts :: Array AffectedContext, correlationIdentifiers :: Array CorrelationIdentifier ))
+newtype Transaction = Transaction (TransactionRecord( affectedContexts :: Array AffectedContext, correlationIdentifiers :: Array CorrelationIdentifier, nextDeltaIndex :: Int ))
 
 type TransactionRecord f =
   { author :: String
@@ -76,25 +77,26 @@ instance encodeTransactie' :: Encode Transaction' where
 instance decodeTransactie :: Decode Transaction where
   decode f = do
     ((Transaction' {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles}) :: Transaction') <- decode f
-    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: []}
+    pure $ Transaction{author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, affectedContexts: [], correlationIdentifiers: [], nextDeltaIndex: 0}
 
 
 instance decodeTransactie' :: Decode Transaction' where
   decode = genericDecode defaultOptions
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles})
-    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, universeContextDeltas: uc, universeRoleDeltas: ur, changedDomeinFiles: cd}) = Transaction
+  append t1@(Transaction {author, timeStamp, contextDeltas, roleDeltas, propertyDeltas, universeContextDeltas, universeRoleDeltas, changedDomeinFiles, nextDeltaIndex: base})
+    t2@(Transaction {author: a, timeStamp: t, contextDeltas: r, roleDeltas: b, propertyDeltas: p, universeContextDeltas: uc, universeRoleDeltas: ur, changedDomeinFiles: cd, nextDeltaIndex: extra}) = Transaction
       { author: author
       , timeStamp: timeStamp
-      , contextDeltas: union contextDeltas r
-      , roleDeltas: union roleDeltas b
-      , propertyDeltas: union propertyDeltas p
-      , universeContextDeltas: union universeContextDeltas uc
-      , universeRoleDeltas: union universeRoleDeltas ur
+      , contextDeltas: union contextDeltas (addBase base <$> r)
+      , roleDeltas: union roleDeltas (addBase base <$> b)
+      , propertyDeltas: union propertyDeltas (addBase base <$> p)
+      , universeContextDeltas: union universeContextDeltas (addBase base <$> uc)
+      , universeRoleDeltas: union universeRoleDeltas (addBase base <$> ur)
       , changedDomeinFiles: union changedDomeinFiles cd
       , affectedContexts: []
       , correlationIdentifiers: []
+      , nextDeltaIndex: base + extra
     }
 
 createTransactie :: String -> Aff Transaction
@@ -111,7 +113,8 @@ createTransactie author =
       , universeRoleDeltas: []
       , changedDomeinFiles: []
       , affectedContexts: []
-      , correlationIdentifiers: []}
+      , correlationIdentifiers: []
+      , nextDeltaIndex: 0}
 
 cloneEmptyTransaction :: Transaction -> Transaction
 cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
@@ -124,16 +127,11 @@ cloneEmptyTransaction (Transaction{ author, timeStamp}) = Transaction
   , universeRoleDeltas: []
   , changedDomeinFiles: []
   , affectedContexts: []
-  , correlationIdentifiers: []}
+  , correlationIdentifiers: []
+  , nextDeltaIndex: 0}
 
 isEmptyTransaction :: Transaction -> Boolean
-isEmptyTransaction (Transaction t) =
-  null t.contextDeltas
-  && null t.roleDeltas
-  && null t.propertyDeltas
-  && null t.universeContextDeltas
-  && null t.universeRoleDeltas
-  && null t.changedDomeinFiles
+isEmptyTransaction (Transaction {nextDeltaIndex}) = nextDeltaIndex == 0
 
 transactieID :: Transaction -> String
 transactieID (Transaction{author, timeStamp}) = author <> "_" <> show timeStamp

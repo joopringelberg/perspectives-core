@@ -46,12 +46,12 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
+import Perspectives.Sync.Class.DeltaClass (setIndex)
 import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (+))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -70,7 +70,7 @@ sendTransactieToUser :: RoleInstance -> Transaction -> MonadPerspectives Unit
 sendTransactieToUser userId t = do
   -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ userId
-  getChannel <- getPropertyGetter (EnumeratedPropertyType "model:System$PerspectivesSystem$User$Channel") userType
+  getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
   mchannel <- userId ##> getChannel
   case mchannel of
     Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> (unwrap userId)))
@@ -111,19 +111,19 @@ addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changed
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
 addContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
-addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas} -> t {contextDeltas = cons d contextDeltas})
+addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas, nextDeltaIndex} -> t {contextDeltas = cons (setIndex nextDeltaIndex d) contextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas} -> t {roleDeltas = cons d roleDeltas})
+addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas, nextDeltaIndex} -> t {roleDeltas = cons (setIndex nextDeltaIndex d) roleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas} -> t {propertyDeltas = cons d propertyDeltas})
+addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, nextDeltaIndex} -> t {propertyDeltas = cons (setIndex nextDeltaIndex d) propertyDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas} -> t {universeContextDeltas = cons d universeContextDeltas})
+addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} -> t {universeContextDeltas = cons (setIndex nextDeltaIndex d) universeContextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
-addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas} -> t {universeRoleDeltas = cons d universeRoleDeltas})
+addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} -> t {universeRoleDeltas = cons (setIndex nextDeltaIndex d) universeRoleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})

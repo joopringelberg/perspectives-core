@@ -25,33 +25,40 @@ import Data.Array (cons)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
+import Prelude ((+)) 
 
 class DeltaUsers d where
   users :: d -> Array RoleInstance
   addToTransaction :: d -> Transaction -> Transaction
   transactionCloneWithDelta :: d -> Transaction -> Transaction
+  addBase :: Int -> d -> d
 
 instance contextDeltaDeltaUsers :: DeltaUsers ContextDelta where
   users (ContextDelta{users:u}) = u
   addToTransaction d (Transaction tr@{contextDeltas}) = Transaction tr {contextDeltas = cons d contextDeltas}
   transactionCloneWithDelta d (Transaction tr) = Transaction tr {contextDeltas = [d], roleDeltas = [], propertyDeltas = [], universeContextDeltas = [], universeRoleDeltas = []}
+  addBase i (ContextDelta r@{sequenceNumber}) = ContextDelta r {sequenceNumber = sequenceNumber + i}
 
 instance roleBindingDeltaDeltaUsers :: DeltaUsers RoleBindingDelta where
   users (RoleBindingDelta{users:u}) = u
   addToTransaction d (Transaction tr@{roleDeltas}) = Transaction tr {roleDeltas = cons d roleDeltas}
   transactionCloneWithDelta d (Transaction tr) = Transaction tr {roleDeltas = [d], contextDeltas = [], propertyDeltas = [], universeContextDeltas = [], universeRoleDeltas = []}
+  addBase i (RoleBindingDelta r@{sequenceNumber}) = RoleBindingDelta r {sequenceNumber = sequenceNumber + i}
 
 instance rolePropertyDeltaDeltaUsers :: DeltaUsers RolePropertyDelta where
   users (RolePropertyDelta{users:u}) = u
   addToTransaction d (Transaction tr@{propertyDeltas}) = Transaction tr {propertyDeltas = cons d propertyDeltas}
   transactionCloneWithDelta d (Transaction tr) = Transaction tr {propertyDeltas = [d], roleDeltas = [], contextDeltas = [], universeContextDeltas = [], universeRoleDeltas = []}
+  addBase i (RolePropertyDelta r@{sequenceNumber}) = RolePropertyDelta r {sequenceNumber = sequenceNumber + i}
 
 instance deltaUsersUniverseContextDelta :: DeltaUsers UniverseContextDelta where
   users (UniverseContextDelta{users:u}) = u
   addToTransaction d (Transaction tr@{universeContextDeltas}) = Transaction tr {universeContextDeltas = cons d universeContextDeltas}
   transactionCloneWithDelta d (Transaction tr) = Transaction tr {universeContextDeltas = [d], roleDeltas = [], contextDeltas = [], propertyDeltas = [], universeRoleDeltas = []}
+  addBase i (UniverseContextDelta r@{sequenceNumber}) = UniverseContextDelta r {sequenceNumber = sequenceNumber + i}
 
 instance deltaUsersUniverseRoleDelta :: DeltaUsers UniverseRoleDelta where
   users (UniverseRoleDelta{users:u}) = u
   addToTransaction d (Transaction tr@{universeRoleDeltas}) = Transaction tr {universeRoleDeltas = cons d universeRoleDeltas}
   transactionCloneWithDelta d (Transaction tr) = Transaction tr {universeRoleDeltas = [d], roleDeltas = [], contextDeltas = [], propertyDeltas = [], universeContextDeltas = []}
+  addBase i (UniverseRoleDelta r@{sequenceNumber}) = UniverseRoleDelta r {sequenceNumber = sequenceNumber + i}

@@ -22,8 +22,8 @@
 module Perspectives.Sync.DateTime where
 
 import Data.DateTime (DateTime(..), Time(..), day, month, year)
-import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)import Data.Interval (millisecond)
-import Data.Maybe (fromJust)import Data.Newtype (unwrap)
+import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)
+import Data.Maybe (fromJust)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Time.Duration (Milliseconds(..))
 import Foreign.Class (class Decode, class Encode, decode, encode)

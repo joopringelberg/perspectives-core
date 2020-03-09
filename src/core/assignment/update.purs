@@ -138,6 +138,7 @@ setBinding roleId (newBindingId :: RoleInstance) = do
                 , oldBinding: rol_binding originalRole
                 , deltaType: Change
                 , users: []
+                , sequenceNumber: 0
                 }
   addRoleDelta delta
   pure users
@@ -166,6 +167,7 @@ removeBinding_ roleWillBeRemoved roleId = do
                   , oldBinding: (rol_binding originalRole)
                   , deltaType: Remove
                   , users: []
+                  , sequenceNumber: 0
                   }
       when (not roleWillBeRemoved)
         (do
@@ -216,13 +218,16 @@ addRoleInstancesToContext contextId rolName rolInstances = do
                 , deltaType: Add
                 , roleInstance
                 , users: []
+                , sequenceNumber: 0
                 }
     addContextDelta delta
     addUniverseRoleDelta $ UniverseRoleDelta
         { id: roleInstance
         , roleType: rolName
         , deltaType: Add
-        , users}
+        , users
+        , sequenceNumber: 0
+      }
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
 
 -- | Modifies the context instance by detaching the given role instances.
@@ -247,6 +252,7 @@ removeRoleInstancesFromContext_ contextWillBeRemoved contextId rolName rolInstan
       , deltaType: Remove
       , roleInstance
       , users: []
+      , sequenceNumber: 0
       }
     -- TODO. Ik denk dat de ContextDelta overbodig is als de context zelf weggegooid wordt.
     addContextDelta delta
@@ -254,7 +260,9 @@ removeRoleInstancesFromContext_ contextWillBeRemoved contextId rolName rolInstan
         { id: roleInstance
         , roleType: rolName
         , deltaType: Remove
-        , users}
+        , users
+        , sequenceNumber: 0
+      }
   (pe :: PerspectContext) <- lift2 $ getPerspectContext contextId
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
@@ -286,13 +294,16 @@ deleteRoleFromContextInstance contextId rolName = do
                 , deltaType: Remove
                 , roleInstance
                 , users: []
+                , sequenceNumber: 0
                 }
     addContextDelta delta
     addUniverseRoleDelta $ UniverseRoleDelta
         { id: roleInstance
         , roleType: rolName
         , deltaType: Remove
-        , users}
+        , users
+        , sequenceNumber: 0
+      }
 
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
   changedContext <- pure (deleteContext_rolInContext pe rolName)
@@ -321,13 +332,16 @@ setRoleInstancesInContext contextId rolName rolInstances = do
                 , deltaType: Remove
                 , roleInstance
                 , users: []
+                , sequenceNumber: 0
                 }
     addContextDelta delta
     addUniverseRoleDelta $ UniverseRoleDelta
         { id: roleInstance
         , roleType: rolName
         , deltaType: Remove
-        , users}
+        , users
+        , sequenceNumber: 0
+      }
   (lift2 $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
   me <- pure $ rol_id <$> find rol_isMe roles
@@ -341,13 +355,16 @@ setRoleInstancesInContext contextId rolName rolInstances = do
                 , deltaType: Add
                 , roleInstance
                 , users: []
+                , sequenceNumber: 0
                 }
     addContextDelta delta
     addUniverseRoleDelta $ UniverseRoleDelta
         { id: roleInstance
         , roleType: rolName
         , deltaType: Add
-        , users}
+        , users
+        , sequenceNumber: 0
+      }
 
 -- | Detach the role instances from their current context and attach them to the new context.
 -- | This is not just a convenience function. The combination of removeRoleInstancesFromContext and addRoleInstancesToContext would add UniverseRoleDeltas, which we don't need here.
@@ -379,6 +396,7 @@ moveRoles originContextId destinationContextId rolName rolInstances = do
                 , deltaType: Delete
                 , roleInstance: rolInstance
                 , users: []
+                , sequenceNumber: 0
                 }) >>= addContextDelta
     (aisInContextDelta $ ContextDelta
                 { id : destinationContextId
@@ -386,6 +404,7 @@ moveRoles originContextId destinationContextId rolName rolInstances = do
                 , deltaType: Add
                 , roleInstance: rolInstance
                 , users: []
+                , sequenceNumber: 0
                 }) >>= addContextDelta
   (lift2 $ findRoleRequests destinationContextId rolName) >>= addCorrelationIdentifiersToTransactie
   (lift2 $ findRoleRequests originContextId rolName) >>= addCorrelationIdentifiersToTransactie
@@ -412,6 +431,7 @@ addProperty rids propertyName values = for_ rids \rid -> do
                 , deltaType: Add
                 , value: Just val
                 , users: []
+                , sequenceNumber: 0
                 }) >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
 
@@ -431,6 +451,7 @@ removeProperty rids propertyName values = for_ rids \rid -> do
               , deltaType: Remove
               , value: Just val
               , users: []
+              , sequenceNumber: 0
               }) >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
 
@@ -450,6 +471,7 @@ deleteProperty rids propertyName = for_ rids \rid -> do
               , deltaType: Delete
               , value: Nothing
               , users: []
+              , sequenceNumber: 0
               }) >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
 
@@ -471,6 +493,7 @@ setProperty rids propertyName values = for_ rids \rid -> do
                 , deltaType: Change
                 , value: Just value
                 , users: []
+                , sequenceNumber: 0
                 }
     aisInPropertyDelta delta >>= addPropertyDelta
   (lift2 $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie

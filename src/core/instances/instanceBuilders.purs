@@ -93,7 +93,9 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
                   { id: contextInstanceId
                   , contextType: ContextType $ expandDefaultNamespaces ctype
                   , deltaType: Add
-                  , users}
+                  , users
+                  , sequenceNumber: 0
+                }
               pure $ Right contextInstanceId
   where
     constructSingleRoleInstance :: ContextInstance -> EnumeratedRoleType -> Int -> RolSerialization -> WriterT (Array RoleInstance)  MonadPerspectivesTransaction RoleInstance

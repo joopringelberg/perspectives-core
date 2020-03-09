@@ -81,14 +81,18 @@ saveContextInstance id = do
       , binding: binding
       , oldBinding: Nothing
       , deltaType: Add
-      , users: []}
+      , users: []
+      , sequenceNumber: 0
+    }
     -- Users from this context (let's trigger all rules).
     void $ aisInContextDelta $ ContextDelta
       { id
       , roleType: pspType
       , roleInstance: _id
       , deltaType: Add
-      , users: []}
+      , users: []
+      , sequenceNumber: 0
+    }
 
   (_ :: PerspectRol) <- lift2 $ saveEntiteit (context_buitenRol ctxt)
   -- For roles with a binding equal to R: detect the binder <RoleType> requests for R
@@ -111,7 +115,9 @@ removeContextInstance id = do
     { id
     , contextType: context_pspType ctxt
     , deltaType: Remove
-    , users}
+    , users
+    , sequenceNumber: 0
+  }
   pure unit
 
 -- | Collects the union of the user role instances that occurr in the bindings.

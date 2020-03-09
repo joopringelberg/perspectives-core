@@ -33,15 +33,18 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPrope
 import Prelude (class Show)
 
 -----------------------------------------------------------
+-- GENERIC
+-----------------------------------------------------------
+type DeltaRecord f = {users :: Array RoleInstance, deltaType :: DeltaType, sequenceNumber :: Int | f}
+
+-----------------------------------------------------------
 -- UNIVERSECONTEXTDELTA
 -----------------------------------------------------------
-newtype UniverseContextDelta = UniverseContextDelta
-  { id :: ContextInstance
+newtype UniverseContextDelta = UniverseContextDelta (DeltaRecord
+  ( id :: ContextInstance
   , contextType :: ContextType
   -- Add, Remove
-  , deltaType :: DeltaType
-  , users :: Array RoleInstance
-  }
+  ))
 
 derive instance genericUniverseContextDelta :: Generic UniverseContextDelta _
 
@@ -58,13 +61,11 @@ instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTA
 -----------------------------------------------------------
-newtype UniverseRoleDelta = UniverseRoleDelta
-  { id :: RoleInstance
+newtype UniverseRoleDelta = UniverseRoleDelta (DeltaRecord
+  ( id :: RoleInstance
   , roleType :: EnumeratedRoleType
   -- Add, Remove
-  , deltaType :: DeltaType
-  , users :: Array RoleInstance
-  }
+  ))
 
 derive instance genericUniverseRoleDelta :: Generic UniverseRoleDelta _
 
@@ -83,14 +84,12 @@ instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
 -----------------------------------------------------------
 -- CONTEXTDELTA
 -----------------------------------------------------------
-newtype ContextDelta = ContextDelta
-  { id :: ContextInstance
+newtype ContextDelta = ContextDelta (DeltaRecord
+  ( id :: ContextInstance
   , roleType :: EnumeratedRoleType
   , roleInstance :: RoleInstance
   -- Add, Remove, Delete,
-  , deltaType :: DeltaType
-  , users :: Array RoleInstance
-  }
+  ))
 
 derive instance genericContextDelta :: Generic ContextDelta _
 
@@ -107,14 +106,12 @@ instance decodeContextDelta :: Decode ContextDelta where
 -----------------------------------------------------------
 -- ROLEBINDINGDELTA
 -----------------------------------------------------------
-newtype RoleBindingDelta = RoleBindingDelta
-  { id :: RoleInstance
+newtype RoleBindingDelta = RoleBindingDelta (DeltaRecord
+  ( id :: RoleInstance
   , binding :: Maybe RoleInstance
   , oldBinding :: Maybe RoleInstance
   -- Remove, Change
-  , deltaType :: DeltaType
-  , users :: Array RoleInstance
-  }
+  ))
 
 derive instance genericRoleDelta :: Generic RoleBindingDelta _
 
@@ -131,14 +128,12 @@ instance decodeRoleDelta :: Decode RoleBindingDelta where
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTA
 -----------------------------------------------------------
-newtype RolePropertyDelta = RolePropertyDelta
-  { id :: RoleInstance
+newtype RolePropertyDelta = RolePropertyDelta (DeltaRecord
+  ( id :: RoleInstance
   , property :: EnumeratedPropertyType
   , value :: Maybe Value
   -- Add, Remove, Delete, Change
-  , deltaType :: DeltaType
-  , users :: Array RoleInstance
-  }
+  ))
 
 derive instance genericPropertyDelta :: Generic RolePropertyDelta _
 
