@@ -23,7 +23,7 @@ module Perspectives.Deltas where
 
 import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
-import Control.Monad.AvarMonadAsk (modify) as AA
+import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
 import Data.Array (cons, union)
@@ -127,6 +127,12 @@ addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDelt
 
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})
+
+increaseDeltaIndex :: MonadPerspectivesTransaction Int
+increaseDeltaIndex = do
+  i <- lift $  AA.gets (\(Transaction{nextDeltaIndex}) -> nextDeltaIndex)
+  lift $ AA.modify (over Transaction \t@{nextDeltaIndex} -> t {nextDeltaIndex = nextDeltaIndex + 1})
+  pure i
 
 -- Procedure om Delta's zuinig toe te voegen.
 -- 2. Bepaal of de rol functioneel is.

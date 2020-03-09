@@ -43,6 +43,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Foreign.Generic.Class (class GenericEncode)
+import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.CollectAffectedContexts (aisInContextDelta, aisInPropertyDelta, aisInRoleDelta, lift2)
 import Perspectives.ContextAndRole (addRol_gevuldeRollen, addRol_property, changeContext_me, changeRol_binding, changeRol_isMe, context_me, context_rolInContext, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_context, rol_id, rol_isMe, rol_pspType, setContext_rolInContext, setRol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater)
@@ -52,7 +53,10 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistent (class Persistent, getPerspectEntiteit, getPerspectRol, getPerspectContext)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheOverwritingRevision)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseRoleDelta(..))
 
 {-
@@ -141,6 +145,13 @@ setBinding roleId (newBindingId :: RoleInstance) = do
                 , sequenceNumber: 0
                 }
   addRoleDelta delta
+
+  -- If the type of the role has kind UserRole, we add a new user to the context. This user should have access to
+  -- this context. We will generate Deltas so his PDR can build it from scratch, according to his perspective.
+  (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole (rol_pspType originalRole)
+  if kindOfRole == UserRole
+    then (rol_context originalRole) `serialisedAsDeltasFor` newBindingId
+    else pure unit
   pure users
 
 -- | Removes the binding R of the rol, if any.
