@@ -4,31 +4,27 @@ import Prelude
 
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Free (Free)
-import Control.Monad.Writer (lift, runWriterT)
-import Data.Array (elemIndex, head, length, null)
+import Control.Monad.Writer (runWriterT)
+import Data.Array (elemIndex, length, null)
 import Data.Maybe (Maybe(..), isJust)
-import Data.Newtype (unwrap)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Object (lookup)
-import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=), (##>))
+import Perspectives.CoreTypes (evalMonadPerspectivesQuery, (##=))
 import Perspectives.Couchdb (designDocumentViews)
-import Perspectives.Couchdb.Databases (deleteDatabase, getDesignDocument)
+import Perspectives.Couchdb.Databases (getDesignDocument)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinFile (DomeinFileId(..))
 import Perspectives.Extern.Couchdb (addExternalFunctions) as ExternalCouchdb
-import Perspectives.Extern.Couchdb (addUserToChannel, createChannel, models, roleInstances, uploadToRepository)
-import Perspectives.LoadCRL (loadAndSaveCrlFile)
+import Perspectives.Extern.Couchdb (models, uploadToRepository)
 import Perspectives.Persistent (entitiesDatabaseName)
-import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
+import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SetupCouchdb (setModelDescriptionsView, setRoleView)
-import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile)
+import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile, loadCompileAndSaveArcFile)
 import Perspectives.User (getCouchdbBaseURL)
-import Test.Perspectives.Utils (assertEqual, clearUserDatabase, runP, setupUser)
+import Test.Perspectives.Utils (assertEqual, runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
 
@@ -110,45 +106,3 @@ theSuite = suite "Perspectives.Extern.Couchdb" do
 --     logShow users
 --     liftAff $ assert "There should be two users" (length users == 2)
 -- )
-
-  test "createChannel" (runP do
-    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    setupUser
-    void $ runMonadPerspectivesTransaction createChannel
-
-    -- There must be an instance of "model:System$PerspectivesSystem$Channels" in "model:User$MijnSysteem"
-    -- If we can retrieve a value for the property model:System$PerspectivesSystem$User$Channel, everything is OK.
-    getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-    mdbname <- RoleInstance "model:User$MijnSysteem$User_0001" ##> getter
-    lift $ logShow mdbname
-    liftAff $ assert "We should be able to calculate the value of the Channel property for `me`" (isJust mdbname)
-    case mdbname of
-      Nothing -> pure unit
-      Just dbname -> deleteDatabase (unwrap dbname)
-    clearUserDatabase
-    )
-
-  test "create channel, add user" (runP do
-    -- _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
-    -- setupUser
-    achannel <- runMonadPerspectivesTransaction createChannel
-    case head achannel of
-      Nothing -> liftAff $ assert "Failed to create a channel" false
-      Just channel -> do
-        -- load a second user
-        void $ loadAndSaveCrlFile "userJoop.crl" testDirectory
-        void $ runMonadPerspectivesTransaction $ addUserToChannel (RoleInstance "model:User$JoopsSysteem$User_0001") channel
-
-    getter <- getPropertyFunction "model:System$PerspectivesSystem$User$Channel"
-    mdbname <- RoleInstance "model:User$JoopsSysteem$User_0001" ##> getter
-    lift $ logShow mdbname
-
-    liftAff $ assert "We should be able to calculate the value of the Channel property for `model:User$JoopsSysteem$User_0001`" (isJust mdbname)
-
-    -- Comment out to prepare for a test of Transaction distribution.
-    -- case mdbname of
-    --   Nothing -> pure unit
-    --   Just dbname -> deleteDatabase (unwrap dbname)
-    -- clearUserDatabase
-
-    )

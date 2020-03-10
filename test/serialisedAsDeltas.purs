@@ -13,10 +13,10 @@ import Effect.Class.Console (log, logShow)
 import Perspectives.Assignment.Update (setBinding)
 import Perspectives.CoreTypes ((##>>))
 import Perspectives.Couchdb.Databases (deleteDatabase)
-import Perspectives.Extern.Couchdb (addUserToChannel, createChannel)
+import Perspectives.Sync.Channel (addUserToChannel, createChannel)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
 import Perspectives.Instances.ObjectGetters (roleType_)
-import Perspectives.LoadCRL (loadAndSaveCrlFile, loadCrlFile_)
+import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Query.Compiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
@@ -35,7 +35,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "SerialisedAsDeltas" do
+theSuite = suite "SerialisedAsDeltas" do
 
   test "Bind a user to a role in a context" (runP do
     _ <- setupUser
