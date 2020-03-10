@@ -28,6 +28,7 @@ import Test.Queries as QR
 import Test.SetupCouchdb as SCDB
 import Test.LocalAuthentication as LA
 import Test.SerialisedAsDeltas as SAD
+import Test.Sync.Channel as CHA
 import Test.Unit.Main (runTest)
 
 
@@ -56,3 +57,4 @@ main = runTest do
   SCDB.theSuite
   LA.theSuite
   SAD.theSuite
+  CHA.theSuite
