@@ -34,14 +34,14 @@ import Foreign.Object (empty, fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (##>))
 import Perspectives.Couchdb.Databases (createDatabase)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (isMe)
-import Perspectives.Query.Compiler (getRoleFunction)
+import Perspectives.Instances.ObjectGetters (isMe, externalRole)
+import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<<<), (<>), (>=>), not)
@@ -107,10 +107,63 @@ setMyRelayAddress host port channel = do
   setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayHost") [Value host]
   setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayPort") [Value (show port)]
 
-
 setYourRelayAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit
 setYourRelayAddress host port channel = do
   connectedPartner <- lift2 (getRoleFunction "sys:Channel$ConnectedPartner")
   me <- lift2 (channel ##= filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not)))
   setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayHost") [Value host]
   setProperty me (EnumeratedPropertyType "model:System$Channel$ConnectedPartner$RelayPort") [Value (show port)]
+
+-- | For a channel, set the replication of the local copy to the database found at either Host or RelayHost.
+-- | If host and port are equal for both partners, do not set replication.
+-- | Also set replication for the channel to the post database.
+setChannelReplication :: ContextInstance -> MonadPerspectives Unit
+setChannelReplication channel = do
+  connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
+  myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
+  case myou of
+    Nothing -> pure unit
+    Just you -> do
+      host <- getPropertyFunction "sys:Channel$ConnectedPartner$Host"
+      hostValue <- you ##> host
+      case hostValue of
+        Nothing -> do
+          relayHost <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayHost"
+          relayHostValue <- you ##> relayHost
+          case relayHostValue of
+            Nothing -> pure unit
+            Just (Value h) -> do
+              -- if h equals the host of this PDR, just stop.
+              relayPort <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayPort"
+              portValue <- you ##> relayPort
+              case portValue of
+                Nothing -> pure unit
+                Just (Value p) -> do
+                  getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+                  mchannel <- channel ##> externalRole >=> getChannelId
+                  case mchannel of
+                    Nothing -> pure unit
+                    Just (Value channelId) -> do
+                      setPushAndPullReplication channelId h p
+                      -- Get the post db name.
+                      -- replicate channelId post
+        Just (Value h) -> do
+          -- if h equals the host of this PDR, just stop.
+          port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
+          portValue <- you ##> port
+          case portValue of
+            Nothing -> pure unit
+            Just (Value p) -> do
+              getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+              mchannel <- channel ##> externalRole >=> getChannelId
+              case mchannel of
+                Nothing -> pure unit
+                Just (Value channelId) -> setPushReplication channelId h p
+
+-- | Push local channel to remote.
+setPushReplication :: String -> String -> String -> MonadPerspectives Unit
+setPushReplication channelDatabaseName host port = pure unit
+
+-- | Push local channel to remote, pull remote channel to local.
+setPushAndPullReplication :: String -> String -> String -> MonadPerspectives Unit
+setPushAndPullReplication channelDatabaseName host port = pure unit
