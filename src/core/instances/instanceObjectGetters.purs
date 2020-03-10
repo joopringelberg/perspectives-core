@@ -23,7 +23,7 @@ module Perspectives.Instances.ObjectGetters where
 
 import Control.Alt ((<|>))
 import Control.Monad.Writer (lift, tell)
-import Data.Array (findIndex, index, singleton)
+import Data.Array (findIndex, head, index, singleton)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
@@ -35,7 +35,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_isMe, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
@@ -102,6 +102,13 @@ binding r = ArrayT do
   case rol_binding role of
     Nothing -> pure []
     (Just b) -> pure [b]
+
+bottom :: RoleInstance ~~> RoleInstance
+bottom r = ArrayT do
+  (bs :: Array RoleInstance) <- runArrayT $ binding r
+  case head bs of
+    Nothing -> pure [r]
+    Just b -> runArrayT $ bottom b
 
 -- | From the instance of a Rol of any kind, find the instances of the Rol of the given
 -- | type that bind it (that have it as their binding). The type of rname (RolDef) may
