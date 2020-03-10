@@ -42,6 +42,7 @@ import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
+import Effect.Class.Console (log)
 import Foreign.Generic.Class (class GenericEncode)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.CollectAffectedContexts (aisInContextDelta, aisInPropertyDelta, aisInRoleDelta, lift2)
@@ -145,12 +146,13 @@ setBinding roleId (newBindingId :: RoleInstance) = do
                 , sequenceNumber: 0
                 }
   addRoleDelta delta
+  log ("setBinding: " <> show delta)
 
   -- If the type of the role has kind UserRole, we add a new user to the context. This user should have access to
   -- this context. We will generate Deltas so his PDR can build it from scratch, according to his perspective.
   (EnumeratedRole{kindOfRole}) <- lift2 $ getEnumeratedRole (rol_pspType originalRole)
-  if kindOfRole == UserRole
-    then (rol_context originalRole) `serialisedAsDeltasFor` newBindingId
+  if kindOfRole == UserRole && not isMe
+    then (rol_context originalRole) `serialisedAsDeltasFor` roleId
     else pure unit
   pure users
 

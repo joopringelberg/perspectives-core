@@ -39,7 +39,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
+theSuite = suite "Perspectives.Extern.Couchdb" do
 
   test "models" (runP do
     ExternalCouchdb.addExternalFunctions
@@ -128,7 +128,7 @@ theSuite = suiteOnly "Perspectives.Extern.Couchdb" do
     clearUserDatabase
     )
 
-  testOnly "create channel, add user" (runP do
+  test "create channel, add user" (runP do
     -- _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     -- setupUser
     achannel <- runMonadPerspectivesTransaction createChannel

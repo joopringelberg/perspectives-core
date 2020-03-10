@@ -83,9 +83,9 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
       if share then lift $ lift $ distributeTransaction ft else pure unit
       -- 4. Finally re-run the active queries. Derive changed assumptions from the Transaction and use the dependency
       -- administration to find the queries that should be re-run.
-      log "==========ASSUMPTIONS============"
+      -- log "==========ASSUMPTIONS============"
       (corrIds :: Array CorrelationIdentifier) <- lift $ lift $ foldM (\bottom ass -> do
-        logShow ass
+        -- logShow ass
         mcorrIds <- findDependencies ass
         case mcorrIds of
           Nothing -> pure bottom
@@ -93,13 +93,13 @@ runMonadPerspectivesTransaction' share a = getUserIdentifier >>= lift <<< create
         []
         (assumptionsInTransaction ft)
       -- Sort from low to high, so we can never actualise a client side component after it has been removed.
-      log "==========RUNNING EFFECTS============"
+      -- log "==========RUNNING EFFECTS============"
       lift $ lift $ for_ (sort $ correlationIdentifiers <> corrIds) \corrId -> do
         me <- pure $ lookupActiveSupportedEffect corrId
         case me of
           Nothing -> pure unit
           (Just {runner}) -> do
-            logShow corrId
+            -- logShow corrId
             runner unit
       pure r
 
@@ -134,17 +134,17 @@ runActions t = do
   -- Collect all combinations of context instances and user types.
   -- Check if the type of 'me' is among them.
   -- If so, execute the automatic actions for 'me'.
-  log "==========RUNNING ACTIONS============"
+  -- log "==========RUNNING ACTIONS============"
   (as :: Array ActionInstance) <- contextsAffectedByTransaction >>= traverse getAllAutomaticActions >>= pure <<< join
   lift $ void $ AA.modify cloneEmptyTransaction
   for_ as \(ActionInstance ctxt atype) ->
       case retrieveAction atype of
         (Just (Tuple _ updater)) -> do
-          log ("Evaluating " <> unwrap atype)
+          -- log ("Evaluating " <> unwrap atype)
           updater ctxt
         Nothing -> do
           (Tuple _ updater) <- lift2 $ compileBotAction atype
-          log ("Evaluating " <> unwrap atype)
+          -- log ("Evaluating " <> unwrap atype)
           updater ctxt
           pure unit
   nt <- lift AA.get

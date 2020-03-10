@@ -27,6 +27,7 @@ import Test.Types.ObjectGetters as TTO
 import Test.Queries as QR
 import Test.SetupCouchdb as SCDB
 import Test.LocalAuthentication as LA
+import Test.SerialisedAsDeltas as SAD
 import Test.Unit.Main (runTest)
 
 
@@ -54,3 +55,4 @@ main = runTest do
   QR.theSuite
   SCDB.theSuite
   LA.theSuite
+  SAD.theSuite

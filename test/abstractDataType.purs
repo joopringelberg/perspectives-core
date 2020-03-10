@@ -17,7 +17,7 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Role (binding, typeExcludingBinding)
+import Perspectives.Representation.Class.Role (binding, roleADT)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
@@ -53,6 +53,6 @@ theSuite = suite  "Perspectives.Representation.ADT" do
                 case lookup "model:MyTestDomain$AnotherRole" calculatedRoles of
                   Nothing -> assert "There should be a role 'model:MyTestDomain$AnotherRole'" false
                   Just arl -> do
-                    tp <- runP $ typeExcludingBinding arl
+                    tp <- runP $ roleADT arl
                     assert "The type of AnotherRole should be equal to YetAnotherRole"
                       (tp == ST (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole"))
