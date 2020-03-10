@@ -50,6 +50,16 @@ domain: System
     external:
       property: ChannelDatabaseName (mandatory, functional, String)
     user: ConnectedPartner filledBy: sys:PerspectivesSystem$User
+      -- The public URL of the PDR of the partner.
+      property: Host (not mandatory, functional, String)
+      -- The port where Couchdb listens.
+      property: Port (not mandatory, functional, Number)
+      -- The public URL of the RelayServer of the partner
+      property: RelayHost (not mandatory, functional, String)
+      -- The port where Couchdb listens on the RelayServer.
+      property: RelayPort (not mandatory, functional, String)
+
+      perspective on: ConnectedPartner
 
   case: Model
     external:
