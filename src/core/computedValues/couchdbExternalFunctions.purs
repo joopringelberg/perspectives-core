@@ -41,7 +41,6 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
@@ -211,7 +210,6 @@ uploadToRepository_ dfId url df = lift $ lift $ do
 createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
   channelName <- pure ("channel_" <> (show $ guid unit))
-  log ("Will create " <> channelName)
   lift2 $ createDatabase channelName
   eChannel <- constructContext $ ContextSerialization
     { id: "model:User$" <> channelName

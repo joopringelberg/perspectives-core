@@ -24,7 +24,6 @@ module Perspectives.Assignment.SerialiseAsDeltas where
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
-import Effect.Class.Console (log)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###>>))
 import Perspectives.Deltas (addContextDelta, addPropertyDelta, addRoleDelta, addUniverseContextDelta, addUniverseRoleDelta)
@@ -35,7 +34,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
 import Perspectives.TypesForDeltas (ContextDelta(..), DeltaType(..), RoleBindingDelta(..), RolePropertyDelta(..), UniverseContextDelta(..), UniverseRoleDelta(..))
-import Prelude (Unit, bind, ($), discard, pure, unit, (<>), show)
+import Prelude (Unit, bind, ($), discard, pure, unit)
 
 serialisedAsDeltasFor:: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
@@ -52,7 +51,6 @@ serialisedAsDeltasFor cid userId = do
   userType <- lift2 $ roleType_ userId
   forWithIndex_ rolInContext \roleTypeId roleInstances -> do
     allowed <- lift2 (userType ###>> roleIsInPerspectiveOf (ENR $ EnumeratedRoleType roleTypeId))
-    log ("allowed = " <> show allowed <> " for " <> show userType <> " and " <> roleTypeId)
     if allowed
       then do
         for_ roleInstances \roleInstance -> do
@@ -81,7 +79,6 @@ serialisedAsDeltasFor cid userId = do
             , sequenceNumber: 0
             }
           addRoleDelta rd
-          log ("SerialiseAsDeltas: " <> show rd)
           -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
           forWithIndex_ properties \propertyTypeId values -> do
             propAllowed <- lift2 (userType ###>> propertyIsInPerspectiveOf (ENP (EnumeratedPropertyType propertyTypeId)))
