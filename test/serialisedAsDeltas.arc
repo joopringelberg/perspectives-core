@@ -5,5 +5,6 @@ domain: Test
     user: Self filledBy: sys:PerspectivesSystem$User
     user: Other filledBy: sys:PerspectivesSystem$User
       perspective on: ARole
+      perspective on: Other
     thing: ARole
       property: Prop1 (not mandatory, functional, Boolean)

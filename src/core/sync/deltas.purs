@@ -113,19 +113,19 @@ addDomeinFileToTransactie dfId = lift $ AA.modify (over Transaction \(t@{changed
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
 addContextDelta :: ContextDelta -> MonadPerspectivesTransaction Unit
-addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas, nextDeltaIndex} -> t {contextDeltas = cons (setIndex nextDeltaIndex d) contextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
+addContextDelta d = lift $ AA.modify (over Transaction \t@{contextDeltas, nextDeltaIndex} -> t {contextDeltas = union [(setIndex nextDeltaIndex d)] contextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addRoleDelta :: RoleBindingDelta -> MonadPerspectivesTransaction Unit
-addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas, nextDeltaIndex} -> t {roleDeltas = cons (setIndex nextDeltaIndex d) roleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
+addRoleDelta d = lift $ AA.modify (over Transaction \t@{roleDeltas, nextDeltaIndex} -> t {roleDeltas = union [(setIndex nextDeltaIndex d)] roleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addPropertyDelta :: RolePropertyDelta -> MonadPerspectivesTransaction Unit
-addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, nextDeltaIndex} -> t {propertyDeltas = cons (setIndex nextDeltaIndex d) propertyDeltas, nextDeltaIndex = nextDeltaIndex + 1})
+addPropertyDelta d = lift $ AA.modify (over Transaction \t@{propertyDeltas, nextDeltaIndex} -> t {propertyDeltas = union [(setIndex nextDeltaIndex d)] propertyDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addUniverseContextDelta :: UniverseContextDelta -> MonadPerspectivesTransaction Unit
-addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} -> t {universeContextDeltas = cons (setIndex nextDeltaIndex d) universeContextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
+addUniverseContextDelta d = lift $ AA.modify (over Transaction \t@{universeContextDeltas, nextDeltaIndex} -> t {universeContextDeltas = union [(setIndex nextDeltaIndex d)] universeContextDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addUniverseRoleDelta :: UniverseRoleDelta -> MonadPerspectivesTransaction Unit
-addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} -> t {universeRoleDeltas = cons (setIndex nextDeltaIndex d) universeRoleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
+addUniverseRoleDelta d = lift $ AA.modify (over Transaction \t@{universeRoleDeltas, nextDeltaIndex} -> t {universeRoleDeltas = union [(setIndex nextDeltaIndex d)] universeRoleDeltas, nextDeltaIndex = nextDeltaIndex + 1})
 
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit
 addCorrelationIdentifiersToTransactie corrIds = lift $ AA.modify (over Transaction \t@{correlationIdentifiers} -> t {correlationIdentifiers = union correlationIdentifiers corrIds})

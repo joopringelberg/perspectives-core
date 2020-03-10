@@ -30,7 +30,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (class Show)
+import Prelude (class Show, eq)
 
 -----------------------------------------------------------
 -- GENERIC
@@ -51,7 +51,8 @@ derive instance genericUniverseContextDelta :: Generic UniverseContextDelta _
 instance showUniverseContextDelta :: Show UniverseContextDelta where
   show = genericShow
 
-derive instance eqUniverseContextDelta :: Eq UniverseContextDelta
+instance eqUniverseContextDelta :: Eq UniverseContextDelta where
+  eq (UniverseContextDelta r1@{}) (UniverseContextDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
 
 instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
   encode = genericEncode defaultOptions
@@ -74,7 +75,8 @@ derive instance newTypeUniverseRoleDelta :: Newtype UniverseRoleDelta _
 instance showUniverseRoleDelta :: Show UniverseRoleDelta where
   show = genericShow
 
-derive instance eqUniverseRoleDelta :: Eq UniverseRoleDelta
+instance eqUniverseRoleDelta :: Eq UniverseRoleDelta where
+  eq (UniverseRoleDelta r1@{}) (UniverseRoleDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
 
 instance encodeUniverseRoleDelta :: Encode UniverseRoleDelta where
   encode = genericEncode defaultOptions
@@ -96,7 +98,8 @@ derive instance genericContextDelta :: Generic ContextDelta _
 instance showContextDelta :: Show ContextDelta where
   show = genericShow
 
-derive instance eqContextDelta :: Eq ContextDelta
+instance eqContextDelta :: Eq ContextDelta where
+  eq (ContextDelta r1@{}) (ContextDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
 
 instance encodeContextDelta :: Encode ContextDelta where
   encode = genericEncode defaultOptions
@@ -118,7 +121,9 @@ derive instance genericRoleDelta :: Generic RoleBindingDelta _
 instance showRoleDelta :: Show RoleBindingDelta where
   show = genericShow
 
-derive instance eqRoleDelta :: Eq RoleBindingDelta
+instance eqRoleDelta :: Eq RoleBindingDelta where
+  eq (RoleBindingDelta r1@{}) (RoleBindingDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
+
 
 instance encodeRoleDelta :: Encode RoleBindingDelta where
   encode = genericEncode defaultOptions
@@ -140,7 +145,8 @@ derive instance genericPropertyDelta :: Generic RolePropertyDelta _
 instance showPropertyDelta :: Show RolePropertyDelta where
   show = genericShow
 
-derive instance eqPropertyDelta :: Eq RolePropertyDelta
+instance eqPropertyDelta :: Eq RolePropertyDelta where
+  eq (RolePropertyDelta r1@{}) (RolePropertyDelta r2@{}) = eq r1{sequenceNumber=0} r2{sequenceNumber=0}
 
 instance encodePropertyDelta :: Encode RolePropertyDelta where
   encode = genericEncode defaultOptions
