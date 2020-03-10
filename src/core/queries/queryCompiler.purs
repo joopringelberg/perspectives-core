@@ -41,6 +41,7 @@ import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
+import Perspectives.Identifiers (expandDefaultNamespaces)
 import Perspectives.Instances.Combinators (available, exists, logicalOperation, not, wrapLogicalOperator)
 import Perspectives.Instances.Combinators (filter, disjunction, conjunction) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
@@ -444,19 +445,23 @@ lookup varName _ = ArrayT do
 getRoleFunction ::
   String -> MonadPerspectives (ContextInstance ~~> RoleInstance)
 getRoleFunction id = unsafePartial $
-  case lookupRoleGetterByName id of
+  case lookupRoleGetterByName ident of
     Nothing -> empty
     (Just g) -> pure g
   <|>
   do
-    (p :: EnumeratedRole) <- getPerspectType (EnumeratedRoleType id)
+    (p :: EnumeratedRole) <- getPerspectType (EnumeratedRoleType ident)
     (C2R f) <- RC.calculation p >>= compileFunction
     pure f
   <|>
   do
-    (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType id)
+    (p :: CalculatedRole) <- getPerspectType (CalculatedRoleType ident)
     (C2R f) <- RC.calculation p >>= compileFunction
     pure f
+  where
+    ident :: String
+    ident = expandDefaultNamespaces id
+
 
 -- | Construct a function to compute instances of a ContextType from an instance of a Context.
 context2context :: QueryFunctionDescription -> MP (ContextInstance ~~> ContextInstance)
@@ -496,19 +501,22 @@ context2propertyValue qd = unsafePartial $ do
 getPropertyFunction ::
   String -> MonadPerspectives (RoleInstance ~~> Value)
 getPropertyFunction id = unsafePartial $
-  case lookupPropertyValueGetterByName id of
+  case lookupPropertyValueGetterByName ident of
     Nothing -> empty
     (Just g) -> pure g
   <|>
   do
-    (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType id)
+    (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType ident)
     (R2V f) <- PC.calculation p >>= compileFunction
     pure f
   <|>
   do
-    (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType id)
+    (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
     (R2V f) <- PC.calculation p >>= compileFunction
     pure f
+  where
+    ident :: String
+    ident = expandDefaultNamespaces id
 
 getHiddenFunction :: QueryFunctionDescription -> MP HiddenFunction
 getHiddenFunction qfd = do
