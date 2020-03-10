@@ -38,20 +38,20 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##>>))
 import Perspectives.Couchdb (PutCouchdbDocument, onAccepted, onCorrectCallAndResponse)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest)
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Instances.GetPropertyOnRoleGraph (getPropertyGetter)
-import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Instances.ObjectGetters (bottom, roleType_)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
 import Perspectives.Sync.Class.DeltaClass (setIndex)
 import Perspectives.Sync.Class.DeltaUsers (class DeltaUsers, addToTransaction, transactionCloneWithDelta, users)
 import Perspectives.Sync.Transaction (Transaction(..), transactieID)
 import Perspectives.TypesForDeltas (ContextDelta, RoleBindingDelta, RolePropertyDelta, UniverseContextDelta, UniverseRoleDelta)
 import Perspectives.User (getCouchdbBaseURL)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (+))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<>))
 
 distributeTransaction :: Transaction -> MonadPerspectives Unit
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
@@ -101,9 +101,11 @@ transactieForEachUser t@(Transaction{contextDeltas, roleDeltas, propertyDeltas, 
       trs <- get
       for_
         users
-        (\(user :: RoleInstance) -> case lookup user trs of
-          Nothing -> put $ insert user (transactionCloneWithDelta d t) trs
-          Just tr -> put $ insert user (addToTransaction d tr) trs
+        (\(user :: RoleInstance) -> do
+          sysUser <- lift (user ##>> bottom)
+          case lookup sysUser trs of
+            Nothing -> put $ insert sysUser (transactionCloneWithDelta d t) trs
+            Just tr -> put $ insert sysUser (addToTransaction d tr) trs
         )
 
 addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
