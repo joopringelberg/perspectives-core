@@ -41,7 +41,6 @@ import Prelude (bind, discard, join, pure, ($), (*>), (<*), (<<<), (<>), (==), (
 import Text.Parsing.Indent (withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (lookAhead, option, optionMaybe, try, (<?>))
-import Unsafe.Coerce (unsafeCoerce)
 
 contextE :: IP ContextPart
 contextE = try $ withEntireBlock
@@ -98,7 +97,7 @@ useE = do
   modelName <- arcIdentifier
   if isQualifiedWithDomein modelName
     then pure $ PREFIX prefix modelName
-    else failWithPosition ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)") (unsafeCoerce pos)
+    else failWithPosition ("(NotWellFormedName) The name '" <> modelName <> "' is not well-formed (it cannot be expanded to a fully qualified name)") (arcPosition2Position pos)
 
 roleE :: IP ContextPart
 roleE = try $ withEntireBlock

@@ -51,17 +51,17 @@ onSameLine p = withPos (p <* sameLine)
 
 -- | Returns the position as recorded in `ParseState`
 getPosition :: IP ArcPosition
-getPosition = gets \(ParseState _ pos _) -> unsafeCoerce pos
+getPosition = gets \(ParseState _ pos _) -> position2ArcPosition pos
 
 -- | Returns the position as recorded by the IndentParser.
 get' :: IP ArcPosition
 get' = do
   g <- lift get
-  pure $ unsafeCoerce g
+  pure $ position2ArcPosition g
 
 -- | Records the position with the IndentParser.
 put' :: ArcPosition -> IP Unit
-put' p = lift (put $ unsafeCoerce p)
+put' p = lift (put $ arcPosition2Position p)
 
 derive instance genericArcPosition :: Generic ArcPosition _
 instance showArcPosition :: Show ArcPosition where show = genericShow

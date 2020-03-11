@@ -26,6 +26,7 @@ import Control.Monad.Reader (ReaderT)
 import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (head)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, unwrap)
 import Data.Ordering (Ordering(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
@@ -43,7 +44,6 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.Transaction (Transaction)
 import Prelude (class Eq, class Ord, class Show, Unit, bind, compare, eq, pure, show, ($), (&&), (<<<), (<>), (>>=))
-import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -153,10 +153,10 @@ infix 1 runTypeLevelToMaybeObject as ###>
 -----------------------------------------------------------
 -- OBTAIN A SINGLE RESULT OR AN ERROR (###>>) FROM A TYPELEVELGETTER
 -----------------------------------------------------------
-runTypeLevelToObject :: forall s o. s -> (s ~~~> o) -> (MonadPerspectives) o
+runTypeLevelToObject :: forall s o. Newtype s String => s -> (s ~~~> o) -> (MonadPerspectives) o
 runTypeLevelToObject id tog = runTypeLevelToArray id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "TypeLevelGetter returns no values for '" <> (unsafeCoerce id) <> "'."
+  Nothing -> throwError $ error $ "TypeLevelGetter returns no values for '" <> (unwrap id) <> "'."
   (Just obj) -> pure obj
 
 infix 1 runTypeLevelToObject as ###>>
@@ -218,10 +218,10 @@ infix 0 evalMonadPerspectivesQueryToMaybeObject as ##>
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A SINGLE RESULT OR AN ERROR (##>>) FROM TRACKINGOBJECTSGETTER
 ------------------------------------------------------------------------------------------------------------------------
-runMonadPerspectivesQueryToObject :: forall s o. s -> (s ~~> o) -> (MonadPerspectives) o
+runMonadPerspectivesQueryToObject :: forall s o. Newtype s String => s -> (s ~~> o) -> (MonadPerspectives) o
 runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unsafeCoerce id) <> "'."
+  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "'."
   (Just obj) -> pure obj
 
 infix 0 runMonadPerspectivesQueryToObject as ##>>

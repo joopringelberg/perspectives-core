@@ -29,7 +29,7 @@ import Prelude
 import Data.Array (delete, elemIndex, partition, (:))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Foreign.Object (Object, insert, lookup, singleton, values)
@@ -38,9 +38,8 @@ import Perspectives.ApiTypes (ApiEffect, CorrelationIdentifier, Response(..))
 import Perspectives.CoreTypes (Assumption, MP, type (~~>), runMonadPerspectivesQuery)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Unsafe.Coerce (unsafeCoerce)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..))
 
 -- | Execute an EffectRunner to re-create an effect. This should be done whenever one or more assumptions underlying
 -- | the computation of the query that delivers the results to the ApiEffect, has changed.
@@ -70,7 +69,7 @@ activeSupportedEffects = GLS.new unit
 -- | As a result:
 -- |  1. we have cached a new SupportedEffect in the ActiveSupportedEffects.
 -- |  2. we have registered the dependency of this SupportedEffect in the AssumptionRegister in the PerspectivesState.
-registerSupportedEffect :: forall a b.
+registerSupportedEffect :: forall a b. Newtype b String =>
   CorrelationIdentifier ->
   ApiEffect ->
   (a ~~> b) ->
@@ -99,7 +98,7 @@ registerSupportedEffect corrId ef q arg = do
       for_ vanished (deregisterDependency corrId)
       -- Re-run the effect
       r <- queryAssumptionRegister
-      liftEffect $ ef (Result corrId (unsafeCoerce result))
+      liftEffect $ ef (Result corrId (map unwrap result))
       pure unit
 
 unregisterSupportedEffect :: CorrelationIdentifier -> MP Unit
