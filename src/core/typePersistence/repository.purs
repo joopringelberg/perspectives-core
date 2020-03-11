@@ -29,7 +29,7 @@ import Affjax (Request, request)
 import Control.Monad.Error.Class (catchError, throwError)
 import Data.FoldableWithIndex (forWithIndex_)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
+
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (onAccepted, onCorrectCallAndResponse, version)
 import Perspectives.Couchdb.Databases (defaultPerspectRequest)
@@ -54,7 +54,7 @@ fetchModelFromRepository url = catchError
       (onCorrectCallAndResponse "fetchEntiteit" res.body \(m :: DomeinFile) -> pure unit)
     rev <- version res.headers
     pure $ changeRevision rev m
-  \e -> throwError $ error ("fetchModelFromRepository: failed to retrieve model from this url: " <> url <> "." <> show e)
+  \e -> throwError $ Custom ("fetchModelFromRepository: failed to retrieve model from this url: " <> url <> "." <> show e)
 
 -- | Put the DomeinFile in the user's personal Models database.
 -- | Adds the Model instances to the user's entities.

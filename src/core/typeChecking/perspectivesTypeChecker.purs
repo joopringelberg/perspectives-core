@@ -21,16 +21,18 @@
 
 module Perspectives.Checking.PerspectivesTypeChecker where
 
-import Control.Monad.Except (catchError, lift, throwError)
+import Control.Monad.Except (ExceptT, catchError, lift, throwError)
 import Data.Array (cons, elemIndex)
 import Data.Foldable (for_)
+import Data.List.Lazy.NonEmpty (singleton)
+import Data.List.Lazy.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), isJust)
-import Effect.Exception (error)
+
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
 import Perspectives.Instances.ObjectGetters (roleType_)
-import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Identifiable (identifier)
@@ -41,6 +43,21 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
 import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=))
+
+
+-- | A type for accumulating multiple `PerspectivesErrors`s.
+type MultipleErrors = NonEmptyList PerspectivesError
+
+-- | An error monad, used in this library to encode possible failures when
+-- | checking a Perspectives model data.
+-- |
+-- | The `Alt` instance for `Except` allows us to accumulate errors,
+-- | unlike `Either`, which preserves only the last error.
+type PF = ExceptT MultipleErrors MonadPerspectives
+
+-- | Throws a failure error in `F`.
+fail :: forall a. PerspectivesError -> PF a
+fail = throwError <<< singleton
 
 checkDomeinFile :: DomeinFile -> MonadPerspectives (Array PerspectivesError)
 checkDomeinFile df = pure []
@@ -90,7 +107,7 @@ checkContext c = do
 
     throwOnCycle :: Array ContextType -> Context -> MP Unit
     throwOnCycle path next = if (isJust $ elemIndex (identifier next) path)
-      then (throwError (error "cyclic"))
+      then (throwError (Custom "cyclic"))
       else for_
         (contextAspects next)
         (getPerspectType >=> throwOnCycle (cons (identifier c) path))

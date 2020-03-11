@@ -21,18 +21,21 @@
 
 module Perspectives.RunPerspectives where
 
+import Control.Monad.Except (runExceptT)
 import Control.Monad.Reader (runReaderT)
+import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, new)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.CouchdbState (CouchdbUser(..), UserName(..))
+import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.PerspectivesState (newPerspectivesState)
-import Prelude (bind, ($))
+import Prelude (bind, ($), (<<<))
 
 -- | Run an action in MonadPerspectives, given a username and password.
 runPerspectives :: forall a. String -> String -> String -> MonadPerspectives a
-  -> Aff a
+  -> Aff (Either PerspectivesError a)
 runPerspectives userName password userId mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
@@ -43,7 +46,7 @@ runPerspectives userName password userId mp = do
       , userIdentifier: userName
       , _rev: Nothing})
       av
-  runReaderT mp rf
+  runPerspectivesWithState mp rf
 
-runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a
-runPerspectivesWithState = runReaderT
+runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff (Either PerspectivesError a)
+runPerspectivesWithState = runReaderT <<< runExceptT

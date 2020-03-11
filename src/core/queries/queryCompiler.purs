@@ -35,7 +35,7 @@ import Data.Array (elemIndex, null, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.String (Pattern(..), stripSuffix)
 import Data.Traversable (traverse)
-import Effect.Exception (error)
+
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MP, MPQ, (##=))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -101,18 +101,18 @@ compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ R2R binding
 compileFunction (SQD dom Identity _ _ _) = case dom of
   CDOM _ -> pure $ C2C (pure <<< identity)
   RDOM _ -> pure $ R2R (pure <<< identity)
-  VDOM _ _ -> throwError (error "There is no identity function for value.")
+  VDOM _ _ -> throwError (Custom "There is no identity function for value.")
 
 compileFunction (SQD dom (Constant range value) _ _ _) = case dom of
   CDOM _ -> pure $ C2V (pure <<< const (Value value))
   RDOM _ -> pure $ R2V (pure <<< const (Value value))
-  VDOM _ _ -> throwError (error "There is no constant function for value.")
+  VDOM _ _ -> throwError (Custom "There is no constant function for value.")
 
 compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
       Q descr -> context2string descr
-      S s -> throwError (error $ "Argument to ExternalCoreFunction not compiled: " <> show s))
+      S s -> throwError (Custom $ "Argument to ExternalCoreFunction not compiled: " <> show s))
     args
   pure $ C2R (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
@@ -131,7 +131,7 @@ compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
-      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+      _ -> throwError (Custom "Too many arguments for external core module: maximum is 4")
     )
 
 compileFunction (SQD dom (VariableLookup varName) range _ _) =
@@ -142,7 +142,7 @@ compileFunction (SQD dom (VariableLookup varName) range _ _) =
     (RDOM _), (RDOM _) -> pure $ R2R (unsafeCoerce (lookup varName) :: RoleInstance ~~> RoleInstance)
     (RDOM _), (CDOM _) -> pure $ R2C (unsafeCoerce (lookup varName) :: RoleInstance ~~> ContextInstance)
     (RDOM _), (VDOM _ _) -> pure $ R2V (unsafeCoerce (lookup varName) :: RoleInstance ~~> Value)
-    _, _ -> throwError (error ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
+    _, _ -> throwError (Custom ("Impossible domain-range combination for looking up variable '" <> varName <> "': " <> show dom <> ", " <> show range))
 
 -- If the second term is a constant, we can ignore the left term. This is an optimalisation.
 compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) = compileFunction f2
@@ -168,7 +168,7 @@ compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = if isValueDoma
       (R2C a), (C2R b) -> pure $ R2R (a >=> b)
       (R2C a), (C2V b) -> pure $ R2V (a >=> b)
       (R2R a), (R2V b) -> pure $ R2V (a >=> b)
-      _,  _ -> throwError (error $  "Cannot compose '" <> show f1 <> "' with '" <> show f2 <> "'.")
+      _,  _ -> throwError (Custom $  "Cannot compose '" <> show f1 <> "' with '" <> show f2 <> "'.")
 
   where
     isValueDomain :: Domain -> Boolean
@@ -184,7 +184,7 @@ compileFunction (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = do
     (R2V a), (R2R b) -> pure $ R2R $ Combinators.filter b (makeBoolean a)
     (C2V a), (R2C b) -> pure $ R2C $ Combinators.filter b (makeBoolean a)
     -- TODO: filter Values.
-    _,  _ -> throwError (error $  "Cannot filter '" <> show source <> "' with '" <> show criterium <> "'.")
+    _,  _ -> throwError (Custom $  "Cannot filter '" <> show source <> "' with '" <> show criterium <> "'.")
 
 compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
@@ -208,7 +208,7 @@ compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
     (R2C a), (R2V b) -> pure $ R2V \c -> (a c *> b c)
     (R2R a), (R2V b) -> pure $ R2V \c -> (a c *> b c)
     (R2V a), (R2V b) -> pure $ R2V \c -> (a c *> b c)
-    _, _ -> throwError (error $ "This is not a valid sequence: '" <> show f1 <> "', '" <> show f2 <> "'." )
+    _, _ -> throwError (Custom $ "This is not a valid sequence: '" <> show f1 <> "', '" <> show f2 <> "'." )
 
 compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
@@ -220,7 +220,7 @@ compileFunction (BQD _ (BinaryCombinator DisjunctionF) f1 f2 _ _ _) = do
     (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
     (R2R a), (R2R b) -> pure $ R2R $ Combinators.disjunction a b
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.disjunction a b
-    _,  _ -> throwError (error $ "Cannot create disjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+    _,  _ -> throwError (Custom $ "Cannot create disjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
   f1' <- compileFunction f1
@@ -232,7 +232,7 @@ compileFunction (BQD _ (BinaryCombinator ConjunctionF) f1 f2 _ _ _) = do
     (R2C a), (R2C b) -> pure $ R2C $ Combinators.disjunction a b
     (R2R a), (R2R b) -> pure $ R2R $ Combinators.conjunction a b
     (R2V a), (R2V b) -> pure $ R2V $ Combinators.conjunction a b
-    _,  _ -> throwError (error $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+    _,  _ -> throwError (Custom $ "Cannot create conjunction of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [EqualsF, NotEqualsF] = do
   f1' <- compileFunction f1
@@ -244,7 +244,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
     (R2C a), (R2C b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
     (R2R a), (R2R b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
     (R2V a), (R2V b) -> pure $ R2V $ compareRoles a b (unsafePartial $ compareFunction g)
-    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+    _,  _ -> throwError (Custom $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = do
   f1' <- compileFunction f1
@@ -256,7 +256,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
     (R2C a), (R2C b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
     (R2R a), (R2R b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
     (R2V a), (R2V b) -> pure $ R2V $ orderRoles a b (unsafePartial $ orderFunction g)
-    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+    _,  _ -> throwError (Custom $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g [AndF, OrF] = do
   f1' <- compileFunction f1
@@ -264,7 +264,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | isJust $ elemIndex g 
   case f1', f2' of
     (C2V a), (C2V b) -> pure $ C2V $ \c -> logicalOperation (unsafePartial $ mapLogicalOperator g) a b c
     (R2V a), (R2V b) -> pure $ R2V $ \c -> logicalOperation (unsafePartial $ mapLogicalOperator g) a b c
-    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+    _,  _ -> throwError (Custom $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 -- Add and subtract for numbers and strings. Divide and multiply just for numbers.
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = do
@@ -279,7 +279,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex 
       a' <- a c
       b' <- b c
       (unsafePartial $ (mapNumericOperator g ran)) a' b'
-    _,  _ -> throwError (error $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
+    _,  _ -> throwError (Custom $ "Cannot create comparison for == or \\= of '" <> show f1 <> "' and '" <> show f2 <> "'.")
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -326,7 +326,7 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   case f1' of
     (C2V a) -> pure $ C2V (not a)
     (R2V a) -> pure $ R2V (not a)
-    _ -> throwError (error $ "Cannot negate a non-boolean value, on compiling " <> show f1)
+    _ -> throwError (Custom $ "Cannot negate a non-boolean value, on compiling " <> show f1)
 
 compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ _ ) = do
   case functionName of
@@ -334,10 +334,10 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
 
     -- CreateContextF ->
     -- CreateRoleF ->
-    _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
+    _ -> throwError (Custom $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
 
 -- Catch all
-compileFunction qd = throwError (error $ "Cannot create a function out of '" <> prettyPrint qd <> "'.")
+compileFunction qd = throwError (Custom $ "Cannot create a function out of '" <> prettyPrint qd <> "'.")
 
 -- We handle no results for the two ObjectGetters as follows:
 --  * if both are empty, the result is true

@@ -41,7 +41,7 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
+
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, insert, lookup)
@@ -166,7 +166,7 @@ addModelToLocalStore urls = do
       -- res <- liftAff $ request $ rq {url = docUrl <> (maybe "" ((<>) "?rev=") rev) <> "/screens.js"}
       result <- onAccepted res.status [200, 304] "uploadToRepository_" (pure res.body)
       void $ case result of
-        Left e -> throwError $ error ("uploadToRepository: Errors on retrieving attachment: " <> (printResponseFormatError e))
+        Left e -> throwError $ Custom ("uploadToRepository: Errors on retrieving attachment: " <> (printResponseFormatError e))
         Right attachment -> do
           perspect_models <- modelsDatabaseName
           void $ addAttachment (perspect_models <> modelName) "screens.js" attachment (MediaType "text/ecmascript")

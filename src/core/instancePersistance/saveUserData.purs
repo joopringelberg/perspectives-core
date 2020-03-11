@@ -44,7 +44,7 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
+
 import Foreign.Object (values)
 import Perspectives.Assignment.Update (removeBinding, removeBinding_, removeRoleInstancesFromContext_)
 import Perspectives.CollectAffectedContexts (aisInContextDelta, aisInRoleDelta, lift2)
@@ -149,4 +149,4 @@ removeRoleInstance roleId = void $ runWriterT $ removeRoleInstance_ false roleId
 -- | ContextDelta's are not necessary (see removeRoleInstance).
 -- | TODO: Implementeer removeAllRoleInstances.
 removeAllRoleInstances :: EnumeratedRoleType -> Updater ContextInstance
-removeAllRoleInstances et cid = throwError (error $ show (Custom "Implement removeAllRoleInstances!"))
+removeAllRoleInstances et cid = throwError (Custom $ show (Custom "Implement removeAllRoleInstances!"))

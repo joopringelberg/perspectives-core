@@ -35,7 +35,7 @@ import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, unwrap)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
+
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
@@ -256,7 +256,7 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
   (f :: HiddenFunction) <- pure $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
   (argFunctions :: Array (ContextInstance ~~> String)) <- traverse (\calc -> case calc of
       Q descr -> context2string descr
-      S s -> throwError (error $ "Argument to ExternalEffectFullFunction not compiled: " <> show s))
+      S s -> throwError (Custom $ "Argument to ExternalEffectFullFunction not compiled: " <> show s))
     args
   pure (\c -> do
     (values :: Array (Array String)) <- lift $ lift $ traverse (\g -> c ##= g) argFunctions
@@ -275,8 +275,8 @@ compileAssignment (MQD dom (ExternalEffectFullFunction functionName) args _ _ _)
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
         (unsafePartial (unsafeIndex values 0))
-      _ -> throwError (error "Too many arguments for external core module: maximum is 4")
+      _ -> throwError (Custom "Too many arguments for external core module: maximum is 4")
     )
 
 -- Catchall, remove when all cases have been covered.
-compileAssignment otherwise = throwError (error ("Found unknown case for compileAssignment: " <> show otherwise))
+compileAssignment otherwise = throwError (Custom ("Found unknown case for compileAssignment: " <> show otherwise))

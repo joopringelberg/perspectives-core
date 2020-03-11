@@ -29,7 +29,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
+
 import Foreign.Object (empty, fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
@@ -67,7 +67,7 @@ createChannel = do
     }
   -- TODO: dit is eigenlijk niet nodig.
   case eChannel of
-    Left e -> throwError (error ("createChannel could not create channel: " <> show e))
+    Left e -> throwError (Custom ("createChannel could not create channel: " <> show e))
     Right (channel :: ContextInstance) -> do
       void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
         "model:User$MijnSysteem"

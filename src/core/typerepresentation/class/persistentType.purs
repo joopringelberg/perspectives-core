@@ -30,7 +30,7 @@ import Perspectives.Couchdb.Revision
 import Control.Monad.Except (catchError, throwError)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Effect.Exception (error)
+
 import Foreign.Object (insert, lookup) as FO
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
@@ -60,7 +60,7 @@ getPerspectType :: forall v i. PersistentType v i => i -> MonadPerspectives v
 getPerspectType id = do
   mns <- pure (deconstructModelName (unwrap id))
   case mns of
-    Nothing -> throwError (error $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> show id <> "'.")
+    Nothing -> throwError (Custom $ "getPerspectType cannot retrieve type with incorrectly formed id: '" <> show id <> "'.")
     (Just ns) -> retrieveFromDomein id ns
 
 getEnumeratedRole :: EnumeratedRoleType -> MP EnumeratedRole
@@ -110,7 +110,7 @@ retrieveFromDomein_ :: forall v i. PersistentType v i =>
 retrieveFromDomein_ id lookupFunction ns = do
   df <- retrieveDomeinFile ns
   case lookupFunction df of
-    Nothing -> throwError $ error ("retrieveFromDomein': cannot find definition of " <> (show id) <> " for " <> ns)
+    Nothing -> throwError $ Custom ("retrieveFromDomein': cannot find definition of " <> (show id) <> " for " <> ns)
     (Just v) -> pure v
 
 -----------------------------------------------------------

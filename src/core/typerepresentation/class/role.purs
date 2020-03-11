@@ -27,7 +27,7 @@ import Data.Array (cons, filterA, null, union, (:))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable, Set)
 import Data.Traversable (traverse)
-import Effect.Exception (error)
+
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
@@ -94,7 +94,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   mandatory r = calculation r >>= pure <<< pessimistic <<< QT.mandatory
   calculation r = case (unwrap r).calculation of
     Q qd -> pure qd
-    otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
+    otherwise -> throwError (Custom ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   properties = rangeOfCalculatedRole >=> propertiesOfADT
   roleADT = rangeOfCalculatedRole
   roleAspectsADT = rangeOfCalculatedRole
@@ -107,7 +107,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
     roleCalculationRange :: QueryFunctionDescription -> MonadPerspectives (ADT EnumeratedRoleType)
     roleCalculationRange qfd = case QT.range qfd of
       (RDOM p) -> pure p
-      otherwise -> throwError (error ("range of calculation of a calculated role is not a role Domain."))
+      otherwise -> throwError (Custom ("range of calculation of a calculated role is not a role Domain."))
 
 -----------------------------------------------------------
 -- ENUMERATED ROLE INSTANCE
@@ -252,7 +252,7 @@ bindingOfADT (ST a) = getEnumeratedRole a >>= binding
 bindingOfADT (SUM adts) = map sum (traverse bindingOfADT adts)
 bindingOfADT (PROD adts) = map product (traverse bindingOfADT adts)
 bindingOfADT EMPTY = pure EMPTY
-bindingOfADT a@UNIVERSAL = throwError (error $ show (RoleCannotHaveBinding upperLeft upperLeft (show a)))
+bindingOfADT a@UNIVERSAL = throwError (Custom $ show (RoleCannotHaveBinding upperLeft upperLeft (show a)))
 -----------------------------------------------------------
 -- PROPERTIESOFADT
 -----------------------------------------------------------
@@ -261,7 +261,7 @@ propertiesOfADT :: ADT EnumeratedRoleType -> MP (Array PropertyType)
 propertiesOfADT adt = propertySet adt >>= case _ of
     PSet ps -> pure ps
     Empty -> pure []
-    Universal -> throwError (error $ show UniversalRoleHasNoParts)
+    Universal -> throwError (Custom $ show UniversalRoleHasNoParts)
 
 -----------------------------------------------------------
 -- VIEWSOFADT
@@ -280,7 +280,7 @@ viewsOfADT adt@(SUM terms) = do
     propertiesOfView = (getPerspectType >=> pure <<< fromFoldable <<< propertyReferences)
 viewsOfADT (PROD terms) = traverse viewsOfADT terms >>= pure <<< unionOfArrays
 viewsOfADT EMPTY = pure []
-viewsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
+viewsOfADT UNIVERSAL = throwError (Custom $ show UniversalRoleHasNoParts)
 
 -----------------------------------------------------------
 -- ROLEASPECTSOFADT
@@ -293,7 +293,7 @@ roleAspectsOfADT (ST r) = getEnumeratedRole r >>= pure <<< _.roleAspects <<< unw
 roleAspectsOfADT (SUM terms) = traverse roleAspectsOfADT terms >>= pure <<< unionOfArrays
 roleAspectsOfADT (PROD terms) = traverse roleAspectsOfADT terms >>= pure <<< intersectionOfArrays
 roleAspectsOfADT EMPTY = pure []
-roleAspectsOfADT UNIVERSAL = throwError (error $ show UniversalRoleHasNoParts)
+roleAspectsOfADT UNIVERSAL = throwError (Custom $ show UniversalRoleHasNoParts)
 
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLE

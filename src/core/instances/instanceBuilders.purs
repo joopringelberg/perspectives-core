@@ -43,7 +43,7 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
+
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addRoleInstancesToContext, setBinding, setProperty)
@@ -103,7 +103,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
     constructSingleRoleInstance contextInstanceId roleType i (RolSerialization{properties, binding}) = do
       -- create an empty role
       case (deconstructLocalName $unwrap roleType) of
-        Nothing -> throwError $ error "not a valid identifier"
+        Nothing -> throwError $ Custom "not a valid identifier"
         Just localRoleName -> do
           roleInstance <- lift $ constructEmptyRole roleType contextInstanceId i localRoleName
           -- then add the binding

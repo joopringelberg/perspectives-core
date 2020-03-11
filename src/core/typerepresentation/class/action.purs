@@ -25,7 +25,7 @@ import Control.Monad.Error.Class (throwError)
 import Data.Array (elemIndex)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
-import Effect.Exception (error)
+
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, Calculation(..))
 import Perspectives.Representation.Action (Action(..), Verb)
@@ -65,10 +65,10 @@ instance actionActionClass :: ActionClass Action where
   requiredIndirectObjectProperties = _.requiredIndirectObjectProperties <<< unwrap
   condition r = case (unwrap r).condition of
     Q qd -> pure qd
-    otherwise -> throwError (error ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
+    otherwise -> throwError (Custom ("Attempt to acces Condition of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: ActionType))))
   effect (Action{_id, effect:et}) = case et of
     (Just (EF ar)) -> pure ar
-    otherwise -> throwError (error ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
+    otherwise -> throwError (Custom ("Attempt to access the Effect of an Action before the expression has been compiled. This counts as a system programming error." <> (unwrap $ _id)))
   isExecutedByBot r = (unwrap r).executedByBot
   providesPerspectiveOnRole rt r = rt == (unwrap r).object || (Just rt) == (unwrap r).indirectObject
   providesPerspectiveOnProperty pt r = (||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> ((||) <$> maybe (pure true) isInView (requiredObjectProperties r) <*> maybe (pure true) isInView (requiredSubjectProperties r))

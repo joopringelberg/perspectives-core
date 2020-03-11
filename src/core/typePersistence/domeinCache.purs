@@ -32,7 +32,7 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.AVar (AVar, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
+
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (DocReference(..), GetCouchdbAllDocs(..), onAccepted, onCorrectCallAndResponse)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId(..))
@@ -56,7 +56,7 @@ modifyDomeinFileInCache modifier ns =
   do
     mAvar <- retrieveInternally (DomeinFileId ns)
     case mAvar of
-      Nothing -> throwError $ error $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
+      Nothing -> throwError $ Custom $ "modifyDomeinFileInCache cannot find domeinfile in cache: " <> ns
       (Just avar) -> do
         df <- liftAff $ take avar
         -- Because we modify the existing Entiteit, we do not overwrite the version number -
@@ -70,7 +70,7 @@ modifyDomeinFileInCache modifier ns =
 -- | Retrieve a domain file. First looks in the cache. If not found, retrieves it from the database and caches it.
 retrieveDomeinFile :: Namespace -> MonadPerspectives DomeinFile
 retrieveDomeinFile ns = catchError (getPerspectEntiteit (DomeinFileId ns))
-  \e -> throwError $ error ("retrieveDomeinFile: " <> show e)
+  \e -> throwError $ Custom ("retrieveDomeinFile: " <> show e)
 
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String

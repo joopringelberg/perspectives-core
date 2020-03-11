@@ -30,9 +30,9 @@ import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (Error, error)
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Utilities (onNothing')
 import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||), class Eq, (&&), eq)
 
@@ -96,8 +96,8 @@ instance peIdentifierQualifiedName :: PerspectEntiteitIdentifier QualifiedName w
 -----------------------------------------------------------
 -- THROW ERROR WHEN RESULT IS NOTHING
 -----------------------------------------------------------
-guardWellFormedNess :: forall m. MonadThrow Error m => (String -> Maybe String) -> String -> m String
-guardWellFormedNess f a = onNothing' (error $ "This identifier is not well formed: " <> a ) (f a)
+guardWellFormedNess :: forall m. MonadThrow PerspectivesError m => (String -> Maybe String) -> String -> m String
+guardWellFormedNess f a = onNothing' (Custom $ "This identifier is not well formed: " <> a ) (f a)
 
 -----------------------------------------------------------
 -- DECONSTRUCTING NAMESPACES

@@ -26,18 +26,14 @@ module Perspectives.Parsing.Messages where
 -- | During all three phases of transformation, errors may be detected.
 -- | This module defines the structure and kind of these errors.
 
-import Control.Monad.Except (ExceptT, throwError)
-import Data.List.Lazy.NonEmpty (singleton)
-import Data.List.Lazy.Types (NonEmptyList)
 import Data.Newtype (unwrap)
-import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (LetStep(..), PureLetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Query.QueryTypes (Domain, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedRoleType, RoleKind, RoleType)
-import Prelude (class Eq, class Show, (<>), show, (<<<))
+import Prelude (class Eq, class Show, (<>), show)
 
 -- | A Perspectives sourcefile (text or diagram) will be parsed in two passes.
 -- | The resulting internal representation of types is type-checked.
@@ -142,18 +138,3 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotAPropertyRange start end expected) = "(NotAPropertyRange) Expression does not yield a property value. Expected the range '" <> show expected <> "', between " <> show start <> " and " <> show end
   show (WrongNumberOfArguments start end functionName nrExpected nrGiven) = "(WrongNumberOfArguments) The function '" <> functionName <> "' expects " <> show nrExpected <> " arguments but received " <> show nrGiven <> ", between " <> show start <> " and " <> show end
   show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
-
-
--- | A type for accumulating multiple `PerspectivesErrors`s.
-type MultipleErrors = NonEmptyList PerspectivesError
-
--- | An error monad, used in this library to encode possible failures when
--- | checking a Perspectives model data.
--- |
--- | The `Alt` instance for `Except` allows us to accumulate errors,
--- | unlike `Either`, which preserves only the last error.
-type PF = ExceptT MultipleErrors MonadPerspectives
-
--- | Throws a failure error in `F`.
-fail :: forall a. PerspectivesError -> PF a
-fail = throwError <<< singleton

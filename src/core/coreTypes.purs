@@ -22,6 +22,7 @@
 
 module Perspectives.CoreTypes where
 
+import Control.Monad.Except (ExceptT)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.Writer (WriterT, runWriterT)
 import Data.Array (head)
@@ -31,7 +32,6 @@ import Data.Ordering (Ordering(..))
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, throwError)
 import Effect.Aff.AVar (AVar)
-import Effect.Exception (error)
 import Foreign.Object as F
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CouchdbState (CouchdbState)
@@ -40,6 +40,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (ActionType)
 import Perspectives.Sync.Transaction (Transaction)
@@ -110,7 +111,7 @@ instance ordActionInstance :: Ord ActionInstance where
 -----------------------------------------------------------
 -- | MonadPerspectives is an instance of MonadAff.
 -- | So, with liftAff we lift an operation in Aff to MonadPerspectives.
-type MonadPerspectives = ReaderT (AVar PerspectivesState) Aff
+type MonadPerspectives = ExceptT PerspectivesError (ReaderT (AVar PerspectivesState) Aff)
 
 type MP = MonadPerspectives
 
@@ -156,7 +157,7 @@ infix 1 runTypeLevelToMaybeObject as ###>
 runTypeLevelToObject :: forall s o. Newtype s String => s -> (s ~~~> o) -> (MonadPerspectives) o
 runTypeLevelToObject id tog = runTypeLevelToArray id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "TypeLevelGetter returns no values for '" <> (unwrap id) <> "'."
+  Nothing -> throwError $ Custom $ "TypeLevelGetter returns no values for '" <> (unwrap id) <> "'."
   (Just obj) -> pure obj
 
 infix 1 runTypeLevelToObject as ###>>
@@ -221,7 +222,7 @@ infix 0 evalMonadPerspectivesQueryToMaybeObject as ##>
 runMonadPerspectivesQueryToObject :: forall s o. Newtype s String => s -> (s ~~> o) -> (MonadPerspectives) o
 runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "'."
+  Nothing -> throwError $ Custom $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "'."
   (Just obj) -> pure obj
 
 infix 0 runMonadPerspectivesQueryToObject as ##>>

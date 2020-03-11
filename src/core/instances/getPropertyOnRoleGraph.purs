@@ -30,7 +30,7 @@ import Data.Array (elemIndex, uncons)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
+
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, type (~~>))
 import Perspectives.Instances.ObjectGetters (roleType_, binding) as OG
@@ -61,9 +61,9 @@ isLocallyRepresentedOn pt rt = do
 
 dispatchOnBindingType :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 dispatchOnBindingType pt (ST r) = getPropertyGetter pt r
-dispatchOnBindingType pt EMPTY = throwError (error ("dispatchOnBindingType: cannot handle EMPTY for " <> pt))
-dispatchOnBindingType pt UNIVERSAL = throwError (error ("dispatchOnBindingType: cannot handle UNIVERSAL for " <> pt))
-dispatchOnBindingType pt (PROD _) = throwError (error ("dispatchOnBindingType: cannot handle PRODUCT for " <> pt))
+dispatchOnBindingType pt EMPTY = throwError (Custom ("dispatchOnBindingType: cannot handle EMPTY for " <> pt))
+dispatchOnBindingType pt UNIVERSAL = throwError (Custom ("dispatchOnBindingType: cannot handle UNIVERSAL for " <> pt))
+dispatchOnBindingType pt (PROD _) = throwError (Custom ("dispatchOnBindingType: cannot handle PRODUCT for " <> pt))
 dispatchOnBindingType pt (SUM roles) = do
   (dispatchers :: Array Dispatcher) <- unsafePartial $ traverse dispatchOn roles
   pure $ untilOneSucceeds dispatchers

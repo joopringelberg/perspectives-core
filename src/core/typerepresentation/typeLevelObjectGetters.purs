@@ -27,7 +27,7 @@ import Control.Plus (empty, map, (<|>))
 import Data.Array (filter, find, foldM)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Effect.Exception (error)
+
 import Foreign.Object (keys, values)
 import Perspectives.CoreTypes (MonadPerspectives, type (~~~>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -72,7 +72,7 @@ lookForRoleOfADT criterium rname adt = ArrayT $ roleSet adt >>= case _ of
   PSet rs -> case find criterium rs of
     Nothing -> pure []
     Just r -> pure [r]
-  Universal -> throwError (error $ show (ContextHasNoRole adt rname))
+  Universal -> throwError (Custom $ show (ContextHasNoRole adt rname))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON CONTEXT TYPE

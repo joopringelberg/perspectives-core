@@ -35,7 +35,7 @@ import Data.Newtype (over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
+
 import Foreign.Generic (defaultOptions, genericEncodeJSON)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##>>))
@@ -73,7 +73,7 @@ sendTransactieToUser userId t = do
   getChannel <- getPropertyGetter "model:System$PerspectivesSystem$User$Channel" userType
   mchannel <- userId ##> getChannel
   case mchannel of
-    Nothing -> void $ throwError (error ("sendTransactieToUser: cannot find channel for user " <> (unwrap userId)))
+    Nothing -> void $ throwError (Custom ("sendTransactieToUser: cannot find channel for user " <> (unwrap userId)))
     Just (Value channel) -> do
       cdbUrl <- getCouchdbBaseURL
       (rq :: (Request String)) <- defaultPerspectRequest

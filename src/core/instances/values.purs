@@ -30,20 +30,21 @@ import Data.JSDate (JSDate, parse, toDateTime)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Exception (Error, error, try)
+import Effect.Exception (try)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Effect.Unsafe (unsafePerformEffect)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Prelude (bind, ($), pure, (<>), show)
 
--- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
+-- TODO. We gebruiken hier PerspectivesError, het javascript error type. Liever zou ik een
 -- PerspectivesRuntimeError type gebruiken. Maar dan moeten we MonadPerspectives aanpassen.
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
-parseDate :: forall m. MonadError Error m => String -> m DateTime
+parseDate :: forall m. MonadError PerspectivesError m => String -> m DateTime
 parseDate s = do
   (d :: JSDate) <- pure $ unsafePerformEffect $ parse s
   case toDateTime d of
-    Nothing -> throwError $ error "Not a date"
+    Nothing -> throwError $ Custom "Not a date"
     (Just (dt :: DateTime)) -> pure dt
 
 foreign import parseInt__ :: EffectFn1 String Int
@@ -51,9 +52,9 @@ foreign import parseInt__ :: EffectFn1 String Int
 parseInt_ :: String -> Effect Int
 parseInt_ = runEffectFn1 parseInt__
 
-parseInt :: forall m. MonadError Error m => MonadEffect m => String -> m Int
+parseInt :: forall m. MonadError PerspectivesError m => MonadEffect m => String -> m Int
 parseInt s = do
   r <- liftEffect $ try (parseInt_ s)
   case r of
-    Left e -> throwError (error $ "Cannot parse an integer from '" <> s <> "' (" <> show e <> ")")
+    Left e -> throwError (Custom $ "Cannot parse an integer from '" <> s <> "' (" <> show e <> ")")
     Right i -> pure i

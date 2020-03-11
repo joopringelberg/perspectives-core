@@ -24,7 +24,7 @@ module Perspectives.Representation.Class.Property where
 import Control.Monad.Error.Class (throwError)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Effect.Exception (error)
+
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Calculation(..))
 import Perspectives.Query.QueryTypes (range) as QT
@@ -56,7 +56,7 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
     c <- calculation r
     case QT.range c of
       (VDOM rn _) -> pure rn
-      otherwise -> throwError (error "")
+      otherwise -> throwError (Custom "")
   -- Hoe bepaal je of een Calculated property mandatory is? En wat betekent het?
   -- De betekenis is praktisch: als de property mandatory is, weet je dat er altijd een waarde is (al dan niet berekend).
   -- Een berekende property is alleen mandatory als al zijn componenten dat zijn; anders kan de berekening altijd leeg zijn. Maar dat is dus niet waar: 'exists' levert altijd een waarde op, of zijn argument nu mandatory is of niet.
@@ -66,7 +66,7 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
   functional r = pure true
   calculation r = case (unwrap r).calculation of
     Q calc -> pure calc
-    otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedProperty before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedPropertyType))))
+    otherwise -> throwError (Custom ("Attempt to acces QueryFunctionDescription of a CalculatedProperty before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedPropertyType))))
 
 instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty EnumeratedPropertyType where
   role r = (unwrap r).role

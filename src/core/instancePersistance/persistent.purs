@@ -51,7 +51,7 @@ import Prelude
 import Affjax (Request, request)
 import Affjax.RequestBody as RequestBody
 import Affjax.StatusCode (StatusCode(..))
-import Control.Monad.Except (catchError, throwError)
+import Control.Monad.Except (catchError, lift, throwError)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
@@ -70,6 +70,7 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthenticat
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
@@ -78,25 +79,25 @@ class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i wh
   database :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
-  database _ = do
+  database _ =  lift $ do
     userIdentifier <- getUserIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> userIdentifier <> "_entities/"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
-  database _ = do
+  database _ =  lift $ do
     userIdentifier <- getUserIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> userIdentifier <> "_entities/"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
-  database _ = do
+  database _ =  lift $ do
     userIdentifier <- getUserIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> userIdentifier <> "_models/"
 
 instance persistentCouchdbUser :: Persistent CouchdbUser UserName where
-  database _ = do
+  database _ =  lift $ do
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> "localusers/"
 
@@ -111,7 +112,7 @@ getPerspectEntiteit id =
       Nothing -> fetchEntiteit id
 
 entitiesDatabaseName :: MonadPerspectives String
-entitiesDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_entities/")
+entitiesDatabaseName =  lift $ getUserIdentifier >>= pure <<< (_ <> "_entities/")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
@@ -150,12 +151,12 @@ removeEntiteit entId = do
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
 fetchEntiteit :: forall a i. Persistent a i => i -> MonadPerspectives a
-fetchEntiteit id = ensureAuthentication $ catchError
+fetchEntiteit id = (lift ensureAuthentication) $ catchError
   do
     v <- representInternally id
     -- _ <- forkAff do
     ebase <- database id
-    (rq :: (Request String)) <- defaultPerspectRequest
+    (rq :: (Request String)) <-  lift $ defaultPerspectRequest
     res <- liftAff $ request $ rq {url = ebase <> unwrap id}
     void $ liftAff $ onAccepted res.status [200, 304] "fetchEntiteit"
       (onCorrectCallAndResponse "fetchEntiteit" res.body \a -> put a v)
@@ -165,7 +166,7 @@ fetchEntiteit id = ensureAuthentication $ catchError
     case mav of
       Nothing -> pure unit
       Just av -> liftAff $ kill (error ("Cound not find " <> unwrap id)) av
-    throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
+    throwError $ Custom ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
 
 -- | Save an entity, whether it has been saved before or not. It must be present in the cache.
 -- | On success it will have the same version in cache as in Couchdb.
@@ -196,7 +197,7 @@ saveUnversionedEntiteit :: forall a i r. GenericEncode r => Generic a r => Persi
 saveUnversionedEntiteit id = ensureAuthentication $ do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error ("saveUnversionedEntiteit needs a locally stored resource for " <> unwrap id)
+    Nothing -> throwError $ Custom ("saveUnversionedEntiteit needs a locally stored resource for " <> unwrap id)
     (Just avar) -> do
       pe <- liftAff $ take avar
       ebase <- database id
@@ -216,7 +217,7 @@ saveUnversionedEntiteit id = ensureAuthentication $ do
 saveVersionedEntiteit :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
 saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
   case (rev entiteit) of
-    Nothing -> throwError $ error ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)
+    Nothing -> throwError $ Custom ("saveVersionedEntiteit: entiteit has no revision, deltas are impossible: " <> unwrap entId)
     (Just rev) -> do
       ebase <- database entId
       (rq :: (Request String)) <- defaultPerspectRequest

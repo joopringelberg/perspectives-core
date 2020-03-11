@@ -38,15 +38,15 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (insert, lookup, remove)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
 
@@ -103,7 +103,7 @@ cacheInitially id e = do
       (av :: AVar a) <- representInternally id
       liftAff $ put e av
       pure av
-    otherwise -> throwError $ error $ "cacheInitially: the cache should not hold an AVar for " <> unwrap id
+    otherwise -> throwError $ Custom $ "cacheInitially: the cache should not hold an AVar for " <> unwrap id
 
 -- | Modify a PerspectEntiteit in the cache. Overwrites the revision value.
 cacheOverwritingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
@@ -125,11 +125,11 @@ readEntiteitFromCache :: forall a i. Cacheable a i => i -> MonadPerspectives a
 readEntiteitFromCache id = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
   case mAvar of
-    Nothing -> throwError $ error ("readEntiteitFromCache needs a locally stored resource for " <>  unwrap id)
+    Nothing -> throwError $ Custom ("readEntiteitFromCache needs a locally stored resource for " <>  unwrap id)
     (Just avar) -> do
       empty <- liftAff $ (status >=> pure <<< isEmpty) avar
       if empty
-        then throwError $ error ("readEntiteitFromCache found an empty AVar for " <> unwrap id)
+        then throwError $ Custom ("readEntiteitFromCache found an empty AVar for " <> unwrap id)
         else liftAff $ read avar
 
 -----------------------------------------------------------
