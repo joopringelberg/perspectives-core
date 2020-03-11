@@ -119,46 +119,40 @@ setYourRelayAddress host port channel = do
 -- | Also set replication for the channel to the post database.
 setChannelReplication :: ContextInstance -> MonadPerspectives Unit
 setChannelReplication channel = do
-  connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
-  myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
-  case myou of
+  getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+  mchannel <- channel ##> externalRole >=> getChannelId
+  case mchannel of
     Nothing -> pure unit
-    Just you -> do
-      host <- getPropertyFunction "sys:Channel$ConnectedPartner$Host"
-      hostValue <- you ##> host
-      case hostValue of
-        Nothing -> do
-          relayHost <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayHost"
-          relayHostValue <- you ##> relayHost
-          case relayHostValue of
-            Nothing -> pure unit
+    Just (Value channelId) -> do
+      connectedPartner <- getRoleFunction "sys:Channel$ConnectedPartner"
+      myou <- channel ##> filter connectedPartner (lift <<< lift <<< (isMe >=> pure <<< not))
+      case myou of
+        Nothing -> pure unit
+        Just you -> do
+          host <- getPropertyFunction "sys:Channel$ConnectedPartner$Host"
+          hostValue <- you ##> host
+          case hostValue of
+            Nothing -> do
+              relayHost <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayHost"
+              relayHostValue <- you ##> relayHost
+              case relayHostValue of
+                Nothing -> pure unit
+                Just (Value h) -> do
+                  -- if h equals the host of this PDR, just stop.
+                  relayPort <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayPort"
+                  portValue <- you ##> relayPort
+                  case portValue of
+                    Nothing -> pure unit
+                    Just (Value p) -> setPushAndPullReplication channelId h p
             Just (Value h) -> do
               -- if h equals the host of this PDR, just stop.
-              relayPort <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayPort"
-              portValue <- you ##> relayPort
+              port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
+              portValue <- you ##> port
               case portValue of
                 Nothing -> pure unit
-                Just (Value p) -> do
-                  getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
-                  mchannel <- channel ##> externalRole >=> getChannelId
-                  case mchannel of
-                    Nothing -> pure unit
-                    Just (Value channelId) -> do
-                      setPushAndPullReplication channelId h p
-                      -- Get the post db name.
-                      -- replicate channelId post
-        Just (Value h) -> do
-          -- if h equals the host of this PDR, just stop.
-          port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
-          portValue <- you ##> port
-          case portValue of
-            Nothing -> pure unit
-            Just (Value p) -> do
-              getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
-              mchannel <- channel ##> externalRole >=> getChannelId
-              case mchannel of
-                Nothing -> pure unit
-                Just (Value channelId) -> setPushReplication channelId h p
+                Just (Value p) -> setPushReplication channelId h p
+  -- Get the post db name.
+  -- replicate channelId post
 
 -- | Push local channel to remote.
 setPushReplication :: String -> String -> String -> MonadPerspectives Unit
