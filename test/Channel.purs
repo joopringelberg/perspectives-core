@@ -2,23 +2,27 @@ module Test.Sync.Channel where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Free (Free)
 import Control.Monad.Writer (lift)
 import Data.Array (head)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((##>), (##>>))
-import Perspectives.Couchdb.Databases (deleteDatabase)
+import Perspectives.Couchdb.Databases (addDocument, createDatabase, deleteDatabase, deleteDocument, endReplication, getDocument)
+import Perspectives.CouchdbState (CouchdbUser(..))
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (externalRole, isMe)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.Sync.Channel (addUserToChannel, createChannel, setMyAddress)
+import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplication, setMyAddress)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
+import Perspectives.User (getUser)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
@@ -73,7 +77,7 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
     clearUserDatabase
     )
 
-  testOnly "setMyAddress" (runP do
+  test "setMyAddress" (runP do
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     setupUser
     achannel <- runMonadPerspectivesTransaction createChannel
@@ -95,3 +99,25 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
         deleteDatabase channelId
         clearUserDatabase
     )
+
+  testOnly "local replication" (runP do
+    createDatabase "channel"
+    createDatabase "post"
+    localReplication "channel" "post"
+    (user :: CouchdbUser) <- gets $ _.userInfo
+    addDocument "channel" user "user"
+
+    -- Wait a bit
+    liftAff $ delay (Milliseconds 5000.0)
+    -- Now retrieve the document
+    (muser :: Maybe CouchdbUser) <- getDocument "post" "user"
+    liftAff $ assert "The 'user' document should now be in the post database!" (isJust muser)
+
+    void $ endReplication "channel" "post"
+    deleteDatabase "channel"
+    deleteDatabase "post"
+    )
+
+  test "endReplication" (runP do
+    success <- endReplication "channel" "post"
+    liftAff $ assert "It should be gone!" success)

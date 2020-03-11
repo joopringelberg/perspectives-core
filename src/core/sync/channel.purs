@@ -35,7 +35,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (##>))
-import Perspectives.Couchdb.Databases (createDatabase)
+import Perspectives.Couchdb.Databases (createDatabase, replicateContinuously)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
@@ -44,6 +44,7 @@ import Perspectives.Instances.ObjectGetters (isMe, externalRole)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<<<), (<>), (>=>), not)
 
 -- | Create a new database for the communication between `me` and another user.
@@ -117,6 +118,7 @@ setYourRelayAddress host port channel = do
 -- | For a channel, set the replication of the local copy to the database found at either Host or RelayHost.
 -- | If host and port are equal for both partners, do not set replication.
 -- | Also set replication for the channel to the post database.
+-- TODO. Zodra MonadPerspectives gestapeld is op ExceptT, gebruik dan throwError in plaats van pure unit.
 setChannelReplication :: ContextInstance -> MonadPerspectives Unit
 setChannelReplication channel = do
   getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
@@ -151,13 +153,38 @@ setChannelReplication channel = do
               case portValue of
                 Nothing -> pure unit
                 Just (Value p) -> setPushReplication channelId h p
-  -- Get the post db name.
-  -- replicate channelId post
+      post <- postDbName
+      localReplication channelId post
+
+postDbName :: MonadPerspectives String
+postDbName = do
+  userIdentifier <- getUserIdentifier
+  pure $ userIdentifier <> "_post/"
 
 -- | Push local channel to remote.
 setPushReplication :: String -> String -> String -> MonadPerspectives Unit
-setPushReplication channelDatabaseName host port = pure unit
+setPushReplication channelDatabaseName host port = do
+  base <- getCouchdbBaseURL
+  replicateContinuously
+    channelDatabaseName
+    (base <> channelDatabaseName)
+    (host <> ":" <> port <> "/" <> channelDatabaseName)
 
 -- | Push local channel to remote, pull remote channel to local.
 setPushAndPullReplication :: String -> String -> String -> MonadPerspectives Unit
-setPushAndPullReplication channelDatabaseName host port = pure unit
+setPushAndPullReplication channelDatabaseName host port = do
+  base <- getCouchdbBaseURL
+  replicateContinuously
+    channelDatabaseName
+    (base <> channelDatabaseName)
+    (host <> ":" <> port <> "/" <> channelDatabaseName)
+  replicateContinuously
+    channelDatabaseName
+    (host <> ":" <> port <> "/" <> channelDatabaseName)
+    (base <> channelDatabaseName)
+
+-- | Replicate source to target. Both databases are supposed to be local, so push or pull is unimportant.
+localReplication :: String -> String -> MonadPerspectives Unit
+localReplication source target = do
+  base <- getCouchdbBaseURL
+  replicateContinuously (source <> "_" <> target) (base <> source) (base <> target)
