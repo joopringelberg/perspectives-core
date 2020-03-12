@@ -11,6 +11,7 @@ import Data.Newtype (unwrap)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
+import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.CoreTypes ((##>), (##>>))
 import Perspectives.Couchdb.Databases (addDocument, createDatabase, deleteDatabase, deleteDocument, endReplication, getDocument)
 import Perspectives.CouchdbState (CouchdbUser(..))
@@ -18,9 +19,9 @@ import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (externalRole, isMe)
 import Perspectives.LoadCRL (loadAndSaveCrlFile)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplication, setMyAddress)
+import Perspectives.Sync.Channel (addUserToChannel, createChannel, localReplication, postDbName, setChannelReplication, setMyAddress, setYourAddress)
 import Perspectives.TypePersistence.LoadArc (loadCompileAndCacheArcFile')
 import Perspectives.User (getUser)
 import Test.Perspectives.Utils (clearUserDatabase, runP, setupUser)
@@ -100,7 +101,7 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
         clearUserDatabase
     )
 
-  testOnly "local replication" (runP do
+  test "local replication" (runP do
     createDatabase "channel"
     createDatabase "post"
     localReplication "channel" "post"
@@ -121,3 +122,39 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
   test "endReplication" (runP do
     success <- endReplication "channel" "post"
     liftAff $ assert "It should be gone!" success)
+
+  testOnly "setChannelReplication" (runP do
+    _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
+    setupUser
+    achannel <- runMonadPerspectivesTransaction do
+      channel <- createChannel
+      void $ lift2 $ loadAndSaveCrlFile "userJoop.crl" testDirectory
+      addUserToChannel (RoleInstance "model:User$JoopsSysteem$User_0001") channel
+      setYourAddress "http://127.0.0.1" 5984 channel
+      -- We now have a channel with two partners.
+      lift2 $ setChannelReplication channel
+      -- Because both partners are local, we just replicate the channel to post.
+      pure channel
+    -- Now we test whether a document put into the channel appears in the post.
+    case head achannel of
+      Nothing -> liftAff $ assert "There should be a channel" false
+      Just channel -> do
+        getChannelId <- getPropertyFunction "model:System$Channel$External$ChannelDatabaseName"
+        mchannel <- channel ##> externalRole >=> getChannelId
+        case mchannel of
+          Nothing -> pure unit
+          Just (Value channelId) -> do
+            (user :: CouchdbUser) <- gets $ _.userInfo
+            addDocument channelId user "user"
+            -- Wait a bit
+            liftAff $ delay (Milliseconds 5000.0)
+            -- Now retrieve the document
+            post <- postDbName
+            (muser :: Maybe CouchdbUser) <- getDocument post "user"
+            liftAff $ assert "The 'user' document should now be in the post database!" (isJust muser)
+
+            -- Clean up: end replication, remove the channel, clear the user entities database
+            void $ endReplication channelId post
+            deleteDatabase channelId
+            clearUserDatabase
+    )

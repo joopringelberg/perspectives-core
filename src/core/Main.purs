@@ -51,7 +51,13 @@ runPDR :: String -> String -> String -> Effect Unit
 runPDR usr pwd ident = void $ runAff handleError do
   url <- pure "http://127.0.0.1:5984/"
   (av :: AVar String) <- new "This value will be removed on first authentication!"
-  state <- new $ newPerspectivesState (CouchdbUser {userName: UserName usr, couchdbPassword: pwd, couchdbBaseURL: url, userIdentifier: ident, _rev: Nothing}) av
+  state <- new $ newPerspectivesState (CouchdbUser
+    { userName: UserName usr
+    , couchdbPassword: pwd
+    , couchdbHost: "http://127.0.0.1"
+    , couchdbPort: 5984
+    , userIdentifier: ident
+    , _rev: Nothing}) av
   void $ forkAff $ runPerspectivesWithState f state
   -- void $ forkAff $ runPerspectivesWithState setupTcpApi state
   where

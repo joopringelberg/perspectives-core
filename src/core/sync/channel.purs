@@ -44,8 +44,8 @@ import Perspectives.Instances.ObjectGetters (isMe, externalRole)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<<<), (<>), (>=>), not)
+import Perspectives.User (getCouchdbBaseURL, getHost, getUserIdentifier)
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<<<), (<>), (>=>), not, (==))
 
 -- | Create a new database for the communication between `me` and another user.
 -- | Create an instance of sys:Channel. Bind `me` in the role ConnectedPartner. Set the value of ChannelDatabaseName to
@@ -141,18 +141,26 @@ setChannelReplication channel = do
                 Nothing -> pure unit
                 Just (Value h) -> do
                   -- if h equals the host of this PDR, just stop.
-                  relayPort <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayPort"
-                  portValue <- you ##> relayPort
-                  case portValue of
-                    Nothing -> pure unit
-                    Just (Value p) -> setPushAndPullReplication channelId h p
+                  myHost <- getHost
+                  if myHost == h
+                    then pure unit
+                    else do
+                      relayPort <- getPropertyFunction "sys:Channel$ConnectedPartner$RelayPort"
+                      portValue <- you ##> relayPort
+                      case portValue of
+                        Nothing -> pure unit
+                        Just (Value p) -> setPushAndPullReplication channelId h p
             Just (Value h) -> do
               -- if h equals the host of this PDR, just stop.
-              port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
-              portValue <- you ##> port
-              case portValue of
-                Nothing -> pure unit
-                Just (Value p) -> setPushReplication channelId h p
+              myHost <- getHost
+              if myHost == h
+                then pure unit
+                else do
+                  port <- getPropertyFunction "sys:Channel$ConnectedPartner$Port"
+                  portValue <- you ##> port
+                  case portValue of
+                    Nothing -> pure unit
+                    Just (Value p) -> setPushReplication channelId h p
       post <- postDbName
       localReplication channelId post
 

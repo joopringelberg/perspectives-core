@@ -39,7 +39,8 @@ runPerspectives userName password userId mp = do
     newPerspectivesState (CouchdbUser
       { userName: UserName userName
       , couchdbPassword: password
-      , couchdbBaseURL: "http://127.0.0.1:5984/"
+      , couchdbHost: "http://127.0.0.1"
+      , couchdbPort: 5984
       , userIdentifier: userName
       , _rev: Nothing})
       av
