@@ -60,7 +60,7 @@ import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SaveUserData (removeRoleInstance, removeContextInstance)
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole)
-import Perspectives.User (getUserIdentifier)
+import Perspectives.User (getSystemIdentifier)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (<<<), (<>), discard, negate, (>=>), (==), (<$>), (>>=))
 
 -----------------------------------------------------------
@@ -203,8 +203,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetMeForContext -> do
       registerSupportedEffect corrId setter (context >=> getMe >=> roleType) (RoleInstance subject)
     Api.GetUserIdentifier -> do
-      userIdentifier <- getUserIdentifier
-      sendResponse (Result corrId [userIdentifier]) setter
+      sysId <- getSystemIdentifier
+      sendResponse (Result corrId [sysId]) setter
     Api.CreateContext -> case unwrap $ runExceptT $ decode contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextSerialization cd) :: Either (NonEmptyList ForeignError) ContextSerialization) -> void $ runMonadPerspectivesTransaction $ do

@@ -40,13 +40,13 @@ import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.PerspectivesState (insert, lookup, remove)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..))
 
@@ -67,7 +67,7 @@ type Identifier = String
 type Namespace = String
 
 class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i, i -> v where
-  cache :: MonadPerspectives (GLStrMap (AVar v))
+  theCache :: MonadPerspectives (GLStrMap (AVar v))
   -- | Create an empty AVar that will be filled by the PerspectEntiteit.
   representInternally :: i -> MonadPerspectives (AVar v)
   retrieveInternally :: i -> MonadPerspectives (Maybe (AVar v))
@@ -79,22 +79,14 @@ class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i
 -- overwriteWithOldRevision
 cachePreservingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
 cachePreservingRevision id e = do
-  (mAvar :: Maybe (AVar a)) <- retrieveInternally id
-  case mAvar of
-    Nothing -> cacheInitially id e
-    (Just avar) -> do
-      empty <- liftAff $ (status >=> pure <<< isEmpty) avar
-      -- This is a precaution to prevent us from waiting on an operation that does not return.
-      if empty
-        then liftAff $ put e avar *> pure avar
-        else do
-          ent <- liftAff $ take avar
-          e' <- pure $ changeRevision (rev ent) e
-          liftAff $ put e' avar
-          pure avar
+  (mcachedE :: Maybe a) <- tryReadEntiteitFromCache id
+  case mcachedE of
+    Nothing -> cache id e
+    Just cachedE -> cache id (changeRevision (rev cachedE) e)
 
 -- | Store an internally created PerspectEntiteit for the first time in the local store.
 -- cacheInitially
+-- TODO. Overbodig
 cacheInitially :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
 cacheInitially id e = do
   (mAvar :: Maybe (AVar a)) <- retrieveInternally id
@@ -106,12 +98,30 @@ cacheInitially id e = do
     otherwise -> throwError $ error $ "cacheInitially: the cache should not hold an AVar for " <> unwrap id
 
 -- | Modify a PerspectEntiteit in the cache. Overwrites the revision value.
+-- TODO. Overbodig
 cacheOverwritingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
 cacheOverwritingRevision id e = do
   mAvar <- retrieveInternally id
   case mAvar of
     Nothing -> cacheInitially id e
     (Just avar) -> do
+      empty <- liftAff $ (status >=> pure <<< isEmpty) avar
+      if empty
+        then liftAff $ put e avar *> pure avar
+        else do
+          _ <- liftAff $ take avar
+          liftAff $ put e avar *> pure avar
+
+-- TODO. Vervang cacheInitially en cacheOverwritingRevision door deze functie.
+cache :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
+cache id e = do
+  mAvar <- retrieveInternally id
+  case mAvar of
+    Nothing -> do
+      (av :: AVar a) <- representInternally id
+      liftAff $ put e av
+      pure av
+    Just avar -> do
       empty <- liftAff $ (status >=> pure <<< isEmpty) avar
       if empty
         then liftAff $ put e avar *> pure avar
@@ -132,38 +142,49 @@ readEntiteitFromCache id = do
         then throwError $ error ("readEntiteitFromCache found an empty AVar for " <> unwrap id)
         else liftAff $ read avar
 
+tryReadEntiteitFromCache :: forall a i. Cacheable a i => i -> MonadPerspectives (Maybe a)
+tryReadEntiteitFromCache id = do
+  (mAvar :: Maybe (AVar a)) <- retrieveInternally id
+  case mAvar of
+    Nothing -> pure Nothing
+    (Just avar) -> do
+      empty <- liftAff $ (status >=> pure <<< isEmpty) avar
+      if empty
+        then pure Nothing
+        else Just <$> (liftAff $ read avar)
+
 -----------------------------------------------------------
 -- INSTANCES
 -----------------------------------------------------------
 instance cacheablePerspectContext :: Cacheable PerspectContext ContextInstance where
   -- identifier = _._id <<< unwrap
-  cache = gets _.contextInstances
+  theCache = gets _.contextInstances
   representInternally c = do
     av <- liftAff empty
-    insert cache (unwrap c) av
-  retrieveInternally i = lookup cache (unwrap i)
-  removeInternally i = remove cache (unwrap i)
+    insert theCache (unwrap c) av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)
 
 instance cacheablePerspectRol :: Cacheable PerspectRol RoleInstance where
-  cache = gets _.rolInstances
+  theCache = gets _.rolInstances
   representInternally c = do
     av <- liftAff empty
-    insert cache (unwrap c) av
-  retrieveInternally i = lookup cache (unwrap i)
-  removeInternally i = remove cache (unwrap i)
+    insert theCache (unwrap c) av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)
 
 instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
-  cache = gets _.domeinCache
+  theCache = gets _.domeinCache
   representInternally c = do
     av <- liftAff empty
-    insert cache (unwrap c) av
-  retrieveInternally i = lookup cache (unwrap i)
-  removeInternally i = remove cache (unwrap i)
+    insert theCache (unwrap c) av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)
 
 instance cacheableCouchdbUser :: Cacheable CouchdbUser UserName where
-  cache = pure $ new unit
+  theCache = pure $ new unit
   representInternally c = do
     av <- liftAff empty
-    insert cache (unwrap c) av
-  retrieveInternally i = lookup cache (unwrap i)
-  removeInternally i = remove cache (unwrap i)
+    insert theCache (unwrap c) av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)

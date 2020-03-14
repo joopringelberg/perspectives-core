@@ -51,6 +51,6 @@ authenticate usr pwd = do
   muser <- runPerspectives "authenticator" "secret" "authenticator" (tryGetPerspectEntiteit $ UserName usr)
   case muser of
     Nothing -> pure UnknownUser
-    Just cdbu@(CouchdbUser{couchdbPassword, userIdentifier}) -> if pwd == couchdbPassword
+    Just cdbu@(CouchdbUser{couchdbPassword}) -> if pwd == couchdbPassword
       then pure $ OK cdbu
       else pure WrongPassword

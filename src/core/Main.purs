@@ -56,7 +56,7 @@ runPDR usr pwd ident = void $ runAff handleError do
     , couchdbPassword: pwd
     , couchdbHost: "http://127.0.0.1"
     , couchdbPort: 5984
-    , userIdentifier: ident
+    , systemIdentifier: ident
     , _rev: Nothing}) av
   void $ forkAff $ runPerspectivesWithState f state
   -- void $ forkAff $ runPerspectivesWithState setupTcpApi state
@@ -85,6 +85,6 @@ authenticate usr pwd callback = void $ runAff handler do
     handler (Right r) = case r of
       UnknownUser -> callback 0
       WrongPassword -> callback 1
-      OK (CouchdbUser{userIdentifier})-> do
-        runPDR usr pwd userIdentifier
+      OK (CouchdbUser{systemIdentifier})-> do
+        runPDR usr pwd systemIdentifier
         callback 2

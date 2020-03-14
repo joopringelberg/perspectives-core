@@ -39,7 +39,7 @@ import Perspectives.Couchdb.Databases (addViewToDatabase, allDbs, createDatabase
 import Perspectives.CouchdbState (MonadCouchdb, CouchdbUser(..), runMonadCouchdb)
 import Perspectives.Persistent (entitiesDatabaseName, saveEntiteit_)
 import Perspectives.RunPerspectives (runPerspectives)
-import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
+import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
@@ -48,13 +48,13 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (<<<), (<>), (>>=))
 -----------------------------------------------------------
 setupCouchdbForFirstUser :: String -> String -> Aff Unit
 setupCouchdbForFirstUser usr pwd = do
+  -- TODO: genereer hier de systeemIdentifier als een guid.
   runMonadCouchdb usr pwd usr do
-    -- TODO: genereer userIdentifier als Guid!
     createFirstAdmin usr pwd
     -- Now authenticate
     ensureAuthentication do
       createSystemDatabases
-      getUserIdentifier >>= createUserDatabases
+      getSystemIdentifier >>= createUserDatabases
       -- For now, we initialise the repository, too.
       initRepository
   runPerspectives usr pwd usr do
@@ -71,8 +71,9 @@ setupCouchdbForFirstUser usr pwd = do
 setupCouchdbForAnotherUser :: String -> String -> MonadPerspectives Unit
 setupCouchdbForAnotherUser usr pwd = do
   createAnotherAdmin usr pwd
+  -- TODO: genereer hier de systeemIdentifier als een guid.
   lift $ runPerspectives usr pwd usr do
-    getUserIdentifier >>= createUserDatabases
+    getSystemIdentifier >>= createUserDatabases
     addUserToLocalUsers
     entitiesDatabaseName >>= setRoleView
 

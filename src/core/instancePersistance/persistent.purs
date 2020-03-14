@@ -70,28 +70,28 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthenticat
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, cachePreservingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.User (getCouchdbBaseURL, getUserIdentifier)
+import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   database :: i -> MP String
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   database _ = do
-    userIdentifier <- getUserIdentifier
+    userIdentifier <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> userIdentifier <> "_entities/"
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   database _ = do
-    userIdentifier <- getUserIdentifier
+    userIdentifier <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> userIdentifier <> "_entities/"
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   database _ = do
-    userIdentifier <- getUserIdentifier
+    userIdentifier <- getSystemIdentifier
     cdbUrl <- getCouchdbBaseURL
     pure $ cdbUrl <> userIdentifier <> "_models/"
 
@@ -111,7 +111,7 @@ getPerspectEntiteit id =
       Nothing -> fetchEntiteit id
 
 entitiesDatabaseName :: MonadPerspectives String
-entitiesDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_entities/")
+entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities/")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit
@@ -184,7 +184,10 @@ saveEntiteit_ id pe = do
     Nothing -> do
       (av :: Maybe (AVar a)) <- retrieveInternally id
       case av of
-        (Just avar) -> saveUnversionedEntiteit id
+        (Just avar) -> do
+          -- kijken of er een revisie is?
+          void $ cachePreservingRevision id pe
+          saveUnversionedEntiteit id
         Nothing -> do
           void $ cacheInitially id pe
           saveUnversionedEntiteit id

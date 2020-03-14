@@ -15,6 +15,7 @@
   "main": "dist/perspectives-core.js",
   "homepage": "https://github.com/joopringelberg/perspectives-core#readme",
   "scripts": {
+    "build": "webpack",
     "watch": "webpack --watch",
     "symlinks": "./createPerspectivesLinks.sh",
     "docs": "./gendocs.sh"

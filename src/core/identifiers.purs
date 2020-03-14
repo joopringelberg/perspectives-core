@@ -309,6 +309,7 @@ defaultNamespaces = OBJ.fromFoldable
   , Tuple "usr" "model:User"
   ]
 
+-- TODO. Pas getUserIdentifier hier toe. Dan moet dit in MonadPerspectives.
 defaultIndexedNames :: OBJ.Object String
 defaultIndexedNames = OBJ.fromFoldable
   [ Tuple "model:User$Me" "model:User$MijnSysteem$User_0001"

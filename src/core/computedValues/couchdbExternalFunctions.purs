@@ -26,6 +26,7 @@ module Perspectives.Extern.Couchdb where
 import Affjax (Request, URL, printResponseFormatError, request)
 import Affjax.RequestBody (string) as RequestBody
 import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.Except (runExcept)
 import Control.Monad.State (StateT, execStateT, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
@@ -38,11 +39,13 @@ import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
+import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log, logShow)
 import Effect.Exception (error)
-import Foreign.Generic (defaultOptions, genericEncodeJSON)
+import Foreign.Generic (decodeJSON, defaultOptions, encodeJSON, genericEncodeJSON)
 import Foreign.Generic.Class (class GenericEncode)
 import Foreign.Object (Object, insert, lookup)
 import Perspectives.CollectAffectedContexts (lift2)
@@ -57,12 +60,12 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileId)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hiddenFunctionInsert)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (isMe)
-import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, saveEntiteit, saveEntiteit_)
-import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
+import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cache, cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.User (getUserIdentifier)
-import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<<<), (<>), (>>=))
+import Perspectives.User (getMySystem, getSystemIdentifier)
+import Prelude (class Monad, Unit, bind, discard, map, pure, show, unit, void, ($), (<<<), (<>), (>>=), (||), (==))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Retrieve from the repository the external roles of instances of sys:Model.
@@ -70,7 +73,8 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | TODO: provide a repository parameter, so the URL is taken from the repository rather than hardcoded.
 models :: MPQ RoleInstance
 models = ArrayT do
-  tell [assumption "model:User$MijnSysteem" ophaalTellerName]
+  sysId <- lift getSystemIdentifier
+  tell [assumption sysId ophaalTellerName]
   lift $ getExternalRoles
 
   where
@@ -84,11 +88,15 @@ models = ArrayT do
     getExternalRoles = do
       (roles :: Array PerspectRol) <- getViewOnDatabase "repository" "defaultViews" "modeldescriptions" Nothing
       for roles \r@(PerspectRol{_id}) -> do
-        void $ cachePreservingRevision _id r
+        -- If the model is already in use, this role has been saved before.
+        (savedRole :: Maybe PerspectRol) <- tryGetPerspectEntiteit _id
+        case savedRole of
+          Nothing -> void $ cache _id r
+          Just _ -> pure unit
         pure _id
 
 modelsDatabaseName :: MonadPerspectives String
-modelsDatabaseName = getUserIdentifier >>= pure <<< (_ <> "_models/")
+modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models/")
 
 -- | Retrieves all instances of a particular role type from Couchdb.
 -- | For example: `user: Users = callExternal cdb:RoleInstances("model:System$PerspectivesSystem$User") returns: model:System$PerspectivesSystem$User`
@@ -97,7 +105,7 @@ roleInstances :: Array String -> MPQ RoleInstance
 roleInstances roleTypes = ArrayT $ lift $ do
   (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
   for roles \r@(PerspectRol{_id}) -> do
-    void $ cachePreservingRevision _id r
+    void $ cache _id r
     pure _id
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
@@ -113,16 +121,20 @@ addModelToLocalStore urls = do
         -- Retrieve the DomeinFile from the URL.
       (rq :: (Request String)) <- lift $ lift $ defaultPerspectRequest
       res <- liftAff $ request $ rq {url = url}
-      (df@(DomeinFile{_id, contextInstances, roleInstances: roleInstances', modelDescription}) :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
+      (raw :: DomeinFile) <- liftAff $ onAccepted res.status [200, 304] "addModelToLocalStore"
         (onCorrectCallAndResponse "addModelToLocalStore" res.body \a -> pure unit)
+
+      sysId <- lift2 getMySystem
+      (df@(DomeinFile{_id, contextInstances, roleInstances: roleInstances', modelDescription}) :: DomeinFile) <- replaceSystemIdentifier sysId raw
+
       rev <- version res.headers
       -- Store the model in Couchdb. Remove the revision: it belongs to the repository,
       -- not the local perspect_models.
       save (identifier df :: DomeinFileId) (changeRevision Nothing df)
       -- Copy the attachment
       lift $ lift $ addA url _id
-      -- Take the role- and contextinstances from it and add them to the user (instances) database.
 
+      -- Take the role- and contextinstances from it and add them to the user (instances) database.
       -- We have to cache all roleInstances (except the external role of the modeldescription) first,
       -- otherwise we cannot see what its `isMe` must be.
       forWithIndex_ roleInstances' \i a -> void $ lift $ lift $ try (cacheInitially (RoleInstance i) a)
@@ -142,10 +154,19 @@ addModelToLocalStore urls = do
             -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
             -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
 
+    -- Replace all occurrences of "model:User$MijnSysteem" in the **text** of the DomeinFile with an identifier of the
+    -- form "model:User$<guid>"
+    replaceSystemIdentifier :: String -> DomeinFile -> MonadPerspectivesTransaction DomeinFile
+    replaceSystemIdentifier sysId c = case runExcept $ decodeJSON $ replaceAll (Pattern "model:User$MijnSysteem") (Replacement sysId) (encodeJSON c) of
+      Left e -> do
+        logShow e
+        pure c
+      Right s' -> pure s'
+
     saveRoleInstances :: Object PerspectRol -> StateT (Object PerspectContext) MonadPerspectives Unit
-    saveRoleInstances ris = forWithIndex_ ris \i a@(PerspectRol{context}) -> do
+    saveRoleInstances ris = forWithIndex_ ris \i a@(PerspectRol{context, pspType}) -> do
       me <- lift $ isMe (RoleInstance i)
-      if me
+      if me || pspType == (EnumeratedRoleType "model:System$PerspectivesSystem$User")
         then do
           void $ lift $ saveEntiteit_ (RoleInstance i) (changeRol_isMe a true)
           void $ modify \cis -> case lookup (unwrap context) cis of

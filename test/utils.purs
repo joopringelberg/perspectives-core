@@ -22,6 +22,11 @@ runP :: forall a.
   Aff a
 runP t = runPerspectives "cor" "geheim" "cor" t
 
+runPJoop :: forall a.
+  MonadPerspectives a ->
+  Aff a
+runPJoop t = runPerspectives "joop" "geheim" "joop" t
+
 p :: String -> String
 p s = "model:Perspectives$" <> s
 

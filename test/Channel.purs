@@ -35,7 +35,7 @@ modelDirectory :: String
 modelDirectory = "src/model"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.Sync.Channel" do
+theSuite = suite "Perspectives.Sync.Channel" do
 
   test "createChannel" (runP do
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
@@ -104,7 +104,7 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
   test "local replication" (runP do
     createDatabase "channel"
     createDatabase "post"
-    localReplication "channel" "post"
+    localReplication "channel" "post" Nothing
     (user :: CouchdbUser) <- gets $ _.userInfo
     addDocument "channel" user "user"
 
@@ -123,7 +123,7 @@ theSuite = suiteOnly "Perspectives.Sync.Channel" do
     success <- endReplication "channel" "post"
     liftAff $ assert "It should be gone!" success)
 
-  testOnly "setChannelReplication" (runP do
+  test "setChannelReplication" (runP do
     _ <- loadCompileAndCacheArcFile' "perspectivesSysteem" modelDirectory
     setupUser
     achannel <- runMonadPerspectivesTransaction do

@@ -21,7 +21,6 @@
 
 module Perspectives.Instances.ObjectGetters where
 
-import Control.Alt ((<|>))
 import Control.Monad.Writer (lift, tell)
 import Data.Array (findIndex, head, index, singleton)
 import Data.Foldable (for_)
@@ -32,7 +31,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Foreign.Object (insert, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_isMe, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_pspType, context_rolInContext, rol_binding, rol_context, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (##>), type (~~>), MP, MonadPerspectives, assumption)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -40,8 +39,8 @@ import Perspectives.Identifiers (LocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..), externalRole) as IP
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, saveEntiteit_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType)
-import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>))
+import Perspectives.Representation.TypeIdentifiers (ActionType, ContextType, EnumeratedPropertyType, EnumeratedRoleType(..))
+import Prelude (Unit, bind, discard, flip, identity, join, map, pure, void, ($), (*>), (<<<), (<>), (==), (>>=), (>>>), (||))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -180,8 +179,8 @@ allRoleBinders r = ArrayT do
 
 isMe :: RoleInstance -> MP Boolean
 isMe ri = do
-  (IP.PerspectRol{isMe: me, binding: bnd}) <- getPerspectRol ri
-  if me
+  (IP.PerspectRol{isMe: me, binding: bnd, pspType}) <- getPerspectRol ri
+  if me || pspType == (EnumeratedRoleType "model:System$PerspectivesSystem$User")
     then pure true
     else case bnd of
       Nothing -> pure false

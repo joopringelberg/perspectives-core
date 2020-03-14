@@ -8,7 +8,7 @@ module.exports = {
     filename: "perspectives-core.js",
     path: path.join(__dirname, "dist")
   },
-  watch: true,
+  watch: false,
   mode: "development",
   target: "electron-renderer",
   module: {

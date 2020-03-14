@@ -33,7 +33,7 @@ import Prelude (bind, ($))
 -- | Run an action in MonadPerspectives, given a username and password.
 runPerspectives :: forall a. String -> String -> String -> MonadPerspectives a
   -> Aff a
-runPerspectives userName password userId mp = do
+runPerspectives userName password systemId mp = do
   (av :: AVar String) <- new "This value will be removed on first authentication!"
   (rf :: AVar PerspectivesState) <- new $
     newPerspectivesState (CouchdbUser
@@ -41,7 +41,7 @@ runPerspectives userName password userId mp = do
       , couchdbPassword: password
       , couchdbHost: "http://127.0.0.1"
       , couchdbPort: 5984
-      , userIdentifier: userName
+      , systemIdentifier: systemId
       , _rev: Nothing})
       av
   runReaderT mp rf

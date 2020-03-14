@@ -26,7 +26,7 @@ module Perspectives.Sync.Channel where
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
@@ -34,23 +34,23 @@ import Foreign.Object (empty, fromFoldable)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CollectAffectedContexts (lift2)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (##>))
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives, (##=), (##>), (##>>))
 import Perspectives.Couchdb.Databases (createDatabase, replicateContinuously)
 import Perspectives.Guid (guid)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
-import Perspectives.Instances.ObjectGetters (isMe, externalRole)
+import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.User (getCouchdbBaseURL, getHost, getUserIdentifier)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (<<<), (<>), (>=>), not, (==))
+import Perspectives.User (getCouchdbBaseURL, getHost, getMySystem, getUserIdentifier)
+import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>))
 
 -- | Create a new database for the communication between `me` and another user.
 -- | Create an instance of sys:Channel. Bind `me` in the role ConnectedPartner. Set the value of ChannelDatabaseName to
 -- | that of the new database.
--- | Bind the new Channel to usr:MijnSysteem in the role Channels.
+-- | Bind the new Channel to MySystem in the role Channels.
 createChannel :: MonadPerspectivesTransaction ContextInstance
 createChannel = do
   channelName <- pure ("channel_" <> (show $ guid unit))
@@ -70,8 +70,9 @@ createChannel = do
   case eChannel of
     Left e -> throwError (error ("createChannel could not create channel: " <> show e))
     Right (channel :: ContextInstance) -> do
+      sysId <- lift2 getMySystem
       void $ createAndAddRoleInstance (EnumeratedRoleType "model:System$PerspectivesSystem$Channels")
-        "model:User$MijnSysteem"
+        sysId
         (RolSerialization
           { properties: PropertySerialization empty,
           binding: Just (buitenRol $ unwrap channel)})
@@ -131,6 +132,8 @@ setChannelReplication channel = do
       case myou of
         Nothing -> pure unit
         Just you -> do
+          -- yourIdentifier
+          (RoleInstance userBehindYou) <- you ##>> bottom
           host <- getPropertyFunction "sys:Channel$ConnectedPartner$Host"
           hostValue <- you ##> host
           case hostValue of
@@ -149,7 +152,8 @@ setChannelReplication channel = do
                       portValue <- you ##> relayPort
                       case portValue of
                         Nothing -> pure unit
-                        Just (Value p) -> setPushAndPullReplication channelId h p
+                        -- Push local copy of channel to RelayHost. Author = you
+                        Just (Value p) -> setPushAndPullReplication channelId h p userBehindYou
             Just (Value h) -> do
               -- if h equals the host of this PDR, just stop.
               myHost <- getHost
@@ -160,9 +164,12 @@ setChannelReplication channel = do
                   portValue <- you ##> port
                   case portValue of
                     Nothing -> pure unit
-                    Just (Value p) -> setPushReplication channelId h p
-      post <- postDbName
-      localReplication channelId post
+                    -- Push local copy of channel to PeerHost. Author = me
+                    Just (Value p) -> do
+                      me <- getUserIdentifier
+                      setPushReplication channelId h p me
+          post <- postDbName
+          localReplication channelId post (Just userBehindYou)
 
 postDbName :: MonadPerspectives String
 postDbName = do
@@ -170,29 +177,39 @@ postDbName = do
   pure $ userIdentifier <> "_post/"
 
 -- | Push local channel to remote.
-setPushReplication :: String -> String -> String -> MonadPerspectives Unit
-setPushReplication channelDatabaseName host port = do
+setPushReplication :: String -> String -> String -> String -> MonadPerspectives Unit
+setPushReplication channelDatabaseName host port author = do
   base <- getCouchdbBaseURL
   replicateContinuously
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
+    (Just $ fromFoldable [Tuple "author" author])
 
--- | Push local channel to remote, pull remote channel to local.
-setPushAndPullReplication :: String -> String -> String -> MonadPerspectives Unit
-setPushAndPullReplication channelDatabaseName host port = do
+-- | Push local channel to remote, pull remote channel on the RelayHost to local.
+setPushAndPullReplication :: String -> String -> String -> String -> MonadPerspectives Unit
+setPushAndPullReplication channelDatabaseName host port author = do
   base <- getCouchdbBaseURL
+  -- Push my Transactions outwards;
+  me <- getUserIdentifier
   replicateContinuously
     channelDatabaseName
     (base <> channelDatabaseName)
     (host <> ":" <> port <> "/" <> channelDatabaseName)
+    (Just $ fromFoldable [Tuple "author" me])
+  -- Pull in all Transactions from the partner inwards.
   replicateContinuously
     channelDatabaseName
     (host <> ":" <> port <> "/" <> channelDatabaseName)
     (base <> channelDatabaseName)
+    (Just $ fromFoldable [Tuple "author" author])
 
 -- | Replicate source to target. Both databases are supposed to be local, so push or pull is unimportant.
-localReplication :: String -> String -> MonadPerspectives Unit
-localReplication source target = do
+localReplication :: String -> String -> Maybe String -> MonadPerspectives Unit
+localReplication source target author = do
   base <- getCouchdbBaseURL
-  replicateContinuously (source <> "_" <> target) (base <> source) (base <> target)
+  replicateContinuously
+    (source <> "_" <> target)
+    (base <> source)
+    (base <> target)
+    (maybe Nothing (\a -> Just $ fromFoldable [Tuple "author" a]) author)
