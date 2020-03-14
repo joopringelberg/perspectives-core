@@ -48,15 +48,16 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, expandDefaultNamespaces, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructModelName, endsWithSegments, isQualifiedWithDomein)
 import Perspectives.InvertedQuery (InvertedQuery(..))
+import Perspectives.Names (defaultIndexedNames, expandDefaultNamespaces)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Assignment(..), AssignmentOperator(..), LetStep(..), Step)
 import Perspectives.Parsing.Arc.IndentParser (ArcPosition)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, modifyDF, runPhaseTwo_', withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeComposition, makeSequence)
+import Perspectives.Query.DescriptionCompiler (addVarBindingToSequence, compileStep, makeSequence)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, mandatory, range)
 import Perspectives.Representation.ADT (ADT(..), reduce)
 import Perspectives.Representation.Action (Action(..))
@@ -80,22 +81,24 @@ import Prelude (Unit, bind, discard, map, pure, unit, void, ($), (<$>), (<*>), (
 
 phaseThree :: DomeinFileRecord -> MP (Either PerspectivesError DomeinFileRecord)
 phaseThree df@{_id} = do
-    (Tuple ei {dfr}) <- runPhaseTwo_'
-      (do
-        qualifyActionRoles
-        qualifyBindings
-        qualifyPropertyReferences
-        qualifyViewReferences
-        -- inverseBindings  -- not yet implemented, probably unnecessary.
-        qualifyReturnsClause
-        invertedQueriesForLocalRolesAndProperties
-        compileExpressions
-        compileRules
-        )
-      df
-    case ei of
-      (Left e) -> pure $ Left e
-      otherwise -> pure $ Right dfr
+  indexedNames <- defaultIndexedNames
+  (Tuple ei {dfr}) <- runPhaseTwo_'
+    (do
+      qualifyActionRoles
+      qualifyBindings
+      qualifyPropertyReferences
+      qualifyViewReferences
+      -- inverseBindings  -- not yet implemented, probably unnecessary.
+      qualifyReturnsClause
+      invertedQueriesForLocalRolesAndProperties
+      compileExpressions
+      compileRules
+      )
+    df
+    indexedNames
+  case ei of
+    (Left e) -> pure $ Left e
+    otherwise -> pure $ Right dfr
 
 getDF :: Unit -> PhaseThree DomeinFileRecord
 getDF _ = lift $ gets _.dfr
@@ -291,7 +294,8 @@ qualifyReturnsClause = (lift $ gets _.dfr) >>= qualifyReturnsClause'
       (\(CalculatedRole rr@{_id, calculation, pos}) -> do
         case calculation of
           Q (MQD dom (QF.ExternalCoreRoleGetter f) args (RDOM (ST (EnumeratedRoleType computedType))) isF isM) -> do
-            qComputedType <- qualifyRoleType pos (expandDefaultNamespaces computedType) enumeratedRoles
+            computedType' <- lift $ lift $ expandDefaultNamespaces computedType
+            qComputedType <- qualifyRoleType pos computedType' enumeratedRoles
             if computedType == unwrap qComputedType
               then pure unit
               else -- change the role in the domain
@@ -586,11 +590,12 @@ compileRules = do
                   otherwise -> throwError $ NotAPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty
                 pure $ BQD currentDomain fname valueQfd roleQfd currentDomain True True
               ExternalEffect f@{start, end, effectName, arguments} -> do
-                case (deconstructModelName (expandDefaultNamespaces effectName)) of
+                effectName' <- lift $ lift (expandDefaultNamespaces effectName)
+                case (deconstructModelName effectName' ) of
                   Nothing -> throwError (NotWellFormedName start effectName)
                   Just modelName -> if isExternalCoreModule modelName
                     then do
-                      mappedFunctionName <- pure $ mapName (expandDefaultNamespaces effectName)
+                      mappedFunctionName <- lift $ lift (mapName <$> (expandDefaultNamespaces effectName))
                       mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs mappedFunctionName
                       case mexpectedNrOfArgs of
                         Nothing -> throwError (UnknownExternalFunction start end mappedFunctionName)

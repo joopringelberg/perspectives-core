@@ -29,9 +29,7 @@ import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, stripSuff
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Tuple (Tuple(..))
 import Effect.Exception (Error, error)
-import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (onNothing')
 import Prelude (class Show, flip, identity, ($), (<<<), (<>), (==), (||), class Eq, (&&), eq)
@@ -278,48 +276,3 @@ getSecondMatch :: Regex -> String -> Maybe String
 getSecondMatch regex s = case match regex s of
   (Just (matches :: NonEmptyArray (Maybe String))) -> maybe Nothing identity (index matches 2)
   _ -> Nothing
-
------------------------------------------------------------
--- EXPAND DEFAULT NAMESPACES
------------------------------------------------------------
--- | Replace `sys:User` by `model:Systeem$User` if sys = `model:Systeem`
--- | Useful for expanding local names used in bindings, property- and view references.
-expandDefaultNamespaces :: String -> String
-expandDefaultNamespaces n = let
-  expandedName = expandNamespaces defaultNamespaces n in
-  case OBJ.lookup expandedName defaultIndexedNames of
-    (Just ind) -> ind
-    Nothing -> expandedName
-
-expandNamespaces :: OBJ.Object String -> String -> String
-expandNamespaces namespaces s = if isQualifiedWithDomein s then s else
-  case deconstructPrefix s of
-    (Just pre) -> do
-      case OBJ.lookup pre namespaces of
-        (Just modelName) -> case deconstructLocalNameFromCurie s of
-          (Just ln) -> (modelName <> "$" <> ln )
-          Nothing -> s
-        Nothing -> s
-    Nothing -> s
-
-defaultNamespaces :: OBJ.Object String
-defaultNamespaces = OBJ.fromFoldable
-  [ Tuple "cdb" "model:Couchdb"
-  , Tuple "sys" "model:System"
-  , Tuple "usr" "model:User"
-  ]
-
--- TODO. Pas getUserIdentifier hier toe. Dan moet dit in MonadPerspectives.
-defaultIndexedNames :: OBJ.Object String
-defaultIndexedNames = OBJ.fromFoldable
-  [ Tuple "model:User$Me" "model:User$MijnSysteem$User_0001"
-
-  ]
------------------------------------------------------------
--- CONVENIENCE NAMESPACE PREFIX FUNCIONS
------------------------------------------------------------
-q :: String -> String
-q ln = "model:QueryAst$" <> ln
-
-psp :: String -> String
-psp ln = "model:Perspectives$" <> ln

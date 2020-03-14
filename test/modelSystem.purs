@@ -23,7 +23,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit)
 import Perspectives.Query.Compiler (getRoleFunction)
-import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, removeInternally)
+import Perspectives.Representation.Class.Cacheable (cacheEntity, removeInternally)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
@@ -82,7 +82,7 @@ theSuite = suiteSkip  "Model:System" do
           (RolSerialization{ properties: PropertySerialization empty, binding: Just descriptionId})
         role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head roleIds)
         b <- getPerspectRol (RoleInstance descriptionId)
-        void $ cacheOverwritingRevision (RoleInstance descriptionId) (addRol_gevuldeRollen b binder _id)
+        void $ cacheEntity (RoleInstance descriptionId) (addRol_gevuldeRollen b binder _id)
         void $ saveEntiteit (RoleInstance descriptionId)
 
         -- Check if model:TestBotActie is in perspect_models

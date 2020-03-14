@@ -15,12 +15,12 @@ testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
 
 theSuite :: Free TestF Unit
-theSuite = suiteOnly "Perspectives.SetupCouchdb" do
+theSuite = suiteSkip "Perspectives.SetupCouchdb" do
   test "setupCouchdbForFirstUser" do
     setupCouchdbForFirstUser "cor" "geheim"
     assert "Just ran 'setupCouchdbForFirstUser'" true
 
-  testOnly "setupCouchdbForAnotherUser" (runP do
+  test "setupCouchdbForAnotherUser" (runP do
     setupCouchdbForAnotherUser "cor" "geheim"
     liftAff $ assert "Just ran 'setupCouchdbForAnotherUser'" true)
 

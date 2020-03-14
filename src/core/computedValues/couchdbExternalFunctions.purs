@@ -61,7 +61,7 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription, hid
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (isMe)
 import Perspectives.Persistent (class Persistent, entitiesDatabaseName, getPerspectEntiteit, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cache, cacheInitially, cacheOverwritingRevision, cachePreservingRevision)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, cachePreservingRevision)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.User (getMySystem, getSystemIdentifier)
@@ -91,7 +91,7 @@ models = ArrayT do
         -- If the model is already in use, this role has been saved before.
         (savedRole :: Maybe PerspectRol) <- tryGetPerspectEntiteit _id
         case savedRole of
-          Nothing -> void $ cache _id r
+          Nothing -> void $ cacheEntity _id r
           Just _ -> pure unit
         pure _id
 
@@ -105,7 +105,7 @@ roleInstances :: Array String -> MPQ RoleInstance
 roleInstances roleTypes = ArrayT $ lift $ do
   (roles :: Array PerspectRol) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews" "roleView" (head roleTypes)
   for roles \r@(PerspectRol{_id}) -> do
-    void $ cache _id r
+    void $ cacheEntity _id r
     pure _id
 
 -- | Retrieve the model(s) from the url(s) and add them to the local couchdb installation.
@@ -137,7 +137,7 @@ addModelToLocalStore urls = do
       -- Take the role- and contextinstances from it and add them to the user (instances) database.
       -- We have to cache all roleInstances (except the external role of the modeldescription) first,
       -- otherwise we cannot see what its `isMe` must be.
-      forWithIndex_ roleInstances' \i a -> void $ lift $ lift $ try (cacheInitially (RoleInstance i) a)
+      forWithIndex_ roleInstances' \i a -> void $ lift $ lift $ try (cacheEntity (RoleInstance i) a)
       cis <- lift2 $ execStateT (saveRoleInstances roleInstances') contextInstances
       forWithIndex_ cis \i a -> save (ContextInstance i) a
       -- For each role instance with a binding that is not one of the other imported role instances,
@@ -149,7 +149,7 @@ addModelToLocalStore urls = do
           else do
             -- set the inverse binding
             newBinding <- lift2 $ getPerspectEntiteit newBindingId
-            lift2 $ void $ cacheOverwritingRevision newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
+            lift2 $ void $ cacheEntity newBindingId (addRol_gevuldeRollen newBinding (rol_pspType a) (RoleInstance i))
             lift2 $ void $ saveEntiteit newBindingId
             -- There can be no queries that use binder <type of a> on newBindingId, since the model is new.
             -- So we need no action for QUERY UPDATES or RULE TRIGGERING.
@@ -176,7 +176,7 @@ addModelToLocalStore urls = do
 
     save :: forall a i r. GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectivesTransaction Unit
     save i a = do
-      void $ lift $ lift $ cacheInitially i a
+      void $ lift $ lift $ cacheEntity i a
       void $ lift $ lift $ saveEntiteit i
 
     -- url is the path to the document in the repository.

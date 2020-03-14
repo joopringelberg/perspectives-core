@@ -45,7 +45,7 @@ import Perspectives.Identifiers (ModelName(..), PEIdentifier, QualifiedName(..),
 import Perspectives.IndentParser (IP, addContextInstance, addRoleInstance, generatedNameCounter, getAllRoleOccurrences, getContextInstances, getNamespace, getPrefix, getRoleInstances, getRoleOccurrences, getSection, getTypeNamespace, incrementRoleInstances, liftAffToIP, modifyContextInstance, runIndentParser', setNamespace, setPrefix, setRoleInstances, setRoleOccurrences, setSection, setTypeNamespace, withExtendedTypeNamespace, withNamespace, withTypeNamespace)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.Representation.Class.Cacheable (cacheInitially, cacheOverwritingRevision)
+import Perspectives.Representation.Class.Cacheable (cacheEntity, cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier) as ID
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..))
@@ -393,12 +393,12 @@ roleBinding' cname arrow p = ("rolename => contextName" <??>
 
 cacheRol ::  RoleInstance -> PerspectRol -> IP Unit
 cacheRol rolId rol = do
-  _ <- liftAffToIP $ cacheInitially rolId rol
+  _ <- liftAffToIP $ cacheEntity rolId rol
   addRoleInstance rolId rol
 
 cacheContext ::  ContextInstance -> PerspectContext -> IP Unit
 cacheContext contextId ctxt = do
-  _ <- liftAffToIP $ cacheInitially contextId ctxt
+  _ <- liftAffToIP $ cacheEntity contextId ctxt
   addContextInstance contextId ctxt
 
 -- | The inline context may itself use a contextInstanceIDInCurrentNamespace to identify the context instance. However,
@@ -631,8 +631,8 @@ userData = do
     setRoleInstances x
     -- Now the contexts and roles have changed in the state of the parser, but not yet
     -- in cache. Cache them.
-    getRoleInstances >>= traverse_ \r -> lift $ lift $ lift $ cacheOverwritingRevision (ID.identifier r) r
-    getContextInstances >>= traverse_ \r -> lift $ lift $ lift $ cacheOverwritingRevision (ID.identifier r) r
+    getRoleInstances >>= traverse_ \r -> lift $ lift $ lift $ cacheEntity (ID.identifier r) r
+    getContextInstances >>= traverse_ \r -> lift $ lift $ lift $ cacheEntity (ID.identifier r) r
     pure eroles
   where
 

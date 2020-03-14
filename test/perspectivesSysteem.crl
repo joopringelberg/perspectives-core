@@ -1,0 +1,22 @@
+GebruikerGegevens
+
+import model:System als sys:
+
+sys:PerspectivesSystem usr:cor
+	extern $ModelOphaalTeller = 0
+	extern sys:NamedContext$External$Name = "Mijn Systeem"
+	$User(1) => ()
+		$Voornaam = "Cor"
+		$Achternaam = "Baars"
+	$TheTrustedCluster =>
+		sys:TrustedCluster $MijnCluster
+			extern $Naam = "Het cluster van Cor"
+			$ClusterGenoot -> $$User(1)
+				$Url = "http://localhost"
+	$IndexedContexts => usr:cor
+	$ModelsInUse =>
+		sys:Model usr:PerspectivesSystemModel
+			extern $Name = "Perspectives System"
+			extern $Description = "The base model of Perspectives."
+			extern $Url = "http://127.0.0.1:5984/repository/model%3ASystem"
+			$IndexedContext => usr:cor

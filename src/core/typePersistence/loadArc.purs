@@ -34,15 +34,16 @@ import Node.Path as Path
 import Node.Process (cwd)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache, storeDomeinFileInCouchdb)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
+import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.LoadCRL (loadCrlFile)
+import Perspectives.Names (defaultIndexedNames)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
+import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
 import Prelude (bind, discard, pure, show, void, ($), (*>), (<>), (==))
@@ -69,7 +70,9 @@ loadAndCompileArcFile fileName directoryName = do
       case r of
         (Left e) -> pure $ Left [parseError2PerspectivesError e]
         (Right ctxt) -> do
-          case unwrap $ evalPhaseTwo' (traverseDomain ctxt "model:") of
+          -- TODO. Voeg hier CNS namen toe.
+          indexedNames <- defaultIndexedNames
+          case unwrap $ evalPhaseTwo_' (traverseDomain ctxt "model:") defaultDomeinFileRecord indexedNames of
             (Left e) -> pure $ Left [e]
             (Right (DomeinFile dr')) -> do
               (x' :: (Either PerspectivesError DomeinFileRecord)) <- phaseThree dr'

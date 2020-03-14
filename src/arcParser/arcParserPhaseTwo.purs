@@ -42,7 +42,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.External.CoreModules (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionNArgs)
-import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace_, expandDefaultNamespaces, isQualifiedWithDomein)
+import Perspectives.Identifiers (Namespace, deconstructModelName, deconstructNamespace_, isQualifiedWithDomein)
 import Perspectives.Parsing.Arc (mkActionFromVerb)
 import Perspectives.Parsing.Arc.AST (ActionE(..), ActionPart(..), ContextE(..), ContextPart(..), PerspectiveE(..), PerspectivePart(..), PropertyE(..), PropertyPart(..), RoleE(..), RolePart(..), ViewE(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..)) as Expr
@@ -337,16 +337,17 @@ traverseComputedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
 
   where
     handleParts :: Partial => CalculatedRole -> RolePart -> PhaseTwo CalculatedRole
-    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) =
-      case (deconstructModelName (expandDefaultNamespaces functionName)) of
+    handleParts (CalculatedRole roleUnderConstruction) (Computation functionName arguments computedType) = do
+      functionName' <- expandDefaultNamespaces functionName
+      case (deconstructModelName functionName') of
         Nothing -> throwError (NotWellFormedName pos functionName)
         Just modelName -> if isExternalCoreModule modelName
           then let
-            mappedFunctionName = mapName (expandDefaultNamespaces functionName)
+            mappedFunctionName = mapName functionName'
             mexpectedNrOfArgs = lookupHiddenFunctionNArgs mappedFunctionName
             calculation = Q $ MQD (CDOM $ ST $ ContextType ns) (ExternalCoreRoleGetter mappedFunctionName) (S <$> (fromFoldable arguments)) (RDOM (ST (EnumeratedRoleType computedType))) Unknown Unknown
             in case mexpectedNrOfArgs of
-              Nothing -> throwError (UnknownExternalFunction pos pos mappedFunctionName)
+              Nothing -> throwError (UnknownExternalFunction pos pos functionName')
               Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments
                 then pure (CalculatedRole $ roleUnderConstruction {calculation = calculation})
                 else throwError (WrongNumberOfArguments pos pos functionName expectedNrOfArgs (length arguments))

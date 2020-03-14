@@ -40,7 +40,7 @@ import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (Namespace, escapeCouchdbDocumentName)
 import Perspectives.Persistent (getPerspectEntiteit, removeEntiteit, saveEntiteit)
 import Perspectives.PerspectivesState (domeinCacheRemove)
-import Perspectives.Representation.Class.Cacheable (cacheOverwritingRevision, cachePreservingRevision, retrieveInternally)
+import Perspectives.Representation.Class.Cacheable (cacheEntity, cachePreservingRevision, retrieveInternally)
 import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>))
 
@@ -61,7 +61,7 @@ modifyDomeinFileInCache modifier ns =
         df <- liftAff $ take avar
         -- Because we modify the existing Entiteit, we do not overwrite the version number -
         -- unless that is what our modifier does.
-        _ <- cacheOverwritingRevision (DomeinFileId ns) (modifier df)
+        _ <- cacheEntity (DomeinFileId ns) (modifier df)
         pure unit
 
 -----------------------------------------------------------

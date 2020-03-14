@@ -70,7 +70,7 @@ import Perspectives.Couchdb.Databases (defaultPerspectRequest, ensureAuthenticat
 import Perspectives.CouchdbState (CouchdbUser, UserName)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileId)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheInitially, cacheOverwritingRevision, cachePreservingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
+import Perspectives.Representation.Class.Cacheable (class Cacheable, cacheEntity, cacheEntity, cachePreservingRevision, changeRevision, removeInternally, representInternally, retrieveInternally, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.User (getCouchdbBaseURL, getSystemIdentifier)
 
@@ -189,7 +189,7 @@ saveEntiteit_ id pe = do
           void $ cachePreservingRevision id pe
           saveUnversionedEntiteit id
         Nothing -> do
-          void $ cacheInitially id pe
+          void $ cacheEntity id pe
           saveUnversionedEntiteit id
     otherwise -> saveVersionedEntiteit id pe
 
@@ -227,6 +227,6 @@ saveVersionedEntiteit entId entiteit = ensureAuthentication $ do
       void $ onAccepted res.status [200, 201] "saveVersionedEntiteit"
         (onCorrectCallAndResponse "saveVersionedEntiteit" res.body (\(a :: PutCouchdbDocument) -> do
           v <- version res.headers
-          -- We **must** use cacheOverwritingRevision because we want to overwrite the version number.
-          void $ cacheOverwritingRevision entId (changeRevision v entiteit)))
+          -- We **must** use cacheEntity because we want to overwrite the version number.
+          void $ cacheEntity entId (changeRevision v entiteit)))
       pure entiteit

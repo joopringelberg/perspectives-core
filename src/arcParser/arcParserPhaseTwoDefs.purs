@@ -32,9 +32,9 @@ import Foreign.Object (Object, empty)
 import Foreign.Object (fromFoldable) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (defaultNamespaces, expandNamespaces)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
+import Perspectives.Names (defaultNamespaces, expandDefaultNamespaces_, expandNamespaces)
 import Perspectives.Parsing.Arc.AST (ContextPart(..))
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
@@ -49,6 +49,7 @@ type PhaseTwoState =
   { bot :: Boolean
   , dfr :: DomeinFileRecord
   , namespaces :: Object String
+  , indexedNames :: Object String
   -- In PhaseTwoState, variables are bound to QueryFunctionDescriptions.
   -- In PerspectivesState, variables are bound to Strings.
   , variableBindings :: Environment QueryFunctionDescription
@@ -61,17 +62,17 @@ type PhaseTwo' a m = ExceptT PerspectivesError (StateT PhaseTwoState m) a
 
 -- | Run a computation in `PhaseTwo`, returning Errors or a Tuple holding both the state and the result of the computation.
 runPhaseTwo' :: forall a m. PhaseTwo' a m -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord
+runPhaseTwo' computation = runPhaseTwo_' computation defaultDomeinFileRecord empty
 
-runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> m (Tuple (Either PerspectivesError a) PhaseTwoState)
-runPhaseTwo_' computation dfr = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: defaultNamespaces, variableBindings: ENV.empty}
+runPhaseTwo_' :: forall a m. PhaseTwo' a m -> DomeinFileRecord -> Object String ->  m (Tuple (Either PerspectivesError a) PhaseTwoState)
+runPhaseTwo_' computation dfr indexedNames = runStateT (runExceptT computation) {bot: false, dfr: dfr, namespaces: defaultNamespaces, indexedNames, variableBindings: ENV.empty}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 evalPhaseTwo' :: forall a m. Monad m => PhaseTwo' a m -> m (Either PerspectivesError a)
-evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord
+evalPhaseTwo' computation = evalPhaseTwo_' computation defaultDomeinFileRecord empty
 
-evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> m (Either PerspectivesError a)
-evalPhaseTwo_' computation drf = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, variableBindings: ENV.empty}
+evalPhaseTwo_' :: forall a m. Monad m => PhaseTwo' a m -> DomeinFileRecord -> Object String -> m (Either PerspectivesError a)
+evalPhaseTwo_' computation drf indexedNames = evalStateT (runExceptT computation) {bot: false, dfr: drf, namespaces: empty, indexedNames, variableBindings: ENV.empty}
 
 type PhaseTwo a = PhaseTwo' a Identity
 
@@ -129,3 +130,9 @@ expandNamespace :: String -> PhaseTwo String
 expandNamespace s = do
   namespaces <- lift $ gets _.namespaces
   pure $ expandNamespaces namespaces s
+
+expandDefaultNamespaces :: String -> PhaseTwo String
+expandDefaultNamespaces s = do
+  namespaces <- lift $ gets _.namespaces
+  indexedNames <- lift $ gets _.indexedNames
+  pure $ expandDefaultNamespaces_ indexedNames namespaces s

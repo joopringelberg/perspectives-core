@@ -24,8 +24,7 @@ module Perspectives.Representation.Class.Cacheable
   , module Perspectives.Couchdb.Revision
   , module Perspectives.Representation.TypeIdentifiers
   , cachePreservingRevision
-  , cacheInitially
-  , cacheOverwritingRevision
+  , cacheEntity
   ) where
 
 -- | Members of Cacheable trade identifiers for a representation.
@@ -57,10 +56,10 @@ import Perspectives.Representation.TypeIdentifiers (ActionType(..), CalculatedPr
 -- | This gives rise to four possibilities, one of which is nonsense (not cached before,
 -- | but preserve the revision). These are the three remaining functions:
 -- |
--- | * cacheInitially;
+-- | * cacheEntity;
 -- | * cachePreservingRevision: before overwriting the cached value, take its revision and
 -- | store it in the new value to cache;
--- | * cacheOverwritingRevision: just overwrite the cached value.
+-- | * cacheEntity: just overwrite the cached value.
 -- |
 
 type Identifier = String
@@ -81,40 +80,12 @@ cachePreservingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspecti
 cachePreservingRevision id e = do
   (mcachedE :: Maybe a) <- tryReadEntiteitFromCache id
   case mcachedE of
-    Nothing -> cache id e
-    Just cachedE -> cache id (changeRevision (rev cachedE) e)
+    Nothing -> cacheEntity id e
+    Just cachedE -> cacheEntity id (changeRevision (rev cachedE) e)
 
--- | Store an internally created PerspectEntiteit for the first time in the local store.
--- cacheInitially
--- TODO. Overbodig
-cacheInitially :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cacheInitially id e = do
-  (mAvar :: Maybe (AVar a)) <- retrieveInternally id
-  case mAvar of
-    Nothing -> do
-      (av :: AVar a) <- representInternally id
-      liftAff $ put e av
-      pure av
-    otherwise -> throwError $ error $ "cacheInitially: the cache should not hold an AVar for " <> unwrap id
-
--- | Modify a PerspectEntiteit in the cache. Overwrites the revision value.
--- TODO. Overbodig
-cacheOverwritingRevision :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cacheOverwritingRevision id e = do
-  mAvar <- retrieveInternally id
-  case mAvar of
-    Nothing -> cacheInitially id e
-    (Just avar) -> do
-      empty <- liftAff $ (status >=> pure <<< isEmpty) avar
-      if empty
-        then liftAff $ put e avar *> pure avar
-        else do
-          _ <- liftAff $ take avar
-          liftAff $ put e avar *> pure avar
-
--- TODO. Vervang cacheInitially en cacheOverwritingRevision door deze functie.
-cache :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
-cache id e = do
+-- TODO. Vervang cacheEntity en cacheEntity door deze functie.
+cacheEntity :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
+cacheEntity id e = do
   mAvar <- retrieveInternally id
   case mAvar of
     Nothing -> do

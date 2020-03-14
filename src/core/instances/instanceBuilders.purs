@@ -51,13 +51,14 @@ import Perspectives.CollectAffectedContexts (lift2)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, rol_padOccurrence)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=))
 import Perspectives.Deltas (addUniverseContextDelta, increaseDeltaIndex)
-import Perspectives.Identifiers (buitenRol, deconstructLocalName, expandDefaultNamespaces)
+import Perspectives.Identifiers (buitenRol, deconstructLocalName)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Names (expandDefaultNamespaces)
 import Perspectives.Instances.ObjectGetters (getRole)
 import Perspectives.Parsing.Arc.IndentParser (upperLeft)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (saveEntiteit, tryGetPerspectEntiteit)
-import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheInitially)
+import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.TypesForDeltas (DeltaType(..), UniverseContextDelta(..))
 import Prelude (bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>))
@@ -69,7 +70,7 @@ import Prelude (bind, discard, pure, show, unit, void, ($), (*>), (<$>), (<>))
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
 constructContext :: ContextSerialization -> MonadPerspectivesTransaction (Either (Array PerspectivesError) ContextInstance)
 constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
-  contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
+  contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
   case (deconstructLocalName $ unwrap contextInstanceId) of
     Nothing -> pure $ Left [(NotWellFormedName upperLeft (unwrap contextInstanceId))]
     Just localName -> do
@@ -90,9 +91,10 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
             Left e -> pure $ Left [Custom (show e)]
             Right (Tuple _ users) -> do
               -- Add a UniverseContextDelta with the union of the users of the RoleBindingDeltas.
+              contextType <- ContextType <$> (lift2 $ expandDefaultNamespaces ctype)
               addUniverseContextDelta $ UniverseContextDelta
                   { id: contextInstanceId
-                  , contextType: ContextType $ expandDefaultNamespaces ctype
+                  , contextType
                   , deltaType: Add
                   , users
                   , sequenceNumber: i
@@ -111,7 +113,7 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
             -- the roleInstance is only in cache, save it.
             Nothing -> lift $ lift2 $ saveEntiteit roleInstance *> pure []
             Just bnd -> do
-              expandedBinding <- pure $ RoleInstance $ expandDefaultNamespaces bnd
+              expandedBinding <- RoleInstance <$> (lift $ lift2 $ expandDefaultNamespaces bnd)
               -- setBinding saves, too.
               lift $ setBinding roleInstance expandedBinding
           tell users
@@ -127,18 +129,18 @@ constructContext c@(ContextSerialization{id, ctype, rollen, externeProperties}) 
 constructEmptyContext :: ContextInstance -> String -> String -> PropertySerialization -> MonadPerspectivesTransaction ContextInstance
 constructEmptyContext contextInstanceId ctype localName externeProperties = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
-  pspType <- pure $ ContextType $ expandDefaultNamespaces ctype
-  _ <- lift2 $ cacheInitially contextInstanceId
+  pspType <- ContextType <$> (lift2 $ expandDefaultNamespaces ctype)
+  _ <- lift2 $ cacheEntity contextInstanceId
     (PerspectContext defaultContextRecord
       { _id = contextInstanceId
       , displayName  = localName
       , pspType = pspType
       , buitenRol = externalRole
     })
-  _ <- lift2 $ cacheInitially externalRole
+  _ <- lift2 $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
       { _id = externalRole
-      , pspType = EnumeratedRoleType $ expandDefaultNamespaces ctype <> "$External"
+      , pspType = EnumeratedRoleType (unwrap pspType <> "$External")
       , context = contextInstanceId
       , binding = Nothing
       })
@@ -157,7 +159,7 @@ constructEmptyRole roleType contextInstance i localRoleName = do
         , context = contextInstance
         , occurrence = i
         })
-  void $ lift2 $ cacheInitially rolInstanceId role
+  void $ lift2 $ cacheEntity rolInstanceId role
   pure rolInstanceId
 
 -- | Construct a Role instance for an existing Context instance.
@@ -165,7 +167,7 @@ constructEmptyRole roleType contextInstance i localRoleName = do
 -- | Notice that roleType must be a well-formed identifier!
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance roleType id (RolSerialization{properties, binding}) = do
-  contextInstanceId <- pure $ ContextInstance $ expandDefaultNamespaces id
+  contextInstanceId <- ContextInstance <$> (lift2 $ expandDefaultNamespaces id)
   rolInstances <- lift2 (contextInstanceId ##= getRole roleType)
   -- create an empty role
   roleInstance <- constructEmptyRole roleType contextInstanceId (getNextRolIndex rolInstances) (unsafePartial $ fromJust (deconstructLocalName $ unwrap roleType))
@@ -173,7 +175,7 @@ createAndAddRoleInstance roleType id (RolSerialization{properties, binding}) = d
   case binding of
     Nothing -> pure unit
     Just bnd -> do
-      expandedBinding <- pure $ RoleInstance $ expandDefaultNamespaces bnd
+      expandedBinding <- RoleInstance <$> (lift2 $ expandDefaultNamespaces bnd)
       void $ setBinding roleInstance expandedBinding
   -- then add the properties
   case properties of
