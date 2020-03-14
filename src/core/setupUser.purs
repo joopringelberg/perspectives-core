@@ -25,11 +25,12 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Couchdb (addModelToLocalStore)
 import Perspectives.InstanceRepresentation (PerspectContext)
+import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (entitiesDatabaseName, tryGetPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.RunMonadPerspectivesTransaction (runSterileTransaction)
 import Perspectives.SetupCouchdb (setRoleView)
-import Perspectives.User (getCouchdbBaseURL, getMySystem)
+import Perspectives.User (getCouchdbBaseURL)
 import Prelude (Unit, bind, pure, unit, void, ($), discard, (<>), (>>=))
 
 modelDirectory :: String

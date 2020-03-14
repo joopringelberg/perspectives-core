@@ -27,8 +27,8 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isQualifiedWithDomein)
-import Perspectives.User (getUserIdentifier)
-import Prelude (bind, pure, ($), (<>), (>>=), (<<<))
+import Perspectives.User (getSystemIdentifier)
+import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- EXPAND DEFAULT NAMESPACES
@@ -85,3 +85,11 @@ q ln = "model:QueryAst$" <> ln
 
 psp :: String -> String
 psp ln = "model:Perspectives$" <> ln
+
+-- | Returns a Perspectives Identifier of the form "model:User$<guid>$User_0001".
+getUserIdentifier :: MonadPerspectives String
+getUserIdentifier = getMySystem >>= pure <<< flip append "$User_0001"
+
+-- | Returns a Perspectives Identifier of the form "model:User$<guid>"
+getMySystem :: MonadPerspectives String
+getMySystem = getSystemIdentifier >>= pure <<< append "model:User$"

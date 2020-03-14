@@ -41,10 +41,11 @@ import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter)
 import Perspectives.Instances.ObjectGetters (bottom, externalRole, isMe)
+import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Query.Compiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
-import Perspectives.User (getCouchdbBaseURL, getHost, getMySystem, getUserIdentifier)
+import Perspectives.User (getCouchdbBaseURL, getHost)
 import Prelude (Unit, bind, discard, not, pure, show, unit, void, ($), (<<<), (<>), (==), (>=>))
 
 -- | Create a new database for the communication between `me` and another user.
